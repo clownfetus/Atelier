@@ -42,14 +42,11 @@ def api_skins():
     cid      = request.query.get("char_id", "")
     skin_ids = char_skin_ids(cid)
     out      = []
-    for i, sid in enumerate(skin_ids, 1):
-        name  = skin_name(sid)
-        label = f"{i:03d} - {name}" if name != sid else f"{i:03d} - {sid}"
-        if i == 1 and not name.upper().startswith("DEFAULT"):
-            label_display = f"001 - Default ({name})"
-        else:
-            label_display = label
-        out.append({"skin_id": sid, "name": name, "label": label_display if i == 1 else label})
+    for sid in skin_ids:
+        suffix = sid[-3:]
+        name   = skin_name(sid)
+        label  = f"{suffix} - Default" if name == sid else f"{suffix} - {name}"
+        out.append({"skin_id": sid, "name": name, "label": label})
     response.content_type = "application/json"
     return json.dumps(out)
 

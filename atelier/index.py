@@ -32,7 +32,7 @@ def ensure_index():
             print(f"  [warn] {os.path.basename(utoc)}: {e}", file=sys.stderr); continue
         cont = os.path.basename(utoc)
         for p, _ in ents:
-            if "/Characters/" in p and p.lower().endswith(".uasset"):
+            if "Marvel/Content/Marvel/Characters/" in p and p.lower().endswith(".uasset"):
                 _INDEX.append((p, cont))
     os.makedirs(_WORK, exist_ok=True)
     json.dump({"key": key, "entries": _INDEX}, open(_CACHE_FILE, "w"))
