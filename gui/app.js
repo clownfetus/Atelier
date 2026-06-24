@@ -317,9 +317,16 @@ document.getElementById("search-input").addEventListener("input", () => {
 });
 
 // ── texture click / single import ─────────────────────────────────────────────
+function handleImportedFileAction(item) {
+  const ft = item.file_type || "texture";
+  if (ft === "texture") {
+    fetch(`/api/open_explorer?game_rel=${encodeURIComponent(item.game_rel)}`);
+  }
+}
+
 function handleTextureClick(item) {
   if (item.imported && item.token) {
-    fetch(`/api/open_explorer?game_rel=${encodeURIComponent(item.game_rel)}`);
+    handleImportedFileAction(item);
     return;
   }
   document.getElementById("confirm-msg").textContent =
@@ -538,10 +545,12 @@ function renderSidebar() {
       e.stopPropagation();
       clearImported(item.token);
     });
-    el.addEventListener("click", () => {
+    el.querySelector(".sb-check").addEventListener("click", e => {
+      e.stopPropagation();
       item.selected = !item.selected;
       renderSidebar();
     });
+    el.addEventListener("click", () => handleImportedFileAction(item));
     list.appendChild(el);
   });
   lucide.createIcons({ nodes: [list] });
