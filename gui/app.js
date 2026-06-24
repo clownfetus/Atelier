@@ -19,11 +19,11 @@ let   suppressChangeToastUntil = 0;  // swallow watcher "updated on disk" toasts
 // ── handler registry ──────────────────────────────────────────────────────────
 // Add a new entry here when a new asset type handler is implemented.
 const ASSET_HANDLERS = {
-  texture:  { endpoint: "/api/import_texture",  preview: true,  icon: "image" },
-  material: { endpoint: "/api/import_material", preview: false, icon: "circle-star" },
-  vfx:      { endpoint: "/api/import_vfx",      preview: false,  icon: "sparkles"   },
+  texture:  { import_endpoint: "/api/import_texture",  export_endpoint: "export_textures",  preview: true,  icon: "image"        },
+  material: { import_endpoint: "/api/import_material", export_endpoint: "export_materials", preview: false, icon: "circle-star"  },
+  vfx:      { import_endpoint: "/api/import_vfx",      export_endpoint: "export_vfx",      preview: false, icon: "sparkles"     },
 };
-function handlerFor(ft) { return ASSET_HANDLERS[ft] || { endpoint: "/api/import", preview: false, icon: "file-question" }; }
+function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
 const ASSET_ICON_CLS = {
   texture:  "texture-icon",
@@ -379,7 +379,7 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
   suppressChangeToastUntil = Date.now() + 2500;
   setStatus(`Importing ${item.name}…`);
   try {
-    const res = await api(handlerFor(item.file_type).endpoint, {
+    const res = await api(handlerFor(item.file_type).import_endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ skin_id: item.skin_id, rel_path: item.rel_path }),
@@ -599,18 +599,14 @@ function updateExportBtn() {
   document.getElementById("export-btn").disabled = sel === 0;
 }
 
-document.getElementById("export-btn").addEventListener("click", async () => {
-  const selected = Object.values(sidebarData).filter(i => i.selected);
-  if (!selected.length) return;
-  const modName = document.getElementById("mod-name-input").value.trim() || "ModFilename";
-  const items   = selected.map(i => i.game_rel);
-  setStatus(`Exporting ${items.length} asset${items.length !== 1 ? "s" : ""}…`);
-  document.getElementById("export-btn").disabled = true;
+async function export_textures(items, modName) {
+  const game_rels = items.map(i => i.game_rel);
+  setStatus(`Exporting ${game_rels.length} texture${game_rels.length !== 1 ? "s" : ""}…`);
   try {
     const res = await api("/api/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mod_name: modName, items }),
+      body: JSON.stringify({ mod_name: modName, items: game_rels }),
     });
     if (res.ok && res.pak_path) {
       toast(`Exported: ${modName}_9999999_P.pak`, "success", 5000);
@@ -623,6 +619,32 @@ document.getElementById("export-btn").addEventListener("click", async () => {
   } catch (e) {
     toast(`Error: ${e.message}`, "warning");
     setStatus("");
+  }
+}
+
+async function export_materials(items) {
+  toast(`${items.length} material${items.length !== 1 ? "s" : ""} skipped`, "info");
+}
+
+async function export_vfx(items) {
+  toast(`${items.length} VFX asset${items.length !== 1 ? "s" : ""} skipped`, "info");
+}
+
+document.getElementById("export-btn").addEventListener("click", async () => {
+  const selected = Object.values(sidebarData).filter(i => i.selected);
+  if (!selected.length) return;
+  const modName = document.getElementById("mod-name-input").value.trim() || "ModFilename";
+  document.getElementById("export-btn").disabled = true;
+  try {
+    const byType = {};
+    selected.forEach(i => { (byType[i.file_type || "other"] ??= []).push(i); });
+    for (const [ft, items] of Object.entries(byType)) {
+      const fn = ASSET_HANDLERS[ft]?.export_endpoint;
+      if      (fn === "export_textures")  await export_textures(items, modName);
+      else if (fn === "export_materials") await export_materials(items);
+      else if (fn === "export_vfx")       await export_vfx(items);
+      else toast(`${items.length} ${ft} asset${items.length !== 1 ? "s" : ""} skipped (no export handler)`, "info");
+    }
   } finally {
     updateExportBtn();
   }
