@@ -464,6 +464,14 @@ body {
 }
 .setup-input:focus { outline: none; border-color: var(--blue); }
 .setup-input::placeholder { color: var(--muted); font-weight: 500; }
+#setup-status {
+  flex: 1;
+  font-size: 12px;
+  display: flex; align-items: center; gap: 5px;
+  color: var(--muted);
+}
+#setup-status.ok    { color: var(--green); }
+#setup-status.error { color: var(--acc2); }
 
 /* ── material parameter editor ── */
 .mat-modal { max-width: 660px; width: calc(100% - 40px); max-height: 86vh;

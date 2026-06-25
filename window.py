@@ -38,7 +38,7 @@ def main():
             sys.exit(1)
 
         window = webview.create_window("Atelier", URL, width=1400, height=900)
-        webview.start()
+        webview.start(debug=False)
     finally:
         server.terminate()
         try:

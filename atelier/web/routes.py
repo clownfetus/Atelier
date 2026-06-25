@@ -44,7 +44,9 @@ def index():
 
 @app.route("/static/<path:path>")
 def static(path):
-    return static_file(path, root=GUI_DIR)
+    r = static_file(path, root=GUI_DIR)
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return r
 
 # ── prereqs ───────────────────────────────────────────────────────────────────
 
@@ -57,11 +59,11 @@ def api_prereqs():
 
 @app.get("/api/setup_status")
 def api_setup_status():
+    import atelier.config as _c
+    configured = bool(_c._load_config().get("paks"))
+    suggestion = "" if configured else _c.paks_suggestion()
     response.content_type = "application/json"
-    return json.dumps({
-        "configured": CONFIG_HAS_PAKS,
-        "suggestion": "" if CONFIG_HAS_PAKS else paks_suggestion(),
-    })
+    return json.dumps({"configured": configured, "suggestion": suggestion})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -85,6 +87,19 @@ def api_pick_folder():
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
+
+@app.get("/api/validate_paks")
+def api_validate_paks():
+    path = request.query.get("path", "").strip()
+    response.content_type = "application/json"
+    if not path:
+        return json.dumps({"status": "empty"})
+    norm = path.replace("\\", "/").rstrip("/")
+    if not norm.lower().endswith("marvelgame/marvel/content/paks"):
+        return json.dumps({"status": "wrong_folder"})
+    if not os.path.isdir(norm):
+        return json.dumps({"status": "missing"})
+    return json.dumps({"status": "ok"})
 
 def _validate_paks_path(path):
     norm = path.replace("\\", "/").rstrip("/")

@@ -15,6 +15,7 @@ let   pendingImport = null;
 let   pendingClear  = null;
 let   pendingImportAll = null;
 let   suppressChangeToastUntil = 0;
+let   suppressedImportGameRels = new Set();
 let   _pathLabels = {};      // "Characters/1234" -> "1234 — Spider-Man" (cached from browse results)
 
 // ── handler registry ──────────────────────────────────────────────────────────
@@ -58,6 +59,14 @@ const ICON_CLS_TO_LUCIDE = {
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   return res.json();
+}
+
+function toastSpinner(msg) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+  document.getElementById("toast-area").appendChild(el);
+  return el;
 }
 
 function toast(msg, type = "info", duration = 3200) {
@@ -348,7 +357,8 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
   document.getElementById("confirm-overlay").classList.remove("active");
   if (!pendingImport) return;
   const item = pendingImport; pendingImport = null;
-  suppressChangeToastUntil = Date.now() + 2500;
+  suppressedImportGameRels.add(item.game_rel);
+  const loadingToast = toastSpinner(`Importing ${item.name}…`);
   setStatus(`Importing ${item.name}…`);
   try {
     const res = await api(handlerFor(item.file_type).import_endpoint, {
@@ -356,6 +366,8 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ skin_id: item.skin_id, rel_path: item.rel_path }),
     });
+    loadingToast.remove();
+    suppressedImportGameRels.delete(item.game_rel);
     if (res.ok) {
       toast(`Imported: ${item.name}`, "success");
       setStatus("");
@@ -366,6 +378,8 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
       setStatus("");
     }
   } catch (e) {
+    loadingToast.remove();
+    suppressedImportGameRels.delete(item.game_rel);
     toast(`Error: ${e.message}`, "warning");
     setStatus("");
   }
@@ -596,7 +610,7 @@ function handleSSE(d) {
     document.querySelectorAll(`#sidebar-list .sb-item[data-token="${d.token}"] .sb-thumb img`).forEach(img => {
       img.src = `/api/preview${bust}`;
     });
-    if (!importing && Date.now() >= suppressChangeToastUntil) {
+    if (!importing && !suppressedImportGameRels.has(d.game_rel) && Date.now() >= suppressChangeToastUntil) {
       toast("Asset updated on disk — preview refreshed", "warning", 4000);
     }
     return;
@@ -831,12 +845,55 @@ async function checkPrereqs() {
 async function checkSetup() {
   try {
     const res = await api("/api/setup_status");
-    if (res.configured) return false;
+    console.log("[setup] /api/setup_status →", res);
+    if (res.configured) { console.log("[setup] already configured, skipping modal"); return false; }
+    console.log("[setup] not configured — showing modal");
     document.getElementById("setup-path").value = res.suggestion || "";
     document.getElementById("setup-overlay").classList.add("active");
+    console.log("[setup] overlay active:", document.getElementById("setup-overlay").classList.contains("active"));
+    await validateSetupPath();
     return true;
-  } catch (e) { return false; }
+  } catch (e) { console.error("[setup] checkSetup error:", e); return false; }
 }
+
+let _validateTimer = null;
+function triggerValidate() {
+  clearTimeout(_validateTimer);
+  _validateTimer = setTimeout(validateSetupPath, 350);
+}
+async function validateSetupPath() {
+  const path    = document.getElementById("setup-path").value.trim();
+  const el      = document.getElementById("setup-status");
+  const saveBtn = document.getElementById("setup-save");
+  if (!path) {
+    el.className = ""; el.innerHTML = "";
+    saveBtn.disabled = true;
+    return;
+  }
+  try {
+    const res = await fetch(`/api/validate_paks?path=${encodeURIComponent(path)}`);
+    const d   = await res.json();
+    if (d.status === "ok") {
+      el.className = "ok";
+      el.innerHTML = '<i data-lucide="check-circle" size="13"></i> Path valid';
+      saveBtn.disabled = false;
+    } else if (d.status === "missing") {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Path doesn\'t exist';
+      saveBtn.disabled = true;
+    } else if (d.status === "wrong_folder") {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Not a Pak folder';
+      saveBtn.disabled = true;
+    } else {
+      el.className = ""; el.innerHTML = "";
+      saveBtn.disabled = true;
+    }
+    lucide.createIcons({ nodes: [el] });
+  } catch (_) {}
+}
+
+document.getElementById("setup-path").addEventListener("input", triggerValidate);
 
 document.getElementById("setup-browse").addEventListener("click", async () => {
   const initial = document.getElementById("setup-path").value.trim();
@@ -848,7 +905,10 @@ document.getElementById("setup-browse").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ initial }),
     });
-    if (res.ok && res.path) document.getElementById("setup-path").value = res.path;
+    if (res.ok && res.path) {
+      document.getElementById("setup-path").value = res.path;
+      validateSetupPath();
+    }
   } catch (e) {}
   btn.disabled = false;
 });
@@ -884,8 +944,9 @@ document.getElementById("setup-save").addEventListener("click", async () => {
 
 // ── initial load ──────────────────────────────────────────────────────────────
 async function init() {
+  console.log("[init] starting");
   renderBreadcrumbs();
-  if (await checkSetup()) return;
+  if (await checkSetup()) { console.log("[init] halted for setup"); return; }
   await checkPrereqs();
   await renderGrid();
   await loadSidebar();
