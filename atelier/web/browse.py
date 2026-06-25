@@ -9,10 +9,16 @@ _update_callback = None   # set by routes.py to _push_sse after it's defined
 _fetch_attempted = False
 _fetch_lock      = threading.Lock()
 
-# Paths (relative to Marvel/Content/Marvel/) whose immediate children are hero char IDs
-# and grandchildren are skin IDs (both get ID→name labels).
-# Add additional paths here if other areas of the pak use the same numbering scheme.
+# Paths (relative to Marvel/Content/Marvel/) where skin browsing is used
+# (immediate children are char IDs, grandchildren are skin IDs navigated via _browse_skin).
 HERO_PATHS = ["Characters"]
+
+# Paths where 4-digit children = char IDs and 7-digit grandchildren = skin IDs for label display.
+# Browsing inside these (at skin level) uses _browse_pak_level, not _browse_skin.
+CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters"]
+
+# Top-level folder names (lowercase) shown at the root of the browser.
+ROOT_ALLOWED = frozenset({"characters", "vfx"})
 
 def _parse_char_md_text(text):
     """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
@@ -125,9 +131,9 @@ def _classify_file(name):
 
 def _label_folder(rel_path, folder_name):
     """Return display label for folder_name found at rel_path under Marvel/Content/Marvel/."""
-    if rel_path in HERO_PATHS and re.match(r"^\d{4}$", folder_name):
+    if rel_path in CHAR_LABEL_PATHS and re.match(r"^\d{4}$", folder_name):
         return f"{folder_name} — {char_name(folder_name)}"
-    for hp in HERO_PATHS:
+    for hp in CHAR_LABEL_PATHS:
         m = re.match(rf"^{re.escape(hp)}/(\d{{4}})$", rel_path, re.IGNORECASE)
         if m and re.match(r"^\d{7}$", folder_name):
             sname  = skin_name(folder_name)
@@ -162,6 +168,8 @@ def _browse_pak_level(rel_path):
 
     result = []
     for fname_lower in sorted(folders):
+        if not rel_path and fname_lower not in ROOT_ALLOWED:
+            continue
         fname = folders[fname_lower]
         label = _label_folder(rel_path, fname)
         child = f"{rel_path}/{fname}" if rel_path else fname
@@ -273,6 +281,9 @@ def char_skin_ids(cid):
         if re.match(r"^\d{7}$", sid): seen.add(sid)
     return sorted(seen)
 
+_HERO_LABEL_RES = [re.compile(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})/", re.IGNORECASE)
+                   for hp in CHAR_LABEL_PATHS]
+
 def all_imported():
     """Walk IMPORT_ROOT and return all imported assets."""
     items = []
@@ -281,9 +292,12 @@ def all_imported():
     for dirpath, _, files in os.walk(IMPORT_ROOT):
         for fname in sorted(files):
             rel = os.path.relpath(os.path.join(dirpath, fname), IMPORT_ROOT).replace("\\", "/")
-            m   = re.match(r"^Characters/(\d{4})/(\d{7})/", rel)
-            cid = m.group(1) if m else None
-            sid = m.group(2) if m else None
+            cid = sid = None
+            for hr in _HERO_LABEL_RES:
+                m = hr.match(rel)
+                if m:
+                    cid, sid = m.group(1), m.group(2)
+                    break
             if fname.endswith(".png"):
                 gr = rel[:-4]
                 items.append({

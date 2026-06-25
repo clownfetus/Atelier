@@ -478,9 +478,11 @@ async function saveMaterial() {
       body: JSON.stringify({ game_rel: matEditor.game_rel, colors, scalars }),
     });
     if (res.ok) {
-      document.getElementById("mat-status").textContent = "Saved — staged for export.";
-      toast(`Saved: ${matEditor.name}`, "success");
+      const name = matEditor.name;
+      closeMaterialEditor();
+      toast(`Saved: ${name}`, "success");
       loadSidebar();
+      renderGrid().catch(() => {});
     } else {
       document.getElementById("mat-status").textContent = "Error: " + (res.error || "save failed");
     }
@@ -945,6 +947,37 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     lucide.createIcons({ nodes: [btn] });
   }
 });
+
+// ── sidebar resize ────────────────────────────────────────────────────────────
+{
+  const handle  = document.getElementById("sidebar-resize");
+  const sidebar = document.getElementById("sidebar");
+  let dragging = false, startX = 0, startW = 0;
+
+  handle.addEventListener("mousedown", e => {
+    dragging = true;
+    startX   = e.clientX;
+    startW   = sidebar.offsetWidth;
+    handle.classList.add("dragging");
+    document.body.style.userSelect = "none";
+    document.body.style.cursor     = "col-resize";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const newW = Math.min(520, Math.max(140, startW + (startX - e.clientX)));
+    sidebar.style.width = newW + "px";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove("dragging");
+    document.body.style.userSelect = "";
+    document.body.style.cursor     = "";
+  });
+}
 
 // ── initial load ──────────────────────────────────────────────────────────────
 async function init() {
