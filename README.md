@@ -9,23 +9,20 @@ This supercharged modding interface allows anyone (seriously anyone) to make mod
 - Unlike Fmodel, it shows character and skin names:  
 <img src="images\skin_ids.png" alt="Character/Skin IDs" width="600" height="400">
 
-- Self-contained ZIP with no external dependancies, get started in seconds
+- No external dependancies, everything comes with the exe, get started in seconds
 
 ### Installation
 1. Download latest version from [Releases](https://github.com/clownfetus/Atelier/releases)
-2. Extract contents of downloaded .zip
-3. Run Atelier.exe
-4. Set your Pak folder (ex. `.../MarvelGame/Marvel/Content/Paks`)
+2. Launch the exe and setup to the default directory
+3. Set your Pak folder (ex. `.../MarvelGame/Marvel/Content/Paks`)
 
 ## Usage
-1. Navigate to the textures you want to edit
-2. Click them to Import them (or click "Import All" at bottom to import all visible items)
-3. Click any Imported texture to open them in File Explorer for easier editing
-4. Click the checkbox next to the textures you want to export in the sidebar
-5. Type a mod name at the bottom and click Export Mod
+1. Navigate to the textures/materials you want to edit
+2. In sidebar: toggle the assets you want to export in mod
+3. In sidebar: Type a mod name at the bottom and click "Export Mod"
 
-- You can delete imported textures by pressing "X" in sidebar or "Clear All"
-- Materials work but with noted bugs; VFX/Mesh handlers coming soon
+- You can delete imported textures by pressing "X" next to it in sidebar
+- VFX/Mesh handlers coming soon
 
 
 ### Credits

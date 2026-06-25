@@ -354,8 +354,8 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
   if (!pendingImport) return;
   const item = pendingImport; pendingImport = null;
   suppressedImportGameRels.add(item.game_rel);
-  const loadingToast = toastSpinner(`Editing ${item.name}…`);
-  setStatus(`Editing ${item.name}…`);
+  const loadingToast = toastSpinner(`Loading ${item.name}…`);
+  setStatus(`Loading ${item.name}…`);
   try {
     let res;
     if (item.file_type === "material") {
@@ -371,7 +371,7 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
     loadingToast.remove();
     suppressedImportGameRels.delete(item.game_rel);
     if (res.ok) {
-      toast(`Edited: ${item.name}`, "success");
+      toast(`Loaded: ${item.name}`, "success");
       setStatus("");
       refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
       const gridArea   = document.getElementById("grid-area");
@@ -635,9 +635,9 @@ function handleSSE(d) {
     suppressChangeToastUntil = Date.now() + 2500;
     document.getElementById("prog-overlay").classList.remove("active");
     if (d.error) {
-      toast(`Edit failed: ${d.error}`, "warning", 8000);
+      toast(`Load failed: ${d.error}`, "warning", 8000);
     } else {
-      toast(`Edited ${d.current} texture${d.current !== 1 ? "s" : ""}`, "success");
+      toast(`Loaded ${d.current} texture${d.current !== 1 ? "s" : ""}`, "success");
     }
     setStatus("");
     loadSidebar();
