@@ -1,23 +1,25 @@
 import os, sys, glob, re, shutil
-from atelier.config import ASSETS, IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _WORK, check_prereqs
+from atelier.config import ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
-def decode_png(dst_base):
-    """Decode one extracted UE texture (.uasset/.uexp/.ubulk) to .png via UAssetTool."""
-    if not os.path.exists(dst_base + ".uasset"): return
-    out_png = os.path.abspath(dst_base + ".png")
-    r = uat(["extract_texture", os.path.abspath(dst_base + ".uasset"), out_png, "--usmap", USMAP])
+def decode_png(import_base, uasset_base):
+    """Decode one extracted UE texture to .png. uasset_base is where .uasset lives; png goes to import_base."""
+    if not os.path.exists(uasset_base + ".uasset"): return
+    out_png = os.path.abspath(import_base + ".png")
+    r = uat(["extract_texture", os.path.abspath(uasset_base + ".uasset"), out_png, "--usmap", USMAP])
     if not os.path.exists(out_png):
-        print(f"  [warn] PNG decode failed for {os.path.basename(dst_base)}: "
+        print(f"  [warn] PNG decode failed for {os.path.basename(import_base)}: "
               f"{((r.stderr or '') + (r.stdout or '')).strip()[-200:]}", file=sys.stderr)
 
-def decode_batch(uasset_paths):
-    """Parallel-decode many extracted .uasset textures to .png next to each."""
+def decode_batch(uasset_paths, output_root=None, base_root=None):
+    """Parallel-decode many extracted .uasset textures to .png.
+    output_root: where PNGs go (default IMPORT_ROOT). base_root: root used to compute relative paths (default IMPORT_ROOT)."""
     paths = [os.path.abspath(p) for p in uasset_paths if os.path.exists(p)]
     if not paths: return {}
     return uat_json({"action": "batch_extract_texture_png", "file_paths": paths,
-                     "output_path": os.path.abspath(IMPORT_ROOT), "base_path": os.path.abspath(IMPORT_ROOT),
+                     "output_path": os.path.abspath(output_root or IMPORT_ROOT),
+                     "base_path":   os.path.abspath(base_root   or IMPORT_ROOT),
                      "usmap_path": USMAP, "format": "png", "parallel": True})
 
 def decode_thumb(uasset_path, thumb_path):
@@ -33,18 +35,19 @@ def decode_thumb(uasset_path, thumb_path):
 def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
-    base = os.path.join(IMPORT_ROOT, *game_rel.split("/"))
-    png  = base + ".png"
-    if not os.path.exists(base + ".uasset"):
+    import_base = os.path.join(IMPORT_ROOT,      *game_rel.split("/"))
+    work_base   = os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
+    png = import_base + ".png"
+    if not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
     if not os.path.exists(png):
-        decode_png(base)
+        decode_png(import_base, work_base)
         if not os.path.exists(png):
             raise RuntimeError("PNG missing and decode failed — re-import this texture")
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    r = uat(["inject_texture", os.path.abspath(base + ".uasset"), os.path.abspath(png),
+    r = uat(["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(png),
              os.path.abspath(out_ua), "--usmap", USMAP])
     if not os.path.exists(out_ua):
         raise RuntimeError("inject failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
@@ -57,8 +60,8 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True):
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
     for ext in (".pak", ".ucas", ".utoc"):
         if os.path.exists(base + ext): os.remove(base + ext)
-    stage = os.path.join(_WORK, "build_stage", mod_name)
-    shutil.rmtree(os.path.join(_WORK, "build_stage"), ignore_errors=True); os.makedirs(stage)
+    stage = os.path.join(_CACHE, "build_stage", mod_name)
+    shutil.rmtree(os.path.join(_CACHE, "build_stage"), ignore_errors=True); os.makedirs(stage)
     applied, skipped = [], []
     for game_rel in tex_items:
         try: applied.append("tex " + stage_inject(stage, game_rel))
@@ -106,8 +109,9 @@ def cmd_import(arg):
     if not entries:
         print(f"No entries matched {arg!r}"); return
 
-    cid       = char_id(skin_id)
-    dest_root = os.path.abspath(os.path.join(IMPORT_ROOT, "Characters", cid, skin_id))
+    cid            = char_id(skin_id)
+    dest_root      = os.path.abspath(os.path.join(IMPORT_ROOT,      "Characters", cid, skin_id))
+    work_dest_root = os.path.abspath(os.path.join(WORK_IMPORT_ROOT, "Characters", cid, skin_id))
     print(f"  Destination: {dest_root}")
 
     names = sorted({os.path.basename(p)[:-7] for p, _ in entries})
@@ -115,15 +119,16 @@ def cmd_import(arg):
     r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
     if "Extraction complete" not in (r.stdout or ""):
         print(f"  [warn] extract: {((r.stderr or '') + (r.stdout or '')).strip()[-300:]}", file=sys.stderr)
-    # Move extracted files from pak location to import location
+    # Move UE files to _cache/import; PNGs will decode to assets/imported
     pak_skin_dir = os.path.join(ASSETS, "Marvel", "Content", "Marvel", "Characters", cid, skin_id)
-    if os.path.isdir(pak_skin_dir) and pak_skin_dir != dest_root:
-        os.makedirs(os.path.dirname(dest_root), exist_ok=True)
-        shutil.copytree(pak_skin_dir, dest_root, dirs_exist_ok=True)
+    if os.path.isdir(pak_skin_dir):
+        os.makedirs(work_dest_root, exist_ok=True)
+        shutil.copytree(pak_skin_dir, work_dest_root, dirs_exist_ok=True)
         shutil.rmtree(pak_skin_dir, ignore_errors=True)
-    decode_batch(glob.glob(os.path.join(dest_root, "**", "*.uasset"), recursive=True))
+    uasset_paths = glob.glob(os.path.join(work_dest_root, "**", "*.uasset"), recursive=True)
+    decode_batch(uasset_paths, output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
 
-    n_assets = len(glob.glob(os.path.join(dest_root, "**", "*.uasset"), recursive=True))
+    n_assets = len(uasset_paths)
     n_png    = len(glob.glob(os.path.join(dest_root, "**", "*.png"), recursive=True))
     print(f"Extracted {n_assets} asset(s), decoded {n_png} PNG -> {dest_root}")
 
@@ -139,9 +144,15 @@ def expand_export_args(args):
     for arg in args:
         arg = arg.replace("\\", "/")
         if os.path.isabs(arg):
-            try: arg = os.path.relpath(arg.replace("/", os.sep), IMPORT_ROOT).replace("\\", "/")
+            abs_arg = arg.replace("/", os.sep)
+            try:
+                rel = os.path.relpath(abs_arg, WORK_IMPORT_ROOT)
+                if not rel.startswith(".."):
+                    arg = rel.replace("\\", "/")
+                else:
+                    arg = os.path.relpath(abs_arg, IMPORT_ROOT).replace("\\", "/")
             except ValueError:
-                print(f"  [warn] path not under assets/import/: {arg}", file=sys.stderr); continue
+                print(f"  [warn] path not under import roots: {arg}", file=sys.stderr); continue
         noext = arg[:-7] if arg.lower().endswith(".uasset") else arg
         if re.match(r"^\d{7}(/|$)", noext):
             skin_id  = noext[:7]
@@ -151,7 +162,7 @@ def expand_export_args(args):
             if "*" in tex_part:
                 dir_part, file_prefix = _split_glob_prefix(tex_part.split("*")[0])
                 cid      = char_id(skin_id)
-                skin_dir = os.path.join(IMPORT_ROOT, "Characters", cid, skin_id)
+                skin_dir = os.path.join(WORK_IMPORT_ROOT, "Characters", cid, skin_id)
                 search_dir = os.path.join(skin_dir, *dir_part.split("/")) if dir_part else skin_dir
                 if not os.path.isdir(search_dir):
                     print(f"  [warn] directory not found: {search_dir}", file=sys.stderr); continue
@@ -167,14 +178,14 @@ def expand_export_args(args):
         else:
             if "*" in noext:
                 dir_part, file_prefix = _split_glob_prefix(noext.split("*")[0])
-                search_dir = os.path.join(IMPORT_ROOT, *dir_part.split("/")) if dir_part else IMPORT_ROOT
+                search_dir = os.path.join(WORK_IMPORT_ROOT, *dir_part.split("/")) if dir_part else WORK_IMPORT_ROOT
                 if not os.path.isdir(search_dir):
                     print(f"  [warn] directory not found: {search_dir}", file=sys.stderr); continue
                 for root_dir, _, files in os.walk(search_dir):
                     for fname in sorted(files):
                         if not fname.lower().endswith(".uasset"): continue
                         if file_prefix and not fname.lower().startswith(file_prefix.lower()): continue
-                        r = os.path.relpath(os.path.join(root_dir, fname), IMPORT_ROOT).replace("\\", "/")
+                        r = os.path.relpath(os.path.join(root_dir, fname), WORK_IMPORT_ROOT).replace("\\", "/")
                         r = r[:-7] if r.lower().endswith(".uasset") else r
                         results.append((r, r))
             else:
@@ -203,7 +214,7 @@ def cmd_export(mod_name, tex_args, out_dir, force):
     for fp in existing:
         os.remove(fp)
 
-    stage = os.path.join(_WORK, "cli_export_stage", mod_name)
+    stage = os.path.join(_CACHE, "cli_export_stage", mod_name)
     shutil.rmtree(stage, ignore_errors=True); os.makedirs(stage)
     try:
         staged = 0; skipped = []

@@ -1,5 +1,5 @@
 import os, json, shutil
-from atelier.config import ASSETS, IMPORT_ROOT, PAKS, USMAP, _WORK
+from atelier.config import ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
@@ -61,23 +61,25 @@ def _apply_mat_edits(d, colors, scalars):
 
 def mat_json(game_rel):
     """Extract the MI + convert to JSON (cached at IMPORT_ROOT/<game_rel>.json). Returns the json path."""
-    base = os.path.join(IMPORT_ROOT, *game_rel.split("/"))
-    jp   = base + ".json"
+    import_base = os.path.join(IMPORT_ROOT,      *game_rel.split("/"))
+    work_base   = os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
+    jp = import_base + ".json"
     if os.path.exists(jp): return jp
-    if not os.path.exists(base + ".uasset"):
+    if not os.path.exists(work_base + ".uasset"):
         pak_gr   = pak_game_path(game_rel)
         pak_base = os.path.join(ASSETS, *pak_gr.split("/"))
         uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS),
              "--filter", os.path.basename(pak_gr)])
-        os.makedirs(os.path.dirname(base), exist_ok=True)
+        os.makedirs(os.path.dirname(work_base), exist_ok=True)
         for ext in (".uasset", ".uexp", ".ubulk"):
             src = pak_base + ext
             if os.path.exists(src):
-                shutil.move(src, base + ext)
-    if not os.path.exists(base + ".uasset"):
+                shutil.move(src, work_base + ext)
+    if not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("material not found in game paks")
-    uat(["to_json", os.path.abspath(base + ".uasset"), USMAP,
-         os.path.abspath(os.path.dirname(base))])
+    os.makedirs(os.path.dirname(import_base), exist_ok=True)
+    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP,
+         os.path.abspath(os.path.dirname(import_base))])
     if not os.path.exists(jp): raise RuntimeError("to_json produced no JSON")
     return jp
 
@@ -105,7 +107,7 @@ def stage_material(stage, game_rel, colors, scalars):
     """Apply color/scalar edits to the MI and from_json it into the export stage at pak game path."""
     d = json.load(open(mat_json(game_rel), encoding="utf-8-sig"))
     _apply_mat_edits(d, colors or {}, scalars or {})
-    ej = os.path.join(_WORK, "_mat_edit.json"); json.dump(d, open(ej, "w"))
+    ej = os.path.join(_CACHE, "_mat_edit.json"); json.dump(d, open(ej, "w"))
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)

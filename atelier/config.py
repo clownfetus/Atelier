@@ -51,10 +51,11 @@ USMAP   = next((u for u in _usmaps if "_latest" not in os.path.basename(u).lower
                _usmaps[0] if _usmaps else "")
 CNW     = 0x08000000 if os.name == "nt" else 0
 
-ASSETS      = os.path.join(ROOT, "assets")
-IMPORT_ROOT = os.path.join(ROOT, "assets", "import")
-ASSETS_MODS = os.path.join(ROOT, "assets", "mods")
-_WORK       = os.path.join(ROOT, "_work")
+ASSETS           = os.path.join(ROOT, "assets")
+IMPORT_ROOT      = os.path.join(ROOT, "assets", "imported")
+ASSETS_MODS      = os.path.join(ROOT, "assets", "exported")
+_CACHE           = os.path.join(ROOT, "_cache")
+WORK_IMPORT_ROOT = os.path.join(_CACHE, "import")
 GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
 
 def _prereq_issues(need_tool=True):

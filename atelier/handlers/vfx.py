@@ -1,5 +1,5 @@
 import os, json, shutil
-from atelier.config import ASSETS, IMPORT_ROOT, PAKS, USMAP, _WORK
+from atelier.config import ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
@@ -19,19 +19,19 @@ def is_vfx(path_or_name):
     return nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_"))
 
 def _ensure_extracted(game_rel):
-    base = os.path.join(IMPORT_ROOT, *game_rel.split("/"))
-    if not os.path.exists(base + ".uasset"):
+    work_base = os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
+    if not os.path.exists(work_base + ".uasset"):
         pak_gr   = pak_game_path(game_rel)
         pak_base = os.path.join(ASSETS, *pak_gr.split("/"))
         uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter", os.path.basename(pak_gr)])
-        os.makedirs(os.path.dirname(base), exist_ok=True)
+        os.makedirs(os.path.dirname(work_base), exist_ok=True)
         for ext in (".uasset", ".uexp", ".ubulk"):
             src = pak_base + ext
             if os.path.exists(src):
-                shutil.move(src, base + ext)
-    if not os.path.exists(base + ".uasset"):
+                shutil.move(src, work_base + ext)
+    if not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("VFX asset not found in game paks")
-    return base
+    return work_base
 
 def _classify(channels, samples):
     """-> (kind, editable). kind: color|emission|opacity (4ch) | scalar (1) | vector2 (2) | vector3 (3)."""
@@ -117,7 +117,7 @@ def stage_vfx(stage, game_rel, edits):
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    ej = os.path.join(_WORK, "_vfx_edit.json"); json.dump(payload, open(ej, "w"))
+    ej = os.path.join(_CACHE, "_vfx_edit.json"); json.dump(payload, open(ej, "w"))
     uat(["niagara_edit", os.path.abspath(base + ".uasset"), "--usmap", USMAP,
          "--output", os.path.abspath(out_ua), "--edits-file", os.path.abspath(ej)])
     if not os.path.exists(out_ua):

@@ -4,7 +4,7 @@
 Usage:
   python main.py list   <skin_id>[/subpath]                    List assets in paks (recursive)
   python main.py import <skin_id>[/subpath[/*]]                Extract to assets/Marvel/Content/...
-  python main.py export <mod_name> <skin_id/tex_path> [...]    Pack from assets/ to assets/mods/
+  python main.py export <mod_name> <skin_id/tex_path> [...]    Pack from assets/ to assets/exported/
                         [--dir <output_dir>] [--override]
 
 skin_id is the 7-digit ID (e.g. 1029304); character ID (1029) is derived automatically.

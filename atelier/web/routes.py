@@ -2,10 +2,10 @@ import os, sys, glob, json, shutil, threading, queue, subprocess
 from bottle import request, response, static_file
 
 from atelier.web.app import app
-from atelier.config import (ASSETS, IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _WORK,
+from atelier.config import (ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _CACHE,
                             get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion, save_paks_config)
 
-THUMBS_DIR = os.path.join(_WORK, "thumbs")
+THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
 from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb
 from atelier.handlers.pak_thumb import decode_thumb_from_pak
@@ -17,19 +17,21 @@ from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all
 # ── extraction helpers ────────────────────────────────────────────────────────
 
 def _import_base(game_rel):
-    """Full disk path (no ext) for a game_rel in the import structure."""
+    """Full disk path (no ext) for a game_rel in the import structure (png/json live here)."""
     return os.path.join(IMPORT_ROOT, *game_rel.split("/"))
+
+def _cache_import_base(game_rel):
+    """Full disk path (no ext) for a game_rel in _cache/import (uasset/uexp/ubulk live here)."""
+    return os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
 
 def _pak_extract_base(game_rel):
     """Where extract_iostore_legacy puts the file (under ASSETS at pak game path)."""
     return os.path.join(ASSETS, *pak_game_path(game_rel).split("/"))
 
 def _relocate_to_import(game_rel):
-    """Move .uasset/.uexp/.ubulk from pak extraction location to import structure."""
+    """Move .uasset/.uexp/.ubulk from pak extraction location to _cache/import structure."""
     src_base = _pak_extract_base(game_rel)
-    dst_base = _import_base(game_rel)
-    if src_base == dst_base:
-        return
+    dst_base = _cache_import_base(game_rel)
     os.makedirs(os.path.dirname(dst_base), exist_ok=True)
     for ext in (".uasset", ".uexp", ".ubulk"):
         src = src_base + ext
@@ -237,7 +239,7 @@ def api_prefetch_thumbs():
                         f.write(png)
                 else:
                     # fallback: extract via UAssetTool if pak decode unsupported
-                    uasset = _import_base(gr) + ".uasset"
+                    uasset = _cache_import_base(gr) + ".uasset"
                     if not os.path.exists(uasset):
                         names = [os.path.basename(pak_game_path(gr))]
                         uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
@@ -269,16 +271,18 @@ def api_import_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing skin_id or rel_path"})
     try:
-        gr       = game_rel_for_skin(skin_id, rel)
-        dst_base = _import_base(gr)
-        os.makedirs(os.path.dirname(dst_base), exist_ok=True)
+        gr         = game_rel_for_skin(skin_id, rel)
+        dst_base   = _import_base(gr)
+        work_base  = _cache_import_base(gr)
+        os.makedirs(os.path.dirname(dst_base),  exist_ok=True)
+        os.makedirs(os.path.dirname(work_base), exist_ok=True)
         uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS),
              "--filter", os.path.basename(pak_game_path(gr))])
         _relocate_to_import(gr)
-        decode_batch([dst_base + ".uasset"])
+        decode_batch([work_base + ".uasset"], output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
         png_exists = os.path.exists(dst_base + ".png")
         if not png_exists:
-            uasset_exists = os.path.exists(dst_base + ".uasset")
+            uasset_exists = os.path.exists(work_base + ".uasset")
             msg = "decode failed — PNG not created" if uasset_exists else "extraction failed — asset not found in pak"
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": msg, "game_rel": gr})
@@ -405,8 +409,9 @@ def _run_import_job(items):
             _relocate_to_import(it["game_rel"])
 
         _push_sse({"current": 0, "total": len(items), "name": "Decoding…", "done": False})
-        uassets = [_import_base(it["game_rel"]) + ".uasset" for it in items]
-        decode_batch([u for u in uassets if os.path.exists(u)])
+        uassets = [_cache_import_base(it["game_rel"]) + ".uasset" for it in items]
+        decode_batch([u for u in uassets if os.path.exists(u)],
+                     output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
 
         results = []; current = 0
         for it in items:
@@ -549,9 +554,15 @@ def api_delete_imported():
     if not gr:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing game_rel"})
-    base = _import_base(gr)
-    for ext in (".png", ".uasset", ".uexp", ".ubulk", ".json"):
-        p = base + ext
+    import_base = _import_base(gr)
+    work_base   = _cache_import_base(gr)
+    for ext in (".png", ".json"):
+        p = import_base + ext
+        if os.path.exists(p):
+            try: os.remove(p)
+            except Exception: pass
+    for ext in (".uasset", ".uexp", ".ubulk"):
+        p = work_base + ext
         if os.path.exists(p):
             try: os.remove(p)
             except Exception: pass
@@ -562,9 +573,15 @@ def api_delete_imported():
 def api_delete_all_imported():
     items = all_imported()
     for item in items:
-        base = _import_base(item["game_rel"])
-        for ext in (".png", ".uasset", ".uexp", ".ubulk", ".json"):
-            p = base + ext
+        import_base = _import_base(item["game_rel"])
+        work_base   = _cache_import_base(item["game_rel"])
+        for ext in (".png", ".json"):
+            p = import_base + ext
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
+        for ext in (".uasset", ".uexp", ".ubulk"):
+            p = work_base + ext
             if os.path.exists(p):
                 try: os.remove(p)
                 except Exception: pass

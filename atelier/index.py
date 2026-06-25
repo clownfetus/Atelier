@@ -1,9 +1,9 @@
 import os, sys, glob, json
-from atelier.config import PAKS, _WORK  # sets MR_TOOLS env var before io_lib reads it
+from atelier.config import PAKS, _CACHE  # sets MR_TOOLS env var before io_lib reads it
 import io_lib
 
 _INDEX      = None
-_CACHE_FILE = os.path.join(_WORK, "cli_index_cache.json")
+_CACHE_FILE = os.path.join(_CACHE, "cli_index_cache.json")
 _CACHE_VER  = "v2"  # bump to invalidate cached indexes
 
 def _utoc_key():
@@ -35,6 +35,6 @@ def ensure_index():
         for p, _ in ents:
             if "Marvel/Content/Marvel/" in p and p.lower().endswith(".uasset"):
                 _INDEX.append((p, cont))
-    os.makedirs(_WORK, exist_ok=True)
+    os.makedirs(_CACHE, exist_ok=True)
     json.dump({"key": key, "entries": _INDEX}, open(_CACHE_FILE, "w"))
     return _INDEX
