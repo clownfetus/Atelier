@@ -3,9 +3,12 @@ This supercharged modding interface allows anyone (seriously anyone) to make mod
 
 - Combines essential functionality from UE and Fmodel into one intuitive interface: 
 <img src="images\screenshot.png" alt="Screenshot" width="600" height="400">
+
 - No more repetitive and slow Unreal Engine nonsense (extremely long export, Data Asset/texture type/filepath management)
+
 - Unlike Fmodel, it shows character and skin names:  
 <img src="images\skin_ids.png" alt="Character/Skin IDs" width="600" height="400">
+
 - Self-contained ZIP with no external dependancies, get started in seconds
 
 ### Installation
