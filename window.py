@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-import subprocess
 import sys
 import time
+import threading
 import urllib.request
-import urllib.error
 import os
 import webview
 
 PORT = 8767
 URL  = f"http://localhost:{PORT}"
-
-ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__)))
 
 
 def _wait_for_server(timeout=15):
@@ -25,26 +21,26 @@ def _wait_for_server(timeout=15):
     return False
 
 
-def main():
-    server = subprocess.Popen(
-        [sys.executable, os.path.join(ROOT, "server.py")],
-        cwd=ROOT,
-    )
-
+def _run_server():
+    import atelier.web.routes as _routes  # registers all Bottle routes
+    from atelier.web.app import app, PORT as _PORT, _ThreadedServer
     try:
-        if not _wait_for_server():
-            print("Server did not start in time.", file=sys.stderr)
-            server.terminate()
-            sys.exit(1)
-
-        window = webview.create_window("Atelier", URL, width=1400, height=900)
-        webview.start(debug=False)
+        app.run(host="127.0.0.1", port=_PORT, quiet=True, server=_ThreadedServer)
     finally:
-        server.terminate()
-        try:
-            server.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server.kill()
+        _routes._observer.stop()
+        _routes._observer.join()
+
+
+def main():
+    t = threading.Thread(target=_run_server, daemon=True)
+    t.start()
+
+    if not _wait_for_server():
+        print("Server did not start in time.", file=sys.stderr)
+        sys.exit(1)
+
+    window = webview.create_window("Atelier", URL, width=1400, height=900)
+    webview.start(debug=False)
 
 
 if __name__ == "__main__":
