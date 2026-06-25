@@ -7,6 +7,7 @@ from atelier.config import ASSETS, IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _WOR
 THUMBS_DIR = os.path.join(_WORK, "thumbs")
 from atelier.tools import uat
 from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb
+from atelier.handlers.pak_thumb import decode_thumb_from_pak
 from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
 from atelier.handlers.vfx import read_vfx, is_vfx
 from atelier.paths import game_rel_for_skin, pak_game_path
@@ -130,22 +131,26 @@ def api_prefetch_thumbs():
 
     def _run():
         if not pending: return
-        # Extract assets that aren't already in the import tree
-        to_extract = [gr for gr in pending
-                      if not os.path.exists(_import_base(gr) + ".uasset")]
-        if to_extract:
-            names = list({os.path.basename(pak_game_path(gr)) for gr in to_extract})
-            uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
-            for gr in to_extract:
-                _relocate_to_import(gr)
         for gr in pending:
             with _prefetch_gen_lock:
                 if _prefetch_gen != my_gen:
                     return
-            uasset = _import_base(gr) + ".uasset"
-            thumb  = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if os.path.exists(uasset) and not os.path.exists(thumb):
-                decode_thumb(uasset, thumb)
+            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+            if not os.path.exists(thumb):
+                png = decode_thumb_from_pak(gr)
+                if png:
+                    os.makedirs(os.path.dirname(thumb), exist_ok=True)
+                    with open(thumb, "wb") as f:
+                        f.write(png)
+                else:
+                    # fallback: extract via UAssetTool if pak decode unsupported
+                    uasset = _import_base(gr) + ".uasset"
+                    if not os.path.exists(uasset):
+                        names = [os.path.basename(pak_game_path(gr))]
+                        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
+                        _relocate_to_import(gr)
+                    if os.path.exists(uasset):
+                        decode_thumb(uasset, thumb)
             if os.path.exists(thumb):
                 _push_sse({"thumb_ready": True, "game_rel": gr})
 
