@@ -61,20 +61,24 @@ def _apply_mat_edits(d, colors, scalars):
 
 def mat_json(game_rel):
     """Extract the MI + convert to JSON (cached at IMPORT_ROOT/<game_rel>.json). Returns the json path."""
+    from atelier.handlers.texture import find_extracted
     import_base = os.path.join(IMPORT_ROOT,      *game_rel.split("/"))
     work_base   = os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
     jp = import_base + ".json"
     if os.path.exists(jp): return jp
     if not os.path.exists(work_base + ".uasset"):
         pak_gr   = pak_game_path(game_rel)
-        pak_base = os.path.join(ASSETS, *pak_gr.split("/"))
         uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS),
              "--filter", os.path.basename(pak_gr)])
-        os.makedirs(os.path.dirname(work_base), exist_ok=True)
-        for ext in (".uasset", ".uexp", ".ubulk"):
-            src = pak_base + ext
-            if os.path.exists(src):
-                shutil.move(src, work_base + ext)
+        src_base = os.path.join(ASSETS, *pak_gr.split("/"))
+        if not os.path.exists(src_base + ".uasset"):
+            src_base = find_extracted(game_rel)
+        if src_base:
+            os.makedirs(os.path.dirname(work_base), exist_ok=True)
+            for ext in (".uasset", ".uexp", ".ubulk"):
+                src = src_base + ext
+                if os.path.exists(src):
+                    shutil.move(src, work_base + ext)
     if not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("material not found in game paks")
     os.makedirs(os.path.dirname(import_base), exist_ok=True)

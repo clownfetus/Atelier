@@ -33,7 +33,7 @@ def _download_usmap_file(download_url, dest_path):
 
 THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
-from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb
+from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb, find_extracted
 from atelier.handlers.pak_thumb import decode_thumb_from_pak
 import atelier.handlers.pak_thumb as _pak_thumb_mod
 import io_lib as _io_lib_mod
@@ -60,16 +60,21 @@ def _pak_extract_base(game_rel):
     return os.path.join(ASSETS, *pak_game_path(game_rel).split("/"))
 
 def _relocate_to_import(game_rel):
-    """Move .uasset/.uexp/.ubulk from pak extraction location to _cache/import structure."""
+    """Move .uasset/.uexp/.ubulk from pak extraction location to _cache/import structure.
+    Falls back to searching ASSETS by path suffix when UAssetTool used a non-standard
+    output prefix (e.g. patch paks extract to ent/Marvel/ instead of Marvel/Content/Marvel/)."""
     src_base = _pak_extract_base(game_rel)
+    if not os.path.exists(src_base + ".uasset"):
+        src_base = find_extracted(game_rel)
+    if not src_base:
+        return
     dst_base = _cache_import_base(game_rel)
     os.makedirs(os.path.dirname(dst_base), exist_ok=True)
+    assets_root = os.path.abspath(ASSETS)
     for ext in (".uasset", ".uexp", ".ubulk"):
         src = src_base + ext
         if os.path.exists(src):
             shutil.move(src, dst_base + ext)
-    # Remove empty source directories left behind after the move
-    assets_root = os.path.abspath(ASSETS)
     src_dir = os.path.abspath(os.path.dirname(src_base))
     while src_dir.startswith(assets_root) and src_dir != assets_root:
         try:

@@ -32,6 +32,21 @@ def decode_thumb(uasset_path, thumb_path):
             return True
     return False
 
+def find_extracted(game_rel):
+    """Walk ASSETS for a .uasset whose path ends with the game_rel suffix.
+    UAssetTool uses different output prefixes per pak container (e.g. Marvel/Content/Marvel/
+    for pakchunkCharacter vs ent/Marvel/ for patch paks), so we match by suffix instead."""
+    suf = os.path.join(*game_rel.split("/")) + ".uasset"
+    assets_abs = os.path.abspath(ASSETS)
+    for dirpath, _, files in os.walk(assets_abs):
+        for fname in files:
+            if not fname.lower().endswith(".uasset"):
+                continue
+            full = os.path.join(dirpath, fname)
+            if full.lower().endswith(suf.lower()):
+                return full[:-7]
+    return None
+
 def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
@@ -119,12 +134,24 @@ def cmd_import(arg):
     r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
     if "Extraction complete" not in (r.stdout or ""):
         print(f"  [warn] extract: {((r.stderr or '') + (r.stdout or '')).strip()[-300:]}", file=sys.stderr)
-    # Move UE files to _cache/import; PNGs will decode to assets/imported
-    pak_skin_dir = os.path.join(ASSETS, "Marvel", "Content", "Marvel", "Characters", cid, skin_id)
-    if os.path.isdir(pak_skin_dir):
-        os.makedirs(work_dest_root, exist_ok=True)
-        shutil.copytree(pak_skin_dir, work_dest_root, dirs_exist_ok=True)
-        shutil.rmtree(pak_skin_dir, ignore_errors=True)
+    # Move UE files to _cache/import by matching path suffix — UAssetTool uses
+    # different output prefixes per pak (e.g. ent/Marvel/ for patch paks).
+    skin_suf = os.path.join("Characters", cid, skin_id).lower()
+    assets_abs = os.path.abspath(ASSETS)
+    to_move = []
+    for dirpath, _, files in os.walk(assets_abs):
+        for fname in files:
+            full = os.path.join(dirpath, fname)
+            rel  = os.path.relpath(full, assets_abs)
+            if skin_suf not in rel.lower():
+                continue
+            idx      = rel.lower().index(skin_suf)
+            skin_rel = rel[idx + len(skin_suf):].lstrip(os.sep)
+            to_move.append((full, os.path.join(work_dest_root, skin_rel)))
+    os.makedirs(work_dest_root, exist_ok=True)
+    for src, dst in to_move:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.move(src, dst)
     uasset_paths = glob.glob(os.path.join(work_dest_root, "**", "*.uasset"), recursive=True)
     decode_batch(uasset_paths, output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
 

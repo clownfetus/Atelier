@@ -8,6 +8,7 @@ hovering over item in sidebar should show tooltip with full path
 lazy load thumbnails, aka dont load thumbnails that are out of view, and keep a certain number of them in memory
 use webview max compatibility gui method, ex leave undefined if better compat
 Icon trim
+toggle select all on the circled number
 
 ### partially formed ideas
 better top bar format (still coming up with one that includes settings and a help button that leads to https://github.com/clownfetus/Atelier#usage which should be more descriptive and hand-holdy and contain a YT shorts link)

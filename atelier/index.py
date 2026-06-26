@@ -4,12 +4,10 @@ import io_lib
 
 _INDEX      = None
 _CACHE_FILE = os.path.join(_CACHE, "cli_index_cache.json")
-_CACHE_VER  = "v3"  # bump to invalidate cached indexes
+_CACHE_VER  = "v4"  # bump to invalidate cached indexes
 
 def _index_utocs():
-    char  = glob.glob(PAKS + "/pakchunkCharacter-Windows*.utoc")
-    patch = glob.glob(PAKS + "/Patch_-Windows*_P.utoc")
-    return sorted(char + patch)
+    return sorted(glob.glob(PAKS + "/*.utoc"))
 
 def _utoc_key():
     parts = [_CACHE_VER]
