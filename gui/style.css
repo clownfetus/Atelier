@@ -535,6 +535,17 @@ body {
 }
 #setup-status.ok    { color: var(--green); }
 #setup-status.error { color: var(--acc2); }
+.setup-help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin-left: auto; flex-shrink: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.setup-help-btn:hover { border-color: var(--acc); color: var(--text); }
 
 /* ── material parameter editor ── */
 .mat-modal { max-width: 660px; width: calc(100% - 40px); max-height: 86vh;

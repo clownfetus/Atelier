@@ -11,7 +11,7 @@ This supercharged modding interface allows anyone (seriously anyone) to make mod
 
 - No external dependancies, everything comes with the exe, get started in seconds
 
-### Installation
+## Installation
 1. Download latest version from [Releases](https://github.com/clownfetus/Atelier/releases)
 2. Launch the exe and setup to the default directory
 3. Set your Pak folder (ex. `.../MarvelGame/Marvel/Content/Paks`)
@@ -22,12 +22,18 @@ This supercharged modding interface allows anyone (seriously anyone) to make mod
 3. In sidebar: Type a mod name at the bottom and click "Export Mod"
 
 - You can delete imported textures by pressing "X" next to it in sidebar
-- VFX/Mesh handlers coming soon
+- Right-click for option to replace texture with external image
 
+## Help
+This section is only relevant if the current mappings/AES repo is down, until we update to using a different one
+- Get AES Key from [Discord server](https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616)
+- Get USMAP file from [SpaceHost](https://spacedepot.github.io/SpaceHost/)
+- Get MarvelRivals location from Steam
+<img src="images\rivals_path.png" alt="Rivals > Manage > Browse Local" width="600" height="400">
 
-### Credits
+## Credits
 - Noobmaster and Clownfetus  
 - Xzant ([UAssetToolRivals](https://github.com/XzantGaming/UAssetToolRivals))  
-- Natimerry ([repak-rivals](https://github.com/natimerry/repak-rivals/))  
-- Saturn ([Repak-X](https://github.com/XzantGaming/Repak-X) style)
+- Natimerry ([repak-rivals retoc](https://github.com/natimerry/repak-rivals/))  
+- Saturn ([Repak-X](https://github.com/XzantGaming/Repak-X), [SpaceHost](https://spacedepot.github.io/SpaceHost/))
 - donutman07 ([Character IDs](https://github.com/donutman07/MarvelRivalsCharacterIDs/))
