@@ -989,8 +989,10 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       body: JSON.stringify({ path, aes_key }),
     });
     if (res.ok) {
-      btn.innerHTML = "Restarting…";
-      setTimeout(() => window.location.reload(), 1200);
+      document.getElementById("setup-overlay").classList.remove("active");
+      await checkPrereqs();
+      await renderGrid();
+      await loadSidebar();
     } else {
       toast(`Error: ${res.error}`, "warning");
       btn.disabled = false;

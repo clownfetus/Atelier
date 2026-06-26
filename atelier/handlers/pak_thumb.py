@@ -94,7 +94,8 @@ def _warmup():
     except Exception:
         pass
 
-threading.Thread(target=_warmup, daemon=True, name="pak_thumb_warmup").start()
+def start_warmup():
+    threading.Thread(target=_warmup, daemon=True, name="pak_thumb_warmup").start()
 
 
 def decode_thumb_from_pak(game_rel: str) -> bytes | None:

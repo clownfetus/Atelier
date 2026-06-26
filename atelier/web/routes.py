@@ -10,6 +10,10 @@ THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
 from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb
 from atelier.handlers.pak_thumb import decode_thumb_from_pak
+import atelier.handlers.pak_thumb as _pak_thumb_mod
+import io_lib as _io_lib_mod
+if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
+    _pak_thumb_mod.start_warmup()
 from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
 from atelier.handlers.vfx import read_vfx, is_vfx
 from atelier.paths import game_rel_for_skin, pak_game_path
@@ -178,14 +182,31 @@ def api_save_paks():
         return json.dumps({"ok": False, "error": err})
     try:
         save_setup_config(paks_path, aes_key)
-        def _restart():
-            import time; time.sleep(0.4)
-            if getattr(sys, "frozen", False):
-                subprocess.Popen([sys.executable])
-            else:
-                subprocess.Popen([sys.executable] + sys.argv)
-            os._exit(0)
-        threading.Thread(target=_restart, daemon=True).start()
+
+        # Write AES_KEY.txt so io_lib picks it up immediately
+        import atelier.config as _c
+        os.makedirs(_c.TOOLS, exist_ok=True)
+        with open(os.path.join(_c.TOOLS, "AES_KEY.txt"), "w", encoding="utf-8") as _f:
+            _f.write(aes_key)
+
+        # Update in-process globals — no restart needed
+        _io_lib_mod.AES_KEY = bytes.fromhex(aes_key)
+
+        _c.PAKS = paks_path
+        _c.CONFIG_HAS_PAKS = True
+        global PAKS
+        PAKS = paks_path
+
+        import atelier.index as _idx
+        _idx.PAKS = paks_path
+        _idx._INDEX = None  # force re-index with new path
+
+        _pak_thumb_mod.PAKS = paks_path
+        with _pak_thumb_mod._toc_lock:  _pak_thumb_mod._toc_cache.clear()
+        with _pak_thumb_mod._gr_map_lock: _pak_thumb_mod._gr_to_cont.clear()
+        _pak_thumb_mod._gr_map_ready = False
+        _pak_thumb_mod.start_warmup()
+
         response.content_type = "application/json"
         return json.dumps({"ok": True})
     except Exception as e:

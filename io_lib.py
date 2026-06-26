@@ -1,6 +1,7 @@
 import struct, ctypes, os
 
 _TOOLS = os.environ.get("MR_TOOLS") or os.path.join(os.path.dirname(__file__), "Tools")
+AES_KEY = b""
 if os.path.exists(AES_PATH := os.path.join(_TOOLS, "AES_KEY.txt")):
     with open(AES_PATH) as AES_FILE: AES_KEY = bytes.fromhex(AES_FILE.read().strip())
 
@@ -18,6 +19,8 @@ def oodle_decompress(comp, raw_len):
 # --- AES-256-ECB via Windows CNG (bcrypt) ---
 _bcrypt = ctypes.windll.bcrypt
 def _aes_ecb(data, decrypt):
+    if not AES_KEY:
+        raise RuntimeError("AES key not configured")
     BCRYPT_AES_ALGORITHM = ctypes.c_wchar_p("AES")
     hAlg = ctypes.c_void_p()
     _bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(hAlg), BCRYPT_AES_ALGORITHM, None, 0)
