@@ -635,6 +635,34 @@ def api_open_explorer():
     return json.dumps({"ok": True})
 
 
+@app.post("/api/replace_texture")
+def api_replace_texture():
+    from PIL import Image
+    import io
+    gr     = request.forms.get("game_rel", "").strip()
+    upload = request.files.get("file")
+    if not gr or not upload:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "missing game_rel or file"})
+    dst = _import_base(gr) + ".png"
+    if not os.path.exists(dst):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "asset not imported — edit it first"})
+    try:
+        img = Image.open(io.BytesIO(upload.file.read())).convert("RGBA")
+        img.save(dst, "PNG")
+        thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+        try:
+            if os.path.exists(thumb): os.remove(thumb)
+        except Exception:
+            pass
+        response.content_type = "application/json"
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr})
+    except Exception as e:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+
+
 @app.get("/api/open_with")
 def api_open_with():
     path = request.query.get("path", "")

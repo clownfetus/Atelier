@@ -293,6 +293,9 @@ function buildGrid(cards) {
     el.appendChild(thumb);
     el.appendChild(name);
     el.addEventListener("click", card.onClick);
+    if (card.type === "asset") {
+      el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
+    }
     grid.appendChild(el);
   });
 
@@ -722,6 +725,7 @@ function renderSidebar() {
       renderSidebar();
     });
     el.addEventListener("click", () => handleImportedFileAction(item));
+    el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsSidebar(item)));
     list.appendChild(el);
   });
   lucide.createIcons({ nodes: [list] });
@@ -1036,6 +1040,109 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     document.body.style.userSelect = "";
     document.body.style.cursor     = "";
   });
+}
+
+// ── context menu ──────────────────────────────────────────────────────────────
+let _ctxFileTarget = null;
+const _ctxMenu      = document.getElementById("ctx-menu");
+const _ctxFileInput = document.getElementById("ctx-file-input");
+
+function _ctxShow(e, items) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!items.length) return;
+  _ctxMenu.innerHTML = "";
+  for (const item of items) {
+    if (item === "sep") {
+      const d = document.createElement("div");
+      d.className = "ctx-sep";
+      _ctxMenu.appendChild(d);
+      continue;
+    }
+    const el = document.createElement("div");
+    el.className = "ctx-item" + (item.danger ? " danger" : "");
+    el.innerHTML = `<i data-lucide="${item.icon}" size="13"></i><span>${item.label}</span>`;
+    el.addEventListener("click", ev => { ev.stopPropagation(); _ctxHide(); item.action(); });
+    _ctxMenu.appendChild(el);
+  }
+  lucide.createIcons({ nodes: [_ctxMenu] });
+  _ctxMenu.style.left = e.clientX + "px";
+  _ctxMenu.style.top  = e.clientY + "px";
+  _ctxMenu.classList.add("active");
+  const r = _ctxMenu.getBoundingClientRect();
+  if (r.right  > window.innerWidth)  _ctxMenu.style.left = (e.clientX - r.width)  + "px";
+  if (r.bottom > window.innerHeight) _ctxMenu.style.top  = (e.clientY - r.height) + "px";
+}
+
+function _ctxHide() { _ctxMenu.classList.remove("active"); }
+
+document.addEventListener("click", _ctxHide);
+document.addEventListener("contextmenu", () => _ctxHide());
+
+_ctxFileInput.addEventListener("change", async () => {
+  const file = _ctxFileInput.files[0];
+  _ctxFileInput.value = "";
+  if (!file || !_ctxFileTarget) return;
+  const game_rel = _ctxFileTarget;
+  _ctxFileTarget = null;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("game_rel", game_rel);
+  const t = toastSpinner("Replacing…");
+  try {
+    const res  = await fetch("/api/replace_texture", { method: "POST", body: fd });
+    const data = await res.json();
+    t.remove();
+    if (data.ok) {
+      toast("Texture replaced", "success");
+      const bust = `&_t=${Date.now()}`;
+      document.querySelectorAll(`img[data-game-rel="${CSS.escape(game_rel)}"]`).forEach(img => {
+        img.src = `/api/thumb?game_rel=${encodeURIComponent(game_rel)}${bust}`;
+      });
+      if (data.token) {
+        document.querySelectorAll(`img[data-token="${data.token}"]`).forEach(img => {
+          img.src = `/api/preview?token=${data.token}&game_rel=${encodeURIComponent(game_rel)}${bust}`;
+        });
+      }
+    } else {
+      toast(`Replace failed: ${data.error}`, "warning");
+    }
+  } catch (err) {
+    t.remove();
+    toast(`Error: ${err.message}`, "warning");
+  }
+});
+
+function _ctxItemsCard(card) {
+  const items = [];
+  if (card.imported && card.game_rel)
+    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(card.game_rel)}`) });
+  if (card.game_rel)
+    items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = card.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
+  if (card.imported && card.file_type === "texture" && card.game_rel) {
+    if (items.length) items.push("sep");
+    items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = card.game_rel; _ctxFileInput.click(); } });
+  }
+  if (card.imported && card.token) {
+    if (items.length && items[items.length - 1] !== "sep") items.push("sep");
+    items.push({ icon: "trash-2", label: "Delete edits", danger: true, action: () => clearImported(card.token) });
+  }
+  return items;
+}
+
+function _ctxItemsSidebar(item) {
+  const items = [];
+  if (item.game_rel)
+    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(item.game_rel)}`) });
+  if (item.game_rel)
+    items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = item.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
+  if (item.file_type === "texture" && item.game_rel) {
+    if (items.length) items.push("sep");
+    items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = item.game_rel; _ctxFileInput.click(); } });
+  }
+  if (items.length) items.push("sep");
+  items.push({ icon: "trash-2", label: "Delete edits", danger: true, action: () => clearImported(item.token) });
+  return items;
 }
 
 // ── initial load ──────────────────────────────────────────────────────────────
