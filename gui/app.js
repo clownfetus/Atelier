@@ -768,11 +768,13 @@ async function doExport() {
   }
   document.getElementById("export-btn").disabled = true;
   setStatus(`Exporting ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
+  const exportingToast = toastSpinner(`Exporting ${modName}…`);
   try {
     const res = await api("/api/export", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel) }),
     });
+    exportingToast.remove();
     if (res.ok && res.pak_path) {
       toast(`Exported: ${modName}_9999999_P.pak` + (skipped ? ` (${skipped} VFX/other skipped)` : ""), "success", 5000);
       setStatus(`Exported → ${res.pak_path}`);
@@ -782,6 +784,7 @@ async function doExport() {
       setStatus("");
     }
   } catch (e) {
+    exportingToast.remove();
     toast(`Error: ${e.message}`, "warning"); setStatus("");
   } finally {
     updateExportBtn();
