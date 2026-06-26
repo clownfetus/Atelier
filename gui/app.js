@@ -1193,7 +1193,11 @@ _ctxFileInput.addEventListener("change", async () => {
 
 function _ctxItemsCard(card) {
   const items = [];
-  if (card.imported && card.game_rel)
+  if (!card.imported) {
+    items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    return items;
+  }
+  if (card.game_rel)
     items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(card.game_rel)}`) });
   if (card.game_rel)
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = card.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
