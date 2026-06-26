@@ -389,6 +389,8 @@ def _do_update_download(download_url):
             }
 
     try:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
         print(f"[update] downloading to {tmp_path}...")
         urllib.request.urlretrieve(download_url, tmp_path, reporthook=_reporthook)
         print("[update] download complete, launching installer...")
