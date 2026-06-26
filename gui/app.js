@@ -320,6 +320,15 @@ document.getElementById("search-input").addEventListener("input", () => {
   renderSidebar();
 });
 
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+    e.preventDefault();
+    const si = document.getElementById("search-input");
+    si.focus();
+    si.select();
+  }
+});
+
 // ── asset click / single import ───────────────────────────────────────────────
 function handleImportedFileAction(item) {
   const ft = item.file_type || "texture";
@@ -664,7 +673,7 @@ async function loadSidebar() {
   const data = await api("/api/imported");
   data.forEach(item => {
     if (!sidebarData[item.token]) {
-      sidebarData[item.token] = { ...item, selected: false };
+      sidebarData[item.token] = { ...item, selected: true };
     } else {
       Object.assign(sidebarData[item.token], item);
     }
@@ -677,7 +686,7 @@ async function loadSidebar() {
 function refreshSidebarEntry(game_rel, name, skin_id) {
   api("/api/imported").then(data => {
     data.forEach(item => {
-      if (!sidebarData[item.token]) sidebarData[item.token] = { ...item, selected: false };
+      if (!sidebarData[item.token]) sidebarData[item.token] = { ...item, selected: true };
       else Object.assign(sidebarData[item.token], item);
     });
     renderSidebar();
