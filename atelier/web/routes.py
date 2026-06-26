@@ -1,10 +1,35 @@
-import os, sys, glob, json, shutil, threading, queue, subprocess
+import os, sys, glob, json, re, shutil, threading, queue, subprocess, time, urllib.request
 from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier.config import (ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _CACHE,
                             get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion, save_paks_config,
-                            save_setup_config)
+                            save_setup_config, save_usmap_config, get_usmap_checked_at, save_usmap_checked_at)
+
+_USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
+_THREE_DAYS    = 3 * 24 * 3600
+
+def _fetch_github_usmap_list():
+    url = "https://api.github.com/repos/SpaceDepot/rivals-depot/contents/usmap"
+    req = urllib.request.Request(url, headers={"User-Agent": "Atelier/1.0"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read())
+
+def _get_latest_usmap_from_github():
+    files = _fetch_github_usmap_list()
+    matching = [f for f in files if f.get("type") == "file" and _USMAP_PATTERN.match(f["name"])]
+    if not matching:
+        return None
+    matching.sort(key=lambda x: x["name"])
+    return matching[-1]
+
+def _download_usmap_file(download_url, dest_path):
+    req = urllib.request.Request(download_url, headers={"User-Agent": "Atelier/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = r.read()
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    with open(dest_path, "wb") as f:
+        f.write(data)
 
 THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
@@ -101,17 +126,19 @@ def api_setup_status():
     cfg  = _c._load_config()
     paks = cfg.get("paks", "")
     aes  = cfg.get("aes_key", "")
-    configured = bool(paks) and bool(aes)
+    configured = bool(paks) and bool(aes) and bool(_c.USMAP)
     if paks:
         mr_prefill = _mr_root_to_display(paks)
     else:
         suggestion = _c.paks_suggestion()
         mr_prefill = _mr_root_to_display(suggestion) if suggestion else ""
-    aes_prefill = ("0x" + aes) if aes else ""
+    aes_prefill  = ("0x" + aes) if aes else ""
+    usmap_prefill = (_c.USMAP or "").replace("\\", "/")
     response.content_type = "application/json"
     return json.dumps({"configured": configured,
-                       "paks_prefill": mr_prefill,
-                       "aes_prefill":  aes_prefill})
+                       "paks_prefill":  mr_prefill,
+                       "aes_prefill":   aes_prefill,
+                       "usmap_prefill": usmap_prefill})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -167,9 +194,10 @@ def _validate_and_build_paks(path):
 
 @app.post("/api/save_paks")
 def api_save_paks():
-    body    = request.json or {}
-    path    = body.get("path", "").strip()
-    aes_key = body.get("aes_key", "").strip()  # stored without 0x prefix
+    body       = request.json or {}
+    path       = body.get("path", "").strip()
+    aes_key    = body.get("aes_key", "").strip()  # stored without 0x prefix
+    usmap_path = body.get("usmap_path", "").strip()
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
@@ -181,7 +209,8 @@ def api_save_paks():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": err})
     try:
-        save_setup_config(paks_path, aes_key)
+        save_setup_config(paks_path, aes_key,
+                          usmap_path if (usmap_path and os.path.exists(usmap_path)) else None)
 
         # Write AES_KEY.txt so io_lib picks it up immediately
         import atelier.config as _c
@@ -207,6 +236,15 @@ def api_save_paks():
         _pak_thumb_mod._gr_map_ready = False
         _pak_thumb_mod.start_warmup()
 
+        if usmap_path and os.path.exists(usmap_path):
+            _c.USMAP = usmap_path
+            import atelier.handlers.texture as _tex
+            import atelier.handlers.material as _mat
+            import atelier.handlers.vfx     as _vfx
+            _tex.USMAP = usmap_path
+            _mat.USMAP = usmap_path
+            _vfx.USMAP = usmap_path
+
         response.content_type = "application/json"
         return json.dumps({"ok": True})
     except Exception as e:
@@ -220,6 +258,112 @@ def api_open_discord_key():
     except Exception: pass
     response.content_type = "application/json"
     return json.dumps({"ok": True})
+
+# ── USMAP management ──────────────────────────────────────────────────────────
+
+@app.get("/api/validate_usmap")
+def api_validate_usmap():
+    path = request.query.get("path", "").strip()
+    response.content_type = "application/json"
+    if not path:
+        return json.dumps({"status": "empty"})
+    if not path.lower().endswith(".usmap"):
+        return json.dumps({"status": "invalid"})
+    if not os.path.exists(path):
+        return json.dumps({"status": "missing"})
+    return json.dumps({"status": "ok"})
+
+@app.post("/api/pick_usmap_file")
+def api_pick_usmap_file():
+    body    = request.json or {}
+    initial = (body.get("initial") or "").replace("/", "\\")
+    env     = os.environ.copy()
+    env["USMAP_INITIAL"] = os.path.dirname(initial) if initial else ""
+    ps = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+        "$f.Title = 'Select USMAP mapping file'; "
+        "$f.Filter = 'USMAP files (*.usmap)|*.usmap|All files (*.*)|*.*'; "
+        "$f.InitialDirectory = $env:USMAP_INITIAL; "
+        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }"
+    )
+    try:
+        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                             capture_output=True, text=True, timeout=120, env=env)
+        raw = r.stdout.strip().replace("\\", "/")
+        response.content_type = "application/json"
+        return json.dumps({"ok": True, "path": raw})
+    except Exception as e:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "path": "", "error": str(e)})
+
+@app.post("/api/download_usmap")
+def api_download_usmap():
+    import atelier.config as _c
+    try:
+        latest = _get_latest_usmap_from_github()
+        if not latest:
+            response.content_type = "application/json"
+            return json.dumps({"ok": False, "error": "No matching USMAP found on GitHub"})
+        mappings_dir = os.path.join(_c.TOOLS, "Mappings")
+        dest_path    = os.path.join(mappings_dir, latest["name"])
+        if not os.path.exists(dest_path):
+            _download_usmap_file(latest["download_url"], dest_path)
+        response.content_type = "application/json"
+        return json.dumps({"ok": True, "path": dest_path.replace("\\", "/"), "name": latest["name"]})
+    except Exception as e:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+
+_usmap_check_running = False
+_usmap_check_lock    = threading.Lock()
+
+@app.get("/api/usmap_update_check")
+def api_usmap_update_check():
+    global _usmap_check_running
+    import atelier.config as _c
+    last = _c.get_usmap_checked_at()
+    if time.time() - last < _THREE_DAYS:
+        response.content_type = "application/json"
+        return json.dumps({"ok": True, "updated": False})
+    with _usmap_check_lock:
+        if _usmap_check_running:
+            response.content_type = "application/json"
+            return json.dumps({"ok": True, "checking": True})
+        _usmap_check_running = True
+
+    def _check():
+        global _usmap_check_running
+        try:
+            latest = _get_latest_usmap_from_github()
+            if not latest:
+                return
+            latest_name  = latest["name"]
+            current_name = os.path.basename(_c.USMAP) if _c.USMAP else ""
+            _c.save_usmap_checked_at(time.time())
+            if latest_name == current_name:
+                return
+            mappings_dir = os.path.join(_c.TOOLS, "Mappings")
+            dest_path    = os.path.join(mappings_dir, latest_name)
+            _download_usmap_file(latest["download_url"], dest_path)
+            # Remove old file if it matches the pattern
+            if current_name and _USMAP_PATTERN.match(current_name):
+                old_path = os.path.join(mappings_dir, current_name)
+                if os.path.exists(old_path) and os.path.abspath(old_path) != os.path.abspath(dest_path):
+                    try: os.remove(old_path)
+                    except Exception: pass
+            _c.save_usmap_config(dest_path)
+            _c.USMAP = dest_path
+            _push_sse({"usmap_updated": True, "name": latest_name})
+        except Exception:
+            pass  # silent fail — will retry on next launch
+        finally:
+            with _usmap_check_lock:
+                _usmap_check_running = False
+
+    threading.Thread(target=_check, daemon=True).start()
+    response.content_type = "application/json"
+    return json.dumps({"ok": True, "checking": True})
 
 # ── browse (unified) ──────────────────────────────────────────────────────────
 

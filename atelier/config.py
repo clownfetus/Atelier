@@ -40,13 +40,32 @@ def save_paks_config(paks_path):
     cfg["paks"] = paks_path.replace("\\", "/")
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
-def save_setup_config(paks_path, aes_key):
-    """Save paks path and AES key (without 0x prefix) together."""
+def save_setup_config(paks_path, aes_key, usmap_path=None):
+    """Save paks path, AES key (without 0x prefix), and optionally USMAP path together."""
     cfg = {}
     try: cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
     except Exception: pass
     cfg["paks"]    = paks_path.replace("\\", "/")
     cfg["aes_key"] = aes_key
+    if usmap_path is not None:
+        cfg["usmap"] = usmap_path.replace("\\", "/")
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
+def save_usmap_config(usmap_path):
+    cfg = {}
+    try: cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+    except Exception: pass
+    cfg["usmap"] = usmap_path.replace("\\", "/")
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
+def get_usmap_checked_at():
+    return _load_config().get("usmap_checked_at", 0)
+
+def save_usmap_checked_at(ts):
+    cfg = {}
+    try: cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+    except Exception: pass
+    cfg["usmap_checked_at"] = ts
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
 _cfg            = _load_config()
@@ -64,9 +83,13 @@ if _aes_key_cfg:
             _f.write(_aes_key_cfg)
     except Exception: pass
 
-_usmaps = sorted(glob.glob(os.path.join(TOOLS, "Mappings", "*.usmap")))
-USMAP   = next((u for u in _usmaps if "_latest" not in os.path.basename(u).lower()),
-               _usmaps[0] if _usmaps else "")
+_usmap_cfg = _cfg.get("usmap", "").strip()
+if _usmap_cfg and os.path.exists(_usmap_cfg):
+    USMAP = _usmap_cfg
+else:
+    _usmaps = sorted(glob.glob(os.path.join(TOOLS, "Mappings", "*.usmap")))
+    USMAP = next((u for u in _usmaps if "_latest" not in os.path.basename(u).lower()),
+                 _usmaps[0] if _usmaps else "")
 CNW     = 0x08000000 if os.name == "nt" else 0
 
 ASSETS           = os.path.join(ROOT, "assets")

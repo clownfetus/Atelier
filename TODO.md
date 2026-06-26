@@ -1,7 +1,4 @@
 ### critical
-right click asset (sidebar or browser) to show menu options: Open in Explorer, Find in Atelier, Replace with Image (Only for textures), Delete edits
-request AES key on initial start like Pak directory with a shallow validity check (confirm AES format/length), then purge from git history
-USMAP bindings auto-download with Browse option in initial setup popup too with redesign for alt sources
 Logging system
 
 ### regular

@@ -605,6 +605,13 @@ function connectSSE() {
 }
 
 function handleSSE(d) {
+  if (d.usmap_updated) {
+    const ov = document.getElementById("usmap-update-overlay");
+    document.getElementById("usmap-update-name").textContent = d.name || "";
+    ov.classList.add("active");
+    lucide.createIcons({ nodes: [ov] });
+    return;
+  }
   if (d.toast) {
     toast(d.toast, d.toast_type || "info", 5000);
     return;
@@ -861,39 +868,59 @@ async function checkPrereqs() {
 }
 
 // ── first-run setup ───────────────────────────────────────────────────────────
-async function _fetchAesKey() {
+async function _fetchAesKeyValue() {
   try {
     const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES");
-    if (!r.ok) return;
+    if (!r.ok) return null;
     const text = (await r.text()).trim();
-    if (!text) return;
-    const aesEl = document.getElementById("setup-aes");
-    if (!aesEl || aesEl.value.trim()) return;
-    const key = /^0x/i.test(text) ? text : "0x" + text;
-    aesEl.value = key;
-    await validateSetup();
-  } catch (_) {}
+    if (!text) return null;
+    return /^0x/i.test(text) ? text : "0x" + text;
+  } catch (_) { return null; }
+}
+
+async function _fetchUsmapPath() {
+  try {
+    const res = await api("/api/download_usmap", { method: "POST" });
+    return (res.ok && res.path) ? res.path : null;
+  } catch (_) { return null; }
+}
+
+function _setSetupLoading(on) {
+  document.getElementById("setup-loading").classList.toggle("active", on);
 }
 
 async function checkSetup() {
+  document.getElementById("setup-overlay").classList.add("active");
+  _setSetupLoading(true);
   try {
-    const res = await api("/api/setup_status");
-    if (res.configured) { return false; }
-    document.getElementById("setup-path").value = res.paks_prefill || "";
-    document.getElementById("setup-aes").value  = res.aes_prefill  || "";
-    document.getElementById("setup-overlay").classList.add("active");
+    const [statusRes, aes, usmapPath] = await Promise.all([
+      api("/api/setup_status"),
+      _fetchAesKeyValue(),
+      _fetchUsmapPath(),
+    ]);
+    if (statusRes.configured) {
+      document.getElementById("setup-overlay").classList.remove("active");
+      return false;
+    }
+    document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
+    document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
+    document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
+    _setSetupLoading(false);
     await validateSetup();
-    if (!document.getElementById("setup-aes").value.trim()) _fetchAesKey();
     return true;
-  } catch (e) { return false; }
+  } catch (e) {
+    _setSetupLoading(false);
+    return false;
+  }
 }
 
 let _validateGen = 0;
 async function validateSetup() {
-  const gen = ++_validateGen;
-  const path = document.getElementById("setup-path").value.trim();
-  const key  = document.getElementById("setup-aes").value.trim();
-  const el   = document.getElementById("setup-status");
+  const gen     = ++_validateGen;
+  const path    = document.getElementById("setup-path").value.trim();
+  const usmap   = document.getElementById("setup-usmap").value.trim();
+  const key     = document.getElementById("setup-aes").value.trim();
+  const el      = document.getElementById("setup-status");
   const saveBtn = document.getElementById("setup-save");
 
   let pakStatus = "", pakMsg = "";
@@ -907,6 +934,15 @@ async function validateSetup() {
     } catch (_) {}
   }
 
+  let usmapStatus = "";
+  if (usmap) {
+    try {
+      const r = await fetch(`/api/validate_usmap?path=${encodeURIComponent(usmap)}`);
+      const d = await r.json();
+      usmapStatus = d.status;
+    } catch (_) {}
+  }
+
   if (gen !== _validateGen) return;
 
   let keyStatus = "";
@@ -914,49 +950,61 @@ async function validateSetup() {
     keyStatus = /^0x[0-9A-Fa-f]{60,68}$/.test(key) ? "ok" : "invalid";
   }
 
-  const pakOk  = pakStatus === "ok";
-  const keyOk  = keyStatus === "ok";
-  const pakBad = pakStatus === "wrong_folder" || pakStatus === "missing";
-  const keyBad = keyStatus === "invalid";
+  const pakOk    = pakStatus === "ok";
+  const usmapOk  = usmapStatus === "ok";
+  const keyOk    = keyStatus === "ok";
+  const pakBad   = pakStatus === "wrong_folder" || pakStatus === "missing";
+  const usmapBad = usmapStatus === "invalid" || usmapStatus === "missing";
+  const keyBad   = keyStatus === "invalid";
 
-  if (pakOk && keyOk) {
+  if (pakOk && usmapOk && keyOk) {
     el.className = "ok";
-    el.innerHTML = '<i data-lucide="check-circle" size="13"></i> Both Valid';
+    el.innerHTML = '<i data-lucide="check-circle" size="13"></i> All Valid';
     saveBtn.disabled = false;
-  } else if (pakBad && keyBad) {
-    el.className = "error";
-    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Enter valid Key and Pak folder';
-    saveBtn.disabled = true;
-  } else if (pakBad) {
-    el.className = "error";
-    el.innerHTML = `<i data-lucide="x-circle" size="13"></i> ${pakMsg}`;
-    saveBtn.disabled = true;
-  } else if (keyBad) {
-    el.className = "error";
-    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid AES key format';
-    saveBtn.disabled = true;
-  } else if (pakOk) {
-    el.className = "error";
-    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Key missing';
-    saveBtn.disabled = true;
   } else {
-    el.className = ""; el.innerHTML = "";
     saveBtn.disabled = true;
+    if (pakBad) {
+      el.className = "error";
+      el.innerHTML = `<i data-lucide="x-circle" size="13"></i> ${pakMsg}`;
+    } else if (usmapBad) {
+      el.className = "error";
+      el.innerHTML = usmapStatus === "missing"
+        ? '<i data-lucide="x-circle" size="13"></i> USMAP file not found'
+        : '<i data-lucide="x-circle" size="13"></i> Not a valid .usmap file';
+    } else if (keyBad) {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid AES key format';
+    } else if (pakOk && usmapOk && !key) {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Key missing';
+    } else {
+      el.className = ""; el.innerHTML = "";
+    }
   }
   lucide.createIcons({ nodes: [el] });
 
-  const pathEl = document.getElementById("setup-path");
-  const aesEl  = document.getElementById("setup-aes");
+  const pathEl  = document.getElementById("setup-path");
+  const usmapEl = document.getElementById("setup-usmap");
+  const aesEl   = document.getElementById("setup-aes");
   pathEl.classList.toggle("setup-valid",   pakOk);
   pathEl.classList.toggle("setup-invalid", pakBad);
+  usmapEl.classList.toggle("setup-valid",   usmapOk);
+  usmapEl.classList.toggle("setup-invalid", usmapBad);
   aesEl.classList.toggle("setup-valid",   keyOk);
-  aesEl.classList.toggle("setup-invalid", keyBad || (pakOk && !key));
+  aesEl.classList.toggle("setup-invalid", keyBad || (pakOk && usmapOk && !key));
 }
 
 document.getElementById("setup-path").addEventListener("input", validateSetup);
+document.getElementById("setup-usmap").addEventListener("input", validateSetup);
 document.getElementById("setup-aes").addEventListener("input", validateSetup);
-document.getElementById("setup-get-key").addEventListener("click", () => {
-  fetch("/api/open_discord_key");
+document.getElementById("setup-paste-key").addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      document.getElementById("setup-aes").value = text.trim();
+      validateSetup();
+    }
+  } catch {}
 });
 
 document.getElementById("setup-browse").addEventListener("click", async () => {
@@ -977,12 +1025,33 @@ document.getElementById("setup-browse").addEventListener("click", async () => {
   btn.disabled = false;
 });
 
+document.getElementById("setup-usmap-browse").addEventListener("click", async () => {
+  const initial = document.getElementById("setup-usmap").value.trim();
+  const btn = document.getElementById("setup-usmap-browse");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/pick_usmap_file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initial }),
+    });
+    if (res.ok && res.path) {
+      document.getElementById("setup-usmap").value = res.path;
+      validateSetup();
+    }
+  } catch (e) {}
+  btn.disabled = false;
+});
+
+
 document.getElementById("setup-save").addEventListener("click", async () => {
-  const path   = document.getElementById("setup-path").value.trim();
-  const rawKey = document.getElementById("setup-aes").value.trim();
-  const aes_key = rawKey.toLowerCase().startsWith("0x") ? rawKey.slice(2) : rawKey;
-  if (!path)    { toast("Please enter a path", "warning"); return; }
-  if (!aes_key) { toast("Please enter an AES key", "warning"); return; }
+  const path      = document.getElementById("setup-path").value.trim();
+  const usmapPath = document.getElementById("setup-usmap").value.trim();
+  const rawKey    = document.getElementById("setup-aes").value.trim();
+  const aes_key   = rawKey.toLowerCase().startsWith("0x") ? rawKey.slice(2) : rawKey;
+  if (!path)      { toast("Please enter a path", "warning"); return; }
+  if (!usmapPath) { toast("Please enter or auto-fetch a USMAP file", "warning"); return; }
+  if (!aes_key)   { toast("Please enter an AES key", "warning"); return; }
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
   btn.innerHTML = "Saving…";
@@ -990,7 +1059,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     const res = await api("/api/save_paks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, aes_key }),
+      body: JSON.stringify({ path, aes_key, usmap_path: usmapPath }),
     });
     if (res.ok) {
       document.getElementById("setup-overlay").classList.remove("active");
@@ -1145,6 +1214,11 @@ function _ctxItemsSidebar(item) {
   return items;
 }
 
+// ── USMAP update check ────────────────────────────────────────────────────────
+async function checkUsmapUpdate() {
+  try { await api("/api/usmap_update_check"); } catch (_) {}
+}
+
 // ── initial load ──────────────────────────────────────────────────────────────
 async function init() {
   console.log("[init] starting");
@@ -1153,6 +1227,7 @@ async function init() {
   await checkPrereqs();
   await renderGrid();
   await loadSidebar();
+  checkUsmapUpdate();
 }
 
 init();
