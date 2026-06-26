@@ -166,10 +166,14 @@
 <div class="overlay" id="setup-overlay">
   <div class="modal">
     <h2><i data-lucide="folder-open" size="18" style="color:var(--acc)"></i> Set Game Location</h2>
-    <p>Point Atelier to your Marvel Rivals <strong style="color:var(--text)">Paks</strong> folder to get started.</p>
+    <p>Point Atelier to <strong style="color:var(--text)">MarvelRivals</strong> folder and enter <strong style="color:var(--text)">AES key</strong>.</p>
     <div class="setup-row">
-      <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelGame/Marvel/Content/Paks" spellcheck="false">
+      <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals (Path to your MarvelRivals install)" spellcheck="false">
       <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+    </div>
+    <div class="setup-row">
+      <input id="setup-aes" type="text" class="setup-input" placeholder="0x… (Paste key with Ctrl+V)" spellcheck="false">
+      <button class="btn" id="setup-get-key"><i data-lucide="key" size="14"></i> Get Key</button>
     </div>
     <div class="modal-row">
       <div id="setup-status"></div>

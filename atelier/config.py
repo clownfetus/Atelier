@@ -40,11 +40,29 @@ def save_paks_config(paks_path):
     cfg["paks"] = paks_path.replace("\\", "/")
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
+def save_setup_config(paks_path, aes_key):
+    """Save paks path and AES key (without 0x prefix) together."""
+    cfg = {}
+    try: cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+    except Exception: pass
+    cfg["paks"]    = paks_path.replace("\\", "/")
+    cfg["aes_key"] = aes_key
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
 _cfg            = _load_config()
 CONFIG_HAS_PAKS = bool(_cfg.get("paks"))
 TOOLS = _cfg.get("tools") or os.path.join(ROOT, "Tools")
 PAKS  = (_cfg.get("paks") or _detect_paks()).replace("\\", "/")
 os.environ["MR_TOOLS"] = TOOLS  # must be set before io_lib is imported anywhere
+
+# Write AES_KEY.txt from config on startup so UAssetTool can read it
+_aes_key_cfg = _cfg.get("aes_key", "").strip()
+if _aes_key_cfg:
+    try:
+        os.makedirs(TOOLS, exist_ok=True)
+        with open(os.path.join(TOOLS, "AES_KEY.txt"), "w", encoding="utf-8") as _f:
+            _f.write(_aes_key_cfg)
+    except Exception: pass
 
 _usmaps = sorted(glob.glob(os.path.join(TOOLS, "Mappings", "*.usmap")))
 USMAP   = next((u for u in _usmaps if "_latest" not in os.path.basename(u).lower()),

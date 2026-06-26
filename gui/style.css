@@ -496,6 +496,8 @@ body {
 }
 .setup-input:focus { outline: none; border-color: var(--blue); }
 .setup-input::placeholder { color: var(--muted); font-weight: 500; }
+.setup-input.setup-valid   { border-color: var(--green); }
+.setup-input.setup-invalid { border-color: var(--acc2); }
 #setup-status {
   flex: 1;
   font-size: 12px;

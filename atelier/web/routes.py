@@ -3,7 +3,8 @@ from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier.config import (ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _CACHE,
-                            get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion, save_paks_config)
+                            get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion, save_paks_config,
+                            save_setup_config)
 
 THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
@@ -69,13 +70,44 @@ def api_prereqs():
 
 # ── first-run setup ───────────────────────────────────────────────────────────
 
+def _find_mr_root(path):
+    """Find the MarvelRivals ancestor of path (including path itself). Returns None if not found."""
+    norm  = path.replace("\\", "/").rstrip("/")
+    parts = norm.split("/")
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i].lower() == "marvelrivals":
+            return "/".join(parts[:i + 1])
+    return None
+
+def _mr_root_to_display(paks_path):
+    """Given a stored Paks path, return the MarvelRivals root for display in the frontend."""
+    mr = _find_mr_root(paks_path)
+    if mr:
+        return mr
+    # Fallback for non-standard installs: strip the known paks suffix if present
+    norm = paks_path.replace("\\", "/").rstrip("/")
+    suffix = "/marvelgame/marvel/content/paks"
+    if norm.lower().endswith(suffix):
+        return norm[:-len(suffix)]
+    return norm
+
 @app.get("/api/setup_status")
 def api_setup_status():
     import atelier.config as _c
-    configured = bool(_c._load_config().get("paks"))
-    suggestion = "" if configured else _c.paks_suggestion()
+    cfg  = _c._load_config()
+    paks = cfg.get("paks", "")
+    aes  = cfg.get("aes_key", "")
+    configured = bool(paks) and bool(aes)
+    if paks:
+        mr_prefill = _mr_root_to_display(paks)
+    else:
+        suggestion = _c.paks_suggestion()
+        mr_prefill = _mr_root_to_display(suggestion) if suggestion else ""
+    aes_prefill = ("0x" + aes) if aes else ""
     response.content_type = "application/json"
-    return json.dumps({"configured": configured, "suggestion": suggestion})
+    return json.dumps({"configured": configured,
+                       "paks_prefill": mr_prefill,
+                       "aes_prefill":  aes_prefill})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -86,16 +118,17 @@ def api_pick_folder():
     ps = (
         "Add-Type -AssemblyName System.Windows.Forms; "
         "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-        "$f.Description = 'Select the Marvel Rivals Paks folder'; "
+        "$f.Description = 'Select your MarvelRivals folder:'; "
         "$f.SelectedPath = $env:PAKS_INITIAL; "
         "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"
     )
     try:
-        r    = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                              capture_output=True, text=True, timeout=120, env=env)
-        path = r.stdout.strip().replace("\\", "/")
+        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                             capture_output=True, text=True, timeout=120, env=env)
+        raw = r.stdout.strip().replace("\\", "/")
+        mr  = _find_mr_root(raw) if raw else ""
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "path": path})
+        return json.dumps({"ok": True, "path": mr or raw})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
@@ -106,34 +139,45 @@ def api_validate_paks():
     response.content_type = "application/json"
     if not path:
         return json.dumps({"status": "empty"})
-    norm = path.replace("\\", "/").rstrip("/")
-    if not norm.lower().endswith("marvelgame/marvel/content/paks"):
+    mr = _find_mr_root(path)
+    if not mr:
         return json.dumps({"status": "wrong_folder"})
-    if not os.path.isdir(norm):
+    if not os.path.isdir(mr):
         return json.dumps({"status": "missing"})
+    paks = mr + "/MarvelGame/Marvel/Content/Paks"
+    if not os.path.exists(paks + "/pakchunkCharacter-Windows.ucas"):
+        return json.dumps({"status": "wrong_folder"})
     return json.dumps({"status": "ok"})
 
-def _validate_paks_path(path):
-    norm = path.replace("\\", "/").rstrip("/")
-    if not norm.lower().endswith("marvelgame/marvel/content/paks"):
-        return "Path must end with MarvelGame/Marvel/Content/Paks"
-    if not os.path.isdir(norm):
-        return "Directory does not exist"
-    return None
+def _validate_and_build_paks(path):
+    """Validate user-supplied path (MarvelRivals root or subfolder) and return (paks_path, error)."""
+    mr = _find_mr_root(path)
+    if not mr:
+        return None, "MarvelRivals folder not found in path"
+    if not os.path.isdir(mr):
+        return None, "MarvelRivals directory does not exist"
+    paks = mr + "/MarvelGame/Marvel/Content/Paks"
+    if not os.path.exists(paks + "/pakchunkCharacter-Windows.ucas"):
+        return None, "pakchunkCharacter-Windows.ucas not found — wrong MarvelRivals folder"
+    return paks, None
 
 @app.post("/api/save_paks")
 def api_save_paks():
-    body = request.json or {}
-    path = body.get("path", "").strip()
+    body    = request.json or {}
+    path    = body.get("path", "").strip()
+    aes_key = body.get("aes_key", "").strip()  # stored without 0x prefix
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
-    err = _validate_paks_path(path)
+    if not aes_key:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "no AES key provided"})
+    paks_path, err = _validate_and_build_paks(path)
     if err:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": err})
     try:
-        save_paks_config(path)
+        save_setup_config(paks_path, aes_key)
         def _restart():
             import time; time.sleep(0.4)
             if getattr(sys, "frozen", False):
@@ -147,6 +191,14 @@ def api_save_paks():
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/open_discord_key")
+def api_open_discord_key():
+    url = "https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616"
+    try: os.startfile(url)
+    except Exception: pass
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
 
 # ── browse (unified) ──────────────────────────────────────────────────────────
 

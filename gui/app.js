@@ -857,58 +857,103 @@ async function checkPrereqs() {
 }
 
 // ── first-run setup ───────────────────────────────────────────────────────────
-async function checkSetup() {
+async function _fetchAesKey() {
   try {
-    const res = await api("/api/setup_status");
-    console.log("[setup] /api/setup_status →", res);
-    if (res.configured) { console.log("[setup] already configured, skipping modal"); return false; }
-    console.log("[setup] not configured — showing modal");
-    document.getElementById("setup-path").value = res.suggestion || "";
-    document.getElementById("setup-overlay").classList.add("active");
-    console.log("[setup] overlay active:", document.getElementById("setup-overlay").classList.contains("active"));
-    await validateSetupPath();
-    return true;
-  } catch (e) { console.error("[setup] checkSetup error:", e); return false; }
-}
-
-let _validateTimer = null;
-function triggerValidate() {
-  clearTimeout(_validateTimer);
-  _validateTimer = setTimeout(validateSetupPath, 350);
-}
-async function validateSetupPath() {
-  const path    = document.getElementById("setup-path").value.trim();
-  const el      = document.getElementById("setup-status");
-  const saveBtn = document.getElementById("setup-save");
-  if (!path) {
-    el.className = ""; el.innerHTML = "";
-    saveBtn.disabled = true;
-    return;
-  }
-  try {
-    const res = await fetch(`/api/validate_paks?path=${encodeURIComponent(path)}`);
-    const d   = await res.json();
-    if (d.status === "ok") {
-      el.className = "ok";
-      el.innerHTML = '<i data-lucide="check-circle" size="13"></i> Path valid';
-      saveBtn.disabled = false;
-    } else if (d.status === "missing") {
-      el.className = "error";
-      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Path doesn\'t exist';
-      saveBtn.disabled = true;
-    } else if (d.status === "wrong_folder") {
-      el.className = "error";
-      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Not a Pak folder';
-      saveBtn.disabled = true;
-    } else {
-      el.className = ""; el.innerHTML = "";
-      saveBtn.disabled = true;
-    }
-    lucide.createIcons({ nodes: [el] });
+    const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES");
+    if (!r.ok) return;
+    const text = (await r.text()).trim();
+    if (!text) return;
+    const aesEl = document.getElementById("setup-aes");
+    if (!aesEl || aesEl.value.trim()) return;
+    const key = /^0x/i.test(text) ? text : "0x" + text;
+    aesEl.value = key;
+    await validateSetup();
   } catch (_) {}
 }
 
-document.getElementById("setup-path").addEventListener("input", triggerValidate);
+async function checkSetup() {
+  try {
+    const res = await api("/api/setup_status");
+    if (res.configured) { return false; }
+    document.getElementById("setup-path").value = res.paks_prefill || "";
+    document.getElementById("setup-aes").value  = res.aes_prefill  || "";
+    document.getElementById("setup-overlay").classList.add("active");
+    await validateSetup();
+    if (!document.getElementById("setup-aes").value.trim()) _fetchAesKey();
+    return true;
+  } catch (e) { return false; }
+}
+
+let _validateGen = 0;
+async function validateSetup() {
+  const gen = ++_validateGen;
+  const path = document.getElementById("setup-path").value.trim();
+  const key  = document.getElementById("setup-aes").value.trim();
+  const el   = document.getElementById("setup-status");
+  const saveBtn = document.getElementById("setup-save");
+
+  let pakStatus = "", pakMsg = "";
+  if (path) {
+    try {
+      const r = await fetch(`/api/validate_paks?path=${encodeURIComponent(path)}`);
+      const d = await r.json();
+      pakStatus = d.status;
+      if (d.status === "wrong_folder") pakMsg = "MarvelRivals folder not found";
+      else if (d.status === "missing")  pakMsg = "Path doesn't exist";
+    } catch (_) {}
+  }
+
+  if (gen !== _validateGen) return;
+
+  let keyStatus = "";
+  if (key) {
+    keyStatus = /^0x[0-9A-Fa-f]{60,68}$/.test(key) ? "ok" : "invalid";
+  }
+
+  const pakOk  = pakStatus === "ok";
+  const keyOk  = keyStatus === "ok";
+  const pakBad = pakStatus === "wrong_folder" || pakStatus === "missing";
+  const keyBad = keyStatus === "invalid";
+
+  if (pakOk && keyOk) {
+    el.className = "ok";
+    el.innerHTML = '<i data-lucide="check-circle" size="13"></i> Both Valid';
+    saveBtn.disabled = false;
+  } else if (pakBad && keyBad) {
+    el.className = "error";
+    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Enter valid Key and Pak folder';
+    saveBtn.disabled = true;
+  } else if (pakBad) {
+    el.className = "error";
+    el.innerHTML = `<i data-lucide="x-circle" size="13"></i> ${pakMsg}`;
+    saveBtn.disabled = true;
+  } else if (keyBad) {
+    el.className = "error";
+    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid AES key format';
+    saveBtn.disabled = true;
+  } else if (pakOk) {
+    el.className = "error";
+    el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Key missing';
+    saveBtn.disabled = true;
+  } else {
+    el.className = ""; el.innerHTML = "";
+    saveBtn.disabled = true;
+  }
+  lucide.createIcons({ nodes: [el] });
+
+  const pathEl = document.getElementById("setup-path");
+  const aesEl  = document.getElementById("setup-aes");
+  pathEl.classList.toggle("setup-valid",   pakOk);
+  pathEl.classList.toggle("setup-invalid", pakBad);
+  aesEl.classList.toggle("setup-valid",   keyOk);
+  aesEl.classList.toggle("setup-invalid", keyBad || (pakOk && !key));
+}
+
+document.getElementById("setup-path").addEventListener("input", validateSetup);
+document.getElementById("setup-aes").addEventListener("input", validateSetup);
+document.getElementById("setup-get-key").addEventListener("click", () => {
+  fetch("/api/open_discord_key");
+});
 
 document.getElementById("setup-browse").addEventListener("click", async () => {
   const initial = document.getElementById("setup-path").value.trim();
@@ -922,15 +967,18 @@ document.getElementById("setup-browse").addEventListener("click", async () => {
     });
     if (res.ok && res.path) {
       document.getElementById("setup-path").value = res.path;
-      validateSetupPath();
+      validateSetup();
     }
   } catch (e) {}
   btn.disabled = false;
 });
 
 document.getElementById("setup-save").addEventListener("click", async () => {
-  const path = document.getElementById("setup-path").value.trim();
-  if (!path) { toast("Please enter a path", "warning"); return; }
+  const path   = document.getElementById("setup-path").value.trim();
+  const rawKey = document.getElementById("setup-aes").value.trim();
+  const aes_key = rawKey.toLowerCase().startsWith("0x") ? rawKey.slice(2) : rawKey;
+  if (!path)    { toast("Please enter a path", "warning"); return; }
+  if (!aes_key) { toast("Please enter an AES key", "warning"); return; }
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
   btn.innerHTML = "Saving…";
@@ -938,7 +986,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     const res = await api("/api/save_paks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path, aes_key }),
     });
     if (res.ok) {
       btn.innerHTML = "Restarting…";
