@@ -17,8 +17,8 @@ HERO_PATHS = ["Characters"]
 # Browsing inside these (at skin level) uses _browse_pak_level, not _browse_skin.
 CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters"]
 
-# Top-level folder names (lowercase) shown at the root of the browser.
-ROOT_ALLOWED = frozenset({"characters", "vfx"})
+# Folders pinned to the top at the root level (in order).
+ROOT_PINNED = ("characters", "vfx", "ui")
 
 def _parse_char_md_text(text):
     """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
@@ -168,12 +168,14 @@ def _browse_pak_level(rel_path):
 
     result = []
     for fname_lower in sorted(folders):
-        if not rel_path and fname_lower not in ROOT_ALLOWED:
-            continue
         fname = folders[fname_lower]
         label = _label_folder(rel_path, fname)
         child = f"{rel_path}/{fname}" if rel_path else fname
         result.append({"type": "folder", "name": fname, "label": label, "rel_path": child})
+    if not rel_path:
+        pinned = [r for r in result if r["name"].lower() in ROOT_PINNED]
+        others = [r for r in result if r["name"].lower() not in ROOT_PINNED]
+        result = sorted(pinned, key=lambda r: ROOT_PINNED.index(r["name"].lower())) + others
     for name_lower in sorted(files):
         name     = files[name_lower]
         ft       = _classify_file(name)

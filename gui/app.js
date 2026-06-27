@@ -34,6 +34,8 @@ const ASSET_ICON_CLS = {
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
 const FOLDER_ICON_PATTERNS = [
+  [/^characters?$/i,    "char-icon"],
+  [/^ui$/i,             "ui-folder-icon"],
   [/^textures?$/i,      "texture-folder-icon"],
   [/^materials?$/i,     "material-folder-icon"],
   [/^(vfx|effects?)$/i, "vfx-folder-icon"],
@@ -49,6 +51,7 @@ const ICON_CLS_TO_LUCIDE = {
   "material-folder-icon": "circle-star",
   "vfx-folder-icon":      "sparkles",
   "char-icon":            "square-user-round",
+  "ui-folder-icon":       "swatch-book",
   "texture-icon":         "image",
   "vfx-icon":             "sparkles",
   "material-icon":        "circle-star",

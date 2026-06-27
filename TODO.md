@@ -1,8 +1,5 @@
-### major architectural changes
-
-
 ### regular
-replace toast with tkinter splash screen
+replace on-boot toast with extremely fast lightweight splash screen
 confirm message before export files override files with same name
 fix the duplicate toast from watchdog on file edit
 sidebar: path under material/vfx items dont show anything, its just '/', show path truncated

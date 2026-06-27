@@ -178,7 +178,8 @@ body {
   opacity: .7;
 }
 .card-thumb .card-icon.folder-icon         { color: var(--yellow); opacity: 1; }
-.card-thumb .card-icon.char-icon           { color: var(--blue);   opacity: 1; }
+.card-thumb .card-icon.char-icon           { color: #00d0ec;       opacity: 1; }
+.card-thumb .card-icon.ui-folder-icon      { color: #f06899;       opacity: 1; }
 .card-thumb .card-icon.texture-folder-icon  { color: #22c4d0;       opacity: 1; }
 .card-thumb .card-icon.texture-icon         { color: #22c4d0;       opacity: 1; }
 .card-thumb .card-icon.vfx-icon             { color: #c472e8;       opacity: 1; }
