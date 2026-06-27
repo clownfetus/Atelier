@@ -1,6 +1,6 @@
 @echo off
 timeout 3
-set /p VERSION=Version (e.g. 0.1.3):
+set /p VERSION=Version (e.g. 0.1.3): 
 if "%VERSION%"=="" (echo Version cannot be empty & exit /b 1)
 echo %VERSION%> version
 rmdir /s /q build dist 2>nul

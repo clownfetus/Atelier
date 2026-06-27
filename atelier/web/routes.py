@@ -283,14 +283,13 @@ def api_update_check():
 
     try:
         req = urllib.request.Request(
-            "https://api.github.com/repos/clownfetus/Atelier/releases?per_page=1",
+            "https://api.github.com/repos/clownfetus/Atelier/releases/latest",
             headers={"User-Agent": "Atelier-Updater"},
         )
         with urllib.request.urlopen(req, timeout=5) as r:
-            releases = json.loads(r.read().decode())
-        if not releases:
+            data = json.loads(r.read().decode())
+        if not data or "tag_name" not in data:
             return json.dumps({"available": False})
-        data = releases[0]
     except Exception as e:
         print(f"[update] GitHub request failed: {e}")
         return json.dumps({"available": False})
