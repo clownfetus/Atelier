@@ -1,4 +1,6 @@
 ### regular
+force focus on webview window when confirmed started
+horizontally center navbar's breadcrumbs (change base folder "Import" name to "Home")
 confirmation before export files override files with same name
 descriptive spinner text during initial (extra long loading for index)
 replace on-boot win11 toast with extremely fast lightweight splash screen
@@ -8,6 +10,7 @@ sidebar: path under material/vfx items dont show anything, its just '/', show pa
 hovering over item in sidebar should show tooltip with pak name + full path
 use webview max compatibility gui method, ex leave undefined if better compat
 during the prefill stage of initial configuration when config file doesnt exist, create one with the prefilled contents, "" if no input prefilled
+show atelier version number next to name on top-left, click to open repo page
 
 ### partially formed ideas
 better filetype classification system?
