@@ -593,28 +593,81 @@ def api_prefetch_thumbs():
 
     def _run():
         if not pending: return
+        from PIL import Image as _Image
+        import io as _io
+        print(f"[PREFETCH] starting {len(pending)} pending thumbs", file=sys.stderr, flush=True)
+        t_start = time.time()
+
+        # Pass 1: fast pak decode for everything; collect textures whose mips are
+        # inlined in the export-bundle (no separate BulkData chunk) for batch fallback.
+        to_fallback = []  # game_rels that need UAT extraction
         for gr in pending:
             with _prefetch_gen_lock:
                 if _prefetch_gen != my_gen:
+                    print(f"[PREFETCH] cancelled after pass-1", file=sys.stderr, flush=True)
                     return
             thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if not os.path.exists(thumb):
-                png = decode_thumb_from_pak(gr)
-                if png:
-                    os.makedirs(os.path.dirname(thumb), exist_ok=True)
-                    with open(thumb, "wb") as f:
-                        f.write(png)
-                else:
-                    # fallback: extract via UAssetTool if pak decode unsupported
-                    uasset = _cache_import_base(gr) + ".uasset"
-                    if not os.path.exists(uasset):
-                        names = [os.path.basename(pak_game_path(gr))]
-                        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
-                        _relocate_to_import(gr)
-                    if os.path.exists(uasset):
-                        decode_thumb(uasset, thumb)
             if os.path.exists(thumb):
+                continue
+            png = decode_thumb_from_pak(gr)
+            if png:
+                os.makedirs(os.path.dirname(thumb), exist_ok=True)
+                with open(thumb, "wb") as f:
+                    f.write(png)
                 _push_sse({"thumb_ready": True, "game_rel": gr})
+            else:
+                uasset = _cache_import_base(gr) + ".uasset"
+                if os.path.exists(uasset):
+                    # uasset already on disk (previously imported), just decode
+                    decode_thumb(uasset, thumb)
+                    if os.path.exists(thumb):
+                        _push_sse({"thumb_ready": True, "game_rel": gr})
+                else:
+                    to_fallback.append(gr)
+
+        n_pak = len(pending) - len(to_fallback)
+        print(f"[PREFETCH] pass-1 done: {n_pak} pak-ok, {len(to_fallback)} need UAT  ({time.time()-t_start:.2f}s)",
+              file=sys.stderr, flush=True)
+
+        if not to_fallback:
+            return
+
+        with _prefetch_gen_lock:
+            if _prefetch_gen != my_gen:
+                return
+
+        # Pass 2: batch-extract all no-bulk textures in one UAT call, then
+        # parallel-decode all their PNGs directly to THUMBS_DIR and resize.
+        t_uat = time.time()
+        names = sorted({os.path.basename(pak_game_path(gr)) for gr in to_fallback})
+        print(f"[PREFETCH] batch extract {len(names)} assets via UAT...", file=sys.stderr, flush=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
+        for gr in to_fallback:
+            _relocate_to_import(gr)
+        print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
+
+        t_dec = time.time()
+        uasset_paths = [_cache_import_base(gr) + ".uasset" for gr in to_fallback
+                        if os.path.exists(_cache_import_base(gr) + ".uasset")]
+        if uasset_paths:
+            decode_batch(uasset_paths, output_root=THUMBS_DIR, base_root=WORK_IMPORT_ROOT)
+        print(f"[PREFETCH] decode done in {time.time()-t_dec:.2f}s", file=sys.stderr, flush=True)
+
+        # Resize decoded PNGs in-place to thumbnail size, fire SSE per asset
+        for gr in to_fallback:
+            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+            if os.path.exists(thumb):
+                try:
+                    img = _Image.open(thumb)
+                    if img.width > 128 or img.height > 128:
+                        img.thumbnail((128, 128), _Image.LANCZOS)
+                        img.save(thumb, "PNG", optimize=False)
+                except Exception:
+                    pass
+                _push_sse({"thumb_ready": True, "game_rel": gr})
+
+        print(f"[PREFETCH] total {time.time()-t_start:.2f}s  ({len(to_fallback)} batched UAT fallbacks)",
+              file=sys.stderr, flush=True)
 
     threading.Thread(target=_run, daemon=True).start()
     response.content_type = "application/json"

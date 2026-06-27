@@ -1,4 +1,5 @@
 ### regular
+during the prefill stage of initial configuration when config file doesnt exist, create one with the prefilled contents, "" if no input prefilled
 UI thumbnail generation takes forever compared to character textures?
 replace on-boot toast with extremely fast lightweight splash screen
 toggle select/deselect all when clicking the sidebar's circled number
