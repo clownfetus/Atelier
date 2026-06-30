@@ -1335,7 +1335,10 @@ _enforceSafeName(document.getElementById("mod-name-input"));
 
 async function checkProject() {
   const res = await api("/api/projects");
-  if (res.active && res.projects.find(p => p.name === res.active)) return;
+  if (res.active && res.projects.find(p => p.name === res.active)) {
+    toast(`Project: ${res.active}`, "success");
+    return;
+  }
   return new Promise(resolve => {
     _projPickerResolve = resolve;
     _renderProjectPicker(res.projects || []);
@@ -1368,7 +1371,7 @@ function _renderProjectPicker(projects) {
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
     card.innerHTML = `
       <div class="proj-thumb">
-        <img src="${thumbUrl}" alt="" onerror="this.style.display='none'">
+        <img src="${thumbUrl}" alt="" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">
         <i data-lucide="folder" size="40" class="proj-thumb-icon"></i>
       </div>
       <div class="proj-body">
@@ -1437,6 +1440,7 @@ async function _selectProject(name) {
     body: JSON.stringify({ name }),
   });
   if (!r.ok) { toast(`Failed to open project: ${r.error}`, "warning"); return; }
+  toast(`Project: ${name}`, "success");
   _applyActiveProject(name);
   document.getElementById("project-overlay").classList.remove("active");
   if (_projPickerResolve) {
