@@ -29,8 +29,11 @@ def game_rel_for_skin(skin_id, tex_rel):
 def pak_game_path(game_rel):
     """Full content-mount path for game_rel (used for pak extraction and mod staging).
     Looks up which mount the asset came from so LQ-only assets get the right prefix."""
+    import sys
     pfx = get_content_prefix(game_rel)
-    return pfx.rstrip("/") + "/" + game_rel
+    result = pfx.rstrip("/") + "/" + game_rel
+    print(f"[pak_game_path] {game_rel}: pfx={pfx}  result={result}", file=sys.stderr, flush=True)
+    return result
 
 def skin_entries(skin_id):
     pfx = _skin_prefix(skin_id)

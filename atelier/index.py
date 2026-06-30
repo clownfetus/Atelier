@@ -4,21 +4,26 @@ import io_lib
 
 _INDEX      = None
 _CACHE_FILE = os.path.join(_CACHE, "cli_index_cache.json")
-_CACHE_VER  = "v7"  # bump to invalidate cached indexes
+_CACHE_VER  = "v9"  # bump to invalidate cached indexes
 
-# The two content mounts we care about.  Both map to the same virtual namespace.
+# Content mount prefixes we care about.  All pak formats (base and patch) embed raw utoc paths
+# like ../../../Marvel/Content/Marvel/... or ../../../Marvel/Content/Marvel_LQ/... — the leading
+# junk varies but Marvel/Content/Marvel[_LQ]/ is the stable anchor.  Using find() below handles
+# any arbitrary prefix before that anchor without needing to enumerate all variants.
 _CONTENT_PREFIXES = (
     "Marvel/Content/Marvel/",
     "Marvel/Content/Marvel_LQ/",
 )
 
 def _virtual_path(raw):
-    """Strip ../../../ prefix and content mount; return (virtual_rel_path, content_prefix) or (None, None)."""
-    clean = re.sub(r"^(\.\./)+", "", raw.replace("\\", "/"))
+    """Find the content-mount anchor anywhere in the raw path; return (virtual_rel_path, content_prefix) or (None, None).
+    Using find() instead of startswith-after-strip handles any leading junk (../../, ent/, etc.)."""
+    clean = raw.replace("\\", "/")
     cl = clean.lower()
     for pfx in _CONTENT_PREFIXES:
-        if cl.startswith(pfx.lower()):
-            return clean[len(pfx):], pfx
+        idx = cl.find(pfx.lower())
+        if idx >= 0:
+            return clean[idx + len(pfx):], pfx
     return None, None
 
 def _index_utocs():
@@ -80,9 +85,7 @@ def ensure_index():
             existing = seen.get(vp_key)
             if existing is not None:
                 ex_pfx = existing[2]
-                # Always prefer HQ over LQ — even if the LQ entry comes from a patch pak.
-                # Patch paks include both HQ and LQ entries; alphabetical pak order puts HQ
-                # first so the LQ entry would otherwise overwrite it.
+                # HQ always beats LQ for the same virtual path.
                 if ex_pfx == "Marvel/Content/Marvel/" and pfx == "Marvel/Content/Marvel_LQ/":
                     continue
             seen[vp_key] = (vp, cont, pfx)

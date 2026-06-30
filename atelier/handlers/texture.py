@@ -1,5 +1,5 @@
 import os, sys, glob, re, shutil, concurrent.futures
-from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs
+from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs, get_import_root
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
@@ -45,6 +45,13 @@ def decode_thumb(uasset_path, thumb_path):
             return True
     return False
 
+# UAT extract_iostore_legacy drops patch pak assets under ent/Marvel[_LQ]/ instead of the full
+# Marvel/Content/Marvel[_LQ]/ path that base paks use.  Map index pfx → UAT output prefix.
+_PATCH_UAT_PREFIX = {
+    "Marvel/Content/Marvel/":    "ent/Marvel/",
+    "Marvel/Content/Marvel_LQ/": "ent/Marvel_LQ/",
+}
+
 def extract_info(game_rel):
     """Return (cache_base_path, pak, pfx) from the pak index (no ext on path).
     cache_base_path is where UAssetTool drops the file in WORK_IMPORT_ROOT.
@@ -54,13 +61,18 @@ def extract_info(game_rel):
     result = (None, None, None)
     for virt_path, container, pfx in ensure_index():
         if virt_path.lower() == target:
-            cp = os.path.join(WORK_IMPORT_ROOT, *(pfx.rstrip("/") + "/" + virt_path[:-7]).split("/"))
+            is_patch = container.lower().endswith("_p.utoc")
+            uat_pfx  = _PATCH_UAT_PREFIX.get(pfx, pfx) if is_patch else pfx
+            cp = os.path.join(WORK_IMPORT_ROOT, *(uat_pfx.rstrip("/") + "/" + virt_path[:-7]).split("/"))
+            print(f"[extract_info] {game_rel}: container={container} pfx={pfx} uat_pfx={uat_pfx} predicted={cp}", file=sys.stderr, flush=True)
             result = (cp, container, pfx)
+    if result == (None, None, None):
+        print(f"[extract_info] {game_rel}: NOT IN INDEX", file=sys.stderr, flush=True)
     return result
 
 def find_extracted(game_rel):
     """Fallback: walk WORK_IMPORT_ROOT for a .uasset matching the game_rel suffix.
-    Used when the asset_cache has no entry (legacy state, stale index, etc.)."""
+    Used when the predicted path doesn't exist (e.g. stale index, unexpected UAT output prefix)."""
     suf = os.path.join(*game_rel.split("/")) + ".uasset"
     work_abs = os.path.abspath(WORK_IMPORT_ROOT)
     for dirpath, _, files in os.walk(work_abs):
@@ -69,14 +81,16 @@ def find_extracted(game_rel):
                 continue
             full = os.path.join(dirpath, fname)
             if full.lower().endswith(suf.lower()):
+                print(f"[find_extracted] {game_rel}: found at {full}", file=sys.stderr, flush=True)
                 return full[:-7]
+    print(f"[find_extracted] {game_rel}: NOT FOUND in {work_abs}", file=sys.stderr, flush=True)
     return None
 
 def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
     import atelier.asset_cache as _ac
-    import_base = os.path.join(IMPORT_ROOT, os.path.basename(game_rel))
+    import_base = os.path.join(get_import_root(), os.path.basename(game_rel))
     work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
@@ -87,6 +101,7 @@ def stage_inject(stage, game_rel):
             raise RuntimeError("PNG missing and decode failed — re-import this texture")
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
+    print(f"[stage_inject] {game_rel}: pak_game_path={pak_gr}  stage_ua={out_ua}", file=sys.stderr, flush=True)
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
     r = uat(["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(png),
              os.path.abspath(out_ua), "--usmap", USMAP])

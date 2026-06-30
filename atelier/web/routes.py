@@ -626,7 +626,13 @@ def api_prefetch_thumbs():
         cache_entries = []
         for gr in to_fallback:
             cp, pak, pfx = extract_info(gr)
-            if cp: cache_entries.append((gr, cp, pak, pfx))
+            cp_ok = cp and os.path.exists(cp + ".uasset")
+            actual = cp if cp_ok else find_extracted(gr)
+            if actual and os.path.exists(actual + ".uasset"):
+                print(f"[PREFETCH cache] {gr}: {'predicted' if cp_ok else 'fallback'} -> {actual}", file=sys.stderr, flush=True)
+                cache_entries.append((gr, actual, pak or "", pfx or ""))
+            else:
+                print(f"[PREFETCH cache] {gr}: uasset NOT FOUND (predicted={cp})", file=sys.stderr, flush=True)
         _asset_cache.record_many(cache_entries)
         print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
 
@@ -686,16 +692,31 @@ def api_import_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing skin_id/rel_path or game_rel"})
     try:
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
         os.makedirs(get_import_root(), exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-             "--filter", os.path.basename(pak_game_path(gr))])
-        cp, pak, pfx = extract_info(gr)
-        if cp and os.path.exists(cp + ".uasset"):
-            _asset_cache.record(gr, cp, pak, pfx)
+        # Skip UAT extraction if the uasset is already cached on disk.
+        cb = _asset_cache.cache_base(gr)
+        if cb and os.path.exists(cb + ".uasset"):
+            print(f"[import] {gr}: cache hit, skipping UAT ({cb})", file=sys.stderr, flush=True)
+        else:
+            os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+            uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
+                 "--filter", os.path.basename(pak_game_path(gr))])
+            cp, pak, pfx = extract_info(gr)
+            if cp and os.path.exists(cp + ".uasset"):
+                print(f"[import] {gr}: predicted path hit -> {cp}", file=sys.stderr, flush=True)
+                _asset_cache.record(gr, cp, pak, pfx)
+            else:
+                fb = find_extracted(gr)
+                if fb and os.path.exists(fb + ".uasset"):
+                    print(f"[import] {gr}: fallback found -> {fb}", file=sys.stderr, flush=True)
+                    _asset_cache.record(gr, fb, pak or "", pfx or "")
+                else:
+                    print(f"[import] {gr}: uasset NOT FOUND anywhere (predicted={cp})", file=sys.stderr, flush=True)
         dst_base  = _import_base(gr)
         work_base = _cache_import_base(gr)
-        if work_base and os.path.exists(work_base + ".uasset"):
+        print(f"[import] {gr}: work_base={work_base!r} exists={bool(work_base) and os.path.exists(work_base + '.uasset')}", file=sys.stderr, flush=True)
+        # Don't re-decode if the PNG already exists — would overwrite user's edited version.
+        if work_base and os.path.exists(work_base + ".uasset") and not os.path.exists(dst_base + ".png"):
             decode_png(dst_base, work_base)
         png_exists    = os.path.exists(dst_base + ".png")
         uasset_exists = bool(work_base) and os.path.exists(work_base + ".uasset")

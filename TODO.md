@@ -1,4 +1,4 @@
-diagnose export times (manually seeks filenames instead of cached index/uasset path?)
+diagnose import/export times (all LQ and patches using UAT fallback?)
 test pak override order, maybe write a test that checks cases where two patches override the same base asset to ensure latest patch's item is used
 preview thumbnails sometimes infinitely load until revisit/triggered refresh bug
 - all refreshes reset edited asset thumbnails to original bug
