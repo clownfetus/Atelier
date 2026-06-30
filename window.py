@@ -6,6 +6,7 @@ import urllib.request
 import os
 import datetime
 import subprocess
+import ctypes
 import webview
 
 PORT = 8767
@@ -103,7 +104,15 @@ def main():
         sys.exit(1)
 
     window = webview.create_window("Atelier", URL, width=1400, height=900)
-    webview.start(debug=False, gui='edgechromium')
+
+    def _focus():
+        time.sleep(0.3)
+        hwnd = ctypes.windll.user32.FindWindowW(None, "Atelier")
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+    webview.start(_focus, debug=False)
     os._exit(0)
 
 
