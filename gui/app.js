@@ -155,7 +155,12 @@ function renderBreadcrumbs() {
   };
 
   const parts = nav.path ? nav.path.split("/") : [];
-  bc.appendChild(crumb("Import", parts.length > 0 ? { path: "" } : null));
+  const homeCrumb = document.createElement("span");
+  homeCrumb.className = "crumb" + (parts.length === 0 ? " active" : "");
+  homeCrumb.title = "Import";
+  homeCrumb.innerHTML = '<i data-lucide="house" size="14"></i>';
+  if (parts.length > 0) homeCrumb.addEventListener("click", () => pushNav({ path: "" }));
+  bc.appendChild(homeCrumb);
 
   let accumulated = "";
   for (let i = 0; i < parts.length; i++) {

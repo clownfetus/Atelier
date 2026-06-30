@@ -62,6 +62,7 @@ body {
 #breadcrumbs {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   flex: 1;
   min-width: 0;
@@ -75,11 +76,13 @@ body {
   padding: 2px 6px;
   border-radius: 5px;
   transition: color .15s, background .15s;
+  display: inline-flex;
+  align-items: center;
 }
 .crumb:hover { color: var(--text); background: var(--bg3); }
 .crumb.active { color: var(--text); cursor: default; }
 .crumb.active:hover { background: transparent; }
-.sep { color: var(--border2); font-size: 11px; flex-shrink: 0; }
+.sep { color: var(--border2); font-size: 11px; flex-shrink: 0; display: inline-flex; align-items: center; }
 .logo {
   font-size: 15px; font-weight: 800;
   color: var(--acc);
