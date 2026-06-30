@@ -706,6 +706,15 @@ function refreshSidebarEntry(game_rel, name, skin_id) {
   });
 }
 
+function sbSubLabel(item) {
+  if (item.char_name || item.skin_id) {
+    return `${item.char_name || item.skin_id} / ${item.skin_name || ""}`;
+  }
+  const parts = (item.game_rel || "").split("/").filter(Boolean);
+  if (parts.length >= 2) return `…/${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+  return parts.join("/") || item.game_rel || "";
+}
+
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
   list.innerHTML = "";
@@ -740,7 +749,7 @@ function renderSidebar() {
       </div>
       <div class="sb-info">
         <div class="sb-name">${item.name}</div>
-        <div class="sb-sub">${item.char_name || item.skin_id || ""} / ${item.skin_name || ""}</div>
+        <div class="sb-sub">${sbSubLabel(item)}</div>
       </div>
       <div class="sb-check">${item.selected ? '<i data-lucide="check" size="12"></i>' : ""}</div>
     `;
@@ -1540,9 +1549,9 @@ document.getElementById("menu-btn").addEventListener("click", e => {
         _renderProjectPicker(res.projects || []);
         document.getElementById("project-overlay").classList.add("active");
       }},
-      { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid() },
-      { icon: "folder-search", label: "Show in Explorer", action: () => fetch("/api/open_projects_folder") },
-      { icon: "circle-help", label: "Help / Info", action: () => window.open("https://github.com/clownfetus/Atelier#usage", "_blank") },
+      { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
+      { icon: "folder-search", label: "Show in Explorer", action: () => { fetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
+      { icon: "circle-help", label: "Help / Info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
       { icon: "trash-2", label: "Reset Data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },
     ]
