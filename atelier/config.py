@@ -94,10 +94,33 @@ CNW     = 0x08000000 if os.name == "nt" else 0
 
 ASSETS           = os.path.join(ROOT, "assets")
 IMPORT_ROOT      = os.path.join(ROOT, "assets", "imported")
+PROJECTS_ROOT    = os.path.join(ROOT, "assets", "projects")
 ASSETS_MODS      = os.path.join(ROOT, "assets", "exported")
 _CACHE           = os.path.join(ROOT, "_cache")
 WORK_IMPORT_ROOT = os.path.join(_CACHE, "import")
 GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
+
+_active_project = _cfg.get("active_project", "")
+
+def get_import_root():
+    global _active_project
+    if _active_project:
+        return os.path.join(PROJECTS_ROOT, _active_project)
+    return IMPORT_ROOT
+
+def get_active_project():
+    global _active_project
+    return _active_project
+
+def set_active_project(name):
+    global _active_project
+    _active_project = name
+    cfg = _load_config()
+    if name:
+        cfg["active_project"] = name
+    else:
+        cfg.pop("active_project", None)
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
 def _prereq_issues(need_tool=True):
     issues = []

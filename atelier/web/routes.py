@@ -2,9 +2,11 @@ import os, sys, glob, json, re, shutil, threading, queue, subprocess, tempfile, 
 from bottle import request, response, static_file
 
 from atelier.web.app import app
-from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, GUI_DIR, _CACHE,
-                            get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion, save_paks_config,
-                            save_setup_config, save_usmap_config, get_usmap_checked_at, save_usmap_checked_at)
+from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
+                            GUI_DIR, _CACHE, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
+                            save_paks_config, save_setup_config, save_usmap_config,
+                            get_usmap_checked_at, save_usmap_checked_at,
+                            get_import_root, get_active_project, set_active_project)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -33,7 +35,8 @@ def _download_usmap_file(download_url, dest_path):
 
 THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
-from atelier.handlers.texture import decode_batch, stage_inject, build_mod, decode_thumb, extract_output_base, find_extracted
+from atelier.handlers.texture import decode_batch, decode_flat, decode_png, stage_inject, build_mod, decode_thumb, extract_info, find_extracted
+import atelier.asset_cache as _asset_cache
 from atelier.handlers.pak_thumb import decode_thumb_from_pak
 import atelier.handlers.pak_thumb as _pak_thumb_mod
 import io_lib as _io_lib_mod
@@ -48,36 +51,12 @@ import atelier.web.browse as _browse_mod
 # ── extraction helpers ────────────────────────────────────────────────────────
 
 def _import_base(game_rel):
-    """Full disk path (no ext) for a game_rel in the import structure (png/json live here)."""
-    return os.path.join(IMPORT_ROOT, *game_rel.split("/"))
+    """Full disk path (no ext) for a game_rel in the active project (flat — png/json live here)."""
+    return os.path.join(get_import_root(), os.path.basename(game_rel))
 
 def _cache_import_base(game_rel):
-    """Full disk path (no ext) for a game_rel in _cache/import (uasset/uexp/ubulk live here)."""
-    return os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
-
-def _relocate_to_import(game_rel):
-    """Move .uasset/.uexp/.ubulk from pak extraction location to _cache/import structure.
-    Uses the index to determine the exact extraction output path; falls back to ASSETS walk
-    if the asset isn't in the index (stale cache, etc.)."""
-    src_base = extract_output_base(game_rel)
-    if not src_base or not os.path.exists(src_base + ".uasset"):
-        src_base = find_extracted(game_rel)
-    if not src_base:
-        return
-    dst_base = _cache_import_base(game_rel)
-    os.makedirs(os.path.dirname(dst_base), exist_ok=True)
-    assets_root = os.path.abspath(ASSETS)
-    for ext in (".uasset", ".uexp", ".ubulk"):
-        src = src_base + ext
-        if os.path.exists(src):
-            shutil.move(src, dst_base + ext)
-    src_dir = os.path.abspath(os.path.dirname(src_base))
-    while src_dir.startswith(assets_root) and src_dir != assets_root:
-        try:
-            os.rmdir(src_dir)
-        except OSError:
-            break
-        src_dir = os.path.dirname(src_dir)
+    """Extracted cache path (no ext) for a game_rel in _cache/import, via asset_cache."""
+    return _asset_cache.cache_base(game_rel)
 
 # ── static ────────────────────────────────────────────────────────────────────
 
@@ -615,8 +594,9 @@ def api_prefetch_thumbs():
                     f.write(png)
                 _push_sse({"thumb_ready": True, "game_rel": gr})
             else:
-                uasset = _cache_import_base(gr) + ".uasset"
-                if os.path.exists(uasset):
+                cb = _asset_cache.cache_base(gr)
+                uasset = (cb + ".uasset") if cb else ""
+                if uasset and os.path.exists(uasset):
                     # uasset already on disk (previously imported), just decode
                     decode_thumb(uasset, thumb)
                     if os.path.exists(thumb):
@@ -636,20 +616,31 @@ def api_prefetch_thumbs():
                 return
 
         # Pass 2: batch-extract all no-bulk textures in one UAT call, then
-        # parallel-decode all their PNGs directly to THUMBS_DIR and resize.
+        # parallel-decode thumbnails per-file to THUMBS_DIR.
+        import concurrent.futures as _cf
         t_uat = time.time()
         names = sorted({os.path.basename(pak_game_path(gr)) for gr in to_fallback})
         print(f"[PREFETCH] batch extract {len(names)} assets via UAT...", file=sys.stderr, flush=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
+        cache_entries = []
         for gr in to_fallback:
-            _relocate_to_import(gr)
+            cp, pak, pfx = extract_info(gr)
+            if cp: cache_entries.append((gr, cp, pak, pfx))
+        _asset_cache.record_many(cache_entries)
         print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
 
         t_dec = time.time()
-        uasset_paths = [_cache_import_base(gr) + ".uasset" for gr in to_fallback
-                        if os.path.exists(_cache_import_base(gr) + ".uasset")]
-        if uasset_paths:
-            decode_batch(uasset_paths, output_root=THUMBS_DIR, base_root=WORK_IMPORT_ROOT)
+        def _decode_thumb_fallback(gr):
+            cb = _asset_cache.cache_base(gr)
+            if not cb: return
+            uasset = cb + ".uasset"
+            if not os.path.exists(uasset): return
+            th = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+            os.makedirs(os.path.dirname(th), exist_ok=True)
+            decode_thumb(uasset, th)
+        with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
+            list(_ex.map(_decode_thumb_fallback, to_fallback))
         print(f"[PREFETCH] decode done in {time.time()-t_dec:.2f}s", file=sys.stderr, flush=True)
 
         # Resize decoded PNGs in-place to thumbnail size, fire SSE per asset
@@ -695,17 +686,20 @@ def api_import_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing skin_id/rel_path or game_rel"})
     try:
-        dst_base   = _import_base(gr)
-        work_base  = _cache_import_base(gr)
-        os.makedirs(os.path.dirname(dst_base),  exist_ok=True)
-        os.makedirs(os.path.dirname(work_base), exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS),
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        os.makedirs(get_import_root(), exist_ok=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
              "--filter", os.path.basename(pak_game_path(gr))])
-        _relocate_to_import(gr)
-        decode_batch([work_base + ".uasset"], output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
-        png_exists = os.path.exists(dst_base + ".png")
+        cp, pak, pfx = extract_info(gr)
+        if cp and os.path.exists(cp + ".uasset"):
+            _asset_cache.record(gr, cp, pak, pfx)
+        dst_base  = _import_base(gr)
+        work_base = _cache_import_base(gr)
+        if work_base and os.path.exists(work_base + ".uasset"):
+            decode_png(dst_base, work_base)
+        png_exists    = os.path.exists(dst_base + ".png")
+        uasset_exists = bool(work_base) and os.path.exists(work_base + ".uasset")
         if not png_exists:
-            uasset_exists = os.path.exists(work_base + ".uasset")
             msg = "decode failed — PNG not created" if uasset_exists else "extraction failed — asset not found in pak"
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": msg, "game_rel": gr})
@@ -828,15 +822,18 @@ def _run_import_job(items):
     try:
         names = sorted({os.path.basename(pak_game_path(it["game_rel"])) for it in items})
         _push_sse({"current": 0, "total": len(items), "name": "Extracting from game…", "done": False})
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        os.makedirs(get_import_root(), exist_ok=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
 
+        cache_entries = []
         for it in items:
-            _relocate_to_import(it["game_rel"])
+            cp, pak, pfx = extract_info(it["game_rel"])
+            if cp: cache_entries.append((it["game_rel"], cp, pak, pfx))
+        _asset_cache.record_many(cache_entries)
 
         _push_sse({"current": 0, "total": len(items), "name": "Decoding…", "done": False})
-        uassets = [_cache_import_base(it["game_rel"]) + ".uasset" for it in items]
-        decode_batch([u for u in uassets if os.path.exists(u)],
-                     output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
+        decode_flat([it["game_rel"] for it in items], get_import_root())
 
         results = []; current = 0
         for it in items:
@@ -917,20 +914,199 @@ class _PNGHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith(".png"):
+            import_root = get_import_root().replace("\\", "/")
+            evt_path    = event.src_path.replace("\\", "/")
+            if not evt_path.startswith(import_root + "/"):
+                return
             now = time.monotonic()
             if now - self._last.get(event.src_path, 0) < 0.5:
                 return
             self._last[event.src_path] = now
-            gr = os.path.relpath(event.src_path[:-4], IMPORT_ROOT).replace("\\", "/")
+            name = os.path.basename(event.src_path)[:-4]
+            gr   = _asset_cache.by_name(name) or name
             _push_sse({"file_changed": True, "token": token(gr), "game_rel": gr})
 
     def on_created(self, event):
         self.on_modified(event)
 
-os.makedirs(IMPORT_ROOT, exist_ok=True)
+def _migrate_legacy_imports():
+    """Move files from assets/imported/ to projects/Default/ on first use of projects."""
+    if not os.path.isdir(IMPORT_ROOT):
+        return
+    files = [f for f in os.listdir(IMPORT_ROOT) if os.path.isfile(os.path.join(IMPORT_ROOT, f))]
+    if not files:
+        return
+    if os.path.isdir(PROJECTS_ROOT) and any(
+        os.path.isdir(os.path.join(PROJECTS_ROOT, d)) for d in os.listdir(PROJECTS_ROOT)
+    ):
+        return
+    new_root = os.path.join(PROJECTS_ROOT, "Default")
+    os.makedirs(new_root, exist_ok=True)
+    for fname in files:
+        src = os.path.join(IMPORT_ROOT, fname)
+        dst = os.path.join(new_root, fname)
+        if not os.path.exists(dst):
+            shutil.move(src, dst)
+    print(f"[migrate] moved {len(files)} files from imported/ to projects/Default/", flush=True)
+
+_migrate_legacy_imports()
+os.makedirs(PROJECTS_ROOT, exist_ok=True)
 _observer = Observer()
-_observer.schedule(_PNGHandler(), IMPORT_ROOT, recursive=True)
+_observer.schedule(_PNGHandler(), PROJECTS_ROOT, recursive=True)
 _observer.start()
+
+# ── projects ─────────────────────────────────────────────────────────────────
+
+def _list_projects():
+    if not os.path.isdir(PROJECTS_ROOT):
+        return []
+    projects = []
+    for name in os.listdir(PROJECTS_ROOT):
+        path = os.path.join(PROJECTS_ROOT, name)
+        if not os.path.isdir(path):
+            continue
+        mtime       = 0
+        asset_count = 0
+        try:
+            for fname in os.listdir(path):
+                fp = os.path.join(path, fname)
+                if not os.path.isfile(fp):
+                    continue
+                mt = os.path.getmtime(fp)
+                if mt > mtime:
+                    mtime = mt
+                if fname.endswith(".png") or fname.endswith(".json"):
+                    asset_count += 1
+        except Exception:
+            pass
+        if not mtime:
+            try: mtime = os.path.getmtime(path)
+            except Exception: pass
+        projects.append({"name": name, "mtime": int(mtime), "asset_count": asset_count})
+    projects.sort(key=lambda p: p["mtime"], reverse=True)
+    return projects
+
+@app.get("/api/projects")
+def api_projects():
+    response.content_type = "application/json"
+    return json.dumps({"ok": True, "projects": _list_projects(), "active": get_active_project()})
+
+@app.post("/api/project/select")
+def api_project_select():
+    body = request.json or {}
+    name = body.get("name", "").strip()
+    if not name:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "no name"})
+    project_dir = os.path.join(PROJECTS_ROOT, name)
+    if not os.path.isdir(project_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "project not found"})
+    set_active_project(name)
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.post("/api/project/create")
+def api_project_create():
+    body = request.json or {}
+    name = body.get("name", "").strip()
+    if not name or any(c in name for c in r'/\:*?"<>|'):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "invalid project name"})
+    project_dir = os.path.join(PROJECTS_ROOT, name)
+    if os.path.exists(project_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "project already exists"})
+    os.makedirs(project_dir, exist_ok=True)
+    set_active_project(name)
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.post("/api/project/rename")
+def api_project_rename():
+    body     = request.json or {}
+    old_name = body.get("old_name", "").strip()
+    new_name = body.get("new_name", "").strip()
+    if not old_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "invalid name"})
+    old_dir = os.path.join(PROJECTS_ROOT, old_name)
+    new_dir = os.path.join(PROJECTS_ROOT, new_name)
+    if not os.path.isdir(old_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "project not found"})
+    if os.path.exists(new_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "name already taken"})
+    os.rename(old_dir, new_dir)
+    if get_active_project() == old_name:
+        set_active_project(new_name)
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.post("/api/project/duplicate")
+def api_project_duplicate():
+    body     = request.json or {}
+    src_name = body.get("name", "").strip()
+    new_name = body.get("new_name", "").strip()
+    if not src_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "invalid name"})
+    src_dir = os.path.join(PROJECTS_ROOT, src_name)
+    dst_dir = os.path.join(PROJECTS_ROOT, new_name)
+    if not os.path.isdir(src_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "source project not found"})
+    if os.path.exists(dst_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "name already taken"})
+    shutil.copytree(src_dir, dst_dir)
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.post("/api/project/delete")
+def api_project_delete():
+    body = request.json or {}
+    name = body.get("name", "").strip()
+    if not name:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "no name"})
+    project_dir = os.path.join(PROJECTS_ROOT, name)
+    if not os.path.isdir(project_dir):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "project not found"})
+    shutil.rmtree(project_dir)
+    if get_active_project() == name:
+        set_active_project("")
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.get("/api/project/thumb")
+def api_project_thumb():
+    project = request.query.get("project", "")
+    if not project:
+        response.status = 404; return b""
+    project_dir = os.path.join(PROJECTS_ROOT, project)
+    if not os.path.isdir(project_dir):
+        response.status = 404; return b""
+    best_file  = None
+    best_mtime = 0
+    try:
+        for fname in os.listdir(project_dir):
+            if not fname.endswith(".png"):
+                continue
+            fp = os.path.join(project_dir, fname)
+            mt = os.path.getmtime(fp)
+            if mt > best_mtime:
+                best_mtime = mt
+                best_file  = fp
+    except Exception:
+        pass
+    if not best_file:
+        response.status = 404; return b""
+    response.content_type = "image/png"
+    with open(best_file, "rb") as f:
+        return f.read()
 
 # ── open in explorer ──────────────────────────────────────────────────────────
 
@@ -1072,11 +1248,13 @@ def api_delete_imported():
         if os.path.exists(p):
             try: os.remove(p)
             except Exception: pass
-    for ext in (".uasset", ".uexp", ".ubulk"):
-        p = work_base + ext
-        if os.path.exists(p):
-            try: os.remove(p)
-            except Exception: pass
+    if work_base:
+        for ext in (".uasset", ".uexp", ".ubulk"):
+            p = work_base + ext
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
+    _asset_cache.remove(gr)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -1091,10 +1269,27 @@ def api_delete_all_imported():
             if os.path.exists(p):
                 try: os.remove(p)
                 except Exception: pass
-        for ext in (".uasset", ".uexp", ".ubulk"):
-            p = work_base + ext
-            if os.path.exists(p):
-                try: os.remove(p)
-                except Exception: pass
+        if work_base:
+            for ext in (".uasset", ".uexp", ".ubulk"):
+                p = work_base + ext
+                if os.path.exists(p):
+                    try: os.remove(p)
+                    except Exception: pass
+        _asset_cache.remove(item["game_rel"])
     response.content_type = "application/json"
     return json.dumps({"ok": True, "deleted": len(items)})
+
+@app.get("/api/asset_info")
+def api_asset_info():
+    """Return pak source + game path for a game_rel (for sidebar tooltips)."""
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    info = _asset_cache.get(gr)
+    if not info:
+        return json.dumps({"ok": False})
+    pak       = os.path.basename(info.get("pak", ""))
+    pfx       = info.get("pfx", "")
+    game_path = pfx.rstrip("/") + "/" + gr if pfx else gr
+    return json.dumps({"ok": True, "pak": pak, "game_path": game_path})

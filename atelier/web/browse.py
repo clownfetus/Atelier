@@ -1,5 +1,5 @@
 import os, re, hashlib, threading, urllib.request
-from atelier.config import ROOT, IMPORT_ROOT
+from atelier.config import ROOT, get_import_root
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
@@ -106,13 +106,15 @@ def token(game_rel):
     return hashlib.md5(game_rel.encode()).hexdigest()[:20]
 
 def game_rel_from_token(tok):
-    """Reverse-lookup game_rel from a token by scanning IMPORT_ROOT."""
-    for root, _, files in os.walk(IMPORT_ROOT):
-        for f in files:
-            if not f.endswith(".png"): continue
-            gr = os.path.relpath(os.path.join(root, f[:-4]), IMPORT_ROOT).replace("\\", "/")
-            if token(gr) == tok:
-                return gr
+    """Reverse-lookup game_rel from a token via the asset_cache (flat project root)."""
+    import atelier.asset_cache as _ac
+    import_root = get_import_root()
+    if not os.path.isdir(import_root): return None
+    for fname in os.listdir(import_root):
+        if not fname.endswith(".png"): continue
+        gr = _ac.by_name(fname[:-4]) or fname[:-4]
+        if token(gr) == tok:
+            return gr
     return None
 
 # Only these asset kinds are surfaced in the browser. Everything else
@@ -183,8 +185,7 @@ def _browse_pak_level(rel_path):
             continue
         gr       = f"{rel_path}/{name}" if rel_path else name
         is_mat   = ft == "material"
-        base     = os.path.join(IMPORT_ROOT, *gr.split("/"))
-        imported = os.path.exists(base + (".json" if is_mat else ".png"))
+        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(gr) + (".json" if is_mat else ".png")))
         result.append({
             "type":      "asset",
             "file_type": ft,
@@ -229,9 +230,8 @@ def _browse_skin(skin_id, subpath):
         ft     = _classify_file(name, td["rel_path"])
         if ft not in LISTED_FILE_TYPES:        # hide meshes/curves/blueprints/vfx/etc.
             continue
-        base   = os.path.join(IMPORT_ROOT, *td["game_rel"].split("/"))
-        is_mat = ft == "material"
-        imported = os.path.exists(base + (".json" if is_mat else ".png"))
+        is_mat   = ft == "material"
+        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(td["game_rel"]) + (".json" if is_mat else ".png")))
         tok      = token(td["game_rel"]) if imported else None
         result.append({
             "type":      "asset",
@@ -286,37 +286,36 @@ _HERO_LABEL_RES = [re.compile(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})/", re.IGNO
                    for hp in CHAR_LABEL_PATHS]
 
 def all_imported():
-    """Walk IMPORT_ROOT and return all imported assets."""
+    """Scan flat active project dir and return all imported assets, resolving game_rel via asset_cache."""
+    import atelier.asset_cache as _ac
+    import_root = get_import_root()
+    if not os.path.isdir(import_root): return []
     items = []
-    if not os.path.isdir(IMPORT_ROOT):
-        return items
-    for dirpath, _, files in os.walk(IMPORT_ROOT):
-        for fname in sorted(files):
-            rel = os.path.relpath(os.path.join(dirpath, fname), IMPORT_ROOT).replace("\\", "/")
-            cid = sid = None
-            for hr in _HERO_LABEL_RES:
-                m = hr.match(rel)
-                if m:
-                    cid, sid = m.group(1), m.group(2)
-                    break
-            if fname.endswith(".png"):
-                gr = rel[:-4]
-                items.append({
-                    "token": token(gr), "game_rel": gr, "name": fname[:-4],
-                    "file_type": "texture",
-                    "skin_id":   sid or "", "char_id": cid or "",
-                    "char_name": char_name(cid) if cid else "",
-                    "skin_name": skin_name(sid) if sid else "",
-                    "mtime": int(os.path.getmtime(os.path.join(dirpath, fname))),
-                })
-            elif fname.endswith(".json") and _classify_file(fname[:-5]) == "material":
-                gr = rel[:-5]
-                items.append({
-                    "token": token(gr), "game_rel": gr, "name": fname[:-5],
-                    "file_type": "material",
-                    "skin_id":   sid or "", "char_id": cid or "",
-                    "char_name": char_name(cid) if cid else "",
-                    "skin_name": skin_name(sid) if sid else "",
-                    "mtime": int(os.path.getmtime(os.path.join(dirpath, fname))),
-                })
+    for fname in sorted(os.listdir(import_root)):
+        fpath = os.path.join(import_root, fname)
+        if not os.path.isfile(fpath): continue
+        if fname.endswith(".png"):
+            name = fname[:-4]
+            gr   = _ac.by_name(name) or name
+            ft   = "texture"
+        elif fname.endswith(".json") and _classify_file(fname[:-5]) == "material":
+            name = fname[:-5]
+            gr   = _ac.by_name(name) or name
+            ft   = "material"
+        else:
+            continue
+        cid = sid = None
+        for hr in _HERO_LABEL_RES:
+            m = hr.match(gr)
+            if m:
+                cid, sid = m.group(1), m.group(2)
+                break
+        items.append({
+            "token": token(gr), "game_rel": gr, "name": name,
+            "file_type": ft,
+            "skin_id":   sid or "", "char_id": cid or "",
+            "char_name": char_name(cid) if cid else "",
+            "skin_name": skin_name(sid) if sid else "",
+            "mtime": int(os.path.getmtime(fpath)),
+        })
     return items

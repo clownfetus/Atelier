@@ -1,5 +1,5 @@
-import os, sys, glob, re, shutil
-from atelier.config import ASSETS, IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs
+import os, sys, glob, re, shutil, concurrent.futures
+from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
@@ -22,6 +22,19 @@ def decode_batch(uasset_paths, output_root=None, base_root=None):
                      "base_path":   os.path.abspath(base_root   or IMPORT_ROOT),
                      "usmap_path": USMAP, "format": "png", "parallel": True})
 
+def decode_flat(game_rels, output_dir):
+    """Parallel-decode extracted uassets to output_dir as flat basename.png (no subdirectory tree)."""
+    import atelier.asset_cache as _ac
+    os.makedirs(output_dir, exist_ok=True)
+    def _one(gr):
+        cb = _ac.cache_base(gr) or find_extracted(gr)
+        if not cb or not os.path.exists(cb + ".uasset"): return
+        decode_png(os.path.join(output_dir, os.path.basename(cb)), cb)
+    grs = list(game_rels)
+    if not grs: return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
+        list(ex.map(_one, grs))
+
 def decode_thumb(uasset_path, thumb_path):
     """Decode the lowest available mip to a small thumbnail PNG (tries mip 4 → 3 → 2 → 0)."""
     os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
@@ -32,23 +45,25 @@ def decode_thumb(uasset_path, thumb_path):
             return True
     return False
 
-def extract_output_base(game_rel):
-    """Return the exact path (no ext) where UAssetTool drops the extracted file.
-    Uses the content-mount prefix stored in the index so LQ assets resolve to the right path."""
+def extract_info(game_rel):
+    """Return (cache_base_path, pak, pfx) from the pak index (no ext on path).
+    cache_base_path is where UAssetTool drops the file in WORK_IMPORT_ROOT.
+    Returns (None, None, None) if the asset is absent from the index."""
     from atelier.index import ensure_index
     target = game_rel.lower() + ".uasset"
-    result = None
-    for virt_path, _cont, pfx in ensure_index():
+    result = (None, None, None)
+    for virt_path, container, pfx in ensure_index():
         if virt_path.lower() == target:
-            result = os.path.join(ASSETS, *(pfx.rstrip("/") + "/" + virt_path[:-7]).split("/"))
+            cp = os.path.join(WORK_IMPORT_ROOT, *(pfx.rstrip("/") + "/" + virt_path[:-7]).split("/"))
+            result = (cp, container, pfx)
     return result
 
 def find_extracted(game_rel):
-    """Fallback: walk ASSETS for a .uasset whose path ends with the game_rel suffix.
-    Used when the asset is absent from the index (stale cache, mid-update, etc.)."""
+    """Fallback: walk WORK_IMPORT_ROOT for a .uasset matching the game_rel suffix.
+    Used when the asset_cache has no entry (legacy state, stale index, etc.)."""
     suf = os.path.join(*game_rel.split("/")) + ".uasset"
-    assets_abs = os.path.abspath(ASSETS)
-    for dirpath, _, files in os.walk(assets_abs):
+    work_abs = os.path.abspath(WORK_IMPORT_ROOT)
+    for dirpath, _, files in os.walk(work_abs):
         for fname in files:
             if not fname.lower().endswith(".uasset"):
                 continue
@@ -60,11 +75,12 @@ def find_extracted(game_rel):
 def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
-    import_base = os.path.join(IMPORT_ROOT,      *game_rel.split("/"))
-    work_base   = os.path.join(WORK_IMPORT_ROOT, *game_rel.split("/"))
-    png = import_base + ".png"
-    if not os.path.exists(work_base + ".uasset"):
+    import atelier.asset_cache as _ac
+    import_base = os.path.join(IMPORT_ROOT, os.path.basename(game_rel))
+    work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
+    if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
+    png = import_base + ".png"
     if not os.path.exists(png):
         decode_png(import_base, work_base)
         if not os.path.exists(png):
@@ -124,6 +140,7 @@ def cmd_list(arg):
 
 def cmd_import(arg):
     check_prereqs()
+    import atelier.asset_cache as _ac
     arg     = arg.replace("\\", "/")
     skin_id, _, subpath = arg.partition("/")
     entries = skin_entries(skin_id)
@@ -134,40 +151,33 @@ def cmd_import(arg):
     if not entries:
         print(f"No entries matched {arg!r}"); return
 
-    cid            = char_id(skin_id)
-    dest_root      = os.path.abspath(os.path.join(IMPORT_ROOT,      "Characters", cid, skin_id))
-    work_dest_root = os.path.abspath(os.path.join(WORK_IMPORT_ROOT, "Characters", cid, skin_id))
-    print(f"  Destination: {dest_root}")
+    game_rels = []
+    seen = set()
+    for p, _ in entries:
+        sr = skin_rel(p, skin_id)
+        if sr.lower().endswith(".uasset"): sr = sr[:-7]
+        gr = game_rel_for_skin(skin_id, sr)
+        if gr.lower() not in seen:
+            seen.add(gr.lower()); game_rels.append(gr)
 
     names = sorted({os.path.basename(p)[:-7] for p, _ in entries})
     print(f"  Extracting {len(names)} asset(s) from game via UAssetTool...", file=sys.stderr)
-    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(ASSETS), "--filter"] + names)
+    os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
     if "Extraction complete" not in (r.stdout or ""):
         print(f"  [warn] extract: {((r.stderr or '') + (r.stdout or '')).strip()[-300:]}", file=sys.stderr)
-    # Move UE files to _cache/import by matching path suffix — UAssetTool uses
-    # different output prefixes per pak (e.g. ent/Marvel/ for patch paks).
-    skin_suf = os.path.join("Characters", cid, skin_id).lower()
-    assets_abs = os.path.abspath(ASSETS)
-    to_move = []
-    for dirpath, _, files in os.walk(assets_abs):
-        for fname in files:
-            full = os.path.join(dirpath, fname)
-            rel  = os.path.relpath(full, assets_abs)
-            if skin_suf not in rel.lower():
-                continue
-            idx      = rel.lower().index(skin_suf)
-            skin_rel = rel[idx + len(skin_suf):].lstrip(os.sep)
-            to_move.append((full, os.path.join(work_dest_root, skin_rel)))
-    os.makedirs(work_dest_root, exist_ok=True)
-    for src, dst in to_move:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.move(src, dst)
-    uasset_paths = glob.glob(os.path.join(work_dest_root, "**", "*.uasset"), recursive=True)
-    decode_batch(uasset_paths, output_root=IMPORT_ROOT, base_root=WORK_IMPORT_ROOT)
 
-    n_assets = len(uasset_paths)
-    n_png    = len(glob.glob(os.path.join(dest_root, "**", "*.png"), recursive=True))
-    print(f"Extracted {n_assets} asset(s), decoded {n_png} PNG -> {dest_root}")
+    cache_entries = []
+    for gr in game_rels:
+        cp, pak, pfx = extract_info(gr)
+        if cp: cache_entries.append((gr, cp, pak, pfx))
+    _ac.record_many(cache_entries)
+
+    decode_flat(game_rels, IMPORT_ROOT)
+
+    n_png = sum(1 for gr in game_rels
+                if os.path.exists(os.path.join(IMPORT_ROOT, os.path.basename(gr) + ".png")))
+    print(f"Extracted {len(names)} asset(s), decoded {n_png} PNG -> {IMPORT_ROOT}")
 
 def _split_glob_prefix(prefix):
     if "/" in prefix:
@@ -198,33 +208,25 @@ def expand_export_args(args):
                 print(f"  [warn] no texture path after skin_id in {arg!r}", file=sys.stderr); continue
             if "*" in tex_part:
                 dir_part, file_prefix = _split_glob_prefix(tex_part.split("*")[0])
+                import atelier.asset_cache as _ac
                 cid      = char_id(skin_id)
-                skin_dir = os.path.join(WORK_IMPORT_ROOT, "Characters", cid, skin_id)
-                search_dir = os.path.join(skin_dir, *dir_part.split("/")) if dir_part else skin_dir
-                if not os.path.isdir(search_dir):
-                    print(f"  [warn] directory not found: {search_dir}", file=sys.stderr); continue
-                for root_dir, _, files in os.walk(search_dir):
-                    for fname in sorted(files):
-                        if not fname.lower().endswith(".uasset"): continue
-                        if file_prefix and not fname.lower().startswith(file_prefix.lower()): continue
-                        r = os.path.relpath(os.path.join(root_dir, fname), skin_dir).replace("\\", "/")
-                        r = r[:-7] if r.lower().endswith(".uasset") else r
-                        results.append((game_rel_for_skin(skin_id, r), f"{skin_id}/{r}"))
+                skin_pfx = f"characters/{cid.lower()}/{skin_id.lower()}/"
+                for gr, info in _ac.iter_skin(cid, skin_id):
+                    if not os.path.exists(info["cache_path"] + ".uasset"): continue
+                    r = gr[len(skin_pfx):]
+                    if dir_part and not r.lower().startswith(dir_part.lower()): continue
+                    if file_prefix and not os.path.basename(r).lower().startswith(file_prefix.lower()): continue
+                    results.append((gr, f"{skin_id}/{r}"))
             else:
                 results.append((game_rel_for_skin(skin_id, tex_part), f"{skin_id}/{tex_part}"))
         else:
             if "*" in noext:
                 dir_part, file_prefix = _split_glob_prefix(noext.split("*")[0])
-                search_dir = os.path.join(WORK_IMPORT_ROOT, *dir_part.split("/")) if dir_part else WORK_IMPORT_ROOT
-                if not os.path.isdir(search_dir):
-                    print(f"  [warn] directory not found: {search_dir}", file=sys.stderr); continue
-                for root_dir, _, files in os.walk(search_dir):
-                    for fname in sorted(files):
-                        if not fname.lower().endswith(".uasset"): continue
-                        if file_prefix and not fname.lower().startswith(file_prefix.lower()): continue
-                        r = os.path.relpath(os.path.join(root_dir, fname), WORK_IMPORT_ROOT).replace("\\", "/")
-                        r = r[:-7] if r.lower().endswith(".uasset") else r
-                        results.append((r, r))
+                import atelier.asset_cache as _ac
+                for gr, info in (_ac.iter_prefix(dir_part) if dir_part else _ac.iter_prefix("")):
+                    if not os.path.exists(info["cache_path"] + ".uasset"): continue
+                    if file_prefix and not os.path.basename(gr).lower().startswith(file_prefix.lower()): continue
+                    results.append((gr, gr))
             else:
                 results.append((noext, noext))
     seen = set(); out = []

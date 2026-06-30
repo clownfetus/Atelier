@@ -1,6 +1,11 @@
+diagnose export times (manually seeks filenames instead of cached index/uasset path?)
+test pak override order
+preview thumbnails sometimes infinitely load until revisit/triggered refresh
+triggered refresh resets edited asset thumbnails to original
+F5 to refresh
+
 ### regular
 force focus on webview window when confirmed started
-horizontally center navbar's breadcrumbs (change base folder "Import" name to "Home")
 confirmation before export files override files with same name
 descriptive spinner text during initial (extra long loading for index)
 replace on-boot win11 toast with extremely fast lightweight splash screen

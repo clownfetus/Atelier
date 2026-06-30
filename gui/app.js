@@ -158,7 +158,7 @@ function renderBreadcrumbs() {
   const homeCrumb = document.createElement("span");
   homeCrumb.className = "crumb" + (parts.length === 0 ? " active" : "");
   homeCrumb.title = "Import";
-  homeCrumb.innerHTML = '<i data-lucide="house" size="14"></i>';
+  homeCrumb.innerHTML = '<i data-lucide="house" size="12"></i>';
   if (parts.length > 0) homeCrumb.addEventListener("click", () => pushNav({ path: "" }));
   bc.appendChild(homeCrumb);
 
@@ -1088,6 +1088,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     });
     if (res.ok) {
       document.getElementById("setup-overlay").classList.remove("active");
+      await checkProject();
       await checkPrereqs();
       await renderGrid();
       await loadSidebar();
@@ -1316,12 +1317,209 @@ async function checkUpdate() {
   });
 }
 
+// ── project picker ────────────────────────────────────────────────────────────
+let _projPickerResolve = null;
+let _projNameCtx       = null;
+let _projDeleteName    = null;
+
+async function checkProject() {
+  const res = await api("/api/projects");
+  if (res.active && res.projects.find(p => p.name === res.active)) return;
+  return new Promise(resolve => {
+    _projPickerResolve = resolve;
+    _renderProjectPicker(res.projects || []);
+    document.getElementById("project-overlay").classList.add("active");
+  });
+}
+
+function _relTime(mtime) {
+  const diff = Math.floor(Date.now() / 1000 - mtime);
+  if (diff < 60)         return "just now";
+  if (diff < 3600)       return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)      return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 7)  return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(mtime * 1000).toLocaleDateString();
+}
+
+function _renderProjectPicker(projects) {
+  const grid = document.getElementById("proj-grid");
+  grid.innerHTML = "";
+  if (!projects.length) {
+    grid.innerHTML = '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
+    lucide.createIcons({ nodes: [grid] });
+    return;
+  }
+  projects.forEach(proj => {
+    const card = document.createElement("div");
+    card.className = "proj-card";
+    card.dataset.name = proj.name;
+    const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
+    const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
+    card.innerHTML = `
+      <div class="proj-thumb">
+        <img src="${thumbUrl}" alt="" onerror="this.style.display='none'">
+        <i data-lucide="folder" size="40" class="proj-thumb-icon"></i>
+      </div>
+      <div class="proj-body">
+        <div class="proj-name" title="${proj.name}">${proj.name}</div>
+        <div class="proj-meta">${assetTxt} &middot; ${_relTime(proj.mtime)}</div>
+      </div>
+      <div class="proj-actions">
+        <button class="proj-action-btn" title="Rename" data-action="rename"><i data-lucide="pencil" size="13"></i></button>
+        <button class="proj-action-btn" title="Duplicate" data-action="duplicate"><i data-lucide="copy" size="13"></i></button>
+        <button class="proj-action-btn danger" title="Delete" data-action="delete"><i data-lucide="trash-2" size="13"></i></button>
+      </div>`;
+    card.addEventListener("click", e => {
+      if (e.target.closest(".proj-action-btn")) return;
+      _selectProject(proj.name);
+    });
+    card.querySelector("[data-action=rename]").addEventListener("click", e => {
+      e.stopPropagation();
+      _showProjNameModal({
+        title: "Rename Project", value: proj.name, okLabel: "Rename",
+        action: async newName => {
+          const r = await api("/api/project/rename", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ old_name: proj.name, new_name: newName }),
+          });
+          if (r.ok) { const res = await api("/api/projects"); _renderProjectPicker(res.projects || []); }
+          else toast(`Rename failed: ${r.error}`, "warning");
+        },
+      });
+    });
+    card.querySelector("[data-action=duplicate]").addEventListener("click", e => {
+      e.stopPropagation();
+      _showProjNameModal({
+        title: "Duplicate Project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
+        action: async newName => {
+          const r = await api("/api/project/duplicate", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: proj.name, new_name: newName }),
+          });
+          if (r.ok) { const res = await api("/api/projects"); _renderProjectPicker(res.projects || []); }
+          else toast(`Duplicate failed: ${r.error}`, "warning");
+        },
+      });
+    });
+    card.querySelector("[data-action=delete]").addEventListener("click", e => {
+      e.stopPropagation();
+      _projDeleteName = proj.name;
+      document.getElementById("proj-delete-msg").textContent =
+        `Delete project "${proj.name}"? All ${proj.asset_count} edited asset${proj.asset_count !== 1 ? "s" : ""} will be permanently deleted.`;
+      document.getElementById("proj-delete-overlay").classList.add("active");
+    });
+    grid.appendChild(card);
+  });
+  lucide.createIcons({ nodes: [grid] });
+}
+
+async function _selectProject(name) {
+  const r = await api("/api/project/select", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) { toast(`Failed to open project: ${r.error}`, "warning"); return; }
+  document.getElementById("project-overlay").classList.remove("active");
+  if (_projPickerResolve) {
+    const resolve = _projPickerResolve;
+    _projPickerResolve = null;
+    resolve();
+  } else {
+    sidebarData = {};
+    nav = { ...NAV_ROOT };
+    history = [{ ...NAV_ROOT }];
+    histIdx = 0;
+    updateNavBtns();
+    document.getElementById("search-input").value = "";
+    renderBreadcrumbs();
+    await renderGrid();
+    await loadSidebar();
+  }
+}
+
+function _showProjNameModal(ctx) {
+  _projNameCtx = ctx;
+  document.getElementById("proj-name-title").textContent = ctx.title;
+  document.getElementById("proj-name-input").value = ctx.value;
+  const okBtn = document.getElementById("proj-name-ok");
+  okBtn.innerHTML = `<i data-lucide="check" size="14"></i> ${ctx.okLabel}`;
+  lucide.createIcons({ nodes: [okBtn] });
+  document.getElementById("proj-name-overlay").classList.add("active");
+  setTimeout(() => {
+    const inp = document.getElementById("proj-name-input");
+    inp.focus(); inp.select();
+  }, 40);
+}
+
+document.getElementById("proj-new-btn").addEventListener("click", () => {
+  _showProjNameModal({
+    title: "New Project", value: "", okLabel: "Create",
+    action: async name => {
+      const r = await api("/api/project/create", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (r.ok) await _selectProject(name);
+      else toast(`Create failed: ${r.error}`, "warning");
+    },
+  });
+});
+
+document.getElementById("proj-name-cancel").addEventListener("click", () => {
+  document.getElementById("proj-name-overlay").classList.remove("active");
+  _projNameCtx = null;
+});
+
+document.getElementById("proj-name-ok").addEventListener("click", async () => {
+  const name = document.getElementById("proj-name-input").value.trim();
+  if (!name) return;
+  document.getElementById("proj-name-overlay").classList.remove("active");
+  if (_projNameCtx) { const ctx = _projNameCtx; _projNameCtx = null; await ctx.action(name); }
+});
+
+document.getElementById("proj-name-input").addEventListener("keydown", e => {
+  if (e.key === "Enter")  document.getElementById("proj-name-ok").click();
+  if (e.key === "Escape") document.getElementById("proj-name-cancel").click();
+});
+
+document.getElementById("proj-delete-cancel").addEventListener("click", () => {
+  document.getElementById("proj-delete-overlay").classList.remove("active");
+  _projDeleteName = null;
+});
+
+document.getElementById("proj-delete-ok").addEventListener("click", async () => {
+  document.getElementById("proj-delete-overlay").classList.remove("active");
+  const name = _projDeleteName; _projDeleteName = null;
+  if (!name) return;
+  const r = await api("/api/project/delete", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (r.ok) {
+    toast(`Deleted project "${name}"`, "warning");
+    const res = await api("/api/projects");
+    _renderProjectPicker(res.projects || []);
+    if (!res.active || !res.projects.find(p => p.name === res.active)) {
+      document.getElementById("project-overlay").classList.add("active");
+    }
+  } else {
+    toast(`Delete failed: ${r.error}`, "warning");
+  }
+});
+
+document.getElementById("menu-btn").addEventListener("click", async () => {
+  const res = await api("/api/projects");
+  _renderProjectPicker(res.projects || []);
+  document.getElementById("project-overlay").classList.add("active");
+});
+
 // ── initial load ──────────────────────────────────────────────────────────────
 async function init() {
   console.log("[init] starting");
   renderBreadcrumbs();
   if (await checkUpdate()) { console.log("[init] update in progress"); return; }
   if (await checkSetup()) { console.log("[init] halted for setup"); return; }
+  await checkProject();
   await checkPrereqs();
   await renderGrid();
   await loadSidebar();

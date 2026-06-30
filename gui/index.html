@@ -10,7 +10,7 @@
 
 <!-- ── top bar ── -->
 <div id="topbar">
-  <span class="logo">ATELIER</span>
+  <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
   <div id="nav-btns">
     <button class="nav-btn" id="btn-back"    title="Back"    disabled><i data-lucide="arrow-left"  size="15"></i></button>
     <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
@@ -240,6 +240,47 @@
     <div class="warning" style="margin-top:4px">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
       <span>A new mapping file was downloaded. Please restart Atelier to apply it.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── project picker ── -->
+<div class="overlay" id="project-overlay">
+  <div class="modal proj-modal">
+    <div class="proj-modal-header">
+      <h2><i data-lucide="folder-open" size="18" style="color:var(--acc)"></i> Projects</h2>
+      <button class="btn primary" id="proj-new-btn">
+        <i data-lucide="plus" size="14"></i> New Project
+      </button>
+    </div>
+    <div id="proj-grid"></div>
+  </div>
+</div>
+
+<!-- ── project name input ── -->
+<div class="overlay" id="proj-name-overlay">
+  <div class="modal">
+    <h2 id="proj-name-title">New Project</h2>
+    <input id="proj-name-input" type="text" class="setup-input" placeholder="Project name" maxlength="80" spellcheck="false">
+    <div class="modal-row">
+      <button class="btn" id="proj-name-cancel">Cancel</button>
+      <button class="btn primary" id="proj-name-ok">
+        <i data-lucide="check" size="14"></i> Create
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── project delete confirm ── -->
+<div class="overlay" id="proj-delete-overlay">
+  <div class="modal">
+    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i> Delete Project?</h2>
+    <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
+    <div class="modal-row">
+      <button class="btn" id="proj-delete-cancel">Cancel</button>
+      <button class="btn primary" id="proj-delete-ok">
+        <i data-lucide="trash-2" size="14"></i> Delete
+      </button>
     </div>
   </div>
 </div>
