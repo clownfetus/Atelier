@@ -5,7 +5,6 @@ preview thumbnails sometimes infinitely load until revisit/triggered refresh bug
 keep reset data button updated during expansion
 
 ### regular
-pressing save should close the material/vfx editor popup
 confirmation before export files override files with same name
 descriptive spinner text during initial (extra long loading for index)
 replace on-boot win11 toast with extremely fast lightweight splash screen

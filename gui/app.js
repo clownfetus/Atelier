@@ -510,9 +510,9 @@ async function saveMaterial() {
       body: JSON.stringify({ game_rel: matEditor.game_rel, colors, scalars }),
     });
     if (res.ok) {
-      document.getElementById("mat-status").textContent = "Saved — staged for export.";
       toast(`Saved: ${matEditor.name}`, "success");
       loadSidebar();
+      closeMaterialEditor();
     } else {
       document.getElementById("mat-status").textContent = "Error: " + (res.error || "save failed");
     }
