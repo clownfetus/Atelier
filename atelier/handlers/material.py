@@ -1,5 +1,5 @@
 import os, json
-from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, get_import_root
+from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
@@ -84,13 +84,19 @@ def _apply_mat_edits(d, colors, scalars):
             pv = _gn(e["Value"], "ParameterValue")
             if pv is not None: pv["Value"] = float(scalars[nm])
 
-def mat_json(game_rel):
-    """Extract the MI + convert to JSON (flat in active project dir as <basename>.json). Returns the json path."""
+def mat_json(game_rel, out_dir=None):
+    """Extract the MI + convert to JSON as <basename>.json. Returns the json path.
+    The active project dir always takes priority (edits/explicit imports live there); if no
+    project copy exists, the JSON is produced in out_dir (defaults to the project dir — the
+    explicit import/edit flows). Pass out_dir=CACHE_3DVIEW for viewport-only reads that shouldn't
+    pollute the project folder."""
     import atelier.asset_cache as _ac
     from atelier.handlers.texture import extract_info, find_extracted
     import_root = get_import_root()
-    import_base = os.path.join(import_root, os.path.basename(game_rel))
-    jp = import_base + ".json"
+    project_jp  = os.path.join(import_root, os.path.basename(game_rel)) + ".json"
+    if os.path.exists(project_jp): return project_jp
+    out_dir = out_dir or import_root
+    jp = os.path.join(out_dir, os.path.basename(game_rel)) + ".json"
     if os.path.exists(jp): return jp
     work_base = _ac.cache_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
@@ -106,14 +112,16 @@ def mat_json(game_rel):
             work_base = find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("material not found in game paks")
-    os.makedirs(import_root, exist_ok=True)
-    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(import_root)])
+    os.makedirs(out_dir, exist_ok=True)
+    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(out_dir)])
     if not os.path.exists(jp): raise RuntimeError("to_json produced no JSON")
     return jp
 
-def read_material(game_rel):
-    """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance."""
-    d = json.load(open(mat_json(game_rel), encoding="utf-8-sig"))
+def read_material(game_rel, cache_only=False):
+    """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance.
+    cache_only=True routes any freshly-extracted JSON into CACHE_3DVIEW instead of the project
+    folder — used by the 3D viewport's automatic per-mesh material reads."""
+    d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
 

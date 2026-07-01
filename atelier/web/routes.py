@@ -3,7 +3,7 @@ from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
-                            GUI_DIR, _CACHE, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
+                            GUI_DIR, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
                             save_paks_config, save_setup_config, save_usmap_config,
                             get_usmap_checked_at, save_usmap_checked_at,
                             get_import_root, get_active_project, set_active_project)
@@ -149,7 +149,7 @@ def api_skin_materials():
         seen.add(base)
         gr = game_rel_for_skin(skin_id, skin_rel(p, skin_id))
         try:
-            params = read_material(gr)
+            params = read_material(gr, cache_only=True)
             texs   = params.get("textures", {}) or {}
             tvers  = {g: _tex_version(g) for g in texs.values()}   # edited-mtime stamps for cache-busting
             out[base] = {"game_rel": gr, "token": token(gr), **params, "tex_ver": tvers}
@@ -170,11 +170,11 @@ def _tex_version(game_rel):
 def _texture_png(game_rel):
     """PNG path for a texture game_rel. Prefers the user's EDITED/imported PNG in the active project
     (so viewport shows their edits); otherwise extracts + decodes the vanilla texture from the paks
-    (cached in _CACHE/tex_png). Returns a path or None."""
+    (cached in CACHE_3DVIEW). Returns a path or None."""
     edited = _import_base(game_rel) + ".png"
     if os.path.exists(edited):
         return edited
-    out_dir = os.path.join(_CACHE, "tex_png")
+    out_dir = CACHE_3DVIEW
     base    = os.path.join(out_dir, os.path.basename(game_rel))   # no ext
     out_png = base + ".png"
     if os.path.exists(out_png):

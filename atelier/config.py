@@ -98,6 +98,7 @@ PROJECTS_ROOT    = os.path.join(ROOT, "assets", "projects")
 ASSETS_MODS      = os.path.join(ROOT, "assets", "exported")
 _CACHE           = os.path.join(ROOT, "_cache")
 WORK_IMPORT_ROOT = os.path.join(_CACHE, "import")
+CACHE_3DVIEW     = os.path.join(_CACHE, "3dview")  # material jsons + texture pngs for viewport-only reads
 GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
 
 _active_project = _cfg.get("active_project", "")
