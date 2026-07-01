@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <title>Atelier</title>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "/static/vendor/three/three.module.min.js",
+  "three/addons/": "/static/vendor/three/jsm/"
+}}
+</script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -158,6 +164,42 @@
     </div>
   </div>
 </div>
+
+<!-- ── 3D viewport ── -->
+<div class="overlay" id="viewport-overlay">
+  <div id="viewport-box">
+    <div id="viewport-head">
+      <h2><i data-lucide="box" size="16"></i> <span id="viewport-title">3D Preview</span></h2>
+      <span id="viewport-status"></span>
+      <button class="sb-clear" id="viewport-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div id="viewport-body">
+      <div id="viewport-stage">
+        <canvas id="viewport-canvas"></canvas>
+        <div id="viewport-loading">
+          <div class="spinner"></div>
+          <span id="viewport-loading-msg">Decoding model…</span>
+        </div>
+      </div>
+      <div id="viewport-materials" class="empty">
+        <div id="viewport-mat-head">
+          <span>Materials</span>
+          <span id="viewport-mat-count"></span>
+        </div>
+        <div id="viewport-mat-list"></div>
+        <div id="viewport-mat-foot">
+          <button id="viewport-mat-reset" title="Revert to vanilla colors">Reset</button>
+          <button id="viewport-mat-save" title="Save recolors to the mod">Save recolors</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 3D viewport trigger (bottom-center) ── -->
+<button id="view3d-fab" title="Preview this skin in 3D">
+  <i data-lucide="box" size="16"></i> 3D View
+</button>
 
 <!-- ── toast area ── -->
 <div id="toast-area"></div>
@@ -314,5 +356,6 @@
 <input type="file" id="ctx-file-input" accept="image/*" style="display:none">
 
 <script src="/static/app.js"></script>
+<script type="module" src="/static/viewport.js"></script>
 </body>
 </html>

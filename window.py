@@ -112,7 +112,10 @@ def main():
             ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
             ctypes.windll.user32.SetForegroundWindow(hwnd)
 
-    webview.start(_focus, debug=False)
+    # Debug (devtools) is off in production, but a "DEBUG" marker file next to the exe turns it on
+    # for diagnostic builds — keeps the shipped app clean while letting debug builds inspect the console.
+    _debug = bool(os.environ.get("ATELIER_DEBUG")) or os.path.exists(os.path.join(_ROOT, "DEBUG"))
+    webview.start(_focus, debug=_debug)
     os._exit(0)
 
 

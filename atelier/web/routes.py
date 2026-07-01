@@ -70,6 +70,150 @@ def static(path):
     r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return r
 
+# ── 3D viewport (mesh -> glTF via AtelierMesh / CUE4Parse) ────────────────────
+from atelier.tools import atelier_mesh
+from atelier.paths import skin_entries, skin_rel
+
+_MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
+
+@app.get("/api/skin_meshes")
+def api_skin_meshes():
+    """List the skin's renderable skeletal meshes (game_rels) for the viewport to compose."""
+    skin_id = request.query.get("skin_id", "")
+    response.content_type = "application/json"
+    if not skin_id:
+        return json.dumps([])
+    seen, out = set(), []
+    for p, _c in skin_entries(skin_id):
+        nm = os.path.basename(p)
+        if not nm.lower().startswith("sk_") or not nm.lower().endswith(".uasset"):
+            continue
+        base = nm[:-7]
+        if _MESH_SKIP.search(base):
+            continue
+        gr = game_rel_for_skin(skin_id, skin_rel(p, skin_id))
+        if gr in seen:
+            continue
+        seen.add(gr)
+        out.append({"name": base, "game_rel": gr})
+    return json.dumps(out)
+
+def _model_glb(game_rel):
+    """Decode (cached) a mesh game_rel to a .glb; return its path or None."""
+    asset   = pak_game_path(game_rel)                        # Marvel/Content/Marvel/.../SK_...
+    out_dir = os.path.join(_CACHE, "gltf")
+    glb     = os.path.join(out_dir, *asset.split("/")) + ".glb"
+    if os.path.exists(glb):
+        return glb
+    os.makedirs(out_dir, exist_ok=True)
+    atelier_mesh(asset, out_dir)
+    return glb if os.path.exists(glb) else None
+
+@app.get("/api/model_gltf")
+def api_model_gltf():
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        return b""
+    try:
+        glb = _model_glb(gr)
+    except Exception as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    if glb and os.path.exists(glb):
+        return static_file(os.path.basename(glb), root=os.path.dirname(glb),
+                           mimetype="model/gltf-binary")
+    response.status = 404
+    return b""
+
+@app.post("/api/skin_materials")
+def api_skin_materials():
+    """Read the skin's MI materials, keyed by name (matches the glTF slot names), so the viewport
+    can tint each mesh part and offer live recolor. Pass `names` (the mesh's slot names) to only
+    read materials actually on the model; empty/omitted reads every MI under the skin folder."""
+    body    = request.json or {}
+    skin_id = body.get("skin_id", "")
+    want    = set(str(n).lower() for n in (body.get("names") or []))
+    response.content_type = "application/json"
+    if not skin_id:
+        return json.dumps({"ok": False, "error": "missing skin_id"})
+    out, seen = {}, set()
+    for p, _c in skin_entries(skin_id):
+        nm = os.path.basename(p)
+        if not nm.upper().startswith("MI_") or not nm.lower().endswith(".uasset"):
+            continue
+        base = nm[:-7]
+        if base in seen or (want and base.lower() not in want):
+            continue
+        seen.add(base)
+        gr = game_rel_for_skin(skin_id, skin_rel(p, skin_id))
+        try:
+            params = read_material(gr)
+            texs   = params.get("textures", {}) or {}
+            tvers  = {g: _tex_version(g) for g in texs.values()}   # edited-mtime stamps for cache-busting
+            out[base] = {"game_rel": gr, "token": token(gr), **params, "tex_ver": tvers}
+        except Exception as e:
+            print(f"[skin_materials] {base}: {e}", file=sys.stderr, flush=True)
+    return json.dumps({"ok": True, "materials": out})
+
+def _tex_version(game_rel):
+    """Cache-busting stamp for a texture: mtime of the user's edited PNG if one exists, else '0'
+    (vanilla). The viewport keys its GPU-texture cache on this, so edits invalidate while vanilla
+    textures stay cached across opens."""
+    edited = _import_base(game_rel) + ".png"
+    try:
+        return str(int(os.path.getmtime(edited))) if os.path.exists(edited) else "0"
+    except OSError:
+        return "0"
+
+def _texture_png(game_rel):
+    """PNG path for a texture game_rel. Prefers the user's EDITED/imported PNG in the active project
+    (so viewport shows their edits); otherwise extracts + decodes the vanilla texture from the paks
+    (cached in _CACHE/tex_png). Returns a path or None."""
+    edited = _import_base(game_rel) + ".png"
+    if os.path.exists(edited):
+        return edited
+    out_dir = os.path.join(_CACHE, "tex_png")
+    base    = os.path.join(out_dir, os.path.basename(game_rel))   # no ext
+    out_png = base + ".png"
+    if os.path.exists(out_png):
+        return out_png
+    cb = _asset_cache.cache_base(game_rel)
+    if not cb or not os.path.exists(cb + ".uasset"):
+        pak_gr = pak_game_path(game_rel)
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
+             "--filter", os.path.basename(pak_gr)])
+        cp, pak, pfx = extract_info(game_rel)
+        if cp and os.path.exists(cp + ".uasset"):
+            _asset_cache.record(game_rel, cp, pak, pfx); cb = cp
+        else:
+            cb = find_extracted(game_rel)
+    if not cb or not os.path.exists(cb + ".uasset"):
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    decode_png(base, cb)
+    return out_png if os.path.exists(out_png) else None
+
+@app.get("/api/texture_png")
+def api_texture_png():
+    """Decode a texture game_rel to PNG and serve it (for the viewport to apply as a mesh map)."""
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        return b""
+    try:
+        png = _texture_png(gr)
+    except Exception as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    if png and os.path.exists(png):
+        return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
+    response.status = 404
+    return b""
+
 # ── prereqs ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/prereqs")

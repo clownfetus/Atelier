@@ -1,7 +1,24 @@
 import os, json, subprocess, threading, atexit
-from atelier.config import TOOLS, CNW, ROOT
+from atelier.config import TOOLS, CNW, ROOT, PAKS, USMAP
 
 UAT = os.path.join(TOOLS, "UAssetTool.exe")
+
+# AtelierMesh: CUE4Parse-based mesh -> glTF (.glb) decoder for the 3D viewport.
+ATELIER_MESH = os.path.join(TOOLS, "AtelierMesh", "AtelierMesh.exe")
+
+def _aes_hex():
+    try:
+        k = open(os.path.join(TOOLS, "AES_KEY.txt"), encoding="utf-8").read().strip()
+    except Exception:
+        return ""
+    return k if k.lower().startswith("0x") else "0x" + k
+
+def atelier_mesh(asset, out_dir):
+    """Decode an MR mesh (content-mount path, no ext) to glTF (.glb) under out_dir."""
+    return subprocess.run(
+        [ATELIER_MESH, "--paks", PAKS, "--aes", _aes_hex(), "--usmap", USMAP,
+         "--asset", asset, "--out", os.path.abspath(out_dir)],
+        capture_output=True, text=True, cwd=ROOT, creationflags=CNW)
 
 def uat(args):
     """Run UAssetTool (one-shot). Pass ABSOLUTE paths — it requires them for output."""

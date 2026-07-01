@@ -42,6 +42,31 @@ def _mat_params(d):
             scalars.append({"name": nm, "value": round(_f(pv.get("Value")), 5)})
     return colors, scalars
 
+def _mat_textures(d):
+    """{slot: game_rel} for the MI's texture params (BaseColor/Normal/ORM/…), resolved through the
+    Imports table. Each TextureParameterValue's ParameterValue is an import link (negative index);
+    that import's outer Package holds the /Game/Marvel/… path → storage-relative game_rel."""
+    ex = d["Exports"][0]
+    tp = _gn(_ex_props(ex), "TextureParameterValues")
+    imports = d.get("Imports", [])
+    out = {}
+    for e in (tp or {}).get("Value", []):
+        nm = _mat_pname(e)
+        pv = _gn(e["Value"], "ParameterValue")
+        idx = pv.get("Value") if pv else None
+        if not nm or not isinstance(idx, int) or idx >= 0:
+            continue
+        ii = -idx - 1
+        if not (0 <= ii < len(imports)):
+            continue
+        outer = imports[ii].get("OuterIndex")
+        pkg = None
+        if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
+            pkg = imports[-outer - 1].get("ObjectName")
+        if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
+            out[nm] = pkg[len("/Game/Marvel/"):]
+    return out
+
 def _apply_mat_edits(d, colors, scalars):
     ex = d["Exports"][0]
     vp = _gn(_ex_props(ex), "VectorParameterValues")
@@ -87,9 +112,10 @@ def mat_json(game_rel):
     return jp
 
 def read_material(game_rel):
-    """{colors:[{name,rgba}], scalars:[{name,value}]} for an MI material instance."""
-    colors, scalars = _mat_params(json.load(open(mat_json(game_rel), encoding="utf-8-sig")))
-    return {"colors": colors, "scalars": scalars}
+    """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance."""
+    d = json.load(open(mat_json(game_rel), encoding="utf-8-sig"))
+    colors, scalars = _mat_params(d)
+    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
 
 def save_material(game_rel, colors, scalars):
     """Apply color/scalar edits and PERSIST them into the material's on-disk JSON."""

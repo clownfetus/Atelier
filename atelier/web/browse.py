@@ -119,7 +119,7 @@ def game_rel_from_token(tok):
 
 # Only these asset kinds are surfaced in the browser. Everything else
 # (meshes, curves, blueprints, niagara systems, data tables, …) is hidden.
-LISTED_FILE_TYPES = ("material", "texture")
+LISTED_FILE_TYPES = ("material", "texture", "mesh")
 
 def _classify_file(name, rel_path=""):
     nl = name.lower()
@@ -129,6 +129,9 @@ def _classify_file(name, rel_path=""):
         return "vfx"
     if nl.startswith("mi_"):
         return "material"
+    # Renderable meshes (skeletal/static) — exclude skeleton/physics/anim helper assets.
+    if nl.startswith(("sk_", "sm_")) and not any(s in nl for s in ("_skeleton", "physics", "_anim")):
+        return "mesh"
     # Path-context fallback: anything sitting inside a Textures folder is a texture.
     if "/textures/" in ("/" + rel_path.lower() + "/"):
         return "texture"

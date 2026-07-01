@@ -23,6 +23,7 @@ const ASSET_HANDLERS = {
   texture:  { import_endpoint: "/api/import_texture",  preview: true,  icon: "image"        },
   material: { import_endpoint: "/api/import_material", preview: false, icon: "circle-star"  },
   vfx:      { import_endpoint: "/api/import_vfx",      preview: false, icon: "sparkles"     },
+  mesh:     { import_endpoint: null,                   preview: false, icon: "box"          },
 };
 function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
@@ -30,6 +31,7 @@ const ASSET_ICON_CLS = {
   texture:  "texture-icon",
   vfx:      "vfx-icon",
   material: "material-icon",
+  mesh:     "mesh-icon",
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
@@ -55,6 +57,7 @@ const ICON_CLS_TO_LUCIDE = {
   "texture-icon":         "image",
   "vfx-icon":             "sparkles",
   "material-icon":        "circle-star",
+  "mesh-icon":            "box",
   "unhandled-icon":       "file-question",
 };
 
@@ -220,6 +223,7 @@ async function renderGrid() {
 
     const importable = data.filter(d => d.type === "asset" && d.file_type === "texture");
     document.getElementById("import-all-btn").disabled = importable.length === 0;
+    document.getElementById("view3d-fab").classList.toggle("show", !!skinIdFromPath(nav.path));
 
     const unimportedTextures = data.filter(d => d.type === "asset" && d.file_type === "texture" && !d.imported);
     if (unimportedTextures.length) {
@@ -353,6 +357,11 @@ function handleImportedFileAction(item) {
 }
 
 function handleAssetClick(item) {
+  if ((item.file_type || "") === "mesh") {
+    if (window.AtelierViewport) window.AtelierViewport.openMesh(item.game_rel, item.name, skinIdFromPath(nav.path));
+    else toast("3D viewport failed to load", "warning");
+    return;
+  }
   if (item.imported && item.token) {
     handleImportedFileAction(item);
     return;
@@ -551,6 +560,13 @@ function _shownTextures() {
   return allItems.filter(i => i.type === "asset" && i.file_type === "texture"
     && (!q || (i.name || i.label || "").toLowerCase().includes(q)));
 }
+
+document.getElementById("view3d-fab").addEventListener("click", () => {
+  const sid = skinIdFromPath(nav.path);
+  if (!sid) { toast("Open a skin folder first", "info"); return; }
+  if (window.AtelierViewport) window.AtelierViewport.open(sid, `3D Preview — ${sid}`);
+  else toast("3D viewport failed to load", "warning");
+});
 
 document.getElementById("import-all-btn").addEventListener("click", () => {
   const shown   = _shownTextures();
