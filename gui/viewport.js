@@ -225,20 +225,36 @@ function frameCamera() {
 }
 
 // ── materials: fetch params, tint mesh parts, build the recolor panel ─────────
+// Runs fully in the background: the mesh is already up and orbitable (viewport-loading is long
+// gone by the time this is called), so we surface progress with a toast spinner — same as every
+// other long-running job in the app — instead of the blocking mesh-load overlay. The sidebar
+// (#viewport-materials) appears as soon as params are back; textures fill in live on whatever
+// model is current, no reopen needed — this just keeps the user informed while that happens.
 async function loadMaterials(skinId) {
   if (!skinId) return;
   currentSkin = skinId;
   const gen = generation;
   const slots = Object.keys(matsByName);
+  const spinner = typeof window.toastSpinner === 'function' ? window.toastSpinner('Loading materials…') : null;
+  const spinnerMsg = spinner ? spinner.querySelector('span') : null;
+
   let res;
   try {
     res = await fetch('/api/skin_materials', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ skin_id: skinId, names: slots }),
     }).then(r => r.json());
-  } catch (e) { console.warn('viewport: skin_materials request failed', e); return; }
-  if (gen !== generation) return;                        // model changed while fetching params
-  if (!res || !res.ok || !res.materials) { console.warn('viewport: skin_materials bad response', res); return; }
+  } catch (e) {
+    console.warn('viewport: skin_materials request failed', e);
+    if (spinner) spinner.remove();
+    return;
+  }
+  if (gen !== generation) { if (spinner) spinner.remove(); return; }   // model changed while fetching params
+  if (!res || !res.ok || !res.materials) {
+    console.warn('viewport: skin_materials bad response', res);
+    if (spinner) spinner.remove();
+    return;
+  }
 
   // Keep only materials that actually appear as slots on the loaded mesh; wire each part.
   let matched = 0;
@@ -255,22 +271,20 @@ async function loadMaterials(skinId) {
     if (tex.BaseColor) texJobs.push(applyMatTexture(name, tex.BaseColor, 'map', ver[tex.BaseColor]));       // albedo
     if (tex.Emissive)  texJobs.push(applyMatTexture(name, tex.Emissive, 'emissiveMap', ver[tex.Emissive])); // glow mask
   }
-  buildPanel();
+  buildPanel();   // sidebar shows up now — params are extracted, even though textures are still in flight
 
-  // Texture decode is slow on first load (each is extracted + BC7-decoded server-side, cached after).
-  // Show progress so it doesn't look hung; the mesh fills in part-by-part as each finishes.
-  if (texJobs.length) {
-    const total = texJobs.length;
-    let done = 0;
-    const partsLabel = `${matched} part${matched !== 1 ? 's' : ''}`;
-    const tick = () => { if (gen === generation) $('viewport-status').textContent = `Decoding textures… ${done}/${total}`; };
-    tick();
-    texJobs.forEach(p => p.then(() => {
-      done++;
-      if (done === total) { if (gen === generation) $('viewport-status').textContent = partsLabel; }
-      else tick();
-    }));
-  }
+  if (!texJobs.length) { if (spinner) spinner.remove(); return; }
+
+  // All texture fetches are already in flight together (fired above, not awaited one at a time) —
+  // the spinner just reports on that single batch as it lands, part-by-part, until every texture
+  // for this model has been decoded and applied.
+  const total = texJobs.length;
+  let done = 0;
+  const tick = () => { if (spinnerMsg && gen === generation) spinnerMsg.textContent = `Loading textures… ${done}/${total}`; };
+  tick();
+  await Promise.allSettled(texJobs.map(p => p.then(() => { done++; tick(); })));
+  if (spinner) spinner.remove();
+  if (gen === generation) $('viewport-status').textContent = `${matched} part${matched !== 1 ? 's' : ''}`;
 }
 
 function buildPanel() {
