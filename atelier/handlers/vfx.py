@@ -1,18 +1,20 @@
-import os, json
-from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE
+import os, re, json
+from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, get_import_root
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
-# VFX = Niagara systems / data-interface assets. Editable content is NOT single scalar/color
-# values (that's materials) — it's per-export CURVES baked into a flat LUT:
-#   channels 1 -> scalar curve (size/alpha/intensity over life)
-#   channels 2 -> vector2 curve (UV scroll / 2D motion)
-#   channels 3 -> vector3 curve (RGB or 3D vector over life)
-#   channels 4 -> color curve (RGBA; classified color / emission(HDR) / opacity(grayscale))
-# UAssetTool reads these with `niagara_details` and edits them with
-#   `niagara_edit ... --edits '[{"exportIndex":N,"flatLut":[...]}]'`  (flatLut length must match lut_floats).
+# VFX = Niagara systems / data-interface assets. Editable content is NOT single scalar/color values
+# (that's materials) — it's per-export CURVES baked into a flat LUT (sampleCount samples × channels):
+#   channels 1 -> scalar curve   2 -> vector2   3 -> vector3   4 -> color (RGBA; color/emission/opacity)
+# UAssetTool reads these with `niagara_details` and rewrites a whole export's LUT with
+#   `niagara_edit ... --edits-file [{"exportIndex":N,"flatLut":[...]}]`  (flatLut length == floatCount).
+#
+# A system has MANY identical color curves (duplicates/LOD). We dedupe editable color/emission curves
+# into GROUPS keyed by their (vanilla) gradient, edit each group's stops, and on export rebuild the
+# full LUT for every export in the group. Edits persist as a <basename>.json sidecar in the project
+# (same "edits on disk, applied at export" model as materials/curves); niagara_edit applies to vanilla.
 
-PREVIEW_STOPS = 16   # gradient stops returned for the UI (full LUT stays on disk for editing)
+PREVIEW_STOPS = 16   # gradient stops exposed for editing (the full LUT is rebuilt from them on export)
 
 def is_vfx(path_or_name):
     nl = os.path.basename(path_or_name).lower()
@@ -61,9 +63,90 @@ def _downsample(samples, stops):
     step = (len(samples) - 1) / (stops - 1)
     return [samples[round(i * step)] for i in range(stops)]
 
+# ── edit sidecar (persisted color-curve group edits) ──────────────────────────
+
+def vfx_sidecar(game_rel):
+    return os.path.join(get_import_root(), os.path.basename(game_rel)) + ".json"
+
+def _load_edits(game_rel):
+    p = vfx_sidecar(game_rel)
+    if os.path.exists(p):
+        try:
+            return json.load(open(p, encoding="utf-8-sig")).get("vfx_edits") or []
+        except Exception:
+            return []
+    return []
+
+def _vfx_labels(game_rel, base):
+    """{exportIndex -> 'Emitter · Script'} resolved via the full to_json OuterIndex chain
+    (curve -> owning NiagaraScript -> owning NiagaraEmitter). Cached to _cache/vfx_labels.
+    Best-effort: returns {} if to_json is unavailable, so curves just show by kind/index instead."""
+    cache = os.path.join(_CACHE, "vfx_labels", os.path.basename(game_rel) + ".json")
+    if os.path.exists(cache):
+        try:
+            return {int(k): v for k, v in json.load(open(cache, encoding="utf-8")).items()}
+        except Exception:
+            pass
+    labels = {}
+    try:
+        outdir = os.path.join(_CACHE, "vfx_labels", "_tj")
+        os.makedirs(outdir, exist_ok=True)
+        uat(["to_json", os.path.abspath(base + ".uasset"), USMAP, os.path.abspath(outdir)])
+        jp   = os.path.join(outdir, os.path.basename(game_rel) + ".json")
+        exps = json.load(open(jp, encoding="utf-8-sig")).get("Exports") or []
+        def oidx(e):
+            o = e.get("OuterIndex")
+            return (o.get("Index") if isinstance(o, dict) else o) or 0
+        def ref(i):                      # OuterIndex is a 1-based positive export ref
+            return exps[i - 1] if isinstance(i, int) and 0 < i <= len(exps) else None
+        strip = lambda s: re.sub(r"_\d+$", "", s or "")
+        for i, e in enumerate(exps):
+            script = ref(oidx(e))
+            if not script:
+                continue
+            sn = strip(script.get("ObjectName"))
+            em = ref(oidx(script))
+            en = strip(em.get("ObjectName")) if em else ""
+            labels[i] = f"{en} · {sn}" if en and sn else (sn or en)
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        json.dump(labels, open(cache, "w"))
+        try:
+            os.remove(jp)                # the 17MB dump isn't needed once the label map is cached
+        except OSError:
+            pass
+    except Exception:
+        pass
+    return labels
+
+def _sig(stops):
+    return tuple(round(v, 4) for s in stops for v in s)
+
+def _at(s, c):
+    return s[c] if c < len(s) else 0.0
+
+def _rebuild_lut(stops, sample_count, channels):
+    """Interpolate `sample_count` LUT samples of `channels` floats from evenly-spaced stops; flat list."""
+    n = len(stops)
+    if not n or not sample_count:
+        return []
+    flat = []
+    for j in range(sample_count):
+        if n == 1 or sample_count == 1:
+            s = stops[0]
+        else:
+            pos = j / (sample_count - 1) * (n - 1)
+            i0 = int(pos); i1 = min(i0 + 1, n - 1); f = pos - i0
+            a, b = stops[i0], stops[i1]
+            s = [_at(a, c) + (_at(b, c) - _at(a, c)) * f for c in range(channels)]
+        flat.extend(float(_at(s, c)) for c in range(channels))
+    return flat
+
+# ── read / save / reset ───────────────────────────────────────────────────────
+
 def read_vfx(game_rel):
-    """Enumerate every editable curve in a Niagara asset, classified by type.
-    Returns {ok, name, total_exports, color_exports, summary, params:[...]}."""
+    """Enumerate a Niagara asset's editable COLOR curves, deduped into groups with gradient stops.
+    Returns {ok, name, total_exports, color_exports, summary, groups:[{group_id, export_indices,
+    channels, sample_count, lut_floats, kind, is_hdr, stops:[[r,g,b,a]…]}]}."""
     base = _ensure_extracted(game_rel)
     r = uat(["niagara_details", os.path.abspath(base + ".uasset"), "--usmap", USMAP])
     try:
@@ -71,52 +154,85 @@ def read_vfx(game_rel):
     except Exception:
         raise RuntimeError("niagara_details failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "no output"))
 
-    params, summary = [], {}
+    labels = _vfx_labels(game_rel, base)
+    order, groups, summary = [], {}, {}
     for e in d.get("exports", []):
         lut      = e.get("shaderLut") or {}
         samples  = lut.get("samples") or []
         channels = e.get("channels", 1)
         kind, editable = _classify(channels, samples)
         summary[kind] = summary.get(kind, 0) + 1
+        if not editable:                 # color/emission/scalar/vector are editable; opacity ramps aren't
+            continue
+        stops = [[round(x, 5) for x in (s + [0, 0, 0, 0])[:channels]] for s in _downsample(samples, PREVIEW_STOPS)]
+        # Size-aware key: same-class curves come in different LUT sizes ("clones") — never merge them,
+        # or the group's single rebuilt LUT would be the wrong length for the odd-sized exports.
+        sig   = (_sig(stops), lut.get("sampleCount", len(samples)), channels)
+        g = groups.get(sig)
+        if not g:
+            g = {"export_indices": [], "channels": channels,
+                 "sample_count": lut.get("sampleCount", len(samples)),
+                 "lut_floats":   lut.get("floatCount", 0),
+                 "kind": kind,
+                 "label": labels.get(e["exportIndex"], ""),
+                 "is_hdr": max((max(s[:3]) for s in samples if s), default=0.0) > 1.05,
+                 "stops": stops}
+            groups[sig] = g; order.append(sig)
+        g["export_indices"].append(e["exportIndex"])
 
-        avg = [0.0, 0.0, 0.0, 1.0]
-        if samples:
-            for c in range(min(channels, 4)):
-                avg[c] = sum((s + [0, 0, 0, 0])[c] for s in samples) / len(samples)
-        is_hdr = max((max(s[:3]) for s in samples if s), default=0.0) > 1.05
+    # overlay saved edits onto matching groups (match by shared export indices)
+    for ed in _load_edits(game_rel):
+        idxset = set(ed.get("export_indices", []))
+        stops  = ed.get("stops")
+        if not stops:
+            continue
+        for sig in order:
+            if idxset & set(groups[sig]["export_indices"]):
+                groups[sig]["stops"] = stops
 
-        params.append({
-            "export_index": e["exportIndex"],
-            "class":        e["classType"],
-            "channels":     channels,
-            "kind":         kind,
-            "editable":     editable,
-            "lut_floats":   lut.get("floatCount", 0),     # flatLut length required for niagara_edit
-            "sample_count": lut.get("sampleCount", 0),
-            "min_time":     lut.get("minTime", 0),
-            "max_time":     lut.get("maxTime", 0),
-            "is_hdr":       is_hdr,
-            "avg":          [round(x, 5) for x in avg],
-            "stops":        [[round(x, 5) for x in s] for s in _downsample(samples, PREVIEW_STOPS)],
-        })
+    glist = [groups[s] for s in order]
+    for i, g in enumerate(glist):
+        g["group_id"] = i
+    return {"ok": True, "name": os.path.basename(game_rel),
+            "total_exports": d.get("totalExports"), "color_exports": d.get("colorExports"),
+            "summary": summary, "groups": glist}
 
-    return {
-        "ok":            True,
-        "name":          os.path.basename(game_rel),
-        "total_exports": d.get("totalExports"),
-        "color_exports": d.get("colorExports"),
-        "summary":       summary,
-        "params":        params,
-    }
+def save_vfx(game_rel, groups):
+    """Persist edited color-curve groups to the sidecar. groups: [{export_indices, stops, sample_count, channels}]."""
+    _ensure_extracted(game_rel)
+    clean = [{"export_indices": list(g.get("export_indices") or []),
+              "stops":          g.get("stops") or [],
+              "sample_count":   int(g.get("sample_count") or 0),
+              "channels":       int(g.get("channels") or 4)}
+             for g in (groups or []) if g.get("export_indices") and g.get("stops")]
+    p = vfx_sidecar(game_rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    json.dump({"vfx_edits": clean}, open(p, "w"))
+    return read_vfx(game_rel)
 
-def stage_vfx(stage, game_rel, edits):
-    """Apply curve edits and write the modified Niagara asset into the export stage.
-    edits: [{export_index, flat_lut:[...]}] — flat_lut length must equal that curve's lut_floats.
-    (Export wiring is still WIP; this is the building block niagara_edit provides.)"""
-    base = _ensure_extracted(game_rel)
-    payload = [{"exportIndex": ed["export_index"], "flatLut": ed["flat_lut"]} for ed in (edits or [])]
+def reset_vfx(game_rel):
+    p = vfx_sidecar(game_rel)
+    if os.path.exists(p):
+        os.remove(p)
+    return read_vfx(game_rel)
+
+def stage_vfx(stage, game_rel, edits=None):
+    """Rebuild each edited group's LUT and niagara_edit the asset into the export stage.
+    edits: [{export_indices, stops, sample_count, channels}] — defaults to the on-disk sidecar."""
+    base   = _ensure_extracted(game_rel)
+    groups = edits if edits is not None else _load_edits(game_rel)
+    payload = []
+    for g in (groups or []):
+        stops = g.get("stops") or []
+        sc    = int(g.get("sample_count") or 0)
+        ch    = int(g.get("channels") or 4)
+        if not stops or not sc:
+            continue
+        flat = _rebuild_lut(stops, sc, ch)
+        for idx in (g.get("export_indices") or []):
+            payload.append({"exportIndex": idx, "flatLut": flat})
     if not payload:
-        raise RuntimeError("no curve edits supplied")
+        raise RuntimeError("no VFX edits to stage")
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)

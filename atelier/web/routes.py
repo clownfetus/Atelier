@@ -43,7 +43,8 @@ import io_lib as _io_lib_mod
 if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
     _pak_thumb_mod.start_warmup()
 from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
-from atelier.handlers.vfx import read_vfx, is_vfx
+from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
+from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
 from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.web.browse as _browse_mod
@@ -730,27 +731,100 @@ def api_import_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
 
-# ── vfx import (placeholder) ─────────────────────────────────────────────────
+# ── vfx import ────────────────────────────────────────────────────────────────
 
 @app.post("/api/import_vfx")
 def api_import_vfx():
+    body = request.json or {}
+    gr   = body.get("game_rel", "") or (game_rel_for_skin(body["skin_id"], body["rel_path"])
+                                        if body.get("skin_id") and body.get("rel_path") else "")
     response.content_type = "application/json"
-    return json.dumps({"ok": False, "error": "VFX handler not yet implemented"})
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        read_vfx(gr)   # extract + validate the Niagara asset is readable
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
 
-# ── vfx parameters (read: enumerate editable Niagara curves, classified) ──────
+# ── vfx parameters (read / save / reset: Niagara colour-curve group edits) ────
 
 @app.get("/api/vfx_params")
 def api_vfx_params():
     gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
     if not gr:
-        response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = read_vfx(gr)
-        response.content_type = "application/json"
         return json.dumps({"game_rel": gr, "token": token(gr), **p})
     except Exception as e:
-        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/vfx_save")
+def api_vfx_save():
+    body = request.json or {}
+    gr   = body.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        p = save_vfx(gr, body.get("groups", []))
+        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/vfx_reset")
+def api_vfx_reset():
+    body = request.json or {}
+    gr   = body.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        p = reset_vfx(gr)
+        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+# ── curve parameters (read / save / reset: CurveLinearColor R/G/B/A key edits) ─
+
+@app.get("/api/curve_params")
+def api_curve_params():
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        p = read_curve(gr)
+        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/curve_save")
+def api_curve_save():
+    body = request.json or {}
+    gr   = body.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        p = save_curve(gr, body.get("edits", {}))
+        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/curve_reset")
+def api_curve_reset():
+    body = request.json or {}
+    gr   = body.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        p = reset_curve(gr)
+        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+    except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
 # ── material import ───────────────────────────────────────────────────────────
@@ -1297,9 +1371,12 @@ def api_export():
     os.makedirs(out_dir, exist_ok=True)
 
     try:
-        tex_items = [gr for gr in items if not is_material(gr)]
-        mat_items = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
-        result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True)
+        tex_items   = [gr for gr in items if not is_material(gr) and not is_curve(gr) and not is_vfx(gr)]
+        mat_items   = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
+        curve_items = [{"game_rel": gr, "edits": {}} for gr in items if is_curve(gr)]   # edits already on disk
+        vfx_items   = [gr for gr in items if is_vfx(gr)]                                 # edits from sidecar
+        result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
+                           curve_items=curve_items, vfx_items=vfx_items)
         if not result.get("ok"):
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})

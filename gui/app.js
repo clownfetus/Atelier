@@ -23,6 +23,7 @@ const ASSET_HANDLERS = {
   texture:  { import_endpoint: "/api/import_texture",  preview: true,  icon: "image"        },
   material: { import_endpoint: "/api/import_material", preview: false, icon: "circle-star"  },
   vfx:      { import_endpoint: "/api/import_vfx",      preview: false, icon: "sparkles"     },
+  curve:    { import_endpoint: "/api/curve_params",    preview: false, icon: "spline"       },
 };
 function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
@@ -30,6 +31,7 @@ const ASSET_ICON_CLS = {
   texture:  "texture-icon",
   vfx:      "vfx-icon",
   material: "material-icon",
+  curve:    "curve-icon",
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
@@ -55,6 +57,7 @@ const ICON_CLS_TO_LUCIDE = {
   "texture-icon":         "image",
   "vfx-icon":             "sparkles",
   "material-icon":        "circle-star",
+  "curve-icon":           "spline",
   "unhandled-icon":       "file-question",
 };
 
@@ -347,6 +350,12 @@ function handleImportedFileAction(item) {
     case "material":
       openMaterialEditor(item);
       return;
+    case "curve":
+      openCurveEditor(item);
+      return;
+    case "vfx":
+      openVfxEditor(item);
+      return;
     default:
       fetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
@@ -384,6 +393,12 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
     if (item.file_type === "material") {
       // materials: api_material_params triggers mat_json (extraction) for any game_rel path
       res = await api(`/api/material_params?game_rel=${encodeURIComponent(item.game_rel)}`);
+    } else if (item.file_type === "curve") {
+      // curves: api_curve_params triggers extraction + to_json for any game_rel path
+      res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`);
+    } else if (item.file_type === "vfx") {
+      // vfx: api_vfx_params triggers extraction + niagara_details for any game_rel path
+      res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`);
     } else {
       res = await api(handlerFor(item.file_type).import_endpoint, {
         method: "POST",
@@ -543,6 +558,275 @@ document.getElementById("mat-reset").addEventListener("click", resetMaterial);
 document.getElementById("mat-close").addEventListener("click", closeMaterialEditor);
 document.getElementById("material-overlay").addEventListener("click", e => {
   if (e.target.id === "material-overlay") closeMaterialEditor();
+});
+
+// ── curve editor (CurveLinearColor R/G/B/A key values) ────────────────────────
+let curveEditor = null;
+const CURVE_CH = ["R", "G", "B", "A"];
+
+function _c01(v) { return Math.min(1, Math.max(0, v)); }
+function _curveGradCss(stops) {
+  if (!stops || !stops.length) return "#222";
+  const t0 = stops[0].time, t1 = stops[stops.length - 1].time, span = (t1 - t0) || 1;
+  const parts = stops.map(s => {
+    const [r, g, b] = s.rgba;
+    const pct = (((s.time - t0) / span) * 100).toFixed(1);
+    return `rgb(${Math.round(_c01(r) * 255)},${Math.round(_c01(g) * 255)},${Math.round(_c01(b) * 255)}) ${pct}%`;
+  });
+  return `linear-gradient(to right, ${parts.join(", ")})`;
+}
+function _evalCh(keys, t) {
+  if (!keys || !keys.length) return 0;
+  if (t <= keys[0].time) return keys[0].value;
+  if (t >= keys[keys.length - 1].time) return keys[keys.length - 1].value;
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1], b = keys[i];
+    if (t <= b.time) { const sp = b.time - a.time; return a.value + (b.value - a.value) * (sp ? (t - a.time) / sp : 0); }
+  }
+  return keys[keys.length - 1].value;
+}
+function _resampleStops(channels) {
+  const ts = new Set();
+  for (const ch of CURVE_CH) (channels[ch] || []).forEach(k => ts.add(k.time));
+  return [...ts].sort((a, b) => a - b).map(t => ({ time: t, rgba: CURVE_CH.map(ch => _evalCh(channels[ch], t)) }));
+}
+
+async function openCurveEditor(item) {
+  const ov = document.getElementById("curve-overlay");
+  document.getElementById("curve-title").textContent = item.name;
+  document.getElementById("curve-sub").textContent = item.game_rel || "";
+  document.getElementById("curve-status").textContent = "";
+  document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  ov.classList.add("active");
+  let res;
+  try { res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
+  catch (e) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
+  if (!res.ok) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read curve"}</div>`; return; }
+  curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
+  renderCurveEditor();
+  loadSidebar();
+}
+
+function renderCurveEditor() {
+  const c = curveEditor; if (!c) return;
+  let h = `<div class="curve-preview" id="curve-grad"></div>`;
+  let any = false;
+  for (const ch of CURVE_CH) {
+    const keys = c.channels[ch] || [];
+    if (!keys.length) continue;
+    any = true;
+    h += `<div class="mat-section">${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</div>`;
+    keys.forEach((k, i) => {
+      h += `<div class="mat-row">
+        <label>t = ${(+k.time).toFixed(3)}</label>
+        <input class="mat-num wide" type="number" step="any" value="${k.value}" oninput="curveKey('${ch}',${i},this.value)">
+      </div>`;
+    });
+  }
+  if (!any) h = `<div class="mat-empty">This curve exposes no editable keys.</div>`;
+  document.getElementById("curve-body").innerHTML = h;
+  const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
+}
+
+function curveKey(ch, i, v) {
+  const c = curveEditor; if (!c) return;
+  const val = parseFloat(v); if (isNaN(val)) return;
+  c.channels[ch][i].value = val;
+  (c.dirty[ch] || (c.dirty[ch] = {}))[i] = val;
+  c.stops = _resampleStops(c.channels);
+  const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
+}
+
+async function saveCurve() {
+  const c = curveEditor; if (!c) return;
+  if (!Object.keys(c.dirty).length) { document.getElementById("curve-status").textContent = "No changes to save."; return; }
+  document.getElementById("curve-status").textContent = "Saving…";
+  try {
+    const res = await api("/api/curve_save", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: c.game_rel, edits: c.dirty }) });
+    if (res.ok) { toast(`Saved: ${c.name}`, "success"); loadSidebar(); closeCurveEditor(); }
+    else document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed");
+  } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
+}
+
+async function resetCurve() {
+  const c = curveEditor; if (!c) return;
+  document.getElementById("curve-status").textContent = "Resetting…";
+  try {
+    const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: c.game_rel }) });
+    if (res.ok) { c.channels = res.channels || {}; c.stops = res.stops || []; c.dirty = {}; renderCurveEditor();
+      document.getElementById("curve-status").textContent = "Reset to vanilla."; toast(`Reset: ${c.name}`, "info"); }
+    else document.getElementById("curve-status").textContent = "Error: " + (res.error || "reset failed");
+  } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
+}
+
+function closeCurveEditor() { document.getElementById("curve-overlay").classList.remove("active"); curveEditor = null; }
+
+document.getElementById("curve-save").addEventListener("click", saveCurve);
+document.getElementById("curve-reset").addEventListener("click", resetCurve);
+document.getElementById("curve-close").addEventListener("click", closeCurveEditor);
+document.getElementById("curve-overlay").addEventListener("click", e => {
+  if (e.target.id === "curve-overlay") closeCurveEditor();
+});
+
+// ── Niagara VFX editor (color-curve group recolor) ────────────────────────────
+let vfxEditor = null;
+
+function _vfxInten(g) {                       // HDR curves keep magnitude via a group intensity
+  let m = 1e-6;
+  for (const s of g.stops) m = Math.max(m, s[0], s[1], s[2]);
+  return g.is_hdr ? Math.max(m, 1) : 1;
+}
+function _vhex(c) { return ("0" + Math.round(Math.min(255, Math.max(0, c * 255))).toString(16)).slice(-2); }
+function _vStopHex(s, inten) { const n = Math.max(inten, 1e-6); return "#" + _vhex(s[0] / n) + _vhex(s[1] / n) + _vhex(s[2] / n); }
+function _vfxGradCss(g) {
+  const n = g.stops.length; if (!n) return "#222";
+  const inten = Math.max(g.inten, 1e-6);
+  const parts = g.stops.map((s, i) => {
+    const a = s.length > 3 ? Math.min(1, Math.max(0, s[3])) : 1;
+    return `rgba(${Math.round(Math.min(1, s[0] / inten) * 255)},${Math.round(Math.min(1, s[1] / inten) * 255)},${Math.round(Math.min(1, s[2] / inten) * 255)},${a.toFixed(3)}) ${(i / (n - 1) * 100).toFixed(1)}%`;
+  });
+  // checkerboard underlay so alpha reads visually
+  return `linear-gradient(to right, ${parts.join(", ")}), repeating-conic-gradient(#5a5a5a 0% 25%, #888 0% 50%) 0 0 / 14px 14px`;
+}
+
+async function openVfxEditor(item) {
+  const ov = document.getElementById("vfx-overlay");
+  document.getElementById("vfx-title").textContent = item.name;
+  document.getElementById("vfx-sub").textContent = item.game_rel || "";
+  document.getElementById("vfx-status").textContent = "";
+  document.getElementById("vfx-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  ov.classList.add("active");
+  let res;
+  try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
+  catch (e) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
+  if (!res.ok) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read VFX"}</div>`; return; }
+  vfxEditor = { game_rel: item.game_rel, name: item.name,
+                groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g) })) };
+  renderVfxEditor();
+  loadSidebar();
+}
+
+const _VFX_CHAN_COLS = ["#e05a5a", "#5ae06a", "#5a8ae0", "#cccccc"];
+function _vfxSpark(g) {                                    // SVG line preview for scalar/vector curves
+  const W = 300, H = 56, pad = 5, n = g.stops.length; if (!n) return "";
+  let mn = Infinity, mx = -Infinity;
+  g.stops.forEach(s => { for (let c = 0; c < g.channels; c++) { mn = Math.min(mn, s[c]); mx = Math.max(mx, s[c]); } });
+  if (!isFinite(mn)) { mn = 0; mx = 1; }
+  if (mx - mn < 1e-6) { mx = mn + 1; mn -= 0; }
+  const x = i => pad + (n === 1 ? 0 : i / (n - 1) * (W - 2 * pad));
+  const y = val => H - pad - (val - mn) / (mx - mn) * (H - 2 * pad);
+  let paths = "";
+  for (let c = 0; c < g.channels; c++) {
+    const pts = g.stops.map((s, i) => `${x(i).toFixed(1)},${y(s[c]).toFixed(1)}`).join(" ");
+    paths += `<polyline points="${pts}" fill="none" stroke="${_VFX_CHAN_COLS[c % 4]}" stroke-width="1.5"/>`;
+  }
+  return `<svg class="vfx-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths}` +
+         `<text x="4" y="11" fill="#888" font-size="9">${mn.toFixed(2)} … ${mx.toFixed(2)}</text></svg>`;
+}
+
+function renderVfxEditor() {
+  const v = vfxEditor; if (!v) return;
+  if (!v.groups.length) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">This VFX exposes no editable curves.</div>`; return; }
+  let h = "";
+  v.groups.forEach((g, gi) => {
+    const owners = g.label ? g.label : `${g.export_indices.length} emitter${g.export_indices.length !== 1 ? "s" : ""}`;
+    const extra  = g.export_indices.length > 1 ? ` ×${g.export_indices.length}` : "";
+    h += `<div class="mat-section">${g.kind} curve — ${owners}${extra}${g.is_hdr ? " · HDR" : ""}</div>`;
+    if (g.channels === 4) {                               // color / emission: gradient + swatches + alpha
+      h += `<div class="curve-preview" id="vgrad${gi}"></div>`;
+      if (g.is_hdr) {
+        h += `<div class="mat-row"><label>intensity</label>
+          <input type="range" id="vint${gi}" min="0" max="20" step="0.1" value="${Math.min(g.inten, 20)}" oninput="vfxInten(${gi},this.value,1)">
+          <input class="mat-num" id="vinn${gi}" type="number" step="0.1" value="${+g.inten.toFixed(2)}" oninput="vfxInten(${gi},this.value,0)"></div>`;
+      }
+      h += `<div class="vfx-stops">`;
+      g.stops.forEach((s, si) => {
+        const a = s.length > 3 ? s[3] : 1;
+        h += `<div class="vfx-stop">
+          <input type="color" value="${_vStopHex(s, g.inten)}" oninput="vfxStop(${gi},${si},this.value)">
+          <input class="vfx-alpha" type="number" min="0" max="1" step="0.05" value="${+(+a).toFixed(2)}" title="alpha (opacity)" oninput="vfxAlpha(${gi},${si},this.value)">
+        </div>`;
+      });
+      h += `</div>`;
+    } else {                                              // scalar / vector: line preview + value inputs
+      h += `<div class="vfx-spark-wrap" id="vspark${gi}">${_vfxSpark(g)}</div>`;
+      h += `<div class="vfx-vals">`;
+      g.stops.forEach((s, si) => {
+        h += `<div class="vfx-val">`;
+        for (let c = 0; c < g.channels; c++)
+          h += `<input type="number" step="any" value="${s[c]}" oninput="vfxVal(${gi},${si},${c},this.value)">`;
+        h += `</div>`;
+      });
+      h += `</div>`;
+    }
+  });
+  document.getElementById("vfx-body").innerHTML = h;
+  v.groups.forEach((g, gi) => {
+    if (g.channels === 4) { const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g); }
+  });
+}
+
+function vfxVal(gi, si, ci, val) {
+  const g = vfxEditor.groups[gi], x = parseFloat(val);
+  if (isNaN(x)) return;
+  g.stops[si][ci] = x;
+  const el = document.getElementById("vspark" + gi); if (el) el.innerHTML = _vfxSpark(g);
+}
+
+function vfxStop(gi, si, hex) {
+  const g = vfxEditor.groups[gi], n = Math.max(g.inten, 1e-6), s = g.stops[si];
+  s[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
+  s[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
+  s[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
+  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+}
+function vfxAlpha(gi, si, v) {
+  const g = vfxEditor.groups[gi], s = g.stops[si], a = parseFloat(v);
+  if (isNaN(a)) return;
+  while (s.length < 4) s.push(1);
+  s[3] = Math.min(1, Math.max(0, a));
+  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+}
+function vfxInten(gi, val, fromRange) {
+  const g = vfxEditor.groups[gi], o = Math.max(g.inten, 1e-6), nv = parseFloat(val) || 0, k = nv / o;
+  g.stops.forEach(s => { s[0] *= k; s[1] *= k; s[2] *= k; });
+  g.inten = nv;
+  const other = document.getElementById((fromRange ? "vinn" : "vint") + gi); if (other) other.value = val;
+  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+}
+
+async function saveVfx() {
+  const v = vfxEditor; if (!v) return;
+  document.getElementById("vfx-status").textContent = "Saving…";
+  const groups = v.groups.map(g => ({ export_indices: g.export_indices, stops: g.stops,
+                                      sample_count: g.sample_count, channels: g.channels }));
+  try {
+    const res = await api("/api/vfx_save", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: v.game_rel, groups }) });
+    if (res.ok) { toast(`Saved: ${v.name}`, "success"); loadSidebar(); closeVfxEditor(); }
+    else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
+  } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+}
+async function resetVfx() {
+  const v = vfxEditor; if (!v) return;
+  document.getElementById("vfx-status").textContent = "Resetting…";
+  try {
+    const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: v.game_rel }) });
+    if (res.ok) { v.groups = (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g) })); renderVfxEditor();
+      document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
+    else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
+  } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+}
+function closeVfxEditor() { document.getElementById("vfx-overlay").classList.remove("active"); vfxEditor = null; }
+
+document.getElementById("vfx-save").addEventListener("click", saveVfx);
+document.getElementById("vfx-reset").addEventListener("click", resetVfx);
+document.getElementById("vfx-close").addEventListener("click", closeVfxEditor);
+document.getElementById("vfx-overlay").addEventListener("click", e => {
+  if (e.target.id === "vfx-overlay") closeVfxEditor();
 });
 
 // ── import all ────────────────────────────────────────────────────────────────
@@ -782,10 +1066,10 @@ async function doExport() {
   const selected = Object.values(sidebarData).filter(i => i.selected);
   if (!selected.length) return;
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material"].includes(i.file_type || ""));
+  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx"].includes(i.file_type || ""));
   const skipped    = selected.length - exportable.length;
   if (!exportable.length) {
-    toast("Nothing exportable selected — VFX export isn't implemented yet", "info");
+    toast("Nothing exportable selected", "info");
     return;
   }
   document.getElementById("export-btn").disabled = true;
