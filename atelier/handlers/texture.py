@@ -23,13 +23,16 @@ def decode_batch(uasset_paths, output_root=None, base_root=None):
                      "usmap_path": USMAP, "format": "png", "parallel": True})
 
 def decode_flat(game_rels, output_dir):
-    """Parallel-decode extracted uassets to output_dir as flat basename.png (no subdirectory tree)."""
+    """Parallel-decode extracted uassets to output_dir as flat stem.png (no subdirectory tree).
+    Stem is the manifest-assigned name for this game_rel in output_dir (collision-disambiguated)."""
     import atelier.asset_cache as _ac
+    import atelier.manifest as _mf
     os.makedirs(output_dir, exist_ok=True)
     def _one(gr):
         cb = _ac.cache_base(gr) or find_extracted(gr)
         if not cb or not os.path.exists(cb + ".uasset"): return
-        decode_png(os.path.join(output_dir, os.path.basename(cb)), cb)
+        stem = _mf.stem_for(output_dir, gr, "texture")
+        decode_png(os.path.join(output_dir, stem), cb)
     grs = list(game_rels)
     if not grs: return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
@@ -90,7 +93,9 @@ def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
     import atelier.asset_cache as _ac
-    import_base = os.path.join(get_import_root(), os.path.basename(game_rel))
+    import atelier.manifest as _mf
+    import_root = get_import_root()
+    import_base = os.path.join(import_root, _mf.stem_for(import_root, game_rel, "texture"))
     work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
@@ -199,8 +204,9 @@ def cmd_import(arg):
 
     decode_flat(game_rels, IMPORT_ROOT)
 
+    import atelier.manifest as _mf
     n_png = sum(1 for gr in game_rels
-                if os.path.exists(os.path.join(IMPORT_ROOT, os.path.basename(gr) + ".png")))
+                if os.path.exists(os.path.join(IMPORT_ROOT, _mf.stem_for(IMPORT_ROOT, gr, "texture") + ".png")))
     print(f"Extracted {len(names)} asset(s), decoded {n_png} PNG -> {IMPORT_ROOT}")
 
 def _split_glob_prefix(prefix):

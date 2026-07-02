@@ -52,8 +52,12 @@ import atelier.web.browse as _browse_mod
 # ── extraction helpers ────────────────────────────────────────────────────────
 
 def _import_base(game_rel):
-    """Full disk path (no ext) for a game_rel in the active project (flat — png/json live here)."""
-    return os.path.join(get_import_root(), os.path.basename(game_rel))
+    """Full disk path (no ext) for a game_rel in the active project (flat — png/json live here).
+    Resolves through the project manifest so two different game_rels that share a basename
+    (a real occurrence in the paks) don't collide onto the same file."""
+    import atelier.manifest as _mf
+    import_root = get_import_root()
+    return os.path.join(import_root, _mf.stem_for(import_root, game_rel, "texture"))
 
 def _cache_import_base(game_rel):
     """Extracted cache path (no ext) for a game_rel in _cache/import, via asset_cache."""
@@ -1162,7 +1166,8 @@ class _PNGHandler(FileSystemEventHandler):
                 return
             self._last[event.src_path] = now
             name = os.path.basename(event.src_path)[:-4]
-            gr   = _asset_cache.by_name(name) or name
+            import atelier.manifest as _mf
+            gr = _mf.lookup_game_rel(get_import_root(), name) or name
             _push_sse({"file_changed": True, "token": token(gr), "game_rel": gr})
 
     def on_created(self, event):
@@ -1278,6 +1283,8 @@ def api_project_rename():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "name already taken"})
     os.rename(old_dir, new_dir)
+    import atelier.manifest as _mf
+    _mf.invalidate(old_dir)
     if get_active_project() == old_name:
         set_active_project(new_name)
     response.content_type = "application/json"
@@ -1315,6 +1322,8 @@ def api_project_delete():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
     shutil.rmtree(project_dir)
+    import atelier.manifest as _mf
+    _mf.invalidate(project_dir)
     if get_active_project() == name:
         set_active_project("")
     response.content_type = "application/json"
@@ -1554,11 +1563,15 @@ def api_delete_imported():
                 try: os.remove(p)
                 except Exception: pass
     _asset_cache.remove(gr)
+    import atelier.manifest as _mf
+    _mf.remove(get_import_root(), gr)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
 @app.post("/api/delete_all_imported")
 def api_delete_all_imported():
+    import atelier.manifest as _mf
+    import_root = get_import_root()
     items = all_imported()
     for item in items:
         import_base = _import_base(item["game_rel"])
@@ -1575,6 +1588,7 @@ def api_delete_all_imported():
                     try: os.remove(p)
                     except Exception: pass
         _asset_cache.remove(item["game_rel"])
+        _mf.remove(import_root, item["game_rel"])
     response.content_type = "application/json"
     return json.dumps({"ok": True, "deleted": len(items)})
 

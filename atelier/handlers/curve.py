@@ -18,12 +18,14 @@ def _f(x):
     except (TypeError, ValueError): return 0.0
 
 def curve_json(game_rel):
-    """Extract the curve + convert to JSON (flat in active project as <basename>.json). Returns json path."""
+    """Extract the curve + convert to JSON (flat in active project as <stem>.json). Returns json path.
+    <stem> is the project-manifest stem for game_rel (collision-disambiguated)."""
     import atelier.asset_cache as _ac
+    import atelier.manifest as _mf
     from atelier.handlers.texture import extract_info, find_extracted
     import_root = get_import_root()
-    import_base = os.path.join(import_root, os.path.basename(game_rel))
-    jp = import_base + ".json"
+    stem        = _mf.stem_for(import_root, game_rel, "curve")
+    jp = os.path.join(import_root, stem) + ".json"
     if os.path.exists(jp): return jp
     work_base = _ac.cache_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
@@ -41,7 +43,12 @@ def curve_json(game_rel):
         raise RuntimeError("curve not found in game paks")
     os.makedirs(import_root, exist_ok=True)
     uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(import_root)])
-    if not os.path.exists(jp): raise RuntimeError("to_json produced no JSON")
+    # to_json names its output after the input .uasset's own basename — rename to the
+    # disambiguated stem when it differs (collision case).
+    produced = os.path.join(import_root, os.path.basename(game_rel)) + ".json"
+    if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
+    if os.path.abspath(produced) != os.path.abspath(jp):
+        os.replace(produced, jp)
     return jp
 
 def _float_curves(d):
@@ -125,7 +132,9 @@ def save_curve(game_rel, edits):
 
 def reset_curve(game_rel):
     """Drop local edits: delete the cached JSON and re-derive vanilla keys from the .uasset."""
-    jp = os.path.join(get_import_root(), os.path.basename(game_rel)) + ".json"
+    import atelier.manifest as _mf
+    import_root = get_import_root()
+    jp = os.path.join(import_root, _mf.stem_for(import_root, game_rel, "curve")) + ".json"
     if os.path.exists(jp): os.remove(jp)
     return read_curve(game_rel)
 

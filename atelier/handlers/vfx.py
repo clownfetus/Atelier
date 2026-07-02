@@ -66,7 +66,9 @@ def _downsample(samples, stops):
 # ── edit sidecar (persisted color-curve group edits) ──────────────────────────
 
 def vfx_sidecar(game_rel):
-    return os.path.join(get_import_root(), os.path.basename(game_rel)) + ".json"
+    import atelier.manifest as _mf
+    import_root = get_import_root()
+    return os.path.join(import_root, _mf.stem_for(import_root, game_rel, "vfx")) + ".json"
 
 def _load_edits(game_rel):
     p = vfx_sidecar(game_rel)
