@@ -13,11 +13,12 @@ travels for free with the existing os.rename/shutil.copytree/shutil.rmtree proje
 operations in atelier/web/routes.py, and is skipped by directory listings that only
 look at files (all_imported(), _list_projects()).
 """
-import os, json, hashlib, threading
+import os, json, random, string, threading
 
-_MANIFEST_SUBDIR = ".atelier"
-_MANIFEST_FILE   = "manifest.json"
-_VERSION         = 1
+_MANIFEST_SUBDIR  = ".atelier"
+_MANIFEST_FILE    = "manifest.json"
+_VERSION          = 1
+_SUFFIX_ALPHABET  = string.ascii_letters + string.digits
 
 _lock  = threading.Lock()
 _cache: dict = {}  # abspath(project_dir) -> {"stems": {stem: {"game_rel", "kind"}}, "by_gr": {game_rel: stem}}
@@ -78,11 +79,16 @@ def lookup_stem(project_dir, game_rel):
     return _load(project_dir)["by_gr"].get(game_rel)
 
 
+def _random_suffix(n=5):
+    return "".join(random.choices(_SUFFIX_ALPHABET, k=n))
+
+
 def stem_for(project_dir, game_rel, kind):
     """Get-or-create the on-disk filename stem for game_rel in this project.
-    Same game_rel always returns the same stem (idempotent). A different game_rel whose
-    plain basename is already taken gets disambiguated (parent-folder suffix, then a short
-    hash) instead of clobbering the existing entry."""
+    Same game_rel always returns the same stem (idempotent). A different game_rel whose plain
+    basename is already taken gets a random 5-char alphanumeric suffix instead of clobbering the
+    existing entry; the suffix is checked against existing stems and re-rolled on the (extremely
+    unlikely) chance it's already in use, so collisions are provably impossible."""
     with _lock:
         data = _load(project_dir)
         stems, by_gr = data["stems"], data["by_gr"]
@@ -93,9 +99,11 @@ def stem_for(project_dir, game_rel, kind):
         if candidate not in stems:
             chosen = candidate
         else:
-            parent = os.path.basename(os.path.dirname(game_rel))
-            alt = f"{candidate}__{parent}" if parent else candidate
-            chosen = alt if alt not in stems else f"{candidate}__{hashlib.sha1(game_rel.encode()).hexdigest()[:6]}"
+            while True:
+                alt = f"{candidate}__{_random_suffix()}"
+                if alt not in stems:
+                    chosen = alt
+                    break
         stems[chosen] = {"game_rel": game_rel, "kind": kind}
         by_gr[game_rel] = chosen
         _save(project_dir)

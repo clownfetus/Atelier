@@ -1,4 +1,4 @@
-import os, json, shutil
+import os, json, shutil, tempfile
 from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root
 from atelier.tools import uat
 from atelier.paths import pak_game_path
@@ -127,13 +127,18 @@ def mat_json(game_rel, out_dir=None):
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("material not found in game paks")
     os.makedirs(out_dir, exist_ok=True)
-    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(out_dir)])
-    # to_json always names its output after the input .uasset's own basename — rename to the
-    # disambiguated stem when it differs (collision case).
-    produced = os.path.join(out_dir, os.path.basename(game_rel)) + ".json"
-    if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
-    if os.path.abspath(produced) != os.path.abspath(jp):
-        os.replace(produced, jp)
+    # to_json always names its output after the input .uasset's own basename — if that name is
+    # already taken in out_dir by a DIFFERENT (colliding) game_rel's file, writing straight into
+    # out_dir would silently overwrite it before we get a chance to move ours aside. Always
+    # extract into an isolated scratch dir first, then move the single result into place.
+    tmp_dir = tempfile.mkdtemp(prefix="mat_tojson_", dir=_CACHE)
+    try:
+        uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(tmp_dir)])
+        produced = os.path.join(tmp_dir, os.path.basename(game_rel)) + ".json"
+        if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
+        shutil.move(produced, jp)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
     return jp
 
 def read_material(game_rel, cache_only=False):

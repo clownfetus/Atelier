@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('gui', 'gui'), ('version', '.')]
+datas = [('gui', 'gui')]
 binaries = []
 hiddenimports = [
     'io_lib',

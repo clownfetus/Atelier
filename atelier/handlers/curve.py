@@ -1,4 +1,4 @@
-import os, json
+import os, json, shutil, tempfile
 from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, get_import_root
 from atelier.tools import uat
 from atelier.paths import pak_game_path
@@ -42,13 +42,18 @@ def curve_json(game_rel):
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("curve not found in game paks")
     os.makedirs(import_root, exist_ok=True)
-    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(import_root)])
-    # to_json names its output after the input .uasset's own basename — rename to the
-    # disambiguated stem when it differs (collision case).
-    produced = os.path.join(import_root, os.path.basename(game_rel)) + ".json"
-    if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
-    if os.path.abspath(produced) != os.path.abspath(jp):
-        os.replace(produced, jp)
+    # to_json always names its output after the input .uasset's own basename — if that name is
+    # already taken in import_root by a DIFFERENT (colliding) game_rel's file, writing straight
+    # into import_root would silently overwrite it before we get a chance to move ours aside.
+    # Always extract into an isolated scratch dir first, then move the single result into place.
+    tmp_dir = tempfile.mkdtemp(prefix="curve_tojson_", dir=_CACHE)
+    try:
+        uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(tmp_dir)])
+        produced = os.path.join(tmp_dir, os.path.basename(game_rel)) + ".json"
+        if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
+        shutil.move(produced, jp)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
     return jp
 
 def _float_curves(d):
