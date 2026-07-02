@@ -109,10 +109,13 @@ def stage_inject(stage, game_rel):
         raise RuntimeError("inject failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
     return os.path.basename(game_rel)
 
-def build_mod(mod_name, tex_items, mat_items, out_dir, force=True):
-    """Pack texture edits (inject) + material param edits (from_json) into one mod.
-    tex_items: [game_rel]; mat_items: [{game_rel, colors:{name:[r,g,b,a]}, scalars:{name:val}}]."""
+def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None):
+    """Pack texture edits (inject) + material/curve param edits + Niagara curve edits into one mod.
+    tex_items: [game_rel]; mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
+    vfx_items: [game_rel] (Niagara edits come from the on-disk sidecar)."""
     from atelier.handlers.material import stage_material
+    from atelier.handlers.curve import stage_curve
+    from atelier.handlers.vfx import stage_vfx
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
     for ext in (".pak", ".ucas", ".utoc"):
         if os.path.exists(base + ext): os.remove(base + ext)
@@ -126,6 +129,12 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True):
         try: applied.append("mat " + stage_material(stage, m["game_rel"],
                                                     m.get("colors", {}), m.get("scalars", {})))
         except Exception as e: skipped.append(f"{os.path.basename(m.get('game_rel',''))}: {e}")
+    for c in (curve_items or []):
+        try: applied.append("curve " + stage_curve(stage, c["game_rel"], c.get("edits", {})))
+        except Exception as e: skipped.append(f"{os.path.basename(c.get('game_rel',''))}: {e}")
+    for gr in (vfx_items or []):
+        try: applied.append("vfx " + stage_vfx(stage, gr))
+        except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     if not applied:
         return {"ok": False, "error": "nothing staged: " + "; ".join(skipped)}
     os.makedirs(out_dir, exist_ok=True)

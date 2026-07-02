@@ -205,10 +205,48 @@
   </div>
 </div>
 
+<!-- ── curve editor (CurveLinearColor R/G/B/A keys) ── -->
+<div class="overlay" id="curve-overlay">
+  <div class="modal mat-modal">
+    <div class="mat-head">
+      <div class="mat-head-titles">
+        <h2><i data-lucide="spline" size="18"></i> <span id="curve-title">Curve</span></h2>
+        <div id="curve-sub" class="mat-subpath"></div>
+      </div>
+      <button class="sb-clear" id="curve-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div id="curve-body" class="mat-body"></div>
+    <div class="mat-foot">
+      <span id="curve-status" class="mat-status"></span>
+      <button class="btn" id="curve-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
+      <button class="btn primary" id="curve-save"><i data-lucide="save" size="13"></i> Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── 3D viewport trigger (bottom-center) ── -->
 <button id="view3d-fab" title="Preview this skin in 3D">
   <i data-lucide="box" size="16"></i> 3D View
 </button>
+
+<!-- ── Niagara VFX editor (color-curve group recolor) ── -->
+<div class="overlay" id="vfx-overlay">
+  <div class="modal mat-modal">
+    <div class="mat-head">
+      <div class="mat-head-titles">
+        <h2><i data-lucide="sparkles" size="18"></i> <span id="vfx-title">VFX</span></h2>
+        <div id="vfx-sub" class="mat-subpath"></div>
+      </div>
+      <button class="sb-clear" id="vfx-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div id="vfx-body" class="mat-body"></div>
+    <div class="mat-foot">
+      <span id="vfx-status" class="mat-status"></span>
+      <button class="btn" id="vfx-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
+      <button class="btn primary" id="vfx-save"><i data-lucide="save" size="13"></i> Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── toast area ── -->
 <div id="toast-area"></div>

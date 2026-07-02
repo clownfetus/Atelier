@@ -118,8 +118,10 @@ def game_rel_from_token(tok):
     return None
 
 # Only these asset kinds are surfaced in the browser. Everything else
-# (meshes, curves, blueprints, niagara systems, data tables, …) is hidden.
-LISTED_FILE_TYPES = ("material", "texture", "mesh")
+# (blueprints, data tables, …) is hidden.
+LISTED_FILE_TYPES = ("material", "texture", "vfx", "curve", "mesh")
+# Editable non-texture assets persist as <basename>.json in the active project (textures use .png).
+JSON_EDIT_TYPES = ("material", "curve", "vfx")
 
 def _classify_file(name, rel_path=""):
     nl = name.lower()
@@ -127,6 +129,9 @@ def _classify_file(name, rel_path=""):
         return "texture"
     if nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_")):
         return "vfx"
+    # C_* = CurveLinearColor, Curve_* = CurveVector/Float (confirmed via UAssetTool `detect`).
+    if nl.startswith(("c_", "curve_")):
+        return "curve"
     if nl.startswith("mi_"):
         return "material"
     # Renderable meshes (skeletal/static) — exclude skeleton/physics/anim helper assets.
@@ -188,7 +193,7 @@ def _browse_pak_level(rel_path):
             continue
         gr       = f"{rel_path}/{name}" if rel_path else name
         is_mat   = ft == "material"
-        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(gr) + (".json" if is_mat else ".png")))
+        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(gr) + (".json" if ft in JSON_EDIT_TYPES else ".png")))
         result.append({
             "type":      "asset",
             "file_type": ft,
@@ -234,7 +239,7 @@ def _browse_skin(skin_id, subpath):
         if ft not in LISTED_FILE_TYPES:        # hide meshes/curves/blueprints/vfx/etc.
             continue
         is_mat   = ft == "material"
-        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(td["game_rel"]) + (".json" if is_mat else ".png")))
+        imported = os.path.exists(os.path.join(get_import_root(), os.path.basename(td["game_rel"]) + (".json" if ft in JSON_EDIT_TYPES else ".png")))
         tok      = token(td["game_rel"]) if imported else None
         result.append({
             "type":      "asset",
@@ -301,10 +306,10 @@ def all_imported():
             name = fname[:-4]
             gr   = _ac.by_name(name) or name
             ft   = "texture"
-        elif fname.endswith(".json") and _classify_file(fname[:-5]) == "material":
+        elif fname.endswith(".json") and _classify_file(fname[:-5]) in JSON_EDIT_TYPES:
             name = fname[:-5]
             gr   = _ac.by_name(name) or name
-            ft   = "material"
+            ft   = _classify_file(name)   # material | curve | vfx
         else:
             continue
         cid = sid = None
