@@ -1,7 +1,72 @@
-import os, sys, glob, re, shutil, concurrent.futures
-from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE, check_prereqs, get_import_root
+import os, sys, glob, re, shutil, struct, concurrent.futures
+from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE,
+                            check_prereqs, get_import_root, project_base, project_base_legacy)
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
+
+# ── DDS passthrough ────────────────────────────────────────────────────────────
+# Some textures MUST keep their exact block data, not be re-encoded from PNG. The dyeing/recolour
+# masks (T_*_ColorID, slot "DyeingTexture" on M_Common_* masters) pack a REGION INDEX into alpha as
+# 7 quantised steps of 255/7 ≈ 36.43 — Region 1..7 in the material's "Region N - ColorA/ColorB/
+# ColorGChannel/ColorBChannel" params. They ship DXT5 (independent alpha block), Filter=TF_Nearest
+# and SRGB=false precisely so a sample snaps to an exact step. Round-tripping that through a
+# recompressor can drift alpha across a step boundary and silently reassign a patch to the wrong
+# region — a normal map tolerates that kind of drift, an index map does not.
+_BPB = {"DXT1": 8, "BC1": 8, "DXT5": 16, "BC3": 16, "BC5": 16, "BC7": 16, "BC4": 8, "BC6H": 16}
+
+def _dds_header(w, h, fourcc, linear):
+    hdr = bytearray(128); hdr[0:4] = b"DDS "
+    struct.pack_into("<I", hdr, 4, 124)                                # dwSize
+    struct.pack_into("<I", hdr, 8, 0x1 | 0x2 | 0x4 | 0x1000 | 0x80000) # CAPS|HEIGHT|WIDTH|PIXELFORMAT|LINEARSIZE
+    struct.pack_into("<I", hdr, 12, h); struct.pack_into("<I", hdr, 16, w)
+    struct.pack_into("<I", hdr, 20, linear)                            # dwPitchOrLinearSize
+    struct.pack_into("<I", hdr, 28, 1)                                 # dwMipMapCount
+    struct.pack_into("<I", hdr, 76, 32)                                # ddspf.dwSize
+    struct.pack_into("<I", hdr, 80, 0x4)                               # ddspf.dwFlags = FOURCC
+    hdr[84:88] = fourcc.encode("ascii")
+    struct.pack_into("<I", hdr, 108, 0x1000)                           # dwCaps = TEXTURE
+    return bytes(hdr)
+
+def _tex_info(uasset_base):
+    """(declared_w, declared_h, fourcc) from UAssetTool's own decode log."""
+    probe = os.path.join(_CACHE, "_texinfo.png")
+    r = uat(["extract_texture", os.path.abspath(uasset_base + ".uasset"), os.path.abspath(probe),
+             "--usmap", USMAP])
+    log = (r.stdout or "") + (r.stderr or "")
+    m = re.search(r"Texture:\s*(\d+)x(\d+),\s*format=PF_(\w+)", log)
+    return (int(m.group(1)), int(m.group(2)), m.group(3)) if m else (0, 0, "")
+
+def decode_dds(import_base, uasset_base):
+    """Write the LARGEST SHIPPED mip as a .dds next to import_base, block data untouched.
+
+    MR strips the top mip on big textures: the header still declares e.g. 4096x4096 while the
+    largest data actually shipped is 2048x2048. UAssetTool maps mip[i] -> DataResource[i], so with
+    mip0 absent every level is off by one, each size check fails, and it degrades to the 4x4 tail
+    (measured: T_1037303_Hair_D/-Hair_ID decode as 4x4). Storage varies — .uptnl holds the top mip
+    when present, otherwise the .ubulk chain starts at it — so find it rather than assume.
+    Returns the dds path, or None if no block data is recoverable."""
+    w, h, fmt = _tex_info(uasset_base)
+    bpb = _BPB.get(fmt)
+    if not bpb or not w:
+        return None
+    blocks = lambda d: max(1, d // 4) * max(1, d // 4)
+    for src in (".uptnl", ".ubulk"):
+        p = uasset_base + src
+        if not os.path.exists(p):
+            continue
+        data = open(p, "rb").read()
+        for p2 in range(14, 1, -1):
+            d = 1 << p2
+            if d > w:
+                continue
+            size = blocks(d) * bpb
+            # .uptnl is exactly the top mip; .ubulk is a chain whose head is ~3/4 of the whole
+            if size == len(data) or (src == ".ubulk" and size <= len(data) and size > len(data) * 0.6):
+                out = import_base + ".dds"
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                open(out, "wb").write(_dds_header(d, d, fmt, size) + data[:size])
+                return out
+    return None
 
 def decode_png(import_base, uasset_base):
     """Decode one extracted UE texture to .png. uasset_base is where .uasset lives; png goes to import_base."""
@@ -23,16 +88,16 @@ def decode_batch(uasset_paths, output_root=None, base_root=None):
                      "usmap_path": USMAP, "format": "png", "parallel": True})
 
 def decode_flat(game_rels, output_dir):
-    """Parallel-decode extracted uassets to output_dir as flat stem.png (no subdirectory tree).
-    Stem is the manifest-assigned name for this game_rel in output_dir (collision-disambiguated)."""
+    """Parallel-decode extracted uassets to output_dir mirrored by game_rel subfolders (project_base),
+    so same-named textures under different skins don't overwrite each other."""
     import atelier.asset_cache as _ac
-    import atelier.manifest as _mf
     os.makedirs(output_dir, exist_ok=True)
     def _one(gr):
         cb = _ac.cache_base(gr) or find_extracted(gr)
         if not cb or not os.path.exists(cb + ".uasset"): return
-        stem = _mf.stem_for(output_dir, gr, "texture")
-        decode_png(os.path.join(output_dir, stem), cb)
+        dst = project_base(gr, output_dir)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        decode_png(dst, cb)
     grs = list(game_rels)
     if not grs: return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
@@ -93,34 +158,47 @@ def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
     import atelier.asset_cache as _ac
-    import atelier.manifest as _mf
-    import_root = get_import_root()
-    import_base = os.path.join(import_root, _mf.stem_for(import_root, game_rel, "texture"))
+    # Prefer the unique subfolder path; fall back to a legacy flat png if that's where it already lives.
+    import_base = project_base(game_rel)
+    if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):
+        import_base = project_base_legacy(game_rel)
     work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
-    png = import_base + ".png"
-    if not os.path.exists(png):
-        decode_png(import_base, work_base)
-        if not os.path.exists(png):
-            raise RuntimeError("PNG missing and decode failed — re-import this texture")
+    # An authored .dds wins over the .png: UAssetTool takes DDS directly and keeps the base's pixel
+    # format, so hand-authored block data ships as-is instead of being recompressed from RGBA. That
+    # matters for index maps like the ColorID/DyeingTexture masks (see decode_dds) — a recompressor
+    # can nudge alpha across one of the 255/7 region steps and reassign the region.
+    src = import_base + ".dds"
+    if not os.path.exists(src):
+        src = import_base + ".png"
+        if not os.path.exists(src):
+            os.makedirs(os.path.dirname(import_base), exist_ok=True)
+            decode_png(import_base, work_base)
+            if not os.path.exists(src):
+                raise RuntimeError("PNG missing and decode failed — re-import this texture")
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
-    print(f"[stage_inject] {game_rel}: pak_game_path={pak_gr}  stage_ua={out_ua}", file=sys.stderr, flush=True)
+    print(f"[stage_inject] {game_rel}: pak_game_path={pak_gr}  src={os.path.basename(src)}  stage_ua={out_ua}",
+          file=sys.stderr, flush=True)
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    r = uat(["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(png),
+    r = uat(["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(src),
              os.path.abspath(out_ua), "--usmap", USMAP])
     if not os.path.exists(out_ua):
         raise RuntimeError("inject failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
     return os.path.basename(game_rel)
 
-def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None):
-    """Pack texture edits (inject) + material/curve param edits + Niagara curve edits into one mod.
-    tex_items: [game_rel]; mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
-    vfx_items: [game_rel] (Niagara edits come from the on-disk sidecar)."""
+def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
+              world_items=None, text_items=None, password=None):
+    """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
+    edits + StringTable (text) edits into one mod. tex_items: [game_rel]; mat_items: [{game_rel,
+    colors, scalars}]; curve_items: [{game_rel, edits}]; vfx_items/world_items/text_items: [game_rel]
+    (edits come from the sidecar)."""
     from atelier.handlers.material import stage_material
     from atelier.handlers.curve import stage_curve
     from atelier.handlers.vfx import stage_vfx
+    from atelier.handlers.world import stage_world
+    from atelier.handlers.text import stage_text
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
     for ext in (".pak", ".ucas", ".utoc"):
         if os.path.exists(base + ext): os.remove(base + ext)
@@ -140,13 +218,81 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
     for gr in (vfx_items or []):
         try: applied.append("vfx " + stage_vfx(stage, gr))
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
+    for gr in (text_items or []):
+        try: applied.append("text " + stage_text(stage, gr))
+        except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
+    staged_any = bool(applied)   # anything that must go through create_mod_iostore (small assets)
+    # WORLD (levels): patch the VANILLA Zen chunk in place (build_world_mod) and only fall back to
+    # the UAssetGUI round-trip (build_world_uag) if nothing could be patched faithfully.
+    #
+    # WHY the order matters — measured on TimeSquare_HighQuality:
+    #   retoc CANNOT round-trip a level. `retoc unpack -> retoc pack` with NO edits and no other
+    #   tool involved returns 199 imports where vanilla has 166, one ImportedPublicExportHash short,
+    #   and +256 bytes; the ImportMap gets RENUMBERED 0,1,2... instead of vanilla's real hash indices
+    #   (only 90/166 entries survive). The engine then can't resolve those imports — including the
+    #   BlueprintGeneratedClass refs — and drops placeholder actors (mesh + camera-facing billboard)
+    #   at world origin. That happens for ANY edit, because the damage is in the repack, not the edit.
+    #   build_world_mod never repacks the package: it patches vanilla's chunk bytes and reuses
+    #   vanilla's store entry, so the same light edit comes out as FIVE changed bytes with
+    #   imports 166->166 and hashes 78->78.
+    # build_world_uag remains the fallback ONLY because it can ADD settings vanilla never serialized
+    # (turning an override ON), which an in-place patch physically cannot do — but it corrupts the
+    # package, so it must never be the default path.
+    from atelier.handlers.world import build_world_mod, build_world_uag
+    world_out = []
+    for gr in (world_items or []):
+        sub = os.path.basename(gr); sub = sub[:-5] if sub.lower().endswith(".umap") else sub
+        try:
+            r = build_world_mod(gr, None, os.path.join(out_dir, f"{sub}_9999999_P"))
+            if not r.get("ok"):
+                r = build_world_uag(gr, None, os.path.join(out_dir, f"{sub}_9999999_P"))
+                if r.get("ok"):
+                    skipped.append(f"{sub}: in-place patch unavailable — used the round-trip builder, "
+                                   f"which breaks blueprint refs (placeholders at world origin)")
+            if r.get("ok"):
+                applied.append(f"world {sub} ({', '.join(r.get('applied') or [])})")
+                world_out.append(os.path.join(out_dir, f"{sub}_9999999_P.pak"))
+                skipped += [f"{sub}: {s}" for s in (r.get("skipped") or [])]
+            else:
+                skipped.append(f"{sub}: {r.get('error')}")
+        except Exception as e:
+            skipped.append(f"{sub}: {e}")
     if not applied:
         return {"ok": False, "error": "nothing staged: " + "; ".join(skipped)}
     os.makedirs(out_dir, exist_ok=True)
-    uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage), "--usmap", USMAP])
-    if not os.path.exists(base + ".utoc"):
-        return {"ok": False, "error": "create_mod_iostore failed"}
-    return {"ok": True, "applied": applied, "skipped": skipped, "pak": base + ".pak"}
+    if staged_any:
+        uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage), "--usmap", USMAP])
+        if not os.path.exists(base + ".utoc"):
+            return {"ok": False, "error": "create_mod_iostore failed"}
+    pak = (base + ".pak") if staged_any else (world_out[0] if world_out else base + ".pak")
+    # COMBINE into one container. This runs AFTER both builders and only copies their finished chunks
+    # (world edits stay exactly as build_world_mod produced them — no re-pack, byte-identical). If the
+    # merge fails for any reason, we keep today's separate-paks behavior untouched.
+    containers = ([base] if staged_any else []) + [w[:-4] for w in world_out]   # strip .pak -> base path
+    if len(containers) >= 2:
+        try:
+            from atelier.handlers.container_merge import merge_containers
+            tmp = base + "__merge_tmp"
+            merge_containers([(c + ".utoc", c + ".ucas") for c in containers], tmp)
+            for ext in (".utoc", ".ucas"):                 # swap merged result into the single base name
+                if os.path.exists(base + ext): os.remove(base + ext)
+                os.replace(tmp + ext, base + ext)
+            if not os.path.exists(base + ".pak"):
+                shutil.copy(containers[0] + ".pak", base + ".pak")
+            for w in world_out:                            # drop the now-merged separate world paks
+                for ext in (".pak", ".ucas", ".utoc"):
+                    p = w[:-4] + ext
+                    if os.path.abspath(p) != os.path.abspath(base + ext) and os.path.exists(p):
+                        os.remove(p)
+            pak = base + ".pak"; world_out = []
+            applied.append(f"combined {len(containers)} containers into one pak")
+        except Exception as e:
+            skipped.append(f"pak-combine skipped (kept separate paks): {e}")
+    if password:                                         # optional soft mod-lock on the exported mod
+        from atelier.handlers import modlock
+        for p in ([pak] + world_out):
+            if p and p.endswith(".pak"): modlock.embed(p[:-4], password)
+    return {"ok": True, "applied": applied, "skipped": skipped, "pak": pak, "world_mods": world_out}
 
 # ── CLI commands ───────────────────────────────────────────────────────────────
 
@@ -204,9 +350,8 @@ def cmd_import(arg):
 
     decode_flat(game_rels, IMPORT_ROOT)
 
-    import atelier.manifest as _mf
     n_png = sum(1 for gr in game_rels
-                if os.path.exists(os.path.join(IMPORT_ROOT, _mf.stem_for(IMPORT_ROOT, gr, "texture") + ".png")))
+                if os.path.exists(project_base(gr, IMPORT_ROOT) + ".png"))
     print(f"Extracted {len(names)} asset(s), decoded {n_png} PNG -> {IMPORT_ROOT}")
 
 def _split_glob_prefix(prefix):

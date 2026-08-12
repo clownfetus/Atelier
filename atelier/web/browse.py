@@ -1,8 +1,13 @@
 import os, re, hashlib, threading, urllib.request
-from atelier.config import ROOT, get_import_root
+from atelier.config import ROOT, get_import_root, project_base, project_base_legacy, project_game_rel
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
+
+def _imported_exists(game_rel, ext):
+    """A project copy exists at the unique subfolder path, or at the legacy flat path (back-compat)."""
+    return (os.path.exists(project_base(game_rel) + ext)
+            or os.path.exists(project_base_legacy(game_rel) + ext))
 
 _REMOTE_MD_URL   = "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/refs/heads/main/MarvelRivalsCharacterIDs.md"
 _update_callback = None   # set by routes.py to _push_sse after it's defined
@@ -15,7 +20,7 @@ HERO_PATHS = ["Characters"]
 
 # Paths where 4-digit children = char IDs and 7-digit grandchildren = skin IDs for label display.
 # Browsing inside these (at skin level) uses _browse_pak_level, not _browse_skin.
-CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters", "VFX/Textures/Characters"]
+CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters"]
 
 # Folders pinned to the top at the root level (in order).
 ROOT_PINNED = ("characters", "vfx", "ui")
@@ -106,36 +111,33 @@ def token(game_rel):
     return hashlib.md5(game_rel.encode()).hexdigest()[:20]
 
 def game_rel_from_token(tok):
-    """Reverse-lookup game_rel from a token via the active project's manifest."""
-    import atelier.manifest as _mf
+    """Reverse-lookup game_rel from a token by scanning the active project (subfolder-mirrored)."""
+    import atelier.asset_cache as _ac
     import_root = get_import_root()
     if not os.path.isdir(import_root): return None
-    _mf.ensure_migrated(import_root)
-    for _stem, gr, _kind in _mf.all_entries(import_root):
-        if token(gr) == tok:
-            return gr
+    for dirpath, _dirs, files in os.walk(import_root):
+        for fname in files:
+            if not fname.endswith(".png"): continue
+            gr = project_game_rel(os.path.join(dirpath, fname), import_root)
+            if "/" not in gr:                       # legacy flat file: resolve via asset_cache
+                gr = _ac.by_name(gr) or gr
+            if token(gr) == tok:
+                return gr
     return None
 
 # Only these asset kinds are surfaced in the browser. Everything else
 # (blueprints, data tables, …) is hidden.
-LISTED_FILE_TYPES = ("material", "texture", "vfx", "curve", "mesh")
-# Editable non-texture assets persist as <stem>.json in the active project (textures use .png).
-JSON_EDIT_TYPES = ("material", "curve", "vfx")
-
-def _is_imported(game_rel, file_type):
-    """Read-only: has game_rel already been imported into the active project? Looks up the
-    manifest by game_rel without creating an entry — browsing an asset shouldn't reserve a stem
-    for it before it's actually imported."""
-    import atelier.manifest as _mf
-    import_root = get_import_root()
-    stem = _mf.lookup_stem(import_root, game_rel)
-    if not stem:
-        return False
-    ext = ".json" if file_type in JSON_EDIT_TYPES else ".png"
-    return os.path.exists(os.path.join(import_root, stem + ext))
+LISTED_FILE_TYPES = ("material", "texture", "vfx", "curve", "mesh", "world", "text")
+# Editable non-texture assets persist as <basename>.json in the active project (textures use .png).
+JSON_EDIT_TYPES = ("material", "curve", "vfx", "world", "text")
 
 def _classify_file(name, rel_path=""):
     nl = name.lower()
+    if nl.endswith(".uasset"): nl = nl[:-7]
+    if nl.endswith(".umap"):            # level sublevel — lighting/components/fog/grade editing
+        return "world"
+    if nl.endswith("_st"):              # StringTable — editable key->string text
+        return "text"
     if nl.startswith("t_"):
         return "texture"
     if nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_")):
@@ -204,7 +206,7 @@ def _browse_pak_level(rel_path):
             continue
         gr       = f"{rel_path}/{name}" if rel_path else name
         is_mat   = ft == "material"
-        imported = _is_imported(gr, ft)
+        imported = _imported_exists(gr, ".json" if ft in JSON_EDIT_TYPES else ".png")
         result.append({
             "type":      "asset",
             "file_type": ft,
@@ -250,7 +252,7 @@ def _browse_skin(skin_id, subpath):
         if ft not in LISTED_FILE_TYPES:        # hide meshes/curves/blueprints/vfx/etc.
             continue
         is_mat   = ft == "material"
-        imported = _is_imported(td["game_rel"], ft)
+        imported = _imported_exists(td["game_rel"], ".json" if ft in JSON_EDIT_TYPES else ".png")
         tok      = token(td["game_rel"]) if imported else None
         result.append({
             "type":      "asset",
@@ -264,9 +266,53 @@ def _browse_skin(skin_id, subpath):
         })
     return result
 
+def _browse_maps(path):
+    """Level browsing: 'Maps' -> map folders; 'Maps/<map>' -> its .umap sublevels as world assets.
+    Maps aren't in the pak-asset index (that's characters/textures/vfx), so they're enumerated
+    straight from the map containers via the world handler."""
+    import atelier.handlers.world as _world
+    rest = path[4:].strip("/")           # after "Maps"
+    if not rest:
+        out = []
+        for mp in _world.list_maps():
+            fr, mode = _world.map_friendly(mp)
+            out.append({"type": "folder", "name": mp,
+                        "label": fr + (f" · {mode}" if mode else ""), "rel_path": f"Maps/{mp}"})
+        return out
+    mapname = rest.split("/")[0]
+    out = []
+    for s in _world.list_map_sublevels(mapname):
+        gr = s["game_rel"]
+        imported = _imported_exists(gr, ".json")
+        out.append({"type": "asset", "file_type": "world", "name": s["sub"], "label": s["sub"],
+                    "rel_path": gr, "game_rel": gr, "imported": imported,
+                    "token": token(gr) if imported else None})
+    return out
+
+def _browse_text(path):
+    """StringTable browsing under the synthetic 'Text' root (not in the pak-asset index)."""
+    import atelier.handlers.text as _text
+    out = []
+    for s in _text.list_stringtables():
+        gr = s["game_rel"]
+        imported = _imported_exists(gr, ".json")
+        out.append({"type": "asset", "file_type": "text", "name": s["name"], "label": s["name"],
+                    "rel_path": gr, "game_rel": gr, "imported": imported,
+                    "token": token(gr) if imported else None})
+    return out
+
 def browse_dispatch(path):
     """Unified browse entry point. path is relative to Marvel/Content/Marvel/."""
     path = (path or "").strip("/")
+    if not path:                         # root: pin synthetic "Maps" + "Text" sections (not indexed)
+        res = _browse_pak_level("")
+        res.insert(0, {"type": "folder", "name": "Text", "label": "Text (StringTables)", "rel_path": "Text"})
+        res.insert(0, {"type": "folder", "name": "Maps", "label": "Maps", "rel_path": "Maps"})
+        return res
+    if path.lower() == "maps" or path.lower().startswith("maps/"):
+        return _browse_maps(path)
+    if path.lower() == "text" or path.lower().startswith("text/"):
+        return _browse_text(path)
     for hp in HERO_PATHS:
         m = re.match(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})(?:/(.*))?$", path, re.IGNORECASE)
         if m:
@@ -305,30 +351,44 @@ _HERO_LABEL_RES = [re.compile(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})/", re.IGNO
                    for hp in CHAR_LABEL_PATHS]
 
 def all_imported():
-    """Return all imported assets in the active project, resolved via its manifest (collision-safe).
-    A pre-existing project without a manifest yet is backfilled once via ensure_migrated()."""
-    import atelier.manifest as _mf
+    """Walk the active project dir (subfolder-mirrored by game_rel) and return all imported assets.
+    Files stored under a subfolder path carry their own game_rel; legacy flat files (no subfolder)
+    are resolved through asset_cache by basename."""
+    import atelier.asset_cache as _ac
     import_root = get_import_root()
     if not os.path.isdir(import_root): return []
-    _mf.ensure_migrated(import_root)
     items = []
-    for stem, gr, ft in _mf.all_entries(import_root):
-        ext   = ".json" if ft in JSON_EDIT_TYPES else ".png"
-        fpath = os.path.join(import_root, stem + ext)
-        if not os.path.isfile(fpath): continue
-        cid = sid = None
-        for hr in _HERO_LABEL_RES:
-            m = hr.match(gr)
-            if m:
-                cid, sid = m.group(1), m.group(2)
-                break
-        items.append({
-            "token": token(gr), "game_rel": gr, "name": os.path.basename(gr),
-            "file_type": ft,
-            "skin_id":   sid or "", "char_id": cid or "",
-            "char_name": char_name(cid) if cid else "",
-            "skin_name": skin_name(sid) if sid else "",
-            "mtime": int(os.path.getmtime(fpath)),
-        })
-    items.sort(key=lambda it: it["name"])
+    for dirpath, _dirs, files in os.walk(import_root):
+        for fname in sorted(files):
+            fpath = os.path.join(dirpath, fname)
+            if fname.endswith(".png"):
+                ext = ".png"
+            elif fname.endswith(".json"):
+                ext = ".json"
+            else:
+                continue
+            gr = project_game_rel(fpath, import_root)   # subfolder path -> game_rel; flat -> basename
+            if "/" not in gr:                           # legacy flat file: resolve via asset_cache
+                gr = _ac.by_name(gr) or gr
+            name = os.path.basename(gr)
+            if ext == ".png":
+                ft = "texture"
+            else:
+                ft = _classify_file(name)               # material | curve | vfx
+                if ft not in JSON_EDIT_TYPES:
+                    continue
+            cid = sid = None
+            for hr in _HERO_LABEL_RES:
+                m = hr.match(gr)
+                if m:
+                    cid, sid = m.group(1), m.group(2)
+                    break
+            items.append({
+                "token": token(gr), "game_rel": gr, "name": name,
+                "file_type": ft,
+                "skin_id":   sid or "", "char_id": cid or "",
+                "char_name": char_name(cid) if cid else "",
+                "skin_name": skin_name(sid) if sid else "",
+                "mtime": int(os.path.getmtime(fpath)),
+            })
     return items

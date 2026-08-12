@@ -1,5 +1,6 @@
 import os, re, json
-from atelier.config import IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, get_import_root
+from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, get_import_root,
+                            project_base, project_base_legacy)
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
@@ -54,7 +55,7 @@ def _classify(channels, samples):
     ar, ag, ab = sr / n, sg / n, sb / n
     gray = abs(ar - ag) < 0.02 and abs(ag - ab) < 0.02
     hdr  = mx > 1.05
-    if all_zero or (gray and not hdr): return ("opacity", False)   # alpha/grayscale ramp — not a recolor target
+    if all_zero or (gray and not hdr): return ("opacity", True)    # alpha/grayscale ramp — editable (transparency/mask over life)
     if hdr and not gray:               return ("emission", True)   # HDR glow
     return ("color", True)
 
@@ -66,24 +67,28 @@ def _downsample(samples, stops):
 # ── edit sidecar (persisted color-curve group edits) ──────────────────────────
 
 def vfx_sidecar(game_rel):
-    import atelier.manifest as _mf
-    import_root = get_import_root()
-    return os.path.join(import_root, _mf.stem_for(import_root, game_rel, "vfx")) + ".json"
+    """Where a VFX's edit sidecar is written — the unique subfolder path (no basename collisions)."""
+    return project_base(game_rel) + ".json"
 
 def _load_edits(game_rel):
-    p = vfx_sidecar(game_rel)
-    if os.path.exists(p):
-        try:
-            return json.load(open(p, encoding="utf-8-sig")).get("vfx_edits") or []
-        except Exception:
-            return []
+    # New subfolder path wins; fall back to the legacy flat path so pre-existing projects still load.
+    for p in (vfx_sidecar(game_rel), project_base_legacy(game_rel) + ".json"):
+        if os.path.exists(p):
+            try:
+                return json.load(open(p, encoding="utf-8-sig")).get("vfx_edits") or []
+            except Exception:
+                return []
     return []
 
 def _vfx_labels(game_rel, base):
-    """{exportIndex -> 'Emitter · Script'} resolved via the full to_json OuterIndex chain
-    (curve -> owning NiagaraScript -> owning NiagaraEmitter). Cached to _cache/vfx_labels.
-    Best-effort: returns {} if to_json is unavailable, so curves just show by kind/index instead."""
-    cache = os.path.join(_CACHE, "vfx_labels", os.path.basename(game_rel) + ".json")
+    """{exportIndex -> label} from to_json. Two sources, best first:
+      1. each NiagaraScript's ResolvedDataInterfaces -> Name '<Emitter>.<Module>.<Input>' +
+         ResolvedDataInterface (the DI export it drives). This NAMES WHAT THE CURVE DOES
+         ('Glow2001 · ScaleSpriteSize002 · Uniform Curve Sprite Scale') and is unique per curve.
+      2. fallback: the OuterIndex chain (curve -> owning script -> owning emitter) = 'Emitter · Script',
+         which is identical for every curve on an emitter and so can't tell scale from opacity.
+    Cached to _cache/vfx_labels2. Best-effort: returns {} if to_json is unavailable."""
+    cache = project_base(game_rel, os.path.join(_CACHE, "vfx_labels2")) + ".json"
     if os.path.exists(cache):
         try:
             return {int(k): v for k, v in json.load(open(cache, encoding="utf-8")).items()}
@@ -102,14 +107,49 @@ def _vfx_labels(game_rel, base):
         def ref(i):                      # OuterIndex is a 1-based positive export ref
             return exps[i - 1] if isinstance(i, int) and 0 < i <= len(exps) else None
         strip = lambda s: re.sub(r"_\d+$", "", s or "")
+
+        # --- source 1: precise binding names via each script's ResolvedDataInterfaces ---
+        def _walk(o, name, acc):
+            if isinstance(o, dict):
+                if o.get("Name") == name: acc.append(o)
+                for v in o.values(): _walk(v, name, acc)
+            elif isinstance(o, list):
+                for v in o: _walk(v, name, acc)
+        def _prop(lst, n):
+            for p in lst or []:
+                if isinstance(p, dict) and p.get("Name") == n: return p
+        bind = {}
+        for e in exps:
+            acc = []; _walk(e.get("Data"), "ResolvedDataInterfaces", acc)
+            for a in acc:
+                for entry in (a.get("Value") or []):
+                    if not isinstance(entry, dict): continue
+                    nm = _prop(entry.get("Value"), "Name")
+                    rd = _prop(entry.get("Value"), "ResolvedDataInterface")
+                    if not nm or not rd: continue
+                    tgt = rd.get("Value")
+                    if isinstance(tgt, int) and 0 < tgt <= len(exps):
+                        nv = str(nm.get("Value") or "").strip()
+                        if nv and nv != "None":
+                            bind[tgt - 1] = nv.replace(".", " · ")
+
+        # --- source 2: OuterIndex chain fallback ---
+        asset = strip(os.path.basename(game_rel))
         for i, e in enumerate(exps):
+            if i in bind:                       # precise binding wins
+                labels[i] = bind[i]
+                continue
             script = ref(oidx(e))
             if not script:
                 continue
             sn = strip(script.get("ObjectName"))
             em = ref(oidx(script))
             en = strip(em.get("ObjectName")) if em else ""
-            labels[i] = f"{en} · {sn}" if en and sn else (sn or en)
+            lbl = f"{en} · {sn}" if en and sn else (sn or en)
+            # A DI owned by the system/package (not an emitter's script) walks up to the asset's own
+            # name — that's not a label, it's "unknown", and it has no ResolvedDataInterfaces binding
+            # either. Say so rather than printing the filename N times as if it identified the curve.
+            labels[i] = "(unbound)" if (not lbl or strip(lbl) == asset) else lbl
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         json.dump(labels, open(cache, "w"))
         try:
@@ -182,6 +222,18 @@ def read_vfx(game_rel):
             groups[sig] = g; order.append(sig)
         g["export_indices"].append(e["exportIndex"])
 
+    # A clone-group's members don't all carry a binding, and "label" above is set from whichever
+    # export created the group — often an unbound clone. Re-pick the most specific label any member
+    # has: a binding name ('Glow2001 · ScaleSpriteSize002 · Uniform Curve Sprite Scale', 2 separators)
+    # beats the OuterIndex fallback ('Glow2001 · SpawnScript', 1), which is identical across an
+    # emitter's curves and can't tell sprite-scale from opacity.
+    for sig in order:
+        g = groups[sig]
+        best = max((labels.get(i, "") for i in g["export_indices"]),
+                   key=lambda s: (s.count(" · "), len(s)), default="")
+        if best:
+            g["label"] = best
+
     # overlay saved edits onto matching groups (match by shared export indices)
     for ed in _load_edits(game_rel):
         idxset = set(ed.get("export_indices", []))
@@ -213,9 +265,9 @@ def save_vfx(game_rel, groups):
     return read_vfx(game_rel)
 
 def reset_vfx(game_rel):
-    p = vfx_sidecar(game_rel)
-    if os.path.exists(p):
-        os.remove(p)
+    for p in (vfx_sidecar(game_rel), project_base_legacy(game_rel) + ".json"):
+        if os.path.exists(p):
+            os.remove(p)
     return read_vfx(game_rel)
 
 def stage_vfx(stage, game_rel, edits=None):

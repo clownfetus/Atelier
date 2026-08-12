@@ -17,6 +17,8 @@ let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
 let   _pathLabels = {};      // "Characters/1234" -> "1234 — Spider-Man" (cached from browse results)
+let   _modsFolderSet = false; // whether a mods folder is configured (gates Build & Install)
+let   _pathsMode     = false; // setup overlay opened as the editable Paths panel (vs first-run)
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -360,6 +362,12 @@ function handleImportedFileAction(item) {
     case "vfx":
       openVfxEditor(item);
       return;
+    case "world":
+      openWorldEditor(item);
+      return;
+    case "text":
+      openTextEditor(item);
+      return;
     default:
       fetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
@@ -408,6 +416,12 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
     } else if (item.file_type === "vfx") {
       // vfx: api_vfx_params triggers extraction + niagara_details for any game_rel path
       res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`);
+    } else if (item.file_type === "world") {
+      // world: api_world_params triggers extraction + to_json for the level sublevel
+      res = await api(`/api/world_params?game_rel=${encodeURIComponent(item.game_rel)}`);
+    } else if (item.file_type === "text") {
+      // text: api_text_params triggers extraction + to_json for the StringTable
+      res = await api(`/api/text_params?game_rel=${encodeURIComponent(item.game_rel)}`);
     } else {
       res = await api(handlerFor(item.file_type).import_endpoint, {
         method: "POST",
@@ -471,11 +485,94 @@ async function openMaterialEditor(item) {
                 colors: _seedColors(res.colors), scalars: _seedScalars(res.scalars) };
   renderMatEditor();
   loadSidebar();
+  // Dyeing materials (chromas) recolour through the ColorID mask, so the "Region N" pickers below
+  // do nothing visible on their own — attach a live composite so the user can see what they're doing.
+  try {
+    const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`);
+    if (di && di.dyeable && matEditor && matEditor.game_rel === item.game_rel) {
+      matEditor.dyeable = true;
+      matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
+      renderMatEditor();
+      dyeRefresh(0);
+    }
+  } catch (e) { /* preview is a bonus; never block the editor on it */ }
+}
+
+// ── dye preview ───────────────────────────────────────────────────────────────
+function _dyeOverrides() {
+  // the editor's live (unsaved) "Region N - Param" colours, shaped for the compositor
+  const ov = {};
+  (matEditor && matEditor.colors || []).forEach(c => {
+    const m = /^Region\s+(\d+)\s*-\s*(.+)$/.exec(c.name || "");
+    if (!m) return;
+    (ov[m[1]] = ov[m[1]] || {})[m[2].trim()] = c.rgba;
+  });
+  return ov;
+}
+
+let _dyeTimer = null;
+function dyeRefresh(delay = 140) {
+  if (!matEditor || !matEditor.dyeable) return;
+  clearTimeout(_dyeTimer);
+  // debounce: a colour drag fires oninput continuously; the composite is ~80ms server-side
+  _dyeTimer = setTimeout(async () => {
+    const img = document.getElementById("dye-prev");
+    if (!img || !matEditor) return;
+    const gr = matEditor.game_rel;
+    try {
+      const r = await fetch("/api/dye_preview", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides() }),
+      });
+      if (!r.ok || !matEditor || matEditor.game_rel !== gr) return;   // editor closed/switched
+      const b = await r.blob();
+      if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+      const u = URL.createObjectURL(b);
+      img.dataset.url = u; img.src = u;
+    } catch (e) { /* leave the last good preview up */ }
+  }, delay);
+}
+
+async function dyeDownload() {
+  if (!matEditor) return;
+  const st = document.getElementById("mat-status");
+  st.textContent = "Baking dyed texture…";
+  try {
+    const r = await fetch("/api/dye_download", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048, overrides: _dyeOverrides() }),
+    });
+    if (!r.ok) { st.textContent = "Download failed"; return; }
+    const b = await r.blob();
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a");
+    a.href = u; a.download = matEditor.name + "_dyed.png";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 8000);
+    st.textContent = "Downloaded " + a.download;
+    toast("Baked dyed texture", "success");
+  } catch (e) { st.textContent = "Error: " + e.message; }
 }
 
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   let h = "";
+  if (m.dyeable) {
+    const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
+    h += `<div class="mat-section">Dye preview <span class="mat-tag">${used}</span></div>
+      <div class="mat-row" style="align-items:flex-start;gap:14px">
+        <img id="dye-prev" alt="dye preview"
+             style="width:230px;height:230px;object-fit:contain;background:#0d0d10;border:1px solid var(--bd);border-radius:6px">
+        <div style="flex:1;font-size:12px;line-height:1.5" class="muted">
+          This skin recolours through its <b>ColorID</b> mask — the diffuse is shared across chromas,
+          so the <b>Region N</b> colours below are what actually change its look.
+          Edit any of them to see this update live.
+          <div style="margin-top:12px">
+            <button class="btn" onclick="dyeDownload()"><i data-lucide="download" size="13"></i> Download dyed texture</button>
+          </div>
+        </div>
+      </div>`;
+  }
   if (m.colors.length) {
     h += `<div class="mat-section">Colors</div>`;
     m.colors.forEach((c, i) => {
@@ -486,7 +583,7 @@ function renderMatEditor() {
         <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
         <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
         <span class="mat-tag">A</span>
-        <input class="mat-num" type="number" step="0.05" min="0" max="1" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">
+        <input class="mat-num" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">
       </div>`;
     });
   }
@@ -510,13 +607,15 @@ function matColor(i, hex) {
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
+  dyeRefresh();
 }
 function matInten(i, v, fromRange) {
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
   const other = document.getElementById((fromRange ? "min" : "mir") + i); if (other) other.value = v;
+  dyeRefresh();
 }
-function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; }
+function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; dyeRefresh(); }
 function matScalar(i, v, fromRange) {
   matEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
@@ -596,8 +695,9 @@ function _evalCh(keys, t) {
 }
 function _resampleStops(channels) {
   const ts = new Set();
-  for (const ch of CURVE_CH) (channels[ch] || []).forEach(k => ts.add(k.time));
-  return [...ts].sort((a, b) => a - b).map(t => ({ time: t, rgba: CURVE_CH.map(ch => _evalCh(channels[ch], t)) }));
+  const sorted = {};
+  for (const ch of CURVE_CH) { sorted[ch] = [...(channels[ch] || [])].sort((a, b) => a.time - b.time); sorted[ch].forEach(k => ts.add(k.time)); }
+  return [...ts].sort((a, b) => a - b).map(t => ({ time: t, rgba: CURVE_CH.map(ch => _evalCh(sorted[ch], t)) }));
 }
 
 async function openCurveEditor(item) {
@@ -616,43 +716,72 @@ async function openCurveEditor(item) {
   loadSidebar();
 }
 
+const CURVE_INTERP = ["RCIM_Linear", "RCIM_Cubic", "RCIM_Constant"];
+
 function renderCurveEditor() {
   const c = curveEditor; if (!c) return;
   let h = `<div class="curve-preview" id="curve-grad"></div>`;
-  let any = false;
   for (const ch of CURVE_CH) {
-    const keys = c.channels[ch] || [];
-    if (!keys.length) continue;
-    any = true;
-    h += `<div class="mat-section">${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</div>`;
+    const keys = c.channels[ch] || (c.channels[ch] = []);
+    h += `<div class="mat-section" style="display:flex;align-items:center;gap:8px">
+      <span>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
+      <button class="btn" style="padding:2px 9px;font-size:11px" onclick="curveAddKey('${ch}')">+ key</button></div>`;
     keys.forEach((k, i) => {
-      h += `<div class="mat-row">
-        <label>t = ${(+k.time).toFixed(3)}</label>
-        <input class="mat-num wide" type="number" step="any" value="${k.value}" oninput="curveKey('${ch}',${i},this.value)">
+      const cubic = (k.interp || "RCIM_Linear") === "RCIM_Cubic";
+      h += `<div style="display:flex;gap:6px;align-items:center;padding:3px 0;flex-wrap:wrap;font-size:12px">
+        <input type="number" step="any" title="time" style="width:72px" value="${k.time}" oninput="curveKeyField('${ch}',${i},'time',this.value)">
+        <input type="number" step="any" title="value" style="width:88px" value="${k.value}" oninput="curveKeyField('${ch}',${i},'value',this.value)">
+        <select title="interpolation" onchange="curveKeyField('${ch}',${i},'interp',this.value)">
+          ${CURVE_INTERP.map(m => `<option value="${m}" ${m === (k.interp || "RCIM_Linear") ? "selected" : ""}>${m.slice(5)}</option>`).join("")}
+        </select>
+        ${cubic ? `<input type="number" step="any" title="arrive tangent" style="width:62px" value="${k.arriveTangent || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangent',this.value)">
+        <input type="number" step="any" title="arrive tangent WEIGHT" style="width:58px" value="${k.arriveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangentWeight',this.value)">
+        <input type="number" step="any" title="leave tangent" style="width:62px" value="${k.leaveTangent || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangent',this.value)">
+        <input type="number" step="any" title="leave tangent WEIGHT" style="width:58px" value="${k.leaveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangentWeight',this.value)">` : ""}
+        <button class="sb-clear" title="remove key" onclick="curveRemoveKey('${ch}',${i})"><i data-lucide="x" size="13"></i></button>
       </div>`;
     });
   }
-  if (!any) h = `<div class="mat-empty">This curve exposes no editable keys.</div>`;
   document.getElementById("curve-body").innerHTML = h;
+  lucide.createIcons({ nodes: [document.getElementById("curve-body")] });
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
 }
 
-function curveKey(ch, i, v) {
-  const c = curveEditor; if (!c) return;
+function _curveTouch(ch) {
+  curveEditor.dirty[ch] = true;
+  curveEditor.stops = _resampleStops(curveEditor.channels);
+  const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(curveEditor.stops);
+}
+
+function curveKeyField(ch, i, field, v) {
+  const c = curveEditor; if (!c || !c.channels[ch] || !c.channels[ch][i]) return;
+  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); renderCurveEditor(); return; }
   const val = parseFloat(v); if (isNaN(val)) return;
-  c.channels[ch][i].value = val;
-  (c.dirty[ch] || (c.dirty[ch] = {}))[i] = val;
-  c.stops = _resampleStops(c.channels);
-  const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
+  c.channels[ch][i][field] = val;
+  _curveTouch(ch);
+}
+
+function curveAddKey(ch) {
+  const c = curveEditor; const keys = c.channels[ch] || (c.channels[ch] = []);
+  const t = keys.length ? Math.min(1, (+keys[keys.length - 1].time || 0) + 0.1) : 0;
+  keys.push({ time: t, value: 0, interp: "RCIM_Linear", arriveTangent: 0, arriveTangentWeight: 0, leaveTangent: 0, leaveTangentWeight: 0 });
+  _curveTouch(ch); renderCurveEditor();
+}
+
+function curveRemoveKey(ch, i) {
+  const c = curveEditor; if (!c.channels[ch]) return;
+  c.channels[ch].splice(i, 1); _curveTouch(ch); renderCurveEditor();
 }
 
 async function saveCurve() {
   const c = curveEditor; if (!c) return;
-  if (!Object.keys(c.dirty).length) { document.getElementById("curve-status").textContent = "No changes to save."; return; }
+  const edits = {};
+  for (const ch of Object.keys(c.dirty)) if (c.dirty[ch]) edits[ch] = c.channels[ch];   // full key list per changed channel
+  if (!Object.keys(edits).length) { document.getElementById("curve-status").textContent = "No changes to save."; return; }
   document.getElementById("curve-status").textContent = "Saving…";
   try {
     const res = await api("/api/curve_save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: c.game_rel, edits: c.dirty }) });
+      body: JSON.stringify({ game_rel: c.game_rel, edits }) });
     if (res.ok) { toast(`Saved: ${c.name}`, "success"); loadSidebar(); closeCurveEditor(); }
     else document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed");
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
@@ -1076,13 +1205,20 @@ function updateExportBtn() {
   badge.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
   document.getElementById("export-btn").disabled = sel === 0;
+  const installBtn = document.getElementById("install-btn");
+  if (installBtn) {
+    installBtn.disabled = sel === 0;
+    installBtn.title = _modsFolderSet
+      ? "Build and install into your mods folder (replaces the previous version)"
+      : "Set a mods folder first (Menu → Paths)";
+  }
 }
 
 async function doExport() {
   const selected = Object.values(sidebarData).filter(i => i.selected);
   if (!selected.length) return;
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx"].includes(i.file_type || ""));
+  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
   const skipped    = selected.length - exportable.length;
   if (!exportable.length) {
     toast("Nothing exportable selected", "info");
@@ -1094,13 +1230,13 @@ async function doExport() {
   try {
     const res = await api("/api/export", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel) }),
+      body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel), password: (document.getElementById("export-pw").value||"").trim() }),
     });
     exportingToast.remove();
     if (res.ok && res.pak_path) {
       toast(`Exported: ${modName}_9999999_P.pak` + (skipped ? ` (${skipped} VFX/other skipped)` : ""), "success", 5000);
       setStatus(`Exported → ${res.pak_path}`);
-      fetch(`/api/open_explorer?path=${encodeURIComponent(res.pak_path.replace(/\//g, "\\"))}`);
+      fetch(`/api/open_export_folder?select=${encodeURIComponent(res.pak_path)}`);
     } else {
       toast(`Export failed: ${res.error || "unknown error"}`, "warning");
       setStatus("");
@@ -1114,6 +1250,48 @@ async function doExport() {
 }
 
 document.getElementById("export-btn").addEventListener("click", doExport);
+
+async function doBuildInstall() {
+  const selected = Object.values(sidebarData).filter(i => i.selected);
+  if (!selected.length) return;
+  if (!_modsFolderSet) {
+    toast("Set a mods folder first — opening Paths…", "info");
+    openPaths();
+    return;
+  }
+  const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
+  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
+  const skipped    = selected.length - exportable.length;
+  if (!exportable.length) { toast("Nothing exportable selected", "info"); return; }
+  document.getElementById("install-btn").disabled = true;
+  setStatus(`Building & installing ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
+  const t = toastSpinner(`Building & installing ${modName}…`);
+  try {
+    const res = await api("/api/build_install", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel), password: (document.getElementById("export-pw").value||"").trim() }),
+    });
+    t.remove();
+    if (res.ok) {
+      toast(`Installed: ${modName}_9999999_P` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
+      setStatus(`Installed → ${res.installed_dir}`);
+    } else if (res.need_mods_folder) {
+      _modsFolderSet = false;
+      toast("No mods folder set — opening Paths…", "warning");
+      openPaths();
+    } else {
+      toast(`Install failed: ${res.error || "unknown error"}`, "warning");
+      setStatus("");
+    }
+  } catch (e) {
+    t.remove();
+    toast(`Error: ${e.message}`, "warning"); setStatus("");
+  } finally {
+    updateExportBtn();
+  }
+}
+
+document.getElementById("install-btn").addEventListener("click", doBuildInstall);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
 function clearImported(token) {
@@ -1232,10 +1410,13 @@ async function checkSetup() {
       _fetchAesKeyValue(),
       _fetchUsmapPath(),
     ]);
+    _modsFolderSet = !!(statusRes.mods_prefill);
     if (statusRes.configured) {
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
+    _pathsMode = false;
+    _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
     document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
@@ -1247,6 +1428,42 @@ async function checkSetup() {
     return false;
   }
 }
+
+function _applySetupMode() {
+  const paths = _pathsMode;
+  document.getElementById("setup-title").textContent = paths ? "Paths" : "Initial Configuration";
+  document.getElementById("setup-desc").innerHTML = paths
+    ? "Edit where Atelier reads the game from, and the folder mods install into."
+    : 'Provide <strong style="color:var(--text)">MarvelRivals</strong> folder, latest <strong style="color:var(--text)">USMAP</strong> file and <strong style="color:var(--text)">AES key</strong>.';
+  document.getElementById("setup-mods-row").style.display = paths ? "" : "none";
+  document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
+  document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
+}
+
+async function openPaths() {
+  _pathsMode = true;
+  _applySetupMode();
+  document.getElementById("setup-overlay").classList.add("active");
+  _setSetupLoading(true);
+  try {
+    const [statusRes, aes, usmapPath] = await Promise.all([
+      api("/api/setup_status"), _fetchAesKeyValue(), _fetchUsmapPath(),
+    ]);
+    _modsFolderSet = !!(statusRes.mods_prefill);
+    document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
+    document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
+    document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
+    document.getElementById("setup-mods").value  = statusRes.mods_prefill || "";
+  } catch (e) {}
+  _setSetupLoading(false);
+  await validateSetup();
+  updateExportBtn();
+}
+
+document.getElementById("setup-cancel").addEventListener("click", () => {
+  document.getElementById("setup-overlay").classList.remove("active");
+  _pathsMode = false;
+});
 
 let _validateGen = 0;
 async function validateSetup() {
@@ -1377,6 +1594,29 @@ document.getElementById("setup-usmap-browse").addEventListener("click", async ()
   btn.disabled = false;
 });
 
+document.getElementById("setup-mods-browse").addEventListener("click", async () => {
+  const initial = document.getElementById("setup-mods").value.trim();
+  const btn = document.getElementById("setup-mods-browse");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/pick_folder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initial, raw: true, desc: "Select your mods folder (e.g. …/Paks/~mods):" }),
+    });
+    if (res.ok && res.path) document.getElementById("setup-mods").value = res.path;
+  } catch (e) {}
+  btn.disabled = false;
+});
+
+
+function _resetSaveBtn() {
+  const btn = document.getElementById("setup-save");
+  const label = _pathsMode ? "Save" : "Save & Continue";
+  btn.disabled = false;
+  btn.innerHTML = `<i data-lucide="check" size="14"></i> <span id="setup-save-label">${label}</span>`;
+  lucide.createIcons({ nodes: [btn] });
+}
 
 document.getElementById("setup-save").addEventListener("click", async () => {
   const path      = document.getElementById("setup-path").value.trim();
@@ -1386,6 +1626,8 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   if (!path)      { toast("Please enter a path", "warning"); return; }
   if (!usmapPath) { toast("Please enter or auto-fetch a USMAP file", "warning"); return; }
   if (!aes_key)   { toast("Please enter an AES key", "warning"); return; }
+  const payload = { path, aes_key, usmap_path: usmapPath };
+  if (_pathsMode) payload.mods_folder = document.getElementById("setup-mods").value.trim();
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
   btn.innerHTML = "Saving…";
@@ -1393,25 +1635,32 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     const res = await api("/api/save_paks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, aes_key, usmap_path: usmapPath }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
+      const wasPaths = _pathsMode;
+      _pathsMode = false;
       document.getElementById("setup-overlay").classList.remove("active");
-      await checkProject();
-      await checkPrereqs();
-      await renderGrid();
-      await loadSidebar();
+      _resetSaveBtn();
+      if (wasPaths) {
+        _modsFolderSet = !!payload.mods_folder;
+        toast("Paths saved", "success");
+        await renderGrid();
+        await loadSidebar();
+        updateExportBtn();
+      } else {
+        await checkProject();
+        await checkPrereqs();
+        await renderGrid();
+        await loadSidebar();
+      }
     } else {
       toast(`Error: ${res.error}`, "warning");
-      btn.disabled = false;
-      btn.innerHTML = '<i data-lucide="check" size="14"></i> Save & Continue';
-      lucide.createIcons({ nodes: [btn] });
+      _resetSaveBtn();
     }
   } catch (e) {
     toast(`Error: ${e.message}`, "warning");
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="check" size="14"></i> Save & Continue';
-    lucide.createIcons({ nodes: [btn] });
+    _resetSaveBtn();
   }
 });
 
@@ -1851,6 +2100,11 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       }},
       { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { fetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
+      { icon: "package-open", label: "Open Export Folder", action: () => { fetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
+      "sep",
+      { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
+      { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
+      { icon: "sliders-horizontal", label: "Paths…", action: () => openPaths() },
       { icon: "circle-help", label: "Help / Info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
       { icon: "trash-2", label: "Reset Data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },
@@ -1860,6 +2114,55 @@ document.getElementById("menu-btn").addEventListener("click", e => {
 
 document.getElementById("reset-cancel").addEventListener("click", () => {
   document.getElementById("reset-overlay").classList.remove("active");
+});
+
+// ── Repatcher ──────────────────────────────────────────────────────────────
+let _repatchPath = "";
+function openRepatcher() {
+  _repatchPath = "";
+  document.getElementById("repatch-file").textContent = "";
+  document.getElementById("repatch-lockrow").style.display = "none";
+  document.getElementById("repatch-unlock").value = "";
+  document.getElementById("repatch-stage").checked = false;
+  document.getElementById("repatch-pw").value = "";
+  document.getElementById("repatch-run").disabled = true;
+  const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = "";
+  document.getElementById("repatch-overlay").classList.add("active");
+  if (window.lucide) lucide.createIcons();
+}
+document.getElementById("repatch-close").addEventListener("click", () =>
+  document.getElementById("repatch-overlay").classList.remove("active"));
+document.getElementById("repatch-pick").addEventListener("click", async () => {
+  const r = await api("/api/pick_mod_file", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  if (!r || !r.ok || !r.path) return;
+  _repatchPath = r.path;
+  document.getElementById("repatch-file").textContent = r.path;
+  document.getElementById("repatch-lockrow").style.display = r.locked ? "block" : "none";
+  document.getElementById("repatch-run").disabled = false;
+});
+document.getElementById("repatch-run").addEventListener("click", async () => {
+  if (!_repatchPath) return;
+  const btn = document.getElementById("repatch-run"); btn.disabled = true;
+  const res = document.getElementById("repatch-result");
+  res.style.display = "block"; res.innerHTML = '<span class="muted">Repatching…</span>';
+  const stage = document.getElementById("repatch-stage").checked;
+  const pw = document.getElementById("repatch-pw").value.trim();
+  try {
+    const r = await api("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage, password: pw }) });
+    if (r.locked) { res.innerHTML = '<span class="warning">Wrong or missing password.</span>'; btn.disabled = false; return; }
+    if (!r.ok) { res.innerHTML = '<span class="warning">Failed: ' + (r.error || "unknown") + '</span>'; btn.disabled = false; return; }
+    const m = r.manifest || {};
+    res.innerHTML = '<b>✓ Repatched</b> — ' + r.mod + '<br><span class="muted">' +
+      (m.materials || 0) + ' materials · ' + (m.textures || 0) + ' textures · ' + (m.skipped || 0) + ' skipped' +
+      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · 🔒 locked' : '') +
+      '</span><br><a href="#" id="repatch-open">Open export folder</a>';
+    const oa = document.getElementById("repatch-open");
+    if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); fetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });
+    toast("Repatched: " + r.mod, "success", 5000);
+    if (stage) renderGrid();
+    btn.disabled = false;
+  } catch (e) { res.innerHTML = '<span class="warning">Error: ' + e + '</span>'; btn.disabled = false; }
 });
 
 document.getElementById("reset-ok").addEventListener("click", async () => {
@@ -1889,3 +2192,500 @@ async function init() {
 }
 
 init();
+
+// ── Shader Studio ─────────────────────────────────────────────────────────────
+const _sh = { page: 0, total: 0, sel: null, busy: false, poll: null };
+
+function _shEl(id) { return document.getElementById(id); }
+
+async function openShaderStudio() {
+  _shEl("shader-overlay").classList.add("active");
+  lucide.createIcons({ nodes: [_shEl("shader-overlay")] });
+  await refreshShaderStatus();
+}
+
+function closeShaderStudio() {
+  if (_sh.poll) { clearInterval(_sh.poll); _sh.poll = null; }
+  _shEl("shader-overlay").classList.remove("active");
+}
+
+async function refreshShaderStatus() {
+  let st;
+  try { st = await api("/api/shaders/status"); }
+  catch (e) { toast("Shader status failed: " + e.message, "warning"); return; }
+  if (!st.ok || !st.tools_ok) {
+    _shEl("shader-build").style.display = "flex";
+    _shEl("shader-browser").style.display = "none";
+    _shEl("shader-build-title").textContent = "Shader tools not found.";
+    _shEl("shader-build-btn").style.display = "none";
+    _shEl("shader-build-err").style.display = "flex";
+    _shEl("shader-build-err").textContent = "Expected retoc + dxc under Tools/shaders.";
+    return;
+  }
+  if (st.db_ready) { showShaderBrowser(st.libraries || []); }
+  else { _shEl("shader-build").style.display = "flex"; _shEl("shader-browser").style.display = "none"; }
+}
+
+_shEl("shader-build-btn").addEventListener("click", startShaderBuild);
+_shEl("shader-close").addEventListener("click", closeShaderStudio);
+
+async function startShaderBuild() {
+  _shEl("shader-build-btn").style.display = "none";
+  _shEl("shader-build-err").style.display = "none";
+  _shEl("shader-build-prog").style.display = "block";
+  _shEl("shader-bar-fill").style.width = "5%";
+  _shEl("shader-build-msg").textContent = "Starting…";
+  try { await api("/api/shaders/build", { method: "POST" }); }
+  catch (e) { _shBuildError(e.message); return; }
+  _sh.poll = setInterval(async () => {
+    let st; try { st = await api("/api/shaders/status"); } catch { return; }
+    const b = st.build || {};
+    if (b.error) { clearInterval(_sh.poll); _sh.poll = null; _shBuildError(b.error); return; }
+    _shEl("shader-bar-fill").style.width = Math.max(5, b.pct || 0) + "%";
+    _shEl("shader-build-msg").textContent =
+      (b.phase || "Working…") + (b.count ? `  (${b.count.toLocaleString()} shaders)` : "");
+    if (st.db_ready && b.done) {
+      clearInterval(_sh.poll); _sh.poll = null;
+      toast("Shader index built", "success");
+      showShaderBrowser(st.libraries || []);
+    }
+  }, 1200);
+}
+
+function _shBuildError(msg) {
+  _shEl("shader-build-prog").style.display = "none";
+  _shEl("shader-build-btn").style.display = "";
+  _shEl("shader-build-err").style.display = "flex";
+  _shEl("shader-build-err").textContent = "Build failed: " + msg;
+}
+
+function showShaderBrowser(libs) {
+  _shEl("shader-build").style.display = "none";
+  _shEl("shader-browser").style.display = "flex";
+  const sel = _shEl("shader-lib");
+  sel.innerHTML = libs.map(l =>
+    `<option value="${l.name}">${l.short} — ${l.total.toLocaleString()} shaders</option>`).join("");
+  const totalAll = libs.reduce((a, l) => a + l.total, 0);
+  _shEl("shader-subtitle").textContent = `${totalAll.toLocaleString()} shaders indexed`;
+  _sh.page = 0;
+  loadShaderList();
+}
+
+let _shQTimer = null;
+["shader-lib", "shader-freq"].forEach(id =>
+  _shEl(id).addEventListener("change", () => { _sh.page = 0; loadShaderList(); }));
+_shEl("shader-q").addEventListener("input", () => {
+  clearTimeout(_shQTimer);
+  _shQTimer = setTimeout(() => { _sh.page = 0; loadShaderList(); }, 250);
+});
+_shEl("shader-prev").addEventListener("click", () => { if (_sh.page > 0) { _sh.page--; loadShaderList(); } });
+_shEl("shader-next").addEventListener("click", () => {
+  if ((_sh.page + 1) * 200 < _sh.total) { _sh.page++; loadShaderList(); }
+});
+
+const _FREQ_CLASS = { 0: "vtx", 3: "pix", 5: "cmp" };
+
+async function loadShaderList() {
+  const lib = _shEl("shader-lib").value;
+  const freq = _shEl("shader-freq").value;
+  const q = _shEl("shader-q").value.trim();
+  const list = _shEl("shader-list");
+  list.innerHTML = `<div class="shader-loading"><div class="spinner"></div></div>`;
+  let res;
+  try {
+    res = await api(`/api/shaders/list?lib=${encodeURIComponent(lib)}&freq=${freq}` +
+                    `&q=${encodeURIComponent(q)}&page=${_sh.page}&page_size=200`);
+  } catch (e) { list.innerHTML = `<div class="muted" style="padding:14px">Error: ${e.message}</div>`; return; }
+  if (!res.ok) { list.innerHTML = `<div class="muted" style="padding:14px">${res.error}</div>`; return; }
+  _sh.total = res.total;
+  if (!res.rows.length) { list.innerHTML = `<div class="muted" style="padding:14px">No shaders match.</div>`; }
+  else {
+    list.innerHTML = res.rows.map(r => {
+      const fc = _FREQ_CLASS[r.freq] || "oth";
+      return `<div class="shader-row" data-lib="${r.lib}" data-idx="${r.idx}">
+        <span class="sh-badge ${fc}">${r.freq_name}</span>
+        <span class="sh-idx">#${r.idx}</span>
+        <span class="sh-hash">${r.hash.slice(0, 16)}</span>
+        <span class="sh-size">${(r.size / 1024).toFixed(1)}K</span>
+      </div>`;
+    }).join("");
+    list.querySelectorAll(".shader-row").forEach(el =>
+      el.addEventListener("click", () => selectShader(el)));
+  }
+  const start = _sh.total ? _sh.page * 200 + 1 : 0;
+  const end = Math.min(_sh.total, (_sh.page + 1) * 200);
+  _shEl("shader-count").textContent = `${_sh.total.toLocaleString()} match`;
+  _shEl("shader-page").textContent = _sh.total ? `${start.toLocaleString()}–${end.toLocaleString()}` : "0";
+  _shEl("shader-prev").disabled = _sh.page === 0;
+  _shEl("shader-next").disabled = (_sh.page + 1) * 200 >= _sh.total;
+}
+
+async function selectShader(el) {
+  document.querySelectorAll(".shader-row.sel").forEach(r => r.classList.remove("sel"));
+  el.classList.add("sel");
+  _sh.cur = { lib: el.dataset.lib, idx: el.dataset.idx };
+  _shEl("shader-detail-empty").style.display = "none";
+  _shEl("shader-detail-content").style.display = "block";
+  _shEl("shader-meta").innerHTML = `<div class="shader-loading"><div class="spinner"></div><span>Extracting & disassembling…</span></div>`;
+  _shEl("shader-disasm").textContent = "";
+  let res;
+  try { res = await api(`/api/shaders/disasm?lib=${encodeURIComponent(el.dataset.lib)}&idx=${el.dataset.idx}`); }
+  catch (e) { _shEl("shader-meta").innerHTML = `<div class="warning">${e.message}</div>`; return; }
+  if (!res.ok) { _shEl("shader-meta").innerHTML = `<div class="warning">${res.error}</div>`; return; }
+  const m = res.meta || {};
+  _shEl("shader-meta").innerHTML =
+    `<div class="sh-meta-row">
+       <b>${m.stage || "Shader"}</b>
+       ${m.entry ? `<span class="sh-chip">entry <code>${m.entry}</code></span>` : ""}
+       <span class="sh-chip">${(m.dxbc_size || 0).toLocaleString()} B</span>
+     </div>`;
+  _shEl("shader-disasm").textContent = res.disasm || "";
+  renderShaderProps(res.properties || {});
+  _shSelectTab("props");
+}
+
+function _esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+function _shSelectTab(tab) {
+  document.querySelectorAll(".sh-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  _shEl("shader-props").style.display = tab === "props" ? "block" : "none";
+  _shEl("shader-disasm").style.display = tab === "raw" ? "block" : "none";
+}
+
+async function loadShaderEdit() {
+  const wrap = _shEl("shader-edit");
+  if (!_sh.cur) { wrap.innerHTML = `<div class="sh-note">Select a shader first.</div>`; return; }
+  if (wrap.dataset.loadedFor === `${_sh.cur.lib}#${_sh.cur.idx}`) return;   // cache per shader
+  wrap.dataset.loadedFor = `${_sh.cur.lib}#${_sh.cur.idx}`;
+  wrap.innerHTML = `<div class="shader-loading"><div class="spinner"></div><span>Disassembling to editable IR…</span></div>`;
+  let res;
+  try { res = await api(`/api/shaders/ir?lib=${encodeURIComponent(_sh.cur.lib)}&idx=${_sh.cur.idx}`); }
+  catch (e) { wrap.innerHTML = `<div class="warning">${e.message}</div>`; wrap.dataset.loadedFor = ""; return; }
+  if (!res.ok) { wrap.innerHTML = `<div class="warning">${res.error}</div>`; wrap.dataset.loadedFor = ""; return; }
+  wrap.innerHTML = `
+    <div class="sh-note"><i data-lucide="pencil" size="13"></i>
+      This is the shader's real code as editable LLVM IR (${(res.lines || 0).toLocaleString()} lines).
+      Edit it — e.g. change a <code>fmul</code> factor or a <code>float</code> constant — then
+      <b>Reassemble &amp; Build Mod</b>. DXC reassembles it into a real shader.
+      <b>Note:</b> if this dxil.dll can't sign, the mod is emitted unsigned — test it in-game.</div>
+    <textarea id="sh-ir" class="sh-ir" spellcheck="false"></textarea>
+    <div class="sh-buildrow">
+      <input id="sh-mod-name" class="sh-pval" placeholder="mod name (optional)" spellcheck="false" style="flex:1">
+      <button class="btn" id="sh-ir-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
+      <button class="btn primary" id="sh-build-btn"><i data-lucide="package" size="14"></i> Reassemble &amp; Build Mod</button>
+    </div>`;
+  lucide.createIcons({ nodes: [wrap] });
+  const ta = _shEl("sh-ir");
+  ta.value = res.ir || "";
+  ta.dataset.orig = res.ir || "";
+  _shEl("sh-ir-reset").addEventListener("click", () => { ta.value = ta.dataset.orig; });
+  _shEl("sh-build-btn").addEventListener("click", buildShaderMod);
+}
+
+async function buildShaderMod() {
+  const ta = _shEl("sh-ir");
+  if (!ta || !ta.value.trim()) { toast("No IR to build", "warning"); return; }
+  if (ta.value === ta.dataset.orig) { toast("Edit the IR first — it's unchanged", "warning"); return; }
+  const btn = _shEl("sh-build-btn");
+  btn.disabled = true;
+  const t = toastSpinner("Reassembling & building shader mod…");
+  let res;
+  try {
+    res = await api("/api/shaders/build_mod_ir", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lib: _sh.cur.lib, idx: _sh.cur.idx,
+                             name: (_shEl("sh-mod-name").value || "").trim(), ir: ta.value }),
+    });
+  } catch (e) { t.remove(); btn.disabled = false; toast("Build failed: " + e.message, "warning"); return; }
+  t.remove(); btn.disabled = false;
+  if (!res.ok) { toast("Build failed: " + res.error, "warning", 7000); return; }
+  toast(`${res.signed ? "Signed" : "UNSIGNED"} shader mod built → ${res.files.join(", ")}`,
+        res.signed ? "success" : "warning", 8000);
+  if (res.note) toast(res.note, "info", 9000);
+}
+document.querySelectorAll(".sh-tab").forEach(b =>
+  b.addEventListener("click", () => _shSelectTab(b.dataset.tab)));
+
+function renderShaderProps(p) {
+  const wrap = _shEl("shader-props");
+  const res = p.resources || [];
+  const cbufs = res.filter(r => r.type === "cbuffer");
+  const other = res.filter(r => r.type !== "cbuffer");
+  const sigRows = (arr) => arr.length
+    ? arr.map(r => `<tr><td class="pk">${_esc(r.name)}</td><td class="pm">${_esc(r.format)}</td>
+        <td class="pm">${_esc(r.mask || "")}</td><td class="pm">reg ${_esc(r.register)}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="pm">none</td></tr>`;
+
+  let html = `<div class="sh-note"><i data-lucide="info" size="13"></i>
+      These are the shader's live properties. Constant buffers are its parameter banks; per-value
+      editing arrives with Phase&nbsp;4's in-game round-trip (proven on one shader first).</div>`;
+
+  // Constant buffers = the shader's parameter banks.
+  html += `<div class="sh-sec">
+      <div class="sh-sec-h"><i data-lucide="box" size="13"></i> Constant buffers (params)
+        <span class="pm">${cbufs.length}</span></div>
+      <table class="sh-tbl">
+        ${cbufs.length ? cbufs.map(r => `<tr>
+          <td class="pk">${_esc(r.bind)}</td><td>${_esc(r.name)}</td>
+          <td><input class="sh-pval" placeholder="edit in Phase 4" disabled
+               title="Per-value editing arrives with the Phase 4 round-trip"></td></tr>`).join("")
+        : `<tr><td class="pm">none</td></tr>`}
+      </table></div>`;
+
+  // Textures / samplers / UAVs.
+  html += `<div class="sh-sec">
+      <div class="sh-sec-h"><i data-lucide="plug" size="13"></i> Textures &amp; samplers
+        <span class="pm">${other.length}</span></div>
+      <table class="sh-tbl">
+        ${other.length ? other.map(r => `<tr>
+          <td class="pk">${_esc(r.bind)}</td><td class="pm">${_esc(r.type)}</td>
+          <td class="pm">${_esc(r.fmt || "")}</td><td>${_esc(r.name)}</td></tr>`).join("")
+        : `<tr><td class="pm">none</td></tr>`}
+      </table></div>`;
+
+  // Signatures.
+  html += `<div class="sh-sec">
+      <div class="sh-sec-h"><i data-lucide="arrow-down-to-line" size="13"></i> Input signature
+        <span class="pm">${(p.input || []).length}</span></div>
+      <table class="sh-tbl">${sigRows(p.input || [])}</table></div>
+    <div class="sh-sec">
+      <div class="sh-sec-h"><i data-lucide="arrow-up-from-line" size="13"></i> Output signature
+        <span class="pm">${(p.output || []).length}</span></div>
+      <table class="sh-tbl">${sigRows(p.output || [])}</table></div>`;
+
+  wrap.innerHTML = html;
+  lucide.createIcons({ nodes: [wrap] });
+}
+
+// ── World / level editor (lights · fog · grade · component visibility) ─────────
+let worldEditor = null;
+
+function _wHx(n) { return ("0" + Math.round(Math.min(255, Math.max(0, n))).toString(16)).slice(-2); }
+function _rgb255Hex(c) { c = c || [255, 255, 255]; return "#" + _wHx(c[0]) + _wHx(c[1]) + _wHx(c[2]); }
+function _hex255(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+function _rgb01Hex(c) { c = c || [1, 1, 1]; return "#" + _wHx(c[0] * 255) + _wHx(c[1] * 255) + _wHx(c[2] * 255); }
+function _hex01(h) { return [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; }
+
+async function openWorldEditor(item) {
+  const ov = document.getElementById("world-overlay");
+  document.getElementById("world-title").textContent = item.name;
+  document.getElementById("world-sub").textContent = item.game_rel || "";
+  document.getElementById("world-status").textContent = "";
+  document.getElementById("world-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  ov.classList.add("active");
+  lucide.createIcons({ nodes: [ov] });
+  let res;
+  try { res = await api("/api/world_params?game_rel=" + encodeURIComponent(item.game_rel)); }
+  catch (e) { document.getElementById("world-body").innerHTML = '<div class="mat-empty">Error: ' + e.message + '</div>'; return; }
+  if (!res.ok) { document.getElementById("world-body").innerHTML = '<div class="mat-empty">' + (res.error || "failed to read level") + '</div>'; return; }
+  const e = res.edits || {};
+  worldEditor = { game_rel: item.game_rel, name: item.name, model: res,
+                  edits: { lights: e.lights || {}, fog: e.fog || {}, grade: e.grade || {}, visibility: e.visibility || {} } };
+  renderWorldEditor();
+}
+
+function renderWorldEditor() {
+  const m = worldEditor.model, ed = worldEditor.edits, out = [];
+  const sec = (icon, title, inner) => '<div style="margin-bottom:18px"><div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;margin-bottom:8px"><i data-lucide="' + icon + '" size="14" style="color:var(--acc)"></i> ' + title + '</div>' + inner + '</div>';
+  const row = inner => '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;flex-wrap:wrap">' + inner + '</div>';
+
+  if (m.lights && m.lights.length) {
+    const rows = m.lights.map(L => {
+      const cur = ed.lights[L.idx] || {};
+      const inten = (cur.intensity != null) ? cur.intensity : L.intensity;
+      const col = cur.color || L.color;
+      const ni = (L.intensity != null) ? '<label style="font-size:12px">Intensity <input type="number" step="0.1" style="width:80px" data-lidx="' + L.idx + '" data-lk="intensity" value="' + inten + '"></label>' : "";
+      const nc = (L.color) ? '<label style="font-size:12px">Color <input type="color" data-lidx="' + L.idx + '" data-lk="color" value="' + _rgb255Hex(col) + '"></label>' : "";
+      return row('<span style="flex:1;min-width:180px;font-size:12px">' + L.name + ' <span class="muted">' + L.cls.replace(/Component$/, "") + '</span></span>' + ni + nc);
+    }).join("");
+    out.push(sec("sun", 'Lights <span class="muted">(' + m.lights.length + ')</span>', rows));
+  }
+  if (m.fog) {
+    const fc = ed.fog.color || m.fog.color;
+    const fd = (ed.fog.density != null) ? ed.fog.density : m.fog.density;
+    const nc = (m.fog.color) ? '<label style="font-size:12px">Inscatter color <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
+    const nd = (m.fog.density != null) ? '<label style="font-size:12px">Density <input type="number" step="0.001" style="width:90px" data-fog="density" value="' + fd + '"></label>' : "";
+    out.push(sec("cloud-fog", "Height Fog", row(nc + nd)));
+  }
+  const ppv = (m.components || []).find(c => c.is_ppv);
+  if (ppv && ppv.grade && Object.keys(ppv.grade).length) {
+    const ORDER = ["ColorSaturation", "ColorContrast", "ColorGamma", "ColorGain", "ColorOffset",
+      "ColorSaturationShadows", "ColorContrastShadows", "ColorGainShadows",
+      "ColorSaturationMidtones", "ColorSaturationHighlights",
+      "BloomIntensity", "VignetteIntensity", "FilmGrainIntensity"];
+    const names = ORDER.filter(n => n in ppv.grade).concat(Object.keys(ppv.grade).filter(n => !ORDER.includes(n)));
+    let gh = "";
+    for (const name of names) {
+      const gd = ppv.grade[name];
+      const cur = (name in (ed.grade || {})) ? ed.grade[name] : gd.value;
+      const pretty = name.replace(/^Color/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
+      const tag = gd.override ? "" : ' <span class="muted" style="font-size:10px">(off — edit to enable)</span>';
+      const dim = gd.override ? "" : ";opacity:.72";
+      const lbl = '<span style="flex:0 0 158px">' + pretty + tag + '</span>';
+      if (Array.isArray(gd.value)) {
+        const v = Array.isArray(cur) ? cur : gd.value;
+        gh += '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px' + dim + '">' + lbl +
+          [0, 1, 2].map(ci => '<input type="number" step="0.01" style="width:64px" title="' + "RGB"[ci] +
+            '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + name + '" data-gch="' + ci + '">').join("") + '</div>';
+      } else {
+        gh += '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px' + dim + '">' + lbl +
+          '<input type="number" step="0.05" style="width:82px" value="' + (+cur).toFixed(3) + '" data-gname="' + name + '"></div>';
+      }
+    }
+    out.push(sec("palette", "Post-Process Grade", gh));
+  }
+  const hide = (m.components || []).filter(c => c.hideable);
+  if (hide.length) {
+    const rows = hide.map(c => {
+      const cur = (c.idx in ed.visibility) ? ed.visibility[c.idx] : (c.enables && "bVisible" in c.enables ? c.enables.bVisible : true);
+      return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + c.name + ' <span class="muted">' + c.cls.replace(/Component$/, "") + '</span></span></label>';
+    }).join("");
+    out.push(sec("eye", 'Visibility <span class="muted">(' + hide.length + ')</span>',
+      '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px">' + rows + '</div>'));
+  }
+  const body = document.getElementById("world-body");
+  body.innerHTML = out.join("") || '<div class="mat-empty">No editable lights, fog, grade, or components in this sublevel.</div>';
+  lucide.createIcons({ nodes: [body] });
+  _wireWorldInputs();
+}
+
+function _wireWorldInputs() {
+  const ed = worldEditor.edits, body = document.getElementById("world-body");
+  body.querySelectorAll("[data-lidx]").forEach(el => el.addEventListener("input", () => {
+    const i = el.dataset.lidx, k = el.dataset.lk;
+    (ed.lights[i] = ed.lights[i] || {});
+    ed.lights[i][k] = (k === "color") ? _hex255(el.value) : parseFloat(el.value);
+  }));
+  body.querySelectorAll("[data-fog]").forEach(el => el.addEventListener("input", () => {
+    if (el.dataset.fog === "color") ed.fog.color = _hex01(el.value);
+    else ed.fog.density = parseFloat(el.value);
+  }));
+  body.querySelectorAll("[data-gname]").forEach(el => el.addEventListener("input", () => {
+    const name = el.dataset.gname, v = parseFloat(el.value); if (isNaN(v)) return;
+    if (el.dataset.gch !== undefined) {                         // vec4 channel edit (keep the other channels)
+      const ppv = (worldEditor.model.components || []).find(c => c.is_ppv);
+      const base = Array.isArray(ed.grade[name]) ? ed.grade[name].slice()
+                 : ((ppv && ppv.grade[name] && Array.isArray(ppv.grade[name].value)) ? ppv.grade[name].value.slice() : [1, 1, 1, 1]);
+      base[+el.dataset.gch] = v; ed.grade[name] = base;
+    } else {                                                    // scalar (bloom/vignette/grain)
+      ed.grade[name] = v;
+    }
+  }));
+  body.querySelectorAll("[data-vidx]").forEach(el => el.addEventListener("change", () => {
+    ed.visibility[el.dataset.vidx] = el.checked;
+  }));
+}
+
+document.getElementById("world-close").addEventListener("click", () =>
+  document.getElementById("world-overlay").classList.remove("active"));
+
+document.getElementById("world-save").addEventListener("click", async () => {
+  if (!worldEditor) return;
+  const st = document.getElementById("world-status"); st.textContent = "Saving…";
+  try {
+    const res = await api("/api/world_save", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: worldEditor.game_rel, edits: worldEditor.edits }) });
+    if (!res.ok) { st.textContent = res.error || "save failed"; return; }
+    st.textContent = "Saved — included at export.";
+    toast("Saved " + worldEditor.name, "success");
+    refreshSidebarEntry(worldEditor.game_rel, worldEditor.name, "");
+    await renderGrid();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+});
+
+document.getElementById("world-reset").addEventListener("click", async () => {
+  if (!worldEditor) return;
+  const st = document.getElementById("world-status"); st.textContent = "Resetting…";
+  try {
+    const res = await api("/api/world_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: worldEditor.game_rel }) });
+    if (!res.ok) { st.textContent = res.error || "reset failed"; return; }
+    worldEditor.edits = { lights: {}, fog: {}, grade: {}, visibility: {} };
+    worldEditor.model = res;
+    renderWorldEditor();
+    st.textContent = "Reset to vanilla.";
+    toast("Reset " + worldEditor.name, "success");
+    await renderGrid();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+});
+
+// ── Text / StringTable editor ─────────────────────────────────────────────────
+let textEditor = null;
+
+function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+async function openTextEditor(item) {
+  const ov = document.getElementById("text-overlay");
+  document.getElementById("text-title").textContent = item.name;
+  document.getElementById("text-sub").textContent = item.game_rel || "";
+  document.getElementById("text-status").textContent = "";
+  document.getElementById("text-search").value = "";
+  document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  ov.classList.add("active");
+  lucide.createIcons({ nodes: [ov] });
+  let res;
+  try { res = await api("/api/text_params?game_rel=" + encodeURIComponent(item.game_rel)); }
+  catch (e) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">Error: ' + e.message + '</div>'; return; }
+  if (!res.ok) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">' + (res.error || "failed to read StringTable") + '</div>'; return; }
+  textEditor = { game_rel: item.game_rel, name: item.name, entries: res.entries || [], edits: Object.assign({}, res.edits || {}) };
+  renderTextEditor("");
+}
+
+function renderTextEditor(filter) {
+  const ed = textEditor.edits, f = (filter || "").toLowerCase();
+  const rows = [];
+  for (const e of textEditor.entries) {
+    const cur = (e.key in ed) ? ed[e.key] : e.value;
+    if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
+    const changed = (e.key in ed) && ed[e.key] !== e.value;
+    rows.push('<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">' +
+      '<div style="flex:0 0 40%;font-size:12px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"' +
+      ' title="' + _esc(e.key) + '">' + (changed ? '<span style="color:var(--acc)">●</span> ' : '') + _esc(e.key) + '</div>' +
+      '<input data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"' +
+      ' style="flex:1;background:#0000;color:inherit;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:12px"></div>');
+  }
+  const body = document.getElementById("text-body");
+  body.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + textEditor.entries.length +
+    ' strings' + (f ? ' (' + rows.length + ' shown)' : '') + '</div>' +
+    (rows.join("") || '<div class="mat-empty">No matching strings.</div>');
+  body.querySelectorAll("[data-tkey]").forEach(el => el.addEventListener("input", () => {
+    const k = el.dataset.tkey, orig = (textEditor.entries.find(x => String(x.key) === k) || {}).value;
+    if (el.value === (orig == null ? "" : String(orig))) delete ed[k];
+    else ed[k] = el.value;
+  }));
+}
+
+document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
+
+document.getElementById("text-close").addEventListener("click", () =>
+  document.getElementById("text-overlay").classList.remove("active"));
+
+document.getElementById("text-save").addEventListener("click", async () => {
+  if (!textEditor) return;
+  const st = document.getElementById("text-status"); st.textContent = "Saving…";
+  try {
+    const res = await api("/api/text_save", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: textEditor.game_rel, edits: textEditor.edits }) });
+    if (!res.ok) { st.textContent = res.error || "save failed"; return; }
+    const n = Object.keys(textEditor.edits).length;
+    st.textContent = n ? (n + " string(s) edited — included at export.") : "No changes.";
+    toast("Saved " + textEditor.name, "success");
+    refreshSidebarEntry(textEditor.game_rel, textEditor.name, "");
+    await renderGrid();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+});
+
+document.getElementById("text-reset").addEventListener("click", async () => {
+  if (!textEditor) return;
+  const st = document.getElementById("text-status"); st.textContent = "Resetting…";
+  try {
+    const res = await api("/api/text_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: textEditor.game_rel }) });
+    if (!res.ok) { st.textContent = res.error || "reset failed"; return; }
+    textEditor.entries = res.entries || []; textEditor.edits = {};
+    renderTextEditor(document.getElementById("text-search").value);
+    st.textContent = "Reset to vanilla.";
+    toast("Reset " + textEditor.name, "success");
+    await renderGrid();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+});

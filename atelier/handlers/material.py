@@ -1,5 +1,6 @@
-import os, json, shutil, tempfile
-from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root
+import os, json, shutil
+from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
+                            project_base, project_base_legacy)
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 
@@ -85,31 +86,28 @@ def _apply_mat_edits(d, colors, scalars):
             if pv is not None: pv["Value"] = float(scalars[nm])
 
 def mat_json(game_rel, out_dir=None):
-    """Extract the MI + convert to JSON as <stem>.json. Returns the json path.
+    """Extract the MI + convert to JSON as <basename>.json. Returns the json path.
     The active project dir always takes priority (edits/explicit imports live there); if no
     project copy exists, the JSON is produced in out_dir (defaults to the project dir — the
     explicit import/edit flows). Pass out_dir=CACHE_3DVIEW for viewport-only reads that shouldn't
-    pollute the project folder.
-
-    <stem> is the project-manifest stem for game_rel (collision-disambiguated) when out_dir is
-    the project dir; CACHE_3DVIEW is a global vanilla-texture cache keyed on the plain pak
-    basename instead, since it's not user project data."""
+    pollute the project folder."""
     import atelier.asset_cache as _ac
-    import atelier.manifest as _mf
     from atelier.handlers.texture import extract_info, find_extracted
     import_root = get_import_root()
-    stem        = _mf.stem_for(import_root, game_rel, "material")
-    project_jp  = os.path.join(import_root, stem) + ".json"
+    # Project copy wins. Unique subfolder path (no basename collisions); fall back to the legacy flat
+    # layout so pre-existing projects still load.
+    project_jp  = project_base(game_rel, import_root) + ".json"
     if os.path.exists(project_jp): return project_jp
-    out_dir    = out_dir or import_root
-    final_name = stem if out_dir == import_root else os.path.basename(game_rel)
-    jp = os.path.join(out_dir, final_name) + ".json"
+    legacy_jp   = project_base_legacy(game_rel, import_root) + ".json"
+    if os.path.exists(legacy_jp): return legacy_jp
+    out_dir = out_dir or import_root
+    jp = project_base(game_rel, out_dir) + ".json"
     if os.path.exists(jp): return jp
     if out_dir != CACHE_3DVIEW:
         # reuse the vanilla copy the viewport already cached instead of re-extracting from paks
-        cached_jp = os.path.join(CACHE_3DVIEW, os.path.basename(game_rel)) + ".json"
+        cached_jp = project_base(game_rel, CACHE_3DVIEW) + ".json"
         if os.path.exists(cached_jp):
-            os.makedirs(out_dir, exist_ok=True)
+            os.makedirs(os.path.dirname(jp), exist_ok=True)
             shutil.copyfile(cached_jp, jp)
             return jp
     work_base = _ac.cache_base(game_rel)
@@ -126,19 +124,10 @@ def mat_json(game_rel, out_dir=None):
             work_base = find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("material not found in game paks")
-    os.makedirs(out_dir, exist_ok=True)
-    # to_json always names its output after the input .uasset's own basename — if that name is
-    # already taken in out_dir by a DIFFERENT (colliding) game_rel's file, writing straight into
-    # out_dir would silently overwrite it before we get a chance to move ours aside. Always
-    # extract into an isolated scratch dir first, then move the single result into place.
-    tmp_dir = tempfile.mkdtemp(prefix="mat_tojson_", dir=_CACHE)
-    try:
-        uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(tmp_dir)])
-        produced = os.path.join(tmp_dir, os.path.basename(game_rel)) + ".json"
-        if not os.path.exists(produced): raise RuntimeError("to_json produced no JSON")
-        shutil.move(produced, jp)
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+    sub = os.path.dirname(jp)                         # the game_rel subfolder under out_dir
+    os.makedirs(sub, exist_ok=True)
+    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])
+    if not os.path.exists(jp): raise RuntimeError("to_json produced no JSON")
     return jp
 
 def read_material(game_rel, cache_only=False):
@@ -159,11 +148,9 @@ def save_material(game_rel, colors, scalars):
     return {"colors": cols, "scalars": scals}
 
 def reset_material(game_rel):
-    """Drop local edits: delete the cached JSON and re-derive vanilla params from the .uasset."""
-    import atelier.manifest as _mf
-    import_root = get_import_root()
-    jp = os.path.join(import_root, _mf.stem_for(import_root, game_rel, "material")) + ".json"
-    if os.path.exists(jp): os.remove(jp)
+    """Drop local edits: delete the project JSON (new + legacy paths) and re-derive from the .uasset."""
+    for jp in (project_base(game_rel) + ".json", project_base_legacy(game_rel) + ".json"):
+        if os.path.exists(jp): os.remove(jp)
     return read_material(game_rel)
 
 def stage_material(stage, game_rel, colors, scalars):

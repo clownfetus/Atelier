@@ -23,11 +23,16 @@ let currentSkin = null;
 let objects     = [];  // [{ name, root: THREE.Object3D }] — one entry per top-level mesh added to modelRoot
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
+// ACES filmic tonemap (Narkowicz), per channel. UE material colours are LINEAR and often HDR (>1,
+// up to ~10 for dye/emissive). Hard-clamping each channel to 1 renders them PURE WHITE and kills the
+// hue; this rolls the highlights off smoothly into [0,1] instead. Matches the dye composite's tonemap
+// so a colour reads the same on a swatch, as a mesh tint, and in the baked dye.
+const aces = v => { v = Math.max(0, v); return Math.min(1, (v * (2.51 * v + 0.03)) / (v * (2.43 * v + 0.59) + 0.14)); };
 
 // UE material colors are LINEAR floats; <input type=color> is sRGB. Convert via THREE.Color.
 function linToHex(rgba) {
   const c = new THREE.Color();
-  c.setRGB(clamp01(rgba[0]), clamp01(rgba[1]), clamp01(rgba[2]), THREE.LinearSRGBColorSpace);
+  c.setRGB(aces(rgba[0]), aces(rgba[1]), aces(rgba[2]), THREE.LinearSRGBColorSpace);
   return '#' + c.getHexString(THREE.SRGBColorSpace);
 }
 function hexToLin(hex) {
@@ -64,7 +69,7 @@ function paramRgb(name, idx) {
   if (!d || idx < 0 || !d.colors[idx]) return null;
   const p = d.colors[idx];
   const rgba = (edited[name] && edited[name][p.name]) || p.rgba;
-  return [clamp01(rgba[0]), clamp01(rgba[1]), clamp01(rgba[2])];
+  return [aces(rgba[0]), aces(rgba[1]), aces(rgba[2])];   // tonemap HDR instead of clamping to white
 }
 function scalarVal(name, re) {
   const d = matData[name]; if (!d) return null;
@@ -220,7 +225,7 @@ function retint(name) {
   }
 }
 
-async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0') {
+async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0', url = null) {
   // Textures are big (2048²) and expensive to upload — load each once, cache, and reuse across opens.
   // We apply to whatever model is CURRENT (matsByName), so no generation-dispose race: a load that
   // finishes after the user switched meshes simply applies to the current model's slot of that name
@@ -228,11 +233,11 @@ async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0') {
   // The cache key + URL include `ver` (edited-PNG mtime): unedited textures stay cached across opens,
   // but once the user edits one its stamp changes → we refetch and show the edit.
   ver = ver || '0';
-  const key = texGameRel + '@' + ver;
+  const key = (url || texGameRel) + '@' + ver;
   let tex = texCache.get(key);
   if (!tex) {
     try {
-      tex = await texLoader.loadAsync(`/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`);
+      tex = await texLoader.loadAsync(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`);
     } catch (e) { console.warn('viewport: texture load failed', name, slot, texGameRel, e); return; }
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;                              // glTF UV convention (origin top-left)
@@ -272,11 +277,54 @@ function frameCamera() {
 // other long-running job in the app — instead of the blocking mesh-load overlay. The sidebar
 // (#viewport-materials) appears as soon as params are back; textures fill in live on whatever
 // model is current, no reopen needed — this just keeps the user informed while that happens.
+// ── "materials from" picker ───────────────────────────────────────────────────
+// A chroma/recolour has no mesh of its own — and there's NO reliable way to spot one: some ship a
+// full mesh set, some are textures-only, some materials-only, and sibling IDs under a character
+// aren't necessarily variants of each other. So don't classify: list what exists under the character
+// and let the user point at the material set they want, applied to whatever mesh is loaded.
+let chromaSkin = null;      // the skin whose materials are currently applied (null = the mesh's own)
+let meshSkin   = null;      // the skin the loaded mesh came from
+
+async function buildChromaPicker(skinId, meshGameRel) {
+  const row = $('viewport-chroma-row'), sel = $('viewport-chroma');
+  if (!row || !sel) return;
+  // Walk up from the LOADED MESH's real path to the folder holding the skin folders, rather than
+  // deriving it from the id — the folder schema isn't reliably a skin id (e.g. 1060CommonMaterial).
+  const parts = String(meshGameRel || '').split('/');    // Characters/<char>/<skin>/.../SK_x
+  if (parts.length < 3) { row.style.display = 'none'; return; }
+  const parent = parts.slice(0, 2).join('/');            // Characters/<char>
+  let list = [];
+  try {
+    const d = await fetch(`/api/browse_material_dirs?path=${encodeURIComponent(parent)}`).then(r => r.json());
+    list = (d && d.dirs) || [];
+  } catch (e) { row.style.display = 'none'; return; }
+  list = list.filter(s => s.materials > 0);
+  if (list.length < 2) { row.style.display = 'none'; return; }
+  sel.innerHTML = list.map(s => {
+    const label = s.label ? `${s.label} (${s.name})` : s.name;   // "COASTAL KUMIHO (1060501)"
+    return `<option value="${s.name}"${s.name === (chromaSkin || skinId) ? ' selected' : ''}>${label}`
+      + `${s.name === skinId ? ' — this skin' : ''} · ${s.materials} mat`
+      + `${s.meshes ? `, ${s.meshes} mesh` : ', no mesh'}</option>`;
+  }).join('');
+  sel.onchange = () => {
+    chromaSkin = sel.value;
+    $('viewport-status').textContent = `Materials: ${chromaSkin}`;
+    loadMaterials(chromaSkin);
+  };
+  row.style.display = '';
+}
+
+// Chroma MI names carry their OWN skin id: the base mesh's slot is MI_10600_1060300_Equip_01 but
+// the chroma ships MI_10600_1060301_Equip_01 — same material, different digits. So slot matching
+// treats long digit runs as wildcards; exact match still wins when it exists.
+const _canonName = n => String(n || '').toLowerCase().replace(/\d{4,}/g, '#');
+
 async function loadMaterials(skinId) {
   if (!skinId) return;
   currentSkin = skinId;
   const gen = generation;
   const slots = Object.keys(matsByName);
+  const foreign = !!(meshSkin && skinId !== meshSkin);   // applying another skin's materials
   const spinner = typeof window.toastSpinner === 'function' ? window.toastSpinner('Loading materials…') : null;
   const spinnerMsg = spinner ? spinner.querySelector('span') : null;
 
@@ -284,7 +332,9 @@ async function loadMaterials(skinId) {
   try {
     res = await fetch('/api/skin_materials', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skin_id: skinId, names: slots }),
+      // a foreign skin's MI names won't equal the slot names, so the server-side name filter would
+      // drop everything — fetch all of them and match canonically here instead
+      body: JSON.stringify({ skin_id: skinId, names: foreign ? [] : slots }),
     }).then(r => r.json());
   } catch (e) {
     console.warn('viewport: skin_materials request failed', e);
@@ -298,11 +348,17 @@ async function loadMaterials(skinId) {
     return;
   }
 
-  // Keep only materials that actually appear as slots on the loaded mesh; wire each part.
+  // Keep only materials that appear as slots on the loaded mesh; wire each part. `matName` is the
+  // material's own name, `name` is the MESH SLOT it drives — identical for the skin's own materials,
+  // but for a foreign chroma they differ by embedded skin id (resolved canonically).
+  const slotCanon = {};                                  // canonical slot name -> real slot name
+  for (const s of Object.keys(matsByName)) slotCanon[_canonName(s)] = s;
+  const resolveSlot = mn => (matsByName[mn] ? mn : slotCanon[_canonName(mn)] || null);
   let matched = 0;
   const texJobs = [];
-  for (const [name, info] of Object.entries(res.materials)) {
-    if (!matsByName[name]) continue;
+  for (const [matName, info] of Object.entries(res.materials)) {
+    const name = resolveSlot(matName);
+    if (!name) continue;
     matched++;
     info.baseIdx = pickBaseIdx(info.colors);
     info.emiIdx  = pickEmissiveIdx(info.colors);
@@ -310,12 +366,31 @@ async function loadMaterials(skinId) {
     retint(name);
     const tex = info.textures || {};
     const ver = info.tex_ver || {};
-    if (tex.BaseColor) texJobs.push(applyMatTexture(name, tex.BaseColor, 'map', ver[tex.BaseColor]));       // albedo
+    // Dyeing materials (CHROMAS): the skin's colour lives in the MI's "Region N" params applied
+    // through the ColorID mask, NOT in the diffuse — every chroma of a skin shares one diffuse, so
+    // loading BaseColor renders them all identically. Ask for the server-side composite instead.
+    if (info.dyeable) {
+      texJobs.push(applyMatTexture(name, tex.BaseColor || info.game_rel, 'map', info.dye_ver || '0',
+        `/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(info.dye_ver || '0')}`));
+    } else if (tex.BaseColor) {
+      texJobs.push(applyMatTexture(name, tex.BaseColor, 'map', ver[tex.BaseColor]));                        // albedo
+    }
     if (tex.Emissive)  texJobs.push(applyMatTexture(name, tex.Emissive, 'emissiveMap', ver[tex.Emissive])); // glow mask
   }
   buildPanel();   // sidebar shows up now — params are extracted, even though textures are still in flight
 
-  if (!texJobs.length) { if (spinner) spinner.remove(); return; }
+  if (!texJobs.length) {
+    if (spinner) spinner.remove();
+    // Materials are matched to the mesh by NAME (glTF slot == MI name). A chroma authored with
+    // different MI names matches nothing — say so instead of failing silently, since the picker
+    // makes that a normal thing for the user to hit.
+    if (gen === generation && !matched) {
+      $('viewport-status').textContent = (chromaSkin && chromaSkin !== meshSkin)
+        ? `${chromaSkin}: no materials match this mesh's slot names`
+        : 'no materials matched';
+    }
+    return;
+  }
 
   // All texture fetches are already in flight together (fired above, not awaited one at a time) —
   // the spinner just reports on that single batch as it lands, part-by-part, until every texture
@@ -341,6 +416,13 @@ function buildPanel() {
     wrap.className = 'vp-mat';
     const h = document.createElement('div');
     h.className = 'vp-mat-name'; h.textContent = name;
+    if (d.dyeable) {
+      // dyeing material — offer to bake+download the composited albedo with the current Region colours
+      const dl = document.createElement('button');
+      dl.className = 'vp-mat-dl'; dl.title = 'Download baked dyed texture (2048)'; dl.textContent = '⤓';
+      dl.addEventListener('click', e => { e.stopPropagation(); dyeDownloadMesh(name); });
+      h.appendChild(dl);
+    }
     wrap.appendChild(h);
     d.colors.forEach((col, idx) => {
       const row = document.createElement('div');
@@ -371,7 +453,64 @@ function onColorInput(matName, paramName, hex) {
   // the emissive glow (through the emissive mask), a base/albedo tint → material.color. Editing the
   // emissive swatch recolours the glow; other params are saved but don't have a faithful preview.
   retint(matName);
+  // Dyeing materials: the colour lives in the ColorID composite, not a flat tint. A "Region N" edit
+  // must re-BAKE the albedo (server-side) and swap it onto the mesh — that's the faithful preview.
+  if (d && d.dyeable && /^Region\s+\d+\s*-/.test(paramName)) dyeRebakeMesh(matName);
   refreshFoot();
+}
+
+// Live dye: re-bake this material's ColorID composite with the panel's current Region colours and
+// swap it onto the mesh. Reuses /api/dye_preview (the same compositor the material editor uses).
+const _dyeMeshTimer = {};
+function _dyeOverridesFor(matName) {
+  const ov = {};
+  for (const [pname, rgba] of Object.entries(edited[matName] || {})) {
+    const m = /^Region\s+(\d+)\s*-\s*(.+)$/.exec(pname);
+    if (m) (ov[m[1]] = ov[m[1]] || {})[m[2].trim()] = rgba;
+  }
+  return ov;
+}
+function dyeRebakeMesh(matName) {
+  const d = matData[matName];
+  if (!d || !d.dyeable || !d.game_rel) return;
+  clearTimeout(_dyeMeshTimer[matName]);
+  _dyeMeshTimer[matName] = setTimeout(async () => {
+    let blobUrl;
+    try {
+      const r = await fetch('/api/dye_preview', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_rel: d.game_rel, size: 1024, overrides: _dyeOverridesFor(matName) }),
+      });
+      if (!r.ok) return;
+      blobUrl = URL.createObjectURL(await r.blob());
+      const tex = await texLoader.loadAsync(blobUrl);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.flipY = false;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      for (const mm of (matsByName[matName] || [])) {
+        mm.map = tex; mm.color.setHex(0xffffff); mm.needsUpdate = true;
+      }
+    } catch (e) { /* keep the last good bake */ }
+    finally { if (blobUrl) URL.revokeObjectURL(blobUrl); }
+  }, 160);
+}
+
+async function dyeDownloadMesh(matName) {
+  const d = matData[matName];
+  if (!d || !d.dyeable || !d.game_rel) return;
+  try {
+    const r = await fetch('/api/dye_download', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_rel: d.game_rel, size: 2048, overrides: _dyeOverridesFor(matName) }),
+    });
+    if (!r.ok) return;
+    const u = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = u; a.download = matName + '_dyed.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 8000);
+  } catch (e) { /* ignore */ }
 }
 
 function refreshFoot() {
@@ -421,6 +560,8 @@ function skinFromGameRel(gr) {
 
 async function open(skinId, title) {
   init();
+  meshSkin = skinId; chromaSkin = null;                       // reset the material-set choice
+  const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent  = title || `3D Preview — ${skinId}`;
   $('viewport-status').textContent = '';
   $('viewport-overlay').classList.add('active');
@@ -454,6 +595,8 @@ async function open(skinId, title) {
     frameCamera();
     $('viewport-loading').style.display = 'none';
     loadMaterials(skinId);
+    // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
+    buildChromaPicker(skinId, meshes[0] && meshes[0].game_rel);
   } catch (e) {
     $('viewport-loading-msg').textContent = 'Error: ' + e.message;
   }
@@ -461,6 +604,9 @@ async function open(skinId, title) {
 
 async function openMesh(gameRel, name, skinId) {
   init();
+  const _sk = skinId || skinFromGameRel(gameRel);
+  meshSkin = _sk; chromaSkin = null;                         // reset the material-set choice
+  const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent  = name || '3D Preview';
   $('viewport-status').textContent = '';
   $('viewport-overlay').classList.add('active');
@@ -478,7 +624,8 @@ async function openMesh(gameRel, name, skinId) {
     frameCamera();
     $('viewport-status').textContent = name || '';
     $('viewport-loading').style.display = 'none';
-    loadMaterials(skinId || skinFromGameRel(gameRel));
+    loadMaterials(_sk);
+    buildChromaPicker(_sk, gameRel);   // same "materials from" picker as the skin path
   } catch (e) {
     $('viewport-loading-msg').textContent = 'Failed to load: ' + (e && e.message || e);
   }

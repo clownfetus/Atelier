@@ -6,7 +6,9 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             GUI_DIR, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
                             save_paks_config, save_setup_config, save_usmap_config,
                             get_usmap_checked_at, save_usmap_checked_at,
-                            get_import_root, get_active_project, set_active_project)
+                            get_import_root, get_active_project, set_active_project,
+                            project_base, project_base_legacy, project_game_rel,
+                            get_mods_folder, save_mods_folder)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -45,6 +47,8 @@ if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
 from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
 from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
 from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
+from atelier.handlers.world import is_world
+from atelier.handlers.text import is_text
 from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.web.browse as _browse_mod
@@ -52,12 +56,17 @@ import atelier.web.browse as _browse_mod
 # ── extraction helpers ────────────────────────────────────────────────────────
 
 def _import_base(game_rel):
-    """Full disk path (no ext) for a game_rel in the active project (flat — png/json live here).
-    Resolves through the project manifest so two different game_rels that share a basename
-    (a real occurrence in the paks) don't collide onto the same file."""
-    import atelier.manifest as _mf
-    import_root = get_import_root()
-    return os.path.join(import_root, _mf.stem_for(import_root, game_rel, "texture"))
+    """Full disk path (no ext) for a game_rel's project file, subfolder-mirrored by game_rel so
+    same-named assets under different skins never collide. Prefers whichever layout already holds a
+    file (new subfolder, then legacy flat) for back-compat; defaults to the new layout for writes.
+    Callers that WRITE must os.makedirs(os.path.dirname(...)) since the subfolder may not exist yet."""
+    new = project_base(game_rel)
+    if any(os.path.exists(new + e) for e in (".png", ".json")):
+        return new
+    legacy = project_base_legacy(game_rel)
+    if any(os.path.exists(legacy + e) for e in (".png", ".json")):
+        return legacy
+    return new
 
 def _cache_import_base(game_rel):
     """Extracted cache path (no ext) for a game_rel in _cache/import, via asset_cache."""
@@ -102,6 +111,57 @@ def api_skin_meshes():
         seen.add(gr)
         out.append({"name": base, "game_rel": gr})
     return json.dumps(out)
+
+@app.get("/api/browse_material_dirs")
+def api_browse_material_dirs():
+    """Browse the pak tree for folders that contain MI_ materials — the viewport's "materials from"
+    picker.
+
+    NO CONVENTION IS ASSUMED, deliberately. Chromas/recolours have no mesh of their own, but there
+    is no rule for finding them: some ship a full mesh set, some are textures-only, some materials-
+    only, sibling ids under a character aren't necessarily variants of each other, and the folder
+    schema isn't even consistently a skin id (`Characters/1060/1060CommonMaterial`). Every attempt to
+    infer the relationship gets it wrong. So: the user navigates, we just report what's actually
+    there, and they point at the material set they want applied to the loaded mesh.
+
+    `path` = a virtual folder prefix ('' = roots). Returns its immediate child folders with recursive
+    MI_/SK_ counts, so a chroma reads as "materials, no mesh" without us having to call it one.
+    Reads the cached pak index — a dict walk, not a scan.
+    """
+    from atelier.index import ensure_index
+    response.content_type = "application/json"
+    path = (request.query.get("path") or "").strip("/")
+    depth = len(path.split("/")) if path else 0
+    pfx = (path.lower() + "/") if path else ""
+    acc = {}
+    for p, _c, _x in ensure_index():
+        pl = p.lower()
+        if pfx and not pl.startswith(pfx):
+            continue
+        if not pl.endswith(".uasset"):
+            continue
+        parts = p.split("/")
+        if len(parts) <= depth + 1:      # a file sitting directly in `path`, not a child folder
+            continue
+        child = parts[depth]
+        e = acc.setdefault(child, {"name": child, "path": (path + "/" + child) if path else child,
+                                   "materials": 0, "meshes": 0})
+        b = os.path.basename(pl)
+        if b.startswith("mi_"):
+            e["materials"] += 1
+        elif b.startswith("sk_") and not _MESH_SKIP.search(b[:-7]):
+            e["meshes"] += 1
+    out = [v for v in acc.values() if v["materials"] or v["meshes"]]
+    try:
+        from atelier.handlers.skinnames import label_for
+        for v in out:
+            v["label"] = label_for(v["name"])      # "COASTAL KUMIHO" etc., None if unknown
+    except Exception:
+        pass
+    out.sort(key=lambda v: v["name"])
+    return json.dumps({"path": path,
+                       "up": "/".join(path.split("/")[:-1]) if path else None,
+                       "dirs": out})
 
 def _model_glb(game_rel):
     """Decode (cached) a mesh game_rel to a .glb; return its path or None."""
@@ -157,7 +217,13 @@ def api_skin_materials():
             params = read_material(gr, cache_only=True)
             texs   = params.get("textures", {}) or {}
             tvers  = {g: _tex_version(g) for g in texs.values()}   # edited-mtime stamps for cache-busting
-            out[base] = {"game_rel": gr, "token": token(gr), **params, "tex_ver": tvers}
+            # Dyeing materials must render the COMPOSITE, not the raw diffuse. Chromas differ only in
+            # their "Region N" colours over the same mask+diffuse, so handing three.js the BaseColor
+            # renders every chroma identically. Free to detect — the slot is already in `textures`.
+            dyeable = "DyeingTexture" in texs
+            out[base] = {"game_rel": gr, "token": token(gr), **params, "tex_ver": tvers,
+                         "dyeable": dyeable,
+                         "dye_ver": _dye_version(gr, texs) if dyeable else "0"}
         except Exception as e:
             print(f"[skin_materials] {base}: {e}", file=sys.stderr, flush=True)
     return json.dumps({"ok": True, "materials": out})
@@ -172,6 +238,21 @@ def _tex_version(game_rel):
     except OSError:
         return "0"
 
+def _dye_version(game_rel, texs):
+    """Cache-busting stamp for a dyed composite. It changes when the Region colours are re-saved
+    (the material's project JSON) OR when the mask/diffuse are edited — those are its three inputs."""
+    parts = []
+    jp = project_base(game_rel) + ".json"
+    try:
+        parts.append(str(int(os.path.getmtime(jp))) if os.path.exists(jp) else "0")
+    except OSError:
+        parts.append("0")
+    for slot in ("DyeingTexture", "BaseColor"):
+        g = (texs or {}).get(slot)
+        if g:
+            parts.append(_tex_version(g))
+    return "-".join(parts)
+
 def _texture_png(game_rel):
     """PNG path for a texture game_rel. Prefers the user's EDITED/imported PNG in the active project
     (so viewport shows their edits); otherwise extracts + decodes the vanilla texture from the paks
@@ -180,25 +261,53 @@ def _texture_png(game_rel):
     if os.path.exists(edited):
         return edited
     out_dir = CACHE_3DVIEW
-    base    = os.path.join(out_dir, os.path.basename(game_rel))   # no ext
+    base    = project_base(game_rel, out_dir)   # no ext, subfolder-mirrored (no basename collisions)
     out_png = base + ".png"
     if os.path.exists(out_png):
         return out_png
-    cb = _asset_cache.cache_base(game_rel)
-    if not cb or not os.path.exists(cb + ".uasset"):
-        pak_gr = pak_game_path(game_rel)
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-             "--filter", os.path.basename(pak_gr)])
-        cp, pak, pfx = extract_info(game_rel)
-        if cp and os.path.exists(cp + ".uasset"):
-            _asset_cache.record(game_rel, cp, pak, pfx); cb = cp
-        else:
-            cb = find_extracted(game_rel)
-    if not cb or not os.path.exists(cb + ".uasset"):
-        return None
-    os.makedirs(out_dir, exist_ok=True)
-    decode_png(base, cb)
+    # Everything below extracts + decodes (a UAssetTool cold-start + a full-res texture in RAM). The
+    # viewport fires these ~2N-at-once, so gate the heavy work behind tex_semaphore to cap concurrent
+    # processes/memory — that swarm is what crashes the viewport on big skins. Re-check the cache
+    # inside the gate: a sibling request for the same texture may have finished while we waited.
+    from atelier.tools import tex_semaphore
+    with tex_semaphore:
+        if os.path.exists(out_png):
+            return out_png
+        cb = _asset_cache.cache_base(game_rel)
+        if not cb or not os.path.exists(cb + ".uasset"):
+            pak_gr = pak_game_path(game_rel)
+            os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+            uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
+                 "--filter", os.path.basename(pak_gr)])
+            cp, pak, pfx = extract_info(game_rel)
+            if cp and os.path.exists(cp + ".uasset"):
+                _asset_cache.record(game_rel, cp, pak, pfx); cb = cp
+            else:
+                cb = find_extracted(game_rel)
+        if not cb or not os.path.exists(cb + ".uasset"):
+            return None
+        return _decode_texture_png(game_rel, base, out_png, cb)
+
+def _decode_texture_png(game_rel, base, out_png, cb):
+    os.makedirs(os.path.dirname(base), exist_ok=True)
+    # MR strips the top mip on big textures; decode_png (UAssetTool) then falls back to the 4x4 tail
+    # and the viewport shows a solid smear. decode_dds recovers the largest SHIPPED mip from the
+    # .uptnl/.ubulk; convert that to the PNG the viewport expects, and fall back to decode_png only
+    # if there's no recoverable block data.
+    from atelier.handlers.texture import decode_dds
+    dds = None
+    try:
+        dds = decode_dds(base, cb)
+    except Exception as e:
+        print(f"[texture_png] decode_dds failed for {game_rel}: {e}", file=sys.stderr, flush=True)
+    if dds and os.path.exists(dds):
+        try:
+            from PIL import Image
+            Image.open(dds).convert("RGBA").save(out_png)
+        except Exception as e:
+            print(f"[texture_png] dds->png failed for {game_rel}: {e}", file=sys.stderr, flush=True)
+    if not os.path.exists(out_png):
+        decode_png(base, cb)
     return out_png if os.path.exists(out_png) else None
 
 @app.get("/api/texture_png")
@@ -216,6 +325,97 @@ def api_texture_png():
         return json.dumps({"error": str(e)})
     if png and os.path.exists(png):
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
+    response.status = 404
+    return b""
+
+# ── dyeing / ID-mask preview ──────────────────────────────────────────────────
+@app.get("/api/dye_texture")
+def api_dye_texture():
+    """The dyed albedo for a dyeing MI, as a plain GET so the viewport's TextureLoader can take it
+    like any other map. `v` is only a cache-buster (see _dye_version)."""
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        return b""
+    try:
+        from atelier.handlers.dye import dye_preview
+        png = dye_preview(gr, size=int(request.query.get("size") or 1024))
+    except Exception as e:
+        print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
+        response.status = 404
+        return b""
+    if png and os.path.exists(png):
+        return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
+    response.status = 404
+    return b""
+
+@app.get("/api/dye_info")
+def api_dye_info():
+    """Regions + current colours for a dyeing material, and which regions the mask actually uses."""
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        response.status = 400
+        return json.dumps({"error": "game_rel required"})
+    try:
+        from atelier.handlers.dye import dye_info
+        return json.dumps(dye_info(gr))
+    except Exception as e:
+        response.status = 500
+        return json.dumps({"error": str(e)})
+
+def _dye_png(gr, overrides, size):
+    from atelier.handlers.dye import dye_preview
+    return dye_preview(gr, overrides=overrides, size=size)
+
+@app.post("/api/dye_preview")
+def api_dye_preview():
+    """Composite a dye preview and serve it. Body may carry unsaved {region: {param: rgba}} so a
+    colour pick previews before it's saved."""
+    try:
+        body = request.json or {}
+    except Exception:
+        body = {}
+    gr = body.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"error": "game_rel required"})
+    try:
+        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 1024))
+    except Exception as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    if png and os.path.exists(png):
+        return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
+    response.status = 404
+    return b""
+
+@app.post("/api/dye_download")
+def api_dye_download():
+    """QoL: bake the dyed result to a full-res PNG the user can take into an image editor as a
+    starting point. Same composite as the preview, just at the mask's native size and served as an
+    attachment."""
+    try:
+        body = request.json or {}
+    except Exception:
+        body = {}
+    gr = body.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"error": "game_rel required"})
+    try:
+        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 2048))
+    except Exception as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    if png and os.path.exists(png):
+        name = os.path.basename(gr) + "_dyed.png"
+        return static_file(os.path.basename(png), root=os.path.dirname(png),
+                           mimetype="image/png", download=name)
     response.status = 404
     return b""
 
@@ -268,18 +468,23 @@ def api_setup_status():
     return json.dumps({"configured": configured,
                        "paks_prefill":  mr_prefill,
                        "aes_prefill":   aes_prefill,
-                       "usmap_prefill": usmap_prefill})
+                       "usmap_prefill": usmap_prefill,
+                       "mods_prefill":  get_mods_folder()})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
     body    = request.json or {}
     initial = (body.get("initial") or "").replace("/", "\\")
+    raw_pick = bool(body.get("raw"))   # raw=True returns the chosen folder as-is (e.g. mods folder,
+                                       # which can be named anything); default resolves the MR root.
+    desc    = (body.get("desc") or ("Select a folder:" if raw_pick else "Select your MarvelRivals folder:"))
     env     = os.environ.copy()
     env["PAKS_INITIAL"] = initial
+    env["PICK_DESC"]    = desc
     ps = (
         "Add-Type -AssemblyName System.Windows.Forms; "
         "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-        "$f.Description = 'Select your MarvelRivals folder:'; "
+        "$f.Description = $env:PICK_DESC; "
         "$f.SelectedPath = $env:PAKS_INITIAL; "
         "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"
     )
@@ -287,9 +492,12 @@ def api_pick_folder():
         r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
                              capture_output=True, text=True, timeout=120, env=env)
         raw = r.stdout.strip().replace("\\", "/")
-        mr  = _find_mr_root(raw) if raw else ""
+        if raw_pick:
+            path = raw
+        else:
+            path = (_find_mr_root(raw) if raw else "") or raw
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "path": mr or raw})
+        return json.dumps({"ok": True, "path": path})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
@@ -326,6 +534,8 @@ def api_save_paks():
     path       = body.get("path", "").strip()
     aes_key    = body.get("aes_key", "").strip()  # stored without 0x prefix
     usmap_path = body.get("usmap_path", "").strip()
+    has_mods   = "mods_folder" in body            # only touch mods config when the field was sent
+    mods_folder = (body.get("mods_folder") or "").strip()
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
@@ -339,6 +549,8 @@ def api_save_paks():
     try:
         save_setup_config(paks_path, aes_key,
                           usmap_path if (usmap_path and os.path.exists(usmap_path)) else None)
+        if has_mods:
+            save_mods_folder(mods_folder)   # empty string clears it
 
         # Write AES_KEY.txt so io_lib picks it up immediately
         import atelier.config as _c
@@ -866,6 +1078,7 @@ def api_import_texture():
         print(f"[import] {gr}: work_base={work_base!r} exists={bool(work_base) and os.path.exists(work_base + '.uasset')}", file=sys.stderr, flush=True)
         # Don't re-decode if the PNG already exists — would overwrite user's edited version.
         if work_base and os.path.exists(work_base + ".uasset") and not os.path.exists(dst_base + ".png"):
+            os.makedirs(os.path.dirname(dst_base), exist_ok=True)
             decode_png(dst_base, work_base)
         png_exists    = os.path.exists(dst_base + ".png")
         uasset_exists = bool(work_base) and os.path.exists(work_base + ".uasset")
@@ -1165,9 +1378,10 @@ class _PNGHandler(FileSystemEventHandler):
             if now - self._last.get(event.src_path, 0) < 0.5:
                 return
             self._last[event.src_path] = now
-            name = os.path.basename(event.src_path)[:-4]
-            import atelier.manifest as _mf
-            gr = _mf.lookup_game_rel(get_import_root(), name) or name
+            # Derive game_rel from the subfolder-mirrored path; legacy flat files resolve via cache.
+            gr = project_game_rel(event.src_path, get_import_root())
+            if "/" not in gr:
+                gr = _asset_cache.by_name(gr) or gr
             _push_sse({"file_changed": True, "token": token(gr), "game_rel": gr})
 
     def on_created(self, event):
@@ -1212,15 +1426,15 @@ def _list_projects():
         mtime       = 0
         asset_count = 0
         try:
-            for fname in os.listdir(path):
-                fp = os.path.join(path, fname)
-                if not os.path.isfile(fp):
-                    continue
-                mt = os.path.getmtime(fp)
-                if mt > mtime:
-                    mtime = mt
-                if fname.endswith(".png") or fname.endswith(".json"):
-                    asset_count += 1
+            # Project files are subfolder-mirrored by game_rel, so walk (not just listdir).
+            for dirpath, _dirs, files in os.walk(path):
+                for fname in files:
+                    fp = os.path.join(dirpath, fname)
+                    mt = os.path.getmtime(fp)
+                    if mt > mtime:
+                        mtime = mt
+                    if fname.endswith(".png") or fname.endswith(".json"):
+                        asset_count += 1
         except Exception:
             pass
         if not mtime:
@@ -1283,8 +1497,6 @@ def api_project_rename():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "name already taken"})
     os.rename(old_dir, new_dir)
-    import atelier.manifest as _mf
-    _mf.invalidate(old_dir)
     if get_active_project() == old_name:
         set_active_project(new_name)
     response.content_type = "application/json"
@@ -1322,8 +1534,6 @@ def api_project_delete():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
     shutil.rmtree(project_dir)
-    import atelier.manifest as _mf
-    _mf.invalidate(project_dir)
     if get_active_project() == name:
         set_active_project("")
     response.content_type = "application/json"
@@ -1395,6 +1605,16 @@ def _open_explorer_focused(args):
     threading.Thread(target=_focus, daemon=True).start()
 
 
+def _explorer_reveal(path, select):
+    """Open Explorer to a folder, optionally selecting a file. Built as a QUOTED STRING command, not a
+    Popen arg list: the list form mangles '/select,<path with spaces>' (our install path has spaces),
+    which makes Explorer open the file itself (the 'how do you want to open this?' popup) or land on
+    the wrong folder. A single 'explorer /select,\"<path>\"' string parses correctly."""
+    p = os.path.abspath(path).replace("/", "\\")
+    cmd = ('explorer.exe /select,"%s"' % p) if select else ('explorer.exe "%s"' % p)
+    _open_explorer_focused(cmd)
+
+
 @app.get("/api/open_explorer")
 def api_open_explorer():
     path = request.query.get("path", "")
@@ -1404,9 +1624,9 @@ def api_open_explorer():
     if path:
         abs_path = os.path.abspath(path)
         if os.path.exists(abs_path):
-            _open_explorer_focused(["explorer.exe", f"/select,{abs_path}"])
+            _explorer_reveal(abs_path, select=True)
         elif os.path.isdir(os.path.dirname(abs_path)):
-            _open_explorer_focused(["explorer.exe", os.path.dirname(abs_path)])
+            _explorer_reveal(os.path.dirname(abs_path), select=False)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -1460,10 +1680,10 @@ def api_open_projects_folder():
     if active:
         target = os.path.join(PROJECTS_ROOT, active)
         if os.path.isdir(target):
-            _open_explorer_focused(["explorer.exe", f"/select,{os.path.abspath(target)}"])
+            _explorer_reveal(target, select=True)
             response.content_type = "application/json"
             return json.dumps({"ok": True})
-    _open_explorer_focused(["explorer.exe", os.path.abspath(PROJECTS_ROOT)])
+    _explorer_reveal(PROJECTS_ROOT, select=False)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -1511,6 +1731,42 @@ def api_open_with():
 
 # ── export ────────────────────────────────────────────────────────────────────
 
+def _split_export_items(items):
+    """Partition selected game_rels into build_mod's buckets (edits already live on disk / sidecar)."""
+    tex_items   = [gr for gr in items if not is_material(gr) and not is_curve(gr)
+                   and not is_vfx(gr) and not is_world(gr) and not is_text(gr)]
+    mat_items   = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
+    curve_items = [{"game_rel": gr, "edits": {}} for gr in items if is_curve(gr)]   # edits already on disk
+    vfx_items   = [gr for gr in items if is_vfx(gr)]                                 # edits from sidecar
+    world_items = [gr for gr in items if is_world(gr)]                               # edits from sidecar
+    text_items  = [gr for gr in items if is_text(gr)]                                # edits from sidecar
+    return tex_items, mat_items, curve_items, vfx_items, world_items, text_items
+
+def _install_to_mods(mod_name, export_dir):
+    """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
+    removing any previous version of THIS mod first. Returns (ok, error, dest_dir)."""
+    mods = get_mods_folder()
+    if not mods:
+        return False, "No mods folder set — configure one in Menu → Paths.", None
+    stem = f"{mod_name}_9999999_P"
+    try:
+        os.makedirs(mods, exist_ok=True)
+    except Exception as e:
+        return False, f"Mods folder not usable: {e}", None
+    for ext in (".pak", ".ucas", ".utoc"):              # drop the previous version of this mod
+        old = os.path.join(mods, stem + ext)
+        if os.path.exists(old):
+            try: os.remove(old)
+            except Exception as e: return False, f"Couldn't replace old mod ({stem + ext}): {e}", None
+    copied = []
+    for ext in (".pak", ".ucas", ".utoc"):
+        src = os.path.join(export_dir, stem + ext)
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(mods, stem + ext)); copied.append(ext)
+    if ".utoc" not in copied:
+        return False, "build produced no .utoc to install", None
+    return True, None, mods
+
 @app.post("/api/export")
 def api_export():
     body     = request.json or {}
@@ -1524,12 +1780,10 @@ def api_export():
     os.makedirs(out_dir, exist_ok=True)
 
     try:
-        tex_items   = [gr for gr in items if not is_material(gr) and not is_curve(gr) and not is_vfx(gr)]
-        mat_items   = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
-        curve_items = [{"game_rel": gr, "edits": {}} for gr in items if is_curve(gr)]   # edits already on disk
-        vfx_items   = [gr for gr in items if is_vfx(gr)]                                 # edits from sidecar
+        tex_items, mat_items, curve_items, vfx_items, world_items, text_items = _split_export_items(items)
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
-                           curve_items=curve_items, vfx_items=vfx_items)
+                           curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
+                           text_items=text_items, password=(body.get("password") or "").strip() or None)
         if not result.get("ok"):
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
@@ -1540,6 +1794,98 @@ def api_export():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
 
+@app.post("/api/build_install")
+def api_build_install():
+    """Build the selected edits into a mod, then install it into the configured mods folder —
+    replacing the previous version of that mod. Does NOT open any explorer window."""
+    body     = request.json or {}
+    mod_name = re.sub(r'[/\\:*?"<>|.]', '', (body.get("mod_name") or "Mod").strip()) or "Mod"
+    items    = body.get("items", [])
+    response.content_type = "application/json"
+    if not items:
+        return json.dumps({"ok": False, "error": "no items selected"})
+    if not get_mods_folder():
+        return json.dumps({"ok": False, "error": "No mods folder set — configure one in Menu → Paths.",
+                           "need_mods_folder": True})
+    out_dir = ASSETS_MODS
+    os.makedirs(out_dir, exist_ok=True)
+    try:
+        tex_items, mat_items, curve_items, vfx_items, world_items, text_items = _split_export_items(items)
+        result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
+                           curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
+                           text_items=text_items, password=(body.get("password") or "").strip() or None)
+        if not result.get("ok"):
+            return json.dumps({"ok": False, "error": result.get("error", "build failed")})
+        ok, err, dest = _install_to_mods(mod_name, out_dir)
+        if not ok:
+            return json.dumps({"ok": False, "error": err})
+        return json.dumps({"ok": True, "installed_dir": dest.replace("\\", "/"),
+                           "mod": f"{mod_name}_9999999_P"})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/pick_mod_file")
+def api_pick_mod_file():
+    """Native picker for a mod to repatch (.zip / .pak / .utoc). Reports if it's password-locked."""
+    ps = ("Add-Type -AssemblyName System.Windows.Forms; "
+          "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+          "$f.Title = 'Select a mod to repatch'; "
+          "$f.Filter = 'Mods (*.zip;*.pak;*.utoc)|*.zip;*.pak;*.utoc|All files (*.*)|*.*'; "
+          "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }")
+    response.content_type = "application/json"
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           capture_output=True, text=True, timeout=180)
+        path = r.stdout.strip().replace("\\", "/")
+        locked = False
+        if path:
+            from atelier.handlers import modlock
+            locked = modlock.is_locked(path)
+        return json.dumps({"ok": True, "path": path, "locked": locked})
+    except Exception as e:
+        return json.dumps({"ok": False, "path": "", "error": str(e)})
+
+@app.post("/api/repatch")
+def api_repatch():
+    """Repatch a picked mod for the current patch. body: {path, unlock, stage_as_project, password}."""
+    body = request.json or {}
+    src  = (body.get("path") or "").strip()
+    response.content_type = "application/json"
+    if not src or not os.path.exists(src):
+        return json.dumps({"ok": False, "error": "Pick a mod file first."})
+    from atelier.handlers.repatch import repatch_mod
+    name = re.sub(r'[/\\:*?"<>|.]', '', os.path.splitext(os.path.basename(src))[0])[:60] or "Mod"
+    out_dir = ASSETS_MODS; os.makedirs(out_dir, exist_ok=True)
+    out_base = os.path.join(out_dir, f"{name}_Repatched_9999999_P")
+    try:
+        r = repatch_mod(src, out_base,
+                        unlock=(body.get("unlock") or None),
+                        stage_as_project=bool(body.get("stage_as_project")),
+                        relock=((body.get("password") or "").strip() or None))
+        if r.get("locked"):
+            return json.dumps({"ok": False, "locked": True, "error": r.get("error")})
+        if not r.get("ok"):
+            return json.dumps({"ok": False, "error": r.get("error", "repatch failed"), "manifest": r.get("manifest")})
+        return json.dumps({"ok": True, "manifest": r.get("manifest"), "skipped": r.get("skipped"),
+                           "pak": (r.get("pak") or "").replace("\\", "/"), "mod": f"{name}_Repatched_9999999_P"})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/open_export_folder")
+def api_open_export_folder():
+    """Open the app's export folder (assets/exported), selecting a specific pak when given."""
+    os.makedirs(ASSETS_MODS, exist_ok=True)
+    sel = request.query.get("select", "")
+    if sel:
+        abs_sel = os.path.abspath(sel)
+        if os.path.exists(abs_sel):
+            _explorer_reveal(abs_sel, select=True)
+            response.content_type = "application/json"
+            return json.dumps({"ok": True})
+    _explorer_reveal(ASSETS_MODS, select=False)
+    response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
 # ── delete imported ───────────────────────────────────────────────────────────
 
 @app.post("/api/delete_imported")
@@ -1549,13 +1895,13 @@ def api_delete_imported():
     if not gr:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "missing game_rel"})
-    import_base = _import_base(gr)
     work_base   = _cache_import_base(gr)
-    for ext in (".png", ".json"):
-        p = import_base + ext
-        if os.path.exists(p):
-            try: os.remove(p)
-            except Exception: pass
+    for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
+        for ext in (".png", ".json"):
+            p = base + ext
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
     if work_base:
         for ext in (".uasset", ".uexp", ".ubulk"):
             p = work_base + ext
@@ -1563,24 +1909,21 @@ def api_delete_imported():
                 try: os.remove(p)
                 except Exception: pass
     _asset_cache.remove(gr)
-    import atelier.manifest as _mf
-    _mf.remove(get_import_root(), gr)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
 @app.post("/api/delete_all_imported")
 def api_delete_all_imported():
-    import atelier.manifest as _mf
-    import_root = get_import_root()
     items = all_imported()
     for item in items:
-        import_base = _import_base(item["game_rel"])
-        work_base   = _cache_import_base(item["game_rel"])
-        for ext in (".png", ".json"):
-            p = import_base + ext
-            if os.path.exists(p):
-                try: os.remove(p)
-                except Exception: pass
+        gr          = item["game_rel"]
+        work_base   = _cache_import_base(gr)
+        for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
+            for ext in (".png", ".json"):
+                p = base + ext
+                if os.path.exists(p):
+                    try: os.remove(p)
+                    except Exception: pass
         if work_base:
             for ext in (".uasset", ".uexp", ".ubulk"):
                 p = work_base + ext
@@ -1588,7 +1931,6 @@ def api_delete_all_imported():
                     try: os.remove(p)
                     except Exception: pass
         _asset_cache.remove(item["game_rel"])
-        _mf.remove(import_root, item["game_rel"])
     response.content_type = "application/json"
     return json.dumps({"ok": True, "deleted": len(items)})
 
@@ -1606,3 +1948,116 @@ def api_asset_info():
     pfx       = info.get("pfx", "")
     game_path = pfx.rstrip("/") + "/" + gr if pfx else gr
     return json.dumps({"ok": True, "pak": pak, "game_path": game_path})
+
+
+# ── Shader Studio ─────────────────────────────────────────────────────────────────
+import atelier.handlers.shaders as _shaders
+
+@app.get("/api/shaders/status")
+def api_shaders_status():
+    response.content_type = "application/json"
+    try:
+        return json.dumps({"ok": True, **_shaders.status()})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/shaders/build")
+def api_shaders_build():
+    response.content_type = "application/json"
+    if not _shaders.tools_ok():
+        return json.dumps({"ok": False, "error": "shader tools missing under Tools/shaders"})
+    return json.dumps(_shaders.build_index_async())
+
+@app.get("/api/shaders/list")
+def api_shaders_list():
+    response.content_type = "application/json"
+    q = request.query
+    try:
+        return json.dumps({"ok": True, **_shaders.list_shaders(
+            lib=q.get("lib", ""), freq=q.get("freq", ""), q=q.get("q", ""),
+            page=int(q.get("page", 0) or 0), page_size=min(500, int(q.get("page_size", 200) or 200)))})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/shaders/disasm")
+def api_shaders_disasm():
+    response.content_type = "application/json"
+    q = request.query
+    lib = q.get("lib", ""); idx = q.get("idx", "")
+    if not lib or idx == "":
+        return json.dumps({"ok": False, "error": "missing lib/idx"})
+    try:
+        return json.dumps(_shaders.disasm(lib, int(idx)))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+# Shader EDITING is permanently disabled — Shader Studio ships as a read-only viewer so it can't be
+# used to build cheat shaders. Browsing/disassembly (status, build index, list, disasm) stay open.
+_SHADER_EDIT_DISABLED = json.dumps(
+    {"ok": False, "error": "Shader editing is disabled — Shader Studio is a read-only viewer."})
+
+@app.get("/api/shaders/constants")
+@app.post("/api/shaders/build_mod")
+@app.get("/api/shaders/ir")
+@app.post("/api/shaders/build_mod_ir")
+def api_shaders_edit_disabled():
+    response.content_type = "application/json"
+    return _SHADER_EDIT_DISABLED
+
+
+# ── World: edit level (.umap) lighting / components / fog / grade (bundles into the unified mod) ──
+from atelier.handlers.world import read_world, save_world, reset_world
+
+@app.get("/api/world_params")
+def api_world_params():
+    response.content_type = "application/json"
+    try:
+        return json.dumps(read_world(request.query.get("game_rel", "")))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/world_save")
+def api_world_save():
+    response.content_type = "application/json"
+    try:
+        b = request.json or {}
+        return json.dumps(save_world(b.get("game_rel", ""), b.get("edits") or {}))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/world_reset")
+def api_world_reset():
+    response.content_type = "application/json"
+    try:
+        return json.dumps(reset_world((request.json or {}).get("game_rel", "")))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+# ── Text: edit StringTable strings (bundles into the unified mod) ────────────────
+from atelier.handlers.text import read_text, save_text, reset_text
+
+@app.get("/api/text_params")
+def api_text_params():
+    response.content_type = "application/json"
+    try:
+        return json.dumps(read_text(request.query.get("game_rel", "")))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/text_save")
+def api_text_save():
+    response.content_type = "application/json"
+    try:
+        b = request.json or {}
+        return json.dumps(save_text(b.get("game_rel", ""), b.get("edits") or {}))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/text_reset")
+def api_text_reset():
+    response.content_type = "application/json"
+    try:
+        return json.dumps(reset_text((request.json or {}).get("game_rel", "")))
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})

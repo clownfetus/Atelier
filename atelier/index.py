@@ -4,7 +4,7 @@ import io_lib
 
 _INDEX      = None
 _CACHE_FILE = os.path.join(_CACHE, "cli_index_cache.json")
-_CACHE_VER  = "v9"  # bump to invalidate cached indexes
+_CACHE_VER  = "v10"  # bump to invalidate cached indexes (v10: index EngineSky/MapTemplates/other content)
 
 # Content mount prefixes we care about.  All pak formats (base and patch) embed raw utoc paths
 # like ../../../Marvel/Content/Marvel/... or ../../../Marvel/Content/Marvel_LQ/... — the leading
@@ -14,16 +14,26 @@ _CONTENT_PREFIXES = (
     "Marvel/Content/Marvel/",
     "Marvel/Content/Marvel_LQ/",
 )
-
 def _virtual_path(raw):
     """Find the content-mount anchor anywhere in the raw path; return (virtual_rel_path, content_prefix) or (None, None).
-    Using find() instead of startswith-after-strip handles any leading junk (../../, ent/, etc.)."""
+    Using find() instead of startswith-after-strip handles any leading junk (../../, ent/, etc.).
+
+    Marvel[_LQ] game content mounts at the browse ROOT (Characters/..., Textures/...). ANY other mount
+    (Engine/Content/EngineSky/T_Sky_Stars, Engine/Content/MapTemplates/..., etc.) is indexed too — its
+    subpath after '/Content/' becomes the virtual path (MapTemplates/Sky/T_Sky_Stars) and its mount
+    ('Engine/Content/') is the reconstruction prefix, so pfx+virtual still rebuilds the real pak path
+    and the top folder shows up as a browsable/searchable section."""
     clean = raw.replace("\\", "/")
     cl = clean.lower()
     for pfx in _CONTENT_PREFIXES:
         idx = cl.find(pfx.lower())
         if idx >= 0:
             return clean[idx + len(pfx):], pfx
+    ci = cl.find("/content/")
+    if ci >= 0:
+        start = clean.rfind("/", 0, ci) + 1          # first char of the mount name (e.g. 'Engine')
+        pfx = clean[start:ci] + "/Content/"           # 'Engine/Content/'
+        return clean[ci + len("/content/"):], pfx     # virtual = subpath after /Content/
     return None, None
 
 def _index_utocs():

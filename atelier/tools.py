@@ -3,6 +3,19 @@ from atelier.config import TOOLS, CNW, ROOT, PAKS, USMAP
 
 UAT = os.path.join(TOOLS, "UAssetTool.exe")
 
+# Cap concurrent heavy texture extract/decode. The viewport fires up to 2N requests at once (N
+# materials x albedo+emissive), the server is ThreadingMixIn, and one-shot uat() is unlocked — so
+# without this each request becomes its own UAssetTool process that re-parses the ~248k-entry
+# pakchunkCharacter container AND holds a full 4096² texture in RAM. On a big skin that swarm OOMs and
+# takes the viewport down. Serialise to a few at a time: a decode is fast once it's running; it's the
+# simultaneous pile-up that kills it. Override with ATELIER_TEX_CONCURRENCY if needed.
+_TEX_CONCURRENCY = max(2, min(4, (os.cpu_count() or 4) // 2))
+try:
+    _TEX_CONCURRENCY = max(1, int(os.environ.get("ATELIER_TEX_CONCURRENCY", _TEX_CONCURRENCY)))
+except ValueError:
+    pass
+tex_semaphore = threading.BoundedSemaphore(_TEX_CONCURRENCY)
+
 # AtelierMesh: CUE4Parse-based mesh -> glTF (.glb) decoder for the 3D viewport.
 ATELIER_MESH = os.path.join(TOOLS, "AtelierMesh", "AtelierMesh.exe")
 

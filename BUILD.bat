@@ -27,7 +27,6 @@ echo %VERSION%> version
 rmdir /s /q build dist 2>nul
 python -m PyInstaller --noconfirm --clean Atelier.spec
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-copy /Y version dist\Atelier\version
 xcopy /E /I /Y Tools dist\Atelier\Tools
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%

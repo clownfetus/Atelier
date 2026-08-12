@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('gui', 'gui')]
+datas = [('gui', 'gui'), ('version', '.')]
 binaries = []
 hiddenimports = [
     'io_lib',
@@ -11,6 +11,18 @@ hiddenimports = [
     'atelier.paths',
     'atelier.handlers.texture',
     'atelier.handlers.material',
+    'atelier.handlers.dye',       # imported function-level in routes.py -> PyInstaller won't find it
+    'atelier.handlers.skinnames', # ditto (skin-name labels for the chroma picker)
+    'atelier.handlers.vfx',
+    'atelier.handlers.curve',
+    'atelier.handlers.world',
+    'atelier.handlers.container_merge',  # imported function-level in texture.build_mod -> add explicitly
+    'atelier.handlers.text',
+    'atelier.handlers.repatch',
+    'atelier.handlers.modlock',
+    'atelier.handlers.pak_thumb',
+    'atelier.handlers.shaders',
+    'atelier.handlers.dxc_ir',
     'atelier.web.app',
     'atelier.web.browse',
     'atelier.web.routes',

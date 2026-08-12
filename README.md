@@ -16,6 +16,17 @@ This supercharged modding interface allows anyone (seriously anyone) to make mod
 2. Launch the exe and setup to the default directory
 3. Set your Pak folder (ex. `.../MarvelGame/Marvel/Content/Paks`)
 
+## If Windows warns or blocks it
+Atelier is an unsigned indie app that bundles native tools, so Windows may flag it. **Both warnings below are false positives** — Atelier is open source and contains no malware.
+
+- **"Windows protected your PC" (SmartScreen).** On the first launch of a freshly downloaded copy you'll see an "unrecognized app" warning. Click **More info → Run anyway**. This only appears because the app isn't code-signed; it's normal for community modding tools.
+- **Windows Defender quarantines or deletes `Atelier.exe`.** Antivirus engines frequently false-flag apps packed with PyInstaller (what Atelier uses) and its bundled `.dll`/`.exe` tools. If it happens:
+  1. **Extract the release `.zip` fully before running** (don't launch from inside the zip) — this alone avoids most flags.
+  2. If it's already quarantined: **Windows Security → Virus & threat protection → Protection history**, find the Atelier detection, choose **Restore**.
+  3. To stop it recurring, add a folder **exclusion** for your Atelier install (Virus & threat protection → Manage settings → Exclusions → Add → Folder).
+
+Atelier automatically un-taints its own bundled tools on launch, so no manual "unblock" is needed for those — only `Atelier.exe` itself may trip SmartScreen/Defender as above.
+
 ## Usage
 1. Navigate to the textures/materials you want to edit
 2. In sidebar: toggle the assets you want to export in mod

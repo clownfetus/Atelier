@@ -64,9 +64,14 @@
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
+      <input id="export-pw" type="text" placeholder="🔒 password (optional)" maxlength="64" title="Optional soft lock — Atelier asks for this before it will repatch/edit the mod">
       <button class="btn primary" id="export-btn" disabled>
         <i data-lucide="archive" size="14"></i>
         Export Mod
+      </button>
+      <button class="btn" id="install-btn" title="Build and install into your mods folder (replaces the previous version)" disabled>
+        <i data-lucide="hard-drive-download" size="14"></i>
+        Build &amp; Install
       </button>
     </div>
   </div>
@@ -194,6 +199,13 @@
             <span>Materials</span>
             <span id="viewport-mat-count"></span>
           </div>
+          <!-- Chromas/recolours have no mesh of their own (and sometimes no textures) — they're a
+               material set that reskins the base's mesh. There's no rule to auto-detect them, so
+               load the skin that HAS the mesh and point this at whichever material set you want. -->
+          <div id="viewport-chroma-row" style="display:none">
+            <label for="viewport-chroma">Materials from</label>
+            <select id="viewport-chroma"></select>
+          </div>
           <div id="viewport-mat-list"></div>
           <div id="viewport-mat-foot">
             <button id="viewport-mat-reset" title="Revert to vanilla colors">Reset</button>
@@ -290,11 +302,11 @@
   </div>
 </div>
 
-<!-- ── first-run: game path setup ── -->
+<!-- ── first-run setup / editable Paths panel ── -->
 <div class="overlay" id="setup-overlay">
   <div class="modal">
-    <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> Initial Configuration<a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
-    <p>Provide <strong style="color:var(--text)">MarvelRivals</strong> folder, latest <strong style="color:var(--text)">USMAP</strong> file and <strong style="color:var(--text)">AES key</strong>.</p>
+    <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
+    <p id="setup-desc">Provide <strong style="color:var(--text)">MarvelRivals</strong> folder, latest <strong style="color:var(--text)">USMAP</strong> file and <strong style="color:var(--text)">AES key</strong>.</p>
     <div class="setup-row">
       <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals (Path to your MarvelRivals install)" spellcheck="false">
       <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
@@ -307,11 +319,16 @@
       <input id="setup-aes" type="text" class="setup-input" placeholder="0x… (AES Decryption Key)" spellcheck="false">
       <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
     </div>
+    <div class="setup-row" id="setup-mods-row" style="display:none">
+      <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods (folder mods are installed into — used by Build &amp; Install)" spellcheck="false">
+      <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+    </div>
     <div class="modal-row">
       <div id="setup-status"></div>
+      <button class="btn" id="setup-cancel" style="display:none">Cancel</button>
       <button class="btn primary" id="setup-save" disabled>
         <i data-lucide="check" size="14"></i>
-        Save & Continue
+        <span id="setup-save-label">Save &amp; Continue</span>
       </button>
     </div>
     <div id="setup-loading">
@@ -394,6 +411,148 @@
         <i data-lucide="trash-2" size="14"></i>
         Reset Everything
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Repatcher ── -->
+<div class="overlay" id="repatch-overlay">
+  <div class="modal" style="width:560px;max-width:92vw">
+    <div class="shader-head">
+      <h2><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
+      <span class="muted">port a broken mod to the current patch</span>
+      <button class="sb-clear" id="repatch-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+      <div class="muted" style="line-height:1.55;font-size:12px">
+        Decodes the mod's assets and re-applies them onto current-patch vanilla, so a mod broken by a
+        game update works again. Materials + textures supported.
+      </div>
+      <button class="btn" id="repatch-pick"><i data-lucide="folder-open" size="14"></i> Choose mod (.zip / .pak)…</button>
+      <div id="repatch-file" class="muted" style="font-size:12px;word-break:break-all"></div>
+      <div id="repatch-lockrow" style="display:none">
+        <label class="muted" style="font-size:12px">🔒 This mod is password-protected — enter its password:</label>
+        <input id="repatch-unlock" type="password" placeholder="mod password" style="width:100%;margin-top:4px">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="repatch-stage"> Stage as project in editor
+        <span class="muted" style="font-size:11px">(load assets pre-edited, to remix)</span>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px" class="muted">
+        Password Protect Repatch
+        <input id="repatch-pw" type="text" placeholder="leave blank for none" style="width:100%">
+      </label>
+      <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
+      <div id="repatch-result" style="display:none;font-size:12.5px;line-height:1.6"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Shader Studio ── -->
+<div class="overlay" id="shader-overlay">
+  <div class="modal shader-modal">
+    <div class="shader-head">
+      <h2><i data-lucide="binary" size="18" style="color:var(--acc)"></i> Shader Studio</h2>
+      <span id="shader-subtitle" class="muted"></span>
+      <button class="sb-clear" id="shader-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+
+    <!-- build gate -->
+    <div id="shader-build">
+      <i data-lucide="binary" size="42" style="color:var(--muted)"></i>
+      <div id="shader-build-title">Build the shader index to browse Marvel&nbsp;Rivals' compiled shaders.</div>
+      <div class="muted" style="max-width:440px;text-align:center;line-height:1.6">
+        One-time, ~2&nbsp;minutes. Reads the game's shader containers and builds a searchable index —
+        nothing in the game is modified.
+      </div>
+      <button class="btn primary" id="shader-build-btn"><i data-lucide="database" size="14"></i> Build index</button>
+      <div id="shader-build-prog" style="display:none;width:440px">
+        <div class="shader-bar"><div id="shader-bar-fill"></div></div>
+        <div id="shader-build-msg" class="muted" style="margin-top:8px;text-align:center"></div>
+      </div>
+      <div id="shader-build-err" class="warning" style="display:none"></div>
+    </div>
+
+    <!-- browser -->
+    <div id="shader-browser" style="display:none">
+      <div class="shader-toolbar">
+        <select id="shader-lib" class="shader-sel"></select>
+        <select id="shader-freq" class="shader-sel">
+          <option value="">All stages</option>
+          <option value="0">Vertex</option>
+          <option value="3">Pixel</option>
+          <option value="5">Compute</option>
+          <option value="1">Hull</option>
+          <option value="2">Domain</option>
+          <option value="4">Geometry</option>
+        </select>
+        <div class="shader-search"><i data-lucide="search" size="13"></i><input id="shader-q" type="text" placeholder="hash prefix…" spellcheck="false"></div>
+        <span id="shader-count" class="muted"></span>
+      </div>
+      <div class="shader-bodyrow">
+        <div id="shader-list-wrap">
+          <div id="shader-list"></div>
+          <div class="shader-foot">
+            <button class="btn shader-pg" id="shader-prev" disabled><i data-lucide="chevron-left" size="14"></i></button>
+            <span id="shader-page" class="muted"></span>
+            <button class="btn shader-pg" id="shader-next" disabled><i data-lucide="chevron-right" size="14"></i></button>
+          </div>
+        </div>
+        <div id="shader-detail">
+          <div id="shader-detail-empty" class="muted">Select a shader to disassemble it.</div>
+          <div id="shader-detail-content" style="display:none">
+            <div id="shader-meta"></div>
+            <div id="shader-tabs">
+              <button class="sh-tab active" data-tab="props"><i data-lucide="sliders-horizontal" size="12"></i> Properties</button>
+              <button class="sh-tab" data-tab="raw"><i data-lucide="code" size="12"></i> Raw DXIL</button>
+            </div>
+            <div id="shader-props"></div>
+            <pre id="shader-disasm" style="display:none"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── World / level editor (lights · fog · grade · components) ── -->
+<div class="overlay" id="world-overlay">
+  <div class="modal mat-modal">
+    <div class="mat-head">
+      <div class="mat-head-titles">
+        <h2><i data-lucide="globe" size="18"></i> <span id="world-title">Level</span></h2>
+        <div id="world-sub" class="mat-subpath"></div>
+      </div>
+      <button class="sb-clear" id="world-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div id="world-body" class="mat-body"></div>
+    <div class="mat-foot">
+      <span id="world-status" class="mat-status"></span>
+      <button class="btn" id="world-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
+      <button class="btn primary" id="world-save"><i data-lucide="save" size="13"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Text / StringTable editor ── -->
+<div class="overlay" id="text-overlay">
+  <div class="modal mat-modal">
+    <div class="mat-head">
+      <div class="mat-head-titles">
+        <h2><i data-lucide="type" size="18"></i> <span id="text-title">StringTable</span></h2>
+        <div id="text-sub" class="mat-subpath"></div>
+      </div>
+      <button class="sb-clear" id="text-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div style="padding:10px 16px 4px">
+      <input id="text-search" type="text" placeholder="Search keys or values…" spellcheck="false"
+             style="width:100%;background:var(--input,#0000);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:inherit">
+    </div>
+    <div id="text-body" class="mat-body"></div>
+    <div class="mat-foot">
+      <span id="text-status" class="mat-status"></span>
+      <button class="btn" id="text-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
+      <button class="btn primary" id="text-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
   </div>
 </div>
