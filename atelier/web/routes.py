@@ -8,7 +8,9 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             get_usmap_checked_at, save_usmap_checked_at,
                             get_import_root, get_active_project, set_active_project,
                             project_base, project_base_legacy, project_game_rel,
-                            get_mods_folder, save_mods_folder)
+                            get_mods_folder, save_mods_folder,
+                            get_export_password, save_export_password,
+                            get_aes_key2, save_aes_key2)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -463,13 +465,17 @@ def api_setup_status():
         suggestion = _c.paks_suggestion()
         mr_prefill = _mr_root_to_display(suggestion) if suggestion else ""
     aes_prefill  = ("0x" + aes) if aes else ""
+    aes2         = get_aes_key2()
+    aes2_prefill = ("0x" + aes2) if aes2 else ""
     usmap_prefill = (_c.USMAP or "").replace("\\", "/")
     response.content_type = "application/json"
     return json.dumps({"configured": configured,
                        "paks_prefill":  mr_prefill,
                        "aes_prefill":   aes_prefill,
+                       "aes2_prefill":  aes2_prefill,
                        "usmap_prefill": usmap_prefill,
-                       "mods_prefill":  get_mods_folder()})
+                       "mods_prefill":  get_mods_folder(),
+                       "password_prefill": get_export_password()})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -518,6 +524,23 @@ def api_validate_paks():
         return json.dumps({"status": "wrong_folder"})
     return json.dumps({"status": "ok"})
 
+@app.get("/api/validate_mods_folder")
+def api_validate_mods_folder():
+    """Live validation for the Settings mods-folder input. Any folder that exists (or whose parent
+    exists, since Install Mod creates it via makedirs) is fine — only an existing non-folder path
+    is actually invalid."""
+    path = request.query.get("path", "").strip()
+    response.content_type = "application/json"
+    if not path:
+        return json.dumps({"status": "empty"})
+    p = path.replace("\\", "/").rstrip("/")
+    if os.path.isfile(p):
+        return json.dumps({"status": "invalid"})
+    parent = os.path.dirname(p) or p
+    if os.path.isdir(p) or os.path.isdir(parent):
+        return json.dumps({"status": "ok"})
+    return json.dumps({"status": "missing"})
+
 def _validate_and_build_paks(path):
     """Validate user-supplied path (game root or subfolder) and return (paks_path, error)."""
     mr = _find_mr_root(path)
@@ -533,9 +556,12 @@ def api_save_paks():
     body       = request.json or {}
     path       = body.get("path", "").strip()
     aes_key    = body.get("aes_key", "").strip()  # stored without 0x prefix
+    aes_key2   = (body.get("aes_key2") or "").strip()  # optional "Pakchunk7 Key", without 0x prefix
     usmap_path = body.get("usmap_path", "").strip()
     has_mods   = "mods_folder" in body            # only touch mods config when the field was sent
     mods_folder = (body.get("mods_folder") or "").strip()
+    has_pw     = "export_password" in body        # only touch password config when the field was sent
+    export_password = (body.get("export_password") or "").strip()
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
@@ -549,8 +575,15 @@ def api_save_paks():
     try:
         save_setup_config(paks_path, aes_key,
                           usmap_path if (usmap_path and os.path.exists(usmap_path)) else None)
+        save_aes_key2(aes_key2)   # empty string clears it
         if has_mods:
             save_mods_folder(mods_folder)   # empty string clears it
+        elif not get_mods_folder():
+            # Initial setup (mods_folder not sent yet, nothing configured) — default to the
+            # game's own ~mods dir so "Copy to ~mods/" works without a trip to Settings.
+            save_mods_folder(paks_path + "/~mods")
+        if has_pw:
+            save_export_password(export_password)   # empty string clears it
 
         # Write AES_KEY.txt so io_lib picks it up immediately
         import atelier.config as _c
@@ -586,7 +619,8 @@ def api_save_paks():
             _vfx.USMAP = usmap_path
 
         response.content_type = "application/json"
-        return json.dumps({"ok": True})
+        return json.dumps({"ok": True, "mods_folder": get_mods_folder(),
+                           "export_password": get_export_password()})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -1747,7 +1781,7 @@ def _install_to_mods(mod_name, export_dir):
     removing any previous version of THIS mod first. Returns (ok, error, dest_dir)."""
     mods = get_mods_folder()
     if not mods:
-        return False, "No mods folder set — configure one in Menu → Paths.", None
+        return False, "No mods folder set — configure one in Menu → Settings.", None
     stem = f"{mod_name}_9999999_P"
     try:
         os.makedirs(mods, exist_ok=True)
@@ -1767,45 +1801,43 @@ def _install_to_mods(mod_name, export_dir):
         return False, "build produced no .utoc to install", None
     return True, None, mods
 
-@app.post("/api/export")
-def api_export():
-    body     = request.json or {}
-    mod_name = re.sub(r'[/\\:*?"<>|.]', '', (body.get("mod_name") or "Mod").strip()) or "Mod"
-    items    = body.get("items", [])
-    if not items:
-        response.content_type = "application/json"
-        return json.dumps({"ok": False, "error": "no items selected"})
+def _mod_stem(mod_name):
+    return re.sub(r'[/\\:*?"<>|.]', '', (mod_name or "Mod").strip()) or "Mod"
 
-    out_dir = ASSETS_MODS
-    os.makedirs(out_dir, exist_ok=True)
+@app.get("/api/check_mod_conflict")
+def api_check_mod_conflict():
+    """Whether installing this mod name would overwrite an existing file, in the default export
+    folder and/or the configured mods folder — so the frontend can raise a single confirm popup
+    covering both destinations at once instead of one per destination."""
+    mod_name     = _mod_stem(request.query.get("mod_name", ""))
+    copy_to_mods = request.query.get("copy_to_mods") == "1"
+    stem = f"{mod_name}_9999999_P"
+    default_exists = any(os.path.exists(os.path.join(ASSETS_MODS, stem + ext))
+                         for ext in (".pak", ".ucas", ".utoc"))
+    mods_exists = False
+    if copy_to_mods:
+        mods = get_mods_folder()
+        if mods:
+            mods_exists = any(os.path.exists(os.path.join(mods, stem + ext))
+                              for ext in (".pak", ".ucas", ".utoc"))
+    response.content_type = "application/json"
+    return json.dumps({"default": default_exists, "mods": mods_exists})
 
-    try:
-        tex_items, mat_items, curve_items, vfx_items, world_items, text_items = _split_export_items(items)
-        result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
-                           curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, password=(body.get("password") or "").strip() or None)
-        if not result.get("ok"):
-            response.content_type = "application/json"
-            return json.dumps({"ok": False, "error": result.get("error", "build failed")})
-        pak = result.get("pak")
-        response.content_type = "application/json"
-        return json.dumps({"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None})
-    except Exception as e:
-        response.content_type = "application/json"
-        return json.dumps({"ok": False, "error": str(e)})
-
-@app.post("/api/build_install")
-def api_build_install():
-    """Build the selected edits into a mod, then install it into the configured mods folder —
-    replacing the previous version of that mod. Does NOT open any explorer window."""
-    body     = request.json or {}
-    mod_name = re.sub(r'[/\\:*?"<>|.]', '', (body.get("mod_name") or "Mod").strip()) or "Mod"
-    items    = body.get("items", [])
+@app.post("/api/install_mod")
+def api_install_mod():
+    """Build the selected edits into a mod in the default export folder, then — when copy_to_mods
+    is set — also copy it into the configured mods folder, replacing any previous version there.
+    Single entry point behind the "Install Mod" button, regardless of toggle state."""
+    body         = request.json or {}
+    mod_name     = _mod_stem(body.get("mod_name"))
+    items        = body.get("items", [])
+    copy_to_mods = bool(body.get("copy_to_mods"))
+    password     = (body.get("password") or "").strip() or None
     response.content_type = "application/json"
     if not items:
         return json.dumps({"ok": False, "error": "no items selected"})
-    if not get_mods_folder():
-        return json.dumps({"ok": False, "error": "No mods folder set — configure one in Menu → Paths.",
+    if copy_to_mods and not get_mods_folder():
+        return json.dumps({"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
                            "need_mods_folder": True})
     out_dir = ASSETS_MODS
     os.makedirs(out_dir, exist_ok=True)
@@ -1813,14 +1845,17 @@ def api_build_install():
         tex_items, mat_items, curve_items, vfx_items, world_items, text_items = _split_export_items(items)
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, password=(body.get("password") or "").strip() or None)
+                           text_items=text_items, password=password)
         if not result.get("ok"):
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
-        ok, err, dest = _install_to_mods(mod_name, out_dir)
-        if not ok:
-            return json.dumps({"ok": False, "error": err})
-        return json.dumps({"ok": True, "installed_dir": dest.replace("\\", "/"),
-                           "mod": f"{mod_name}_9999999_P"})
+        pak = result.get("pak")
+        resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None}
+        if copy_to_mods:
+            ok, err, dest = _install_to_mods(mod_name, out_dir)
+            if not ok:
+                return json.dumps({"ok": False, "error": err})
+            resp["installed_dir"] = dest.replace("\\", "/")
+        return json.dumps(resp)
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 

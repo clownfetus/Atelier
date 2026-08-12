@@ -30,7 +30,7 @@ Atelier automatically un-taints its own bundled tools on launch, so no manual "u
 ## Usage
 1. Navigate to the textures/materials you want to edit
 2. In sidebar: toggle the assets you want to export in mod
-3. In sidebar: Type a mod name at the bottom and click "Export Mod"
+3. In sidebar: Type a mod name at the bottom and click "Install Mod" (toggle "Copy to ~mods/" to install straight into your mods folder, and "Password Protect" to lock it with the Protection Password set in Menu → Settings)
 
 - You can delete imported textures by pressing "X" next to it in sidebar
 - Right-click for option to replace texture with external image
@@ -39,7 +39,7 @@ Atelier automatically un-taints its own bundled tools on launch, so no manual "u
 This section is only relevant if the current mappings/AES repo is down, until we update to using a different one
 - Get AES Key from [Discord server](https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616)
 - Get USMAP file from [SpaceHost](https://spacedepot.github.io/SpaceHost/)
-- Get MarvelRivals location from Steam
+- <a id="get-marvelrivals-path"></a>Get MarvelRivals location from Steam
 <img src="images\rivals_path.png" alt="Rivals > Manage > Browse Local" width="600" height="400">
 
 ## Credits

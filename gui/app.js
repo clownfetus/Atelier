@@ -17,8 +17,11 @@ let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
 let   _pathLabels = {};      // "Characters/1234" -> "1234 — Spider-Man" (cached from browse results)
-let   _modsFolderSet = false; // whether a mods folder is configured (gates Build & Install)
-let   _pathsMode     = false; // setup overlay opened as the editable Paths panel (vs first-run)
+let   _modsFolderSet   = false; // whether a mods folder is configured (gates "Copy to %s/")
+let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/" label
+let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
+let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
+let   _pendingOverwriteConfirm = null;
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -1150,7 +1153,7 @@ function renderSidebar() {
   const all = Object.values(sidebarData);
   if (!all.length) {
     list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets yet.</div>';
-    updateExportBtn();
+    updateInstallBtn();
     return;
   }
   const q     = document.getElementById("search-input").value.trim().toLowerCase();
@@ -1160,7 +1163,7 @@ function renderSidebar() {
         (i.char_name || "").toLowerCase().includes(q)) : all;
   if (!items.length) {
     list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets match the search.</div>';
-    updateExportBtn();
+    updateInstallBtn();
     return;
   }
   items.forEach(item => {
@@ -1196,88 +1199,76 @@ function renderSidebar() {
     list.appendChild(el);
   });
   lucide.createIcons({ nodes: [list] });
-  updateExportBtn();
+  updateInstallBtn();
 }
 
-function updateExportBtn() {
+function _modsTopFolderName() {
+  const parts = (_modsFolderPath || "").replace(/\\/g, "/").split("/").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "~mods";
+}
+
+function _syncToggleRow(id) {
+  const cb = document.getElementById(id);
+  cb.closest(".toggle-row").classList.toggle("on", cb.checked);
+}
+
+function updateInstallBtn() {
   const sel = Object.values(sidebarData).filter(i => i.selected).length;
   const badge = document.getElementById("sel-count");
   badge.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
-  document.getElementById("export-btn").disabled = sel === 0;
-  const installBtn = document.getElementById("install-btn");
-  if (installBtn) {
-    installBtn.disabled = sel === 0;
-    installBtn.title = _modsFolderSet
-      ? "Build and install into your mods folder (replaces the previous version)"
-      : "Set a mods folder first (Menu → Paths)";
-  }
+  document.getElementById("install-btn").disabled = sel === 0;
+
+  const copyRow = document.getElementById("toggle-copy-row");
+  const copyCb  = document.getElementById("toggle-copy");
+  copyRow.classList.toggle("disabled", !_modsFolderSet);
+  copyCb.disabled = !_modsFolderSet;
+  if (!_modsFolderSet) copyCb.checked = false;
+  document.getElementById("toggle-copy-label").textContent = `Copy to ${_modsTopFolderName()}/`;
+  copyRow.title = _modsFolderSet ? "" : "Set a mods folder first (Menu → Settings)";
+  _syncToggleRow("toggle-copy");
+
+  const pwRow = document.getElementById("toggle-password-row");
+  const pwCb  = document.getElementById("toggle-password");
+  const hasPw = !!_protectionPassword;
+  pwRow.classList.toggle("disabled", !hasPw);
+  pwCb.disabled = !hasPw;
+  if (!hasPw) pwCb.checked = false;
+  pwRow.title = hasPw ? "Encrypt the mod with the Protection Password set in Settings"
+                      : "Set a Protection Password first (Menu → Settings)";
+  _syncToggleRow("toggle-password");
 }
 
-async function doExport() {
-  const selected = Object.values(sidebarData).filter(i => i.selected);
-  if (!selected.length) return;
-  const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
-  const skipped    = selected.length - exportable.length;
-  if (!exportable.length) {
-    toast("Nothing exportable selected", "info");
-    return;
-  }
-  document.getElementById("export-btn").disabled = true;
-  setStatus(`Exporting ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
-  const exportingToast = toastSpinner(`Exporting ${modName}…`);
-  try {
-    const res = await api("/api/export", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel), password: (document.getElementById("export-pw").value||"").trim() }),
-    });
-    exportingToast.remove();
-    if (res.ok && res.pak_path) {
-      toast(`Exported: ${modName}_9999999_P.pak` + (skipped ? ` (${skipped} VFX/other skipped)` : ""), "success", 5000);
-      setStatus(`Exported → ${res.pak_path}`);
-      fetch(`/api/open_export_folder?select=${encodeURIComponent(res.pak_path)}`);
-    } else {
-      toast(`Export failed: ${res.error || "unknown error"}`, "warning");
-      setStatus("");
-    }
-  } catch (e) {
-    exportingToast.remove();
-    toast(`Error: ${e.message}`, "warning"); setStatus("");
-  } finally {
-    updateExportBtn();
-  }
-}
+document.getElementById("toggle-copy-row").addEventListener("click", e => {
+  if (document.getElementById("toggle-copy").disabled) { e.preventDefault(); openPaths(); }
+});
+document.getElementById("toggle-password-row").addEventListener("click", e => {
+  if (document.getElementById("toggle-password").disabled) { e.preventDefault(); openPaths(); }
+});
+document.getElementById("toggle-copy").addEventListener("change", () => _syncToggleRow("toggle-copy"));
+document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
-document.getElementById("export-btn").addEventListener("click", doExport);
-
-async function doBuildInstall() {
-  const selected = Object.values(sidebarData).filter(i => i.selected);
-  if (!selected.length) return;
-  if (!_modsFolderSet) {
-    toast("Set a mods folder first — opening Paths…", "info");
-    openPaths();
-    return;
-  }
-  const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
-  const skipped    = selected.length - exportable.length;
-  if (!exportable.length) { toast("Nothing exportable selected", "info"); return; }
+async function _runInstall(modName, exportable, skipped, copyToMods, password) {
   document.getElementById("install-btn").disabled = true;
-  setStatus(`Building & installing ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
-  const t = toastSpinner(`Building & installing ${modName}…`);
+  setStatus(`Installing ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
+  const t = toastSpinner(`Installing ${modName}…`);
   try {
-    const res = await api("/api/build_install", {
+    const res = await api("/api/install_mod", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mod_name: modName, items: exportable.map(i => i.game_rel), password: (document.getElementById("export-pw").value||"").trim() }),
+      body: JSON.stringify({
+        mod_name: modName,
+        items: exportable.map(i => i.game_rel),
+        password,
+        copy_to_mods: copyToMods,
+      }),
     });
     t.remove();
     if (res.ok) {
       toast(`Installed: ${modName}_9999999_P` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
-      setStatus(`Installed → ${res.installed_dir}`);
+      setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
-      toast("No mods folder set — opening Paths…", "warning");
+      toast("No mods folder set — opening Settings…", "warning");
       openPaths();
     } else {
       toast(`Install failed: ${res.error || "unknown error"}`, "warning");
@@ -1287,11 +1278,60 @@ async function doBuildInstall() {
     t.remove();
     toast(`Error: ${e.message}`, "warning"); setStatus("");
   } finally {
-    updateExportBtn();
+    updateInstallBtn();
   }
 }
 
-document.getElementById("install-btn").addEventListener("click", doBuildInstall);
+async function doInstallMod() {
+  const selected = Object.values(sidebarData).filter(i => i.selected);
+  if (!selected.length) return;
+  const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
+  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
+  const skipped    = selected.length - exportable.length;
+  if (!exportable.length) { toast("Nothing exportable selected", "info"); return; }
+
+  const copyToMods = document.getElementById("toggle-copy").checked && _modsFolderSet;
+  if (document.getElementById("toggle-copy").checked && !_modsFolderSet) {
+    toast("Set a mods folder first — opening Settings…", "info");
+    openPaths();
+    return;
+  }
+  const passwordProtect = document.getElementById("toggle-password").checked && !!_protectionPassword;
+  const password = passwordProtect ? _protectionPassword : "";
+
+  let conflict = null;
+  try {
+    const q = `/api/check_mod_conflict?mod_name=${encodeURIComponent(modName)}&copy_to_mods=${copyToMods ? "1" : "0"}`;
+    conflict = await (await fetch(q)).json();
+  } catch (_) {}
+
+  const proceed = () => _runInstall(modName, exportable, skipped, copyToMods, password);
+
+  if (conflict && (conflict.default || conflict.mods)) {
+    const locs = [];
+    if (conflict.default) locs.push("the export folder");
+    if (conflict.mods)    locs.push("your mods folder");
+    document.getElementById("confirm-overwrite-msg").textContent =
+      `A mod named "${modName}" already exists in ${locs.join(" and ")}. Installing will replace it.`;
+    _pendingOverwriteConfirm = proceed;
+    document.getElementById("confirm-overwrite-overlay").classList.add("active");
+  } else {
+    await proceed();
+  }
+}
+
+document.getElementById("confirm-overwrite-cancel").addEventListener("click", () => {
+  document.getElementById("confirm-overwrite-overlay").classList.remove("active");
+  _pendingOverwriteConfirm = null;
+});
+document.getElementById("confirm-overwrite-ok").addEventListener("click", async () => {
+  document.getElementById("confirm-overwrite-overlay").classList.remove("active");
+  const fn = _pendingOverwriteConfirm;
+  _pendingOverwriteConfirm = null;
+  if (fn) await fn();
+});
+
+document.getElementById("install-btn").addEventListener("click", doInstallMod);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
 function clearImported(token) {
@@ -1382,9 +1422,10 @@ async function checkPrereqs() {
 // ── first-run setup ───────────────────────────────────────────────────────────
 async function _fetchAesKeyValue() {
   try {
-    const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES");
+    const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES.json");
     if (!r.ok) return null;
-    const text = (await r.text()).trim();
+    const data = await r.json();
+    const text = String(data.mainKey || "").trim();
     if (!text) return null;
     return /^0x/i.test(text) ? text : "0x" + text;
   } catch (_) { return null; }
@@ -1410,7 +1451,10 @@ async function checkSetup() {
       _fetchAesKeyValue(),
       _fetchUsmapPath(),
     ]);
-    _modsFolderSet = !!(statusRes.mods_prefill);
+    _modsFolderSet     = !!(statusRes.mods_prefill);
+    _modsFolderPath    = statusRes.mods_prefill || "";
+    _protectionPassword = statusRes.password_prefill || "";
+    document.getElementById("toggle-copy").checked = _modsFolderSet;
     if (statusRes.configured) {
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
@@ -1419,6 +1463,7 @@ async function checkSetup() {
     _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
+    document.getElementById("setup-aes2").value  = statusRes.aes2_prefill || "";
     document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
     _setSetupLoading(false);
     await validateSetup();
@@ -1431,11 +1476,10 @@ async function checkSetup() {
 
 function _applySetupMode() {
   const paths = _pathsMode;
-  document.getElementById("setup-title").textContent = paths ? "Paths" : "Initial Configuration";
-  document.getElementById("setup-desc").innerHTML = paths
-    ? "Edit where Atelier reads the game from, and the folder mods install into."
-    : 'Provide <strong style="color:var(--text)">MarvelRivals</strong> folder, latest <strong style="color:var(--text)">USMAP</strong> file and <strong style="color:var(--text)">AES key</strong>.';
-  document.getElementById("setup-mods-row").style.display = paths ? "" : "none";
+  document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial Configuration";
+  document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
+  document.getElementById("setup-export-section").style.display = paths ? "" : "none";
+  document.getElementById("setup-password-row").style.display = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
 }
@@ -1449,15 +1493,19 @@ async function openPaths() {
     const [statusRes, aes, usmapPath] = await Promise.all([
       api("/api/setup_status"), _fetchAesKeyValue(), _fetchUsmapPath(),
     ]);
-    _modsFolderSet = !!(statusRes.mods_prefill);
-    document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
-    document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
-    document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
-    document.getElementById("setup-mods").value  = statusRes.mods_prefill || "";
+    _modsFolderSet      = !!(statusRes.mods_prefill);
+    _modsFolderPath     = statusRes.mods_prefill || "";
+    _protectionPassword = statusRes.password_prefill || "";
+    document.getElementById("setup-path").value     = statusRes.paks_prefill  || "";
+    document.getElementById("setup-aes").value      = aes  || statusRes.aes_prefill  || "";
+    document.getElementById("setup-aes2").value     = statusRes.aes2_prefill || "";
+    document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
+    document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
+    document.getElementById("setup-password").value = statusRes.password_prefill || "";
   } catch (e) {}
   _setSetupLoading(false);
   await validateSetup();
-  updateExportBtn();
+  updateInstallBtn();
 }
 
 document.getElementById("setup-cancel").addEventListener("click", () => {
@@ -1471,6 +1519,7 @@ async function validateSetup() {
   const path    = document.getElementById("setup-path").value.trim();
   const usmap   = document.getElementById("setup-usmap").value.trim();
   const key     = document.getElementById("setup-aes").value.trim();
+  const key2    = document.getElementById("setup-aes2").value.trim();
   const el      = document.getElementById("setup-status");
   const saveBtn = document.getElementById("setup-save");
 
@@ -1494,11 +1543,27 @@ async function validateSetup() {
     } catch (_) {}
   }
 
+  let modsStatus = "";
+  if (_pathsMode) {
+    const mods = document.getElementById("setup-mods").value.trim();
+    if (mods) {
+      try {
+        const r = await fetch(`/api/validate_mods_folder?path=${encodeURIComponent(mods)}`);
+        const d = await r.json();
+        modsStatus = d.status;
+      } catch (_) {}
+    }
+  }
+
   if (gen !== _validateGen) return;
 
   let keyStatus = "";
   if (key) {
     keyStatus = /^0x[0-9A-Fa-f]{60,68}$/.test(key) ? "ok" : "invalid";
+  }
+  let key2Status = "";
+  if (key2) {
+    key2Status = /^0x[0-9A-Fa-f]{60,68}$/.test(key2) ? "ok" : "invalid";
   }
 
   const pakOk    = pakStatus === "ok";
@@ -1507,8 +1572,11 @@ async function validateSetup() {
   const pakBad   = pakStatus === "wrong_folder" || pakStatus === "missing";
   const usmapBad = usmapStatus === "invalid" || usmapStatus === "missing";
   const keyBad   = keyStatus === "invalid";
+  const key2Bad  = key2Status === "invalid";
+  const modsOk   = modsStatus === "ok";
+  const modsBad  = modsStatus === "invalid";
 
-  if (pakOk && usmapOk && keyOk) {
+  if (pakOk && usmapOk && keyOk && !modsBad && !key2Bad) {
     el.className = "ok";
     el.innerHTML = '<i data-lucide="check-circle" size="13"></i> All Valid';
     saveBtn.disabled = false;
@@ -1525,6 +1593,12 @@ async function validateSetup() {
     } else if (keyBad) {
       el.className = "error";
       el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid AES key format';
+    } else if (key2Bad) {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid Pakchunk7 Key format';
+    } else if (modsBad) {
+      el.className = "error";
+      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Mods folder path is not a folder';
     } else if (pakOk && usmapOk && !key) {
       el.className = "error";
       el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Key missing';
@@ -1534,25 +1608,57 @@ async function validateSetup() {
   }
   lucide.createIcons({ nodes: [el] });
 
+  const aes2StatusEl = document.getElementById("setup-aes2-status");
+  if (key2Status === "ok") {
+    aes2StatusEl.className = "setup-field-status ok";
+    aes2StatusEl.innerHTML = '<i data-lucide="check-circle" size="12"></i> Valid key format';
+  } else if (key2Status === "invalid") {
+    aes2StatusEl.className = "setup-field-status error";
+    aes2StatusEl.innerHTML = '<i data-lucide="x-circle" size="12"></i> Invalid key format';
+  } else {
+    aes2StatusEl.className = "setup-field-status";
+    aes2StatusEl.innerHTML = "";
+  }
+  lucide.createIcons({ nodes: [aes2StatusEl] });
+
   const pathEl  = document.getElementById("setup-path");
   const usmapEl = document.getElementById("setup-usmap");
   const aesEl   = document.getElementById("setup-aes");
+  const aes2El  = document.getElementById("setup-aes2");
   pathEl.classList.toggle("setup-valid",   pakOk);
   pathEl.classList.toggle("setup-invalid", pakBad);
   usmapEl.classList.toggle("setup-valid",   usmapOk);
   usmapEl.classList.toggle("setup-invalid", usmapBad);
   aesEl.classList.toggle("setup-valid",   keyOk);
   aesEl.classList.toggle("setup-invalid", keyBad || (pakOk && usmapOk && !key));
+  aes2El.classList.toggle("setup-valid",   key2Status === "ok");
+  aes2El.classList.toggle("setup-invalid", key2Bad);
+  if (_pathsMode) {
+    const modsEl = document.getElementById("setup-mods");
+    modsEl.classList.toggle("setup-valid",   modsOk);
+    modsEl.classList.toggle("setup-invalid", modsBad);
+  }
 }
 
 document.getElementById("setup-path").addEventListener("input", validateSetup);
 document.getElementById("setup-usmap").addEventListener("input", validateSetup);
 document.getElementById("setup-aes").addEventListener("input", validateSetup);
+document.getElementById("setup-aes2").addEventListener("input", validateSetup);
+document.getElementById("setup-mods").addEventListener("input", validateSetup);
 document.getElementById("setup-paste-key").addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (text) {
       document.getElementById("setup-aes").value = text.trim();
+      validateSetup();
+    }
+  } catch {}
+});
+document.getElementById("setup-paste-key2").addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      document.getElementById("setup-aes2").value = text.trim();
       validateSetup();
     }
   } catch {}
@@ -1604,7 +1710,10 @@ document.getElementById("setup-mods-browse").addEventListener("click", async () 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ initial, raw: true, desc: "Select your mods folder (e.g. …/Paks/~mods):" }),
     });
-    if (res.ok && res.path) document.getElementById("setup-mods").value = res.path;
+    if (res.ok && res.path) {
+      document.getElementById("setup-mods").value = res.path;
+      validateSetup();
+    }
   } catch (e) {}
   btn.disabled = false;
 });
@@ -1623,11 +1732,16 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const usmapPath = document.getElementById("setup-usmap").value.trim();
   const rawKey    = document.getElementById("setup-aes").value.trim();
   const aes_key   = rawKey.toLowerCase().startsWith("0x") ? rawKey.slice(2) : rawKey;
+  const rawKey2   = document.getElementById("setup-aes2").value.trim();
+  const aes_key2  = rawKey2.toLowerCase().startsWith("0x") ? rawKey2.slice(2) : rawKey2;
   if (!path)      { toast("Please enter a path", "warning"); return; }
   if (!usmapPath) { toast("Please enter or auto-fetch a USMAP file", "warning"); return; }
   if (!aes_key)   { toast("Please enter an AES key", "warning"); return; }
-  const payload = { path, aes_key, usmap_path: usmapPath };
-  if (_pathsMode) payload.mods_folder = document.getElementById("setup-mods").value.trim();
+  const payload = { path, aes_key, aes_key2, usmap_path: usmapPath };
+  if (_pathsMode) {
+    payload.mods_folder     = document.getElementById("setup-mods").value.trim();
+    payload.export_password = document.getElementById("setup-password").value;
+  }
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
   btn.innerHTML = "Saving…";
@@ -1638,21 +1752,26 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      const wasPaths = _pathsMode;
+      const wasPaths   = _pathsMode;
+      const wasModsSet = _modsFolderSet;
       _pathsMode = false;
       document.getElementById("setup-overlay").classList.remove("active");
       _resetSaveBtn();
+      _modsFolderPath      = res.mods_folder || "";
+      _modsFolderSet       = !!res.mods_folder;
+      _protectionPassword  = res.export_password || "";
+      if (!wasModsSet && _modsFolderSet) document.getElementById("toggle-copy").checked = true;
       if (wasPaths) {
-        _modsFolderSet = !!payload.mods_folder;
-        toast("Paths saved", "success");
+        toast("Settings saved", "success");
         await renderGrid();
         await loadSidebar();
-        updateExportBtn();
+        updateInstallBtn();
       } else {
         await checkProject();
         await checkPrereqs();
         await renderGrid();
         await loadSidebar();
+        updateInstallBtn();
       }
     } else {
       toast(`Error: ${res.error}`, "warning");
@@ -2104,7 +2223,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       "sep",
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
-      { icon: "sliders-horizontal", label: "Paths…", action: () => openPaths() },
+      { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
       { icon: "circle-help", label: "Help / Info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
       { icon: "trash-2", label: "Reset Data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },

@@ -104,12 +104,13 @@ def _auto_fetch_aes():
     io_lib + UAssetTool); retoc calls should pass get_aes_key() via -a for full coverage. The key
     has been stable since launch — this is a safety net for the rare rotation. Never blocks startup."""
     try:
-        import urllib.request
+        import urllib.request, json as _json
         req = urllib.request.Request(
-            "https://raw.githubusercontent.com/SpaceDepot/rivals-depot/main/AES",
+            "https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES.json",
             headers={"User-Agent": "Atelier/1.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            key = r.read().decode("utf-8", "replace").strip()
+            data = _json.loads(r.read().decode("utf-8", "replace"))
+        key = str(data.get("mainKey", "")).strip()
         if key[:2].lower() == "0x":
             key = key[2:]
         if len(key) == 64 and all(c in "0123456789abcdefABCDEF" for c in key):
@@ -126,16 +127,15 @@ def _auto_fetch_aes():
         pass
 
 
-_DEFAULT_AES = "0C263D8C22DCB085894899C3A3796383E9BF9DE0CBFB08C9BF2DEF2E84F29D74"
-
 def get_aes_key():
     """Current AES key (no 0x prefix), for passing to retoc via -a so a key rotation needs no
-    rebuild. Falls back to the long-stable default if AES_KEY.txt is missing."""
+    rebuild. Returns "" if AES_KEY.txt is missing — callers are only reachable once
+    _prereq_issues() has confirmed the file exists."""
     try:
         k = open(os.path.join(TOOLS, "AES_KEY.txt"), encoding="utf-8").read().strip()
-        return (k[2:] if k[:2].lower() == "0x" else k) or _DEFAULT_AES
+        return k[2:] if k[:2].lower() == "0x" else k
     except Exception:
-        return _DEFAULT_AES
+        return ""
 
 
 # Packaged app: keep the AES key current (patch-resilience). Tools are un-tainted earlier (before
@@ -216,9 +216,9 @@ def set_active_project(name):
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
 def get_mods_folder():
-    """The folder mods are installed into by 'Build & Install' (the game's ~mods dir, which can be
-    named anything). Empty string when unset — install is gated on this being configured. Read fresh
-    from disk each call so edits in the Paths panel take effect without a restart."""
+    """The folder mods are installed into when 'Copy to %s/' is on (the game's ~mods dir, which can
+    be named anything). Empty string when unset — copy-on-install is gated on this being configured.
+    Read fresh from disk each call so edits in Settings take effect without a restart."""
     return (_load_config().get("mods_folder", "") or "").replace("\\", "/")
 
 def save_mods_folder(path):
@@ -227,6 +227,32 @@ def save_mods_folder(path):
         cfg["mods_folder"] = path.replace("\\", "/")
     else:
         cfg.pop("mods_folder", None)
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
+def get_export_password():
+    """The default 'Protection Password' set in Settings, used when Password Protect is toggled
+    on for Install Mod. Read fresh from disk so edits in Settings take effect without a restart."""
+    return _load_config().get("export_password", "") or ""
+
+def save_export_password(password):
+    cfg = _load_config()
+    if password:
+        cfg["export_password"] = password
+    else:
+        cfg.pop("export_password", None)
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
+def get_aes_key2():
+    """The secondary 'Pakchunk7 Key' set in Settings (without 0x prefix). Stored alongside the
+    main aes_key but not yet consumed by any decode path."""
+    return _load_config().get("aes_key2", "") or ""
+
+def save_aes_key2(key):
+    cfg = _load_config()
+    if key:
+        cfg["aes_key2"] = key
+    else:
+        cfg.pop("aes_key2", None)
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
 def _prereq_issues(need_tool=True):

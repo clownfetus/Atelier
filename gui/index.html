@@ -64,15 +64,20 @@
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
-      <input id="export-pw" type="text" placeholder="🔒 password (optional)" maxlength="64" title="Optional soft lock — Atelier asks for this before it will repatch/edit the mod">
-      <button class="btn primary" id="export-btn" disabled>
-        <i data-lucide="archive" size="14"></i>
-        Export Mod
-      </button>
-      <button class="btn" id="install-btn" title="Build and install into your mods folder (replaces the previous version)" disabled>
+      <button class="btn primary" id="install-btn" title="Build the mod and install it" disabled>
         <i data-lucide="hard-drive-download" size="14"></i>
-        Build &amp; Install
+        Install Mod
       </button>
+      <div id="install-toggles">
+        <label class="toggle-row" id="toggle-password-row" title="Encrypt the mod with the Protection Password set in Settings">
+          <span class="switch"><input type="checkbox" id="toggle-password"><span class="switch-track"></span></span>
+          Password Protect
+        </label>
+        <label class="toggle-row" id="toggle-copy-row">
+          <span class="switch"><input type="checkbox" id="toggle-copy"><span class="switch-track"></span></span>
+          <span id="toggle-copy-label">Copy to ~mods/</span>
+        </label>
+      </div>
     </div>
   </div>
 </div>
@@ -134,6 +139,21 @@
       <button class="btn primary" id="confirm-clear-all-ok">
         <i data-lucide="trash-2" size="14"></i>
         Delete All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── confirm: overwrite existing mod on install ── -->
+<div class="overlay" id="confirm-overwrite-overlay">
+  <div class="modal">
+    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace Existing Mod?</h2>
+    <p id="confirm-overwrite-msg">A mod with this name already exists and will be replaced.</p>
+    <div class="modal-row">
+      <button class="btn" id="confirm-overwrite-cancel">Cancel</button>
+      <button class="btn primary" id="confirm-overwrite-ok">
+        <i data-lucide="hard-drive-download" size="14"></i>
+        Replace &amp; Install
       </button>
     </div>
   </div>
@@ -306,22 +326,63 @@
 <div class="overlay" id="setup-overlay">
   <div class="modal">
     <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
-    <p id="setup-desc">Provide <strong style="color:var(--text)">MarvelRivals</strong> folder, latest <strong style="color:var(--text)">USMAP</strong> file and <strong style="color:var(--text)">AES key</strong>.</p>
-    <div class="setup-row">
-      <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals (Path to your MarvelRivals install)" spellcheck="false">
-      <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+    <div class="setup-section">Paths</div>
+    <div class="setup-field">
+      <div class="setup-label">
+        <span>Path to your MarvelRivals install</span>
+        <a href="https://github.com/clownfetus/Atelier#get-marvelrivals-path" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+      </div>
+      <div class="setup-row">
+        <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals" spellcheck="false">
+        <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+      </div>
     </div>
-    <div class="setup-row">
-      <input id="setup-usmap" type="text" class="setup-input" placeholder="…/Mappings/xxx.usmap (USMAP mapping file)" spellcheck="false">
-      <button class="btn" id="setup-usmap-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+    <div class="setup-field">
+      <div class="setup-label">
+        <span>USMAP mapping file</span>
+        <a href="https://spacedepot.github.io/SpaceHost/" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+      </div>
+      <div class="setup-row">
+        <input id="setup-usmap" type="text" class="setup-input" placeholder="…/Mappings/xxx.usmap" spellcheck="false">
+        <button class="btn" id="setup-usmap-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+      </div>
     </div>
-    <div class="setup-row">
-      <input id="setup-aes" type="text" class="setup-input" placeholder="0x… (AES Decryption Key)" spellcheck="false">
-      <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
+    <div class="setup-section">AES Keys</div>
+    <div class="setup-field">
+      <div class="setup-label">
+        <span>Main AES Key</span>
+        <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+      </div>
+      <div class="setup-row">
+        <input id="setup-aes" type="text" class="setup-input" placeholder="0x…" spellcheck="false">
+        <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
+      </div>
     </div>
-    <div class="setup-row" id="setup-mods-row" style="display:none">
-      <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods (folder mods are installed into — used by Build &amp; Install)" spellcheck="false">
-      <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+    <div class="setup-field">
+      <div class="setup-label">
+        <span>Pakchunk7 Key <span style="color:var(--muted);font-weight:400">(placeholder rn)</span></span>
+        <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+      </div>
+      <div class="setup-row">
+        <input id="setup-aes2" type="text" class="setup-input" placeholder="0x…" spellcheck="false">
+        <button class="btn" id="setup-paste-key2"><i data-lucide="clipboard" size="14"></i> Paste</button>
+      </div>
+      <div id="setup-aes2-status" class="setup-field-status"></div>
+    </div>
+
+    <div class="setup-section" id="setup-export-section" style="display:none">Export</div>
+    <div class="setup-field" id="setup-mods-row" style="display:none">
+      <div class="setup-label"><span>Folder mods are installed into — used by "Copy to ..." toggle</span></div>
+      <div class="setup-row">
+        <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods" spellcheck="false">
+        <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+      </div>
+    </div>
+    <div class="setup-field" id="setup-password-row" style="display:none">
+      <div class="setup-label"><span>Protection Password — optional, for "Password Protect" toggle</span></div>
+      <div class="setup-row">
+        <input id="setup-password" type="text" class="setup-input" placeholder="Password" maxlength="64" spellcheck="false">
+      </div>
     </div>
     <div class="modal-row">
       <div id="setup-status"></div>
