@@ -363,8 +363,12 @@ def all_imported():
             fpath = os.path.join(dirpath, fname)
             if fname.endswith(".png"):
                 ext = ".png"
+            elif fname.endswith(".blend.mat.json"):
+                continue                                # meshedit's texture manifest, not an edit
             elif fname.endswith(".json"):
                 ext = ".json"
+            elif fname.endswith(".blend"):
+                ext = ".blend"
             else:
                 continue
             gr = project_game_rel(fpath, import_root)   # subfolder path -> game_rel; flat -> basename
@@ -373,6 +377,10 @@ def all_imported():
             name = os.path.basename(gr)
             if ext == ".png":
                 ft = "texture"
+            elif ext == ".blend":
+                ft = "mesh"                             # a Blender mesh edit awaiting build
+                if _classify_file(name) != "mesh":
+                    continue
             else:
                 ft = _classify_file(name)               # material | curve | vfx
                 if ft not in JSON_EDIT_TYPES:

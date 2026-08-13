@@ -3,6 +3,7 @@ from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
+                            CNW,
                             GUI_DIR, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
                             save_paks_config, save_setup_config, save_usmap_config,
                             get_usmap_checked_at, save_usmap_checked_at,
@@ -291,26 +292,11 @@ def _texture_png(game_rel):
         return _decode_texture_png(game_rel, base, out_png, cb)
 
 def _decode_texture_png(game_rel, base, out_png, cb):
-    os.makedirs(os.path.dirname(base), exist_ok=True)
     # MR strips the top mip on big textures; decode_png (UAssetTool) then falls back to the 4x4 tail
-    # and the viewport shows a solid smear. decode_dds recovers the largest SHIPPED mip from the
-    # .uptnl/.ubulk; convert that to the PNG the viewport expects, and fall back to decode_png only
-    # if there's no recoverable block data.
-    from atelier.handlers.texture import decode_dds
-    dds = None
-    try:
-        dds = decode_dds(base, cb)
-    except Exception as e:
-        print(f"[texture_png] decode_dds failed for {game_rel}: {e}", file=sys.stderr, flush=True)
-    if dds and os.path.exists(dds):
-        try:
-            from PIL import Image
-            Image.open(dds).convert("RGBA").save(out_png)
-        except Exception as e:
-            print(f"[texture_png] dds->png failed for {game_rel}: {e}", file=sys.stderr, flush=True)
-    if not os.path.exists(out_png):
-        decode_png(base, cb)
-    return out_png if os.path.exists(out_png) else None
+    # and the viewport shows a solid smear. decode_to_png recovers the largest SHIPPED mip from the
+    # .uptnl/.ubulk and only falls back to UAssetTool when there's no recoverable block data.
+    from atelier.handlers.texture import decode_to_png
+    return decode_to_png(base, cb)
 
 @app.get("/api/texture_png")
 def api_texture_png():
@@ -1765,18 +1751,73 @@ def api_open_with():
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
+# ── Blender mesh editing ──────────────────────────────────────────────────────
+
+@app.post("/api/mesh_blend_extract")
+def api_mesh_blend_extract():
+    """Decode a SkeletalMesh into an editable .blend in the active project, with its materials'
+    textures staged alongside and wired into the shader nodes.
+
+    Refuses up front on a mesh format the rebuilder can't pack (the survey's preflight), because
+    the expensive thing a user spends here is the sculpting between extract and build. The reply
+    carries can_force so the UI can offer inspect-anyway."""
+    body  = request.json or {}
+    gr    = (body.get("game_rel") or "").strip()
+    force = bool(body.get("force"))
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "no game_rel"})
+    try:
+        from atelier.handlers import meshedit, meshsurvey
+        base = meshedit._resolve_base(gr)
+        report = meshsurvey.probe(base)
+        if report["status"] != "ok" and not force:
+            return json.dumps({"ok": False, "can_force": True, "error": meshsurvey.verdict_text(report)})
+        r = meshedit.extract_blend(gr, base_path=base, force=True)
+        # probe() reports warnings as bare keys ("morphs"); expand them so the UI shows the
+        # sentence rather than the code.
+        warnings = [meshsurvey.WARNINGS.get(w, w) for w in r["warnings"]]
+        return json.dumps({"ok": True, "blend": r["blend"].replace("\\", "/"),
+                           "preflight": r["preflight"], "warnings": warnings,
+                           "textures": r["textures"], "materials": r["materials"],
+                           "info": r["info"]})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/open_blend")
+def api_open_blend():
+    """Open a project .blend in Blender (falls back to the shell association)."""
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    path = os.path.abspath(project_base(gr) + ".blend") if gr else ""
+    if not path or not os.path.exists(path):
+        return json.dumps({"ok": False, "error": "no .blend for this mesh yet"})
+    try:
+        from atelier.handlers.meshedit import find_blender
+        subprocess.Popen([find_blender(), path], creationflags=CNW)
+    except Exception:
+        try: os.startfile(path)
+        except Exception as e: return json.dumps({"ok": False, "error": str(e)})
+    return json.dumps({"ok": True})
+
 # ── export ────────────────────────────────────────────────────────────────────
+
+def _is_mesh_item(game_rel):
+    """A mesh edit: its edits live in a .blend, not a PNG, so it must not fall into tex_items."""
+    return _browse_mod._classify_file(os.path.basename(game_rel)) == "mesh"
 
 def _split_export_items(items):
     """Partition selected game_rels into build_mod's buckets (edits already live on disk / sidecar)."""
     tex_items   = [gr for gr in items if not is_material(gr) and not is_curve(gr)
-                   and not is_vfx(gr) and not is_world(gr) and not is_text(gr)]
+                   and not is_vfx(gr) and not is_world(gr) and not is_text(gr)
+                   and not _is_mesh_item(gr)]
     mat_items   = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
     curve_items = [{"game_rel": gr, "edits": {}} for gr in items if is_curve(gr)]   # edits already on disk
     vfx_items   = [gr for gr in items if is_vfx(gr)]                                 # edits from sidecar
     world_items = [gr for gr in items if is_world(gr)]                               # edits from sidecar
     text_items  = [gr for gr in items if is_text(gr)]                                # edits from sidecar
-    return tex_items, mat_items, curve_items, vfx_items, world_items, text_items
+    mesh_items  = [gr for gr in items if _is_mesh_item(gr)]                          # edits from the .blend
+    return tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items
 
 def _install_to_mods(mod_name, export_dir):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
@@ -1844,10 +1885,11 @@ def api_install_mod():
     out_dir = ASSETS_MODS
     os.makedirs(out_dir, exist_ok=True)
     try:
-        tex_items, mat_items, curve_items, vfx_items, world_items, text_items = _split_export_items(items)
+        tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+            _split_export_items(items)
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, password=password)
+                           text_items=text_items, password=password, mesh_items=mesh_items)
         if not result.get("ok"):
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
         pak = result.get("pak")

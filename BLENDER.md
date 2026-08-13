@@ -359,7 +359,106 @@ wrong — faces are selected by their **centre**, so their corners legitimately 
 more so on decimated LODs. The exact bound is the selected faces' own vertex span, which
 subdivision cannot exceed.
 
----
+### 3.18 A mesh's material slot NAMES are not its material asset names
+`MaterialSlotName` looks like the MI's asset name and usually is, which is why the 3D viewport
+matches on it. On the reference mesh it is wrong three different ways at once:
+
+| slot name | actual asset (import table) |
+|---|---|
+| `MI_1029304_10290_Body_01` | `MI_1029304_10290_Body` |
+| `MI_1029304_10290_Eye02` | `MI_1029304_10290_Eyes_02` |
+| `MI_1029001_Magik_Weapon` | `MI_1029304_10290_Weapon` |
+
+Worse than a miss: searching the paks for `MI_1029304_10290_Body_01` **finds a real asset of
+exactly that name** in a `Lobby/` subfolder — the wrong material, silently, with plausible
+textures. `MI_..._Head` matches two assets (real + Lobby) and only a path-proximity tiebreak
+picks right.
+
+`FSkeletalMaterial.MaterialInterface` (`pkg_idx`) is a real `FPackageIndex`, so the import table
+answers exactly. `meshmat.resolve_mesh_materials` leads with it (`uat to_json` on the mesh, then
+the same import walk `material._mat_textures` uses) and falls back to names only when the walk
+yields nothing. Cost is one ~8.6 MB cached JSON per mesh.
+
+### 3.19 Synthesised DDS headers must use a FOURCC the reader knows
+`decode_dds` wrote the format name UE reports straight into the header. `"BC5"` **is not a legal
+DDS FOURCC** — readers expect `ATI2`/`BC5U` — and BC6H/BC7 have no legacy code at all and need
+the DX10 extension header. PIL rejected the header, `decode_to_png` fell back to UAssetTool, and
+that is precisely the stripped-top-mip path the function exists to avoid: **every normal map on
+the mesh decoded to 4×4**. It looks like a harmless decode quirk right up until someone paints
+one and injects a destroyed normal map. Now mapped: BC1/BC3→DXT1/DXT5, BC4→ATI1, BC5→ATI2,
+BC6H/BC7→DX10 with the DXGI format. `meshmat` also treats an existing <16 px PNG as a failed
+decode and re-extracts it, so caches poisoned before the fix heal themselves.
+
+### 3.20 Blender does not save painted pixels of LINKED images
+Painting a texture and saving the `.blend` **loses the paint**: Blender keeps edits to linked
+images in memory only. Verified — reopen and the datablock reports `is_dirty=False` with the
+original pixels back. A flush loop in a headless build step cannot rescue it either, since that
+process opens the file fresh and never sees the dirty datablock (it only ever catches *packed*
+images). Users must save images themselves (`Image ▸ Save All Images`), which is Blender's rule,
+not this pipeline's; the app says so in a toast after every extract.
+
+Related ordering constraint: in `build_mod`, **mesh staging runs before texture injection**, since
+staging runs Blender and may flush images onto the very PNGs `stage_inject` reads. Injecting
+first ships the pre-flush bytes — one build behind, indistinguishable from "my edit didn't apply".
+
+### 3.21 BC5 normal maps have no blue channel — Z must be reconstructed
+MR ships normal maps as **BC5, a two-channel format**. The decoded PNG is therefore `(R, G, 0)`
+on every texel — measured: `B min=0 max=0` across the whole image. Feeding that to a Normal Map
+node decodes Z as `2*0-1 = -1`, so every normal points *into* the surface, which looks like fine
+per-texel dents rather than the whole mesh reading as hollow. Rendered side by side, the broken
+version is flat and washed out (EEVEE salvaging back-facing normals) while the correct one has
+real form. **This is a different bug from §3.24's whole-mesh inside-out look** — that one is
+caused by triangle winding, not normal maps, and was originally misdiagnosed as the same issue.
+
+The blue is not lost by our decode, it is **absent from the format**, so it is rebuilt in the node
+tree the way the engine does at runtime — `z = sqrt(1 - x² - y²)` — and never written into the
+PNG: that file is the game's own data and gets injected back verbatim. Applied unconditionally,
+since for a genuine 3-channel map the formula reproduces the stored blue. Green is inverted first
+(UE authors DirectX-convention, Blender reads OpenGL); Z is even in *y*, so the flip is safe.
+
+Do not confuse this with an ORM whose blue is genuinely zero: `T_..._Body_ORM` is DXT1 with real
+RGB and a legitimately black metallic channel — nothing on the body is metal.
+
+### 3.22 A constant-black texture is an unused slot, not data
+MR fills unused MI texture slots with shared dummies (`T_Common_LinearBlack`, `T_Common_Black`).
+Wiring one in mechanically reads "roughness = 0" and turns the surface into a **mirror** — the
+pom-poms rendered as glass. A uniformly black texture means *this master has no such map*, so
+`meshmat` drops the role for maps where zero does damage (ORM, normal) and leaves the image
+loaded but unconnected. Black BaseColor/Emissive stay wired: there, black is a meaningful value.
+
+### 3.23 A skeleton can have genuine duplicate bone names
+`SK_1024_1024307`'s 361-bone skeleton has `hela_weapon` **six times** (real weapon-rig
+bones the Weapon section is actually skinned to, not unused). `export_glb` writes one glTF
+node per bone verbatim in `mesh.bones` order; Blender refuses duplicate bone names within
+one Armature, so import silently renames all but the first occurrence (`hela_weapon` →
+`hela_weapon.001`, ...). `glb_to_sections` matched joints back to bones by NAME, so every
+renamed duplicate came back `ValueError: ... is not a bone of this skeleton` on **any**
+build, unrelated to what was actually edited. Since the armature is never restructured
+(`glb_to_blend.py` locks it), Blender's own bone order stays stable and mirrors
+`mesh.bones` order, so duplicates are now resolved **positionally**: the Nth glTF joint
+sharing a base name (stripping a trailing `.NNN`) maps to the Nth bone of that name in
+`mesh.bones`, in encounter order. A joint that still can't be resolved only raises if some
+vertex actually carries nonzero weight on it — checked once, where JOINTS/WEIGHTS are
+read — the same "dead weight is unconstrained" philosophy as `map_to_fixed_bonemap`.
+
+### 3.24 Triangle winding flips handedness on the UE↔glTF boundary
+`_AXIS_R` (the UE Z-up → glTF Y-up conversion) is a pure axis rotation, determinant **+1** —
+it cannot and does not change handedness. But UE winds front faces **clockwise** and glTF/OpenGL
+define front as **counter-clockwise**, so every triangle read from the cooked index buffer is
+back-facing by glTF's convention. `export_glb` never set `doubleSided`, so Blender's glTF
+importer enabled `use_backface_culling` on every material — every front face gets culled and
+only the interior back surface renders, showing that surface's texture from the inside: the
+mesh appears to fold in on itself from every angle, not merely dented (contrast §3.21). It went
+undetected because Solid shading ignores per-material culling — only Material Preview /
+Rendered mode shows it, and materials only recently started getting wired at all.
+
+Fixed at the boundary, not by un-mirroring geometry: `export_glb` swaps each triangle's last two
+indices (`[:, [0, 2, 1]]`) before writing, and `glb_to_sections` swaps back on rebuild — the two
+flips cancel on untouched geometry, so the null round-trip stays byte-exact. Materials also now
+set `doubleSided: true` as a display safety net for thin geometry (skirts, capes, hair cards)
+being edited, independent of the winding fix. `_compute_tangents` (used when a glb has no
+TANGENT attribute) is winding-order-invariant — it accumulates from UV derivatives per vertex,
+not face orientation — so flipping before it runs is safe.
 
 ### 3.17 Tangent handedness lives in TangentZ.W, not TangentX.W
 The packed tangent basis is `TangentX(4) | TangentZ(4)`. The bitangent handedness sign is
@@ -427,7 +526,7 @@ Numbers below are the **513 body meshes (514 records, 100% coverage)**.
 | | meshes | share |
 |---|---|---|
 | **Editable today** | **262** | **51.0%** |
-| Blocked: `bVariableBonesPerVertex` | 226 | 44.0% |
+| ~~Blocked~~ **Now decoded**: `bVariableBonesPerVertex` (§5.3b) | 226 | 44.0% |
 | Blocked: half-precision UVs | 33 | 6.4% |
 | Blocked: high-precision tangents | 6 | 1.2% |
 | Blocked: cloth | 4 | 0.8% |
@@ -510,10 +609,18 @@ The survey found the severe one — real 16-bit LODs at **65,479 vertices, 57 sh
 ceiling** (§4b). Promotion changes the payload size and the `DataTypeSize` byte, both
 already handled by the existing resize path, but it is unimplemented and untested.
 
-### 5.3b `bVariableBonesPerVertex` — **44% of characters, the largest single blocker**
-See §4b. Needs a **decoder only**; the existing fixed-8 writer is already a legal
-re-encoding, and at a measured mean of 3.24 influences per vertex it is nearly lossless.
-This is the highest value-per-unit-effort item in this document.
+### 5.3b `bVariableBonesPerVertex` — **done**
+`Mesh.skin_weights()` now decodes it: a per-vertex `LookupData[i]` (uint32) gives
+`byte_offset = LookupData[i] >> 8` and `count = LookupData[i] & 0xFF` into the flat
+`MeshWeightData` byte array, then `count` bone indices followed by `count` bone weights
+(same SoA convention as the fixed layout). Counts above 8 (observed up to 12) are capped
+to the 8 heaviest and renormalised to sum 255 — lossy only on the thin tail past 8
+influences (mean measured at 3.24/vertex), matching the glTF round-trip's own 8-influence
+ceiling and the writer, which already always emits a fixed-8 buffer regardless of source
+format (a legal re-encoding — no writer changes were needed). `meshsurvey`'s classifier no
+longer treats this as `UNSUPPORTED`; it is a `WARNINGS` entry. Verified end-to-end on
+`SK_1024_1024307` (LOD0: 100,777 verts, declared max 12 influences, every decoded section-
+local bone index landed inside its section's BoneMap, weight sums exactly 255).
 
 ### 5.4 Cloth — **0.8% of characters, detect and refuse; do not build more**
 No section of the reference asset has cloth (`CorrespondClothAssetIndex == -1` on all 34),
@@ -561,9 +668,7 @@ the build fails with a clear message naming it, since an empty section is a cras
 - **Armature-free `.blend`**: the armature exists only so the exporter emits skinning
   (§3.12). It could be reconstructed at export time from the source asset's bone list and
   stripped from the `.blend` entirely.
-- **App UI wiring**: `meshedit` is CLI-only. Nothing in `build_mod()`
-  ([`texture.py`](atelier/handlers/texture.py)) or the web routes calls it, so mesh editing
-  is unreachable from the GUI. Deliberately deferred.
+- ~~**App UI wiring**~~ — **done**, see §6.
 - **Blender version**: tested on 5.0. `export_colors` does not exist there (it is
   `export_vertex_color` / `export_all_vertex_colors`); 4.x may differ again.
 - Third-party add-ons in the user's Blender profile can inject stray objects (fast64 adds a
@@ -575,3 +680,44 @@ Adding skirt/hair bones for KawaiiPhysics needs new bones, which grows BoneMaps 
 attack animations (only locomotion plays; it looks fine when playing the character
 yourself). If ever built this must be an explicit mode with a warning, never something an
 edit can trigger accidentally.
+
+---
+
+## 6. App integration — mesh + textures in one mod
+
+Mesh editing is reachable from the GUI and no longer ships its own competing pak.
+
+**Entry point.** Right-click any `SK_*` asset in the browser → **Edit in Blender**
+(`POST /api/mesh_blend_extract`). The preflight (§4b) runs first and refuses an unsupported
+format, offering inspect-anyway; the reply carries the material/texture counts and warnings.
+The resulting `.blend` appears in the project sidebar as a `mesh` item with **Open in Blender**
+(`GET /api/open_blend`). Left-click still opens the 3D viewport.
+
+**What extract now produces.** Beside the `.blend`, a `<blend>.mat.json` manifest recording each
+slot's MI, its texture parameters with their resolved PBR role, and the staged file for each.
+Every texture the mesh's materials sample is decoded into the **active project folder** at
+`project_base(game_rel) + ".png"` — the same path `stage_inject` ships and the viewport's
+watchdog live-reloads, so no new injection mechanism and no sidecar mapping exist: the image's
+own file path is its identity. Existing project files are never overwritten (§3.19 degenerate
+husks excepted).
+
+**Wiring in the .blend.** Per material, an image node per texture parameter: BaseColor→Base Color
+(sRGB), Normal→Normal Map with the green channel flipped for UE's DirectX convention (display
+only), ORM→G/B into Roughness/Metallic, Emissive→Emission Color, everything else loaded
+unconnected (MR's ColorID/dyeing masks are real editable textures with no guessable shader role).
+Material **names are never touched** — they remain the key `glb_to_sections` matches sections on
+(§3.9). Images are linked, never packed. `blend_to_glb.py` exports with
+`export_image_format="NONE"` so the per-LOD round-trip glbs stay geometry-only.
+
+**Building.** `build_mod()` takes `mesh_items`; `stage_mesh()` (split out of `build_from_blend`)
+rebuilds every LOD into the shared `build_stage` tree and runs `uat fix`, so one
+`create_mod_iostore` emits a single pak containing the mesh and its textures. Mesh staging runs
+first (§3.20). `build_from_blend` remains the standalone CLI path.
+
+Verified on `SK_10290_1029304`: 12 materials resolved via the import table, 50 textures staged,
+57 images wired, 0 audit problems; round-trip build intact across all 3 LODs; a painted-and-saved
+texture demonstrably changes the injected asset bytes in the packed mod.
+
+Code: [`meshmat.py`](atelier/handlers/meshmat.py) (slot→MI→texture resolution + staging),
+`meshedit.extract_blend/stage_mesh`, `glb_to_blend.py` (node wiring),
+`texture.build_mod/ensure_work_base/decode_to_png`, routes `mesh_blend_extract`/`open_blend`.

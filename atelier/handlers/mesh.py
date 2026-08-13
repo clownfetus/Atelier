@@ -40,6 +40,7 @@ BINARY LAYOUT (Marvel Rivals, UE 5.3, verified against SK_10290_1029304)
 """
 import json
 import os
+import re
 import struct
 
 import numpy as np
@@ -464,11 +465,17 @@ class Mesh:
         sw_var, sw_maxinf, sw_nbones, sw_nv, sw_16i, sw_16w = struct.unpack_from("<IIIIII", blob, o)
         o += 24
         lod["max_bone_influences"] = sw_maxinf
+        lod["variable_bones"] = bool(sw_var)
+        lod["bone_index_16"] = bool(sw_16i)
+        lod["bone_weight_16"] = bool(sw_16w)
         sw_esz, sw_cnt = struct.unpack_from("<II", blob, o); o += 8
-        lod["sw_off"] = o; o += sw_esz * sw_cnt
+        lod["sw_off"], lod["sw_esz"], lod["sw_cnt"] = o, sw_esz, sw_cnt
+        o += sw_esz * sw_cnt
         o += 2                                            # lookup StripFlags
         o += 4                                            # NumLookupVertices
-        lk_esz, lk_cnt = struct.unpack_from("<II", blob, o); o += 8 + lk_esz * lk_cnt
+        lk_esz, lk_cnt = struct.unpack_from("<II", blob, o); o += 8
+        lod["lookup_off"], lod["lookup_esz"], lod["lookup_cnt"] = o, lk_esz, lk_cnt
+        o += lk_esz * lk_cnt
         o += 2                                            # FColorVertexBuffer StripFlags
         col_stride, col_nv = struct.unpack_from("<II", blob, o); o += 8
         if col_nv > 0:
@@ -604,13 +611,50 @@ class Mesh:
         Struct-of-Arrays per vertex -- BoneIndex[8] THEN BoneWeight[8], not interleaved
         pairs (confirmed: interleaved gave weight sums far from 255 and out-of-BoneMap-
         range indices; SoA gives exact 255 sums and every index within its section's
-        BoneMap). Only the first `max_bone_influences` columns are meaningful."""
+        BoneMap). Only the first `max_bone_influences` columns are meaningful.
+
+        bVariableBonesPerVertex meshes (44% of the game's body meshes -- see BLENDER.md
+        S5.3b) pack a different layout: MeshWeightData is one flat byte array, and a
+        per-vertex LookupData[N] (uint32) gives each vertex's (byte_offset << 8 | count)
+        into it -- BoneIndex[count] then BoneWeight[count], same SoA convention as the
+        fixed layout, just variable-length per vertex instead of a constant stride of 16.
+        Counts above 8 (observed up to 12 on this game's meshes) are capped to the 8
+        heaviest influences and renormalised to sum 255: the glTF round-trip already caps
+        at 8 (export_all_influences/export_influence_nb=8, see BLENDER.md S3.7) and the
+        writer always emits a fixed-8 buffer regardless of source format (see
+        rebuild_lod_buffers) -- a legal re-encoding of the same data, lossy only on the
+        thin tail past 8 influences (mean measured at 3.24/vertex)."""
         n = lod["num_verts"]
-        raw = np.frombuffer(bytes(self._blob(lod)), np.uint8, n * 16, lod["sw_off"]).reshape(n, 16)
-        idx, wgt = raw[:, :8].copy(), raw[:, 8:].copy()
-        mi = lod["max_bone_influences"]
-        if mi < 8:
-            idx[:, mi:] = 0; wgt[:, mi:] = 0
+        if lod.get("bone_index_16") or lod.get("bone_weight_16"):
+            raise NotImplementedError("16-bit bone index/weight skin buffers not decoded")
+        blob = bytes(self._blob(lod))
+        if not lod.get("variable_bones"):
+            raw = np.frombuffer(blob, np.uint8, n * 16, lod["sw_off"]).reshape(n, 16)
+            idx, wgt = raw[:, :8].copy(), raw[:, 8:].copy()
+            mi = lod["max_bone_influences"]
+            if mi < 8:
+                idx[:, mi:] = 0; wgt[:, mi:] = 0
+            return idx, wgt.astype(np.float32) / 255.0
+
+        lookup = np.frombuffer(blob, "<u4", n, lod["lookup_off"])
+        data = np.frombuffer(blob, np.uint8, lod["sw_cnt"] * lod["sw_esz"], lod["sw_off"])
+        offs, cnts = (lookup >> 8).astype(np.int64), (lookup & 0xFF).astype(np.int64)
+
+        idx = np.zeros((n, 8), np.uint8)
+        wgt = np.zeros((n, 8), np.uint8)
+        for i in range(n):
+            c, o = int(cnts[i]), int(offs[i])
+            if c == 0:
+                continue
+            bi, bw = data[o:o + c], data[o + c:o + 2 * c]
+            if c > 8:
+                order = np.argsort(-bw.astype(np.int64))[:8]
+                bi, bw = bi[order], bw[order].astype(np.int64)
+                bw = (bw * 255 // max(int(bw.sum()), 1)).astype(np.int64)
+                bw[0] += 255 - int(bw.sum())
+                bw = bw.astype(np.uint8)
+                c = 8
+            idx[i, :c], wgt[i, :c] = bi, bw
         return idx, wgt.astype(np.float32) / 255.0
 
     def section_bonemap(self, sec):
@@ -1071,6 +1115,21 @@ def glb_to_sections(mesh, lod_index, glb_path):
     skin's joint list and node NAMES back to skeleton bone indices, since an exporter may
     renumber joints.
 
+    Some skeletons carry genuine DUPLICATE bone names (observed on SK_1024_1024307: 361
+    bones include 'hela_weapon' x6, real weapon-rig bones the Weapon section is actually
+    skinned to -- not unused). export_glb writes one glTF node per bone verbatim in
+    mesh.bones order, so Blender's round-trip -- which refuses duplicate bone names within
+    one Armature -- renames all but the first occurrence on import ('hela_weapon' ->
+    'hela_weapon.001', ...), breaking a plain name match for those joints on export back
+    out. Since the armature is never restructured (glb_to_blend.py locks it) Blender's own
+    bone order is stable and mirrors mesh.bones order, so occurrences of one base name are
+    resolved POSITIONALLY: the Nth glTF joint sharing a base name is matched to the Nth
+    bone of that name in mesh.bones, in encounter order. A joint that still can't be
+    resolved (an unknown name, or more occurrences than the original skeleton had) only
+    raises if some vertex actually carries nonzero weight on it (checked below, once
+    JOINTS/WEIGHTS are read) -- the same "dead weight is unconstrained" philosophy as
+    map_to_fixed_bonemap.
+
     Vertex counts per section are whatever the file says: Blender splits vertices at UV and
     normal seams, so even an unedited round-trip usually comes back with MORE vertices than
     vanilla. That is expected and fine -- the rebuild is count-agnostic.
@@ -1078,18 +1137,31 @@ def glb_to_sections(mesh, lod_index, glb_path):
     g, bin_ = load_glb(glb_path)
     lod = mesh.lods[lod_index]
 
-    bone_index = {b["name"]: i for i, b in enumerate(mesh.bones)}
+    bone_occurrences = {}
+    for i, b in enumerate(mesh.bones):
+        bone_occurrences.setdefault(b["name"], []).append(i)
     nodes = g.get("nodes", [])
     if not g.get("skins"):
         raise ValueError("glb has no skin -- skinning data is required")
     joints = g["skins"][0]["joints"]
     joint_to_bone = np.zeros(len(joints), np.uint16)
+    unresolved = {}
+    seen = {}
+    _suffix_re = re.compile(r"^(.*)\.\d{3}$")
     for ji, node_i in enumerate(joints):
         nm = nodes[node_i].get("name")
-        if nm not in bone_index:
-            raise ValueError(f"glb joint {ji} node {nm!r} is not a bone of this skeleton "
-                            "-- the armature must not be renamed or restructured")
-        joint_to_bone[ji] = bone_index[nm]
+        base = nm if nm in bone_occurrences else None
+        if base is None:
+            m = _suffix_re.match(nm or "")
+            if m and m.group(1) in bone_occurrences:
+                base = m.group(1)
+        occ = bone_occurrences.get(base) if base else None
+        k = seen.get(base, 0)
+        if not occ or k >= len(occ):
+            unresolved[ji] = nm
+            continue
+        joint_to_bone[ji] = occ[k]
+        seen[base] = k + 1
 
     mat_names = [m.get("name") for m in g.get("materials", [])]
     by_mat = {}
@@ -1114,7 +1186,10 @@ def glb_to_sections(mesh, lod_index, glb_path):
             at = prim["attributes"]
             pos = gltf_accessor(g, bin_, at["POSITION"]).astype("f8")
             nv = len(pos)
-            tris = gltf_accessor(g, bin_, prim["indices"]).reshape(-1, 3).astype(np.int64)
+            # export_glb swaps winding CW->CCW for glTF; undo it here so the rebuilt UE
+            # index buffer keeps the game's CW winding (export-flip + import-flip is the
+            # identity on untouched geometry, preserving the byte-exact null round-trip).
+            tris = gltf_accessor(g, bin_, prim["indices"]).reshape(-1, 3)[:, [0, 2, 1]].astype(np.int64)
             nrm = (gltf_accessor(g, bin_, at["NORMAL"]).astype("f8") if "NORMAL" in at
                    else np.tile([0.0, 0.0, 1.0], (nv, 1)))
             uvs = np.zeros((nv, ntc, 2), "f4")
@@ -1133,6 +1208,16 @@ def glb_to_sections(mesh, lod_index, glb_path):
                 if jk in at and wk in at:
                     j = gltf_accessor(g, bin_, at[jk]).astype(np.int64)
                     wv = gltf_accessor(g, bin_, at[wk]).astype("f8")
+                    if unresolved:
+                        bad = np.isin(j, list(unresolved.keys())) & (wv > 0)
+                        if bad.any():
+                            names = sorted({unresolved[bj] for bj in set(j[bad].tolist())})
+                            raise ValueError(
+                                f"section mat{sec['mat']}: {int(bad.sum())} vertex-influence(s) "
+                                f"weight unresolvable joint node(s) {names} -- likely a "
+                                f"duplicate bone name in the original skeleton that Blender "
+                                f"renamed on round-trip; these can only be safely ignored "
+                                f"while carrying zero weight")
                     gi[:, s*4:(s+1)*4] = joint_to_bone[j]
                     w[:, s*4:(s+1)*4] = wv
             tot = w.sum(1, keepdims=True)
@@ -1276,7 +1361,10 @@ def export_glb(mesh, lod_index, out_path):
     materials_json, mat_lookup = [], {}
     for m in mesh.materials:
         mat_lookup[m["pkg_idx"]] = len(materials_json)
-        materials_json.append({"name": m["slot_name"] or f"mat_{m['pkg_idx']}"})
+        # doubleSided so Blender's importer doesn't backface-cull thin geometry (skirts,
+        # capes, hair cards) while the mesh is being edited -- purely a display aid, since
+        # winding below is corrected to read right in a single-sided viewer too.
+        materials_json.append({"name": m["slot_name"] or f"mat_{m['pkg_idx']}", "doubleSided": True})
 
     # One vertex pool PER PRIMITIVE, with section-local indices. Sharing a single pool
     # across primitives is legal glTF but means every primitive nominally spans the whole
@@ -1288,6 +1376,11 @@ def export_glb(mesh, lod_index, out_path):
         idx = np.frombuffer(bytes(mesh._blob(lod)), "<u4" if lod["idx_stride"] == 4 else "<u2",
                             sec["num_tris"] * 3,
                             lod["idx_off"] + sec["base_index"] * lod["idx_stride"])
+        # UE winds front faces clockwise; glTF/OpenGL define front as counter-clockwise.
+        # _AXIS_R only rotates axes (det +1), so it cannot fix this -- without the swap,
+        # every front face is culled on import and only interior back faces render,
+        # reading as an inside-out / concave mesh. glb_to_sections swaps back on rebuild.
+        idx = idx.reshape(-1, 3)[:, [0, 2, 1]].reshape(-1)
         attrs = {
             "POSITION":  accessor(pos[lo:hi].astype("f4"), F32, "VEC3", ARRAY, minmax=True),
             "NORMAL":    accessor(normal[lo:hi].astype("f4"), F32, "VEC3", ARRAY),

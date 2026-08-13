@@ -14,7 +14,18 @@ from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entrie
 # region — a normal map tolerates that kind of drift, an index map does not.
 _BPB = {"DXT1": 8, "BC1": 8, "DXT5": 16, "BC3": 16, "BC5": 16, "BC7": 16, "BC4": 8, "BC6H": 16}
 
-def _dds_header(w, h, fourcc, linear):
+# The format name UE reports is NOT always a legal DDS FOURCC. "BC5" in particular is not one --
+# readers expect ATI2 (or BC5U) -- and BC6H/BC7 have no legacy code at all, so they need the DX10
+# extension header. Writing the reported name verbatim made every BC5 NORMAL MAP fail to decode:
+# PIL rejected the header, the caller silently fell back to UAssetTool, and that hits the
+# stripped-top-mip problem this whole function exists to avoid -- yielding a 4x4 image that looks
+# like a decode quirk and would ship as a destroyed normal map if painted and injected.
+_FOURCC = {"DXT1": b"DXT1", "BC1": b"DXT1", "DXT3": b"DXT3", "DXT5": b"DXT5", "BC3": b"DXT5",
+           "BC4": b"ATI1", "BC5": b"ATI2"}
+_DXGI   = {"BC6H": 95, "BC7": 98}          # BC6H_UF16, BC7_UNORM
+
+def _dds_header(w, h, fmt, linear):
+    dxgi = _DXGI.get(fmt)
     hdr = bytearray(128); hdr[0:4] = b"DDS "
     struct.pack_into("<I", hdr, 4, 124)                                # dwSize
     struct.pack_into("<I", hdr, 8, 0x1 | 0x2 | 0x4 | 0x1000 | 0x80000) # CAPS|HEIGHT|WIDTH|PIXELFORMAT|LINEARSIZE
@@ -23,8 +34,11 @@ def _dds_header(w, h, fourcc, linear):
     struct.pack_into("<I", hdr, 28, 1)                                 # dwMipMapCount
     struct.pack_into("<I", hdr, 76, 32)                                # ddspf.dwSize
     struct.pack_into("<I", hdr, 80, 0x4)                               # ddspf.dwFlags = FOURCC
-    hdr[84:88] = fourcc.encode("ascii")
+    hdr[84:88] = b"DX10" if dxgi else _FOURCC.get(fmt, (fmt + "\0\0\0\0")[:4].encode("ascii"))
     struct.pack_into("<I", hdr, 108, 0x1000)                           # dwCaps = TEXTURE
+    if dxgi:                                                           # DDS_HEADER_DXT10
+        ext = struct.pack("<IIIII", dxgi, 3, 0, 1, 0)                  # fmt, TEXTURE2D, 0, 1 slice, 0
+        return bytes(hdr) + ext
     return bytes(hdr)
 
 def _tex_info(uasset_base):
@@ -154,6 +168,48 @@ def find_extracted(game_rel):
     print(f"[find_extracted] {game_rel}: NOT FOUND in {work_abs}", file=sys.stderr, flush=True)
     return None
 
+def ensure_work_base(game_rel):
+    """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
+    Returns None if the asset isn't in the game at all."""
+    import atelier.asset_cache as _ac
+    base = _ac.cache_base(game_rel)
+    if base and os.path.exists(base + ".uasset"):
+        return base
+    os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+    uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
+         "--filter", os.path.basename(pak_game_path(game_rel))])
+    cp, pak, pfx = extract_info(game_rel)
+    if cp and os.path.exists(cp + ".uasset"):
+        _ac.record(game_rel, cp, pak, pfx)
+        return cp
+    base = find_extracted(game_rel)
+    return base if base and os.path.exists(base + ".uasset") else None
+
+def decode_to_png(import_base, uasset_base):
+    """Decode one extracted texture to import_base + '.png', preferring the largest SHIPPED mip.
+
+    MR strips the top mip on big textures, so UAssetTool on its own can degrade to the 4x4 tail
+    (see decode_dds); recover the real block data first and convert that, falling back to
+    UAssetTool's decode. Leaves a .dds beside import_base as a by-product of the recovery, so
+    callers that must not produce one (a PROJECT folder, where a .dds outranks the .png at inject
+    time) should decode into a cache dir and copy only the .png out."""
+    os.makedirs(os.path.dirname(import_base), exist_ok=True)
+    out_png = import_base + ".png"
+    dds = None
+    try:
+        dds = decode_dds(import_base, uasset_base)
+    except Exception as e:
+        print(f"  [warn] decode_dds failed for {os.path.basename(import_base)}: {e}", file=sys.stderr)
+    if dds and os.path.exists(dds):
+        try:
+            from PIL import Image
+            Image.open(dds).convert("RGBA").save(out_png)
+        except Exception as e:
+            print(f"  [warn] dds->png failed for {os.path.basename(import_base)}: {e}", file=sys.stderr)
+    if not os.path.exists(out_png):
+        decode_png(import_base, uasset_base)
+    return out_png if os.path.exists(out_png) else None
+
 def stage_inject(stage, game_rel):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
     Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
@@ -189,11 +245,11 @@ def stage_inject(stage, game_rel):
     return os.path.basename(game_rel)
 
 def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-              world_items=None, text_items=None, password=None):
+              world_items=None, text_items=None, password=None, mesh_items=None):
     """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
-    edits + StringTable (text) edits into one mod. tex_items: [game_rel]; mat_items: [{game_rel,
-    colors, scalars}]; curve_items: [{game_rel, edits}]; vfx_items/world_items/text_items: [game_rel]
-    (edits come from the sidecar)."""
+    edits + StringTable (text) edits + Blender mesh edits into one mod. tex_items: [game_rel];
+    mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
+    vfx_items/world_items/text_items/mesh_items: [game_rel] (edits come from the sidecar / .blend)."""
     from atelier.handlers.material import stage_material
     from atelier.handlers.curve import stage_curve
     from atelier.handlers.vfx import stage_vfx
@@ -205,6 +261,16 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
     stage = os.path.join(_CACHE, "build_stage", mod_name)
     shutil.rmtree(os.path.join(_CACHE, "build_stage"), ignore_errors=True); os.makedirs(stage)
     applied, skipped = [], []
+    # MESH FIRST, before any texture is injected. Staging a mesh runs Blender, which flushes any
+    # still-modified image datablock onto the project PNGs stage_inject then reads. Injecting
+    # first would ship the pre-flush version -- one build behind, looking exactly like "my
+    # texture edit didn't apply".
+    for gr in (mesh_items or []):
+        try:
+            from atelier.handlers.meshedit import stage_mesh
+            info = stage_mesh(gr, stage)
+            applied.append(f"mesh {os.path.basename(gr)} ({len(info['applied'])} LODs)")
+        except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     for game_rel in tex_items:
         try: applied.append("tex " + stage_inject(stage, game_rel))
         except Exception as e: skipped.append(f"{os.path.basename(game_rel)}: {e}")

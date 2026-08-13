@@ -468,7 +468,6 @@ UNSUPPORTED = {
     "high_precision_tangent": "bUseHighPrecisionTangentBasis == 1",
     "bone_index_16": "bUse16BitBoneIndex == 1",
     "bone_weight_16": "bUse16BitBoneWeight == 1",
-    "variable_bones": "bVariableBonesPerVertex == 1",
     "skin_weight_profiles": "FSkinWeightProfilesData is non-empty",
     "unified_bonemap": "section uses the UE5 unified-bonemap packing",
     "bonemap_overflow": "a section's BoneMap exceeds 256 bones (8-bit local indices)",
@@ -480,6 +479,9 @@ WARNINGS = {
     "index_16_headroom": "a 16-bit LOD is close to the 65,536-vertex ceiling",
     "cooked_out_lod": "a LOD is cooked out (bIsLODCookedOut)",
     "disabled_section": "a section is flagged bDisabled",
+    "variable_bones": "bVariableBonesPerVertex == 1 -- decoded via the per-vertex lookup "
+                       "table; influence counts above 8 are capped to the 8 heaviest and "
+                       "renormalised (mean measured at ~3.24/vertex, so this is rarely lossy)",
 }
 
 
@@ -689,7 +691,7 @@ def _classify(rec):
         if lod["bone_weight_16"]:
             bad.add("bone_weight_16")
         if lod["variable_bones"]:
-            bad.add("variable_bones")
+            warn.add("variable_bones")
         if lod["skin_weight_profiles"]:
             bad.add("skin_weight_profiles")
         if lod["unified_bonemap"]:

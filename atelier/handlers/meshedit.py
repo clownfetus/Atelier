@@ -12,6 +12,7 @@ count must stay as they are, and the armature must not be touched (glb_to_blend.
 it). Those two constraints are what keep a rebuild a value-only patch of the existing
 section records; see atelier.handlers.mesh.rebuild_lod_buffers for why.
 """
+import json
 import os
 import shutil
 import subprocess
@@ -19,6 +20,7 @@ import sys
 
 from atelier.config import ASSETS_MODS, CNW, USMAP, _CACHE, get_import_root, project_base
 from atelier.handlers import mesh as _mesh
+from atelier.handlers import meshmat as _meshmat
 from atelier.handlers import meshsurvey as _survey
 from atelier.tools import uat
 
@@ -62,7 +64,7 @@ def _run_blender(script, args, label):
     return out
 
 
-def extract_blend(game_rel, base_path=None, blend_path=None, force=False):
+def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True):
     """Decode a mesh's top LOD to a .blend in the active project folder.
 
     Refuses up front on a format this pipeline cannot rebuild. The check runs here, at
@@ -82,25 +84,48 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False):
     m = _mesh.Mesh(base)
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     os.makedirs(os.path.dirname(blend_path), exist_ok=True)
+
+    # Resolve the mesh's materials to their textures and stage those into the project, so the
+    # .blend opens with the character's real surfaces wired up and painting them in Blender edits
+    # the very files the texture pipeline ships. Never fatal: a mesh whose materials can't be
+    # resolved is still perfectly editable as geometry.
+    manifest_path, manifest = blend_path + ".mat.json", None
+    if with_materials:
+        try:
+            manifest = _meshmat.build_manifest(game_rel, m, work_base=base)
+            json.dump(manifest, open(manifest_path, "w"), indent=1)
+        except Exception as e:
+            print(f"[meshedit] material/texture staging skipped: {e}", file=sys.stderr, flush=True)
+            manifest = None
+
     glb = blend_path + ".tmp.glb"
     _mesh.export_glb(m, 0, glb)
     try:
-        out = _run_blender("glb_to_blend.py", [glb, blend_path], "BLEND")
+        args = [glb, blend_path] + ([manifest_path] if manifest else [])
+        out = _run_blender("glb_to_blend.py", args, "BLEND")
     finally:
         if os.path.exists(glb):
             os.remove(glb)
     info = next((l for l in out.splitlines() if l.startswith("BLEND_OK")), "")
+    textures = sorted(t for t, r in (manifest or {}).get("textures", {}).items() if r.get("path"))
     return {"blend": blend_path, "info": info.strip(), "lods": len(m.lods),
-            "warnings": report["warnings"], "preflight": _survey.verdict_text(report)}
+            "warnings": report["warnings"] + ((manifest or {}).get("warnings") or []),
+            "preflight": _survey.verdict_text(report),
+            "textures": textures,
+            "materials": sorted((manifest or {}).get("slots", {}).keys())}
 
 
-def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mod_name=None):
-    """Rebuild every LOD from the edited .blend and pack a mod.
+def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
+    """Rebuild every LOD from the edited .blend into an export stage, ready to be packed.
 
     LOD0 uses the mesh as edited; each lower LOD is decimated to the triangle ratio that
     LOD originally had relative to LOD0, so the vanilla LOD progression is preserved.
     Materials a lower LOD never had are simply not looked up -- matching how the cooker
     drops whole sections from distant LODs.
+
+    Staging is separate from packing so a mesh edit can share ONE pak with the texture and
+    material edits for the same character (texture.build_mod), instead of shipping a second
+    mod that competes with the first.
     """
     base = base_path or _resolve_base(game_rel)
     blend_path = blend_path or (project_base(game_rel) + ".blend")
@@ -131,10 +156,6 @@ def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mo
         applied.append({"lod": i, "ratio": round(ratio, 4), **info})
         os.remove(glb)
 
-    name = mod_name or (os.path.basename(game_rel).replace(".uasset", "") + "_MeshEdit")
-    out_dir = out_dir or ASSETS_MODS
-    stage = os.path.join(_CACHE, "mesh_stage", name)
-    shutil.rmtree(stage, ignore_errors=True)
     target = os.path.join(stage, *_pak_dir(game_rel).split("/"))
     asset_name = os.path.basename(base)
     m.save(target, asset_name)
@@ -146,6 +167,21 @@ def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mo
     r = uat(["fix", os.path.abspath(uasset), USMAP])
     if r.returncode != 0:
         raise RuntimeError("uat fix failed: " + ((r.stdout or "") + (r.stderr or ""))[-400:])
+    return {"applied": applied, "stage": stage, "uasset": uasset}
+
+
+def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mod_name=None):
+    """Rebuild every LOD from the edited .blend and pack a mesh-only mod (the CLI path).
+
+    The app packs mesh edits through texture.build_mod instead, so they share one pak with
+    the character's texture edits; this stays the standalone route.
+    """
+    name = mod_name or (os.path.basename(game_rel).replace(".uasset", "") + "_MeshEdit")
+    out_dir = out_dir or ASSETS_MODS
+    stage = os.path.join(_CACHE, "mesh_stage", name)
+    shutil.rmtree(stage, ignore_errors=True)
+    staged = stage_mesh(game_rel, stage, blend_path=blend_path, base_path=base_path)
+    applied = staged["applied"]
 
     os.makedirs(out_dir, exist_ok=True)
     base_out = os.path.join(out_dir, f"{name}_9999999_P")
@@ -167,11 +203,11 @@ def _pak_dir(game_rel):
 
 
 def _resolve_base(game_rel):
-    import atelier.asset_cache as _ac
-    from atelier.handlers.texture import find_extracted
-    base = _ac.cache_base(game_rel) or find_extracted(game_rel)
+    """Extracted vanilla stem for the mesh, pulling it out of the paks if it isn't cached yet."""
+    from atelier.handlers.texture import ensure_work_base
+    base = ensure_work_base(game_rel)
     if not base or not os.path.exists(base + ".uasset"):
-        raise RuntimeError("mesh not extracted yet -- run 'import' for this asset first")
+        raise RuntimeError(f"mesh not found in the game paks: {game_rel}")
     return base
 
 

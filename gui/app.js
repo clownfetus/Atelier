@@ -371,9 +371,59 @@ function handleImportedFileAction(item) {
     case "text":
       openTextEditor(item);
       return;
+    case "mesh":
+      openBlend(item.game_rel);   // the edit lives in a .blend, not a .png
+      return;
     default:
       fetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
+}
+
+// ── Blender mesh editing ──────────────────────────────────────────────────────
+// Extract is slow (asset extraction + every material's textures + a headless Blender run), so it
+// gets a spinner toast and the result is summarised rather than silently finishing.
+async function meshBlendExtract(game_rel, name, force = false) {
+  const t = toastSpinner(`Preparing ${name} for Blender…`);
+  setStatus(`Preparing ${name} for Blender…`);
+  try {
+    const res = await api("/api/mesh_blend_extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel, force: force ? 1 : 0 }),
+    });
+    t.remove();
+    setStatus("");
+    if (!res.ok) {
+      if (res.can_force) {
+        // The preflight refuses formats the rebuilder can't pack. Extracting anyway is useful for
+        // INSPECTING such a mesh, so offer it -- but say plainly that a build will not work.
+        if (confirm(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`))
+          return meshBlendExtract(game_rel, name, true);
+        return;
+      }
+      toast(res.error || "extract failed", "warning", 8000);
+      return;
+    }
+    const n = (res.textures || []).length, m = (res.materials || []).length;
+    toast(`${name} ready in Blender — ${m} material${m === 1 ? "" : "s"}, ${n} texture${n === 1 ? "" : "s"}`, "success", 6000);
+    // Blender keeps painted pixels only in memory for LINKED images: saving the .blend does not
+    // save them, and reopening silently restores the original. Say so once, up front, because
+    // the failure is invisible until the user has already lost the work.
+    toast("Painted textures must be saved in Blender (Image ▸ Save All Images) — saving the .blend alone discards them", "info", 12000);
+    (res.warnings || []).slice(0, 4).forEach(w => toast(w, "warning", 9000));
+    refreshSidebarEntry(game_rel, name, skinIdFromPath(nav.path));
+    renderGrid();
+  } catch (e) {
+    t.remove();
+    setStatus("");
+    toast(`Error: ${e.message}`, "warning");
+  }
+}
+
+function openBlend(game_rel) {
+  api(`/api/open_blend?game_rel=${encodeURIComponent(game_rel)}`).then(r => {
+    if (r && !r.ok) toast(r.error || "could not open the .blend", "warning");
+  });
 }
 
 function handleAssetClick(item) {
@@ -1893,9 +1943,13 @@ _ctxFileInput.addEventListener("change", async () => {
 function _ctxItemsCard(card) {
   const items = [];
   if (!card.imported) {
-    items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    items.push({ icon: "download", label: card.file_type === "mesh" ? "View in 3D" : "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    if (card.file_type === "mesh" && card.game_rel)
+      items.push({ icon: "box", label: "Edit in Blender", action: () => meshBlendExtract(card.game_rel, card.label) });
     return items;
   }
+  if (card.file_type === "mesh" && card.game_rel)
+    items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(card.game_rel) });
   if (card.game_rel)
     items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(card.game_rel)}`) });
   if (card.game_rel)
@@ -1913,6 +1967,8 @@ function _ctxItemsCard(card) {
 
 function _ctxItemsSidebar(item) {
   const items = [];
+  if (item.file_type === "mesh" && item.game_rel)
+    items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(item.game_rel) });
   if (item.game_rel)
     items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(item.game_rel)}`) });
   if (item.game_rel)

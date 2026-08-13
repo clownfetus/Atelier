@@ -57,6 +57,24 @@ if not any(m.type == "ARMATURE" for m in obj.modifiers):
 if obj.parent is None:
     obj.parent = arm
 
+# Flush any still-modified image to disk before the mod is built, since the project PNGs these
+# point at are the exact files the builder injects.
+#
+# This CANNOT rescue an unsaved texture-paint session, and it is worth being precise about why:
+# Blender does not store edits to LINKED images inside the .blend. Painting without saving the
+# image and then saving the .blend loses the paint on the next open -- verified: the datablock
+# reports is_dirty=False and the original pixels come back. Since this script always opens the
+# file fresh, a dirty linked image can never reach it. The loop therefore only ever catches
+# PACKED or generated images, where the pixels do live in the .blend. Users must save painted
+# images themselves (Image > Save, or Alt+S); that is Blender's rule, not this pipeline's.
+for img in bpy.data.images:
+    if img.is_dirty and img.filepath:
+        try:
+            img.save()
+            print("SAVED_IMG " + bpy.path.abspath(img.filepath))
+        except Exception as e:
+            print(f"WARN could not save image {img.name}: {e}")
+
 # Report surviving materials so the caller can fail loudly if decimation wiped a section
 # out entirely, rather than discovering it as a confusing "material not found" later.
 used = sorted({obj.data.materials[p.material_index].name
@@ -73,6 +91,10 @@ bpy.ops.export_scene.gltf(
     # it keeps "the 4 with highest weight", which would quietly degrade skinning at
     # shoulders and hips before the data ever reached the rebuilder.
     export_all_influences=True, export_influence_nb=8,
-    export_morph=False, export_materials="EXPORT",
+    # Materials are exported for their NAMES ONLY -- glb_to_sections matches primitives to cooked
+    # sections by material name. The image data must NOT come along: it is already staged as
+    # project PNGs the builder injects directly, and embedding it would bloat every per-LOD glb
+    # with textures the rebuilder discards.
+    export_morph=False, export_materials="EXPORT", export_image_format="NONE",
 )
 print("GLB_OK", dst)
