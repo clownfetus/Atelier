@@ -558,13 +558,29 @@ class Mesh:
         """Decode packed tangent basis -> (normal[N,3], tangent[N,3], tangent_w[N]).
         FPackedNormal: each byte (b^0x80)/127.5-1 (the XOR is UE5's IncreaseNormalPrecision
         flag; confirmed required here -- without it the sign byte decodes to ~0 instead of
-        the expected +-1). Stored as TangentX (tangent) then TangentZ (normal, W=handedness
-        sign for the bitangent), 4 bytes each."""
+        the expected +-1). Stored as TangentX (tangent) then TangentZ (normal), 4 bytes each.
+
+        HANDEDNESS LIVES IN TangentZ.W (byte 7), NOT TangentX.W (byte 3). This read the
+        sign out of byte 3 originally, which silently always yields +1: across every vertex
+        of every asset checked, byte 3 is the constant 127 and carries no information,
+        while byte 7 is 127 (+1) or 129 (-1) -- 35,783 of Magik's 123,018 LOD0 vertices are
+        negative. Taking the sign from the wrong byte made every rebuilt mesh
+        right-handed everywhere, flipping the bitangent on the ~29% of vertices whose UV
+        island is mirrored. That inverts the green channel of normal-map lighting, which is
+        subtle enough to survive a visual check and is why it went unnoticed.
+
+        The W is returned as its DECODED VALUE, not np.sign of it. Only the sign carries
+        meaning, but the cooker writes -1 as byte 129 (decoding to -0.992) while
+        round-tripping np.sign(-1) through encode_packed_normal yields byte 128. Both mean
+        "left-handed" and the engine reads only the sign, so the difference is harmless --
+        but passing the value through unchanged makes a null round-trip byte-identical,
+        which is worth far more as a regression invariant than the distinction costs.
+        Consumers that need a true +-1 (glTF's TANGENT.w) take np.sign at that boundary."""
         n = lod["num_verts"]
         raw = np.frombuffer(bytes(self._blob(lod)), np.uint8, n * 8, lod["tan_off"]).reshape(n, 8)
         v = (raw.astype(np.int16) ^ 0x80).astype(np.float32) / 127.5 - 1.0
         tangent, normal_w = v[:, 0:4], v[:, 4:8]
-        return normal_w[:, :3], tangent[:, :3], np.sign(tangent[:, 3])
+        return normal_w[:, :3], tangent[:, :3], normal_w[:, 3]
 
     def uvs(self, lod):
         """[N, NumTexCoords, 2] float32. Always full-precision on this game; a
@@ -912,8 +928,13 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
         tris = np.asarray(si["triangles"], np.uint32)
         n_verts, n_tris = len(pos), len(tris)
 
-        tan_full = encode_packed_normal(np.concatenate([tangent, tan_w[:, None]], 1))
-        nrm_full = encode_packed_normal(np.concatenate([normal, np.ones((n_verts, 1), "f4")], 1))
+        # Handedness belongs in TangentZ.W -- see Mesh.normals_tangents. TangentX.W is the
+        # constant +1 every cooked asset carries there; writing the sign into it instead
+        # (and +1 into TangentZ.W) discards handedness entirely, because TangentZ.W is the
+        # slot the engine reads.
+        tan_full = encode_packed_normal(
+            np.concatenate([tangent, np.ones((n_verts, 1), "f4")], 1))
+        nrm_full = encode_packed_normal(np.concatenate([normal, tan_w[:, None]], 1))
         local_idx = map_to_fixed_bonemap(gidx, w, bonemap, section_label=f"mat{mat}")
         qw = quantize_weights(w)
         sw_bytes = np.concatenate([local_idx.astype(np.uint8), qw], axis=1)
@@ -1270,8 +1291,9 @@ def export_glb(mesh, lod_index, out_path):
         attrs = {
             "POSITION":  accessor(pos[lo:hi].astype("f4"), F32, "VEC3", ARRAY, minmax=True),
             "NORMAL":    accessor(normal[lo:hi].astype("f4"), F32, "VEC3", ARRAY),
+            # glTF requires TANGENT.w to be exactly +-1; the cooked value is +-0.992.
             "TANGENT":   accessor(np.concatenate(
-                             [tangent[lo:hi], tan_w[lo:hi, None]], 1).astype("f4"),
+                             [tangent[lo:hi], np.sign(tan_w[lo:hi])[:, None]], 1).astype("f4"),
                              F32, "VEC4", ARRAY),
             "JOINTS_0":  accessor(global_idx[lo:hi, :4].astype("u2"), U16, "VEC4", ARRAY),
             "WEIGHTS_0": accessor(weight[lo:hi, :4].astype("f4"), F32, "VEC4", ARRAY),

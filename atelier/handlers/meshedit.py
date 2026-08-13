@@ -19,6 +19,7 @@ import sys
 
 from atelier.config import ASSETS_MODS, CNW, USMAP, _CACHE, get_import_root, project_base
 from atelier.handlers import mesh as _mesh
+from atelier.handlers import meshsurvey as _survey
 from atelier.tools import uat
 
 _BLENDER_DIRS = (r"C:\Program Files\Blender Foundation",
@@ -61,9 +62,23 @@ def _run_blender(script, args, label):
     return out
 
 
-def extract_blend(game_rel, base_path=None, blend_path=None):
-    """Decode a mesh's top LOD to a .blend in the active project folder."""
+def extract_blend(game_rel, base_path=None, blend_path=None, force=False):
+    """Decode a mesh's top LOD to a .blend in the active project folder.
+
+    Refuses up front on a format this pipeline cannot rebuild. The check runs here, at
+    extract time, rather than at build time on purpose: the expensive, unrecoverable thing
+    a user spends on a mesh is the sculpting between the two, and discovering afterwards
+    that the asset was never packable wastes all of it. `force` extracts anyway, which is
+    useful for inspecting an unsupported asset without intending to ship it.
+    """
     base = base_path or _resolve_base(game_rel)
+    report = _survey.probe(base)
+    if report["status"] != "ok" and not force:
+        raise RuntimeError(
+            _survey.verdict_text(report)
+            + "\n\nThis mesh cannot be rebuilt by the current pipeline. Pass force=True "
+              "(CLI: --force 1) to extract it for inspection anyway -- but a build will "
+              "fail or produce a broken package.")
     m = _mesh.Mesh(base)
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     os.makedirs(os.path.dirname(blend_path), exist_ok=True)
@@ -75,7 +90,8 @@ def extract_blend(game_rel, base_path=None, blend_path=None):
         if os.path.exists(glb):
             os.remove(glb)
     info = next((l for l in out.splitlines() if l.startswith("BLEND_OK")), "")
-    return {"blend": blend_path, "info": info.strip(), "lods": len(m.lods)}
+    return {"blend": blend_path, "info": info.strip(), "lods": len(m.lods),
+            "warnings": report["warnings"], "preflight": _survey.verdict_text(report)}
 
 
 def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mod_name=None):
@@ -160,9 +176,10 @@ def _resolve_base(game_rel):
 
 
 def _main(argv):
-    if len(argv) < 2 or argv[0] not in ("extract", "build"):
+    if len(argv) < 2 or argv[0] not in ("extract", "build", "preflight"):
         print("usage:\n"
-              "  python -m atelier.handlers.meshedit extract <game_rel> [--base PATH] [--blend PATH]\n"
+              "  python -m atelier.handlers.meshedit preflight <game_rel> [--base PATH]\n"
+              "  python -m atelier.handlers.meshedit extract <game_rel> [--base PATH] [--blend PATH] [--force 1]\n"
               "  python -m atelier.handlers.meshedit build   <game_rel> [--base PATH] [--blend PATH] [--name N]")
         return 2
     cmd, game_rel = argv[0], argv[1]
@@ -171,9 +188,15 @@ def _main(argv):
     for i in range(0, len(rest) - 1, 2):
         if rest[i].startswith("--"):
             opts[rest[i][2:]] = rest[i + 1]
+    if cmd == "preflight":
+        rec = _survey.preflight(game_rel, base_path=opts.get("base"))
+        print(_survey.verdict_text(rec))
+        return 0 if rec["status"] == "ok" else 1
     if cmd == "extract":
-        r = extract_blend(game_rel, base_path=opts.get("base"), blend_path=opts.get("blend"))
-        print(f"blend: {r['blend']}\n{r['info']}\nLODs in asset: {r['lods']} "
+        r = extract_blend(game_rel, base_path=opts.get("base"), blend_path=opts.get("blend"),
+                          force=bool(opts.get("force")))
+        print(r["preflight"])
+        print(f"\nblend: {r['blend']}\n{r['info']}\nLODs in asset: {r['lods']} "
               f"(you edit the top one; the rest are generated on build)")
     else:
         r = build_from_blend(game_rel, blend_path=opts.get("blend"),
