@@ -422,6 +422,7 @@ body {
   font-weight: 700;
   color: var(--muted);
   flex-shrink: 0;
+  cursor: pointer;
   transition: background .15s, border-color .15s, color .15s;
 }
 #sel-count.active {

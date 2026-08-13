@@ -1252,6 +1252,15 @@ function renderSidebar() {
   updateInstallBtn();
 }
 
+function toggleSelectAll() {
+  const all = Object.values(sidebarData);
+  if (!all.length) return;
+  const sel = all.filter(i => i.selected).length;
+  const selectAll = sel === 0 || sel < all.length;
+  all.forEach(i => { i.selected = selectAll; });
+  renderSidebar();
+}
+
 function _modsTopFolderName() {
   const parts = (_modsFolderPath || "").replace(/\\/g, "/").split("/").filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "~mods";
@@ -1336,7 +1345,7 @@ async function doInstallMod() {
   const selected = Object.values(sidebarData).filter(i => i.selected);
   if (!selected.length) return;
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text"].includes(i.file_type || ""));
+  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text", "mesh"].includes(i.file_type || ""));
   const skipped    = selected.length - exportable.length;
   if (!exportable.length) { toast("Nothing exportable selected", "info"); return; }
 
@@ -1382,6 +1391,7 @@ document.getElementById("confirm-overwrite-ok").addEventListener("click", async 
 });
 
 document.getElementById("install-btn").addEventListener("click", doInstallMod);
+document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
 function clearImported(token) {

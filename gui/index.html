@@ -59,14 +59,14 @@
         Edited Assets
       </div>
       <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
-      <span id="sel-count">0</span>
+      <span id="sel-count" title="Toggle select all/none">0</span>
     </div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
       <button class="btn primary" id="install-btn" title="Build the mod and install it" disabled>
         <i data-lucide="hard-drive-download" size="14"></i>
-        Install Mod
+        Export Mod
       </button>
       <div id="install-toggles">
         <label class="toggle-row" id="toggle-password-row" title="Encrypt the mod with the Protection Password set in Settings">
@@ -153,7 +153,7 @@
       <button class="btn" id="confirm-overwrite-cancel">Cancel</button>
       <button class="btn primary" id="confirm-overwrite-ok">
         <i data-lucide="hard-drive-download" size="14"></i>
-        Replace &amp; Install
+        Replace
       </button>
     </div>
   </div>

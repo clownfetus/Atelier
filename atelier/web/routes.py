@@ -1968,6 +1968,11 @@ def api_open_export_folder():
 
 # ── delete imported ───────────────────────────────────────────────────────────
 
+# Every on-disk form a project edit can take. A mesh's edit is a .blend (plus Blender's .blend1
+# backup and the texture manifest beside it), so deleting one has to clear those too -- otherwise
+# the asset returns on the next sidebar refresh and "Delete" looks like it did nothing.
+_EDIT_EXTS = (".png", ".json", ".blend", ".blend.mat.json", ".blend1")
+
 @app.post("/api/delete_imported")
 def api_delete_imported():
     body = request.json or {}
@@ -1977,7 +1982,7 @@ def api_delete_imported():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     work_base   = _cache_import_base(gr)
     for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
-        for ext in (".png", ".json"):
+        for ext in _EDIT_EXTS:
             p = base + ext
             if os.path.exists(p):
                 try: os.remove(p)
@@ -1999,7 +2004,7 @@ def api_delete_all_imported():
         gr          = item["game_rel"]
         work_base   = _cache_import_base(gr)
         for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
-            for ext in (".png", ".json"):
+            for ext in _EDIT_EXTS:
                 p = base + ext
                 if os.path.exists(p):
                     try: os.remove(p)

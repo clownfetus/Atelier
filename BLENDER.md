@@ -487,6 +487,41 @@ from those values alone, and compare bytes. It is now byte-identical on all thre
 gate on Magik — where the only difference is the intentional morph strip, 9,666,375 of
 9,666,383 bytes matching. Worth codifying as an automated test (Stage B).
 
+### 3.25 Blender's glTF exporter only writes real vertex colours for material #0
+Root cause, confirmed directly against `SK_1024_1024307` on Blender 5.2 LTS: when one mesh
+object carries several materials, `bpy.ops.export_scene.gltf(export_vertex_color="ACTIVE",
+export_all_vertex_colors=True)` writes the real per-vertex Color Attribute into `COLOR_0`
+for only the FIRST material's primitive. Every other primitive gets a uniform `(1,1,1,1)`
+in the glb, even though the source `.blend` has correct, non-white data for every material
+(verified by reading `mesh.color_attributes` directly in Blender — every material's true
+average matched vanilla; only material index 0 survived export). This is a genuine
+Blender/`io_scene_gltf2` exporter bug, not a data-loss bug on our side: wiring the attribute
+into the shader node tree makes no difference (tested), and it reproduces on an untouched,
+never-edited `.blend`.
+
+Per §3.14, MR vertex colours are mask data, mostly `(0,0,0)` — several materials use it to
+drive things like an outline. Reading `(1,1,1,1)` instead reads as "fully on", so every mesh
+edit shipped a broken mask for every material except whichever one happened to sort first —
+invisible until someone edited a non-first material and looked closely at exactly that part,
+which is exactly the failure a live bug report described ("outline/material messed up only
+for the part I edited").
+
+**Fix:** `blend_to_glb.py` now separates the mesh by material (`bpy.ops.mesh.separate
+(type="MATERIAL")`) right before export, turning the one multi-material mesh into N
+single-material objects. Each is then its own single-primitive mesh, and the bug — tied to
+multiple primitives sharing one mesh datablock — no longer applies; every material now
+exports its real `COLOR_0` (verified: every material's exported average now matches vanilla,
+not just #0). `mesh.separate` carries the Armature modifier and vertex groups to every new
+part automatically, so skinning is unaffected (verified: same joint count, same
+`WEIGHTS_0`/`WEIGHTS_1` presence, before and after). `export_scene.gltf`'s existing
+`use_selection=False` still exports the whole scene unchanged, since nothing but the split
+parts and the Armature survives the KEEP-list cleanup both scripts already do.
+
+`glb_to_sections` (mesh.py) separately still raises if a primitive has NO `COLOR_0` at all
+(rather than wrong-but-present data) when the vanilla LOD has a colour buffer — a residual
+safety net for a genuinely missing Color Attribute (e.g. manually deleted in Blender), which
+cannot be recovered after the fact and must not silently default to white either.
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;

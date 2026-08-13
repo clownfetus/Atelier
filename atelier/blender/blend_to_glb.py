@@ -82,6 +82,29 @@ used = sorted({obj.data.materials[p.material_index].name
                if obj.data.materials and obj.data.materials[p.material_index]})
 print("MATERIALS " + "|".join(used))
 
+# Split by material before export -- Blender's glTF exporter (verified on 5.2 LTS) only writes
+# real COLOR_0 data for the FIRST primitive of a mesh with multiple materials; every other
+# primitive comes out uniformly (1,1,1,1) even though the source Color Attribute holds real
+# per-vertex data for all of them (checked directly against the .blend: every material's
+# average differed from white and matched the vanilla mask values before this split; only
+# material index 0 survived export). MR reads vertex colour as mask data (mostly (0,0,0) --
+# see BLENDER.md S3.14), which several materials use to drive things like an outline, so this
+# silently shipped a wrong mask -- reading as "full on" -- for every section except the first,
+# invisible until someone actually edited a non-first material and looked closely at it.
+# Separating into one single-material object per material sidesteps the bug entirely (each
+# becomes its own single-primitive mesh); `mesh.separate` carries the Armature modifier and
+# vertex groups to every part, so skinning is unaffected -- verified against the combined
+# export (same joint count, same WEIGHTS_0/1 presence). export_scene.gltf's use_selection=False
+# then exports the whole scene as before: just the split parts + the Armature, since nothing
+# else survives the KEEP-list cleanup at the top of this file and glb_to_blend.py.
+bpy.ops.object.select_all(action="DESELECT")
+bpy.context.view_layer.objects.active = obj
+obj.select_set(True)
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.mesh.separate(type="MATERIAL")
+bpy.ops.object.mode_set(mode="OBJECT")
+
 bpy.ops.export_scene.gltf(
     filepath=dst, export_format="GLB", use_selection=False, export_apply=False,
     export_yup=True, export_texcoords=True, export_normals=True, export_tangents=True,

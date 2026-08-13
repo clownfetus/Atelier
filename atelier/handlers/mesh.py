@@ -1242,6 +1242,19 @@ def glb_to_sections(mesh, lod_index, glb_path):
             voff += nv
 
         has_col = lod["col_off"] is not None
+        if has_col and not C:
+            # The vanilla mesh carries a vertex-colour buffer (MR uses it as mask data, mostly
+            # (0,0,0) -- see BLENDER.md S3.14), but this section's primitive(s) exported no
+            # COLOR_0 at all. That is never expected -- blend_to_glb.py separates the mesh by
+            # material before export specifically so every material gets real COLOR_0 (S3.25);
+            # a primitive with none at all past that means the Color Attribute itself is gone
+            # from the .blend for this material (deleted, or never existed on newly-created
+            # geometry). Silently defaulting to white would ship a mask that reads as "fully
+            # on" for exactly the edited geometry -- raise instead of guessing.
+            raise ValueError(
+                f"section {slot!r}: no vertex colours in the exported glb, but the original "
+                f"mesh has a colour buffer -- the Color Attribute is missing for this material "
+                f"(check Object Data Properties > Color Attributes)")
         sections_in.append({
             "mat": sec["mat"],
             "positions": np.concatenate(P).astype("f4"),
@@ -1249,8 +1262,7 @@ def glb_to_sections(mesh, lod_index, glb_path):
             "tangent": np.concatenate(T).astype("f4"),
             "tan_w": np.concatenate(TW).astype("f4"),
             "uv": np.concatenate(UV).astype("f4"),
-            "color": (np.concatenate(C).astype("f4") if (has_col and C) else
-                      (np.ones((voff, 4), "f4") if has_col else None)),
+            "color": (np.concatenate(C).astype("f4") if has_col else None),
             "global_idx": np.concatenate(GI).astype(np.uint16),
             "weight": np.concatenate(W).astype("f4"),
             "triangles": np.concatenate(TRI).astype(np.uint32),
