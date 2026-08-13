@@ -488,6 +488,7 @@ def api_pick_folder():
     env["PAKS_INITIAL"] = initial
     env["PICK_DESC"]    = desc
     ps = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
         "Add-Type -AssemblyName System.Windows.Forms; "
         "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
         "$f.Description = $env:PICK_DESC; "
@@ -496,7 +497,7 @@ def api_pick_folder():
     )
     try:
         r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                             capture_output=True, text=True, timeout=120, env=env)
+                             capture_output=True, encoding="utf-8", timeout=120, env=env)
         raw = r.stdout.strip().replace("\\", "/")
         if raw_pick:
             path = raw
@@ -802,6 +803,7 @@ def api_pick_usmap_file():
     env     = os.environ.copy()
     env["USMAP_INITIAL"] = os.path.dirname(initial) if initial else ""
     ps = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
         "Add-Type -AssemblyName System.Windows.Forms; "
         "$f = New-Object System.Windows.Forms.OpenFileDialog; "
         "$f.Title = 'Select USMAP mapping file'; "
@@ -811,7 +813,7 @@ def api_pick_usmap_file():
     )
     try:
         r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                             capture_output=True, text=True, timeout=120, env=env)
+                             capture_output=True, encoding="utf-8", timeout=120, env=env)
         raw = r.stdout.strip().replace("\\", "/")
         response.content_type = "application/json"
         return json.dumps({"ok": True, "path": raw})
@@ -1862,7 +1864,8 @@ def api_install_mod():
 @app.post("/api/pick_mod_file")
 def api_pick_mod_file():
     """Native picker for a mod to repatch (.zip / .pak / .utoc). Reports if it's password-locked."""
-    ps = ("Add-Type -AssemblyName System.Windows.Forms; "
+    ps = ("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+          "Add-Type -AssemblyName System.Windows.Forms; "
           "$f = New-Object System.Windows.Forms.OpenFileDialog; "
           "$f.Title = 'Select a mod to repatch'; "
           "$f.Filter = 'Mods (*.zip;*.pak;*.utoc)|*.zip;*.pak;*.utoc|All files (*.*)|*.*'; "
@@ -1870,7 +1873,7 @@ def api_pick_mod_file():
     response.content_type = "application/json"
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                           capture_output=True, text=True, timeout=180)
+                           capture_output=True, encoding="utf-8", timeout=180)
         path = r.stdout.strip().replace("\\", "/")
         locked = False
         if path:
