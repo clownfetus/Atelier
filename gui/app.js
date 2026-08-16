@@ -79,7 +79,11 @@ const ICON_CLS_TO_LUCIDE = {
 // ── helpers ───────────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    return { ok: false, error: `server error (${res.status})` };
+  }
 }
 
 function toastSpinner(msg) {

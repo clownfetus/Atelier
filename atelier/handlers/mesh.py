@@ -1465,13 +1465,22 @@ def export_glb(mesh, lod_index, out_path):
     ARRAY, ELEM = 34962, 34963
     F32, U16 = 5126, 5123
 
-    materials_json, mat_lookup = [], {}
-    for m in mesh.materials:
-        mat_lookup[m["pkg_idx"]] = len(materials_json)
+    # One glTF material PER SLOT, indexed by slot -- NOT keyed by the material ASSET the slot
+    # points at. Several slots can share one asset (SK_1033_1033504 does it four times over:
+    # Equip_01/Equip_01_01 both point at MI_1033504_Equip_01, and likewise for Equip_04,
+    # Equip_02, Equip_03). Keying on pkg_idx made the second slot of each pair overwrite the
+    # first, so BOTH sections exported pointing at one glTF material; Blender then merged the
+    # pair into a single slot and dropped the other, and the mesh came back with 12 materials
+    # for 16 sections. glb_to_sections matches sections to primitives by slot NAME, so the
+    # four missing names made the mesh fail to rebuild at all -- it was not editable before
+    # this. Slot names are unique where asset names are not, which is exactly why they are
+    # the key (S3.9, S3.18).
+    materials_json = [
         # doubleSided so Blender's importer doesn't backface-cull thin geometry (skirts,
         # capes, hair cards) while the mesh is being edited -- purely a display aid, since
         # winding below is corrected to read right in a single-sided viewer too.
-        materials_json.append({"name": m["slot_name"] or f"mat_{m['pkg_idx']}", "doubleSided": True})
+        {"name": m["slot_name"] or f"mat_{i}", "doubleSided": True}
+        for i, m in enumerate(mesh.materials)]
 
     # One vertex pool PER PRIMITIVE, with section-local indices. Sharing a single pool
     # across primitives is legal glTF but means every primitive nominally spans the whole
@@ -1505,11 +1514,12 @@ def export_glb(mesh, lod_index, out_path):
             attrs[f"TEXCOORD_{c}"] = accessor(uv[lo:hi, c, :].astype("f4"), F32, "VEC2", ARRAY)
         if color is not None:
             attrs["COLOR_0"] = accessor(color[lo:hi].astype("f4"), F32, "VEC4", ARRAY)
-        mat_pkg = mesh.materials[sec["mat"]]["pkg_idx"] if sec["mat"] < len(mesh.materials) else None
         primitives.append({
             "attributes": attrs,
             "indices": accessor((idx - lo).astype("<u4"), 5125, "SCALAR", ELEM),
-            "material": mat_lookup.get(mat_pkg, 0) if materials_json else None,
+            # The section's own slot index IS the material index -- one glTF material per slot.
+            "material": (sec["mat"] if sec["mat"] < len(materials_json) else 0)
+                        if materials_json else None,
         })
 
     nodes = [{"name": b["name"], "children": [], "translation": t.tolist(),

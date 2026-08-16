@@ -1512,16 +1512,17 @@ def api_project_rename():
         return json.dumps({"ok": False, "error": "invalid name"})
     old_dir = os.path.join(PROJECTS_ROOT, old_name)
     new_dir = os.path.join(PROJECTS_ROOT, new_name)
+    response.content_type = "application/json"
     if not os.path.isdir(old_dir):
-        response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
-    if os.path.exists(new_dir):
-        response.content_type = "application/json"
+    if os.path.exists(new_dir) and old_name.lower() != new_name.lower():
         return json.dumps({"ok": False, "error": "name already taken"})
-    os.rename(old_dir, new_dir)
+    try:
+        os.rename(old_dir, new_dir)
+    except OSError as e:
+        return json.dumps({"ok": False, "error": str(e)})
     if get_active_project() == old_name:
         set_active_project(new_name)
-    response.content_type = "application/json"
     return json.dumps({"ok": True})
 
 @app.post("/api/project/duplicate")

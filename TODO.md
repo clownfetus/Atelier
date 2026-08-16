@@ -1,8 +1,8 @@
 charID manual refresh option
 auto-refreshing usmap/aes fetch
 confirm version/auto-update works
-pin common folders to start
 project rename doesnt work
+supress Asset Edited spam on project switch (project load?), remove when deleted externally
 
 viewport meshes seem horizontally compressed a little
 optimize 3d view re-open
