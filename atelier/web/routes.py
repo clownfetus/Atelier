@@ -10,8 +10,7 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             get_import_root, get_active_project, set_active_project,
                             project_base, project_base_legacy, project_game_rel,
                             get_mods_folder, save_mods_folder,
-                            get_export_password, save_export_password,
-                            get_aes_key2, save_aes_key2)
+                            get_export_password, save_export_password)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -451,14 +450,11 @@ def api_setup_status():
         suggestion = _c.paks_suggestion()
         mr_prefill = _mr_root_to_display(suggestion) if suggestion else ""
     aes_prefill  = ("0x" + aes) if aes else ""
-    aes2         = get_aes_key2()
-    aes2_prefill = ("0x" + aes2) if aes2 else ""
     usmap_prefill = (_c.USMAP or "").replace("\\", "/")
     response.content_type = "application/json"
     return json.dumps({"configured": configured,
                        "paks_prefill":  mr_prefill,
                        "aes_prefill":   aes_prefill,
-                       "aes2_prefill":  aes2_prefill,
                        "usmap_prefill": usmap_prefill,
                        "mods_prefill":  get_mods_folder(),
                        "password_prefill": get_export_password()})
@@ -543,7 +539,6 @@ def api_save_paks():
     body       = request.json or {}
     path       = body.get("path", "").strip()
     aes_key    = body.get("aes_key", "").strip()  # stored without 0x prefix
-    aes_key2   = (body.get("aes_key2") or "").strip()  # optional "Pakchunk7 Key", without 0x prefix
     usmap_path = body.get("usmap_path", "").strip()
     has_mods   = "mods_folder" in body            # only touch mods config when the field was sent
     mods_folder = (body.get("mods_folder") or "").strip()
@@ -562,7 +557,6 @@ def api_save_paks():
     try:
         save_setup_config(paks_path, aes_key,
                           usmap_path if (usmap_path and os.path.exists(usmap_path)) else None)
-        save_aes_key2(aes_key2)   # empty string clears it
         if has_mods:
             save_mods_folder(mods_folder)   # empty string clears it
         elif not get_mods_folder():

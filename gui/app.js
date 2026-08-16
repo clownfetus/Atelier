@@ -1539,7 +1539,6 @@ async function checkSetup() {
     _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
-    document.getElementById("setup-aes2").value  = statusRes.aes2_prefill || "";
     document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
     _setSetupLoading(false);
     await validateSetup();
@@ -1574,7 +1573,6 @@ async function openPaths() {
     _protectionPassword = statusRes.password_prefill || "";
     document.getElementById("setup-path").value     = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value      = aes  || statusRes.aes_prefill  || "";
-    document.getElementById("setup-aes2").value     = statusRes.aes2_prefill || "";
     document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
     document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
     document.getElementById("setup-password").value = statusRes.password_prefill || "";
@@ -1595,7 +1593,6 @@ async function validateSetup() {
   const path    = document.getElementById("setup-path").value.trim();
   const usmap   = document.getElementById("setup-usmap").value.trim();
   const key     = document.getElementById("setup-aes").value.trim();
-  const key2    = document.getElementById("setup-aes2").value.trim();
   const el      = document.getElementById("setup-status");
   const saveBtn = document.getElementById("setup-save");
 
@@ -1637,10 +1634,6 @@ async function validateSetup() {
   if (key) {
     keyStatus = /^0x[0-9A-Fa-f]{60,68}$/.test(key) ? "ok" : "invalid";
   }
-  let key2Status = "";
-  if (key2) {
-    key2Status = /^0x[0-9A-Fa-f]{60,68}$/.test(key2) ? "ok" : "invalid";
-  }
 
   const pakOk    = pakStatus === "ok";
   const usmapOk  = usmapStatus === "ok";
@@ -1648,11 +1641,10 @@ async function validateSetup() {
   const pakBad   = pakStatus === "wrong_folder" || pakStatus === "missing";
   const usmapBad = usmapStatus === "invalid" || usmapStatus === "missing";
   const keyBad   = keyStatus === "invalid";
-  const key2Bad  = key2Status === "invalid";
   const modsOk   = modsStatus === "ok";
   const modsBad  = modsStatus === "invalid";
 
-  if (pakOk && usmapOk && keyOk && !modsBad && !key2Bad) {
+  if (pakOk && usmapOk && keyOk && !modsBad) {
     el.className = "ok";
     el.innerHTML = '<i data-lucide="check-circle" size="13"></i> All Valid';
     saveBtn.disabled = false;
@@ -1669,9 +1661,6 @@ async function validateSetup() {
     } else if (keyBad) {
       el.className = "error";
       el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid AES key format';
-    } else if (key2Bad) {
-      el.className = "error";
-      el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Invalid Pakchunk7 Key format';
     } else if (modsBad) {
       el.className = "error";
       el.innerHTML = '<i data-lucide="x-circle" size="13"></i> Mods folder path is not a folder';
@@ -1684,31 +1673,15 @@ async function validateSetup() {
   }
   lucide.createIcons({ nodes: [el] });
 
-  const aes2StatusEl = document.getElementById("setup-aes2-status");
-  if (key2Status === "ok") {
-    aes2StatusEl.className = "setup-field-status ok";
-    aes2StatusEl.innerHTML = '<i data-lucide="check-circle" size="12"></i> Valid key format';
-  } else if (key2Status === "invalid") {
-    aes2StatusEl.className = "setup-field-status error";
-    aes2StatusEl.innerHTML = '<i data-lucide="x-circle" size="12"></i> Invalid key format';
-  } else {
-    aes2StatusEl.className = "setup-field-status";
-    aes2StatusEl.innerHTML = "";
-  }
-  lucide.createIcons({ nodes: [aes2StatusEl] });
-
   const pathEl  = document.getElementById("setup-path");
   const usmapEl = document.getElementById("setup-usmap");
   const aesEl   = document.getElementById("setup-aes");
-  const aes2El  = document.getElementById("setup-aes2");
   pathEl.classList.toggle("setup-valid",   pakOk);
   pathEl.classList.toggle("setup-invalid", pakBad);
   usmapEl.classList.toggle("setup-valid",   usmapOk);
   usmapEl.classList.toggle("setup-invalid", usmapBad);
   aesEl.classList.toggle("setup-valid",   keyOk);
   aesEl.classList.toggle("setup-invalid", keyBad || (pakOk && usmapOk && !key));
-  aes2El.classList.toggle("setup-valid",   key2Status === "ok");
-  aes2El.classList.toggle("setup-invalid", key2Bad);
   if (_pathsMode) {
     const modsEl = document.getElementById("setup-mods");
     modsEl.classList.toggle("setup-valid",   modsOk);
@@ -1719,22 +1692,12 @@ async function validateSetup() {
 document.getElementById("setup-path").addEventListener("input", validateSetup);
 document.getElementById("setup-usmap").addEventListener("input", validateSetup);
 document.getElementById("setup-aes").addEventListener("input", validateSetup);
-document.getElementById("setup-aes2").addEventListener("input", validateSetup);
 document.getElementById("setup-mods").addEventListener("input", validateSetup);
 document.getElementById("setup-paste-key").addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (text) {
       document.getElementById("setup-aes").value = text.trim();
-      validateSetup();
-    }
-  } catch {}
-});
-document.getElementById("setup-paste-key2").addEventListener("click", async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      document.getElementById("setup-aes2").value = text.trim();
       validateSetup();
     }
   } catch {}
@@ -1808,12 +1771,10 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const usmapPath = document.getElementById("setup-usmap").value.trim();
   const rawKey    = document.getElementById("setup-aes").value.trim();
   const aes_key   = rawKey.toLowerCase().startsWith("0x") ? rawKey.slice(2) : rawKey;
-  const rawKey2   = document.getElementById("setup-aes2").value.trim();
-  const aes_key2  = rawKey2.toLowerCase().startsWith("0x") ? rawKey2.slice(2) : rawKey2;
   if (!path)      { toast("Please enter a path", "warning"); return; }
   if (!usmapPath) { toast("Please enter or auto-fetch a USMAP file", "warning"); return; }
   if (!aes_key)   { toast("Please enter an AES key", "warning"); return; }
-  const payload = { path, aes_key, aes_key2, usmap_path: usmapPath };
+  const payload = { path, aes_key, usmap_path: usmapPath };
   if (_pathsMode) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
     payload.export_password = document.getElementById("setup-password").value;

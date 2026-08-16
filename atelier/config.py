@@ -242,19 +242,6 @@ def save_export_password(password):
         cfg.pop("export_password", None)
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
-def get_aes_key2():
-    """The secondary 'Pakchunk7 Key' set in Settings (without 0x prefix). Stored alongside the
-    main aes_key but not yet consumed by any decode path."""
-    return _load_config().get("aes_key2", "") or ""
-
-def save_aes_key2(key):
-    cfg = _load_config()
-    if key:
-        cfg["aes_key2"] = key
-    else:
-        cfg.pop("aes_key2", None)
-    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
-
 def _prereq_issues(need_tool=True):
     issues = []
     if not glob.glob(PAKS + "/pakchunk*.utoc"):
