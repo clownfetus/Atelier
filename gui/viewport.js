@@ -21,6 +21,7 @@ let matData    = {};   // "MI_..." -> {game_rel, colors:[{name,rgba}], scalars, 
 let edited      = {};  // "MI_..." -> { paramName: [r,g,b,a] }  (unsaved session edits)
 let currentSkin = null;
 let objects     = [];  // [{ name, root: THREE.Object3D }] — one entry per top-level mesh added to modelRoot
+let meshMeta    = [];  // [{ name, game_rel }] parallel to objects — source path for "Edit In Blender"
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
 // ACES filmic tonemap (Narkowicz), per channel. UE material colours are LINEAR and often HDR (>1,
@@ -104,6 +105,7 @@ function init() {
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
   $('viewport-mat-reset').addEventListener('click', revertEdits);
+  $('viewport-blender-btn').addEventListener('click', editInBlender);
 
   window.addEventListener('resize', onResize);
   inited = true;
@@ -138,10 +140,24 @@ function disposeTree(obj) {
 function clearModel() {
   generation++;   // invalidate any in-flight texture loads from the previous model
   for (const ch of [...modelRoot.children]) { modelRoot.remove(ch); disposeTree(ch); }
-  matsByName = {}; matData = {}; edited = {}; currentSkin = null; objects = [];
+  matsByName = {}; matData = {}; edited = {}; currentSkin = null; objects = []; meshMeta = [];
   const list = $('viewport-mat-list'); if (list) list.innerHTML = '';
   const objList = $('viewport-obj-list'); if (objList) objList.innerHTML = '';
   updateSidebarVisibility();
+  refreshBlenderBtn();
+}
+
+// The footer "Edit In Blender" button targets whichever mesh is currently loaded — the same
+// extraction the right-click "Edit in Blender" menu item runs on a single mesh card.
+function refreshBlenderBtn() {
+  const btn = $('viewport-blender-btn');
+  if (btn) btn.disabled = !meshMeta.length;
+}
+function editInBlender() {
+  const target = meshMeta[0];
+  if (!target) return;
+  if (typeof window.meshBlendExtract === 'function') window.meshBlendExtract(target.game_rel, target.name);
+  else note('Blender extraction unavailable', 'warning');
 }
 
 // Sidebar shows the Objects panel and/or Materials panel independently, and hides itself entirely
@@ -585,12 +601,14 @@ async function open(skinId, title) {
         collectMats(gltf.scene);
         modelRoot.add(gltf.scene);
         objects.push({ name: meshes[i].name, root: gltf.scene });
+        meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
         loaded++;
         frameCamera();
       } catch (e) { console.warn('viewport: mesh load failed', meshes[i].name, e); }
     }
     $('viewport-status').textContent = loaded ? `${loaded} part${loaded !== 1 ? 's' : ''}` : '';
     if (!loaded) { $('viewport-loading-msg').textContent = 'Failed to load meshes.'; return; }
+    refreshBlenderBtn();
     buildObjectPanel();
     frameCamera();
     $('viewport-loading').style.display = 'none';
@@ -620,6 +638,8 @@ async function openMesh(gameRel, name, skinId) {
     collectMats(gltf.scene);
     modelRoot.add(gltf.scene);
     objects.push({ name: name || 'Mesh', root: gltf.scene });
+    meshMeta.push({ name: name || 'Mesh', game_rel: gameRel });
+    refreshBlenderBtn();
     buildObjectPanel();
     frameCamera();
     $('viewport-status').textContent = name || '';

@@ -20,6 +20,7 @@ import sys
 
 from atelier.config import ASSETS_MODS, CNW, USMAP, _CACHE, get_import_root, project_base
 from atelier.handlers import mesh as _mesh
+from atelier.handlers import meshgraft as _meshgraft
 from atelier.handlers import meshmat as _meshmat
 from atelier.handlers import meshsurvey as _survey
 from atelier.tools import uat
@@ -133,6 +134,10 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
         raise RuntimeError(f"no .blend at {blend_path} -- run extract first")
     m = _mesh.Mesh(base)
 
+    graft = _meshgraft.load_graft(blend_path)
+    reweight = _meshgraft.reweights_from(graft)
+    repoints = _meshgraft.repoints_from(graft)
+
     lod0_tris = sum(s["num_tris"] for s in m.lods[0]["sections"])
     applied = []
     for i, lod in enumerate(m.lods):
@@ -151,7 +156,7 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
                 f"LOD{i} (decimate ratio {ratio:.3f}) lost every face of: {', '.join(missing)}. "
                 f"That section would be empty, which the engine does not tolerate. Give those "
                 f"materials more geometry, or raise the LOD ratio.")
-        secs = _mesh.glb_to_sections(m, i, glb)
+        secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight)
         info = m.rebuild_lod(i, secs)
         applied.append({"lod": i, "ratio": round(ratio, 4), **info})
         os.remove(glb)
@@ -160,6 +165,10 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     asset_name = os.path.basename(base)
     m.save(target, asset_name)
 
+    # Cross-character grafts: point a slot at ANOTHER character's material. Adds imports to
+    # the .uasset, so it must run BEFORE uat fix -- fix stays the last word on SerialSize.
+    grafted = _meshgraft.repoint(os.path.join(target, asset_name), repoints) if repoints else []
+
     # The engine reads the SkeletalMesh export's SerialSize from the .uasset; every LOD
     # resize changes it (and the .ubulk length feeds into UAssetTool's formula), so this
     # must run before packing or the package fails to load with a size mismatch.
@@ -167,7 +176,7 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     r = uat(["fix", os.path.abspath(uasset), USMAP])
     if r.returncode != 0:
         raise RuntimeError("uat fix failed: " + ((r.stdout or "") + (r.stderr or ""))[-400:])
-    return {"applied": applied, "stage": stage, "uasset": uasset}
+    return {"applied": applied, "stage": stage, "uasset": uasset, "grafted": grafted}
 
 
 def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mod_name=None):

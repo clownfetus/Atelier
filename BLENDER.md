@@ -529,7 +529,11 @@ cannot be recovered after the fact and must not silently default to white either
    This is what keeps a rebuild a *value-only* patch of existing section records — a
    changing BoneMap size would cascade into resizing the section table, `RequiredBones`,
    and every later LOD's position in the `.uexp`.
-2. **Section count, order and materials are fixed.**
+2. **Section count and order are fixed**, and so is the *set* of material slots — but which
+   material asset a slot POINTS AT is editable, which is what makes cross-character grafts
+   possible (§4c). Geometry still has to be assigned to an existing slot; a Blender material
+   that is not a slot on the mesh is dropped, and `glb_to_sections` now raises rather than
+   letting that happen silently.
 3. **The skeleton is passed through verbatim.** Verified byte-identical: RefSkeleton
    (51,596 B), whole pre-LOD region (57,922 B), `RequiredBones`/`ActiveBoneIndices`
    (1,010 B), and every BoneMap in all 3 LODs. The mod ships **one package** (the mesh);
@@ -612,6 +616,105 @@ that can stay as assertions and never be implemented.
 resolved with `suffix_bytes == 4` on 1,538 of 1,542. Only 2 LODs failed a tail walk and 1
 mesh failed to parse at all. That is the same standard used elsewhere here — two
 independent derivations agreeing — applied at scale.
+
+---
+
+## 4c. Cross-character grafts — moving geometry between characters
+
+Transplanting one character's hair (or any part) onto another and having it keep the donor's
+own surface. Handled by `atelier/handlers/meshgraft.py` plus a `reweight` pass in
+`glb_to_sections`. Driven by a sidecar next to the `.blend`, `<asset>.graft.json`:
+
+```json
+{"slots": {"MI_1029304_10290_Hair_01": {
+    "repoint":  "Characters/1024/1024307/Materials/MI_1024307_Hair_01",
+    "reweight": "all"}}}
+```
+
+The key is the **cooked slot name** (never rename it — it is what `glb_to_sections` matches
+sections on, §3.9). `repoint` is the donor MI's `game_rel`; `reweight` is `"all"` (default),
+`"zero_weight"`, or `null`.
+
+### Why a repoint is the whole feature
+A section's identity in the cooked format IS its material. So the transplant splits in two:
+put the vertices in the target's hair section (Blender), and make that section render with
+the donor's material (code). Without the second half the grafted hair shows up wearing the
+target's hair texture. Because the reference is to the donor's real base-game package, a
+later retexture of the DONOR shows up on the target automatically — there is no copied
+material to drift.
+
+**Nothing extra ships.** The donor MI and its textures are ordinary base-game packages and
+resolve at runtime like any other import. The mod is still one package.
+
+### How the reference is added
+`FSkeletalMaterial.MaterialInterface` is an FPackageIndex into the import table — and the
+import table is in the `.uasset` while the material array is in the `.uexp`, so the two
+halves are patched differently:
+
+- `.uasset` — two imports appended (a `Package` import naming the donor's package path, and a
+  `MaterialInstanceConstant` import whose `OuterIndex` points at it), via
+  `uat to_json` → mutate → `uat from_json`. Their class fields are **cloned from the import
+  being replaced** rather than spelled out: a repoint is always MI→MI. Growing the import
+  table shifts the name table, every summary offset and every export `SerialOffset`;
+  UAssetAPI recomputes all of it on write, so none is done by hand.
+- `.uexp` — `MaterialInterface` overwritten in place, 4 bytes, no resize (offset captured as
+  `pkg_off` by `mesh._try_extras`).
+
+Runs **before** `uat fix`, which stays the last word on `SerialSize` (§3.13). The `.uexp`
+from `from_json` is asserted byte-identical to the one fed in, so the geometry that ships is
+always what the pipeline built, never a re-serialisation of it.
+
+**The JSON round-trip is lossy, and it provably does not matter.** MR ships cooked packages
+with **zeroed name-table hashes**; the JSON carries names as plain strings, so UAssetAPI
+recomputes them on write — 2,292 bytes over 587 name entries on `SK_10290_1029304` (`uat fix`,
+which reads and writes binary directly, is byte-exact by comparison). This never reaches the
+game: building the same mesh through `create_mod_iostore` from the vanilla `.uasset` and from
+the round-tripped one gives **byte-identical `.ucas`/`.utoc`/`.pak`**. Zen conversion rebuilds
+the name map from scratch. *Compare both builds under the SAME output name* — the container ID
+is derived from it, and differing names alone account for an 8-byte `.ucas` difference that has
+nothing to do with contents.
+
+### Weights: donor geometry arrives unrigged
+Donor vertex groups name the DONOR's bones. Blender's glTF exporter pairs groups to armature
+bones by name, so they are dropped and those vertices export with **no influences at all** —
+which nothing downstream caught: zero weights survive normalisation and reach
+`quantize_weights`, whose largest-remainder pass hands 255 units across 8 columns and emits
+rows summing to 8. That reads as geometry pinned near the component origin, not a crash.
+
+`transfer_weights_from_vanilla` fixes it by copying skinning from the section's **own vanilla
+vertices**, nearest-neighbour in model space (`scipy.spatial.cKDTree`). Sourcing from the same
+LOD being rebuilt means every bone copied is already in that LOD's BoneMap (constraint 1 holds
+untouched), and the graft inherits whatever real rig the target's hair used — jiggle-bone
+chains included — rather than being pinned to one bone. Verified **exactly idempotent** on
+unedited geometry across all 12 sections of the reference mesh (max distance 0.0, indices and
+weights identical), so `"all"` is safe to leave on.
+
+A vertex still weightless after that pass is now a hard error, and vertices further from any
+vanilla source than the section is wide produce a warning — that is what a graft that was
+never positioned onto the target's head looks like.
+
+### The Blender side (what the MCP agent must do)
+All of this follows from `blend_to_glb.py`:
+
+- Every object except ones named exactly `Armature` and `SkeletalMesh` is **deleted** at
+  export. Donor hair must be **joined into** `SkeletalMesh`, not left beside it.
+- Grafted faces must be assigned to an **existing** target slot, unrenamed.
+- Delete the target's own hair faces in that slot — but never empty the slot: an empty section
+  is a hard crash (§3.2). `stage_mesh` already catches this per-LOD.
+- Do no weight painting; `reweight` handles it.
+
+Procedure: extract both skins → in the target, `bpy.ops.wm.append` the donor's `SkeletalMesh`
+→ delete down to the hair → scale/align onto the target's head → join into the target
+`SkeletalMesh` → assign the target's hair slot → delete the target's original hair faces →
+save → write the sidecar → build.
+
+### Verified
+Repoint applied to `SK_10290_1029304` slot `MI_1029304_10290_Hair_01` →
+`MI_1024307_Hair_01` (Hela's), packed with `create_mod_iostore` and extracted back to legacy:
+that one slot resolves to the donor package, the other 11 are untouched. The restructure that
+moved `collapse_weights_to_bonemap` out of the per-primitive loop is **byte-neutral** —
+a full 3-LOD Blender rebuild before and after the change produced identical `.uasset`,
+`.uexp` and `.ubulk`. Not yet confirmed in-game with real transplanted geometry.
 
 ---
 

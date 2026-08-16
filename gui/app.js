@@ -28,8 +28,9 @@ const ASSET_HANDLERS = {
   texture:  { import_endpoint: "/api/import_texture",  preview: true,  icon: "image"        },
   material: { import_endpoint: "/api/import_material", preview: false, icon: "circle-star"  },
   vfx:      { import_endpoint: "/api/import_vfx",      preview: false, icon: "sparkles"     },
-  mesh:     { import_endpoint: null,                   preview: false, icon: "box"          },
+  mesh:     { import_endpoint: null,                   preview: false, icon: "scan-box"     },
   curve:    { import_endpoint: "/api/curve_params",    preview: false, icon: "spline"       },
+  text:     { import_endpoint: "/api/text_params",     preview: false, icon: "type-outline" },
 };
 function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
@@ -39,6 +40,7 @@ const ASSET_ICON_CLS = {
   material: "material-icon",
   mesh:     "mesh-icon",
   curve:    "curve-icon",
+  text:     "text-icon",
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
@@ -48,6 +50,8 @@ const FOLDER_ICON_PATTERNS = [
   [/^textures?$/i,      "texture-folder-icon"],
   [/^materials?$/i,     "material-folder-icon"],
   [/^(vfx|effects?)$/i, "vfx-folder-icon"],
+  [/^meshes?$/i,        "mesh-folder-icon"],
+  [/^(text|stringtables?)$/i, "text-folder-icon"],
 ];
 function folderIconCls(name) {
   const hit = FOLDER_ICON_PATTERNS.find(([re]) => re.test(name));
@@ -59,13 +63,16 @@ const ICON_CLS_TO_LUCIDE = {
   "texture-folder-icon":  "image",
   "material-folder-icon": "circle-star",
   "vfx-folder-icon":      "sparkles",
+  "mesh-folder-icon":     "scan-box",
+  "text-folder-icon":     "type-outline",
   "char-icon":            "square-user-round",
   "ui-folder-icon":       "swatch-book",
   "texture-icon":         "image",
   "vfx-icon":             "sparkles",
   "material-icon":        "circle-star",
-  "mesh-icon":            "box",
+  "mesh-icon":            "scan-box",
   "curve-icon":           "spline",
+  "text-icon":            "type-outline",
   "unhandled-icon":       "file-question",
 };
 
@@ -231,7 +238,6 @@ async function renderGrid() {
 
     const importable = data.filter(d => d.type === "asset" && d.file_type === "texture");
     document.getElementById("import-all-btn").disabled = importable.length === 0;
-    document.getElementById("view3d-fab").classList.toggle("show", !!skinIdFromPath(nav.path));
 
     const unimportedTextures = data.filter(d => d.type === "asset" && d.file_type === "texture" && !d.imported);
     if (unimportedTextures.length) {
@@ -257,7 +263,12 @@ function buildGrid(cards) {
   const area = document.getElementById("grid-area");
   const q = document.getElementById("search-input").value.trim().toLowerCase();
 
-  const filtered = q ? cards.filter(c => c.label.toLowerCase().includes(q)) : cards;
+  let filtered = q ? cards.filter(c => c.label.toLowerCase().includes(q)) : cards;
+
+  if (!nav.path) {
+    const isPinned = c => c.type === "folder" && c.iconCls && c.iconCls !== "folder-icon";
+    filtered = [...filtered.filter(isPinned), ...filtered.filter(c => !isPinned(c))];
+  }
 
   if (!filtered.length) {
     area.innerHTML = `<div id="empty-state">
@@ -409,10 +420,11 @@ async function meshBlendExtract(game_rel, name, force = false) {
     // Blender keeps painted pixels only in memory for LINKED images: saving the .blend does not
     // save them, and reopening silently restores the original. Say so once, up front, because
     // the failure is invisible until the user has already lost the work.
-    toast("Painted textures must be saved in Blender (Image ▸ Save All Images) — saving the .blend alone discards them", "info", 12000);
+    toast("Painted textures must be saved in Blender (Image ▸ Save) — saving the .blend alone isn't enough", "info", 12000);
     (res.warnings || []).slice(0, 4).forEach(w => toast(w, "warning", 9000));
     refreshSidebarEntry(game_rel, name, skinIdFromPath(nav.path));
     renderGrid();
+    openBlend(game_rel);   // queuing a mesh means editing it now, same as a texture's auto "Open With"
   } catch (e) {
     t.remove();
     setStatus("");

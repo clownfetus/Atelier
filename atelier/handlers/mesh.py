@@ -191,6 +191,7 @@ def _try_extras(d, o, limit):
     for _ in range(count):
         if o + 40 > limit:
             return None
+        pkg_off = o                        # MaterialInterface: patched in place by meshgraft
         (pkg,) = struct.unpack_from("<i", d, o)
         if not -100000 < pkg < 100000:
             return None
@@ -202,7 +203,8 @@ def _try_extras(d, o, limit):
         if not 0 <= ntag <= 64:
             return None
         o += 4 + ntag * 8
-        mats.append({"pkg_idx": pkg, "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0]})
+        mats.append({"pkg_idx": pkg, "pkg_off": pkg_off,
+                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0]})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)
@@ -1106,8 +1108,45 @@ def _compute_tangents(pos, uv0, normal, tris):
     return tan.astype("f4"), w.astype("f4")
 
 
-def glb_to_sections(mesh, lod_index, glb_path):
+def transfer_weights_from_vanilla(mesh, lod, sec, positions):
+    """Re-rig geometry onto the TARGET skeleton by copying skinning from this section's own
+    VANILLA vertices, nearest-neighbour in model space. Returns (global_idx, weight, dist).
+
+    Geometry grafted in from another character arrives weighted to the DONOR's bones. Those
+    bone names do not exist in this skeleton, so Blender's glTF exporter -- which pairs vertex
+    groups to armature bones by name -- drops them silently and the vertices export with no
+    influences at all. Nothing downstream catches that: zero weights survive normalisation and
+    reach quantize_weights, whose largest-remainder pass then hands out 255 units across only
+    8 columns and emits rows summing to 8. The result is geometry pinned near the component
+    origin rather than a crash, which is the worst way for it to fail.
+
+    Copying from the vanilla section fixes it in the frame that actually matters. The source
+    is the same LOD being rebuilt, so every bone copied is already in that LOD's own BoneMap
+    (BoneMaps are never resized -- design constraint 1), and the grafted hair inherits
+    whatever real rig the target's own hair used, jiggle-bone chains included, instead of
+    being rigidly pinned to one bone. It is also near-idempotent on untouched geometry: each
+    vanilla vertex's nearest source is itself.
+    """
+    from scipy.spatial import cKDTree
+
+    lo = sec["base_vertex"]
+    hi = lo + sec["num_verts"]
+    src_pos = np.asarray(mesh.positions(lod)[lo:hi], "f8")
+    sidx, swgt = mesh.skin_weights(lod)
+    bonemap = np.asarray(mesh.section_bonemap(sec), np.uint16)
+    src_gi = bonemap[np.asarray(sidx[lo:hi], np.int64)]        # section-local -> global
+    src_w = np.asarray(swgt[lo:hi], "f8")
+
+    dist, j = cKDTree(src_pos).query(np.asarray(positions, "f8"), k=1)
+    return src_gi[j], src_w[j], dist, src_pos
+
+
+def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
     """Convert an edited .glb back into the per-section arrays rebuild_lod expects.
+
+    `reweight` is {slot name: 'all'|'zero_weight'} from the graft sidecar: those sections have
+    their skinning recomputed from the vanilla mesh by transfer_weights_from_vanilla, which is
+    what makes geometry transplanted from another character follow this skeleton.
 
     Primitives are matched to sections by MATERIAL NAME (the same names export_glb wrote),
     not by order -- Blender reorders primitives freely, and matching positionally would
@@ -1173,6 +1212,26 @@ def glb_to_sections(mesh, lod_index, glb_path):
             by_mat.setdefault(nm, []).append(prim)
 
     ntc = lod["num_tex_coords"]
+    reweight = reweight or {}
+
+    # Geometry on a material that is not a slot on this MESH is DROPPED -- sections only ever
+    # consume their own slot name, so anything else in `by_mat` is simply never read. That is
+    # the natural mistake when grafting (donor geometry arrives carrying the donor's own
+    # material, or gets parked on a new Blender slot) and it would otherwise show up as a mod
+    # that builds cleanly and is missing the transplant.
+    #
+    # Checked against every slot on the mesh, NOT against this LOD's sections: decimated LODs
+    # legitimately drop whole sections (LOD2 has 10 of this mesh's 12 -- S3.9) while the
+    # .blend still carries all of the materials, so scoping this to one LOD would reject
+    # every ordinary multi-LOD build.
+    known = {m["slot_name"] for m in mesh.materials}
+    stray = sorted(n for n in by_mat if n is not None and n not in known)
+    if stray:
+        raise ValueError(
+            f"{len(stray)} material(s) in the .blend are not slots on this mesh, so their "
+            f"geometry would be silently dropped: {', '.join(stray)}. Assign that geometry to "
+            f"one of the existing slots instead: {', '.join(sorted(n for n in known if n))}")
+
     sections_in = []
     for sec in lod["sections"]:
         slot = mesh.materials[sec["mat"]]["slot_name"]
@@ -1222,10 +1281,6 @@ def glb_to_sections(mesh, lod_index, glb_path):
                     w[:, s*4:(s+1)*4] = wv
             tot = w.sum(1, keepdims=True)
             w = np.where(tot > 0, w / np.where(tot == 0, 1, tot), 0.0)
-            # Collapse influences onto this LOD's own (smaller) BoneMap before they reach
-            # the rebuilder -- required whenever a lower LOD is generated by decimating the
-            # top LOD, whose geometry references the full bone set.
-            gi, w = collapse_weights_to_bonemap(gi, w, mesh.section_bonemap(sec), mesh.bones)
             col = (gltf_accessor(g, bin_, at["COLOR_0"]).astype("f4") if "COLOR_0" in at
                    else None)
             if col is not None and col.shape[1] == 3:
@@ -1255,16 +1310,56 @@ def glb_to_sections(mesh, lod_index, glb_path):
                 f"section {slot!r}: no vertex colours in the exported glb, but the original "
                 f"mesh has a colour buffer -- the Color Attribute is missing for this material "
                 f"(check Object Data Properties > Color Attributes)")
+        pos = np.concatenate(P).astype("f4")
+        gi, w = np.concatenate(GI), np.concatenate(W)
+
+        mode = reweight.get(slot)
+        if mode:
+            src_gi, src_w, dist, src_pos = transfer_weights_from_vanilla(mesh, lod, sec, pos)
+            take = (np.ones(len(pos), bool) if mode == "all"
+                    else w.sum(1) <= 0)
+            gi = gi.copy(); w = w.copy()
+            gi[take], w[take] = src_gi[take], src_w[take]
+            # A graft that was never moved onto the target's head gets weights copied from
+            # whatever vanilla vertex happens to be closest, which is meaningless. The
+            # section's own extent is the natural scale to judge that against.
+            span = float(np.linalg.norm(src_pos.max(0) - src_pos.min(0))) if len(src_pos) else 0.0
+            far = int((dist[take] > span).sum()) if span else 0
+            print(f"[graft] LOD{lod_index} {slot!r}: reweighted {int(take.sum())}/{len(pos)} "
+                  f"vertices from vanilla (max dist {float(dist[take].max()) if take.any() else 0:.1f}cm, "
+                  f"section span {span:.1f}cm)", flush=True)
+            if far:
+                print(f"[graft] WARNING {far} vertex/vertices are further from any vanilla "
+                      f"{slot!r} vertex than that section is wide -- if this is grafted "
+                      f"geometry it probably was not positioned onto the target yet, and "
+                      f"its skinning will be arbitrary", flush=True)
+
+        # Collapse influences onto this LOD's own (smaller) BoneMap before they reach the
+        # rebuilder -- required whenever a lower LOD is generated by decimating the top LOD,
+        # whose geometry references the full bone set. Runs after any reweight so transferred
+        # bones are checked too (they come from this LOD, so this is a no-op for them).
+        gi, w = collapse_weights_to_bonemap(gi, w, mesh.section_bonemap(sec), mesh.bones)
+
+        dead = w.sum(1) <= 0
+        if dead.any():
+            raise ValueError(
+                f"section {slot!r}: {int(dead.sum())} vertex/vertices carry no skin weight at "
+                f"all. Weightless vertices do not reach the game as anything sane -- they "
+                f"quantise to a malformed influence row and collapse toward the component "
+                f"origin. This is what geometry grafted from another character looks like "
+                f"before it is re-rigged: add \"reweight\": \"all\" for this slot to the "
+                f"graft sidecar, or give the vertices groups naming bones this skeleton has.")
+
         sections_in.append({
             "mat": sec["mat"],
-            "positions": np.concatenate(P).astype("f4"),
+            "positions": pos,
             "normal": np.concatenate(N).astype("f4"),
             "tangent": np.concatenate(T).astype("f4"),
             "tan_w": np.concatenate(TW).astype("f4"),
             "uv": np.concatenate(UV).astype("f4"),
             "color": (np.concatenate(C).astype("f4") if has_col else None),
-            "global_idx": np.concatenate(GI).astype(np.uint16),
-            "weight": np.concatenate(W).astype("f4"),
+            "global_idx": gi.astype(np.uint16),
+            "weight": w.astype("f4"),
             "triangles": np.concatenate(TRI).astype(np.uint32),
             "bonemap": mesh.section_bonemap(sec),
         })
