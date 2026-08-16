@@ -1403,6 +1403,20 @@ class _PNGHandler(FileSystemEventHandler):
     def on_created(self, event):
         self.on_modified(event)
 
+    def on_deleted(self, event):
+        # Any edited-asset file (texture/material/curve/vfx json, mesh .blend) removed from the
+        # active project externally (e.g. deleted in Explorer) — tell the sidebar to reconcile.
+        if event.is_directory:
+            return
+        p = event.src_path
+        if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
+            return
+        import_root = get_import_root().replace("\\", "/")
+        evt_path    = p.replace("\\", "/")
+        if not evt_path.startswith(import_root + "/"):
+            return
+        _push_sse({"asset_removed": True})
+
 def _migrate_legacy_imports():
     """Move files from assets/imported/ to projects/Default/ on first use of projects."""
     if not os.path.isdir(IMPORT_ROOT):

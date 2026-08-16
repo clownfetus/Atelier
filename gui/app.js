@@ -1143,6 +1143,10 @@ function handleSSE(d) {
     toast(d.toast, d.toast_type || "info", 5000);
     return;
   }
+  if (d.asset_removed) {
+    loadSidebar();
+    return;
+  }
   if (d.thumb_ready && d.game_rel) {
     const sel = `img[data-game-rel="${CSS.escape(d.game_rel)}"]`;
     document.querySelectorAll(sel).forEach(img => {
@@ -2180,6 +2184,7 @@ async function _selectProject(name) {
     body: JSON.stringify({ name }),
   });
   if (!r.ok) { toast(`Failed to open project: ${r.error}`, "warning"); return; }
+  suppressChangeToastUntil = Date.now() + 2500;
   toast(`Project: ${name}`, "success");
   _applyActiveProject(name);
   document.getElementById("project-overlay").classList.remove("active");
