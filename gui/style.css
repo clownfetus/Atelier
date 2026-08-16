@@ -458,7 +458,25 @@ body {
   box-shadow: 0 24px 60px rgba(0,0,0,.6);
   position: relative;
 }
-#setup-overlay .modal { max-height: 90vh; overflow-y: auto; }
+.setup-modal { padding: 0; gap: 0; max-height: 90vh; overflow: hidden; }
+.setup-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.setup-head h2 { flex: 1; min-width: 0; margin: 0; }
+.setup-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 18px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.setup-foot {
+  flex-shrink: 0;
+  padding: 14px 24px 22px;
+  border-top: 1px solid var(--border);
+}
+.setup-foot .modal-row { margin-top: 0; }
 .modal h2 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .modal p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
 .modal .warning { color: var(--yellow); font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }

@@ -329,61 +329,75 @@
 
 <!-- ── first-run setup / editable Paths panel ── -->
 <div class="overlay" id="setup-overlay">
-  <div class="modal">
-    <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
-    <div class="setup-section">Paths</div>
-    <div class="setup-field">
-      <div class="setup-label">
-        <span>Path to your MarvelRivals install</span>
-        <a href="https://github.com/clownfetus/Atelier#get-marvelrivals-path" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+  <div class="modal setup-modal">
+    <div class="setup-head">
+      <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
+      <button class="sb-clear" id="setup-close" title="Close"><i data-lucide="x" size="16"></i></button>
+    </div>
+    <div class="setup-body">
+      <div class="setup-section">Paths</div>
+      <div class="setup-field">
+        <div class="setup-label">
+          <span>Path to your MarvelRivals install</span>
+          <a href="https://github.com/clownfetus/Atelier#get-marvelrivals-path" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+        </div>
+        <div class="setup-row">
+          <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals" spellcheck="false">
+          <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+        </div>
       </div>
-      <div class="setup-row">
-        <input id="setup-path" type="text" class="setup-input" placeholder="…/MarvelRivals" spellcheck="false">
-        <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+      <div class="setup-field">
+        <div class="setup-label">
+          <span>USMAP mapping file</span>
+          <a href="https://spacedepot.github.io/SpaceHost/" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+        </div>
+        <div class="setup-row">
+          <input id="setup-usmap" type="text" class="setup-input" placeholder="…/Mappings/xxx.usmap" spellcheck="false">
+          <button class="btn" id="setup-usmap-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+        </div>
+      </div>
+      <div class="setup-section">AES Keys</div>
+      <div class="setup-field">
+        <div class="setup-label">
+          <span>Main AES Key</span>
+          <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+        </div>
+        <div class="setup-row">
+          <input id="setup-aes" type="text" class="setup-input" placeholder="0x…" spellcheck="false">
+          <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
+        </div>
+      </div>
+      <div class="setup-section" id="setup-export-section" style="display:none">Export</div>
+      <div class="setup-field" id="setup-mods-row" style="display:none">
+        <div class="setup-label"><span>Folder mods are installed into — used by "Copy to ..." toggle</span></div>
+        <div class="setup-row">
+          <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods" spellcheck="false">
+          <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
+        </div>
+      </div>
+      <div class="setup-field" id="setup-password-row" style="display:none">
+        <div class="setup-label"><span>Protection Password — optional, for "Password Protect" toggle</span></div>
+        <div class="setup-row">
+          <input id="setup-password" type="text" class="setup-input" placeholder="Password" maxlength="64" spellcheck="false">
+        </div>
+      </div>
+      <div class="setup-section">Behavior</div>
+      <div class="setup-field">
+        <label class="toggle-row" id="toggle-import-open-row">
+          <span class="switch"><input type="checkbox" id="toggle-import-open" checked><span class="switch-track"></span></span>
+          Open assets automatically after importing
+        </label>
       </div>
     </div>
-    <div class="setup-field">
-      <div class="setup-label">
-        <span>USMAP mapping file</span>
-        <a href="https://spacedepot.github.io/SpaceHost/" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
+    <div class="setup-foot">
+      <div class="modal-row">
+        <div id="setup-status"></div>
+        <button class="btn" id="setup-cancel" style="display:none">Cancel</button>
+        <button class="btn primary" id="setup-save" disabled>
+          <i data-lucide="check" size="14"></i>
+          <span id="setup-save-label">Save &amp; Continue</span>
+        </button>
       </div>
-      <div class="setup-row">
-        <input id="setup-usmap" type="text" class="setup-input" placeholder="…/Mappings/xxx.usmap" spellcheck="false">
-        <button class="btn" id="setup-usmap-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
-      </div>
-    </div>
-    <div class="setup-section">AES Keys</div>
-    <div class="setup-field">
-      <div class="setup-label">
-        <span>Main AES Key</span>
-        <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
-      </div>
-      <div class="setup-row">
-        <input id="setup-aes" type="text" class="setup-input" placeholder="0x…" spellcheck="false">
-        <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
-      </div>
-    </div>
-    <div class="setup-section" id="setup-export-section" style="display:none">Export</div>
-    <div class="setup-field" id="setup-mods-row" style="display:none">
-      <div class="setup-label"><span>Folder mods are installed into — used by "Copy to ..." toggle</span></div>
-      <div class="setup-row">
-        <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods" spellcheck="false">
-        <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
-      </div>
-    </div>
-    <div class="setup-field" id="setup-password-row" style="display:none">
-      <div class="setup-label"><span>Protection Password — optional, for "Password Protect" toggle</span></div>
-      <div class="setup-row">
-        <input id="setup-password" type="text" class="setup-input" placeholder="Password" maxlength="64" spellcheck="false">
-      </div>
-    </div>
-    <div class="modal-row">
-      <div id="setup-status"></div>
-      <button class="btn" id="setup-cancel" style="display:none">Cancel</button>
-      <button class="btn primary" id="setup-save" disabled>
-        <i data-lucide="check" size="14"></i>
-        <span id="setup-save-label">Save &amp; Continue</span>
-      </button>
     </div>
     <div id="setup-loading">
       <div class="spinner" style="width:28px;height:28px"></div>

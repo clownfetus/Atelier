@@ -22,6 +22,7 @@ let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/"
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
+let   _openAfterImport = localStorage.getItem("atelier.openAfterImport") !== "0"; // Settings → Behavior toggle
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -330,7 +331,11 @@ function buildGrid(cards) {
 
     el.appendChild(thumb);
     el.appendChild(name);
-    el.addEventListener("click", card.onClick);
+    if (card.type === "asset" && card.file_type === "mesh") {
+      el.addEventListener("click", e => _ctxShow(e, _ctxItemsCard(card)));
+    } else {
+      el.addEventListener("click", card.onClick);
+    }
     if (card.type === "asset") {
       el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
     }
@@ -509,8 +514,10 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
       const savedScroll = gridArea.scrollTop;
       await renderGrid();
       gridArea.scrollTop = savedScroll;
-      const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
-      handleImportedFileAction(importedItem);
+      if (_openAfterImport) {
+        const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
+        handleImportedFileAction(importedItem);
+      }
     } else {
       suppressedImportGameRels.delete(item.game_rel);
       toast(`Edit failed: ${res.error}`, "warning");
@@ -1556,6 +1563,7 @@ function _applySetupMode() {
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
   document.getElementById("setup-password-row").style.display = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
+  document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
 }
 
@@ -1585,6 +1593,18 @@ async function openPaths() {
 document.getElementById("setup-cancel").addEventListener("click", () => {
   document.getElementById("setup-overlay").classList.remove("active");
   _pathsMode = false;
+});
+document.getElementById("setup-close").addEventListener("click", () => {
+  document.getElementById("setup-overlay").classList.remove("active");
+  _pathsMode = false;
+});
+
+document.getElementById("toggle-import-open").checked = _openAfterImport;
+_syncToggleRow("toggle-import-open");
+document.getElementById("toggle-import-open").addEventListener("change", e => {
+  _openAfterImport = e.target.checked;
+  localStorage.setItem("atelier.openAfterImport", _openAfterImport ? "1" : "0");
+  _syncToggleRow("toggle-import-open");
 });
 
 let _validateGen = 0;
@@ -1930,13 +1950,13 @@ _ctxFileInput.addEventListener("change", async () => {
 function _ctxItemsCard(card) {
   const items = [];
   if (!card.imported) {
-    items.push({ icon: "download", label: card.file_type === "mesh" ? "View in 3D" : "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    items.push({ icon: card.file_type === "mesh" ? "box" : "download", label: card.file_type === "mesh" ? "View in 3D" : "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
     if (card.file_type === "mesh" && card.game_rel)
-      items.push({ icon: "box", label: "Edit in Blender", action: () => meshBlendExtract(card.game_rel, card.label) });
+      items.push({ icon: "download", label: "Edit in Blender", action: () => meshBlendExtract(card.game_rel, card.label) });
     return items;
   }
   if (card.file_type === "mesh" && card.game_rel)
-    items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(card.game_rel) });
+    items.push({ icon: "download", label: "Open in Blender", action: () => openBlend(card.game_rel) });
   if (card.game_rel)
     items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(card.game_rel)}`) });
   if (card.game_rel)
