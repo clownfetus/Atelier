@@ -1,5 +1,5 @@
 import os, json, subprocess, threading, atexit
-from atelier.config import TOOLS, CNW, ROOT, PAKS, USMAP
+from atelier.config import TOOLS, CNW, ROOT, PAKS, USMAP, _CACHE
 
 UAT = os.path.join(TOOLS, "UAssetTool.exe")
 
@@ -26,10 +26,48 @@ def _aes_hex():
         return ""
     return k if k.lower().startswith("0x") else "0x" + k
 
+_VANILLA_PAKS = os.path.join(_CACHE, "vanilla_paks")
+
+def _vanilla_paks_dir():
+    """Hardlink mirror of PAKS's TOP-LEVEL files only. AtelierMesh's CUE4Parse provider scans
+    the directory it's given recursively, so pointing it at PAKS directly also picks up whatever
+    lives in PAKS/~mods (or any other subfolder the "Copy to mods folder" setting points at) --
+    installed mods then win pack-stacking and the 3D viewport shows modded content, unlike the file
+    browser and the Blender export path, which both resolve assets through index.ensure_index()'s
+    non-recursive `glob(PAKS + "/*.utoc")` and so only ever see vanilla containers. Mirroring PAKS's
+    top level with hardlinks (instant, no extra disk use, same-volume only) keeps the viewport in
+    sync with everything else without needing to touch AtelierMesh itself. Falls back to the real
+    PAKS dir (mods included) if hardlinking isn't possible, e.g. PAKS is on another volume."""
+    try:
+        wanted = {f: os.path.join(PAKS, f) for f in os.listdir(PAKS)
+                  if os.path.isfile(os.path.join(PAKS, f))}
+    except OSError:
+        return PAKS
+    os.makedirs(_VANILLA_PAKS, exist_ok=True)
+    try:
+        have = set(os.listdir(_VANILLA_PAKS))
+    except OSError:
+        return PAKS
+    for stale in have - wanted.keys():
+        try: os.remove(os.path.join(_VANILLA_PAKS, stale))
+        except OSError: pass
+    for name, src in wanted.items():
+        link = os.path.join(_VANILLA_PAKS, name)
+        try:
+            if os.path.exists(link):
+                s_src, s_link = os.stat(src), os.stat(link)
+                if s_src.st_size == s_link.st_size and int(s_src.st_mtime) == int(s_link.st_mtime):
+                    continue
+                os.remove(link)
+            os.link(src, link)
+        except OSError:
+            return PAKS  # cross-volume, no permission, etc. -- better vanilla-or-mods than a broken mirror
+    return _VANILLA_PAKS
+
 def atelier_mesh(asset, out_dir):
     """Decode an MR mesh (content-mount path, no ext) to glTF (.glb) under out_dir."""
     return subprocess.run(
-        [ATELIER_MESH, "--paks", PAKS, "--aes", _aes_hex(), "--usmap", USMAP,
+        [ATELIER_MESH, "--paks", _vanilla_paks_dir(), "--aes", _aes_hex(), "--usmap", USMAP,
          "--asset", asset, "--out", os.path.abspath(out_dir)],
         capture_output=True, text=True, cwd=ROOT, creationflags=CNW)
 
