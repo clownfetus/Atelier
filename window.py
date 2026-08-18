@@ -18,7 +18,8 @@ _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
 
 def _show_launch_toast():
     try:
-        with open(os.path.join(_ROOT, "version"), "r") as f:
+        # Bundled data: frozen it sits in _internal/, not beside the exe (see config.VERSION_FILE).
+        with open(os.path.join(getattr(sys, "_MEIPASS", _ROOT), "version"), "r") as f:
             version = f.read().strip()
     except Exception:
         version = ""

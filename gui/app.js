@@ -1195,9 +1195,12 @@ async function loadSidebar() {
   const data = await api("/api/imported");
   data.forEach(item => {
     if (!sidebarData[item.token]) {
-      sidebarData[item.token] = { ...item, selected: true };
+      // item.selected comes from the project's saved deselect list (default on for new assets)
+      sidebarData[item.token] = { ...item };
     } else {
-      Object.assign(sidebarData[item.token], item);
+      // keep the live in-session toggle; the server value is only the initial state
+      const wasSelected = sidebarData[item.token].selected;
+      Object.assign(sidebarData[item.token], item, { selected: wasSelected });
     }
   });
   const live = new Set(data.map(d => d.token));
@@ -1208,8 +1211,11 @@ async function loadSidebar() {
 function refreshSidebarEntry(game_rel, name, skin_id) {
   api("/api/imported").then(data => {
     data.forEach(item => {
-      if (!sidebarData[item.token]) sidebarData[item.token] = { ...item, selected: true };
-      else Object.assign(sidebarData[item.token], item);
+      if (!sidebarData[item.token]) sidebarData[item.token] = { ...item };
+      else {
+        const wasSelected = sidebarData[item.token].selected;
+        Object.assign(sidebarData[item.token], item, { selected: wasSelected });
+      }
     });
     renderSidebar();
   });
@@ -1270,6 +1276,7 @@ function renderSidebar() {
       e.stopPropagation();
       item.selected = !item.selected;
       renderSidebar();
+      saveSelection();
     });
     el.addEventListener("click", () => handleImportedFileAction(item));
     el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsSidebar(item)));
@@ -1286,6 +1293,24 @@ function toggleSelectAll() {
   const selectAll = sel === 0 || sel < all.length;
   all.forEach(i => { i.selected = selectAll; });
   renderSidebar();
+  saveSelection();
+}
+
+// Persist the OFF set to the active project. Debounced: toggling several assets in a row is one
+// write, and a failure is deliberately silent -- losing a checkbox state must never interrupt
+// what the user is actually doing.
+let _saveSelTimer = null;
+function saveSelection() {
+  clearTimeout(_saveSelTimer);
+  _saveSelTimer = setTimeout(() => {
+    const deselected = Object.values(sidebarData)
+      .filter(i => !i.selected && i.game_rel)
+      .map(i => i.game_rel);
+    api("/api/project/asset_selection", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deselected }),
+    }).catch(() => {});
+  }, 400);
 }
 
 function _modsTopFolderName() {

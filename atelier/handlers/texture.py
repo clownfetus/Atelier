@@ -176,8 +176,14 @@ def ensure_work_base(game_rel):
     if base and os.path.exists(base + ".uasset"):
         return base
     os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-    uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-         "--filter", os.path.basename(pak_game_path(game_rel))])
+    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
+             "--filter", os.path.basename(pak_game_path(game_rel))])
+    # A tool crash, a file lock, or a MOTW-tainted DLL all leave the asset unextracted, and the
+    # caller can only report "not found in the game paks" — indistinguishable from an asset the
+    # game genuinely doesn't have. Log the failure so a transient one is diagnosable from _logs.
+    if r.returncode != 0:
+        print(f"  [warn] extract_iostore_legacy rc={r.returncode} for {game_rel}: "
+              f"{((r.stdout or '') + (r.stderr or '')).strip()[-500:]}", file=sys.stderr, flush=True)
     cp, pak, pfx = extract_info(game_rel)
     if cp and os.path.exists(cp + ".uasset"):
         _ac.record(game_rel, cp, pak, pfx)

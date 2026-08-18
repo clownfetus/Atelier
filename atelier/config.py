@@ -153,18 +153,31 @@ if _aes_key_cfg:
             _f.write(_aes_key_cfg)
     except Exception: pass
 
+def _usmap_build(p):
+    """Build number from a usmap filename (5.3.2-3684529+++… → 3684529), or -1 if it has none."""
+    m = re.search(r"-(\d{6,})", os.path.basename(p))
+    return int(m.group(1)) if m else -1
+
+# Mappings are NEVER bundled with the installer — they are game-derived data and shipping them is a
+# copyright risk. Tools/Mappings is therefore empty on a fresh install and every .usmap in it got
+# there remotely: Setup pulls the newest from GitHub (routes.api_download_usmap) and the 3-day
+# check keeps it current, re-pinning cfg["usmap"] each time it fetches a newer one.
+#
+# That is also why the configured path can simply win here. The pin only ever goes stale if some
+# NEWER usmap appears that the downloader didn't place — which used to happen when the installer
+# shipped its own copies, and meant a pinned path shadowed them forever. With nothing bundled,
+# there is no such source, so no ranking against the pin is needed.
 _usmap_cfg = _cfg.get("usmap", "").strip()
 if _usmap_cfg and os.path.exists(_usmap_cfg):
     USMAP = _usmap_cfg
 else:
-    # Pick the NEWEST usmap by build number (e.g. 5.3.2-3684529 = S9.0 beats 3656487 = S8.5).
-    # Alphabetical sort picked the older build, so a fresh S9.0 game got parsed with S8.5 mappings
-    # → UAssetTool couldn't deserialize PostProcessSettings and base64-dumped the PPV (slow + unusable).
+    # Fallback when the pin is unset or dangling. Rank by build number, never by filename —
+    # alphabetical sort picks the older build, and parsing a fresh season with old mappings makes
+    # UAssetTool fail to deserialize PostProcessSettings and base64-dump the PPV (slow + unusable).
     _usmaps = [u for u in glob.glob(os.path.join(TOOLS, "Mappings", "*.usmap"))
                if "_latest" not in os.path.basename(u).lower()]
-    def _usmap_build(p):
-        m = re.search(r"-(\d{6,})", os.path.basename(p))
-        return int(m.group(1)) if m else -1
+    # "" is the correct answer for a fresh install: _prereq_issues() turns it into the Setup
+    # error that drives the user to the download button.
     USMAP = max(_usmaps, key=_usmap_build) if _usmaps else ""
 CNW     = 0x08000000 if os.name == "nt" else 0
 
@@ -176,6 +189,10 @@ _CACHE           = os.path.join(ROOT, "_cache")
 WORK_IMPORT_ROOT = os.path.join(_CACHE, "import")
 CACHE_3DVIEW     = os.path.join(_CACHE, "3dview")  # material jsons + texture pngs for viewport-only reads
 GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
+# Bundled data, NOT user data: frozen it lands in _internal/ alongside gui/, not next to the exe.
+# Reading it as ROOT/version silently failed in every packaged build, so the update check bailed
+# out early and no user was ever offered an in-app update.
+VERSION_FILE = os.path.join(getattr(sys, "_MEIPASS", ROOT), "version")
 
 _active_project = _cfg.get("active_project", "")
 

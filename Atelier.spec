@@ -1,7 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('gui', 'gui'), ('version', '.')]
+datas = [
+    ('gui', 'gui'),
+    ('version', '.'),
+    # Blender runs these as standalone --python scripts, so they must exist as real .py files on
+    # disk — being importable from the PYZ is not enough. meshedit._SCRIPTS resolves them next to
+    # the package, which is <_MEIPASS>/atelier/blender when frozen. Without this the whole .blend
+    # round-trip dies with "Python file ... could not be opened" in packaged builds only.
+    ('atelier/blender', 'atelier/blender'),
+]
 binaries = []
 hiddenimports = [
     'io_lib',

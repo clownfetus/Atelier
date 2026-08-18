@@ -355,10 +355,15 @@ def all_imported():
     Files stored under a subfolder path carry their own game_rel; legacy flat files (no subfolder)
     are resolved through asset_cache by basename."""
     import atelier.asset_cache as _ac
+    import atelier.project_meta as _pm
     import_root = get_import_root()
     if not os.path.isdir(import_root): return []
+    deselected = _pm.get_deselected(import_root)
     items = []
     for dirpath, _dirs, files in os.walk(import_root):
+        # Atelier's own per-project bookkeeping, not user edits. Pruned by name rather than left
+        # to _classify_file, which rejects "manifest"/"project" only by accident of prefix.
+        _dirs[:] = [d for d in _dirs if d != ".atelier"]
         for fname in sorted(files):
             fpath = os.path.join(dirpath, fname)
             if fname.endswith(".png"):
@@ -398,5 +403,8 @@ def all_imported():
                 "char_name": char_name(cid) if cid else "",
                 "skin_name": skin_name(sid) if sid else "",
                 "mtime": int(os.path.getmtime(fpath)),
+                # Default ON: only an asset the user explicitly switched off is deselected, so
+                # anything new to the project arrives included in the next export.
+                "selected": gr not in deselected,
             })
     return items

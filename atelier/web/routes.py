@@ -4,7 +4,7 @@ from bottle import request, response, static_file
 from atelier.web.app import app
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
                             CNW,
-                            GUI_DIR, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
+                            GUI_DIR, VERSION_FILE, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
                             save_paks_config, save_setup_config, save_usmap_config,
                             get_usmap_checked_at, save_usmap_checked_at,
                             get_import_root, get_active_project, set_active_project,
@@ -53,6 +53,7 @@ from atelier.handlers.world import is_world
 from atelier.handlers.text import is_text
 from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
+import atelier.project_meta as _project_meta
 import atelier.web.browse as _browse_mod
 
 # ── extraction helpers ────────────────────────────────────────────────────────
@@ -627,9 +628,8 @@ def api_update_check():
     global _update_cache
     response.content_type = "application/json"
 
-    version_path = os.path.join(ROOT, "version")
     try:
-        with open(version_path, "r") as f:
+        with open(VERSION_FILE, "r") as f:
             current = tuple(int(x) for x in f.read().strip().split("."))
         print(f"[update] current version: {current}")
     except Exception as e:
@@ -1506,6 +1506,7 @@ def api_project_create():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project already exists"})
     os.makedirs(project_dir, exist_ok=True)
+    _project_meta.stamp_new(project_dir)   # only here: an existing folder's provenance is not ours to claim
     set_active_project(name)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
@@ -1551,6 +1552,21 @@ def api_project_duplicate():
         return json.dumps({"ok": False, "error": "name already taken"})
     shutil.copytree(src_dir, dst_dir)
     response.content_type = "application/json"
+    return json.dumps({"ok": True})
+
+@app.post("/api/project/asset_selection")
+def api_project_asset_selection():
+    """Persist which edited assets are switched OFF for export in the active project, so the
+    sidebar comes back the way the user left it. Stores the deselected set (see project_meta)."""
+    body = request.json or {}
+    response.content_type = "application/json"
+    deselected = body.get("deselected")
+    if not isinstance(deselected, list):
+        return json.dumps({"ok": False, "error": "deselected must be a list"})
+    import_root = get_import_root()
+    if not os.path.isdir(import_root):
+        return json.dumps({"ok": False, "error": "no active project"})
+    _project_meta.set_deselected(import_root, deselected)
     return json.dumps({"ok": True})
 
 @app.post("/api/project/delete")
