@@ -246,6 +246,20 @@ def save_mods_folder(path):
         cfg.pop("mods_folder", None)
     json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
 
+def get_blender_path():
+    """User-configured blender.exe path from Settings, empty string when unset (falls back to
+    ATELIER_BLENDER / auto-detection — see atelier.handlers.meshedit.find_blender).
+    Read fresh from disk each call so edits in Settings take effect without a restart."""
+    return (_load_config().get("blender_path", "") or "").replace("\\", "/")
+
+def save_blender_path(path):
+    cfg = _load_config()
+    if path:
+        cfg["blender_path"] = path.replace("\\", "/")
+    else:
+        cfg.pop("blender_path", None)
+    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+
 def get_export_password():
     """The default 'Protection Password' set in Settings, used when Password Protect is toggled
     on for Install Mod. Read fresh from disk so edits in Settings take effect without a restart."""

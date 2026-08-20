@@ -30,12 +30,9 @@ _BLENDER_DIRS = (r"C:\Program Files\Blender Foundation",
 _SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "blender")
 
 
-def find_blender():
-    """Locate blender.exe. ATELIER_BLENDER wins; otherwise pick the highest-versioned
-    install (a machine can have several side by side)."""
-    env = os.environ.get("ATELIER_BLENDER")
-    if env and os.path.exists(env):
-        return env
+def _scan_blender_dirs():
+    """Auto-detect blender.exe under the standard install dirs, highest-versioned first
+    (a machine can have several side by side). Returns [] if none found."""
     found = []
     for root in _BLENDER_DIRS:
         if not os.path.isdir(root):
@@ -44,12 +41,37 @@ def find_blender():
             exe = os.path.join(root, name, "blender.exe")
             if os.path.exists(exe):
                 found.append((name, exe))
+    found.sort(key=lambda p: [int(x) if x.isdigit() else x for x in p[0].replace("Blender", "").split()])
+    return [exe for _, exe in found]
+
+
+def blender_path_suggestion():
+    """Best-guess blender.exe path for the Settings field: the user's configured path if it
+    still exists, else the highest-versioned auto-detected install, else ''."""
+    from atelier.config import get_blender_path
+    configured = get_blender_path()
+    if configured and os.path.exists(configured):
+        return configured
+    found = _scan_blender_dirs()
+    return found[-1] if found else ""
+
+
+def find_blender():
+    """Locate blender.exe. ATELIER_BLENDER wins, then the path configured in Settings,
+    then the highest-versioned auto-detected install."""
+    env = os.environ.get("ATELIER_BLENDER")
+    if env and os.path.exists(env):
+        return env
+    from atelier.config import get_blender_path
+    configured = get_blender_path()
+    if configured and os.path.exists(configured):
+        return configured
+    found = _scan_blender_dirs()
     if not found:
         raise RuntimeError(
-            "Blender not found. Install Blender 4.x/5.x, or set ATELIER_BLENDER to "
-            "blender.exe.")
-    found.sort(key=lambda p: [int(x) if x.isdigit() else x for x in p[0].replace("Blender", "").split()])
-    return found[-1][1]
+            "Blender not found. Install Blender 4.x/5.x, set its path in Settings, or set "
+            "ATELIER_BLENDER to blender.exe.")
+    return found[-1]
 
 
 def _run_blender(script, args, label):

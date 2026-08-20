@@ -10,7 +10,8 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             get_import_root, get_active_project, set_active_project,
                             project_base, project_base_legacy, project_game_rel,
                             get_mods_folder, save_mods_folder,
-                            get_export_password, save_export_password)
+                            get_export_password, save_export_password,
+                            save_blender_path)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -452,13 +453,15 @@ def api_setup_status():
         mr_prefill = _mr_root_to_display(suggestion) if suggestion else ""
     aes_prefill  = ("0x" + aes) if aes else ""
     usmap_prefill = (_c.USMAP or "").replace("\\", "/")
+    from atelier.handlers.meshedit import blender_path_suggestion
     response.content_type = "application/json"
     return json.dumps({"configured": configured,
                        "paks_prefill":  mr_prefill,
                        "aes_prefill":   aes_prefill,
                        "usmap_prefill": usmap_prefill,
                        "mods_prefill":  get_mods_folder(),
-                       "password_prefill": get_export_password()})
+                       "password_prefill": get_export_password(),
+                       "blender_prefill": blender_path_suggestion()})
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -525,6 +528,54 @@ def api_validate_mods_folder():
         return json.dumps({"status": "ok"})
     return json.dumps({"status": "missing"})
 
+@app.get("/api/validate_blender")
+def api_validate_blender():
+    path = request.query.get("path", "").strip()
+    response.content_type = "application/json"
+    if not path:
+        return json.dumps({"status": "empty"})
+    if os.path.basename(path).lower() != "blender.exe":
+        return json.dumps({"status": "invalid"})
+    if not os.path.exists(path):
+        return json.dumps({"status": "missing"})
+    return json.dumps({"status": "ok"})
+
+@app.post("/api/pick_blender_file")
+def api_pick_blender_file():
+    body    = request.json or {}
+    initial = (body.get("initial") or "").replace("/", "\\")
+    env     = os.environ.copy()
+    env["BLENDER_INITIAL"] = os.path.dirname(initial) if initial else ""
+    ps = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+        "$f.Title = 'Select blender.exe'; "
+        "$f.Filter = 'blender.exe|blender.exe|All files (*.*)|*.*'; "
+        "$f.InitialDirectory = $env:BLENDER_INITIAL; "
+        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }"
+    )
+    try:
+        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                             capture_output=True, encoding="utf-8", timeout=120, env=env)
+        raw = r.stdout.strip().replace("\\", "/")
+        response.content_type = "application/json"
+        return json.dumps({"ok": True, "path": raw})
+    except Exception as e:
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "path": "", "error": str(e)})
+
+@app.get("/api/blender_status")
+def api_blender_status():
+    """Cheap pre-flight for anything about to shell out to Blender. Frontend calls this before
+    an extract/open so it can toast immediately instead of after the slow extraction runs."""
+    from atelier.handlers.meshedit import find_blender
+    response.content_type = "application/json"
+    try:
+        return json.dumps({"ok": True, "path": find_blender()})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
 def _validate_and_build_paks(path):
     """Validate user-supplied path (game root or subfolder) and return (paks_path, error)."""
     mr = _find_mr_root(path)
@@ -545,6 +596,8 @@ def api_save_paks():
     mods_folder = (body.get("mods_folder") or "").strip()
     has_pw     = "export_password" in body        # only touch password config when the field was sent
     export_password = (body.get("export_password") or "").strip()
+    has_blender = "blender_path" in body           # only touch blender config when the field was sent
+    blender_path = (body.get("blender_path") or "").strip()
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
@@ -566,6 +619,8 @@ def api_save_paks():
             save_mods_folder(paks_path + "/~mods")
         if has_pw:
             save_export_password(export_password)   # empty string clears it
+        if has_blender:
+            save_blender_path(blender_path)          # empty string clears it
 
         # Write AES_KEY.txt so io_lib picks it up immediately
         import atelier.config as _c

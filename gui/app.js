@@ -402,7 +402,22 @@ function handleImportedFileAction(item) {
 // ── Blender mesh editing ──────────────────────────────────────────────────────
 // Extract is slow (asset extraction + every material's textures + a headless Blender run), so it
 // gets a spinner toast and the result is summarised rather than silently finishing.
+async function _checkBlenderReady() {
+  try {
+    const res = await api("/api/blender_status");
+    if (!res.ok) {
+      toast(res.error || "Blender not found — set its path in Settings", "warning", 8000);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    toast(`Error: ${e.message}`, "warning");
+    return false;
+  }
+}
+
 async function meshBlendExtract(game_rel, name, force = false) {
+  if (!(await _checkBlenderReady())) return;
   const t = toastSpinner(`Preparing ${name} for Blender…`);
   setStatus(`Preparing ${name} for Blender…`);
   try {
@@ -441,7 +456,8 @@ async function meshBlendExtract(game_rel, name, force = false) {
   }
 }
 
-function openBlend(game_rel) {
+async function openBlend(game_rel) {
+  if (!(await _checkBlenderReady())) return;
   api(`/api/open_blend?game_rel=${encodeURIComponent(game_rel)}`).then(r => {
     if (r && !r.ok) toast(r.error || "could not open the .blend", "warning");
   });
@@ -1591,6 +1607,7 @@ function _applySetupMode() {
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
   document.getElementById("setup-password-row").style.display = paths ? "" : "none";
+  document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
@@ -1613,6 +1630,7 @@ async function openPaths() {
     document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
     document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
     document.getElementById("setup-password").value = statusRes.password_prefill || "";
+    document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
   } catch (e) {}
   _setSetupLoading(false);
   await validateSetup();
@@ -1666,6 +1684,7 @@ async function validateSetup() {
   }
 
   let modsStatus = "";
+  let blenderStatus = "";
   if (_pathsMode) {
     const mods = document.getElementById("setup-mods").value.trim();
     if (mods) {
@@ -1673,6 +1692,14 @@ async function validateSetup() {
         const r = await fetch(`/api/validate_mods_folder?path=${encodeURIComponent(mods)}`);
         const d = await r.json();
         modsStatus = d.status;
+      } catch (_) {}
+    }
+    const blender = document.getElementById("setup-blender").value.trim();
+    if (blender) {
+      try {
+        const r = await fetch(`/api/validate_blender?path=${encodeURIComponent(blender)}`);
+        const d = await r.json();
+        blenderStatus = d.status;
       } catch (_) {}
     }
   }
@@ -1692,6 +1719,8 @@ async function validateSetup() {
   const keyBad   = keyStatus === "invalid";
   const modsOk   = modsStatus === "ok";
   const modsBad  = modsStatus === "invalid";
+  const blenderOk  = blenderStatus === "ok";
+  const blenderBad = blenderStatus === "invalid" || blenderStatus === "missing";
 
   if (pakOk && usmapOk && keyOk && !modsBad) {
     el.className = "ok";
@@ -1735,6 +1764,9 @@ async function validateSetup() {
     const modsEl = document.getElementById("setup-mods");
     modsEl.classList.toggle("setup-valid",   modsOk);
     modsEl.classList.toggle("setup-invalid", modsBad);
+    const blenderEl = document.getElementById("setup-blender");
+    blenderEl.classList.toggle("setup-valid",   blenderOk);
+    blenderEl.classList.toggle("setup-invalid", blenderBad);
   }
 }
 
@@ -1742,6 +1774,7 @@ document.getElementById("setup-path").addEventListener("input", validateSetup);
 document.getElementById("setup-usmap").addEventListener("input", validateSetup);
 document.getElementById("setup-aes").addEventListener("input", validateSetup);
 document.getElementById("setup-mods").addEventListener("input", validateSetup);
+document.getElementById("setup-blender").addEventListener("input", validateSetup);
 document.getElementById("setup-paste-key").addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
@@ -1806,6 +1839,24 @@ document.getElementById("setup-mods-browse").addEventListener("click", async () 
   btn.disabled = false;
 });
 
+document.getElementById("setup-blender-browse").addEventListener("click", async () => {
+  const initial = document.getElementById("setup-blender").value.trim();
+  const btn = document.getElementById("setup-blender-browse");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/pick_blender_file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initial }),
+    });
+    if (res.ok && res.path) {
+      document.getElementById("setup-blender").value = res.path;
+      validateSetup();
+    }
+  } catch (e) {}
+  btn.disabled = false;
+});
+
 
 function _resetSaveBtn() {
   const btn = document.getElementById("setup-save");
@@ -1827,6 +1878,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   if (_pathsMode) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
     payload.export_password = document.getElementById("setup-password").value;
+    payload.blender_path    = document.getElementById("setup-blender").value.trim();
   }
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
