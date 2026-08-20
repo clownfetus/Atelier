@@ -418,6 +418,8 @@ async function _checkBlenderReady() {
 
 async function meshBlendExtract(game_rel, name, force = false) {
   if (!(await _checkBlenderReady())) return;
+  if (!confirm(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`))
+    return;
   const t = toastSpinner(`Preparing ${name} for Blender…`);
   setStatus(`Preparing ${name} for Blender…`);
   try {

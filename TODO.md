@@ -2,8 +2,8 @@ charID manual refresh option
 auto-refreshing usmap/aes fetch
 confirm version/auto-update works
 collate same-type toasts
-popup before blender import explaining project dump
 change viewport to match modded?
+material toggle menu before blender
 
 viewport meshes seem horizontally compressed a little
 optimize 3d view re-open
