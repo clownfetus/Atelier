@@ -1286,7 +1286,7 @@ function renderSidebar() {
     `;
     el.querySelector(".sb-clear").addEventListener("click", e => {
       e.stopPropagation();
-      clearImported(item.token);
+      clearImported(item.token, e.shiftKey);
     });
     el.querySelector(".sb-check").addEventListener("click", e => {
       e.stopPropagation();
@@ -1462,9 +1462,13 @@ document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
-function clearImported(token) {
+function clearImported(token, skipConfirm) {
   const item = sidebarData[token];
   if (!item) return;
+  if (skipConfirm) {
+    performClearImported(item);
+    return;
+  }
   pendingClear = item;
   const ft   = item.file_type || "asset";
   const kind = ft.charAt(0).toUpperCase() + ft.slice(1);
@@ -1474,15 +1478,7 @@ function clearImported(token) {
   document.getElementById("confirm-clear-overlay").classList.add("active");
 }
 
-document.getElementById("confirm-clear-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  pendingClear = null;
-});
-
-document.getElementById("confirm-clear-ok").addEventListener("click", async () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  if (!pendingClear) return;
-  const item = pendingClear; pendingClear = null;
+async function performClearImported(item) {
   try {
     const res = await api("/api/delete_imported", {
       method: "POST",
@@ -1500,6 +1496,18 @@ document.getElementById("confirm-clear-ok").addEventListener("click", async () =
   } catch (e) {
     toast(`Error: ${e.message}`, "warning");
   }
+}
+
+document.getElementById("confirm-clear-cancel").addEventListener("click", () => {
+  document.getElementById("confirm-clear-overlay").classList.remove("active");
+  pendingClear = null;
+});
+
+document.getElementById("confirm-clear-ok").addEventListener("click", async () => {
+  document.getElementById("confirm-clear-overlay").classList.remove("active");
+  if (!pendingClear) return;
+  const item = pendingClear; pendingClear = null;
+  await performClearImported(item);
 });
 
 document.getElementById("clear-all-btn").addEventListener("click", () => {
