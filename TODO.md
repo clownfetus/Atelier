@@ -1,7 +1,13 @@
+# bug reports
+Lumi/diz regressions with materials
+https://discord.com/channels/1419106202511609958/1519707061854670908/1540345749915566130 A Wonders
+GigaWheezer stringtable issue
+dia UI mod quality issue
+
 charID manual refresh option
 auto-refreshing usmap/aes fetch
 confirm version/auto-update works
-collate same-type toasts
+collate same-type toasts (increment x2/x3/... and reset timeout each time)
 change viewport to match modded?
 material toggle menu before blender
 
