@@ -53,6 +53,8 @@ const FOLDER_ICON_PATTERNS = [
   [/^(vfx|effects?)$/i, "vfx-folder-icon"],
   [/^meshes?$/i,        "mesh-folder-icon"],
   [/^(text|stringtables?)$/i, "text-folder-icon"],
+  [/^nameplates?$/i,    "nameplate-folder-icon"],
+  [/^plugins$/i,        "plugin-folder-icon"],
 ];
 function folderIconCls(name) {
   const hit = FOLDER_ICON_PATTERNS.find(([re]) => re.test(name));
@@ -66,6 +68,8 @@ const ICON_CLS_TO_LUCIDE = {
   "vfx-folder-icon":      "sparkles",
   "mesh-folder-icon":     "scan-box",
   "text-folder-icon":     "type-outline",
+  "nameplate-folder-icon": "id-card",
+  "plugin-folder-icon":    "puzzle",
   "char-icon":            "square-user-round",
   "ui-folder-icon":       "swatch-book",
   "texture-icon":         "image",
@@ -84,6 +88,18 @@ async function api(path, opts = {}) {
     return await res.json();
   } catch {
     return { ok: false, error: `server error (${res.status})` };
+  }
+}
+
+// Reveal in the file manager. The endpoint reports why it could not, so surface that instead of
+// firing and forgetting — a silent no-op here was reported as "Open in Explorer does nothing".
+async function revealInExplorer(gameRel) {
+  try {
+    const r = await fetch(`/api/open_explorer?game_rel=${encodeURIComponent(gameRel)}`);
+    const d = await r.json();
+    if (!d.ok) toast(d.error || "Could not open the file manager", "warning", 6000);
+  } catch (e) {
+    toast(`Could not open the file manager: ${e.message}`, "warning", 6000);
   }
 }
 
@@ -231,6 +247,7 @@ async function renderGrid() {
     const data = await api(`/api/browse?path=${encodeURIComponent(nav.path || "")}`);
     if (data.error) throw new Error(data.error);
     allItems = data;
+    checkIndexWarnings();   // fire-and-forget; reports at most once per session
 
     // Cache folder labels for breadcrumbs
     for (const item of data) {
@@ -555,6 +572,51 @@ let matEditor = null;
 function _hx2(c) { return ("0" + Math.round(Math.min(255, Math.max(0, c * 255))).toString(16)).slice(-2); }
 function _rgbHex(r, g, b, inten) { const n = Math.max(inten, 1e-6); return "#" + _hx2(r / n) + _hx2(g / n) + _hx2(b / n); }
 
+// ── colour notation: hex / 0-255 / float, remembered ──────────────────────────
+// The native colour dialog has its own notation switcher, and it resets to hex every time the
+// dialog opens — taylorlinnay asked for that choice to stick, and nothing in this app can reach
+// inside an OS dialog to make it. So the notation lives here instead: a field next to each swatch
+// that reads AND writes in whichever notation you picked, remembered across sessions.
+const COLOR_MODES  = ["hex", "255", "float"];
+const COLOR_LABELS = { hex: "Hex", "255": "0-255", float: "Float" };
+let _colorMode = "hex";
+try { const m = localStorage.getItem("atelier.colorMode"); if (COLOR_MODES.includes(m)) _colorMode = m; } catch (_) {}
+
+function setColorMode(m) {
+  if (!COLOR_MODES.includes(m) || m === _colorMode) return;
+  _colorMode = m;
+  try { localStorage.setItem("atelier.colorMode", m); } catch (_) {}
+  if (matEditor) renderMatEditor();
+  if (vfxEditor && vfxEditor.kind === "mpc") renderVfxEditor();
+}
+
+function colorModeSeg() {
+  return `<span class="seg" title="How colours are typed and shown — remembered between sessions">` +
+    COLOR_MODES.map(m => `<button class="seg-btn ${m === _colorMode ? "on" : ""}" onclick="setColorMode('${m}')">${COLOR_LABELS[m]}</button>`).join("") +
+    `</span>`;
+}
+
+// r,g,b are 0..1 (already divided by intensity where one applies)
+function fmtColor01(r, g, b) {
+  if (_colorMode === "hex")   return "#" + _hx2(r) + _hx2(g) + _hx2(b);
+  if (_colorMode === "255")   return [r, g, b].map(v => Math.round(Math.min(1, Math.max(0, v)) * 255)).join(", ");
+  return [r, g, b].map(v => (+v).toFixed(3)).join(", ");
+}
+
+// Forgiving on purpose: a pasted value is accepted in whatever notation it arrives in, whichever
+// mode is showing. Returns [r,g,b] in 0..1, or null if it isn't a colour.
+function parseColor01(str) {
+  const t = String(str || "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{6}$/i.test(t))
+    return [0, 2, 4].map(i => parseInt(t.substr(i, 2), 16) / 255);
+  if (/^[0-9a-f]{3}$/i.test(t))
+    return [0, 1, 2].map(i => parseInt(t[i] + t[i], 16) / 255);
+  const n = t.split(/[\s,;/]+/).filter(x => x !== "").map(Number);
+  if (n.length < 3 || n.some(v => !isFinite(v))) return null;
+  const scale = n.slice(0, 3).some(v => v > 1.001) ? 255 : 1;   // "255, 128, 0" works in float mode too
+  return n.slice(0, 3).map(v => Math.max(0, v / scale));
+}
+
 function _seedColors(arr) {
   return (arr || []).map(c => ({ name: c.name, rgba: c.rgba.slice(),
                                  inten: Math.max(c.rgba[0], c.rgba[1], c.rgba[2], 1) }));
@@ -585,6 +647,8 @@ async function openMaterialEditor(item) {
     const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`);
     if (di && di.dyeable && matEditor && matEditor.game_rel === item.game_rel) {
       matEditor.dyeable = true;
+      matEditor.dyeInfo = di;
+      matEditor.dyeView = "preview";
       matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
       renderMatEditor();
       dyeRefresh(0);
@@ -613,6 +677,14 @@ function dyeRefresh(delay = 140) {
     const img = document.getElementById("dye-prev");
     if (!img || !matEditor) return;
     const gr = matEditor.game_rel;
+    // The region map is fixed by the MASK, not by the colours being edited, so it is a plain GET
+    // and no colour drag needs to re-render it.
+    if (matEditor.dyeView === "regions") {
+      const want = `/api/dye_overlay?game_rel=${encodeURIComponent(gr)}&size=512`;
+      if (img.dataset.src !== want) { img.dataset.src = want; img.src = want; }
+      return;
+    }
+    img.dataset.src = "";
     try {
       const r = await fetch("/api/dye_preview", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -648,19 +720,80 @@ async function dyeDownload() {
   } catch (e) { st.textContent = "Error: " + e.message; }
 }
 
+// The legend is the half of the ID-mask answer a picture alone can't give: which NUMBER on the map
+// is which "Region N" row, how much of the skin it covers, and what colour it is set to right now.
+// Clicking a row jumps to that region's colour controls.
+function _dyeLegendHtml(m) {
+  const di = m.dyeInfo; if (!di || !di.used) return "";
+  const keys = Object.keys(di.used).sort((a, b) => (+a) - (+b));
+  if (!keys.length) return "";
+  const rows = keys.map(k => {
+    const pct  = (di.coverage || {})[k];
+    const sw   = (di.overlay  || {})[k] || "#888";
+    const undy = k === "0";
+    // the LIVE ColorA out of the editor, not dye_info's snapshot — otherwise the legend keeps
+    // showing the vanilla colour after the first edit and quietly contradicts the preview
+    const live = (m.colors || []).find(c => new RegExp("^Region\\s+" + k + "\\s*-\\s*ColorA$").test(c.name || ""));
+    const cur  = live ? live.rgba : ((di.regions || {})[k] || {}).ColorA;
+    const curSw = (!undy && cur)
+      ? `<span class="dye-sw" style="background:${_rgbHex(cur[0], cur[1], cur[2], Math.max(cur[0], cur[1], cur[2], 1))}" title="current Region ${k} ColorA"></span>`
+      : "";
+    return `<div class="dye-legend-row ${undy ? "undyed" : ""}" ${undy ? "" : `onclick="matFocusRegion(${k})"`}>
+      <span class="dye-sw" style="background:${sw}"></span>
+      <span class="dye-legend-name">${undy ? "Undyed" : "Region " + k}</span>
+      ${curSw}
+      <span class="dye-legend-pct">${pct != null ? pct + "%" : ""}</span>
+    </div>`;
+  }).join("");
+  return `<div class="dye-legend">${rows}</div>`;
+}
+
+function dyeView(mode) {
+  if (!matEditor) return;
+  matEditor.dyeView = mode;
+  renderMatEditor();
+  dyeRefresh(0);
+}
+
+function matFocusRegion(idx) {
+  if (!matEditor) return;
+  const re = new RegExp("^Region\\s+" + idx + "\\s*-");
+  const i  = (matEditor.colors || []).findIndex(c => re.test(c.name || ""));
+  if (i < 0) return;
+  const row = document.getElementById("matrow" + i);
+  if (!row) return;
+  row.scrollIntoView({ block: "center", behavior: "smooth" });
+  // flash every parameter of the region, not just the first — a region is ColorA + ColorB + channels
+  (matEditor.colors || []).forEach((c, j) => {
+    if (!re.test(c.name || "")) return;
+    const r = document.getElementById("matrow" + j);
+    if (!r) return;
+    r.classList.remove("flash"); void r.offsetWidth; r.classList.add("flash");
+  });
+}
+
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   let h = "";
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
-    h += `<div class="mat-section">Dye preview <span class="mat-tag">${used}</span></div>
+    const reg  = m.dyeView === "regions";
+    h += `<div class="mat-section with-ctl">Dye preview <span class="mat-tag">${used}</span>
+        <span class="seg">
+          <button class="seg-btn ${reg ? "" : "on"}" onclick="dyeView('preview')">Dyed</button>
+          <button class="seg-btn ${reg ? "on" : ""}" onclick="dyeView('regions')">Region map</button>
+        </span></div>
       <div class="mat-row" style="align-items:flex-start;gap:14px">
         <img id="dye-prev" alt="dye preview"
              style="width:230px;height:230px;object-fit:contain;background:#0d0d10;border:1px solid var(--bd);border-radius:6px">
         <div style="flex:1;font-size:12px;line-height:1.5" class="muted">
-          This skin recolours through its <b>ColorID</b> mask — the diffuse is shared across chromas,
-          so the <b>Region N</b> colours below are what actually change its look.
-          Edit any of them to see this update live.
+          ${reg ? `Every texel of this skin belongs to one of the mask's <b>regions</b>, and each region
+              is one set of <b>Region N</b> colours below. The numbers on the map are those N.
+              Grey is undyed — no Region colour reaches it.`
+                : `This skin recolours through its <b>ColorID</b> mask — the diffuse is shared across chromas,
+              so the <b>Region N</b> colours below are what actually change its look.
+              Edit any of them to see this update live.`}
+          ${_dyeLegendHtml(m)}
           <div style="margin-top:12px">
             <button class="btn" onclick="dyeDownload()"><i data-lucide="download" size="13"></i> Download dyed texture</button>
           </div>
@@ -668,11 +801,15 @@ function renderMatEditor() {
       </div>`;
   }
   if (m.colors.length) {
-    h += `<div class="mat-section">Colors</div>`;
+    h += `<div class="mat-section with-ctl">Colors ${colorModeSeg()}</div>`;
     m.colors.forEach((c, i) => {
-      h += `<div class="mat-row">
+      h += `<div class="mat-row" id="matrow${i}">
         <label title="${c.name}">${c.name}</label>
-        <input type="color" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)">
+        <input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)">
+        <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
+               title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
+               value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
+               onchange="matColorText(${i},this)">
         <span class="mat-tag">intensity</span>
         <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
         <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
@@ -701,12 +838,28 @@ function matColor(i, hex) {
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
+  const t = document.getElementById("mathx" + i);
+  if (t) { t.value = fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n); t.classList.remove("bad"); }
+  dyeRefresh();
+}
+
+function matColorText(i, el) {
+  const rgb = parseColor01(el.value);
+  if (!rgb) { el.classList.add("bad"); return; }          // leave what they typed so it can be fixed
+  el.classList.remove("bad");
+  const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
+  c.rgba[0] = rgb[0] * n; c.rgba[1] = rgb[1] * n; c.rgba[2] = rgb[2] * n;
+  el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);          // normalise what they typed
+  const sw = document.getElementById("matsw" + i);
+  if (sw) sw.value = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
   const other = document.getElementById((fromRange ? "min" : "mir") + i); if (other) other.value = v;
+  const t = document.getElementById("mathx" + i);
+  if (t) { const n = Math.max(nv, 1e-6); t.value = fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n); }
   dyeRefresh();
 }
 function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; dyeRefresh(); }
@@ -934,10 +1087,89 @@ async function openVfxEditor(item) {
   try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
   catch (e) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
   if (!res.ok) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read VFX"}</div>`; return; }
-  vfxEditor = { game_rel: item.game_rel, name: item.name,
+  vfxEditor = { game_rel: item.game_rel, name: item.name, kind: res.kind || "niagara",
+                scalars: (res.scalars || []).map(x => ({ ...x })),
+                vectors: (res.vectors || []).map(x => ({ ...x, inten: Math.max(x.rgba[0], x.rgba[1], x.rgba[2], 1) })),
                 groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g) })) };
   renderVfxEditor();
   loadSidebar();
+}
+
+// ── MaterialParameterCollection: UE's GLOBAL scalar / vector parameters ──────
+// A skin's glow colour is often not a Niagara curve but a global parameter in an MPC, read by every
+// material that references the collection — that is what diiea was changing in UE on 1031306 and
+// could not find here. Same editor, different payload: named values instead of curve groups.
+function renderMpcEditor() {
+  const v = vfxEditor;
+  let h = `<div class="mat-row" style="align-items:flex-start">
+      <div style="font-size:12px;line-height:1.5" class="muted">
+        These are <b>global</b> parameters: every material that reads this collection sees the change,
+        not only the skin that led you here. That is also why editing them is enough on its own —
+        no per-material override needed.
+      </div></div>`;
+  if (!v.vectors.length && !v.scalars.length)
+    return `<div class="mat-empty">This collection exposes no parameters.</div>`;
+  if (v.vectors.length) {
+    h += `<div class="mat-section with-ctl">Vector parameters ${colorModeSeg()}</div>`;
+    v.vectors.forEach((p, i) => {
+      const n = Math.max(p.inten, 1e-6);
+      h += `<div class="mat-row">
+        <label title="${p.name}">${p.name}</label>
+        <input type="color" id="mpcsw${i}" value="${_rgbHex(p.rgba[0], p.rgba[1], p.rgba[2], p.inten)}" oninput="mpcColor(${i},this.value)">
+        <input class="mat-hex" id="mpchx${i}" type="text" spellcheck="false"
+               title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
+               value="${fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n)}" onchange="mpcColorText(${i},this)">
+        <span class="mat-tag">intensity</span>
+        <input type="range" id="mpcir${i}" min="0" max="10" step="0.05" value="${Math.min(p.inten, 10)}" oninput="mpcInten(${i},this.value,1)">
+        <input class="mat-num" id="mpcin${i}" type="number" step="0.05" value="${+p.inten.toFixed(3)}" oninput="mpcInten(${i},this.value,0)">
+        <span class="mat-tag">A</span>
+        <input class="mat-num" type="number" step="0.01" value="${+p.rgba[3].toFixed(3)}" oninput="mpcAlpha(${i},this.value)">
+      </div>`;
+    });
+  }
+  if (v.scalars.length) {
+    h += `<div class="mat-section">Scalar parameters</div>`;
+    v.scalars.forEach((p, i) => {
+      const max = Math.max(Math.abs(p.value) * 3, 1);
+      h += `<div class="mat-row">
+        <label title="${p.name}">${p.name}</label>
+        <input type="range" id="mpcsr${i}" min="${Math.min(0, p.value)}" max="${max}" step="${max / 1000}" value="${p.value}" oninput="mpcScalar(${i},this.value,1)">
+        <input class="mat-num wide" id="mpcsn${i}" type="number" step="any" value="${p.value}" oninput="mpcScalar(${i},this.value,0)">
+      </div>`;
+    });
+  }
+  return h;
+}
+
+function mpcColor(i, hex) {
+  const p = vfxEditor.vectors[i], n = Math.max(p.inten, 1e-6);
+  p.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
+  p.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
+  p.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
+  const t = document.getElementById("mpchx" + i);
+  if (t) { t.value = fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n); t.classList.remove("bad"); }
+}
+function mpcColorText(i, el) {
+  const rgb = parseColor01(el.value);
+  if (!rgb) { el.classList.add("bad"); return; }
+  el.classList.remove("bad");
+  const p = vfxEditor.vectors[i], n = Math.max(p.inten, 1e-6);
+  p.rgba[0] = rgb[0] * n; p.rgba[1] = rgb[1] * n; p.rgba[2] = rgb[2] * n;
+  el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);
+  const sw = document.getElementById("mpcsw" + i);
+  if (sw) sw.value = _rgbHex(p.rgba[0], p.rgba[1], p.rgba[2], p.inten);
+}
+function mpcInten(i, v, fromRange) {
+  const p = vfxEditor.vectors[i], o = Math.max(p.inten, 1e-6), nv = parseFloat(v) || 0;
+  p.rgba[0] = p.rgba[0] / o * nv; p.rgba[1] = p.rgba[1] / o * nv; p.rgba[2] = p.rgba[2] / o * nv; p.inten = nv;
+  const other = document.getElementById((fromRange ? "mpcin" : "mpcir") + i); if (other) other.value = v;
+  const t = document.getElementById("mpchx" + i);
+  if (t) { const n = Math.max(nv, 1e-6); t.value = fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n); }
+}
+function mpcAlpha(i, v) { vfxEditor.vectors[i].rgba[3] = parseFloat(v) || 0; }
+function mpcScalar(i, v, fromRange) {
+  vfxEditor.scalars[i].value = parseFloat(v) || 0;
+  const other = document.getElementById((fromRange ? "mpcsn" : "mpcsr") + i); if (other) other.value = v;
 }
 
 const _VFX_CHAN_COLS = ["#e05a5a", "#5ae06a", "#5a8ae0", "#cccccc"];
@@ -960,6 +1192,7 @@ function _vfxSpark(g) {                                    // SVG line preview f
 
 function renderVfxEditor() {
   const v = vfxEditor; if (!v) return;
+  if (v.kind === "mpc") { document.getElementById("vfx-body").innerHTML = renderMpcEditor(); return; }
   if (!v.groups.length) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">This VFX exposes no editable curves.</div>`; return; }
   let h = "";
   v.groups.forEach((g, gi) => {
@@ -1034,9 +1267,13 @@ async function saveVfx() {
   document.getElementById("vfx-status").textContent = "Saving…";
   const groups = v.groups.map(g => ({ export_indices: g.export_indices, stops: g.stops,
                                       sample_count: g.sample_count, channels: g.channels }));
+  // an MPC has no curve groups — it saves named scalars/vectors instead
+  const scalars = {}, vectors = {};
+  (v.scalars || []).forEach(p => { scalars[p.name] = p.value; });
+  (v.vectors || []).forEach(p => { vectors[p.name] = p.rgba; });
   try {
     const res = await api("/api/vfx_save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: v.game_rel, groups }) });
+      body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors }) });
     if (res.ok) { toast(`Saved: ${v.name}`, "success"); loadSidebar(); closeVfxEditor(); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
@@ -1047,7 +1284,10 @@ async function resetVfx() {
   try {
     const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel }) });
-    if (res.ok) { v.groups = (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g) })); renderVfxEditor();
+    if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g) }));
+                  v.scalars = (res.scalars || []).map(x => ({ ...x }));
+                  v.vectors = (res.vectors || []).map(x => ({ ...x, inten: Math.max(x.rgba[0], x.rgba[1], x.rgba[2], 1) }));
+                  renderVfxEditor();
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
@@ -1248,6 +1488,70 @@ function sbSubLabel(item) {
   return parts.join("/") || item.game_rel || "";
 }
 
+// ── sidebar multi-select (bulk delete) ────────────────────────────────────────
+// winterwintour asked to delete several edited assets at once; before this the only options were
+// one X at a time or Clear All. Marking is deliberately a separate gesture from the export
+// checkbox — that one means "include in the mod", this one means "act on these".
+let _sbMarked   = new Set();     // tokens
+let _sbLastTok  = null;          // anchor for shift-click ranges
+
+function _sbVisible() {
+  const all = Object.values(sidebarData);
+  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  return q ? all.filter(i =>
+        (i.name || "").toLowerCase().includes(q) ||
+        (i.skin_name || "").toLowerCase().includes(q) ||
+        (i.char_name || "").toLowerCase().includes(q)) : all;
+}
+
+function sbMarkClear() { _sbMarked.clear(); _sbLastTok = null; renderSidebar(); }
+
+function _sbMarkClick(item, e) {
+  const items = _sbVisible();
+  if (e.shiftKey && _sbLastTok) {
+    const a = items.findIndex(i => i.token === _sbLastTok);
+    const b = items.findIndex(i => i.token === item.token);
+    if (a >= 0 && b >= 0) {
+      for (let i = Math.min(a, b); i <= Math.max(a, b); i++) _sbMarked.add(items[i].token);
+    }
+  } else {
+    if (_sbMarked.has(item.token)) _sbMarked.delete(item.token);
+    else _sbMarked.add(item.token);
+    _sbLastTok = item.token;
+  }
+  renderSidebar();
+}
+
+function sbDeleteMarked() {
+  const items = [...(_sbMarked || [])].map(t => sidebarData[t]).filter(Boolean);
+  if (!items.length) return;
+  pendingClearMany = items;
+  document.getElementById("confirm-clear-title").textContent = `Delete ${items.length} assets?`;
+  document.getElementById("confirm-clear-msg").textContent =
+    `Delete these ${items.length} edited assets from local assets? The imported files will be removed.`;
+  document.getElementById("confirm-clear-overlay").classList.add("active");
+}
+
+async function performClearMany(items) {
+  try {
+    const res = await api("/api/delete_imported", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rels: items.map(i => i.game_rel) }),
+    });
+    if (res.ok) {
+      items.forEach(i => { delete sidebarData[i.token]; _sbMarked.delete(i.token); });
+      _sbLastTok = null;
+      renderSidebar();
+      toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "warning", 3500);
+      renderGrid().catch(() => {});
+    } else {
+      toast(`Delete failed: ${res.error}`, "warning");
+    }
+  } catch (e) {
+    toast(`Error: ${e.message}`, "warning");
+  }
+}
+
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
   list.innerHTML = "";
@@ -1267,9 +1571,18 @@ function renderSidebar() {
     updateInstallBtn();
     return;
   }
+  [..._sbMarked].forEach(t => { if (!sidebarData[t]) _sbMarked.delete(t); });
+  if (_sbMarked.size) {
+    const bar = document.createElement("div");
+    bar.className = "sb-bulk";
+    bar.innerHTML = `<span>${_sbMarked.size} selected</span><span class="grow"></span>
+      <button onclick="sbMarkClear()">Clear</button>
+      <button class="danger" onclick="sbDeleteMarked()">Delete</button>`;
+    list.appendChild(bar);
+  }
   items.forEach(item => {
     const el = document.createElement("div");
-    el.className = "sb-item" + (item.selected ? " selected" : "");
+    el.className = "sb-item" + (item.selected ? " selected" : "") + (_sbMarked.has(item.token) ? " marked" : "");
     el.dataset.token = item.token;
     const h = handlerFor(item.file_type);
     el.innerHTML = `
@@ -1296,7 +1609,13 @@ function renderSidebar() {
       renderSidebar();
       saveSelection();
     });
-    el.addEventListener("click", () => handleImportedFileAction(item));
+    el.addEventListener("click", e => {
+      // ctrl/cmd or shift marks for a bulk action; a plain click still opens the asset, and
+      // clears any marks so the two modes can never be confused for one another.
+      if (e.ctrlKey || e.metaKey || (e.shiftKey && _sbLastTok)) { _sbMarkClick(item, e); return; }
+      if (_sbMarked.size) { sbMarkClear(); return; }
+      handleImportedFileAction(item);
+    });
     el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsSidebar(item)));
     list.appendChild(el);
   });
@@ -1464,9 +1783,12 @@ document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
+let pendingClearMany = null;     // several marked assets awaiting the one confirm dialog
+
 function clearImported(token, skipConfirm) {
   const item = sidebarData[token];
   if (!item) return;
+  pendingClearMany = null;
   if (skipConfirm) {
     performClearImported(item);
     return;
@@ -1502,11 +1824,16 @@ async function performClearImported(item) {
 
 document.getElementById("confirm-clear-cancel").addEventListener("click", () => {
   document.getElementById("confirm-clear-overlay").classList.remove("active");
-  pendingClear = null;
+  pendingClear = null; pendingClearMany = null;
 });
 
 document.getElementById("confirm-clear-ok").addEventListener("click", async () => {
   document.getElementById("confirm-clear-overlay").classList.remove("active");
+  if (pendingClearMany) {
+    const items = pendingClearMany; pendingClearMany = null;
+    await performClearMany(items);
+    return;
+  }
   if (!pendingClear) return;
   const item = pendingClear; pendingClear = null;
   await performClearImported(item);
@@ -1544,6 +1871,22 @@ document.getElementById("confirm-clear-all-ok").addEventListener("click", async 
     toast(`Error: ${e.message}`, "warning");
   }
 });
+
+// ── pak index warnings ───────────────────────────────────────────────────────
+// A container that fails to parse is invisible in the browser — its assets are simply absent.
+// Report it once per session so an empty tree is explainable instead of mysterious.
+let _indexWarnShown = false;
+async function checkIndexWarnings() {
+  if (_indexWarnShown) return;
+  try {
+    const res = await api("/api/index_warnings");
+    if (!res.failed || !res.failed.length) return;
+    _indexWarnShown = true;
+    const names = res.failed.map(f => f.container).join(", ");
+    toast(`${res.failed.length} pak container(s) could not be read: ${names}. ` +
+          `Assets inside them are missing — check the AES key in Settings.`, "warning", 14000);
+  } catch (e) {}
+}
 
 // ── prereq check ─────────────────────────────────────────────────────────────
 async function checkPrereqs() {
@@ -2049,7 +2392,7 @@ function _ctxItemsCard(card) {
   if (card.file_type === "mesh" && card.game_rel)
     items.push({ icon: "download", label: "Open in Blender", action: () => openBlend(card.game_rel) });
   if (card.game_rel)
-    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(card.game_rel)}`) });
+    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => revealInExplorer(card.game_rel) });
   if (card.game_rel)
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = card.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
   if (card.imported && card.file_type === "texture" && card.game_rel) {
@@ -2068,7 +2411,7 @@ function _ctxItemsSidebar(item) {
   if (item.file_type === "mesh" && item.game_rel)
     items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(item.game_rel) });
   if (item.game_rel)
-    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => fetch(`/api/open_explorer?game_rel=${encodeURIComponent(item.game_rel)}`) });
+    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => revealInExplorer(item.game_rel) });
   if (item.game_rel)
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = item.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
   if (item.file_type === "texture" && item.game_rel) {
@@ -2076,6 +2419,11 @@ function _ctxItemsSidebar(item) {
     items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = item.game_rel; _ctxFileInput.click(); } });
   }
   if (items.length) items.push("sep");
+  items.push({ icon: _sbMarked.has(item.token) ? "square-check" : "square",
+               label: _sbMarked.has(item.token) ? "Unmark" : "Mark for bulk delete",
+               action: () => _sbMarkClick(item, {}) });
+  if (_sbMarked.size)
+    items.push({ icon: "trash-2", label: `Delete ${_sbMarked.size} marked`, danger: true, action: () => sbDeleteMarked() });
   items.push({ icon: "trash-2", label: "Delete edits", danger: true, action: () => clearImported(item.token) });
   return items;
 }
@@ -2186,11 +2534,35 @@ function _relTime(mtime) {
   return new Date(mtime * 1000).toLocaleDateString();
 }
 
-function _renderProjectPicker(projects) {
+let _projAll = [];               // every project, unfiltered — the search box filters this list
+
+function _projSearchValue() {
+  const el = document.getElementById("proj-search");
+  return el ? el.value.trim().toLowerCase() : "";
+}
+
+function projSearch() {
+  // re-render from the cached list; no server round-trip, the picker already has everything
+  _renderProjectPicker(_projAll, true);
+}
+
+function _renderProjectPicker(projects, keepQuery) {
   const grid = document.getElementById("proj-grid");
+  if (!keepQuery) {
+    _projAll = projects;
+    const el = document.getElementById("proj-search");
+    if (el) el.value = "";
+  }
   grid.innerHTML = "";
+  const q = _projSearchValue();
+  const all = _projAll.length ? _projAll : projects;
+  projects = q ? all.filter(p => (p.name || "").toLowerCase().includes(q)) : all;
+  const search = document.getElementById("proj-search-row");
+  if (search) search.style.display = all.length > 1 ? "" : "none";   // pointless with one project
   if (!projects.length) {
-    grid.innerHTML = '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
+    grid.innerHTML = q
+      ? `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`
+      : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
     lucide.createIcons({ nodes: [grid] });
     return;
   }

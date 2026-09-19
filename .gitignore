@@ -227,3 +227,10 @@ assets/
 mr_config.json
 _cache/
 Atelier.exe
+# ooz checkout built by linux/build_ooz.sh into Tools/libooz.so
+linux/_ooz/
+
+# discord retrieval scratch (contains user token + scraped msgs)
+retrieval/.env
+retrieval/data/
+retrieval/test.py

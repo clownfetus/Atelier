@@ -91,8 +91,7 @@ def mat_json(game_rel, out_dir=None):
     project copy exists, the JSON is produced in out_dir (defaults to the project dir — the
     explicit import/edit flows). Pass out_dir=CACHE_3DVIEW for viewport-only reads that shouldn't
     pollute the project folder."""
-    import atelier.asset_cache as _ac
-    from atelier.handlers.texture import extract_info, find_extracted
+    from atelier.handlers.texture import ensure_work_base
     import_root = get_import_root()
     # Project copy wins. Unique subfolder path (no basename collisions); fall back to the legacy flat
     # layout so pre-existing projects still load.
@@ -110,20 +109,12 @@ def mat_json(game_rel, out_dir=None):
             os.makedirs(os.path.dirname(jp), exist_ok=True)
             shutil.copyfile(cached_jp, jp)
             return jp
-    work_base = _ac.cache_base(game_rel)
+    # One extractor for every handler: it picks retoc or UAssetTool per host and records the
+    # asset cache itself (texture.ensure_work_base).
+    work_base = ensure_work_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
-        pak_gr = pak_game_path(game_rel)
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-             "--filter", os.path.basename(pak_gr)])
-        cp, pak, pfx = extract_info(game_rel)
-        if cp and os.path.exists(cp + ".uasset"):
-            _ac.record(game_rel, cp, pak, pfx)
-            work_base = cp
-        else:
-            work_base = find_extracted(game_rel)
-    if not work_base or not os.path.exists(work_base + ".uasset"):
-        raise RuntimeError("material not found in game paks")
+        from atelier.handlers.texture import missing_reason as TX_missing_reason
+        raise RuntimeError(TX_missing_reason(game_rel, "material"))
     sub = os.path.dirname(jp)                         # the game_rel subfolder under out_dir
     os.makedirs(sub, exist_ok=True)
     uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])

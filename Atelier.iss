@@ -63,7 +63,8 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 ; save_usmap_config() has already pinned the deleted path in mr_config.json while usmap_checked_at
 ; is still fresh, the 3-day gate blocks an automatic re-fetch. The app would sit unusable behind a
 ; Setup prereq error until the user re-downloads by hand.
-; The loose exes (UAssetTool, UAssetGUI, texconv) always ship, so ignoreversion covers them.
+; The loose exes (UAssetTool, UAssetGUI) always ship, so ignoreversion covers them. texconv.exe
+; used to sit beside them and was never invoked by anything -- removed rather than kept shipping.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\_internal"
 Type: filesandordirs; Name: "{app}\Tools\AtelierMesh"

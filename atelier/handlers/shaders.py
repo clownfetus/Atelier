@@ -8,8 +8,8 @@ Dumping every blob would be ~12GB, so we:
 
 All three tools (retoc, dxc, oo2core) are bundled standalone under Tools/shaders — nothing external.
 """
-import os, re, json, glob, sqlite3, subprocess, threading, struct, tempfile
-from atelier.config import ROOT, TOOLS, PAKS, CNW
+import os, re, json, sqlite3, subprocess, threading, struct, tempfile
+from atelier.config import ROOT, TOOLS, PAKS, CNW, dir_glob
 
 SHADER_TOOLS = os.path.join(TOOLS, "shaders")
 RETOC        = os.path.join(SHADER_TOOLS, "retoc-rivals-cli.exe")
@@ -112,7 +112,7 @@ def _build_index():
             raise RuntimeError((r.stderr or r.stdout or "dump-shaders failed").strip().splitlines()[-1])
 
         # 2) stream each line-delimited index.json into SQLite.
-        index_files = glob.glob(os.path.join(IDX_DIR, "*", "index.json"))
+        index_files = dir_glob(IDX_DIR, "*/index.json")
         if not index_files:
             raise RuntimeError("no index.json produced")
         if os.path.isfile(DB_PATH):
@@ -325,7 +325,7 @@ def build_shader_mod(lib, idx, edits, mod_name=""):
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "pack failed").strip().splitlines()[-1]}
 
-        triple = [f for f in glob.glob(os.path.join(modout, "*"))
+        triple = [f for f in dir_glob(modout, "*")
                   if f.lower().endswith((".pak", ".ucas", ".utoc"))]
         if not triple:
             return {"ok": False, "error": "pack produced no mod files"}
@@ -405,7 +405,7 @@ def build_shader_mod_ir(lib, idx, ir_text, mod_name=""):
                            cwd=SHADER_TOOLS, creationflags=CNW)
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "pack failed").strip().splitlines()[-1]}
-        triple = [f for f in glob.glob(os.path.join(modout, "*"))
+        triple = [f for f in dir_glob(modout, "*")
                   if f.lower().endswith((".pak", ".ucas", ".utoc"))]
         if not triple:
             return {"ok": False, "error": "pack produced no mod files"}

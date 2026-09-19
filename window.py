@@ -5,9 +5,9 @@ import threading
 import urllib.request
 import os
 import datetime
-import subprocess
-import ctypes
 import webview
+
+from atelier import hostos
 
 PORT = 8767
 URL  = f"http://localhost:{PORT}"
@@ -24,24 +24,7 @@ def _show_launch_toast():
     except Exception:
         version = ""
     label = f"Atelier {version}" if version else "Atelier"
-    xml = (
-        f'<toast duration="short"><visual><binding template="ToastText02">'
-        f'<text id="1">{label}</text>'
-        f'<text id="2">Launching, please wait...</text>'
-        f'</binding></visual></toast>'
-    )
-    ps = (
-        "[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null;"
-        "[Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom,ContentType=WindowsRuntime]|Out-Null;"
-        f"$x=[Windows.Data.Xml.Dom.XmlDocument]::new();"
-        f"$x.LoadXml('{xml}');"
-        f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{label}').Show("
-        f"[Windows.UI.Notifications.ToastNotification]::new($x))"
-    )
-    subprocess.Popen(
-        ["powershell", "-WindowStyle", "Hidden", "-NoProfile", "-Command", ps],
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+    hostos.notify(label, "Launching, please wait...")
 
 
 def _setup_logging():
@@ -108,10 +91,7 @@ def main():
 
     def _focus():
         time.sleep(0.3)
-        hwnd = ctypes.windll.user32.FindWindowW(None, "Atelier")
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        hostos.focus_window("Atelier")
 
     # Debug (devtools) is off in production, but a "DEBUG" marker file next to the exe turns it on
     # for diagnostic builds — keeps the shipped app clean while letting debug builds inspect the console.

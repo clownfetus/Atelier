@@ -1,44 +1,131 @@
-import struct, ctypes, os
+"""Pure-Python reader for UE5 IoStore containers (.utoc/.ucas).
+
+Two pieces of this are native and therefore platform-specific: Oodle decompression and AES-256-ECB
+decryption. Both are loaded IN-PROCESS via ctypes, so unlike the .exe tools in Tools/ they cannot
+be run under Wine — a Linux Python process cannot load a Windows DLL. Each therefore has a backend
+per platform, chosen once at first use:
+
+  Oodle   Windows: Tools/retoc-rivals-cli/oo2core_9_win64.dll (the real Oodle).
+          Linux:   a real liboo2corelinux64.so if one is present (ATELIER_OODLE or Tools/),
+                   else Tools/libooz.so — powzix/ooz, an open-source decoder for the
+                   Kraken/Mermaid/Selkie/Leviathan codecs UE5 containers use. Decode-only,
+                   which is all this module does; container_merge writes uncompressed blocks.
+                   Build it with linux/build_ooz.sh.
+  AES     Windows: CNG (bcrypt).
+          Linux:   the `cryptography` package.
+
+Both loads are lazy so that a missing codec surfaces as a decode error rather than an import
+failure that takes the whole app down — the asset index only needs AES, so browsing still works.
+"""
+import struct, ctypes, os, sys
+
+IS_WINDOWS = os.name == "nt"
 
 _TOOLS = os.environ.get("MR_TOOLS") or os.path.join(os.path.dirname(__file__), "Tools")
 AES_KEY = b""
 if os.path.exists(AES_PATH := os.path.join(_TOOLS, "AES_KEY.txt")):
     with open(AES_PATH) as AES_FILE: AES_KEY = bytes.fromhex(AES_FILE.read().strip())
 
-OODLE = os.path.join(_TOOLS, "retoc-rivals-cli", "oo2core_9_win64.dll")
-_oo = ctypes.WinDLL(os.path.abspath(OODLE))
-_oo.OodleLZ_Decompress.restype = ctypes.c_int64
+# --- Oodle ---------------------------------------------------------------------------------
+_oodle_fn = None
+
+def _load_oodle():
+    """Returns f(comp: bytes, raw_len: int) -> bytes."""
+    if IS_WINDOWS:
+        dll = os.path.join(_TOOLS, "retoc-rivals-cli", "oo2core_9_win64.dll")
+        oo = ctypes.WinDLL(os.path.abspath(dll))
+        oo.OodleLZ_Decompress.restype = ctypes.c_int64
+        def _decomp(comp, raw_len):
+            out = ctypes.create_string_buffer(raw_len)
+            n = oo.OodleLZ_Decompress(comp, ctypes.c_int64(len(comp)), out, ctypes.c_int64(raw_len),
+                                      1, 0, 0, None, 0, None, None, None, 0, 0)
+            if n != raw_len: raise RuntimeError(f"oodle decompress {n} != {raw_len}")
+            return out.raw
+        return _decomp
+
+    # A real Oodle build, if the user supplied one, keeps us bit-identical to Windows.
+    for cand in (os.environ.get("ATELIER_OODLE"),
+                 os.path.join(_TOOLS, "liboo2corelinux64.so.9"),
+                 os.path.join(_TOOLS, "liboo2corelinux64.so")):
+        if cand and os.path.exists(cand):
+            oo = ctypes.CDLL(os.path.abspath(cand))
+            oo.OodleLZ_Decompress.restype = ctypes.c_int64
+            def _decomp(comp, raw_len):
+                out = ctypes.create_string_buffer(raw_len)
+                n = oo.OodleLZ_Decompress(comp, ctypes.c_int64(len(comp)), out, ctypes.c_int64(raw_len),
+                                          1, 0, 0, None, 0, None, None, None, 0, 0)
+                if n != raw_len: raise RuntimeError(f"oodle decompress {n} != {raw_len}")
+                return out.raw
+            return _decomp
+
+    ooz_path = os.path.join(_TOOLS, "libooz.so")
+    if not os.path.exists(ooz_path):
+        raise RuntimeError(
+            f"No Oodle decoder for Linux at {ooz_path}. Build it with linux/build_ooz.sh, or "
+            f"point ATELIER_OODLE at a liboo2corelinux64.so.")
+    ooz = ctypes.CDLL(ooz_path)
+    ooz.OozDecompress.restype  = ctypes.c_int64
+    ooz.OozDecompress.argtypes = [ctypes.c_char_p, ctypes.c_int64, ctypes.c_char_p, ctypes.c_int64]
+    def _decomp(comp, raw_len):
+        out = ctypes.create_string_buffer(raw_len)
+        n = ooz.OozDecompress(comp, len(comp), out, raw_len)
+        if n != raw_len: raise RuntimeError(f"oodle decompress {n} != {raw_len}")
+        return out.raw
+    return _decomp
 
 def oodle_decompress(comp, raw_len):
-    out = ctypes.create_string_buffer(raw_len)
-    n = _oo.OodleLZ_Decompress(comp, ctypes.c_int64(len(comp)), out, ctypes.c_int64(raw_len),
-                               1, 0, 0, None, 0, None, None, None, 0, 0)
-    if n != raw_len: raise RuntimeError(f"oodle decompress {n} != {raw_len}")
-    return out.raw
+    global _oodle_fn
+    if _oodle_fn is None:
+        _oodle_fn = _load_oodle()
+    return _oodle_fn(comp, raw_len)
 
-# --- AES-256-ECB via Windows CNG (bcrypt) ---
-_bcrypt = ctypes.windll.bcrypt
-def _aes_ecb(data, decrypt):
-    if not AES_KEY:
-        raise RuntimeError("AES key not configured")
-    BCRYPT_AES_ALGORITHM = ctypes.c_wchar_p("AES")
-    hAlg = ctypes.c_void_p()
-    _bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(hAlg), BCRYPT_AES_ALGORITHM, None, 0)
-    chain = ctypes.create_unicode_buffer("ChainingModeECB")
-    _bcrypt.BCryptSetProperty(hAlg, ctypes.c_wchar_p("ChainingMode"),
-                              ctypes.cast(chain, ctypes.c_void_p), (len(chain.value)+1)*2, 0)
-    hKey = ctypes.c_void_p()
-    keyobj = ctypes.create_string_buffer(0)  # let provider manage
-    r = _bcrypt.BCryptGenerateSymmetricKey(hAlg, ctypes.byref(hKey), None, 0,
-                                           AES_KEY, len(AES_KEY), 0)
-    out = ctypes.create_string_buffer(len(data))
-    cb = ctypes.c_ulong(0)
-    fn = _bcrypt.BCryptDecrypt if decrypt else _bcrypt.BCryptEncrypt
-    st = fn(hKey, data, len(data), None, None, 0, out, len(data), ctypes.byref(cb), 0)
-    _bcrypt.BCryptDestroyKey(hKey); _bcrypt.BCryptCloseAlgorithmProvider(hAlg, 0)
-    if st != 0: raise RuntimeError(f"BCrypt status {st:#x}")
-    return out.raw[:cb.value]
-def aes_decrypt(data): return _aes_ecb(data, True)
+# --- AES-256-ECB ---------------------------------------------------------------------------
+# Reads the module-level AES_KEY on every call, never caching a cipher: routes.py rewrites
+# AES_KEY in place when the user sets or clears the key in Setup.
+_aes_fn = None
+
+def _load_aes():
+    """Returns f(data: bytes) -> bytes (decrypt)."""
+    if IS_WINDOWS:
+        _bcrypt = ctypes.windll.bcrypt
+        def _aes_ecb(data, decrypt):
+            if not AES_KEY:
+                raise RuntimeError("AES key not configured")
+            BCRYPT_AES_ALGORITHM = ctypes.c_wchar_p("AES")
+            hAlg = ctypes.c_void_p()
+            _bcrypt.BCryptOpenAlgorithmProvider(ctypes.byref(hAlg), BCRYPT_AES_ALGORITHM, None, 0)
+            chain = ctypes.create_unicode_buffer("ChainingModeECB")
+            _bcrypt.BCryptSetProperty(hAlg, ctypes.c_wchar_p("ChainingMode"),
+                                      ctypes.cast(chain, ctypes.c_void_p), (len(chain.value)+1)*2, 0)
+            hKey = ctypes.c_void_p()
+            _bcrypt.BCryptGenerateSymmetricKey(hAlg, ctypes.byref(hKey), None, 0,
+                                               AES_KEY, len(AES_KEY), 0)
+            out = ctypes.create_string_buffer(len(data))
+            cb = ctypes.c_ulong(0)
+            fn = _bcrypt.BCryptDecrypt if decrypt else _bcrypt.BCryptEncrypt
+            st = fn(hKey, data, len(data), None, None, 0, out, len(data), ctypes.byref(cb), 0)
+            _bcrypt.BCryptDestroyKey(hKey); _bcrypt.BCryptCloseAlgorithmProvider(hAlg, 0)
+            if st != 0: raise RuntimeError(f"BCrypt status {st:#x}")
+            return out.raw[:cb.value]
+        return lambda data: _aes_ecb(data, True)
+
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    except ImportError:
+        raise RuntimeError("the `cryptography` package is required to read paks on Linux "
+                           "(pip install cryptography)")
+    def _decrypt(data):
+        if not AES_KEY:
+            raise RuntimeError("AES key not configured")
+        d = Cipher(algorithms.AES(AES_KEY), modes.ECB()).decryptor()
+        return d.update(data) + d.finalize()
+    return _decrypt
+
+def aes_decrypt(data):
+    global _aes_fn
+    if _aes_fn is None:
+        _aes_fn = _load_aes()
+    return _aes_fn(data)
 
 FLAGBITS = {1:"Compressed",2:"Encrypted",4:"Signed",8:"Indexed",16:"OnDemand"}
 
@@ -116,7 +203,22 @@ def read_chunk(t, ucas_path, idx):
     return bytes(out[:length])
 
 def parse_dir_index(t):
-    """Decode the TOC directory index -> list of (path, toc_entry_index)."""
+    """Decode the TOC directory index -> list of (path, toc_entry_index).
+
+    dir_index_size 0 means the container carries no directory index — the Indexed flag is unset.
+    global.utoc is the normal case: it holds the shader library and the global name map, not
+    assets, and it ships with every install. Returning [] is the truthful answer (it contributes
+    no paths). Raising on the zero-length blob made every real install report "global.utoc could
+    not be read ... usually a wrong or stale AES key" at launch, and, because a build with
+    warnings is deliberately never cached, kept the 546k-asset index from EVER being cached: a
+    19-second re-index on every launch instead of a 1-second load.
+
+    Keyed on the size, not the flag: the size is what makes the blob unparseable, and an
+    encrypted container read with the WRONG key still reports its flags from the plaintext
+    header — so genuine key failures keep surfacing as failures.
+    """
+    if t.dir_index_size == 0:
+        return []
     blob = t.buf[t.off_dirindex:t.off_dirindex + t.dir_index_size]
     if t.encrypted:
         blob = aes_decrypt(blob[:(len(blob) // 16) * 16])

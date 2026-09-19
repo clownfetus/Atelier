@@ -16,6 +16,7 @@ from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, TOOLS, CNW, RO
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 import io_lib
+from atelier import hostos
 
 # Zen-DIRECT build tooling. create_mod_iostore corrupts the name map of BIG level packages during
 # legacy->Zen conversion (a no-op repack of Arakko crashes in-game), so level mods are built the
@@ -32,7 +33,12 @@ _UAG_MAP = "Atelier_S9"
 
 def _uag(args, timeout=240):
     """Run UAssetGUI CLI. Bad/insufficient args make it launch the GUI and hang -> always timeout+kill.
-    tojson: [tojson, asset, out.json, VER_UE5_3, <map>]  fromjson: [fromjson, in.json, out.uasset, <map>]."""
+    tojson: [tojson, asset, out.json, VER_UE5_3, <map>]  fromjson: [fromjson, in.json, out.uasset, <map>].
+
+    Windows-only: UAssetGUI is a WinForms app whose CLI still initialises the GUI stack, and the
+    hang-recovery below depends on taskkill. Level editing therefore has no Linux path yet."""
+    if not hostos.IS_WINDOWS:
+        hostos.unsupported("Level/world editing (UAssetGUI)")
     try:
         r = subprocess.run([UAG] + args, capture_output=True, text=True, creationflags=CNW, timeout=timeout)
         return (r.stdout or "") + (r.stderr or "")
@@ -98,7 +104,7 @@ def _enum():
     global _MAPS
     if _MAPS is not None: return _MAPS
     byk = {}
-    for utoc in sorted(glob.glob(PAKS + "/*.utoc"),
+    for utoc in sorted(dir_glob(PAKS, "*.utoc"),
                        key=lambda u: (_cont_prio(os.path.basename(u)), os.path.basename(u))):
         try:
             t = io_lib.parse_toc(utoc); entries = io_lib.parse_dir_index(t)
@@ -155,11 +161,14 @@ def _ensure_extracted(game_rel):
     if os.path.exists(base + ".uasset"):
         return base
     os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+    # the virtual path, not the basename: --filter matches the mount-relative path, and sublevel
+    # basenames repeat across maps (see texture.uat_filter).
     uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-         "--filter", os.path.basename(pak_gr)])
+         "--filter", _norm(game_rel)])
     if os.path.exists(base + ".uasset"):
         return base
-    raise RuntimeError("level asset not found in game paks: " + pak_gr)
+    from atelier.handlers.texture import missing_reason as TX_missing_reason
+    raise RuntimeError(TX_missing_reason(game_rel, "level asset", check_index=False))
 
 def _to_json(base):
     outdir = os.path.join(_CACHE, "world_tj"); os.makedirs(outdir, exist_ok=True)
@@ -652,13 +661,13 @@ def build_world_mod(game_rel, edits, out_base):
     sub = os.path.basename(gr)[:-5]
     aes = "0x" + get_aes_key()
     ua = os.path.join(_CACHE, "world_zen", re.sub(r"\W+", "_", gr).strip("_") + "_u")
-    if not glob.glob(ua + "/**/*.uasset", recursive=True):
+    if not dir_glob(ua, "**/*.uasset", recursive=True):
         shutil.rmtree(ua, ignore_errors=True)
         for cc in conts:
             subprocess.run([RETOC, "-a", aes, "unpack", os.path.join(PAKS, cc), "--filter", path,
                             "--game-paks-dir", PAKS, "-o", ua], capture_output=True, creationflags=CNW)
-            if glob.glob(ua + "/**/*.uasset", recursive=True): break
-    if not glob.glob(ua + "/**/*.uasset", recursive=True):
+            if dir_glob(ua, "**/*.uasset", recursive=True): break
+    if not dir_glob(ua, "**/*.uasset", recursive=True):
         return {"ok": False, "error": "retoc unpack produced no .uasset for " + sub}
     out = os.path.join(_CACHE, "world_zen_out"); os.makedirs(out, exist_ok=True)
     stage = os.path.join(_CACHE, "world_zen_stage", sub)
@@ -666,7 +675,7 @@ def build_world_mod(game_rel, edits, out_base):
     shutil.copytree(ua, stage)
     rp = subprocess.run([RETOC, "-a", aes, "pack", stage, "-o", out, "--game-paks-dir", PAKS],
                         capture_output=True, text=True, creationflags=CNW)
-    tmpl = sorted(glob.glob(f"{out}/{sub}_*_P.utoc"))
+    tmpl = sorted(dir_glob(out, f"{glob.escape(sub)}_*_P.utoc"))
     if not tmpl:
         return {"ok": False, "error": "retoc template pack failed:\n" + ((rp.stdout or "") + (rp.stderr or ""))[-500:]}
     MB = tmpl[-1][:-5]; mt = io_lib.parse_toc(MB + ".utoc")
@@ -1026,8 +1035,8 @@ def build_world_uag(game_rel, edits, out_base):
     for cc in conts:
         subprocess.run([RETOC, "-a", aes, "unpack", os.path.join(PAKS, cc), "--filter", path,
                         "--game-paks-dir", PAKS, "-o", ua], capture_output=True, creationflags=CNW)
-        if glob.glob(ua + "/**/*.uasset", recursive=True): break
-    rlist = [f for f in glob.glob(ua + "/**/*.uasset", recursive=True) if os.path.basename(f)[:-7] == sub]
+        if dir_glob(ua, "**/*.uasset", recursive=True): break
+    rlist = [f for f in dir_glob(ua, "**/*.uasset", recursive=True) if os.path.basename(f)[:-7] == sub]
     if not rlist:
         return {"ok": False, "error": "retoc unpack produced no .uasset for " + sub}
     r_ua = rlist[0]; r_ux = r_ua[:-7] + ".uexp"
@@ -1090,7 +1099,7 @@ def build_world_uag(game_rel, edits, out_base):
     shutil.rmtree(out, ignore_errors=True); os.makedirs(out)
     rp = subprocess.run([RETOC, "-a", aes, "pack", ua, "-o", out, "--game-paks-dir", PAKS],
                         capture_output=True, text=True, creationflags=CNW)
-    tocs = sorted(glob.glob(out + "/*.utoc"))
+    tocs = sorted(dir_glob(out, "*.utoc"))
     if not tocs:
         return {"ok": False, "error": "retoc pack failed:\n" + ((rp.stdout or "") + (rp.stderr or ""))[-400:]}
     MB = tocs[-1][:-5]

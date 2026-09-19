@@ -1,4 +1,4 @@
-"""Real DXIL editing via the DXC COM API (dxcompiler.dll + dxil.dll).
+"""Real DXIL editing via the DXC COM API (dxcompiler.dll + dxil.dll). Windows-only.
 
 Compiled shaders can't be byte-patched (DXIL bitstream-encodes constants), but DXC round-trips
 cleanly: DXBC container -> LLVM IR text (editable) -> DXBC container. IDxcAssembler assembles the
@@ -8,6 +8,7 @@ edited IR and IDxcValidator (dxil.dll) signs it, producing a valid shader the ga
   assemble_and_sign(ir)  -> signed DXBC container     [ready to splice back]
 """
 import ctypes, uuid, os
+from atelier import hostos
 from ctypes import (c_void_p, c_int32, c_uint32, c_uint64, POINTER, byref, cast,
                     Structure, c_ubyte, c_ushort, c_ulong)
 
@@ -48,6 +49,10 @@ _dxil = None
 
 def _load():
     global _dxc, _dxil
+    # DXC is reached through its COM API, not a CLI, so unlike the tools in Tools/ this cannot be
+    # put behind Wine — the interface lives in our own process.
+    if not hostos.IS_WINDOWS:
+        hostos.unsupported("DXIL shader editing")
     if _dxc is None:
         try:
             os.add_dll_directory(_TOOLS)                       # let dxcompiler find dxil.dll

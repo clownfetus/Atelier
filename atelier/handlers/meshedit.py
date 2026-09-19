@@ -25,14 +25,41 @@ from atelier.handlers import meshmat as _meshmat
 from atelier.handlers import meshsurvey as _survey
 from atelier.tools import uat
 
+# Windows keeps every install under a versioned folder in one of these; Linux has no such
+# convention, so _scan_blender_dirs() falls back to PATH and the usual package locations.
 _BLENDER_DIRS = (r"C:\Program Files\Blender Foundation",
                  r"C:\Program Files (x86)\Blender Foundation")
+_BLENDER_EXE  = "blender.exe" if os.name == "nt" else "blender"
 _SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "blender")
 
 
 def _scan_blender_dirs():
-    """Auto-detect blender.exe under the standard install dirs, highest-versioned first
-    (a machine can have several side by side). Returns [] if none found."""
+    """Auto-detect Blender, lowest-versioned first — callers take the last entry.
+
+    On Windows that means walking the versioned folders under Program Files. On Linux there is
+    no equivalent layout: a distro package, a Flatpak and a hand-unpacked tarball all land
+    somewhere different, so we check PATH first and then the common locations."""
+    if os.name != "nt":
+        found = []
+        which = shutil.which("blender")
+        if which:
+            found.append(which)
+        for cand in ("/usr/bin/blender", "/usr/local/bin/blender", "/var/lib/flatpak/exports/bin/org.blender.Blender",
+                     os.path.expanduser("~/.local/share/flatpak/exports/bin/org.blender.Blender")):
+            if os.path.exists(cand) and cand not in found:
+                found.append(cand)
+        # Tarball installs: /opt/blender-4.2.1/blender and the like, newest last.
+        for base in ("/opt", os.path.expanduser("~/.local/opt"), os.path.expanduser("~/opt")):
+            try: names = sorted(os.listdir(base))
+            except OSError: continue
+            for name in names:
+                if not name.lower().startswith("blender"):
+                    continue
+                exe = os.path.join(base, name, "blender")
+                if os.path.exists(exe) and exe not in found:
+                    found.append(exe)
+        return found
+
     found = []
     for root in _BLENDER_DIRS:
         if not os.path.isdir(root):
@@ -46,7 +73,7 @@ def _scan_blender_dirs():
 
 
 def blender_path_suggestion():
-    """Best-guess blender.exe path for the Settings field: the user's configured path if it
+    """Best-guess Blender path for the Settings field: the user's configured path if it
     still exists, else the highest-versioned auto-detected install, else ''."""
     from atelier.config import get_blender_path
     configured = get_blender_path()
@@ -57,7 +84,7 @@ def blender_path_suggestion():
 
 
 def find_blender():
-    """Locate blender.exe. ATELIER_BLENDER wins, then the path configured in Settings,
+    """Locate the Blender executable. ATELIER_BLENDER wins, then the path configured in Settings,
     then the highest-versioned auto-detected install."""
     env = os.environ.get("ATELIER_BLENDER")
     if env and os.path.exists(env):
@@ -70,7 +97,7 @@ def find_blender():
     if not found:
         raise RuntimeError(
             "Blender not found. Install Blender 4.x/5.x, set its path in Settings, or set "
-            "ATELIER_BLENDER to blender.exe.")
+            f"ATELIER_BLENDER to {_BLENDER_EXE}.")
     return found[-1]
 
 

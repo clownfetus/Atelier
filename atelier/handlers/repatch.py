@@ -5,10 +5,11 @@ usmap + AES. The output is structurally native to the live patch, so it just wor
 which re-encodes the old bytes (stale name map / imports) and breaks on most files + VFX.
 
 Phase 1: materials (read params → stage_material). Textures / VFX curves next."""
-import os, re, glob, json, shutil, subprocess, zipfile
-from atelier.config import PAKS, _CACHE, USMAP, get_aes_key, CNW, WORK_IMPORT_ROOT, project_base
+import os, re, json, shutil, subprocess, zipfile
+from atelier.config import PAKS, _CACHE, USMAP, get_aes_key, WORK_IMPORT_ROOT, project_base, dir_glob
 from atelier.tools import uat
 from atelier.handlers.world import RETOC
+from atelier import hostos
 from atelier.handlers.material import _mat_params, stage_material
 from atelier.paths import pak_game_path
 
@@ -16,17 +17,9 @@ _PREFIX = "Marvel/Content/Marvel/"
 
 def _vanilla_base(gr):
     """Extract the CURRENT-patch vanilla asset for game_rel; return its base path (no ext) or None."""
-    import atelier.asset_cache as _ac
-    from atelier.handlers.texture import extract_info, find_extracted
-    wb = _ac.cache_base(gr)
-    if not wb or not os.path.exists(wb + ".uasset"):
-        pg = pak_game_path(gr)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter", os.path.basename(pg)])
-        cp, pak, pfx = extract_info(gr)
-        if cp and os.path.exists(cp + ".uasset"):
-            _ac.record(gr, cp, pak, pfx); wb = cp
-        else:
-            wb = find_extracted(gr)
+    # the shared resolver: exact --filter path, both patch layouts, provenance-checked asset cache
+    from atelier.handlers.texture import ensure_work_base
+    wb = ensure_work_base(gr)
     return wb if wb and os.path.exists(wb + ".uasset") else None
 
 def _game_rel(asset_path):
@@ -42,7 +35,7 @@ def _resolve_source(mod_source, work):
     """Return a directory containing the mod's .pak/.ucas/.utoc (unzipping if needed)."""
     src = os.path.join(work, "src"); os.makedirs(src, exist_ok=True)
     if os.path.isdir(mod_source):
-        for f in glob.glob(os.path.join(mod_source, "**", "*"), recursive=True):
+        for f in dir_glob(mod_source, "**/*", recursive=True):
             if f.lower().endswith((".pak", ".ucas", ".utoc", ".zip")):
                 if f.lower().endswith(".zip"):
                     with zipfile.ZipFile(f) as z: z.extractall(src)
@@ -68,15 +61,15 @@ def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, reloc
     work = os.path.join(_CACHE, "repatch", re.sub(r"\W+", "_", os.path.basename(mod_source))[:48] or "mod")
     shutil.rmtree(work, ignore_errors=True); os.makedirs(work)
     src = _resolve_source(mod_source, work)
-    utocs = glob.glob(src + "/**/*.utoc", recursive=True)
+    utocs = dir_glob(src, "**/*.utoc", recursive=True)
     if not utocs:
         return {"ok": False, "error": "no .pak/.ucas/.utoc found in the mod"}
 
     unpacked = os.path.join(work, "unpacked"); os.makedirs(unpacked)
     for utoc in utocs:
-        subprocess.run([RETOC, "-a", aes, "unpack", utoc, "--game-paks-dir", PAKS, "-o", unpacked],
-                       capture_output=True, creationflags=CNW)
-    assets = sorted(set(glob.glob(unpacked + "/**/*.uasset", recursive=True)))
+        hostos.run_exe([RETOC, "-a", aes, "unpack", utoc, "--game-paks-dir", PAKS, "-o", unpacked],
+                       capture_output=True)
+    assets = sorted(set(dir_glob(unpacked, "**/*.uasset", recursive=True)))
     if not assets:
         return {"ok": False, "error": "retoc could not unpack the mod's assets"}
 
@@ -93,7 +86,7 @@ def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, reloc
             try:
                 shutil.rmtree(tjd, ignore_errors=True); os.makedirs(tjd)
                 uat(["to_json", os.path.abspath(a), USMAP, os.path.abspath(tjd)])
-                jf = glob.glob(tjd + "/**/*.json", recursive=True)
+                jf = dir_glob(tjd, "**/*.json", recursive=True)
                 if not jf:
                     skipped.append(f"{base}: mod decode failed"); continue
                 d = json.load(open(jf[0], encoding="utf-8-sig"))

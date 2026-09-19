@@ -23,7 +23,17 @@ HERO_PATHS = ["Characters"]
 CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters"]
 
 # Folders pinned to the top at the root level (in order).
-ROOT_PINNED = ("characters", "vfx", "ui")
+ROOT_PINNED = ("characters", "vfx", "ui", "nameplates", "plugins")
+
+# Nameplates are three separate assets that must ALL be replaced for one plate to change, and
+# nothing in the tree says so: winterwintour found the blueprint node empty, ghostex101 and diiea
+# both hunted for the files, and shafsta had to post the paths by hand. They live far apart under
+# UI/Textures, so a curated section is the only place they can be seen together.
+NAMEPLATE_PATHS = [
+    ("UI/Textures/Show/NameplateFrame",  "In game — the plate shown over your head"),
+    ("UI/Textures/Item/NameplateFrame",  "Cosmetic menu — the selection grid"),
+    ("UI/Textures/Show/PlayerheadFrame", "Cropped icon — the round frame on your portrait"),
+]
 
 def _parse_char_md_text(text):
     """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
@@ -140,7 +150,11 @@ def _classify_file(name, rel_path=""):
         return "text"
     if nl.startswith("t_"):
         return "texture"
-    if nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_")):
+    # MPC_* = MaterialParameterCollection: UE's GLOBAL scalar/vector parameters, which is what a
+    # skin's VFX glow colours are driven from (diiea, 1031306 — "global vector parameters"). Handled
+    # by the VFX editor, so it rides the "vfx" type through browse/import/export rather than adding
+    # a whole asset kind for one parameter list.
+    if nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_", "mpc_")):
         return "vfx"
     # C_* = CurveLinearColor, Curve_* = CurveVector/Float (confirmed via UAssetTool `detect`).
     if nl.startswith(("c_", "curve_")):
@@ -157,6 +171,11 @@ def _classify_file(name, rel_path=""):
 
 def _label_folder(rel_path, folder_name):
     """Return display label for folder_name found at rel_path under Marvel/Content/Marvel/."""
+    if not rel_path and folder_name.lower() == "plugins":
+        # Name the mount the way FModel does, so "Marvel/Plugins/MarvelGAS/..." from a guide or a
+        # screenshot leads somewhere. shafsta's team-up ability icons were in here the whole time,
+        # under a path that matched nothing anyone had been told to look for.
+        return "Plugins — separately-mounted game content (MarvelGAS, …)"
     if rel_path in CHAR_LABEL_PATHS and re.match(r"^\d{4}$", folder_name):
         return f"{folder_name} — {char_name(folder_name)}"
     for hp in CHAR_LABEL_PATHS:
@@ -289,6 +308,28 @@ def _browse_maps(path):
                     "token": token(gr) if imported else None})
     return out
 
+def _browse_nameplates():
+    """The curated Nameplates section: the three real UI/Textures paths, side by side.
+
+    Each entry is an ordinary folder pointing straight at its real location, so navigating in lands
+    in the normal tree (breadcrumbs, import-all and thumbnails all keep working) — this only answers
+    "where are they", which is the part that cost three people an afternoon each. A path the current
+    paks don't have is listed anyway and said to be missing, because "it isn't there" is itself the
+    answer to the question, and silently hiding it would recreate the empty node people reported."""
+    have = set()
+    for virt_path, *_ in ensure_index():
+        vl = virt_path.lower()
+        for rp, _desc in NAMEPLATE_PATHS:
+            if vl.startswith(rp.lower() + "/"):
+                have.add(rp)
+    out = []
+    for rp, desc in NAMEPLATE_PATHS:
+        missing = rp not in have
+        out.append({"type": "folder", "name": rp.split("/")[-1],
+                    "label": f"{desc}{' · not in your paks' if missing else ''}",
+                    "rel_path": rp})
+    return out
+
 def _browse_text(path):
     """StringTable browsing under the synthetic 'Text' root (not in the pak-asset index)."""
     import atelier.handlers.text as _text
@@ -306,9 +347,13 @@ def browse_dispatch(path):
     path = (path or "").strip("/")
     if not path:                         # root: pin synthetic "Maps" + "Text" sections (not indexed)
         res = _browse_pak_level("")
+        res.insert(0, {"type": "folder", "name": "Nameplates",
+                       "label": "Nameplates (all three paths)", "rel_path": "Nameplates"})
         res.insert(0, {"type": "folder", "name": "Text", "label": "Text (StringTables)", "rel_path": "Text"})
         res.insert(0, {"type": "folder", "name": "Maps", "label": "Maps", "rel_path": "Maps"})
         return res
+    if path.lower() == "nameplates":
+        return _browse_nameplates()
     if path.lower() == "maps" or path.lower().startswith("maps/"):
         return _browse_maps(path)
     if path.lower() == "text" or path.lower().startswith("text/"):

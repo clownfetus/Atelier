@@ -17,27 +17,21 @@ from atelier.paths import pak_game_path
 
 PREVIEW_STOPS = 16   # gradient stops exposed for editing (the full LUT is rebuilt from them on export)
 
+def is_mpc(path_or_name):
+    """MPC_* = MaterialParameterCollection — UE's GLOBAL scalar/vector parameters."""
+    return os.path.basename(path_or_name).lower().startswith("mpc_")
+
 def is_vfx(path_or_name):
     nl = os.path.basename(path_or_name).lower()
-    return nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_"))
+    return nl.startswith(("ns_", "fx_", "vfx_", "nfx_", "p_", "niagara_", "mpc_"))
 
 def _ensure_extracted(game_rel):
-    import atelier.asset_cache as _ac
-    from atelier.handlers.texture import extract_info, find_extracted
-    work_base = _ac.cache_base(game_rel)
+    from atelier.handlers.texture import ensure_work_base
+    work_base = ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
     if work_base and os.path.exists(work_base + ".uasset"):
         return work_base
-    pak_gr = pak_game_path(game_rel)
-    os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-    uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter", os.path.basename(pak_gr)])
-    cp, pak, pfx = extract_info(game_rel)
-    if cp and os.path.exists(cp + ".uasset"):
-        _ac.record(game_rel, cp, pak, pfx)
-        return cp
-    work_base = find_extracted(game_rel)
-    if work_base and os.path.exists(work_base + ".uasset"):
-        return work_base
-    raise RuntimeError("VFX asset not found in game paks")
+    from atelier.handlers.texture import missing_reason as TX_missing_reason
+    raise RuntimeError(TX_missing_reason(game_rel, "VFX asset"))
 
 def _classify(channels, samples):
     """-> (kind, editable). kind: color|emission|opacity (4ch) | scalar (1) | vector2 (2) | vector3 (3)."""
@@ -183,12 +177,162 @@ def _rebuild_lut(stops, sample_count, channels):
         flat.extend(float(_at(s, c)) for c in range(channels))
     return flat
 
+# ── MaterialParameterCollection (global scalar / vector parameters) ───────────
+# A skin's VFX glow colour is frequently not a Niagara curve at all — it is a GLOBAL parameter in an
+# MPC, read by every material that references the collection. That is what diiea was editing in UE
+# on 1031306 ("the four orange colors in the global parameters"), and Atelier had no way to see it:
+# MPC_* classified as "other" and was hidden from the browser entirely.
+#
+# These are plain typed properties, so the edit model is material.py's exactly — to_json into the
+# project, edit the JSON in place, from_json at export — not the Niagara LUT sidecar above.
+#
+# WARNING worth keeping in mind when reading the UI copy: the collection is global. Every material
+# that references it changes, not just the skin that led you here.
+
+def _gn(lst, n):
+    for p in lst or []:
+        if isinstance(p, dict) and p.get("Name") == n:
+            return p
+    return None
+
+def _ex_props(e):
+    return e.get("Data") or e.get("Value") or []
+
+def _f(x):
+    try: return float(x)          # UAssetAPI serialises 0.0 as the string "+0"
+    except (TypeError, ValueError): return 0.0
+
+def _unwrap(v, depth=4):
+    """UAssetAPI wraps a struct's payload in one or more {"Value": …} layers, and the depth differs
+    between property kinds. Walk down to the first dict that looks like an FLinearColor."""
+    for _ in range(depth):
+        if isinstance(v, dict):
+            if "R" in v and "G" in v and "B" in v:
+                return v
+            v = v.get("Value")
+        elif isinstance(v, list):
+            if not v:
+                return None
+            v = v[0]
+        else:
+            return None
+    return v if isinstance(v, dict) and "R" in v else None
+
+def _param_name(entry):
+    """The FName under this collection entry's ParameterName property."""
+    pn = _gn(entry.get("Value"), "ParameterName")
+    if not pn:
+        return None
+    v = pn.get("Value")
+    if isinstance(v, dict):
+        v = v.get("Value")
+    return v if isinstance(v, str) else None
+
+def _mpc_lists(d):
+    """(scalar_entries, vector_entries) — the raw JSON entries, so edits mutate the document."""
+    ex = d["Exports"][0]
+    sp = _gn(_ex_props(ex), "ScalarParameters")
+    vp = _gn(_ex_props(ex), "VectorParameters")
+    return ((sp or {}).get("Value") or []), ((vp or {}).get("Value") or [])
+
+def mpc_json(game_rel):
+    """The collection's JSON in the active project, extracting + to_json'ing it on first use.
+    Mirrors material.mat_json: the project copy IS the edit, so the sidebar sees it as imported."""
+    import atelier.asset_cache as _ac
+    from atelier.handlers.texture import extract_info, find_extracted
+    import_root = get_import_root()
+    jp = project_base(game_rel, import_root) + ".json"
+    if os.path.exists(jp):
+        return jp
+    legacy_jp = project_base_legacy(game_rel, import_root) + ".json"
+    if os.path.exists(legacy_jp):
+        return legacy_jp
+    work_base = _ac.cache_base(game_rel)
+    if not work_base or not os.path.exists(work_base + ".uasset"):
+        work_base = _ensure_extracted(game_rel)
+    sub = os.path.dirname(jp)
+    os.makedirs(sub, exist_ok=True)
+    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])
+    if not os.path.exists(jp):
+        raise RuntimeError("to_json produced no JSON for " + os.path.basename(game_rel))
+    return jp
+
+def read_mpc(game_rel):
+    """{ok, kind:'mpc', name, scalars:[{name,value}], vectors:[{name,rgba}]} for a collection."""
+    d = json.load(open(mpc_json(game_rel), encoding="utf-8-sig"))
+    sl, vl = _mpc_lists(d)
+    scalars, vectors = [], []
+    for e in sl:
+        nm = _param_name(e)
+        dv = _gn(e.get("Value"), "DefaultValue")
+        if nm and dv is not None:
+            scalars.append({"name": nm, "value": round(_f(dv.get("Value")), 5)})
+    for e in vl:
+        nm = _param_name(e)
+        dv = _gn(e.get("Value"), "DefaultValue")
+        lc = _unwrap(dv.get("Value")) if dv is not None else None
+        if nm and lc:
+            vectors.append({"name": nm, "rgba": [round(_f(lc.get(k)), 5) for k in "RGBA"]})
+    return {"ok": True, "kind": "mpc", "name": os.path.basename(game_rel),
+            "global_params": True, "scalars": scalars, "vectors": vectors,
+            "summary": {"vector": len(vectors), "scalar": len(scalars)}, "groups": []}
+
+def _apply_mpc_edits(d, scalars, vectors):
+    sl, vl = _mpc_lists(d)
+    for e in sl:
+        nm = _param_name(e)
+        if nm in (scalars or {}):
+            dv = _gn(e.get("Value"), "DefaultValue")
+            if dv is not None:
+                dv["Value"] = float(scalars[nm])
+    for e in vl:
+        nm = _param_name(e)
+        if nm in (vectors or {}):
+            dv = _gn(e.get("Value"), "DefaultValue")
+            lc = _unwrap(dv.get("Value")) if dv is not None else None
+            if lc:
+                r, g, b, a = (list(vectors[nm]) + [0, 0, 0, 1])[:4]
+                lc["R"], lc["G"], lc["B"], lc["A"] = float(r), float(g), float(b), float(a)
+
+def save_mpc(game_rel, scalars, vectors):
+    """Apply edits and PERSIST them into the collection's on-disk project JSON."""
+    jp = mpc_json(game_rel)
+    d  = json.load(open(jp, encoding="utf-8-sig"))
+    _apply_mpc_edits(d, scalars or {}, vectors or {})
+    json.dump(d, open(jp, "w"))
+    return read_mpc(game_rel)
+
+def reset_mpc(game_rel):
+    """Drop local edits: delete the project JSON (new + legacy) and re-derive from the .uasset."""
+    for jp in (project_base(game_rel) + ".json", project_base_legacy(game_rel) + ".json"):
+        if os.path.exists(jp):
+            os.remove(jp)
+    return read_mpc(game_rel)
+
+def stage_mpc(stage, game_rel):
+    """from_json the edited collection into the export stage at its pak game path."""
+    d  = json.load(open(mpc_json(game_rel), encoding="utf-8-sig"))
+    ej = os.path.join(_CACHE, "_mpc_edit.json"); json.dump(d, open(ej, "w"))
+    pak_gr = pak_game_path(game_rel)
+    out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
+    os.makedirs(os.path.dirname(out_ua), exist_ok=True)
+    uat(["from_json", os.path.abspath(ej), os.path.abspath(out_ua), USMAP])
+    if not os.path.exists(out_ua):
+        raise RuntimeError("from_json produced no uasset")
+    return os.path.basename(game_rel)
+
+
 # ── read / save / reset ───────────────────────────────────────────────────────
 
 def read_vfx(game_rel):
     """Enumerate a Niagara asset's editable COLOR curves, deduped into groups with gradient stops.
     Returns {ok, name, total_exports, color_exports, summary, groups:[{group_id, export_indices,
-    channels, sample_count, lut_floats, kind, is_hdr, stops:[[r,g,b,a]…]}]}."""
+    channels, sample_count, lut_floats, kind, is_hdr, stops:[[r,g,b,a]…]}]}.
+
+    An MPC is not a Niagara asset and has no LUTs — it goes to read_mpc, which returns the same
+    editor payload shape with `kind: "mpc"` instead of curve groups."""
+    if is_mpc(game_rel):
+        return read_mpc(game_rel)
     base = _ensure_extracted(game_rel)
     r = uat(["niagara_details", os.path.abspath(base + ".uasset"), "--usmap", USMAP])
     try:
@@ -251,8 +395,11 @@ def read_vfx(game_rel):
             "total_exports": d.get("totalExports"), "color_exports": d.get("colorExports"),
             "summary": summary, "groups": glist}
 
-def save_vfx(game_rel, groups):
-    """Persist edited color-curve groups to the sidecar. groups: [{export_indices, stops, sample_count, channels}]."""
+def save_vfx(game_rel, groups, scalars=None, vectors=None):
+    """Persist edited color-curve groups to the sidecar. groups: [{export_indices, stops, sample_count, channels}].
+    For an MPC there are no groups — the named scalar/vector edits go to save_mpc instead."""
+    if is_mpc(game_rel):
+        return save_mpc(game_rel, scalars or {}, vectors or {})
     _ensure_extracted(game_rel)
     clean = [{"export_indices": list(g.get("export_indices") or []),
               "stops":          g.get("stops") or [],
@@ -265,6 +412,8 @@ def save_vfx(game_rel, groups):
     return read_vfx(game_rel)
 
 def reset_vfx(game_rel):
+    if is_mpc(game_rel):
+        return reset_mpc(game_rel)
     for p in (vfx_sidecar(game_rel), project_base_legacy(game_rel) + ".json"):
         if os.path.exists(p):
             os.remove(p)
@@ -273,6 +422,8 @@ def reset_vfx(game_rel):
 def stage_vfx(stage, game_rel, edits=None):
     """Rebuild each edited group's LUT and niagara_edit the asset into the export stage.
     edits: [{export_indices, stops, sample_count, channels}] — defaults to the on-disk sidecar."""
+    if is_mpc(game_rel):
+        return stage_mpc(stage, game_rel)
     base   = _ensure_extracted(game_rel)
     groups = edits if edits is not None else _load_edits(game_rel)
     payload = []

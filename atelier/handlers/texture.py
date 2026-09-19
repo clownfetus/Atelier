@@ -1,6 +1,7 @@
-import os, sys, glob, re, shutil, struct, concurrent.futures
+import os, sys, re, shutil, struct, concurrent.futures
 from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE,
-                            check_prereqs, get_import_root, project_base, project_base_legacy)
+                            check_prereqs, get_import_root, project_base, project_base_legacy,
+                            dir_glob)
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
@@ -127,57 +128,358 @@ def decode_thumb(uasset_path, thumb_path):
             return True
     return False
 
-# UAT extract_iostore_legacy drops patch pak assets under ent/Marvel[_LQ]/ instead of the full
-# Marvel/Content/Marvel[_LQ]/ path that base paks use.  Map index pfx → UAT output prefix.
+# Where UAssetTool drops a PATCH-pak asset. Older builds used ent/Marvel[_LQ]/ instead of the full
+# Marvel/Content/Marvel[_LQ]/ path that base paks use; the current build writes the mount path for
+# both (verified 2026-09-19 against Patch_-Windows_1.1.3870120_P). Both layouts have to be
+# considered, and not only for old tools: a work cache filled before the tool update still holds
+# ent/ copies, so the same asset can exist on disk TWICE — one of them from before the game patch.
 _PATCH_UAT_PREFIX = {
     "Marvel/Content/Marvel/":    "ent/Marvel/",
     "Marvel/Content/Marvel_LQ/": "ent/Marvel_LQ/",
 }
 
+_WORK_EXTS = (".uasset", ".uexp", ".ubulk", ".uptnl")
+
+
+def _uat_candidates(virt_noext, pfx, is_patch):
+    """Every on-disk path a UAssetTool build might have written this asset to, current layout first."""
+    from atelier.index import mount_join
+    prefixes = [pfx]
+    if is_patch:
+        legacy = _PATCH_UAT_PREFIX.get(pfx)
+        if legacy:
+            prefixes.append(legacy)
+    return [os.path.join(WORK_IMPORT_ROOT, *mount_join(px, virt_noext).split("/")) for px in prefixes]
+
+
+def work_candidates(game_rel):
+    """The candidate work-cache paths for game_rel (see _uat_candidates), or [] if it is not indexed."""
+    from atelier.index import index_lookup
+    hit = index_lookup().get(game_rel.lower() + ".uasset")
+    if not hit:
+        return []
+    virt_path, container, pfx = hit
+    return _uat_candidates(virt_path[:-7], pfx, container.lower().endswith("_p.utoc"))
+
 def extract_info(game_rel):
     """Return (cache_base_path, pak, pfx) from the pak index (no ext on path).
     cache_base_path is where UAssetTool drops the file in WORK_IMPORT_ROOT.
     Returns (None, None, None) if the asset is absent from the index."""
-    from atelier.index import ensure_index
-    target = game_rel.lower() + ".uasset"
-    result = (None, None, None)
-    for virt_path, container, pfx in ensure_index():
-        if virt_path.lower() == target:
-            is_patch = container.lower().endswith("_p.utoc")
-            uat_pfx  = _PATCH_UAT_PREFIX.get(pfx, pfx) if is_patch else pfx
-            cp = os.path.join(WORK_IMPORT_ROOT, *(uat_pfx.rstrip("/") + "/" + virt_path[:-7]).split("/"))
-            print(f"[extract_info] {game_rel}: container={container} pfx={pfx} uat_pfx={uat_pfx} predicted={cp}", file=sys.stderr, flush=True)
-            result = (cp, container, pfx)
-    if result == (None, None, None):
+    from atelier.index import index_lookup
+    hit = index_lookup().get(game_rel.lower() + ".uasset")
+    if not hit:
         print(f"[extract_info] {game_rel}: NOT IN INDEX", file=sys.stderr, flush=True)
-    return result
+        return (None, None, None)
+    virt_path, container, pfx = hit
+    # Both layouts are candidates (see _PATCH_UAT_PREFIX). Take the one that is actually on disk;
+    # with none there, keep the current-layout prediction so callers still get the path an
+    # extraction is about to write.
+    cands = _uat_candidates(virt_path[:-7], pfx, container.lower().endswith("_p.utoc"))
+    cp = next((c for c in cands if os.path.exists(c + ".uasset")), cands[0])
+    print(f"[extract_info] {game_rel}: container={container} pfx={pfx} "
+          f"candidates={len(cands)} chosen={cp}", file=sys.stderr, flush=True)
+    return (cp, container, pfx)
 
 def find_extracted(game_rel):
-    """Fallback: walk WORK_IMPORT_ROOT for a .uasset matching the game_rel suffix.
-    Used when the predicted path doesn't exist (e.g. stale index, unexpected UAT output prefix)."""
-    suf = os.path.join(*game_rel.split("/")) + ".uasset"
+    """Fallback: walk WORK_IMPORT_ROOT for the extracted .uasset.
+    Used when the predicted path doesn't exist (e.g. stale index, unexpected UAT output prefix).
+
+    Two passes, and the order is the point:
+      1. the FULL mount path (Marvel/Plugins/MarvelGAS/Content/UI/T_X) — exact, cannot cross mounts;
+      2. only for non-plugin assets, the bare game_rel tail, because UAT writes patch-pak assets
+         under 'ent/Marvel/...' instead of their mount path (see _PATCH_UAT_PREFIX) and pass 1
+         cannot see through that.
+    Pass 2 is withheld from plugin assets deliberately: a tail like 'Marvel/Wwise/.../sfx.uasset'
+    also matches the MAIN mount's copy at 'Marvel/Content/Marvel/Wwise/.../sfx.uasset', so the
+    "fallback" silently answers with a different asset -- the exact substitution text.py documents.
+    """
+    from atelier.index import split_plugin_root
+    root, _rest = split_plugin_root(game_rel)
     work_abs = os.path.abspath(WORK_IMPORT_ROOT)
-    for dirpath, _, files in os.walk(work_abs):
-        for fname in files:
-            if not fname.lower().endswith(".uasset"):
-                continue
-            full = os.path.join(dirpath, fname)
-            if full.lower().endswith(suf.lower()):
-                print(f"[find_extracted] {game_rel}: found at {full}", file=sys.stderr, flush=True)
-                return full[:-7]
+    wants = ["/" + pak_game_path(game_rel).replace("\\", "/").lower() + ".uasset"]
+    if not root:
+        # the legacy patch layout (ent/Marvel/...) and, last, the bare game_rel tail
+        wants += ["/" + c.replace("\\", "/").lower()[len(work_abs) + 1:] + ".uasset"
+                  for c in work_candidates(game_rel)[1:]]
+        wants.append("/" + game_rel.replace("\\", "/").lower() + ".uasset")
+    for want in wants:
+        for dirpath, _, files in os.walk(work_abs):
+            for fname in files:
+                if not fname.lower().endswith(".uasset"):
+                    continue
+                full = os.path.join(dirpath, fname)
+                if full.replace("\\", "/").lower().endswith(want):
+                    print(f"[find_extracted] {game_rel}: found at {full}", file=sys.stderr, flush=True)
+                    return full[:-7]
     print(f"[find_extracted] {game_rel}: NOT FOUND in {work_abs}", file=sys.stderr, flush=True)
     return None
+
+def missing_reason(game_rel, kind="asset", check_index=True):
+    """Explain WHY an asset could not be resolved, distinguishing three very different states.
+
+    All three used to surface as the single sentence "not found in game paks", which made four
+    unrelated reports look identical and none of them triageable:
+
+      * not indexed      - no container Atelier read contains it (it may genuinely not exist)
+      * container failed - some containers did not parse, so the asset may be inside one of them.
+                           Almost always a wrong or stale AES key.
+      * extract failed   - it IS in the index, but UAssetTool produced no file for it.
+
+    check_index=False for asset kinds the index does not carry (levels are .umap; index.py only
+    records .uasset), so the caller never claims "not in the index" about something that was
+    never indexable in the first place.
+    """
+    from atelier.index import ensure_index, index_warnings
+    try:
+        ensure_index()
+        failed = index_warnings()
+    except Exception:
+        failed = []
+
+    cp = pak = None
+    if check_index:
+        try:
+            cp, pak, _pfx = extract_info(game_rel)
+        except Exception:
+            cp = pak = None
+
+    if cp is not None:
+        return (f"{kind} could not be extracted: {game_rel}. It IS in the asset index "
+                f"(container {pak}), but the extractor produced no file for it. Check the newest "
+                f"log in _logs for an extract failure.")
+
+    if failed:
+        names = ", ".join(f["container"] for f in failed[:3])
+        more  = f" (+{len(failed) - 3} more)" if len(failed) > 3 else ""
+        return (f"{kind} not found: {game_rel}. {len(failed)} pak container(s) failed to read - "
+                f"{names}{more} - so it may be inside one of them. That is usually a wrong or "
+                f"stale AES key; re-check the key in Settings.")
+
+    if check_index:
+        return (f"{kind} not found: {game_rel}. It is not in any indexed pak container - check "
+                f"the asset path, or that the game files are up to date.")
+    return (f"{kind} not found: {game_rel}. Every pak container read cleanly, so the paks do not "
+            f"appear to contain it - check the path, or that the game files are up to date.")
+
+
+def is_plugin_asset(game_rel):
+    """True for a virtual path under a plugin mount (Plugins/MarvelGAS/...) — see index.plugin_root."""
+    from atelier.index import split_plugin_root
+    return bool(split_plugin_root(game_rel)[0])
+
+def prefers_retoc():
+    """True when container reads should go through retoc rather than UAssetTool.
+
+    Always on Linux. The native UAssetTool build refuses to decompress without Oodle
+    (`liboo2corelinux64.so.9`, which is not redistributable and is not the ABI Tools/libooz.so
+    provides), while retoc decodes the same chunks on its own. It is also far faster on any host —
+    a full path goes straight to the right container instead of scanning ~548k packages for a
+    basename — and that full path is what disambiguates assets that share a basename across mounts.
+    Windows keeps the UAssetTool path it has always used; nothing there changes.
+    """
+    from atelier import hostos
+    return not hostos.IS_WINDOWS
+
+
+def _retoc_container(game_rel):
+    """The .utoc holding this asset, from the index, or None to mean 'try them all'."""
+    try:
+        _cp, pak, _pfx = extract_info(game_rel)
+    except Exception:
+        return None
+    if not pak:
+        return None
+    path = os.path.join(PAKS, pak)
+    return path if os.path.exists(path) else None
+
+
+def extract_via_retoc(game_rels):
+    """Unpack assets by their FULL mount paths. Takes one game_rel or many; returns {game_rel: stem}.
+
+    Two reasons this is the better extractor, and one that is a correctness issue:
+    `extract_iostore_legacy --filter` matches BASENAMES, and MarvelGAS ships assets whose basenames
+    also exist under Marvel/Content/Marvel — given the ambiguous name UAssetTool writes one asset's
+    bytes to the other asset's path, silently (verified for the hero-ability StringTables; see
+    text.py::_extract_via_retoc). retoc names the exact package instead. It also takes repeated
+    --filter flags, so a whole batch is one call, and the index already knows which container each
+    asset lives in, so there is nothing to scan.
+    """
+    from atelier.config import get_aes_key, dir_glob
+    from atelier.handlers.world import RETOC
+    from atelier import hostos
+    if isinstance(game_rels, str):
+        game_rels = [game_rels]
+    game_rels = [g for g in game_rels if g]
+    if not game_rels:
+        return {}
+    os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+
+    # Group by the container the index says holds each asset; anything unplaced gets the full sweep.
+    by_cont = {}
+    for gr in game_rels:
+        by_cont.setdefault(_retoc_container(gr), []).append(gr)
+    sweep = by_cont.pop(None, [])
+    if sweep:
+        # Patch containers override base chunks in-game, so they must win here too.
+        utocs = sorted(dir_glob(PAKS, "*.utoc"))
+        utocs.sort(key=lambda p: 0 if "patch" in os.path.basename(p).lower() else 1)
+        for utoc in utocs:
+            by_cont.setdefault(utoc, []).extend(sweep)
+
+    found = {}
+    for utoc, grs in by_cont.items():
+        todo = [g for g in grs if g not in found]
+        if not todo:
+            continue
+        args = [RETOC, "-a", "0x" + get_aes_key(), "unpack", utoc]
+        for gr in todo:
+            args += ["--filter", "../../../" + pak_game_path(gr) + ".uasset"]
+        args += ["--game-paks-dir", PAKS, "-o", os.path.abspath(WORK_IMPORT_ROOT)]
+        try:
+            r = hostos.run_exe(args, capture_output=True, text=True)
+            if r.returncode != 0:
+                print(f"  [warn] retoc unpack rc={r.returncode} on {os.path.basename(utoc)}: "
+                      f"{((r.stdout or '') + (r.stderr or '')).strip()[-300:]}",
+                      file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"  [warn] retoc unpack failed on {os.path.basename(utoc)}: {e}",
+                  file=sys.stderr, flush=True)
+            continue
+        for gr in todo:
+            cp, _pak, _pfx = extract_info(gr)
+            if cp and os.path.exists(cp + ".uasset"):
+                found[gr] = cp
+    return found
+
+
+def extract_many(game_rels):
+    """Extract a batch and record it in the asset cache. {game_rel: stem} for everything that landed.
+
+    The batch entry point for import-all / thumbnail prefetch / export, so those paths get retoc's
+    one-call extract on Linux instead of a per-asset UAssetTool scan.
+    """
+    import atelier.asset_cache as _ac
+    game_rels = [g for g in (game_rels or []) if g]
+    if not game_rels:
+        return {}
+    found = {}
+    if prefers_retoc() or any(is_plugin_asset(g) for g in game_rels):
+        found = extract_via_retoc(game_rels)
+    missing = [g for g in game_rels if g not in found]
+    if missing and not prefers_retoc():
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)] + uat_filter(missing))
+        for gr in missing:
+            cp, _pak, _pfx = extract_info(gr)
+            if cp and os.path.exists(cp + ".uasset"):
+                found[gr] = cp
+    entries = []
+    for gr, stem in found.items():
+        _cp, pak, pfx = extract_info(gr)
+        entries.append((gr, stem, pak or "", pfx or ""))
+    if entries:
+        _ac.record_many(entries)
+    return found
+
+
+def _purge_ambiguous(game_rel):
+    """Delete every work-cache copy when there is more than one, so the re-extract cannot lose.
+
+    A game patch moves an asset from a base chunk into a patch chunk. Extract it before the patch
+    and again after, with a tool update in between, and BOTH layouts end up on disk — the same
+    asset twice, one of them pre-patch. Nothing on disk says which is which, so the only answer
+    that cannot serve stale bytes is to drop both and extract again.
+
+    Deliberately a no-op when there is a single copy: extraction overwrites that path anyway, and
+    deleting it would throw away a usable asset if the extractor then fails.
+    """
+    cands = [c for c in work_candidates(game_rel) if os.path.exists(c + ".uasset")]
+    if len(cands) < 2:
+        return False
+    print(f"  [warn] {game_rel}: {len(cands)} work-cache copies (a patch moved it); re-extracting",
+          file=sys.stderr, flush=True)
+    _purge_work(game_rel)
+    return True
+
+
+def _purge_work(game_rel):
+    """Delete every work-cache copy of game_rel, whichever layout it is in. Returns the count.
+
+    Used where a copy is KNOWN stale rather than merely ambiguous. Leaving it would be worse than
+    losing it: extract_info happily finds it again afterwards and the asset cache re-records the
+    pre-patch bytes under the new container, so the invalidation would achieve nothing at all.
+    """
+    n = 0
+    for c in work_candidates(game_rel):
+        if os.path.exists(c + ".uasset"):
+            n += 1
+        for ext in _WORK_EXTS:
+            try: os.remove(c + ext)
+            except OSError: pass
+    return n
+
+
+def uat_filter(game_rels):
+    """`--filter` arguments for these assets: full virtual paths, never basenames.
+
+    `--filter` matches against the VIRTUAL path, so it takes a game_rel as-is (verified: the
+    basename MI_1011001_1011_Body extracts 2 assets, the game_rel extracts the 1 that was asked
+    for, and the mount-prefixed form matches nothing). A basename is both wasteful — every
+    same-named asset in the game gets converted — and unsafe: where two mounts share one, the
+    tool writes one asset's bytes to the other's path, which is the substitution text.py
+    documents for the hero-ability StringTables.
+
+    Long batches go through the patterns-FILE form the tool also accepts. 500 paths is ~40 KB of
+    command line and Windows caps at ~32 KB, so a large import would otherwise fail on the
+    argument list rather than on anything real.
+    """
+    pats = sorted({str(g).replace("\\", "/") for g in game_rels if g})
+    if not pats:
+        return []
+    if sum(len(x) + 1 for x in pats) > 8000:
+        fp = os.path.join(_CACHE, "_uat_filter.txt")
+        os.makedirs(_CACHE, exist_ok=True)
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write("\n".join(pats) + "\n")
+        return ["--filter", os.path.abspath(fp)]
+    return ["--filter"] + pats
+
 
 def ensure_work_base(game_rel):
     """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
     Returns None if the asset isn't in the game at all."""
     import atelier.asset_cache as _ac
-    base = _ac.cache_base(game_rel)
-    if base and os.path.exists(base + ".uasset"):
-        return base
+    cached = _ac.get(game_rel)
+    if cached:
+        cb  = cached.get("cache_path") or ""
+        rec = (cached.get("pak") or "").lower()
+        _cp, pak, _pfx = extract_info(game_rel)
+        # Provenance check: the container the index names now vs the one this copy came from. They
+        # differ exactly when a game patch has taken the asset over, and the cached bytes are then
+        # the pre-patch ones -- the shape of "my materials broke after the update".
+        if os.path.exists(cb + ".uasset") and (not rec or not pak or rec == pak.lower()):
+            return cb
+        if rec and pak and rec != pak.lower():
+            print(f"  [warn] {game_rel}: cached from {rec}, index now says {pak.lower()} — re-extracting",
+                  file=sys.stderr, flush=True)
+            _purge_work(game_rel)      # the copy on disk is pre-patch too, not just the entry
+        _ac.remove(game_rel)
+    _purge_ambiguous(game_rel)
+    # Full-path extract first wherever it applies: on Linux (UAssetTool cannot read containers
+    # without Oodle) and for plugin assets anywhere (a basename cannot tell them from their twins).
+    if prefers_retoc() or is_plugin_asset(game_rel):
+        rb = extract_via_retoc([game_rel]).get(game_rel)
+        if rb:
+            cp, pak, pfx = extract_info(game_rel)
+            _ac.record(game_rel, rb, pak or "", pfx or "")
+            return rb
+        # Fall through to UAssetTool rather than giving up: retoc cannot currently extract from a
+        # PATCH container ("FPackageId(...) has no path name entry"), which is ~5% of the index but
+        # includes the most recently changed assets. On Windows UAssetTool covers those; on Linux it
+        # reports the missing-Oodle reason, which is the honest answer rather than "not found".
     os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-             "--filter", os.path.basename(pak_game_path(game_rel))])
+    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)]
+            + uat_filter([game_rel]))
     # A tool crash, a file lock, or a MOTW-tainted DLL all leave the asset unextracted, and the
     # caller can only report "not found in the game paks" — indistinguishable from an asset the
     # game genuinely doesn't have. Log the failure so a transient one is diagnosable from _logs.
@@ -189,7 +491,13 @@ def ensure_work_base(game_rel):
         _ac.record(game_rel, cp, pak, pfx)
         return cp
     base = find_extracted(game_rel)
-    return base if base and os.path.exists(base + ".uasset") else None
+    if base and os.path.exists(base + ".uasset"):
+        # Record the fallback too. Only the predicted-path branch used to, so every asset whose
+        # layout the prediction missed -- which was EVERY patch-pak asset while _PATCH_UAT_PREFIX
+        # was stale -- was re-extracted on every single operation and never cached at all.
+        _ac.record(game_rel, base, pak or "", pfx or "")
+        return base
+    return None
 
 def decode_to_png(import_base, uasset_base):
     """Decode one extracted texture to import_base + '.png', preferring the largest SHIPPED mip.
@@ -407,10 +715,9 @@ def cmd_import(arg):
         if gr.lower() not in seen:
             seen.add(gr.lower()); game_rels.append(gr)
 
-    names = sorted({os.path.basename(p)[:-7] for p, _ in entries})
-    print(f"  Extracting {len(names)} asset(s) from game via UAssetTool...", file=sys.stderr)
+    print(f"  Extracting {len(game_rels)} asset(s) from game via UAssetTool...", file=sys.stderr)
     os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
+    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)] + uat_filter(game_rels))
     if "Extraction complete" not in (r.stdout or ""):
         print(f"  [warn] extract: {((r.stderr or '') + (r.stdout or '')).strip()[-300:]}", file=sys.stderr)
 
@@ -526,7 +833,7 @@ def cmd_export(mod_name, tex_args, out_dir, force):
         if os.path.exists(base + ".utoc"):
             print(f"Packed {staged} texture(s) -> {os.path.abspath(base)}.{{pak,ucas,utoc}}")
         else:
-            made = sorted(glob.glob(os.path.join(out_dir, "*_P.utoc")))
+            made = sorted(dir_glob(out_dir, "*_P.utoc"))
             if made:
                 base = made[-1][:-5]
                 print(f"Packed {staged} texture(s) -> {os.path.abspath(base)}.{{pak,ucas,utoc}}")

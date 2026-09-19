@@ -1,6 +1,6 @@
 """In-process thumbnail extraction from IoStore — no UAssetTool, no disk writes for .uasset."""
 
-import os, io, struct, threading
+import os, io, sys, struct, threading
 from collections import defaultdict
 from PIL import Image
 from atelier.config import PAKS
@@ -59,8 +59,16 @@ def _get_toc(cont_basename: str):
         if not os.path.exists(utoc):
             _toc_cache[cont_basename] = None
             return None
-        t = io_lib.parse_toc(utoc)
-        ents = io_lib.parse_dir_index(t)
+        try:
+            t = io_lib.parse_toc(utoc)
+            ents = io_lib.parse_dir_index(t)
+        except Exception as e:
+            # index.py catches this exact failure and carries on; without the same guard here the
+            # exception killed the warmup thread, no cache entry was ever written, and the
+            # thumbnail spinner ran forever with nothing logged. Cache the miss so we fail fast.
+            print(f"  [warn] pak_thumb {cont_basename}: {e}", file=sys.stderr, flush=True)
+            _toc_cache[cont_basename] = None
+            return None
         # game_rel -> main chunk index
         t._dir = {_path_to_gr(p).lower(): idx for p, idx in ents if _path_to_gr(p)}
         # path_hash -> {type_bytes: chunk_index}

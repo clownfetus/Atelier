@@ -8,7 +8,8 @@ Note: MR's source strings are Chinese (NetEase); non-source locales (English, et
 from .locres overrides. Editing the StringTable changes the source table; if a locale .locres wins
 in-game, a future .locres editor would be needed. StringTable is the right first target."""
 import os, re, glob, json, struct
-from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, project_base, project_base_legacy
+from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, project_base,
+                            project_base_legacy, dir_glob)
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 import io_lib
@@ -40,7 +41,7 @@ def _enum():
     global _STS
     if _STS is not None: return _STS
     seen, out = set(), []
-    for utoc in sorted(glob.glob(PAKS + "/*.utoc")):
+    for utoc in sorted(dir_glob(PAKS, "*.utoc")):
         try:
             t = io_lib.parse_toc(utoc); entries = io_lib.parse_dir_index(t)
         except Exception:
@@ -75,7 +76,7 @@ def _find_extracted(name, game_rel=None):
     matches game_rel's FULL mount path: 56 hero-ability tables exist twice under the same basename
     (Content/Marvel vs Plugins/MarvelGAS) with DIFFERENT contents, so a basename-only match silently
     returns the wrong table."""
-    cands = glob.glob(os.path.join(WORK_IMPORT_ROOT, "**", name + ".uasset"), recursive=True)
+    cands = dir_glob(WORK_IMPORT_ROOT, "**/" + glob.escape(name) + ".uasset", recursive=True)
     if not cands:
         return None
     if game_rel:
@@ -94,17 +95,18 @@ def _extract_via_retoc(game_rel):
     the '../../../<mount>/...' form — so use it for anything the basename extract can't resolve."""
     import subprocess
     from atelier.config import get_aes_key
-    from atelier.handlers.world import RETOC, CNW
+    from atelier.handlers.world import RETOC
+    from atelier import hostos
     filt = "../../../" + full_pak_path(game_rel) + ".uasset"
     # PATCH containers override base chunks in-game, so they must win here too — 106_Lobby_ST is
     # 371 entries in pakchunk0 but 374 in Patch_-Windows_1.1.3702450_P, and the game loads the 374.
     # (Alphabetical order happens to put "Patch_" first today; don't depend on that.)
-    utocs = sorted(glob.glob(os.path.join(PAKS, "*.utoc")))
+    utocs = sorted(dir_glob(PAKS, "*.utoc"))
     utocs.sort(key=lambda p: 0 if "patch" in os.path.basename(p).lower() else 1)
     for utoc in utocs:
-        subprocess.run([RETOC, "-a", "0x" + get_aes_key(), "unpack", utoc, "--filter", filt,
+        hostos.run_exe([RETOC, "-a", "0x" + get_aes_key(), "unpack", utoc, "--filter", filt,
                         "--game-paks-dir", PAKS, "-o", os.path.abspath(WORK_IMPORT_ROOT)],
-                       capture_output=True, creationflags=CNW)
+                       capture_output=True)
         base = _find_extracted(os.path.basename(game_rel), game_rel)
         if base:
             return base
@@ -126,7 +128,8 @@ def _ensure_extracted(game_rel):
     base = _extract_via_retoc(game_rel)
     if base:
         return base
-    raise RuntimeError("StringTable not found in game paks: " + game_rel)
+    from atelier.handlers.texture import missing_reason as TX_missing_reason
+    raise RuntimeError(TX_missing_reason(game_rel, "StringTable"))
 
 def _to_json(base):
     outdir = os.path.join(_CACHE, "text_tj"); os.makedirs(outdir, exist_ok=True)

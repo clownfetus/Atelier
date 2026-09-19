@@ -1,5 +1,5 @@
 import re
-from atelier.index import ensure_index, get_content_prefix
+from atelier.index import ensure_index, get_content_prefix, mount_join
 
 PAK_GAME_PREFIX = "Marvel/Content/Marvel"  # kept as a constant for external callers
 
@@ -31,7 +31,9 @@ def pak_game_path(game_rel):
     Looks up which mount the asset came from so LQ-only assets get the right prefix."""
     import sys
     pfx = get_content_prefix(game_rel)
-    result = pfx.rstrip("/") + "/" + game_rel
+    # mount_join, never string concatenation: a plugin's virtual path carries a synthetic
+    # 'Plugins/<Name>' root that names its mount and must be removed before joining (index.py).
+    result = mount_join(pfx, game_rel)
     print(f"[pak_game_path] {game_rel}: pfx={pfx}  result={result}", file=sys.stderr, flush=True)
     return result
 

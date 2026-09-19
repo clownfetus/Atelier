@@ -1,0 +1,48 @@
+# Normalise line endings. Development moved to Linux; everything text is LF in the repo and in
+# the working tree. `text=auto` lets git detect and leave binaries alone, but the explicit
+# `binary` rules below remove any doubt for the formats this project ships.
+* text=auto eol=lf
+
+# Windows build inputs. cmd.exe has known edge cases with LF-only batch files (labels, goto and
+# multi-line blocks), so anything cmd.exe interprets keeps CRLF in the working tree. BUILD.bat is
+# the only one today; the rule is by extension so a second one cannot be missed.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary — never touched.
+
+# Images, media, archives.
+*.ico   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.mp4   binary
+*.zip   binary
+*.7z    binary
+
+# Compiled artefacts. The vendored KawaiiPhysics plugin ships .dll + .pdb under Binaries/Win64.
+*.dll   binary
+*.exe   binary
+*.so    binary
+*.pdb   binary
+
+# UE5 containers, and the asset payloads Atelier extracts from them and packs back in. These are
+# the ones worth being explicit about: a .uasset whose line endings git decided to "fix" is a
+# corrupt asset, and nothing says so until the game fails to load it.
+*.pak    binary
+*.ucas   binary
+*.utoc   binary
+*.usmap  binary
+*.uasset binary
+*.uexp   binary
+*.ubulk  binary
+*.uptnl  binary
+*.umap   binary
+*.locres binary
+*.dds    binary
+
+# Mesh interchange. .gltf is JSON and stays text on purpose — only the packed .glb is binary.
+*.blend binary
+*.glb   binary

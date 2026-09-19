@@ -4,8 +4,8 @@ The pak folders are bare ids (Characters/1060/1060501), so the viewport's chroma
 "1060501" instead of "COASTAL KUMIHO". This parses the shipped reference table into a lookup so the
 UI can label them. Purely cosmetic — nothing downstream depends on the names.
 """
-import os, re, glob
-from atelier.config import TOOLS
+import os, re
+from atelier.config import TOOLS, dir_glob
 
 _NAME = "MarvelRivalsCharacterIDs.md"
 _CACHE = None      # {"skins": {skin_id: {"skin": name, "char": id, "char_name": name}}, "chars": {id: name}}
@@ -23,7 +23,7 @@ def _md_path():
     for c in cands:
         if os.path.exists(c):
             return c
-    hits = glob.glob(os.path.join(here, "..", "..", "**", _NAME), recursive=True)
+    hits = dir_glob(os.path.join(here, "..", ".."), "**/" + _NAME, recursive=True)
     return hits[0] if hits else cands[0]
 
 

@@ -24,8 +24,7 @@ def _f(x):
 
 def curve_json(game_rel):
     """Extract the curve + convert to JSON (flat in active project as <basename>.json). Returns json path."""
-    import atelier.asset_cache as _ac
-    from atelier.handlers.texture import extract_info, find_extracted
+    from atelier.handlers.texture import ensure_work_base
     import_root = get_import_root()
     # Unique subfolder path (no basename collisions); fall back to the legacy flat layout so
     # pre-existing projects still load.
@@ -33,20 +32,10 @@ def curve_json(game_rel):
     if os.path.exists(jp): return jp
     legacy_jp = project_base_legacy(game_rel, import_root) + ".json"
     if os.path.exists(legacy_jp): return legacy_jp
-    work_base = _ac.cache_base(game_rel)
+    work_base = ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
     if not work_base or not os.path.exists(work_base + ".uasset"):
-        pak_gr = pak_game_path(game_rel)
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-             "--filter", os.path.basename(pak_gr)])
-        cp, pak, pfx = extract_info(game_rel)
-        if cp and os.path.exists(cp + ".uasset"):
-            _ac.record(game_rel, cp, pak, pfx)
-            work_base = cp
-        else:
-            work_base = find_extracted(game_rel)
-    if not work_base or not os.path.exists(work_base + ".uasset"):
-        raise RuntimeError("curve not found in game paks")
+        from atelier.handlers.texture import missing_reason as TX_missing_reason
+        raise RuntimeError(TX_missing_reason(game_rel, "curve"))
     sub = os.path.dirname(jp)                          # the game_rel subfolder under import_root
     os.makedirs(sub, exist_ok=True)
     uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])

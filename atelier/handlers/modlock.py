@@ -4,7 +4,8 @@ unpack (repatch/import), Atelier scans the mod's files for that tag; if present 
 password, reverses the input, and compares it to the stored (reversed) code — unlocking only on a
 match. The marker sits in the offset-indexed .ucas tail so it's inert to the game but recoverable by
 anyone with a hex editor: this deters casual theft *inside Atelier*, it does not protect the data."""
-import os, glob, zipfile
+import os, zipfile
+from atelier.config import dir_glob
 
 TAG = b"UE5SCO"
 
@@ -40,13 +41,15 @@ def lock_code(mod_source):
     """The stored lock CODE (reversed password) for a mod, or None if it isn't locked.
     mod_source = a directory, a .zip, or a base/.pak/.ucas/.utoc path."""
     if os.path.isdir(mod_source):
-        for f in (glob.glob(os.path.join(mod_source, "**", "*.ucas"), recursive=True) +
-                  glob.glob(os.path.join(mod_source, "**", "*.utoc"), recursive=True) +
-                  glob.glob(os.path.join(mod_source, "**", "*.pak"), recursive=True)):
+        # dir_glob: mod_source carries the user's mod name, and a mod called "[WIP] Recolor"
+        # made every one of these match nothing — so a locked mod reported itself as unlocked.
+        for f in (dir_glob(mod_source, "**/*.ucas", recursive=True) +
+                  dir_glob(mod_source, "**/*.utoc", recursive=True) +
+                  dir_glob(mod_source, "**/*.pak",  recursive=True)):
             code = _scan_bytes(open(f, "rb").read())
             if code:
                 return code
-        for z in glob.glob(os.path.join(mod_source, "**", "*.zip"), recursive=True):
+        for z in dir_glob(mod_source, "**/*.zip", recursive=True):
             code = _scan_zip(z)
             if code:
                 return code

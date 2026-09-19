@@ -14,7 +14,7 @@ are edited/shipped through the normal material path (material.save_material / st
 """
 import os, json, collections
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from atelier.config import _CACHE, PAKS, WORK_IMPORT_ROOT, project_base
 from atelier.tools import uat
@@ -28,6 +28,32 @@ DYE_BASE = 0.35               # OPTION-3 fixed base (t12 stand-in): scales the r
 MASK_SLOT = "DyeingTexture"
 DIFF_SLOT = "BaseColor"
 _CACHE_DYE = os.path.join(_CACHE, "dye")
+
+# ── ID-mask / colour-region overlay ───────────────────────────────────────────────────────────
+# "Which colour do I edit to change THIS part?" is the most-asked question in the corpus (muimifu,
+# finngmin, paillettelebeau, norskpl, leagueofthearcane), and the answers on record are "eyeball the
+# ColorID defaults" and "trial and error a LOT". The mask already answers it exactly: `reg` below is
+# a per-texel region index, and each index is one "Region N - Color*" parameter on the MI. Colouring
+# `reg` by index instead of by dye parameter turns that into a labelled picture.
+#
+# Preview only, like everything else in this module — the overlay is never staged into a mod.
+REGION_COLORS = {
+    0: (142, 142, 147),   # undyed — the dye system does not touch these texels at all
+    1: (255,  59,  48),
+    2: (255, 149,   0),
+    3: (255, 214,  10),
+    4: ( 52, 199,  89),
+    5: ( 50, 173, 230),
+    6: (175,  82, 222),
+    7: (255,  45, 149),
+}
+OVERLAY_MIX = 0.55            # floor of the diffuse shading multiplier (0.55..1.0): how much
+                              # texture detail survives without washing the region hue out
+
+
+def region_hex(idx):
+    r, g, b = REGION_COLORS.get(int(idx), (200, 200, 200))
+    return "#%02x%02x%02x" % (r, g, b)
 
 
 def dye_slots(game_rel):
@@ -82,12 +108,7 @@ def _tex_image_uncached(game_rel):
     # diffuse, fired concurrently. Gate the heavy work so we don't pile up UAssetTool processes /
     # full-res textures in RAM (the thing that crashes the viewport on big skins).
     with tex_semaphore:
-        cb = _ac.cache_base(game_rel) or TX.find_extracted(game_rel)
-        if not cb or not os.path.exists(cb + ".uasset"):
-            os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-            uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-                 "--filter", os.path.basename(pak_game_path(game_rel))])
-            cb = TX.find_extracted(game_rel)
+        cb = TX.ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
         if not cb or not os.path.exists(cb + ".uasset"):
             return None
         base = project_base(game_rel, _CACHE_DYE)
@@ -228,7 +249,150 @@ def dye_info(game_rel):
         reg = np.rint(a.astype(np.float32) / STEP).astype(np.int32)
         vals, cnts = np.unique(reg, return_counts=True)
         used = {int(v): int(c) for v, c in zip(vals, cnts)}
+    total = sum(used.values()) or 1
     return {"dyeable": True, "mask": mask_gr, "diffuse": diff_gr,
             "regions": {str(k): v for k, v in sorted(regions.items())},
             "used": {str(k): v for k, v in sorted(used.items())},
+            # legend for the region overlay: the colour each index is drawn in, and how much of the
+            # texture it covers — so the panel can be built from this one call.
+            "overlay":  {str(k): region_hex(k) for k in sorted(used)},
+            "coverage": {str(k): round(100.0 * v / total, 1) for k, v in sorted(used.items())},
             "step": STEP}
+
+
+def _label_font(size):
+    try:
+        return ImageFont.load_default(size=size)      # Pillow >= 10.1
+    except TypeError:
+        return ImageFont.load_default()               # older Pillow: fixed tiny bitmap font
+
+
+_LABEL_GRID = 96       # coarse grid the blob search runs on — full res is far more than it needs
+_LABEL_MIN_GAP = 34    # px between two numbers before they are treated as colliding
+
+
+def _blobs(cell):
+    """Connected components of a coarse boolean grid, biggest first: [(size, cy, cx)].
+
+    Pure numpy/BFS rather than scipy.label — one dependency this project does not have, for a grid
+    this small. 4-connected is enough: the grid is a downsample, so diagonal-only touches are noise.
+    """
+    h, w = cell.shape
+    seen = np.zeros_like(cell, dtype=bool)
+    out  = []
+    ys, xs = np.nonzero(cell)
+    for y0, x0 in zip(ys.tolist(), xs.tolist()):
+        if seen[y0, x0]:
+            continue
+        stack, pts = [(y0, x0)], []
+        seen[y0, x0] = True
+        while stack:
+            y, x = stack.pop()
+            pts.append((y, x))
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < h and 0 <= nx < w and cell[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    stack.append((ny, nx))
+        arr = np.array(pts, dtype=np.float32)
+        out.append((len(pts), float(arr[:, 0].mean()), float(arr[:, 1].mean())))
+    out.sort(key=lambda b: -b[0])
+    return out
+
+
+def _label_anchor(reg, idx, placed):
+    """Where to print region `idx`'s number, or None if it has no texels.
+
+    Two failure modes this has to avoid, both seen on real masks (White Fox 1060300 Equip_01):
+
+      * the whole region's centroid can fall OUTSIDE the region — a C-shaped belt or a sleeve trim
+        would get its number printed on the neighbouring part, which answers the question wrongly;
+      * two INTERLEAVED regions (that skin's leaf pattern, regions 3 and 4) share a centroid area,
+        so their numbers land 5px apart and the one drawn second hides the other entirely.
+
+    So: take the region's largest connected BLOB, not the region as a whole, and skip a blob whose
+    label would collide with one already placed. Falling back to the plain centroid at the end means
+    a number is always drawn — a missing one is worse than a crowded one.
+    """
+    m = reg == idx
+    if not m.any():
+        return None
+    h, w = reg.shape
+    step = max(1, min(h, w) // _LABEL_GRID)
+    cell = m[::step, ::step]
+    for _size, cy, cx in _blobs(cell)[:6]:              # biggest blobs first
+        y, x = cy * step, cx * step
+        ys, xs = np.nonzero(m)
+        d = (ys - y) ** 2 + (xs - x) ** 2               # snap onto a texel of this region
+        i = int(np.argmin(d))
+        px, py = int(xs[i]), int(ys[i])
+        if all((px - qx) ** 2 + (py - qy) ** 2 >= _LABEL_MIN_GAP ** 2 for qx, qy in placed):
+            return px, py
+    ys, xs = np.nonzero(m)
+    cy, cx = float(ys.mean()), float(xs.mean())
+    d = (ys - cy) ** 2 + (xs - cx) ** 2
+    i = int(np.argmin(d))
+    return int(xs[i]), int(ys[i])
+
+
+def region_overlay(game_rel, size=1024, out_path=None, numbers=True):
+    """Render the ColorID mask as a labelled region map and return the PNG path.
+
+    Each region index gets a fixed colour from REGION_COLORS, laid over the diffuse's own greyscale
+    shading so folds and seams still read, with the region number printed inside each region. Region
+    0 (undyed) is left grey on purpose: those texels ignore every Region parameter, which is the
+    other half of the answer people are missing (thetruedaveed's blank-vs-alpha ColorID confusion)."""
+    mask_gr, diff_gr = dye_slots(game_rel)
+    if not mask_gr:
+        raise RuntimeError("not a dyeing material (no %s slot): %s" % (MASK_SLOT, game_rel))
+    mask_im = _tex_image(mask_gr)
+    if mask_im is None:
+        raise RuntimeError("could not decode the ColorID mask: " + mask_gr)
+    diff_im = _tex_image(diff_gr) if diff_gr else None
+    if diff_im is None:
+        diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
+
+    mask = np.asarray(mask_im.convert("RGBA").resize((size, size), Image.NEAREST), dtype=np.float32)
+    diff = np.asarray(diff_im.convert("RGB").resize((size, size), Image.BILINEAR), dtype=np.float32)
+    reg  = np.rint(mask[..., 3] / STEP).astype(np.int32)
+    lum  = (0.2126 * diff[..., 0] + 0.7152 * diff[..., 1] + 0.0722 * diff[..., 2]) / 255.0
+    # Shading is a narrow multiplier, not a blend: the swatch in the legend has to look like the
+    # region on the map, or the picture answers the wrong question. 0.55..1.0 keeps folds and seams
+    # visible while leaving every region recognisably its own hue.
+    shade = (OVERLAY_MIX + (1.0 - OVERLAY_MIX) * np.clip(lum, 0.0, 1.0))[..., None]
+
+    out = np.zeros((size, size, 3), dtype=np.float32)
+    for idx in np.unique(reg):
+        m = reg == idx
+        col = np.array(REGION_COLORS.get(int(idx), (200, 200, 200)), dtype=np.float32)
+        if int(idx) == 0:
+            # Undyed: a flat mid-grey that mostly ignores the diffuse. Multiplying the grey by the
+            # diffuse's shading like a real region does drives it to near-black wherever the skin is
+            # dark (verified on 1060300 Equip_01, 29% region 0), and black reads as "broken", not
+            # as "the dye system does not touch this".
+            out[m] = col * (0.38 + 0.30 * np.clip(lum[m], 0.0, 1.0))[:, None]
+        else:
+            out[m] = col * shade[m]
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGB")
+    if numbers:
+        d = ImageDraw.Draw(im)
+        font = _label_font(max(14, size // 26))
+        placed = []
+        for idx in np.unique(reg):
+            if int(idx) == 0:
+                continue
+            spot = _label_anchor(reg, int(idx), placed)
+            if spot is None:
+                continue
+            x, y = spot
+            placed.append((x, y))
+            try:
+                d.text((x, y), str(int(idx)), fill=(255, 255, 255), font=font, anchor="mm",
+                       stroke_width=max(2, size // 300), stroke_fill=(0, 0, 0))
+            except (TypeError, ValueError):      # very old Pillow: no anchor/stroke support
+                d.text((x, y), str(int(idx)), fill=(255, 255, 255), font=font)
+    out_png = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "regions")) + ".png")
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    im.save(out_png)
+    return out_png

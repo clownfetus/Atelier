@@ -38,5 +38,16 @@ if exist dist\Atelier\Tools\Mappings rmdir /s /q dist\Atelier\Tools\Mappings
 if exist dist\Atelier\Tools\AES_KEY.txt del /q dist\Atelier\Tools\AES_KEY.txt
 if exist dist\Atelier\Tools\Mappings echo FAILED to remove bundled Mappings & exit /b 1
 if exist dist\Atelier\Tools\AES_KEY.txt echo FAILED to remove bundled AES_KEY.txt & exit /b 1
+rem Native LINUX builds of the same tools sit beside the .exes for development on Linux (they are
+rem picked up by hostos.native_tool, which prefers an extensionless sibling over Wine). The xcopy
+rem above takes them too, and they are ELF binaries -- useless in a Windows installer and ~155 MB
+rem of it. Drop them here rather than teaching xcopy an exclude list.
+if exist dist\Atelier\Tools\UAssetTool del /q dist\Atelier\Tools\UAssetTool
+if exist dist\Atelier\Tools\liboo2corelinux64.so.9 del /q dist\Atelier\Tools\liboo2corelinux64.so.9
+if exist dist\Atelier\Tools\libooz.so del /q dist\Atelier\Tools\libooz.so
+if exist dist\Atelier\Tools\shaders\retoc-rivals-cli del /q dist\Atelier\Tools\shaders\retoc-rivals-cli
+if exist dist\Atelier\Tools\shaders\liboo2corelinux64.so.9 del /q dist\Atelier\Tools\shaders\liboo2corelinux64.so.9
+if exist dist\Atelier\Tools\UAssetTool echo FAILED to remove the Linux UAssetTool & exit /b 1
+if exist dist\Atelier\Tools\shaders\retoc-rivals-cli echo FAILED to remove the Linux retoc & exit /b 1
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%

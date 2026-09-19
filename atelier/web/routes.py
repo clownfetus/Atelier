@@ -1,7 +1,9 @@
-import os, sys, glob, json, re, shutil, threading, queue, subprocess, tempfile, time, urllib.request
+import os, sys, json, re, shutil, threading, queue, subprocess, tempfile, time, urllib.request
 from bottle import request, response, static_file
 
 from atelier.web.app import app
+from atelier import hostos
+import atelier.config as _c   # module handle: several routes rewrite config globals in place
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
                             CNW,
                             GUI_DIR, VERSION_FILE, _CACHE, CACHE_3DVIEW, get_prereq_status, CONFIG_HAS_PAKS, paks_suggestion,
@@ -40,7 +42,9 @@ def _download_usmap_file(download_url, dest_path):
 
 THUMBS_DIR = os.path.join(_CACHE, "thumbs")
 from atelier.tools import uat
-from atelier.handlers.texture import decode_batch, decode_flat, decode_png, stage_inject, build_mod, decode_thumb, extract_info, find_extracted
+from atelier.handlers.texture import (decode_batch, decode_flat, decode_png, stage_inject, build_mod,
+                                      decode_thumb, extract_info, find_extracted,
+                                      ensure_work_base, extract_many)
 import atelier.asset_cache as _asset_cache
 from atelier.handlers.pak_thumb import decode_thumb_from_pak
 import atelier.handlers.pak_thumb as _pak_thumb_mod
@@ -277,17 +281,7 @@ def _texture_png(game_rel):
     with tex_semaphore:
         if os.path.exists(out_png):
             return out_png
-        cb = _asset_cache.cache_base(game_rel)
-        if not cb or not os.path.exists(cb + ".uasset"):
-            pak_gr = pak_game_path(game_rel)
-            os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-            uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-                 "--filter", os.path.basename(pak_gr)])
-            cp, pak, pfx = extract_info(game_rel)
-            if cp and os.path.exists(cp + ".uasset"):
-                _asset_cache.record(game_rel, cp, pak, pfx); cb = cp
-            else:
-                cb = find_extracted(game_rel)
+        cb = ensure_work_base(game_rel)     # retoc or UAssetTool per host; caches the result
         if not cb or not os.path.exists(cb + ".uasset"):
             return None
         return _decode_texture_png(game_rel, base, out_png, cb)
@@ -331,6 +325,27 @@ def api_dye_texture():
         png = dye_preview(gr, size=int(request.query.get("size") or 1024))
     except Exception as e:
         print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
+        response.status = 404
+        return b""
+    if png and os.path.exists(png):
+        return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
+    response.status = 404
+    return b""
+
+@app.get("/api/dye_overlay")
+def api_dye_overlay():
+    """The ID-mask region map: the same ColorID mask the dye preview composites, but coloured BY
+    REGION INDEX and numbered, so "which colour do I edit for this part" is a picture instead of
+    trial and error. Preview only — this never ships into a mod."""
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        return b""
+    try:
+        from atelier.handlers.dye import region_overlay
+        png = region_overlay(gr, size=int(request.query.get("size") or 1024))
+    except Exception as e:
+        print(f"[dye_overlay] {gr}: {e}", file=sys.stderr, flush=True)
         response.status = 404
         return b""
     if png and os.path.exists(png):
@@ -410,6 +425,21 @@ def api_dye_download():
 
 # ── prereqs ───────────────────────────────────────────────────────────────────
 
+@app.get("/api/index_warnings")
+def api_index_warnings():
+    """Pak containers that failed to parse during the last index build.
+
+    A failed container is invisible in the asset browser — every asset inside it simply is not
+    there. Surfacing this turns "Atelier shows nothing / material not found" into a report that
+    names the container and points at the AES key."""
+    response.content_type = "application/json"
+    try:
+        import atelier.index as _idx
+        return json.dumps({"ok": True, "failed": _idx.index_warnings()})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e), "failed": []})
+
+
 @app.get("/api/prereqs")
 def api_prereqs():
     response.content_type = "application/json"
@@ -441,7 +471,6 @@ def _mr_root_to_display(paks_path):
 
 @app.get("/api/setup_status")
 def api_setup_status():
-    import atelier.config as _c
     cfg  = _c._load_config()
     paks = cfg.get("paks", "")
     aes  = cfg.get("aes_key", "")
@@ -466,33 +495,16 @@ def api_setup_status():
 @app.post("/api/pick_folder")
 def api_pick_folder():
     body    = request.json or {}
-    initial = (body.get("initial") or "").replace("/", "\\")
+    initial = body.get("initial") or ""
     raw_pick = bool(body.get("raw"))   # raw=True returns the chosen folder as-is (e.g. mods folder,
                                        # which can be named anything); default resolves the MR root.
     desc    = (body.get("desc") or ("Select a folder:" if raw_pick else "Select your MarvelRivals folder:"))
-    env     = os.environ.copy()
-    env["PAKS_INITIAL"] = initial
-    env["PICK_DESC"]    = desc
-    ps = (
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "Add-Type -AssemblyName System.Windows.Forms; "
-        "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-        "$f.Description = $env:PICK_DESC; "
-        "$f.SelectedPath = $env:PAKS_INITIAL; "
-        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"
-    )
+    response.content_type = "application/json"
     try:
-        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                             capture_output=True, encoding="utf-8", timeout=120, env=env)
-        raw = r.stdout.strip().replace("\\", "/")
-        if raw_pick:
-            path = raw
-        else:
-            path = (_find_mr_root(raw) if raw else "") or raw
-        response.content_type = "application/json"
+        raw = hostos.pick_folder(initial, desc)
+        path = raw if raw_pick else ((_find_mr_root(raw) if raw else "") or raw)
         return json.dumps({"ok": True, "path": path})
     except Exception as e:
-        response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
 @app.get("/api/validate_paks")
@@ -506,10 +518,11 @@ def api_validate_paks():
         return json.dumps({"status": "wrong_folder"})
     if not os.path.isdir(mr):
         return json.dumps({"status": "missing"})
-    paks = mr + "/MarvelGame/Marvel/Content/Paks"
-    if not os.path.exists(paks + "/pakchunkCharacter-Windows.ucas"):
-        return json.dumps({"status": "wrong_folder"})
-    return json.dumps({"status": "ok"})
+    # The live validator behind the green tick in Settings. It goes through the SAME check as the
+    # save handler and the prereq screen: this is the field that told users "every path is valid"
+    # while the app refused to start, because it tested for one literal filename and the prereq
+    # check globbed for containers.
+    return json.dumps({"status": "wrong_folder" if _validate_and_build_paks(path)[1] else "ok"})
 
 @app.get("/api/validate_mods_folder")
 def api_validate_mods_folder():
@@ -528,13 +541,17 @@ def api_validate_mods_folder():
         return json.dumps({"status": "ok"})
     return json.dumps({"status": "missing"})
 
+# Blender is "blender.exe" on Windows and a plain "blender" binary everywhere else; both the
+# Settings validator and the file picker accept either so a config copied between the two works.
+_BLENDER_NAMES = ("blender.exe",) if hostos.IS_WINDOWS else ("blender", "blender.exe")
+
 @app.get("/api/validate_blender")
 def api_validate_blender():
     path = request.query.get("path", "").strip()
     response.content_type = "application/json"
     if not path:
         return json.dumps({"status": "empty"})
-    if os.path.basename(path).lower() != "blender.exe":
+    if os.path.basename(path).lower() not in _BLENDER_NAMES:
         return json.dumps({"status": "invalid"})
     if not os.path.exists(path):
         return json.dumps({"status": "missing"})
@@ -543,26 +560,13 @@ def api_validate_blender():
 @app.post("/api/pick_blender_file")
 def api_pick_blender_file():
     body    = request.json or {}
-    initial = (body.get("initial") or "").replace("/", "\\")
-    env     = os.environ.copy()
-    env["BLENDER_INITIAL"] = os.path.dirname(initial) if initial else ""
-    ps = (
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "Add-Type -AssemblyName System.Windows.Forms; "
-        "$f = New-Object System.Windows.Forms.OpenFileDialog; "
-        "$f.Title = 'Select blender.exe'; "
-        "$f.Filter = 'blender.exe|blender.exe|All files (*.*)|*.*'; "
-        "$f.InitialDirectory = $env:BLENDER_INITIAL; "
-        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }"
-    )
+    initial = body.get("initial") or ""
+    response.content_type = "application/json"
     try:
-        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                             capture_output=True, encoding="utf-8", timeout=120, env=env)
-        raw = r.stdout.strip().replace("\\", "/")
-        response.content_type = "application/json"
-        return json.dumps({"ok": True, "path": raw})
+        title = "Select blender.exe" if hostos.IS_WINDOWS else "Select the blender executable"
+        return json.dumps({"ok": True, "path": hostos.pick_file(
+            title, tuple(_BLENDER_NAMES), initial)})
     except Exception as e:
-        response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
 @app.get("/api/blender_status")
@@ -577,13 +581,18 @@ def api_blender_status():
         return json.dumps({"ok": False, "error": str(e)})
 
 def _validate_and_build_paks(path):
-    """Validate user-supplied path (game root or subfolder) and return (paks_path, error)."""
+    """Validate user-supplied path (game root or subfolder) and return (paks_path, error).
+
+    Defers to config.has_pak_files for the "is this really a paks folder" half. This used to test
+    for a literal pakchunkCharacter-Windows.ucas while the prereq check globbed pakchunk*.utoc, so
+    a path containing glob metacharacters (D:/[Steam]/...) passed here and failed there — Settings
+    said every path was valid while the app said "No pak files found"."""
     mr = _find_mr_root(path)
     if not mr:
         return None, "MarvelGame/Marvel/Content/Paks not found in path"
     paks = mr + "/MarvelGame/Marvel/Content/Paks"
-    if not os.path.exists(paks + "/pakchunkCharacter-Windows.ucas"):
-        return None, "pakchunkCharacter-Windows.ucas not found — wrong folder"
+    if not _c.has_pak_files(paks):
+        return None, f"no pakchunk*.utoc containers found in {paks} — wrong folder"
     return paks, None
 
 @app.post("/api/save_paks")
@@ -604,6 +613,13 @@ def api_save_paks():
     if not aes_key:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no AES key provided"})
+    try:
+        aes_key = _c.normalize_aes_key(aes_key)
+    except ValueError as e:
+        # Reject a malformed key HERE. Saved unchecked, it used to be written out and only show up
+        # later as an empty asset browser with nothing pointing back at the typo.
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
     paks_path, err = _validate_and_build_paks(path)
     if err:
         response.content_type = "application/json"
@@ -622,14 +638,11 @@ def api_save_paks():
         if has_blender:
             save_blender_path(blender_path)          # empty string clears it
 
-        # Write AES_KEY.txt so io_lib picks it up immediately
-        import atelier.config as _c
-        os.makedirs(_c.TOOLS, exist_ok=True)
-        with open(os.path.join(_c.TOOLS, "AES_KEY.txt"), "w", encoding="utf-8") as _f:
-            _f.write(aes_key)
-
-        # Update in-process globals — no restart needed
-        _io_lib_mod.AES_KEY = bytes.fromhex(aes_key)
+        # One call writes AES_KEY.txt (for UAssetTool), io_lib.AES_KEY (for our own pak reader)
+        # and drops the in-memory index. The DISK index cache needs no special handling: its key
+        # includes an AES fingerprint, so the build made under the old key can no longer match.
+        # That is the fix for "entered the correct key and the tree is still empty".
+        _c.set_aes_key(aes_key)
 
         _c.PAKS = paks_path
         _c.CONFIG_HAS_PAKS = True
@@ -665,7 +678,7 @@ def api_save_paks():
 @app.get("/api/open_discord_key")
 def api_open_discord_key():
     url = "https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616"
-    try: os.startfile(url)
+    try: hostos.open_path(url)
     except Exception: pass
     response.content_type = "application/json"
     return json.dumps({"ok": True})
@@ -784,7 +797,14 @@ def api_update_progress():
 
 
 def _do_update_download(download_url):
+    """Downloads and runs the Inno Setup installer. Windows-only by construction — releases ship
+    an .exe installer and nothing else, so on Linux the caller is told to update via git."""
     global _update_state, _update_progress
+    if not hostos.IS_WINDOWS:
+        print("[update] in-app update is Windows-only; update this checkout with git instead")
+        with _update_state_lock:
+            _update_state = "error"
+        return
     tmp_path = os.path.join(tempfile.gettempdir(), "AtelierSetup.exe")
 
     def _reporthook(block_num, block_size, total_size):
@@ -835,30 +855,15 @@ def api_validate_usmap():
 def api_pick_usmap_file():
     body    = request.json or {}
     initial = (body.get("initial") or "").replace("/", "\\")
-    env     = os.environ.copy()
-    env["USMAP_INITIAL"] = os.path.dirname(initial) if initial else ""
-    ps = (
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "Add-Type -AssemblyName System.Windows.Forms; "
-        "$f = New-Object System.Windows.Forms.OpenFileDialog; "
-        "$f.Title = 'Select USMAP mapping file'; "
-        "$f.Filter = 'USMAP files (*.usmap)|*.usmap|All files (*.*)|*.*'; "
-        "$f.InitialDirectory = $env:USMAP_INITIAL; "
-        "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }"
-    )
+    response.content_type = "application/json"
     try:
-        r   = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                             capture_output=True, encoding="utf-8", timeout=120, env=env)
-        raw = r.stdout.strip().replace("\\", "/")
-        response.content_type = "application/json"
-        return json.dumps({"ok": True, "path": raw})
+        return json.dumps({"ok": True, "path": hostos.pick_file(
+            "Select USMAP mapping file", ("*.usmap",), initial)})
     except Exception as e:
-        response.content_type = "application/json"
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
 @app.post("/api/download_usmap")
 def api_download_usmap():
-    import atelier.config as _c
     try:
         latest = _get_latest_usmap_from_github()
         if not latest:
@@ -880,7 +885,6 @@ _usmap_check_lock    = threading.Lock()
 @app.get("/api/usmap_update_check")
 def api_usmap_update_check():
     global _usmap_check_running
-    import atelier.config as _c
     last = _c.get_usmap_checked_at()
     if time.time() - last < _THREE_DAYS:
         response.content_type = "application/json"
@@ -1051,21 +1055,11 @@ def api_prefetch_thumbs():
         # parallel-decode thumbnails per-file to THUMBS_DIR.
         import concurrent.futures as _cf
         t_uat = time.time()
-        names = sorted({os.path.basename(pak_game_path(gr)) for gr in to_fallback})
-        print(f"[PREFETCH] batch extract {len(names)} assets via UAT...", file=sys.stderr, flush=True)
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
-        cache_entries = []
+        print(f"[PREFETCH] batch extract {len(to_fallback)} assets...", file=sys.stderr, flush=True)
+        found = extract_many(to_fallback)       # one retoc call per container, or UAT on Windows
         for gr in to_fallback:
-            cp, pak, pfx = extract_info(gr)
-            cp_ok = cp and os.path.exists(cp + ".uasset")
-            actual = cp if cp_ok else find_extracted(gr)
-            if actual and os.path.exists(actual + ".uasset"):
-                print(f"[PREFETCH cache] {gr}: {'predicted' if cp_ok else 'fallback'} -> {actual}", file=sys.stderr, flush=True)
-                cache_entries.append((gr, actual, pak or "", pfx or ""))
-            else:
-                print(f"[PREFETCH cache] {gr}: uasset NOT FOUND (predicted={cp})", file=sys.stderr, flush=True)
-        _asset_cache.record_many(cache_entries)
+            print(f"[PREFETCH cache] {gr}: {'-> ' + found[gr] if gr in found else 'uasset NOT FOUND'}",
+                  file=sys.stderr, flush=True)
         print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
 
         t_dec = time.time()
@@ -1125,25 +1119,9 @@ def api_import_texture():
         return json.dumps({"ok": False, "error": "missing skin_id/rel_path or game_rel"})
     try:
         os.makedirs(get_import_root(), exist_ok=True)
-        # Skip UAT extraction if the uasset is already cached on disk.
-        cb = _asset_cache.cache_base(gr)
-        if cb and os.path.exists(cb + ".uasset"):
-            print(f"[import] {gr}: cache hit, skipping UAT ({cb})", file=sys.stderr, flush=True)
-        else:
-            os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-            uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT),
-                 "--filter", os.path.basename(pak_game_path(gr))])
-            cp, pak, pfx = extract_info(gr)
-            if cp and os.path.exists(cp + ".uasset"):
-                print(f"[import] {gr}: predicted path hit -> {cp}", file=sys.stderr, flush=True)
-                _asset_cache.record(gr, cp, pak, pfx)
-            else:
-                fb = find_extracted(gr)
-                if fb and os.path.exists(fb + ".uasset"):
-                    print(f"[import] {gr}: fallback found -> {fb}", file=sys.stderr, flush=True)
-                    _asset_cache.record(gr, fb, pak or "", pfx or "")
-                else:
-                    print(f"[import] {gr}: uasset NOT FOUND anywhere (predicted={cp})", file=sys.stderr, flush=True)
+        cb = ensure_work_base(gr)           # retoc or UAssetTool per host; caches the result
+        print(f"[import] {gr}: {'extracted -> ' + cb if cb else 'NOT FOUND anywhere'}",
+              file=sys.stderr, flush=True)
         dst_base  = _import_base(gr)
         work_base = _cache_import_base(gr)
         print(f"[import] {gr}: work_base={work_base!r} exists={bool(work_base) and os.path.exists(work_base + '.uasset')}", file=sys.stderr, flush=True)
@@ -1201,7 +1179,9 @@ def api_vfx_save():
     if not gr:
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
-        p = save_vfx(gr, body.get("groups", []))
+        # groups = Niagara curve groups; scalars/vectors = an MPC's global parameters (vfx.save_mpc)
+        p = save_vfx(gr, body.get("groups", []),
+                     scalars=body.get("scalars"), vectors=body.get("vectors"))
         return json.dumps({"game_rel": gr, "token": token(gr), **p})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
@@ -1347,16 +1327,9 @@ def _run_import_job(items):
     with _job_lock:
         _job.update(running=True, current=0, total=len(items), name="", done=False, error=None, results=[])
     try:
-        names = sorted({os.path.basename(pak_game_path(it["game_rel"])) for it in items})
         _push_sse({"current": 0, "total": len(items), "name": "Extracting from game…", "done": False})
-        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
         os.makedirs(get_import_root(), exist_ok=True)
-        uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT), "--filter"] + names)
-
-        cache_entries = []
-        for it in items:
-            cp, pak, pfx = extract_info(it["game_rel"])
-            if cp: cache_entries.append((it["game_rel"], cp, pak, pfx))
+        extract_many([it["game_rel"] for it in items])   # one retoc call per container, or UAT on Windows
         _asset_cache.record_many(cache_entries)
 
         _push_sse({"current": 0, "total": len(items), "name": "Decoding…", "done": False})
@@ -1668,80 +1641,47 @@ def api_project_thumb():
     with open(best_file, "rb") as f:
         return f.read()
 
-# ── open in explorer ──────────────────────────────────────────────────────────
-
-def _open_explorer_focused(args):
-    import ctypes, time
-    user32    = ctypes.windll.user32
-    kernel32  = ctypes.windll.kernel32
-    EnumProc  = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_size_t, ctypes.c_size_t)
-    _CLS      = ("CabinetWClass", "ExploreWClass")
-
-    def _explorer_hwnds():
-        found = []
-        buf   = ctypes.create_unicode_buffer(64)
-        def cb(hwnd, _):
-            user32.GetClassNameW(hwnd, buf, 64)
-            if buf.value in _CLS and user32.IsWindowVisible(hwnd):
-                found.append(hwnd)
-            return True
-        user32.EnumWindows(EnumProc(cb), 0)
-        return found
-
-    before = set(_explorer_hwnds())
-    proc   = subprocess.Popen(args)
-
-    def _focus():
-        time.sleep(0.6)
-        after  = _explorer_hwnds()
-        target = next((h for h in after if h not in before), None) or (after[0] if after else None)
-        if target:
-            fg_tid  = user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), None)
-            our_tid = kernel32.GetCurrentThreadId()
-            user32.AttachThreadInput(fg_tid, our_tid, True)
-            user32.ShowWindow(target, 9)      # SW_RESTORE
-            user32.BringWindowToTop(target)
-            user32.SetForegroundWindow(target)
-            user32.AttachThreadInput(fg_tid, our_tid, False)
-
-    threading.Thread(target=_focus, daemon=True).start()
-
-
-def _explorer_reveal(path, select):
-    """Open Explorer to a folder, optionally selecting a file. Built as a QUOTED STRING command, not a
-    Popen arg list: the list form mangles '/select,<path with spaces>' (our install path has spaces),
-    which makes Explorer open the file itself (the 'how do you want to open this?' popup) or land on
-    the wrong folder. A single 'explorer /select,\"<path>\"' string parses correctly."""
-    p = os.path.abspath(path).replace("/", "\\")
-    cmd = ('explorer.exe /select,"%s"' % p) if select else ('explorer.exe "%s"' % p)
-    _open_explorer_focused(cmd)
-
+# ── reveal in file manager ────────────────────────────────────────────────────
 
 @app.get("/api/open_explorer")
 def api_open_explorer():
+    """Reveal a file in the desktop file manager.
+
+    Reports failure instead of returning ok:true after doing nothing. The old version silently
+    no-opped whenever the target did not exist yet — which is the normal state for a texture that
+    has not been imported — so the UI showed no error and nothing opened, and it was reported as
+    "Open in Explorer does nothing" more than once."""
     path = request.query.get("path", "")
     gr   = request.query.get("game_rel", "")
+    response.content_type = "application/json"
     if gr:
         path = _import_base(gr) + ".png"
-    if path:
-        abs_path = os.path.abspath(path)
-        if os.path.exists(abs_path):
-            _explorer_reveal(abs_path, select=True)
-        elif os.path.isdir(os.path.dirname(abs_path)):
-            _explorer_reveal(os.path.dirname(abs_path), select=False)
-    response.content_type = "application/json"
-    return json.dumps({"ok": True})
+    if not path:
+        return json.dumps({"ok": False, "error": "No path given."})
+
+    abs_path = os.path.abspath(path)
+    if os.path.exists(abs_path):
+        target, select = abs_path, True
+    elif os.path.isdir(os.path.dirname(abs_path)):
+        target, select = os.path.dirname(abs_path), False
+    else:
+        return json.dumps({"ok": False, "error":
+                           f"Nothing to show yet at {abs_path} — import or export this asset first."})
+    try:
+        hostos.reveal(target, select=select)
+    except Exception as e:
+        return json.dumps({"ok": False, "error": f"Could not open the file manager: {e}"})
+    return json.dumps({"ok": True, "path": target})
 
 
 @app.post("/api/reset_data")
 def api_reset_data():
-    import atelier.config as _c
     paths_to_remove = [
         _c.ASSETS,
         _c._CACHE,
         os.path.join(ROOT, "_logs"),
         os.path.join(_c.TOOLS, "Mappings"),
-        os.path.join(_c.TOOLS, "AES_KEY.txt"),
+        _c.AES_KEY_FILE,
     ]
     for p in paths_to_remove:
         try:
@@ -1782,10 +1722,10 @@ def api_open_projects_folder():
     if active:
         target = os.path.join(PROJECTS_ROOT, active)
         if os.path.isdir(target):
-            _explorer_reveal(target, select=True)
+            hostos.reveal(target, select=True)
             response.content_type = "application/json"
             return json.dumps({"ok": True})
-    _explorer_reveal(PROJECTS_ROOT, select=False)
+    hostos.reveal(PROJECTS_ROOT, select=False)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -1827,7 +1767,7 @@ def api_open_with():
     if path:
         abs_path = os.path.abspath(path)
         if os.path.exists(abs_path):
-            subprocess.Popen(["rundll32.exe", "shell32.dll,OpenAs_RunDLL", abs_path])
+            hostos.open_with(abs_path)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -1876,7 +1816,7 @@ def api_open_blend():
         from atelier.handlers.meshedit import find_blender
         subprocess.Popen([find_blender(), path], creationflags=CNW)
     except Exception:
-        try: os.startfile(path)
+        try: hostos.open_path(path)
         except Exception as e: return json.dumps({"ok": False, "error": str(e)})
     return json.dumps({"ok": True})
 
@@ -1925,7 +1865,13 @@ def _install_to_mods(mod_name, export_dir):
     return True, None, mods
 
 def _mod_stem(mod_name):
-    return re.sub(r'[/\\:*?"<>|.]', '', (mod_name or "Mod").strip()) or "Mod"
+    """Filesystem-safe stem for a mod name.
+
+    Strips the Windows-illegal set AND the glob metacharacters [ ] — legal in filenames, so they
+    survived into _cache/build_stage/<name> and the output filenames, where every later glob over
+    those paths (modlock, repatch, the packed-output scan) matched nothing and quietly did no work.
+    A mod called "[WIP] Recolor" could not be locked or repatched, with no error anywhere."""
+    return re.sub(r'[/\\:*?"<>|.\[\]]', '', (mod_name or "Mod").strip()) or "Mod"
 
 @app.get("/api/check_mod_conflict")
 def api_check_mod_conflict():
@@ -1986,17 +1932,9 @@ def api_install_mod():
 @app.post("/api/pick_mod_file")
 def api_pick_mod_file():
     """Native picker for a mod to repatch (.zip / .pak / .utoc). Reports if it's password-locked."""
-    ps = ("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-          "Add-Type -AssemblyName System.Windows.Forms; "
-          "$f = New-Object System.Windows.Forms.OpenFileDialog; "
-          "$f.Title = 'Select a mod to repatch'; "
-          "$f.Filter = 'Mods (*.zip;*.pak;*.utoc)|*.zip;*.pak;*.utoc|All files (*.*)|*.*'; "
-          "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }")
     response.content_type = "application/json"
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                           capture_output=True, encoding="utf-8", timeout=180)
-        path = r.stdout.strip().replace("\\", "/")
+        path = hostos.pick_file("Select a mod to repatch", ("*.zip", "*.pak", "*.utoc"))
         locked = False
         if path:
             from atelier.handlers import modlock
@@ -2039,10 +1977,10 @@ def api_open_export_folder():
     if sel:
         abs_sel = os.path.abspath(sel)
         if os.path.exists(abs_sel):
-            _explorer_reveal(abs_sel, select=True)
+            hostos.reveal(abs_sel, select=True)
             response.content_type = "application/json"
             return json.dumps({"ok": True})
-    _explorer_reveal(ASSETS_MODS, select=False)
+    hostos.reveal(ASSETS_MODS, select=False)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -2053,14 +1991,9 @@ def api_open_export_folder():
 # the asset returns on the next sidebar refresh and "Delete" looks like it did nothing.
 _EDIT_EXTS = (".png", ".json", ".blend", ".blend.mat.json", ".blend1")
 
-@app.post("/api/delete_imported")
-def api_delete_imported():
-    body = request.json or {}
-    gr   = body.get("game_rel", "")
-    if not gr:
-        response.content_type = "application/json"
-        return json.dumps({"ok": False, "error": "missing game_rel"})
-    work_base   = _cache_import_base(gr)
+def _delete_one_imported(gr):
+    """Remove every on-disk trace of one edited asset (both project layouts + the work copy)."""
+    work_base = _cache_import_base(gr)
     for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
         for ext in _EDIT_EXTS:
             p = base + ext
@@ -2074,28 +2007,26 @@ def api_delete_imported():
                 try: os.remove(p)
                 except Exception: pass
     _asset_cache.remove(gr)
+
+@app.post("/api/delete_imported")
+def api_delete_imported():
+    """Delete one edited asset (`game_rel`) or several (`game_rels`) — the multi-select delete in
+    the sidebar sends the list, so clearing 30 assets is one request and one refresh instead of 30."""
+    body = request.json or {}
+    grs  = [g for g in (body.get("game_rels") or []) if g] or \
+           ([body["game_rel"]] if body.get("game_rel") else [])
     response.content_type = "application/json"
-    return json.dumps({"ok": True})
+    if not grs:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    for gr in grs:
+        _delete_one_imported(gr)
+    return json.dumps({"ok": True, "deleted": len(grs)})
 
 @app.post("/api/delete_all_imported")
 def api_delete_all_imported():
     items = all_imported()
     for item in items:
-        gr          = item["game_rel"]
-        work_base   = _cache_import_base(gr)
-        for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
-            for ext in _EDIT_EXTS:
-                p = base + ext
-                if os.path.exists(p):
-                    try: os.remove(p)
-                    except Exception: pass
-        if work_base:
-            for ext in (".uasset", ".uexp", ".ubulk"):
-                p = work_base + ext
-                if os.path.exists(p):
-                    try: os.remove(p)
-                    except Exception: pass
-        _asset_cache.remove(item["game_rel"])
+        _delete_one_imported(item["game_rel"])
     response.content_type = "application/json"
     return json.dumps({"ok": True, "deleted": len(items)})
 
@@ -2111,7 +2042,10 @@ def api_asset_info():
         return json.dumps({"ok": False})
     pak       = os.path.basename(info.get("pak", ""))
     pfx       = info.get("pfx", "")
-    game_path = pfx.rstrip("/") + "/" + gr if pfx else gr
+    # mount_join, not concatenation: a plugin game_rel carries a synthetic 'Plugins/<Name>' root
+    # that names its mount, so pasting it after the mount would show a path that exists nowhere.
+    from atelier.index import mount_join
+    game_path = mount_join(pfx, gr) if pfx else gr
     return json.dumps({"ok": True, "pak": pak, "game_path": game_path})
 
 
