@@ -80,6 +80,30 @@ try:
 except ValueError:
     pass
 
+# ...except for the commands that ENCODE. Injecting a texture rebuilds its whole mip chain, and
+# BC7 is the slowest encoder in the set: measured 2026-09-20, three 2048x2048 BC7 mip-chain
+# injections plus the pack took 804s -- about 270s each, i.e. right up against the 300s cap. Two
+# of three legitimate injections were killed by it before this existed, and the user saw
+# "inject failed: UAssetTool timed out after 300s" on work that was simply large.
+#
+# PHASES.md's own pivot signal for #6 says to raise the limit rather than revert it and to write
+# down the real duration, which is what this is. The point of the cap is to catch a WEDGED tool
+# (the export hang: unbounded readline behind a global lock, never finishes, only a restart
+# clears it), and 30 minutes still does that while leaving room for a 4096 texture.
+UAT_SLOW_COMMANDS = {"inject_texture": 1800, "batch_inject_texture": 3600}
+try:
+    _slow = int(os.environ.get("ATELIER_UAT_INJECT_TIMEOUT", "0"))
+    if _slow > 0:
+        UAT_SLOW_COMMANDS = {k: max(10, _slow) for k in UAT_SLOW_COMMANDS}
+except ValueError:
+    pass
+
+
+def _timeout_for(args):
+    """The cap for this call: encoding commands get their own, everything else the default."""
+    cmd = args[0] if args else ""
+    return max(UAT_TIMEOUT, UAT_SLOW_COMMANDS.get(cmd, 0))
+
 
 class _TimedOut:
     """CompletedProcess-alike so callers can keep checking .returncode / .stdout / .stderr."""
@@ -95,8 +119,9 @@ def uat(args, timeout=None):
     Off Windows this goes through Wine, which is also what translates those absolute paths
     into the Z:\\ form the tool sees (see hostos._wrap).
 
-    Bounded: a hung tool used to block the calling request forever with nothing logged."""
-    secs = UAT_TIMEOUT if timeout is None else timeout
+    Bounded: a hung tool used to block the calling request forever with nothing logged. The bound
+    depends on the command -- see UAT_SLOW_COMMANDS; an explicit `timeout` still wins."""
+    secs = _timeout_for(args) if timeout is None else timeout
     try:
         return hostos.run_exe([UAT] + args, capture_output=True, text=True, cwd=ROOT,
                               timeout=secs)

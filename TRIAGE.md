@@ -48,7 +48,9 @@ broke patched materials was *resolution*, which #35 fixes. `enc_guid` is now rec
 failed container, so if a genuinely differently-keyed pak ever ships it shows up as a non-zero guid
 in the warning list instead of having to be re-derived.
 
-Item **37** is new: found and fixed on 2026-09-20, covered by `tests/test_phase4.py`.
+Item **37** is new: found and fixed on 2026-09-20, covered by `tests/test_phase4.py`. Item **6**'s
+timeout was raised the same day for encoding commands only, under the pivot signal PHASES.md
+records for it — a 2048² BC7 injection measures ~270 s against what was a 300 s cap.
 
 Phase 4 (items **10, 12, 20, 21, 22, 23**) is implemented as of 2026-09-20, with
 `tests/test_phase4.py`. Item **13** was deliberately left out and is unstarted. Item **10** is

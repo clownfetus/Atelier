@@ -121,6 +121,12 @@ def get_asset_opts(project_dir, game_rel=None):
       dye_off   bool - on a MATERIAL: also ship a neutral ColorID mask so the dye system stops
                        overpainting the BaseColor (see handlers/dye.py::stage_dye_off)
       lq_twin   bool - also stage the Marvel_LQ copy of this asset (only if that mount exists)
+      color_inten {param: float} - on a MATERIAL / MPC / Niagara asset: the HDR intensity split the
+                       colour editor showed for each colour parameter (stored value = swatch x
+                       intensity). Derived as max(rgb, 1) when absent, which is how every asset
+                       edited before this key existed still reads. It is stored because deriving it
+                       is not round-trip stable: a colour set under an intensity above 1 comes back
+                       with the multiplier folded in, reading brighter than the one that was typed.
     """
     opts = load(project_dir)["asset_opts"]
     if game_rel is None:

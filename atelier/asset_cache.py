@@ -45,6 +45,21 @@ def record(game_rel: str, cache_path: str, pak: str, pfx: str):
         _names[os.path.basename(game_rel).lower()] = game_rel
         _save()
 
+def mark(game_rel: str, **fields):
+    """Merge extra fields into an existing entry, leaving cache_path/pak/pfx alone.
+
+    Used for facts learned ABOUT a copy after it was extracted, which record() must not have to
+    know about — currently only `mip_refreshed`, meaning "the paks claim an optional top mip for
+    this asset and a re-extract still did not produce one, so stop asking".
+    """
+    with _lock:
+        e = _data.get(game_rel) or _data.get(game_rel.lower())
+        if not e:
+            return
+        e.update(fields)
+        _save()
+
+
 def record_many(entries):
     """entries: iterable of (game_rel, cache_path, pak, pfx)"""
     with _lock:

@@ -752,6 +752,38 @@ def t_a_current_copy_is_left_alone():
             TX.extract_via_retoc = saved
 
 
+def t_an_unproducible_top_mip_is_only_chased_once():
+    """"The paks contain a .uptnl" is not "the extractor can produce one".
+
+    retoc pulls the optional bulk for some assets and not others — measured: it does for
+    T_1031306_Equip_01_D out of pakchunkCharacter, it does not for the HeroDetail silhouettes out
+    of pakchunkHQ, with --game-paks-dir pointing at the whole Paks folder both times. Chasing the
+    second kind means re-extracting on every single call, forever: a cache that costs more than
+    having none. One attempt, then the copy we have is the copy we keep.
+    """
+    import atelier.asset_cache as _ac
+    with sandbox() as sb:
+        write_asset(sb.paks, "pakchunkUI-Windows.utoc", OPT_MOUNT, "UI", "T_A.uasset")
+        write_asset(sb.paks, "pakchunkUIoptional-Windows.utoc", OPT_MOUNT, "UI", "T_A.uptnl")
+        wb = _fake_project_texture(sb, "UI/T_A")
+        assert TX.missing_optional_mip("UI/T_A", wb) is True
+        # an extractor that cannot deliver the top mip, however many times it is asked
+        n = []
+        saved = (TX.extract_via_retoc, TX.prefers_retoc)
+        TX.prefers_retoc = lambda: True
+        TX.extract_via_retoc = lambda grs: (n.append(1) or {grs[0]: (wb, "pakchunkUI-Windows.utoc",
+                                                                     "Marvel/Content/Marvel/")})
+        try:
+            TX.ensure_work_base("UI/T_A")
+            assert _ac.get("UI/T_A").get("mip_refreshed") is True, "it did not stop asking"
+            assert TX.missing_optional_mip("UI/T_A", wb) is False
+            TX.ensure_work_base("UI/T_A")
+            TX.ensure_work_base("UI/T_A")
+        finally:
+            TX.extract_via_retoc, TX.prefers_retoc = saved
+        assert len(n) == 1, f"re-extracted {len(n)} times; it must give up after one"
+
+
 def t_uninstalling_the_dlc_never_throws_the_top_mip_away():
     """One-directional on purpose: the cached copy is then BETTER than the paks can hand back."""
     with sandbox() as sb:
@@ -812,6 +844,23 @@ def t_nothing_is_reported_without_the_dlc():
         assert TX.stale_mip_imports(sb.project) == []
 
 
+def t_an_encode_gets_longer_than_the_default_cap():
+    """Phase 1's 300s cap is right for extraction and wrong for encoding — measured, not guessed.
+
+    Injecting a texture rebuilds its mip chain, and BC7 is the slowest encoder in the set: three
+    2048x2048 BC7 injections plus the pack took 804s on 2026-09-20, ~270s each. Two of three
+    legitimate injections were killed at 300s and reported to the user as a failure. PHASES.md's
+    pivot signal for #6 says to raise it and write down the real duration rather than revert.
+    """
+    from atelier.tools import _timeout_for, UAT_TIMEOUT
+    assert _timeout_for(["inject_texture", "a", "b", "c"]) >= 1800
+    assert _timeout_for(["batch_inject_texture"]) >= 1800
+    # everything else keeps the tight cap — the hang this exists to catch is unbounded, not slow
+    for cmd in ("extract_texture", "to_json", "from_json", "extract_iostore_legacy", ""):
+        assert _timeout_for([cmd] if cmd else []) == UAT_TIMEOUT, cmd
+    assert "804s" in read_text("atelier/tools.py"), "the measured duration is not written down"
+
+
 def t_the_report_reaches_the_user():
     """A finding nobody sees is not a fix."""
     assert "/api/stale_mips" in read_text("atelier/web/routes.py")
@@ -821,10 +870,12 @@ def t_the_report_reaches_the_user():
 
 for t in (t_a_uptnl_is_recorded_but_not_indexed_as_an_asset, t_the_record_survives_the_index_cache,
           t_installing_the_dlc_invalidates_a_cached_copy, t_a_current_copy_is_left_alone,
+          t_an_unproducible_top_mip_is_only_chased_once,
           t_uninstalling_the_dlc_never_throws_the_top_mip_away,
           t_a_top_mips_size_is_readable_from_its_length_alone,
           t_an_imported_png_that_is_now_too_small_is_reported,
-          t_nothing_is_reported_without_the_dlc, t_the_report_reaches_the_user):
+          t_nothing_is_reported_without_the_dlc, t_an_encode_gets_longer_than_the_default_cap,
+          t_the_report_reaches_the_user):
     check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
 
 
@@ -909,6 +960,106 @@ def t_a_neutral_mask_survives_the_round_trip():
 
 
 for t in (t_the_group_edit_keeps_the_injected_mips, t_a_neutral_mask_survives_the_round_trip):
+    check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
+
+
+# ══ the colour intensity split ═══════════════════════════════════════════════
+section("a colour's intensity split survives the save it was typed under")
+
+# The editor shows a colour parameter as `swatch x intensity`, so an HDR value (an emissive at
+# 9,9,9) reads as a colour plus a multiplier instead of as clipped white. The multiplier used to be
+# DERIVED on every read as max(rgb, 1). These are the two reports that rule produced.
+
+def _derived(rgba):
+    """The old rule: the split the editor used to infer from the value alone."""
+    return max(rgba[0], rgba[1], rgba[2], 1.0)
+
+def _typed(rgb255, inten):
+    """What the editor stores when a colour is typed into a row showing `inten`."""
+    return [c / 255.0 * inten for c in rgb255]
+
+def _shown(rgba, inten):
+    """The 0-255 numbers the editor puts back in the row for a stored value under `inten`."""
+    return [round(c / inten * 255) for c in rgba[:3]]
+
+
+def t_deriving_the_split_reads_back_brighter_than_what_was_typed():
+    """The report: "I set 10 61 0, saved, went back in and it was 12 73 0."
+
+    The parameter's vanilla value peaked at 1.2, so the row opened at intensity 1.2. The typed
+    colour times 1.2 has no channel above 1, so the old max(rgb, 1) derived 1 on the next read and
+    handed the whole multiplier back as colour. Nothing about the value moved — the same product
+    is simply split differently — which is why the mod looks right in game and wrong in the editor."""
+    stored = _typed([10, 61, 0], 1.2)
+    assert _shown(stored, _derived(stored)) == [12, 73, 0]          # what they saw
+    assert _shown(stored, 1.2) == [10, 61, 0]                       # what they typed
+    # the same bug at a different seed is the "it basically doubles" half of the report
+    two = _typed([10, 20, 40], 2.0)
+    assert _shown(two, _derived(two)) == [20, 40, 80]
+    assert _shown(two, 2.0) == [10, 20, 40]
+
+
+def t_an_hdr_value_still_derives_its_own_split():
+    """Derivation is right whenever the intensity IS the peak — that path must not regress.
+
+    A 9,9,9 emissive has to keep reading as white at intensity 9, with nothing stored, or every
+    untouched VFX parameter would start writing a split into project.json."""
+    assert _derived([9.0, 9.0, 9.0, 1.0]) == 9.0
+    assert _shown([9.0, 9.0, 9.0], 9.0) == [255, 255, 255]
+    # darkening it a little keeps the peak, so the split still derives and is still not worth storing
+    dimmed = _typed([250, 255, 255], 9.0)
+    assert abs(_derived(dimmed) - 9.0) < 1e-9
+
+
+def t_the_split_is_stored_per_project_and_read_back():
+    """What the fix turns on: the split the user worked with is the asset's, not a re-derivation."""
+    import atelier.web.routes as R
+    with sandbox() as sb:
+        gr = "Characters/1060/1060302/Materials/MI_10600_1060302_Body_03"
+        assert R._get_inten(gr) == {}, "an untouched asset must mean 'derive it'"
+        assert R._put_inten(gr, {"DynamicLineColor": 1.2}) == {"DynamicLineColor": 1.2}
+        assert R._get_inten(gr) == {"DynamicLineColor": 1.2}
+        # it rides in the asset's own options, so it is per project and travels with the folder
+        assert PM.get_asset_opts(sb.project, gr) == {"color_inten": {"DynamicLineColor": 1.2}}
+
+
+def t_an_empty_split_is_removed_rather_than_stored():
+    """Same rule the rest of asset_opts follows: "none stored" and "an empty map" are one state."""
+    import atelier.web.routes as R
+    with sandbox() as sb:
+        gr = "Characters/1060/1060302/Materials/MI_10600_1060302_Body_03"
+        R._put_inten(gr, {"DynamicLineColor": 1.2})
+        R._put_inten(gr, {})                       # what a reset-to-vanilla sends
+        assert R._get_inten(gr) == {}
+        raw = json.load(open(os.path.join(sb.project, ".atelier", "project.json"), encoding="utf-8"))
+        assert raw.get("asset_opts") == {}, raw.get("asset_opts")
+
+
+def t_a_junk_split_never_reaches_the_project_file():
+    """It arrives over HTTP, so it is not trusted: named keys and finite positive floats only."""
+    import atelier.web.routes as R
+    assert R._clean_inten({"A": 1.2, "B": "3.5"}) == {"A": 1.2, "B": 3.5}
+    assert R._clean_inten({"A": "x", "B": -1, "C": 0, "D": float("inf"),
+                           "E": float("nan"), "": 2, "F": None}) == {}
+    assert R._clean_inten(None) == {} and R._clean_inten([1, 2]) == {}
+
+
+def t_an_asset_deleted_from_the_project_forgets_its_split():
+    """It lives in asset_opts, so the existing forget-on-delete path already covers it."""
+    import atelier.web.routes as R
+    with sandbox() as sb:
+        gr = "Characters/1060/1060302/Materials/MI_10600_1060302_Body_03"
+        R._put_inten(gr, {"DynamicLineColor": 1.2})
+        PM.forget_asset(sb.project, gr)
+        assert R._get_inten(gr) == {}
+
+
+for t in (t_deriving_the_split_reads_back_brighter_than_what_was_typed,
+          t_an_hdr_value_still_derives_its_own_split,
+          t_the_split_is_stored_per_project_and_read_back,
+          t_an_empty_split_is_removed_rather_than_stored,
+          t_a_junk_split_never_reaches_the_project_file,
+          t_an_asset_deleted_from_the_project_forgets_its_split):
     check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
 
 

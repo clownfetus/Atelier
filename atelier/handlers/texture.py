@@ -401,6 +401,9 @@ def missing_optional_mip(game_rel, cache_base):
         return False
     if os.path.exists(cache_base + ".uptnl"):
         return False
+    import atelier.asset_cache as _ac
+    if (_ac.get(game_rel) or {}).get("mip_refreshed"):
+        return False          # already tried; see _note_mip_attempt
     try:
         from atelier.index import has_optional_mip
         return has_optional_mip(game_rel)
@@ -546,6 +549,23 @@ def uat_filter(game_rels):
     return ["--filter"] + pats
 
 
+def _note_mip_attempt(game_rel, base):
+    """After an extraction: if the paks claim a top mip we still do not have, stop asking for it."""
+    if not base or os.path.exists(base + ".uptnl"):
+        return
+    try:
+        from atelier.index import has_optional_mip
+        if not has_optional_mip(game_rel):
+            return
+    except Exception:
+        return
+    import atelier.asset_cache as _ac
+    _ac.mark(game_rel, mip_refreshed=True)
+    print(f"  [warn] {game_rel}: the paks hold an optional top mip but the extractor did not "
+          f"produce one — keeping the largest mip it did (clear _cache to retry)",
+          file=sys.stderr, flush=True)
+
+
 def ensure_work_base(game_rel):
     """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
     Returns None if the asset isn't in the game at all."""
@@ -579,6 +599,7 @@ def ensure_work_base(game_rel):
         if hit:
             rb, pak, pfx = hit
             _ac.record(game_rel, rb, pak or "", pfx or "")
+            _note_mip_attempt(game_rel, rb)
             return rb
         # Fall through to UAssetTool rather than giving up: retoc cannot currently extract from a
         # PATCH container ("FPackageId(...) has no path name entry"), which is ~5% of the index but
@@ -596,6 +617,7 @@ def ensure_work_base(game_rel):
     cp, pak, pfx = extract_info(game_rel)
     if cp and os.path.exists(cp + ".uasset"):
         _ac.record(game_rel, cp, pak, pfx)
+        _note_mip_attempt(game_rel, cp)
         return cp
     base = find_extracted(game_rel)
     if base and os.path.exists(base + ".uasset"):
@@ -603,6 +625,7 @@ def ensure_work_base(game_rel):
         # layout the prediction missed -- which was EVERY patch-pak asset while _PATCH_UAT_PREFIX
         # was stale -- was re-extracted on every single operation and never cached at all.
         _ac.record(game_rel, base, pak or "", pfx or "")
+        _note_mip_attempt(game_rel, base)
         return base
     return None
 

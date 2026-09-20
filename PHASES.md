@@ -89,6 +89,15 @@ it doesn't.
 too tight — raise it rather than reverting, and note the real duration. The measured baseline is
 14.4 s for a single UAT fallback versus 0.38 s for 26 assets straight from the pak.
 
+> **It fired, on 2026-09-20, and the signal was right.** Not on an extraction — on an *encode*.
+> `inject_texture` rebuilds a texture's whole mip chain, and BC7 is the slowest encoder in the
+> set: three 2048×2048 BC7 injections plus the pack measured **804 s**, ~270 s each, against a
+> 300 s cap. Two of three legitimate injections were killed and reported to the user as
+> "inject failed: UAssetTool timed out after 300s" on work that was only large. Raised per the
+> instruction above — encoding commands now get their own cap (`tools.UAT_SLOW_COMMANDS`:
+> 1800 s for `inject_texture`, 3600 s for the batch form) while everything else keeps 300 s,
+> because the hang this exists to catch is unbounded rather than slow.
+
 ---
 
 ## Phase 2 — The index / key cluster

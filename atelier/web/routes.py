@@ -1,4 +1,4 @@
-import os, sys, json, re, shutil, threading, queue, subprocess, tempfile, time, urllib.request
+import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request
 from bottle import request, response, static_file
 
 from atelier.web.app import app
@@ -1231,7 +1231,7 @@ def api_vfx_params():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = read_vfx(gr)
-        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+        return json.dumps({"game_rel": gr, "token": token(gr), "inten": _get_inten(gr), **p})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
@@ -1246,7 +1246,9 @@ def api_vfx_save():
         # groups = Niagara curve groups; scalars/vectors = an MPC's global parameters (vfx.save_mpc)
         p = save_vfx(gr, body.get("groups", []),
                      scalars=body.get("scalars"), vectors=body.get("vectors"))
-        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+        inten = _put_inten(gr, body.get("inten"))
+        return json.dumps({"game_rel": gr, "token": token(gr), "inten": inten,
+                           "inten_saved": inten == _clean_inten(body.get("inten")), **p})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
@@ -1259,7 +1261,8 @@ def api_vfx_reset():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = reset_vfx(gr)
-        return json.dumps({"game_rel": gr, "token": token(gr), **p})
+        _put_inten(gr, {})
+        return json.dumps({"game_rel": gr, "token": token(gr), "inten": {}, **p})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
@@ -1322,6 +1325,52 @@ def api_import_material():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
 
+# ── colour intensity split (persisted) ───────────────────────────────────────
+# A colour parameter's "intensity" is the HDR multiplier the editor shows beside the swatch: the
+# stored value is swatch x intensity. It used to be DERIVED on every read as max(rgb, 1), which
+# does not survive a round-trip — set a colour under intensity 1.2 and the product's max falls
+# below 1, so the next read derives 1 and shows the colour 1.2x brighter than the one that was
+# typed (the "it doubles when I save" report). The split the user actually worked with is theirs,
+# so it is stored per asset and handed back on read; absent still means "derive it", which is the
+# correct reading for every material edited before this existed.
+
+def _clean_inten(v):
+    """Sanitise a {param: intensity} map off the wire — finite positive floats under named keys."""
+    out = {}
+    if not isinstance(v, dict):
+        return out
+    for k, x in v.items():
+        if not isinstance(k, str) or not k:
+            continue
+        try:
+            f = float(x)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(f) and f > 0:
+            out[k] = round(f, 5)
+    return out
+
+def _get_inten(gr):
+    """The stored {param: intensity} for one asset, or {} to mean "derive it from the value"."""
+    try:
+        v = _project_meta.get_asset_opts(get_import_root(), gr).get("color_inten")
+        return v if isinstance(v, dict) else {}
+    except Exception:
+        return {}
+
+def _put_inten(gr, v):
+    """Store one asset's colour intensity split. Returns what is now stored, so the client can see
+    whether it landed — an editor that cannot persist the split must say so rather than let the
+    user find out at the next open."""
+    clean = _clean_inten(v)
+    try:
+        # `or None` because set_asset_opts treats None as "remove", and an empty map is the same
+        # state as never having stored one — it must not be written as {}.
+        _project_meta.set_asset_opts(get_import_root(), gr, {"color_inten": clean or None})
+        return clean
+    except Exception:
+        return {}
+
 # ── material parameters (read / save / reset) ────────────────────────────────
 
 @app.get("/api/material_params")
@@ -1333,7 +1382,8 @@ def api_material_params():
     try:
         p = read_material(gr)
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), **p})
+        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr),
+                           "inten": _get_inten(gr), **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -1347,8 +1397,11 @@ def api_material_save():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = save_material(gr, body.get("colors", {}), body.get("scalars", {}))
+        inten = _put_inten(gr, body.get("inten"))
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), **p})
+        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr),
+                           "inten": inten, "inten_saved": inten == _clean_inten(body.get("inten")),
+                           **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -1362,8 +1415,9 @@ def api_material_reset():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = reset_material(gr)
+        _put_inten(gr, {})
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), **p})
+        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), "inten": {}, **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})

@@ -629,9 +629,45 @@ function parseColor01(str) {
   return n.slice(0, 3).map(v => Math.max(0, v / scale));
 }
 
-function _seedColors(arr) {
+// ── the intensity split ───────────────────────────────────────────────────────
+// A colour row shows `swatch x intensity`, so HDR values (emissives at 9,9,9) stay legible as a
+// colour plus a multiplier. The multiplier used to be derived from the value on every open, and
+// that is not round-trip stable: set a colour under intensity 1.2 and the product's max drops
+// below 1, so the next open derives 1 and shows the colour 1.2x brighter than the one that was
+// typed. That is the "my numbers double when I save" report. The split is now saved with the
+// asset and restored here; derivation is only the fallback for an asset that has none stored.
+function _derivedInten(rgba) { return Math.max(rgba[0], rgba[1], rgba[2], 1); }
+
+function _pickInten(rgba, saved, key) {
+  const v = saved && saved[key];
+  return (typeof v === "number" && isFinite(v) && v > 0) ? v : _derivedInten(rgba);
+}
+
+// Only the splits that derivation would NOT reproduce need storing — that is exactly the set the
+// old behaviour lost, and it keeps project.json from filling with intensity:1 for every parameter.
+// `derive` must be the same function the next open will seed with, or the two disagree and a split
+// is either dropped or stored for a row that has no intensity control.
+function _intenMap(items, keyOf, derive) {
+  const out = {};
+  (items || []).forEach(it => {
+    const d = derive(it);
+    if (isFinite(it.inten) && it.inten > 0 && Math.abs(it.inten - d) > 1e-6) out[keyOf(it)] = it.inten;
+  });
+  return out;
+}
+
+// A curve group has stops rather than one rgba; its derived intensity comes off the brightest stop.
+// A 1- or 2-channel curve's stops are that short, so the missing channels read as 0 rather than
+// poisoning the max with undefined (the old inline version returned NaN for those groups).
+function _stopsMax(g) {
+  const m = [0, 0, 0];
+  (g.stops || []).forEach(s => { for (let k = 0; k < 3; k++) m[k] = Math.max(m[k], s[k] || 0); });
+  return m;
+}
+
+function _seedColors(arr, saved) {
   return (arr || []).map(c => ({ name: c.name, rgba: c.rgba.slice(),
-                                 inten: Math.max(c.rgba[0], c.rgba[1], c.rgba[2], 1) }));
+                                 inten: _pickInten(c.rgba, saved, c.name) }));
 }
 function _seedScalars(arr) {
   return (arr || []).map(s => ({ name: s.name, value: s.value, orig: s.value,
@@ -650,7 +686,7 @@ async function openMaterialEditor(item) {
   catch (e) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
   if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read material"}</div>`; return; }
   matEditor = { game_rel: item.game_rel, name: item.name,
-                colors: _seedColors(res.colors), scalars: _seedScalars(res.scalars) };
+                colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
   renderMatEditor();
   loadSidebar();
   // Dyeing materials (chromas) recolour through the ColorID mask, so the "Region N" pickers below
@@ -925,33 +961,40 @@ function renderMatEditor() {
   document.getElementById("mat-body").innerHTML = h;
 }
 
+// Writes one colour row's inputs back from state. `except` is the id of the element the user is
+// typing into — rewriting that one under the cursor eats half-typed values ("1." -> "1").
+function _matSyncRow(i, except) {
+  const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
+  const set = (id, val) => { const el = document.getElementById(id); if (el && id !== except) el.value = val; };
+  set("mathx" + i, fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n));
+  set("matsw" + i, _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten));
+  set("mir" + i, Math.min(c.inten, 10));
+  set("min" + i, +c.inten.toFixed(3));
+  const t = document.getElementById("mathx" + i); if (t) t.classList.remove("bad");
+}
+
 function matColor(i, hex) {
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
-  const t = document.getElementById("mathx" + i);
-  if (t) { t.value = fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n); t.classList.remove("bad"); }
+  _matSyncRow(i, "matsw" + i);
   dyeRefresh();
 }
 
 function matColorText(i, el) {
   const rgb = parseColor01(el.value);
   if (!rgb) { el.classList.add("bad"); return; }          // leave what they typed so it can be fixed
-  el.classList.remove("bad");
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = rgb[0] * n; c.rgba[1] = rgb[1] * n; c.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);          // normalise what they typed
-  const sw = document.getElementById("matsw" + i);
-  if (sw) sw.value = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
+  _matSyncRow(i, el.id);
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
-  const other = document.getElementById((fromRange ? "min" : "mir") + i); if (other) other.value = v;
-  const t = document.getElementById("mathx" + i);
-  if (t) { const n = Math.max(nv, 1e-6); t.value = fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n); }
+  _matSyncRow(i, (fromRange ? "mir" : "min") + i);
   dyeRefresh();
 }
 function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; dyeRefresh(); }
@@ -960,19 +1003,31 @@ function matScalar(i, v, fromRange) {
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
 }
 
+// The editor must not show a split it cannot guarantee. If the server could not store it (an old
+// build, or a project whose .atelier/ is not writable) the intensities fold into the colours on the
+// next open and the numbers read brighter — say so now rather than let it look like a corruption.
+function _warnIntenLost(res, sent) {
+  const n = Object.keys(sent || {}).length;
+  if (n && res.inten_saved !== true)     // !== true, so an old server that never sends it warns too
+    toast(`Colour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
+          `will reopen with the intensity folded in (same colour in game, different numbers).`, "error");
+}
+
 async function saveMaterial() {
   if (!matEditor) return;
   const colors = {}, scalars = {};
   matEditor.colors.forEach(c => { colors[c.name] = [c.rgba[0], c.rgba[1], c.rgba[2], c.rgba[3]]; });
   matEditor.scalars.forEach(s => { scalars[s.name] = s.value; });
+  const inten = _intenMap(matEditor.colors, c => c.name, c => _derivedInten(c.rgba));
   document.getElementById("mat-status").textContent = "Saving…";
   try {
     const res = await api("/api/material_save", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: matEditor.game_rel, colors, scalars }),
+      body: JSON.stringify({ game_rel: matEditor.game_rel, colors, scalars, inten }),
     });
     if (res.ok) {
       toast(`Saved: ${matEditor.name}`, "success");
+      _warnIntenLost(res, inten);
       loadSidebar();
       closeMaterialEditor();
     } else {
@@ -990,7 +1045,7 @@ async function resetMaterial() {
       body: JSON.stringify({ game_rel: matEditor.game_rel }),
     });
     if (res.ok) {
-      matEditor.colors = _seedColors(res.colors); matEditor.scalars = _seedScalars(res.scalars);
+      matEditor.colors = _seedColors(res.colors, res.inten); matEditor.scalars = _seedScalars(res.scalars);
       renderMatEditor();
       document.getElementById("mat-status").textContent = "Reset to vanilla.";
       toast(`Reset: ${matEditor.name}`, "info");
@@ -1150,10 +1205,16 @@ document.getElementById("curve-overlay").addEventListener("click", e => {
 // ── Niagara VFX editor (color-curve group recolor) ────────────────────────────
 let vfxEditor = null;
 
-function _vfxInten(g) {                       // HDR curves keep magnitude via a group intensity
-  let m = 1e-6;
-  for (const s of g.stops) m = Math.max(m, s[0], s[1], s[2]);
-  return g.is_hdr ? Math.max(m, 1) : 1;
+// A curve group has no parameter name to key its stored intensity by. Its export indices are read
+// from the vanilla asset before any saved edit is overlaid, so the lowest one is stable across
+// edits in a way group_id (an ordinal) would not be if grouping ever changed.
+function _vfxKey(g) {
+  const ix = g.export_indices || [];
+  return "curve:" + (ix.length ? Math.min.apply(null, ix) : g.group_id);
+}
+function _vfxInten(g, saved) {                // HDR curves keep magnitude via a group intensity
+  if (!g.is_hdr || g.channels !== 4) return 1;   // only colour groups render an intensity control
+  return _pickInten(_stopsMax(g), saved, _vfxKey(g));
 }
 function _vhex(c) { return ("0" + Math.round(Math.min(255, Math.max(0, c * 255))).toString(16)).slice(-2); }
 function _vStopHex(s, inten) { const n = Math.max(inten, 1e-6); return "#" + _vhex(s[0] / n) + _vhex(s[1] / n) + _vhex(s[2] / n); }
@@ -1181,8 +1242,8 @@ async function openVfxEditor(item) {
   if (!res.ok) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read VFX"}</div>`; return; }
   vfxEditor = { game_rel: item.game_rel, name: item.name, kind: res.kind || "niagara",
                 scalars: (res.scalars || []).map(x => ({ ...x })),
-                vectors: (res.vectors || []).map(x => ({ ...x, inten: Math.max(x.rgba[0], x.rgba[1], x.rgba[2], 1) })),
-                groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g) })) };
+                vectors: (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) })),
+                groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) })) };
   renderVfxEditor();
   loadSidebar();
 }
@@ -1233,30 +1294,35 @@ function renderMpcEditor() {
   return h;
 }
 
+function _mpcSyncRow(i, except) {
+  const p = vfxEditor.vectors[i], n = Math.max(p.inten, 1e-6);
+  const set = (id, val) => { const el = document.getElementById(id); if (el && id !== except) el.value = val; };
+  set("mpchx" + i, fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n));
+  set("mpcsw" + i, _rgbHex(p.rgba[0], p.rgba[1], p.rgba[2], p.inten));
+  set("mpcir" + i, Math.min(p.inten, 10));
+  set("mpcin" + i, +p.inten.toFixed(3));
+  const t = document.getElementById("mpchx" + i); if (t) t.classList.remove("bad");
+}
+
 function mpcColor(i, hex) {
   const p = vfxEditor.vectors[i], n = Math.max(p.inten, 1e-6);
   p.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   p.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   p.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
-  const t = document.getElementById("mpchx" + i);
-  if (t) { t.value = fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n); t.classList.remove("bad"); }
+  _mpcSyncRow(i, "mpcsw" + i);
 }
 function mpcColorText(i, el) {
   const rgb = parseColor01(el.value);
   if (!rgb) { el.classList.add("bad"); return; }
-  el.classList.remove("bad");
   const p = vfxEditor.vectors[i], n = Math.max(p.inten, 1e-6);
   p.rgba[0] = rgb[0] * n; p.rgba[1] = rgb[1] * n; p.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);
-  const sw = document.getElementById("mpcsw" + i);
-  if (sw) sw.value = _rgbHex(p.rgba[0], p.rgba[1], p.rgba[2], p.inten);
+  _mpcSyncRow(i, el.id);
 }
 function mpcInten(i, v, fromRange) {
   const p = vfxEditor.vectors[i], o = Math.max(p.inten, 1e-6), nv = parseFloat(v) || 0;
   p.rgba[0] = p.rgba[0] / o * nv; p.rgba[1] = p.rgba[1] / o * nv; p.rgba[2] = p.rgba[2] / o * nv; p.inten = nv;
-  const other = document.getElementById((fromRange ? "mpcin" : "mpcir") + i); if (other) other.value = v;
-  const t = document.getElementById("mpchx" + i);
-  if (t) { const n = Math.max(nv, 1e-6); t.value = fmtColor01(p.rgba[0] / n, p.rgba[1] / n, p.rgba[2] / n); }
+  _mpcSyncRow(i, (fromRange ? "mpcir" : "mpcin") + i);
 }
 function mpcAlpha(i, v) { vfxEditor.vectors[i].rgba[3] = parseFloat(v) || 0; }
 function mpcScalar(i, v, fromRange) {
@@ -1363,10 +1429,14 @@ async function saveVfx() {
   const scalars = {}, vectors = {};
   (v.scalars || []).forEach(p => { scalars[p.name] = p.value; });
   (v.vectors || []).forEach(p => { vectors[p.name] = p.rgba; });
+  // Both payload shapes carry colours, and only one of them is populated for a given asset, so the
+  // two intensity maps can share one store — an MPC keys by parameter name, a curve by export index.
+  const inten = { ..._intenMap(v.vectors, p => p.name, p => _derivedInten(p.rgba)),
+                  ..._intenMap(v.groups,  _vfxKey,       g => _vfxInten(g)) };
   try {
     const res = await api("/api/vfx_save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors }) });
-    if (res.ok) { toast(`Saved: ${v.name}`, "success"); loadSidebar(); closeVfxEditor(); }
+      body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors, inten }) });
+    if (res.ok) { toast(`Saved: ${v.name}`, "success"); _warnIntenLost(res, inten); loadSidebar(); closeVfxEditor(); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
@@ -1376,9 +1446,9 @@ async function resetVfx() {
   try {
     const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel }) });
-    if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g) }));
+    if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) }));
                   v.scalars = (res.scalars || []).map(x => ({ ...x }));
-                  v.vectors = (res.vectors || []).map(x => ({ ...x, inten: Math.max(x.rgba[0], x.rgba[1], x.rgba[2], 1) }));
+                  v.vectors = (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) }));
                   renderVfxEditor();
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");

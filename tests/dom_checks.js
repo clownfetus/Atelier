@@ -35,6 +35,41 @@ if (!document.getElementById("mat-body").innerHTML.includes('value="#ff3333"')) 
 if (!document.getElementById("mat-body").innerHTML.includes('value="#ffcc0a"'))
   throw new Error("intensity-normalised hex missing");
 
+// ── the intensity split: stored, not re-derived ──────────────────────────────
+// The reported bug: a colour typed into a row showing intensity 1.2 was stored as the product, and
+// the next open derived max(rgb, 1) = 1 and handed the multiplier back as colour — 10,61,0 read
+// back as 12,73,0. Seeding from the stored split is what stops that.
+const _typed = [10 / 255 * 1.2, 61 / 255 * 1.2, 0, 1];
+setColorMode("255");
+const seededOld = _seedColors([{ name: "DynamicLineColor", rgba: _typed }], null);
+if (seededOld[0].inten !== 1) throw new Error("no stored split must still derive: " + seededOld[0].inten);
+if (fmtColor01(_typed[0], _typed[1], _typed[2]) !== "12, 73, 0")
+  throw new Error("the regression itself changed shape: " + fmtColor01(_typed[0], _typed[1], _typed[2]));
+
+const seeded = _seedColors([{ name: "DynamicLineColor", rgba: _typed }], { DynamicLineColor: 1.2 });
+if (Math.abs(seeded[0].inten - 1.2) > 1e-9) throw new Error("stored split ignored: " + seeded[0].inten);
+const n12 = seeded[0].inten;
+if (fmtColor01(_typed[0] / n12, _typed[1] / n12, _typed[2] / n12) !== "10, 61, 0")
+  throw new Error("row did not read back what was typed");
+
+// a junk or missing entry falls back to derivation rather than poisoning the row
+for (const bad of [{ DynamicLineColor: 0 }, { DynamicLineColor: -2 }, { DynamicLineColor: "1.2" },
+                   { Other: 1.2 }, {}])
+  if (_seedColors([{ name: "DynamicLineColor", rgba: _typed }], bad)[0].inten !== 1)
+    throw new Error("bad stored split not rejected: " + JSON.stringify(bad));
+
+// only a split derivation cannot reproduce is worth storing
+if (JSON.stringify(_intenMap(seeded, c => c.name, c => _derivedInten(c.rgba))) !== '{"DynamicLineColor":1.2}')
+  throw new Error("the split that would be lost was not sent");
+if (Object.keys(_intenMap(seededOld, c => c.name, c => _derivedInten(c.rgba))).length !== 0)
+  throw new Error("a derivable split must not be written to the project");
+// an HDR value whose peak IS its intensity stays derivable, so nothing is stored for it
+const hdr = _seedColors([{ name: "Glow", rgba: [9, 9, 9, 1] }], null);
+if (hdr[0].inten !== 9) throw new Error("HDR derivation regressed: " + hdr[0].inten);
+if (Object.keys(_intenMap(hdr, c => c.name, c => _derivedInten(c.rgba))).length !== 0)
+  throw new Error("an HDR peak must not need storing");
+setColorMode("hex");
+
 // typing a colour writes back through the intensity
 matColorText(2, { value: "#00ff00", classList: { add(){}, remove(){} } });
 const c = matEditor.colors[2];
