@@ -86,19 +86,47 @@ def dye_regions(game_rel):
     return dict(out)
 
 
-_IMCACHE = {}     # game_rel -> (mtime, PIL image). Live colour picking re-composites on every drag;
+_IMCACHE = {}     # game_rel -> (stamp, PIL image). Live colour picking re-composites on every drag;
                   # decoding both textures each time costs ~1.3s and makes it unusable, while the
                   # numpy composite itself is milliseconds. Hold the decoded sources.
+
+
+def edited_png(game_rel):
+    """The user's own PNG for this texture in the active project, or None.
+
+    The preview has to start from this, not from the vanilla texture. finngmin's whole complaint is
+    that a painted texture never shows — "the material overlay trumps the texture PNG" — and a
+    preview built from vanilla reproduces that complaint instead of answering it: paint the
+    diffuse, and the dye preview would keep showing the skin you did not edit."""
+    from atelier.config import project_base_legacy
+    for base in (project_base(game_rel), project_base_legacy(game_rel)):
+        png = base + ".png"
+        if os.path.exists(png):
+            return png
+    return None
+
+
+def _stamp(game_rel):
+    """Cache identity for a decoded source: which file it came from and when it last changed."""
+    png = edited_png(game_rel)
+    if not png:
+        return ("vanilla",)
+    try:
+        return ("edit", png, int(os.path.getmtime(png)))
+    except OSError:
+        return ("edit", png, 0)
+
 
 def _tex_image(game_rel):
     """Extract + decode a texture to a PIL image. decode_dds first: MR strips the top mip, and
     UAssetTool maps mip[i]->DataResource[i], so with mip0 absent it degrades to the 4x4 tail."""
+    stamp = _stamp(game_rel)
     hit = _IMCACHE.get(game_rel)
-    if hit is not None:
-        return hit
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
     im = _tex_image_uncached(game_rel)
     if im is not None:
-        _IMCACHE[game_rel] = im
+        _IMCACHE[game_rel] = (stamp, im)
     return im
 
 def _tex_image_uncached(game_rel):
@@ -107,6 +135,10 @@ def _tex_image_uncached(game_rel):
     # Same swarm hazard as the viewport's albedo path: dye previews extract+decode a mask AND a
     # diffuse, fired concurrently. Gate the heavy work so we don't pile up UAssetTool processes /
     # full-res textures in RAM (the thing that crashes the viewport on big skins).
+    edited = edited_png(game_rel)
+    if edited:
+        im = Image.open(edited); im.load()
+        return im
     with tex_semaphore:
         cb = TX.ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
         if not cb or not os.path.exists(cb + ".uasset"):
@@ -214,9 +246,13 @@ def composite(mask_im, diff_im, regions, size=1024):
     return Image.fromarray(np.clip(srgb * 255.0, 0, 255).astype(np.uint8), "RGB")
 
 
-def dye_preview(game_rel, overrides=None, size=1024, out_path=None):
+def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=False):
     """Composite a dye preview. `overrides` = {region_idx: {param: rgba}} applied over the MI's own
-    values so the UI can preview an unsaved colour pick. Returns the PNG path."""
+    values so the UI can preview an unsaved colour pick. Returns the PNG path.
+
+    dye_off previews what stage_dye_off() ships: no dyeing at all, the BaseColor exactly as it is
+    on disk. That is the whole point of the toggle, so the preview has to show it — a "disabled"
+    checkbox next to a still-dyed picture is the same non-answer finngmin already has."""
     mask_gr, diff_gr = dye_slots(game_rel)
     if not mask_gr:
         raise RuntimeError("not a dyeing material (no %s slot): %s" % (MASK_SLOT, game_rel))
@@ -226,6 +262,12 @@ def dye_preview(game_rel, overrides=None, size=1024, out_path=None):
     diff_im = _tex_image(diff_gr) if diff_gr else None
     if diff_im is None:                                  # dye-only preview if the diffuse is missing
         diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
+    if dye_off:
+        im = diff_im.convert("RGB").resize((size, size), Image.BILINEAR)
+        out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "undyed")) + ".png")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        im.save(out)
+        return out
     regions = dye_regions(game_rel)
     for k, v in (overrides or {}).items():
         regions.setdefault(int(k), {}).update(v)
@@ -396,3 +438,128 @@ def region_overlay(game_rel, size=1024, out_path=None, numbers=True):
     os.makedirs(os.path.dirname(out_png), exist_ok=True)
     im.save(out_png)
     return out_png
+
+
+# ── turning the dye overlay OFF (#12) ─────────────────────────────────────────
+# The most-repeated workflow request in the corpus, and the one thing this module does that is not
+# preview-only. finngmin's spec: the dye system recolours the shared diffuse per chroma, so a
+# hand-painted BaseColor never shows — it is overpainted by whatever the Region params say, except
+# on textures with no ColorID coverage (hair, eyes).
+#
+# THERE IS NO MATERIAL PARAMETER FOR THIS. The dyeing MIs expose BaseTint, UseDyeingGBChannel and
+# the Region N sets, and nothing that switches the system off (checked against real MIs:
+# MI_1050103_Body_01 and MI_10600_1060300_Equip_01). PHASES.md's pivot signal for exactly this
+# case says to ship the workaround as a one-click action, and that workaround is already circulating
+# in #setup-and-guide (leagueofthearcane): replace the ColorID mask with an image whose ALPHA IS
+# ZERO. Alpha is the region index — 0 means "undyed" and the shader leaves those texels alone — so
+# a zero-alpha mask makes the whole surface undyed and the painted BaseColor ships as painted.
+#
+# It is worth being precise about why the trick is non-obvious: thetruedaveed tried a BLACK image
+# and it still shaded. Black RGB with an opaque alpha is region 7, a perfectly ordinary dyed
+# region; it is the ALPHA channel that has to be empty, and nothing in the app said so.
+#
+# Generated at the mask's own dimensions and injected through the normal texture path, so it is an
+# ordinary staged asset in the mod: a uniform image is exact in DXT5 (both alpha endpoints land on
+# 0), so nothing here can drift across a region step the way a recompressed real mask can.
+
+def neutral_mask_png(out_png, size):
+    """A ColorID mask that dyes nothing: every texel alpha 0, i.e. region 0 everywhere."""
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    w, h = size
+    Image.new("RGBA", (max(1, int(w)), max(1, int(h))), (0, 0, 0, 0)).save(out_png)
+    return out_png
+
+
+def dye_off_target(game_rel):
+    """The ColorID mask a dye-off would replace, or None if this material has no dyeing slot."""
+    return dye_slots(game_rel)[0]
+
+
+def stage_dye_off(stage, game_rel):
+    """Stage a neutral ColorID mask for this material, so its dyeing stops overpainting BaseColor.
+
+    Staged at the MASK's pak path, not the material's — the material is untouched, which is what
+    makes the toggle reversible and what keeps any Region colour edits the user also made intact
+    (they simply stop showing while the mask is neutral)."""
+    mask_gr = dye_off_target(game_rel)
+    if not mask_gr:
+        raise RuntimeError("not a dyeing material (no %s slot)" % MASK_SLOT)
+    cb = TX.ensure_work_base(mask_gr)
+    if not cb or not os.path.exists(cb + ".uasset"):
+        raise RuntimeError(TX.missing_reason(mask_gr, "ColorID mask"))
+    # inject_texture keeps the BASE's pixel format, so a mask in a format with no alpha channel
+    # would come back with alpha 255 everywhere — region 7, i.e. the whole skin dyed with one
+    # region's colour. That is far worse than not applying the toggle, so refuse instead. Every
+    # ColorID mask seen so far is DXT5 precisely because the format has an independent alpha block
+    # (see texture.decode_dds), so this is a guard, not an expected path.
+    fmt = TX.texture_format(cb)
+    if not TX.format_has_alpha(fmt):
+        raise RuntimeError("the ColorID mask is %s, which has no alpha channel — a neutral mask "
+                           "would read as region 7 and dye the whole surface instead of none of it"
+                           % (fmt or "in an unknown format"))
+    src = neutral_mask_png(project_base(mask_gr, os.path.join(_CACHE_DYE, "neutral")) + ".png",
+                           TX.texture_size(mask_gr, cb))
+    pak_gr = pak_game_path(mask_gr)
+    out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
+    os.makedirs(os.path.dirname(out_ua), exist_ok=True)
+    from atelier.config import USMAP
+    r = uat(["inject_texture", os.path.abspath(cb + ".uasset"), os.path.abspath(src),
+             os.path.abspath(out_ua), "--usmap", USMAP])
+    if not os.path.exists(out_ua):
+        raise RuntimeError("neutral mask inject failed: "
+                           + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
+    return os.path.basename(mask_gr)
+
+
+# ── downloading the whole texture set (#23) ───────────────────────────────────
+# chopthememegod asked for the dyed-texture download to cover "the other texture types", answered
+# with "noted". The dyed BaseColor on its own is half a starting point: to repaint a skin you need
+# the Normal, the ORM and the ColorID beside it, at their real sizes, and you need to know which
+# file is which slot — which is the same "how do I know what maps to what" question the region
+# overlay answers for colours. So the bundle carries a manifest naming every slot.
+
+def texture_bundle(game_rel, overrides=None, size=None, out_path=None, dye_off=False):
+    """Zip every texture this material references, plus the dyed BaseColor, at native size.
+
+    Returns (zip_path, [slot names included]). Slots that cannot be decoded are listed in the
+    manifest as unavailable rather than silently dropped — a missing normal map in the zip is
+    otherwise indistinguishable from a material that has none."""
+    import zipfile
+    texs = (M.read_material(game_rel).get("textures") or {})
+    if not texs:
+        raise RuntimeError("this material references no textures")
+    out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "bundle")) + "_textures.zip")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    lines = ["Textures for " + game_rel, ""]
+    ok = []
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        if dye_slots(game_rel)[0] and not dye_off:
+            try:
+                dyed = dye_preview(game_rel, overrides=overrides, size=size or 2048)
+                z.write(dyed, os.path.basename(game_rel) + "_BaseColor_dyed.png")
+                ok.append("BaseColor (dyed)")
+                lines.append("%-18s %s" % ("BaseColor (dyed)",
+                                           os.path.basename(game_rel) + "_BaseColor_dyed.png"))
+                lines.append("%-18s %s" % ("", "the dye composite — a preview, NOT what ships"))
+            except Exception as e:
+                lines.append("%-18s unavailable: %s" % ("BaseColor (dyed)", e))
+        for slot in sorted(texs):
+            gr = texs[slot]
+            try:
+                im = _tex_image(gr)
+                if im is None:
+                    raise RuntimeError("could not decode")
+            except Exception as e:
+                lines.append("%-18s unavailable: %s" % (slot, e))
+                continue
+            name = "%s__%s.png" % (slot, os.path.basename(gr))
+            tmp = project_base(gr, os.path.join(_CACHE_DYE, "bundle_src")) + ".png"
+            os.makedirs(os.path.dirname(tmp), exist_ok=True)
+            im.convert("RGBA").save(tmp)
+            z.write(tmp, name)
+            ok.append(slot)
+            lines.append("%-18s %s   (%dx%d)  %s" % (slot, name, im.size[0], im.size[1], gr))
+        lines += ["", "Edited copies in this project are exported as they are; every other file is",
+                  "decoded from the game paks. Re-import a texture in Atelier to edit it."]
+        z.writestr("SLOTS.txt", "\n".join(lines) + "\n")
+    return out, ok

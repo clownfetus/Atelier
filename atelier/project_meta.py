@@ -1,5 +1,5 @@
-"""Per-project state that isn't a file on disk: sidebar selection, and the Atelier version
-that authored the project.
+"""Per-project state that isn't a file on disk: sidebar selection, per-asset export options,
+and the Atelier version that authored the project.
 
 Stored at <project_dir>/.atelier/project.json — nested inside the project folder so it travels
 for free with the os.rename / shutil.copytree / shutil.rmtree project operations in
@@ -21,6 +21,11 @@ TWO DELIBERATE CHOICES HERE:
    by the current build is a lie that a future compatibility check or auto-porter would act on,
    skipping the very projects most likely to need porting. "unknown" means "older than version
    tracking", which is the truth and is what a porter should key off.
+
+THE THIRD THING STORED HERE — per-asset export options (asset_opts) — follows the same rule as
+selection: absent means "the defaults", never "off". An option only exists in the file once the
+user has actually set it, so a project made before Phase 4 opens with every texture on the normal
+mip chain and its vanilla texture group, which is what it was built with.
 
 Nothing here warns or blocks on version. The texture/material/curve/vfx project formats are
 unchanged from 0.2.3 and pre-Noobs builds, so those projects load as-is; this only records
@@ -68,6 +73,8 @@ def load(project_dir):
         "created_version": d.get("created_version", _UNKNOWN),
         "last_version":    d.get("last_version", _UNKNOWN),
         "deselected":      [s for s in (d.get("deselected") or []) if isinstance(s, str)],
+        "asset_opts":      {k: v for k, v in (d.get("asset_opts") or {}).items()
+                            if isinstance(k, str) and isinstance(v, dict)},
     }
 
 
@@ -102,3 +109,51 @@ def set_deselected(project_dir, game_rels):
         d = load(project_dir)
         d["deselected"] = sorted({g for g in game_rels if isinstance(g, str) and g})
         _write(project_dir, d)
+
+
+def get_asset_opts(project_dir, game_rel=None):
+    """Per-asset export options. One asset's dict with game_rel, or the whole {game_rel: opts} map.
+
+    Keys in use (all optional, all defaulting to "vanilla behaviour" when absent):
+      no_mips   bool - ship a single top mip instead of the full chain (inject_texture --no-mips)
+      lod_group str  - override the texture's LODGroup/TEXTUREGROUP_* (its texture group)
+      blank     bool - ship the texture fully transparent instead of the edited PNG
+      dye_off   bool - on a MATERIAL: also ship a neutral ColorID mask so the dye system stops
+                       overpainting the BaseColor (see handlers/dye.py::stage_dye_off)
+      lq_twin   bool - also stage the Marvel_LQ copy of this asset (only if that mount exists)
+    """
+    opts = load(project_dir)["asset_opts"]
+    if game_rel is None:
+        return opts
+    return dict(opts.get(game_rel) or {})
+
+
+def set_asset_opts(project_dir, game_rel, opts):
+    """Merge `opts` into one asset's options. A key set to None/False/"" is REMOVED rather than
+    stored false: "not in the file" and "explicitly off" must stay the same state, or a later
+    default change would silently not reach projects that had only ever looked at the control."""
+    if not game_rel:
+        return {}
+    with _lock:
+        d   = load(project_dir)
+        cur = dict(d["asset_opts"].get(game_rel) or {})
+        for k, v in (opts or {}).items():
+            if v in (None, False, ""):
+                cur.pop(k, None)
+            else:
+                cur[k] = v
+        if cur:
+            d["asset_opts"][game_rel] = cur
+        else:
+            d["asset_opts"].pop(game_rel, None)
+        _write(project_dir, d)
+        return cur
+
+
+def forget_asset(project_dir, game_rel):
+    """Drop an asset's options — called when the asset itself is deleted from the project, so a
+    re-import doesn't silently inherit settings from an edit the user threw away."""
+    with _lock:
+        d = load(project_dir)
+        if d["asset_opts"].pop(game_rel, None) is not None:
+            _write(project_dir, d)

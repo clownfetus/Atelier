@@ -23,7 +23,7 @@ HERO_PATHS = ["Characters"]
 CHAR_LABEL_PATHS = ["Characters", "VFX/Materials/Characters"]
 
 # Folders pinned to the top at the root level (in order).
-ROOT_PINNED = ("characters", "vfx", "ui", "nameplates", "plugins")
+ROOT_PINNED = ("characters", "vfx", "ui", "nameplates", "plugins", "marvel_lq")
 
 # Nameplates are three separate assets that must ALL be replaced for one plate to change, and
 # nothing in the tree says so: winterwintour found the blueprint node empty, ghostex101 and diiea
@@ -171,6 +171,11 @@ def _classify_file(name, rel_path=""):
 
 def _label_folder(rel_path, folder_name):
     """Return display label for folder_name found at rel_path under Marvel/Content/Marvel/."""
+    if not rel_path and folder_name.lower() == "marvel_lq":
+        # Its own root since v13 of the index. It used to be flattened onto the main tree, where
+        # every LQ asset collided with its HQ twin and lost — so the node people were told to look
+        # for could not appear even on an install that had one (fawnls, 2026-08-22).
+        return "Marvel_LQ — the low-quality twin mount (UI mods may need this copy too)"
     if not rel_path and folder_name.lower() == "plugins":
         # Name the mount the way FModel does, so "Marvel/Plugins/MarvelGAS/..." from a guide or a
         # screenshot leads somewhere. shafsta's team-up ability icons were in here the whole time,
@@ -404,6 +409,9 @@ def all_imported():
     import_root = get_import_root()
     if not os.path.isdir(import_root): return []
     deselected = _pm.get_deselected(import_root)
+    # Export options are invisible on the asset itself — a texture set to ship blank looks exactly
+    # like one that ships normally — so the sidebar has to be able to mark them.
+    all_opts = _pm.get_asset_opts(import_root)
     items = []
     for dirpath, _dirs, files in os.walk(import_root):
         # Atelier's own per-project bookkeeping, not user edits. Pruned by name rather than left
@@ -451,5 +459,6 @@ def all_imported():
                 # Default ON: only an asset the user explicitly switched off is deselected, so
                 # anything new to the project arrives included in the next export.
                 "selected": gr not in deselected,
+                "opts": all_opts.get(gr) or {},
             })
     return items

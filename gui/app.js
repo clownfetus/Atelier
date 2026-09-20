@@ -3,6 +3,16 @@
 // ── icons ─────────────────────────────────────────────────────────────────────
 lucide.createIcons();
 
+// ── persisted settings ────────────────────────────────────────────────────────
+// WebKitGTK defines no localStorage at all in an ephemeral (private_mode) session, and touching it
+// then throws a ReferenceError that takes the whole script down before init() ever runs. window.py
+// asks for a persistent store, but every access still goes through here so a storage failure can
+// only cost us the saved value, never the app.
+const _store = {
+  get(k, dflt = null) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (_) { return dflt; } },
+  set(k, v)           { try { localStorage.setItem(k, String(v)); } catch (_) {} },
+};
+
 // ── state ─────────────────────────────────────────────────────────────────────
 const NAV_ROOT    = { path: "" };
 let   nav         = { ...NAV_ROOT };
@@ -22,7 +32,7 @@ let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/"
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
-let   _openAfterImport = localStorage.getItem("atelier.openAfterImport") !== "0"; // Settings → Behavior toggle
+let   _openAfterImport = _store.get("atelier.openAfterImport") !== "0"; // Settings → Behavior toggle
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -248,6 +258,7 @@ async function renderGrid() {
     if (data.error) throw new Error(data.error);
     allItems = data;
     checkIndexWarnings();   // fire-and-forget; reports at most once per session
+    checkStaleMips();       // same: at most once, and only when there is something to say
 
     // Cache folder labels for breadcrumbs
     for (const item of data) {
@@ -580,12 +591,13 @@ function _rgbHex(r, g, b, inten) { const n = Math.max(inten, 1e-6); return "#" +
 const COLOR_MODES  = ["hex", "255", "float"];
 const COLOR_LABELS = { hex: "Hex", "255": "0-255", float: "Float" };
 let _colorMode = "hex";
-try { const m = localStorage.getItem("atelier.colorMode"); if (COLOR_MODES.includes(m)) _colorMode = m; } catch (_) {}
+const _savedColorMode = _store.get("atelier.colorMode");
+if (COLOR_MODES.includes(_savedColorMode)) _colorMode = _savedColorMode;
 
 function setColorMode(m) {
   if (!COLOR_MODES.includes(m) || m === _colorMode) return;
   _colorMode = m;
-  try { localStorage.setItem("atelier.colorMode", m); } catch (_) {}
+  _store.set("atelier.colorMode", m);
   if (matEditor) renderMatEditor();
   if (vfxEditor && vfxEditor.kind === "mpc") renderVfxEditor();
 }
@@ -650,6 +662,11 @@ async function openMaterialEditor(item) {
       matEditor.dyeInfo = di;
       matEditor.dyeView = "preview";
       matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
+      try {
+        const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`);
+        matEditor.dyeOff = !!(ao && ao.opts && ao.opts.dye_off);
+        matEditor.dyeMask = (ao && ao.mask) || "";
+      } catch (e) { matEditor.dyeOff = false; }
       renderMatEditor();
       dyeRefresh(0);
     }
@@ -688,7 +705,8 @@ function dyeRefresh(delay = 140) {
     try {
       const r = await fetch("/api/dye_preview", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides() }),
+        body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides(),
+                               dye_off: !!matEditor.dyeOff }),
       });
       if (!r.ok || !matEditor || matEditor.game_rel !== gr) return;   // editor closed/switched
       const b = await r.blob();
@@ -706,7 +724,8 @@ async function dyeDownload() {
   try {
     const r = await fetch("/api/dye_download", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048, overrides: _dyeOverrides() }),
+      body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048, overrides: _dyeOverrides(),
+                             dye_off: !!matEditor.dyeOff }),
     });
     if (!r.ok) { st.textContent = "Download failed"; return; }
     const b = await r.blob();
@@ -746,6 +765,74 @@ function _dyeLegendHtml(m) {
     </div>`;
   }).join("");
   return `<div class="dye-legend">${rows}</div>`;
+}
+
+// ── turning the dye overlay off (#12) ────────────────────────────────────────
+// The most-repeated workflow request on record: the dye system recolours the shared diffuse per
+// chroma, so a hand-painted BaseColor never shows. There is no material parameter for this — the
+// toggle ships a neutral ColorID mask alongside the material (see handlers/dye.py::stage_dye_off),
+// which is the workaround already circulating by hand, made one click and explained in place.
+function _dyeOffHtml(m) {
+  const on = !!m.dyeOff;
+  return `<div class="opt-row" style="margin:14px 0 4px">
+      <label class="toggle-row ${on ? "on" : ""}">
+        <span class="switch"><input type="checkbox" ${on ? "checked" : ""}
+              onchange="matDyeOff(this.checked)"><span class="switch-track"></span></span>
+        Paint the texture directly — turn this skin's dyeing off
+      </label>
+      <div class="opt-help">The dye system recolours the shared diffuse, so an edit you paint into
+        <b>BaseColor</b> is overpainted by the Region colours above and only shows on parts the mask
+        leaves undyed. Switching this on ships a <b>neutral ColorID mask</b> beside the material, so
+        every texel is undyed and your painted texture ships as painted. The Region colours stay
+        saved — they simply stop applying.${m.dyeMask
+          ? `<br><span class="muted">Adds to the mod: <b>${m.dyeMask.split("/").pop()}</b></span>` : ""}</div>
+    </div>`;
+}
+
+async function matDyeOff(on) {
+  if (!matEditor) return;
+  matEditor.dyeOff = !!on;
+  renderMatEditor();
+  dyeRefresh(0);
+  const st = document.getElementById("mat-status");
+  try {
+    // Saved on toggle rather than on Save: it is an export option on the asset, not one of the
+    // material parameter edits the Save button writes into the material JSON.
+    const res = await api("/api/asset_opts", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: matEditor.game_rel, opts: { dye_off: !!on } }),
+    });
+    if (!res.ok) { st.textContent = "Error: " + (res.error || "could not save"); return; }
+    st.textContent = on ? "Dyeing off — your painted BaseColor will ship as painted."
+                        : "Dyeing on — the Region colours above apply again.";
+    loadSidebar();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+}
+
+async function matTexturesDownload() {
+  if (!matEditor) return;
+  const st = document.getElementById("mat-status");
+  st.textContent = "Packing this material's textures…";
+  try {
+    const r = await fetch("/api/mat_textures_download", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048,
+                             overrides: _dyeOverrides(), dye_off: !!matEditor.dyeOff }),
+    });
+    if (!r.ok) {
+      let msg = "Download failed";
+      try { msg = (await r.json()).error || msg; } catch (_) {}
+      st.textContent = msg; return;
+    }
+    const b = await r.blob();
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a");
+    a.href = u; a.download = matEditor.name + "_textures.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 8000);
+    st.textContent = "Downloaded " + a.download + " — SLOTS.txt inside says which file is which.";
+    toast("Packed every texture this material uses", "success");
+  } catch (e) { st.textContent = "Error: " + e.message; }
 }
 
 function dyeView(mode) {
@@ -794,11 +881,13 @@ function renderMatEditor() {
               so the <b>Region N</b> colours below are what actually change its look.
               Edit any of them to see this update live.`}
           ${_dyeLegendHtml(m)}
-          <div style="margin-top:12px">
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn" onclick="dyeDownload()"><i data-lucide="download" size="13"></i> Download dyed texture</button>
+            <button class="btn" onclick="matTexturesDownload()"><i data-lucide="folder-down" size="13"></i> Download all textures</button>
           </div>
         </div>
-      </div>`;
+      </div>
+      ${_dyeOffHtml(m)}`;
   }
   if (m.colors.length) {
     h += `<div class="mat-section with-ctl">Colors ${colorModeSeg()}</div>`;
@@ -828,8 +917,11 @@ function renderMatEditor() {
       </div>`;
     });
   }
+  // Appended, not assigned: a dyeing material with no exposed Region params still has a preview and
+  // a dye-off toggle above, and replacing the body would throw both away along with the only
+  // controls that material has.
   if (!m.colors.length && !m.scalars.length)
-    h = `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
+    h += `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
   document.getElementById("mat-body").innerHTML = h;
 }
 
@@ -1594,7 +1686,7 @@ function renderSidebar() {
           : `<i data-lucide="${h.icon || 'file-question'}" size="32" class="card-icon ${assetIconCls(item.file_type)}"></i>`}
       </div>
       <div class="sb-info">
-        <div class="sb-name">${item.name}</div>
+        <div class="sb-name">${item.name}${_sbOptBadge(item)}</div>
         <div class="sb-sub">${sbSubLabel(item)}</div>
       </div>
       <div class="sb-check">${item.selected ? '<i data-lucide="check" size="12"></i>' : ""}</div>
@@ -1714,6 +1806,15 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password) {
     if (res.ok) {
       toast(`Installed: ${modName}_9999999_P` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
       setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
+      // A mod can build fine and still be missing a piece — one asset that would not stage. Saying
+      // "Installed" and nothing else makes that look identical to the game ignoring the edit.
+      if ((res.skipped || []).length) {
+        toast(`${res.skipped.length} item(s) did NOT go into the mod:\n• ` +
+              res.skipped.slice(0, 4).join("\n• ") +
+              (res.skipped.length > 4 ? `\n• +${res.skipped.length - 4} more` : ""),
+              "warning", 16000);
+      }
+      console.log("[export] staged:", res.applied, "\n[export] skipped:", res.skipped);
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
       toast("No mods folder set — opening Settings…", "warning");
@@ -1888,6 +1989,26 @@ async function checkIndexWarnings() {
   } catch (e) {}
 }
 
+// ── higher-resolution textures became available ──────────────────────────────
+// The HQ texture DLC ships the top mip of existing textures in separate containers. Install it
+// after importing something and the project keeps the smaller PNG it was decoded from — the work
+// cache repairs itself, the user's artwork cannot be repaired for them. Say so once per session;
+// re-importing is their call, because for an edited texture it means redoing the edit.
+let _staleMipShown = false;
+async function checkStaleMips() {
+  if (_staleMipShown) return;
+  try {
+    const res = await api("/api/stale_mips");
+    if (!res.ok || !res.count) return;
+    _staleMipShown = true;
+    const names = res.items.slice(0, 3).map(i => i.name).join(", ");
+    const more  = res.count > 3 ? ` +${res.count - 3} more` : "";
+    toast(`${res.count} imported texture(s) are below the resolution your paks now hold ` +
+          `(${names}${more}) — the high-res texture pack arrived after they were imported. ` +
+          `Delete and re-import one to get the full-size version.`, "info", 14000);
+  } catch (e) {}
+}
+
 // ── prereq check ─────────────────────────────────────────────────────────────
 async function checkPrereqs() {
   try {
@@ -1961,6 +2082,8 @@ function _applySetupMode() {
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
   document.getElementById("setup-password-row").style.display = paths ? "" : "none";
   document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
+  document.getElementById("setup-mounts-row").style.display      = paths ? "" : "none";
+  document.getElementById("setup-mounts-section").style.display  = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
@@ -1986,8 +2109,33 @@ async function openPaths() {
     document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
   } catch (e) {}
   _setSetupLoading(false);
+  loadContentMounts();      // fire-and-forget: informational, never blocks the panel
   await validateSetup();
   updateInstallBtn();
+}
+
+// ── what this install actually shipped (#10) ─────────────────────────────────
+// "More asset roots (UI/Textures, Marvel_LQ)" was closed with "it should be fixed now" and then
+// reopened by fawnls, who still had no Marvel_LQ node — and nobody could tell a root hidden by a
+// bug from one his install simply did not have. Those are different sentences now, and this says
+// which one is true for the person reading it.
+async function loadContentMounts() {
+  const el = document.getElementById("setup-mounts");
+  if (!el) return;
+  el.textContent = "Reading the index…";
+  try {
+    const res = await api("/api/content_mounts");
+    if (!res.ok) { el.textContent = res.error || "Could not read the asset index."; return; }
+    const rows = (res.mounts || []).map(m =>
+      `<div><b>${m.mount}</b> — ${m.assets.toLocaleString()} assets</div>`).join("");
+    const lq = res.has_lq
+      ? `<div class="good" style="margin-top:6px">Marvel_LQ is present, and has its own section in
+           the browser.</div>`
+      : `<div class="bad" style="margin-top:6px">No <b>Marvel_LQ</b> mount — the game does not ship
+           one in this build, so there is no low-quality copy to browse or to duplicate a UI
+           texture into. This is your install, not a missing feature.</div>`;
+    el.innerHTML = (rows || "<div>No content mounts were read.</div>") + lq;
+  } catch (e) { el.textContent = "Could not read the asset index."; }
 }
 
 document.getElementById("setup-cancel").addEventListener("click", () => {
@@ -2003,7 +2151,7 @@ document.getElementById("toggle-import-open").checked = _openAfterImport;
 _syncToggleRow("toggle-import-open");
 document.getElementById("toggle-import-open").addEventListener("change", e => {
   _openAfterImport = e.target.checked;
-  localStorage.setItem("atelier.openAfterImport", _openAfterImport ? "1" : "0");
+  _store.set("atelier.openAfterImport", _openAfterImport ? "1" : "0");
   _syncToggleRow("toggle-import-open");
 });
 
@@ -2417,6 +2565,7 @@ function _ctxItemsSidebar(item) {
   if (item.file_type === "texture" && item.game_rel) {
     if (items.length) items.push("sep");
     items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = item.game_rel; _ctxFileInput.click(); } });
+    items.push({ icon: "sliders-horizontal", label: "Export options…", action: () => openTexOpts(item) });
   }
   if (items.length) items.push("sep");
   items.push({ icon: _sbMarked.has(item.token) ? "square-check" : "square",
@@ -2427,6 +2576,135 @@ function _ctxItemsSidebar(item) {
   items.push({ icon: "trash-2", label: "Delete edits", danger: true, action: () => clearImported(item.token) });
   return items;
 }
+
+// ── per-asset export options ─────────────────────────────────────────────────
+// Three requests that were all answered with "you need UE for that" (#20 NoMipMaps / texture
+// group, #21 duplicate into Marvel_LQ, #22 remove a texture) plus the dye-off toggle live on the
+// ASSET, not on the app: two projects can ship the same texture differently, so these are stored
+// per project (see project_meta.asset_opts) and shown wherever the asset is.
+const TEXOPT_LABELS = { blank: "blank", no_mips: "no mips", lod_group: "group", dye_off: "no dye",
+                        lq_twin: "LQ" };
+
+function _sbOptBadge(item) {
+  const o = item.opts || {};
+  const on = Object.keys(TEXOPT_LABELS).filter(k => o[k]);
+  if (!on.length) return "";
+  const label = on.map(k => k === "lod_group"
+    ? String(o.lod_group).replace("TEXTUREGROUP_", "")
+    : TEXOPT_LABELS[k]).join(" · ");
+  return `<span class="sb-opt" title="Export options: ${label}">${label}</span>`;
+}
+
+let texOpts = null;
+
+async function openTexOpts(item) {
+  const ov = document.getElementById("texopt-overlay");
+  document.getElementById("texopt-title").textContent = " — " + item.name;
+  document.getElementById("texopt-status").textContent = "";
+  document.getElementById("texopt-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  ov.classList.add("active");
+  let res;
+  try { res = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`); }
+  catch (e) { document.getElementById("texopt-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
+  if (!res.ok) { document.getElementById("texopt-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read options"}</div>`; return; }
+  texOpts = { game_rel: item.game_rel, name: item.name, info: res, opts: Object.assign({}, res.opts) };
+  renderTexOpts();
+}
+
+function renderTexOpts() {
+  const t = texOpts; if (!t) return;
+  const o = t.opts, i = t.info;
+  const cur = i.current_group || "";
+  // "Unchanged" is the default and is NOT the same as picking the group the texture already has:
+  // picking one writes an option, and an option is a thing the export log will mention.
+  const groupOpts = ['<option value="">Unchanged' + (cur ? " (" + cur.replace("TEXTUREGROUP_", "") + ")" : "") + "</option>"]
+    .concat((i.groups || []).map(g =>
+      `<option value="${g}" ${o.lod_group === g ? "selected" : ""}>${g.replace("TEXTUREGROUP_", "")}</option>`))
+    .join("");
+  const blankHelp = i.blank_alpha
+    ? `A mod pak <b>cannot delete</b> an asset, only override one — so this ships a fully
+       transparent texture in its place, which is as close to "gone" as a mod gets.`
+    : `A mod pak <b>cannot delete</b> an asset, only override one. This texture is
+       <b>${i.format || "in a format"}</b>, which has no alpha channel, so the blank it can ship is
+       <b>opaque black</b>, not transparent.`;
+  document.getElementById("texopt-body").innerHTML = `
+    <div class="opt-row">
+      <label class="toggle-row ${o.blank ? "on" : ""}">
+        <span class="switch"><input type="checkbox" id="opt-blank" ${o.blank ? "checked" : ""}
+              onchange="texOptSet('blank', this.checked)"><span class="switch-track"></span></span>
+        Remove this texture
+      </label>
+      <div class="opt-help">${blankHelp} Your painted PNG stays in the project either way.</div>
+    </div>
+    <div class="opt-row">
+      <label class="toggle-row ${o.no_mips ? "on" : ""}">
+        <span class="switch"><input type="checkbox" id="opt-nomips" ${o.no_mips ? "checked" : ""}
+              onchange="texOptSet('no_mips', this.checked)"><span class="switch-track"></span></span>
+        No mip maps
+      </label>
+      <div class="opt-help">Ships one full-size mip instead of the chain. Stops a small UI or icon
+        texture being blurred by a lower mip at distance — the reason this needed UE before.</div>
+    </div>
+    <div class="opt-row">
+      <div class="setup-label"><span>Texture group</span></div>
+      <select class="opt-sel" onchange="texOptSet('lod_group', this.value)">${groupOpts}</select>
+      <div class="opt-help">The asset's <b>LODGroup</b>. <b>UI</b> is the one to reach for on
+        interface art; leave it Unchanged unless you know the group is wrong.</div>
+    </div>
+    <div class="opt-row">
+      <label class="toggle-row ${o.lq_twin ? "on" : ""} ${i.has_lq ? "" : "disabled"}">
+        <span class="switch"><input type="checkbox" id="opt-lq" ${o.lq_twin ? "checked" : ""}
+              ${i.has_lq ? "" : "disabled"}
+              onchange="texOptSet('lq_twin', this.checked)"><span class="switch-track"></span></span>
+        Also ship the Marvel_LQ copy
+      </label>
+      <div class="opt-help">${i.has_lq
+        ? `Your install has a <b>Marvel_LQ</b> mount — a client on low texture quality loads that
+           copy instead, so a mod that overrides only the normal one does nothing for it.`
+        : `<b>Your paks have no Marvel_LQ mount</b>, so there is nothing to duplicate into. The
+           game no longer ships one; this stays here for an install that does.`}</div>
+    </div>`;
+  lucide.createIcons();
+}
+
+function texOptSet(key, value) {
+  if (!texOpts) return;
+  if (value) texOpts.opts[key] = value; else delete texOpts.opts[key];
+  document.getElementById("texopt-status").textContent = "";
+  renderTexOpts();
+}
+
+async function saveTexOpts() {
+  if (!texOpts) return;
+  const st = document.getElementById("texopt-status");
+  st.textContent = "Saving…";
+  // Every key is sent, including the ones now off — the server treats false as "remove", which is
+  // how an option that was switched back off stops being an option at all.
+  const opts = { blank: false, no_mips: false, lq_twin: false, lod_group: "" };
+  Object.assign(opts, texOpts.opts);
+  try {
+    const res = await api("/api/asset_opts", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: texOpts.game_rel, opts }),
+    });
+    if (!res.ok) { st.textContent = "Error: " + (res.error || "save failed"); return; }
+    toast(`Export options saved: ${texOpts.name}`, "success");
+    closeTexOpts();
+    loadSidebar();
+  } catch (e) { st.textContent = "Error: " + e.message; }
+}
+
+function closeTexOpts() {
+  document.getElementById("texopt-overlay").classList.remove("active");
+  texOpts = null;
+}
+
+document.getElementById("texopt-save").addEventListener("click", saveTexOpts);
+document.getElementById("texopt-cancel").addEventListener("click", closeTexOpts);
+document.getElementById("texopt-close").addEventListener("click", closeTexOpts);
+document.getElementById("texopt-overlay").addEventListener("click", e => {
+  if (e.target.id === "texopt-overlay") closeTexOpts();
+});
 
 // ── USMAP update check ────────────────────────────────────────────────────────
 async function checkUsmapUpdate() {

@@ -322,7 +322,8 @@ def api_dye_texture():
         return b""
     try:
         from atelier.handlers.dye import dye_preview
-        png = dye_preview(gr, size=int(request.query.get("size") or 1024))
+        png = dye_preview(gr, size=int(request.query.get("size") or 1024),
+                          dye_off=request.query.get("dye_off") == "1")
     except Exception as e:
         print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
         response.status = 404
@@ -368,9 +369,9 @@ def api_dye_info():
         response.status = 500
         return json.dumps({"error": str(e)})
 
-def _dye_png(gr, overrides, size):
+def _dye_png(gr, overrides, size, dye_off=False):
     from atelier.handlers.dye import dye_preview
-    return dye_preview(gr, overrides=overrides, size=size)
+    return dye_preview(gr, overrides=overrides, size=size, dye_off=dye_off)
 
 @app.post("/api/dye_preview")
 def api_dye_preview():
@@ -386,7 +387,8 @@ def api_dye_preview():
         response.content_type = "application/json"
         return json.dumps({"error": "game_rel required"})
     try:
-        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 1024))
+        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 1024),
+                       bool(body.get("dye_off")))
     except Exception as e:
         response.status = 500
         response.content_type = "application/json"
@@ -411,7 +413,8 @@ def api_dye_download():
         response.content_type = "application/json"
         return json.dumps({"error": "game_rel required"})
     try:
-        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 2048))
+        png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 2048),
+                       bool(body.get("dye_off")))
     except Exception as e:
         response.status = 500
         response.content_type = "application/json"
@@ -422,6 +425,34 @@ def api_dye_download():
                            mimetype="image/png", download=name)
     response.status = 404
     return b""
+
+@app.post("/api/mat_textures_download")
+def api_mat_textures_download():
+    """Every texture this material uses, zipped, at native size, with a manifest naming the slots.
+
+    chopthememegod asked for the dyed download to cover the other texture types and was told
+    "noted". One dyed BaseColor is not a starting point on its own — repainting needs the normal,
+    the ORM and the ColorID next to it, and needs to say which file is which slot."""
+    try:
+        body = request.json or {}
+    except Exception:
+        body = {}
+    gr = body.get("game_rel", "")
+    if not gr:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"error": "game_rel required"})
+    try:
+        from atelier.handlers.dye import texture_bundle
+        zp, _slots = texture_bundle(gr, overrides=body.get("overrides") or None,
+                                    size=int(body.get("size") or 2048),
+                                    dye_off=bool(body.get("dye_off")))
+    except Exception as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    return static_file(os.path.basename(zp), root=os.path.dirname(zp),
+                       mimetype="application/zip", download=os.path.basename(gr) + "_textures.zip")
 
 # ── prereqs ───────────────────────────────────────────────────────────────────
 
@@ -439,6 +470,39 @@ def api_index_warnings():
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e), "failed": []})
 
+
+@app.get("/api/content_mounts")
+def api_content_mounts():
+    """Which content mounts the index actually read, and whether Marvel_LQ is one of them.
+
+    "More asset roots (UI/Textures, Marvel_LQ)" was closed with "it should be fixed now" and then
+    reopened by fawnls, who still had no Marvel_LQ node — with no way to tell a hidden root from an
+    absent one. Both answers are now facts the app can show, and they are different sentences."""
+    response.content_type = "application/json"
+    try:
+        from atelier.index import content_mounts, _LQ_PREFIX
+        mounts = content_mounts()
+        return json.dumps({"ok": True,
+                           "mounts": [{"mount": k, "assets": v} for k, v in sorted(mounts.items())],
+                           "has_lq": _LQ_PREFIX in mounts})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e), "mounts": [], "has_lq": False})
+
+@app.get("/api/stale_mips")
+def api_stale_mips():
+    """Imported textures now below the resolution the paks can give — the HQ texture DLC arriving
+    after they were imported.
+
+    The work cache fixes itself; a project PNG cannot be fixed for the user, because it is their
+    artwork and re-importing an edited texture means redoing the edit at the larger size. So this
+    reports and lets them decide."""
+    response.content_type = "application/json"
+    try:
+        from atelier.handlers.texture import stale_mip_imports
+        items = stale_mip_imports()
+        return json.dumps({"ok": True, "items": items, "count": len(items)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e), "items": [], "count": 0})
 
 @app.get("/api/prereqs")
 def api_prereqs():
@@ -1915,11 +1979,18 @@ def api_install_mod():
             _split_export_items(items)
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, password=password, mesh_items=mesh_items)
+                           text_items=text_items, password=password, mesh_items=mesh_items,
+                           asset_opts=_project_meta.get_asset_opts(get_import_root()))
         if not result.get("ok"):
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
         pak = result.get("pak")
-        resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None}
+        # applied/skipped were computed and then dropped on the floor here. A per-item failure --
+        # a dye-off whose ColorID would not extract, a texture group that could not be set -- left
+        # build_mod with ok:true and the user with "Installed", no hint that part of the mod is
+        # missing. That is indistinguishable from the game ignoring the edit, which is exactly the
+        # confusion the whole diagnostics phase exists to remove.
+        resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
+                "applied": result.get("applied") or [], "skipped": result.get("skipped") or []}
         if copy_to_mods:
             ok, err, dest = _install_to_mods(mod_name, out_dir)
             if not ok:
@@ -2007,6 +2078,10 @@ def _delete_one_imported(gr):
                 try: os.remove(p)
                 except Exception: pass
     _asset_cache.remove(gr)
+    # ...and its export options, so a re-import doesn't silently inherit settings from an edit
+    # the user has just thrown away.
+    try: _project_meta.forget_asset(get_import_root(), gr)
+    except Exception: pass
 
 @app.post("/api/delete_imported")
 def api_delete_imported():
@@ -2048,6 +2123,78 @@ def api_asset_info():
     game_path = mount_join(pfx, gr) if pfx else gr
     return json.dumps({"ok": True, "pak": pak, "game_path": game_path})
 
+
+# ── per-asset export options (#12 dye-off · #20 mips/group · #21 LQ twin · #22 blank) ──
+
+@app.get("/api/asset_opts")
+def api_asset_opts():
+    """One asset's export options, plus everything the panel needs to render the controls:
+    the texture groups on offer, the group this texture actually declares, and whether the two
+    options that depend on the install (a Marvel_LQ mount, a dyeing material) apply at all."""
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    from atelier.handlers.texture import (TEXTURE_GROUPS, texture_props, texture_format,
+                                          format_has_alpha)
+    out = {"ok": True, "game_rel": gr,
+           "opts": _project_meta.get_asset_opts(get_import_root(), gr),
+           "groups": list(TEXTURE_GROUPS), "current_group": "", "has_lq": False,
+           "dyeable": False, "mask": "", "format": "", "blank_alpha": True}
+    try:
+        from atelier.index import has_lq_mount
+        out["has_lq"] = has_lq_mount()
+    except Exception:
+        pass
+    if is_material(gr):
+        try:
+            from atelier.handlers.dye import dye_off_target
+            out["mask"] = dye_off_target(gr) or ""
+            out["dyeable"] = bool(out["mask"])
+        except Exception as e:
+            out["dye_error"] = str(e)
+        return json.dumps(out)
+    # Textures only from here: reading the declared LODGroup costs a to_json, so it is not done
+    # for asset kinds that have none.
+    try:
+        wb = _cache_import_base(gr)
+        if wb and os.path.exists(wb + ".uasset"):
+            out["current_group"] = texture_props(wb).get("lod_group") or ""
+            # Whether "blank" can mean invisible or only black, for THIS texture — the control has
+            # to say so before it is used, not in the export log afterwards.
+            out["format"]      = texture_format(wb)
+            out["blank_alpha"] = format_has_alpha(out["format"])
+    except Exception as e:
+        out["group_error"] = str(e)
+    return json.dumps(out)
+
+@app.post("/api/asset_opts")
+def api_asset_opts_save():
+    """Merge export options into one asset. Options are per PROJECT, not global: two projects can
+    ship the same texture with and without mips, and neither is a setting on the app."""
+    body = request.json or {}
+    gr   = body.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    opts = body.get("opts")
+    if not isinstance(opts, dict):
+        return json.dumps({"ok": False, "error": "opts must be an object"})
+    from atelier.handlers.texture import TEXTURE_GROUPS
+    clean = {}
+    for k in ("no_mips", "blank", "dye_off", "lq_twin"):
+        if k in opts:
+            clean[k] = bool(opts[k])
+    if "lod_group" in opts:
+        g = opts["lod_group"] or ""
+        if g and g not in TEXTURE_GROUPS:
+            return json.dumps({"ok": False, "error": "unknown texture group: " + str(g)})
+        clean["lod_group"] = g
+    try:
+        cur = _project_meta.set_asset_opts(get_import_root(), gr, clean)
+        return json.dumps({"ok": True, "opts": cur})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
 
 # ── Shader Studio ─────────────────────────────────────────────────────────────────
 import atelier.handlers.shaders as _shaders

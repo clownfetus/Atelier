@@ -48,6 +48,23 @@ broke patched materials was *resolution*, which #35 fixes. `enc_guid` is now rec
 failed container, so if a genuinely differently-keyed pak ever ships it shows up as a non-zero guid
 in the warning list instead of having to be re-derived.
 
+Item **37** is new: found and fixed on 2026-09-20, covered by `tests/test_phase4.py`.
+
+Phase 4 (items **10, 12, 20, 21, 22, 23**) is implemented as of 2026-09-20, with
+`tests/test_phase4.py`. Item **13** was deliberately left out and is unstarted. Item **10** is
+**answered rather than fixed**: `Marvel_LQ` is not in the game any more — every container on a
+current install parses clean and **no path anywhere contains it** — re-checked with the HQ
+texture DLC installed (36 containers), so it is not content that was merely undownloaded — that
+DLC adds no asset paths at all, only `.uptnl` bulk data for assets already present. What was fixed
+alongside is a real index bug that would have hidden the mount even on an install that had one
+(both Marvel mounts flattened onto the browse root, so an LQ asset and its HQ twin collided and HQ
+won), plus a Settings panel listing the mounts actually read. Item **21** therefore stages the LQ
+twin only where that mount exists. Item **12** took PHASES.md's stated pivot — there is no
+material parameter that disables dyeing, so the toggle ships a neutral ColorID mask; item **22**
+can only mean *opaque black* on a texture whose format has no alpha channel, and the control says
+so before it is used. Three in-game looks remain open: #12, #20 and #22 each need one export and
+one look.
+
 **All of the above was verified on Linux only.** The Linux port touched code Windows also runs;
 `LINUX.md` → *Still to verify on Windows* lists what that leaves unconfirmed and how to check it.
 
@@ -66,7 +83,8 @@ Everything else below is unstarted.
 | 7 | Wrap `_get_toc` in the try/except `index.py` already uses | High | Trivial | 3 | `atelier/handlers/pak_thumb.py:53-74` | Same two parser calls, two different error policies. In the thumbnail path an exception kills the background thread, no cache entry is written, and the spinner runs forever with no error. |
 | 8 | One writer for `AES_KEY.txt`; re-read on change | High | Small | 12 | `atelier/config.py:143-153` | A background fetch thread and a config write both target the file while `io_lib` reads it once at import. A stale saved key overwrites the fetched one every startup, and `io_lib` and UAssetTool can end up on different keys in one session. |
 | 9 | Make `/api/open_explorer` report failure | Medium | Trivial | 4 | `atelier/web/routes.py:1720-1733` | When neither branch matches it does nothing and still returns `ok:true`. With `game_rel` the path does not exist until the texture is imported — which is the "nothing pops up" report. |
-| 10 | Verify the Marvel_LQ root actually shipped | Medium | Small | 2 | browse / index | Reported fixed in June; fawnls still had no Marvel_LQ node in August, which silently breaks UI mods because they need the LQ copy. |
+| 10 | Verify the Marvel_LQ root actually shipped | Medium | Small | 2 | browse / index | Reported fixed in June; fawnls still had no Marvel_LQ node in August, which silently breaks UI mods because they need the LQ copy. **Answered 2026-09-20: it does not ship.** |
+| 37 | Installing the HQ texture DLC does not invalidate the work cache | High | Small | 0 | `texture.py::ensure_work_base` · `index.py` | **Found and fixed 2026-09-20.** The texture DLC ships as `pakchunk<X>optional-Windows` containers holding only `.uptnl` top mips; the `.uasset` stays in its ordinary chunk. Install the DLC and every texture already in `_cache/import` keeps its pre-DLC, top-mip-less copy **forever**: `ensure_work_base`'s provenance check compares the container the index names for the `.uasset`, and that container did not change — only a *different* container appeared. The result is silent half-resolution imports on exactly the machines that just paid for full resolution. Measured on this install: 4 of 47 cached entries already stale the moment the DLC finished downloading. The index now records which assets have an optional top mip (free — it already walks every entry) and `ensure_work_base` re-extracts when a cached copy lacks one that exists. One-directional: uninstalling the DLC never throws a cached top mip away, since the copy is then better than the paks can give. A project PNG is *not* silently rewritten — it is the user's artwork, and re-importing an edited texture means redoing the edit — so `/api/stale_mips` reports which imported textures are below what the paks now hold and leaves the decision to them. |
 
 ## Diagnostics
 

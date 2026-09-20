@@ -88,4 +88,60 @@ projSearch();
 if (!document.getElementById("proj-grid").innerHTML.includes("No project matches"))
   throw new Error("empty search result not reported");
 
+// ── Phase 4: per-asset export options (#20 mips/group, #21 Marvel_LQ, #22 remove) ───────────
+// The controls are only worth having if they say what they will actually do to THIS asset, so
+// that is what is asserted: the two cases where the honest answer is "not what you might expect".
+texOpts = { game_rel: "UI/T_A", name: "T_A", opts: {},
+            info: { groups: ["TEXTUREGROUP_UI", "TEXTUREGROUP_Character"],
+                    current_group: "TEXTUREGROUP_Character", has_lq: false,
+                    format: "DXT1", blank_alpha: false } };
+renderTexOpts();
+// the help text is a wrapped template literal, so compare against flattened whitespace
+const flat = () => document.getElementById("texopt-body").innerHTML.replace(/\s+/g, " ");
+let oh = flat();
+if (!oh.includes("opaque black") || !oh.includes("DXT1"))
+  throw new Error("a format with no alpha must not be offered as 'transparent'");
+if (!oh.includes("Your paks have no Marvel_LQ mount"))
+  throw new Error("the LQ control must explain why it is off");
+if (!oh.includes("disabled")) throw new Error("the LQ control must be disabled without the mount");
+if (!oh.includes("Unchanged (Character)")) throw new Error("the group dropdown must start unchanged");
+
+texOpts.info.blank_alpha = true; texOpts.info.format = "DXT5"; texOpts.info.has_lq = true;
+texOptSet("blank", true);
+oh = flat();
+if (oh.includes("opaque black")) throw new Error("a format WITH alpha was described as black");
+if (!oh.includes("fully transparent")) throw new Error("the honest blank case lost its wording");
+if (texOpts.opts.blank !== true) throw new Error("the toggle did not record");
+texOptSet("blank", false);
+if ("blank" in texOpts.opts) throw new Error("switching off must remove, not store false");
+
+// the badge: an altered export has to be visible on the asset in the sidebar
+if (_sbOptBadge({ opts: {} }) !== "") throw new Error("a plain asset must carry no badge");
+const badge = _sbOptBadge({ opts: { blank: true, lod_group: "TEXTUREGROUP_UI" } });
+if (!badge.includes("blank") || !badge.includes("UI"))
+  throw new Error("the badge does not name the options: " + badge);
+
+// ── Phase 4: the dye-off toggle (#12) and the whole-set download (#23) ──────────────────────
+// colors/scalars left empty on purpose: a dyeing material whose Region params are not exposed
+// still has a preview and a toggle, and the "no editable parameters" note must not replace them.
+matEditor = { game_rel: "C/MI_X", name: "MI_X", colors: [], scalars: [],
+              dyeable: true, dyeView: "preview", dyeUsed: ["1"], dyeOff: false,
+              dyeMask: "Textures/T_X_ColorID",
+              dyeInfo: { used: { "0": 5, "1": 5 }, coverage: { "0": 50, "1": 50 },
+                         overlay: { "0": "#888", "1": "#f00" }, regions: {} } };
+renderMatEditor();
+let mh = document.getElementById("mat-body").innerHTML.replace(/\s+/g, " ");
+if (!mh.includes("turn this skin's dyeing off"))
+  throw new Error("the dye-off toggle is missing from a dyeing material: ");
+if (!mh.includes("T_X_ColorID"))
+  throw new Error("the toggle must name the asset it adds to the mod");
+if (!mh.includes("Download all textures"))
+  throw new Error("#23's button is missing");
+matEditor.dyeOff = true;
+renderMatEditor();
+mh = document.getElementById("mat-body").innerHTML.replace(/\s+/g, " ");
+if (!/toggle-row on/.test(mh)) throw new Error("the toggle does not reflect its own state");
+if (!mh.includes("no editable color or scalar parameters"))
+  throw new Error("the empty-parameter note went missing");
+
 console.log("DOM smoke: all render paths OK");

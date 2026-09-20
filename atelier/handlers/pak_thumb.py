@@ -25,14 +25,25 @@ _gr_map_lock  = threading.Lock()
 
 
 def _path_to_gr(pak_path: str) -> str | None:
-    """Raw pak path (from parse_dir_index) -> virtual game_rel, or None."""
+    """Raw pak path (from parse_dir_index) -> virtual game_rel, or None.
+
+    This has to agree with index._virtual_path, because the two halves of a thumbnail lookup come
+    from different places: the container is found through _gr_to_cont, which is built FROM the
+    index, and the chunk is then found in a directory listing mapped by this function. Disagree on
+    one mount and a lookup finds the container and then misses inside it, forever — which is what
+    would happen for every Marvel_LQ asset now that the mount has its own root over there.
+    """
     pl = pak_path.replace("\\", "/")
     pl_lower = pl.lower()
     for pfx in _CONTENT_PREFIXES:
         i = pl_lower.find(pfx.lower())
         if i >= 0:
             rest = pl[i + len(pfx):]
-            return rest[:-7] if rest.lower().endswith(".uasset") else None
+            if not rest.lower().endswith(".uasset"):
+                return None
+            rest = rest[:-7]
+            from atelier.index import _LQ_PREFIX, _LQ_ROOT
+            return (_LQ_ROOT + "/" + rest) if pfx == _LQ_PREFIX else rest
     return None
 
 

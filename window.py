@@ -5,6 +5,8 @@ import threading
 import urllib.request
 import os
 import datetime
+if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
+    os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
 import webview
 
 from atelier import hostos
@@ -96,7 +98,12 @@ def main():
     # Debug (devtools) is off in production, but a "DEBUG" marker file next to the exe turns it on
     # for diagnostic builds — keeps the shipped app clean while letting debug builds inspect the console.
     _debug = bool(os.environ.get("ATELIER_DEBUG")) or os.path.exists(os.path.join(_ROOT, "DEBUG"))
-    webview.start(_focus, debug=_debug)
+    # private_mode=True (pywebview's default) hands WebKitGTK an ephemeral data store, which on
+    # Linux means no localStorage at all — touching it throws and kills app.js before init().
+    # A persistent store also keeps the Settings toggles across launches, which is what the UI
+    # already assumes when it reads them back.
+    webview.start(_focus, debug=_debug, private_mode=False,
+                  storage_path=os.path.join(_ROOT, "_webview"))
     os._exit(0)
 
 

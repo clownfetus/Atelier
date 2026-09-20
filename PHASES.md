@@ -175,6 +175,72 @@ compare against.
 **Pivot signal:** if #12 can't be made to work through the material path, the fallback is
 shipping the alpha-ColorID trick as a one-click action rather than a real toggle.
 
+> **Update (2026-09-20): built, and less of it needed the game than this phase assumed.**
+> Items **10, 12, 20, 21, 22, 23** are implemented (`tests/test_phase4.py`, 28 checks). **13 was
+> deliberately left out** and stays on the board.
+>
+> The premise that everything here costs an export-plus-a-look turned out to be too pessimistic.
+> What decides whether a mod is *correct* — which path an asset is staged at, what the injected
+> pixels actually are, whether an option reaches the builder — is all checkable on this side of
+> the game, and two of the checks run against the real UAssetTool on a real extracted texture.
+> Three things genuinely still need the game, and only three:
+>
+> - whether the shader honours a zero-alpha ColorID the way the region arithmetic says (#12)
+> - whether a UI texture stops being mip-blurred once its group is `TEXTUREGROUP_UI` (#20)
+> - whether "removed" reads as gone rather than as a black hole on a given material (#22)
+>
+> **#10 is answered, and the answer is no.** Marvel_LQ does not ship. Not "is hidden" — every
+> container was parsed and **zero paths anywhere contain `Marvel_LQ`**. Re-checked 2026-09-20
+> **with the HQ texture DLC installed** — 36 containers, still zero — so "the LQ tree is in the
+> part of the game I had not downloaded" is ruled out. The DLC in fact adds **no asset paths at
+> all**: the index is 546,297 entries before it and 546,297 after, because its 41,746 entries are
+> `.uptnl` bulk data for assets that were already there. fawnls was looking for a
+> mount his game no longer had, and nothing in the app could tell him that. Two changes follow. The index had a real bug that would
+> have hidden the mount *even where one exists*: both Marvel mounts flattened onto the browse
+> root, so an LQ asset and its HQ twin were one virtual path and the dedup kept HQ — and every LQ
+> asset has an HQ twin. It now gets its own root, exactly like the MarvelGAS plugin mount did for
+> exactly this reason. And Settings now lists the content mounts actually read, so "your install
+> does not have one" is a sentence the app can say.
+>
+> **#21 follows #10 rather than ignoring it.** The duplicate-into-LQ option stages the twin when
+> the mount exists and does nothing — saying so — when it does not. Staging into a mount the game
+> never looks up would only pad the mod.
+>
+> **What replaced the HQ/LQ split, and why it does not bring #21 back.** The texture DLC ships as
+> `pakchunk<X>optional-Windows` containers holding **nothing but `.uptnl` files** — 41,746 of them,
+> the top mip of textures whose `.uasset` stays in the ordinary chunk. So the quality split is now
+> *bulk data for one asset*, not a second asset tree: there is no second path to browse and nothing
+> to duplicate an edit into. It also settles where `decode_dds`'s "MR strips the top mip" comes
+> from — the mip is not stripped, it is in a chunk the machine had not downloaded. With the DLC in,
+> retoc pulls the `.uptnl` across containers on its own and a 2048² texture recovers at 2048²
+> (verified on `T_1031306_Equip_01_D`). **This has a sharp edge — see TRIAGE #37.**
+>
+> **#12 took the pivot this phase wrote down.** There is no material parameter for it: the real
+> dyeing MIs expose `BaseTint`, `UseDyeingGBChannel` and the `Region N` sets, and nothing that
+> switches dyeing off. So the toggle ships a neutral ColorID mask — the circulating workaround,
+> made one click and explained in place. The arithmetic is the module's own: alpha is the region
+> index, 0 is undyed, and a uniform zero alpha is exact in DXT5 (verified through a real
+> inject → extract round trip, alpha came back 0 everywhere). Two things came with it: the dye
+> preview now reads the project's painted PNG instead of the vanilla texture — otherwise it
+> reproduces finngmin's complaint instead of answering it — and `stage_dye_off` refuses outright
+> if a mask's format has no alpha channel, because a "neutral" mask would then read as region 7
+> and dye the whole surface.
+>
+> **#22 cannot always mean invisible, and now says which it is.** `inject_texture` keeps the base
+> asset's pixel format, so a transparent PNG injected into a **DXT1** texture comes back opaque
+> black (measured on `T_1050103_Body_01_D`). The control names the format and says "opaque black"
+> before it is used rather than in the export log afterwards — this is thetruedaveed's
+> black-image confusion arriving from the other direction.
+>
+> **#20 needed no new capability, only the wiring.** `inject_texture --no-mips` already existed
+> and nothing passed it; the texture group is an ordinary `LODGroup` enum, rewritten on the staged
+> asset after injection (from_json writes `.uasset`/`.uexp` only, so the injected `.ubulk` survives
+> — verified by decoding the retargeted texture back). A group edit that fails is reported and the
+> texture still ships.
+>
+> Options are stored per **project**, not per app (`project_meta.asset_opts`), absent means
+> default, and switching one off removes it rather than storing false.
+
 ---
 
 ## Phase 5 — Blocked on live paks
@@ -191,8 +257,9 @@ key, or a season boundary.
 the plumbing is short. The reason it's late isn't difficulty — it's that you can't prove it
 works without a live patch pak that actually uses a different key.
 
-> **Update (2026-09-19): the premise did not survive contact with a real install.** Every container
-> reports `enc_guid=0`, and the patch container's directory index decrypts with the main key — so
+> **Update (2026-09-19, re-checked 2026-09-20): the premise did not survive contact with a real
+> install.** Every container reports `enc_guid=0`, and the patch container's directory index
+> decrypts with the main key — so
 > patched materials were never a second-key problem. The actual cause was *resolution*: which
 > on-disk copy the work cache handed back once a patch had moved an asset. That is item **35**,
 > which is now done (`tests/test_patch_override.py`). Item 2 is therefore **superseded rather than
@@ -200,6 +267,13 @@ works without a live patch pak that actually uses a different key.
 > and `enc_guid` is now recorded on every failed container so that day is a log read, not an
 > investigation. The original reports came from Windows; see `LINUX.md` → *Still to verify on
 > Windows*.
+
+**Re-check, 2026-09-20 (HQ texture DLC installed).** All **36** containers parse cleanly, every
+one reports `enc_guid=0`, and every one decrypts with the main key — including the 15 new
+`*optional` chunks. There is still exactly **one** patch container, `Patch_-Windows_1.1.3870120_P`,
+unchanged since 2026-09-18; no base chunk changed either, so what arrived was the DLC download and
+not a game update. A differently-keyed pak has now failed to appear twice, across a content
+download that added 47k assets. Item 2 stays parked, not reopened.
 
 **Still open, per your read:** cartbuddy's inconsistency (new-skin mods working while older
 material edits broke) could be a skin added straight to the base paks rather than patched, or

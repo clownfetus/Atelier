@@ -294,7 +294,11 @@ def _retoc_container(game_rel):
 
 
 def extract_via_retoc(game_rels):
-    """Unpack assets by their FULL mount paths. Takes one game_rel or many; returns {game_rel: stem}.
+    """Unpack assets by their FULL mount paths. Takes one game_rel or many.
+
+    Returns {game_rel: (stem, pak, pfx)}. Locating the extracted file already costs an index
+    lookup, so the container and prefix it yields are handed back with it — callers record those
+    in the asset cache and would otherwise repeat the same lookup per asset.
 
     Two reasons this is the better extractor, and one that is a correctness issue:
     `extract_iostore_legacy --filter` matches BASENAMES, and MarvelGAS ships assets whose basenames
@@ -346,9 +350,9 @@ def extract_via_retoc(game_rels):
                   file=sys.stderr, flush=True)
             continue
         for gr in todo:
-            cp, _pak, _pfx = extract_info(gr)
+            cp, pak, pfx = extract_info(gr)
             if cp and os.path.exists(cp + ".uasset"):
-                found[gr] = cp
+                found[gr] = (cp, pak, pfx)
     return found
 
 
@@ -362,7 +366,7 @@ def extract_many(game_rels):
     game_rels = [g for g in (game_rels or []) if g]
     if not game_rels:
         return {}
-    found = {}
+    found = {}  # game_rel -> (stem, pak, pfx)
     if prefers_retoc() or any(is_plugin_asset(g) for g in game_rels):
         found = extract_via_retoc(game_rels)
     missing = [g for g in game_rels if g not in found]
@@ -370,16 +374,113 @@ def extract_many(game_rels):
         os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
         uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)] + uat_filter(missing))
         for gr in missing:
-            cp, _pak, _pfx = extract_info(gr)
+            cp, pak, pfx = extract_info(gr)
             if cp and os.path.exists(cp + ".uasset"):
-                found[gr] = cp
-    entries = []
-    for gr, stem in found.items():
-        _cp, pak, pfx = extract_info(gr)
-        entries.append((gr, stem, pak or "", pfx or ""))
+                found[gr] = (cp, pak, pfx)
+    entries = [(gr, stem, pak or "", pfx or "") for gr, (stem, pak, pfx) in found.items()]
     if entries:
         _ac.record_many(entries)
-    return found
+    return {gr: stem for gr, (stem, _pak, _pfx) in found.items()}
+
+
+def missing_optional_mip(game_rel, cache_base):
+    """True when this cached copy predates the HQ texture DLC and the paks now offer its top mip.
+
+    The DLC ships as pakchunk<X>optional-Windows containers carrying ONLY .uptnl files — the top
+    mip of textures whose .uasset stays in its ordinary chunk. Nothing else can see that a copy is
+    out of date: ensure_work_base's provenance check compares the container the index names for the
+    .uasset, and that container did not change — a DIFFERENT container appeared beside it. So a
+    machine that installs the DLC would keep serving its pre-DLC, half-resolution copies forever,
+    which is the opposite of what the person just downloaded.
+
+    Deliberately one-directional. Uninstalling the DLC makes has_optional_mip False again, and a
+    cached copy that still holds the top mip is then BETTER than anything the paks can hand back —
+    so this never asks for it to be thrown away.
+    """
+    if not cache_base or not os.path.exists(cache_base + ".uasset"):
+        return False
+    if os.path.exists(cache_base + ".uptnl"):
+        return False
+    try:
+        from atelier.index import has_optional_mip
+        return has_optional_mip(game_rel)
+    except Exception:
+        return False
+
+
+def uptnl_dimension(uptnl_path):
+    """The pixel dimension of a .uptnl top mip, from its byte length alone. None if it doesn't fit.
+
+    A .uptnl is exactly one square mip of block-compressed data, so len == (d/4)^2 * bytes_per_block
+    and d is a power of two. The two block sizes cannot collide: solving (d/4)^2*16 == (d'/4)^2*8
+    gives d' = d*sqrt(2), which is never also a power of two. That makes this exact without asking
+    the asset what format it is -- which matters, because the alternative is a UAssetTool call per
+    texture just to answer "is this one bigger now".
+    """
+    try:
+        n = os.path.getsize(uptnl_path)
+    except OSError:
+        return None
+    for p2 in range(14, 1, -1):
+        d = 1 << p2
+        blocks = max(1, d // 4) ** 2
+        if n in (blocks * 8, blocks * 16):
+            return d
+    return None
+
+
+def stale_mip_imports(import_root=None):
+    """Project textures whose PNG is below the resolution the paks can now give: [{game_rel, ...}].
+
+    The work cache repairs itself (see ensure_work_base), but a project PNG does not: import
+    deliberately never overwrites one, because it is the user's artwork. So after the HQ texture
+    DLC lands, the textures already in a project stay at the resolution they were decoded at, and
+    nothing says so.
+
+    Measured off the PNG rather than off cache state, so the answer does not change depending on
+    whether the work copy has been re-extracted yet. This only REPORTS -- re-importing is the
+    user's call, because for an edited texture it means redoing the edit at the larger size.
+    """
+    from atelier.config import get_import_root, project_game_rel
+    root = import_root or get_import_root()
+    if not os.path.isdir(root):
+        return []
+    try:
+        from atelier.index import optional_mips
+        opts = optional_mips()
+    except Exception:
+        return []
+    if not opts:
+        return []
+    import atelier.asset_cache as _ac
+    from PIL import Image
+    out = []
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d != ".atelier"]
+        for fname in files:
+            if not fname.endswith(".png"):
+                continue
+            fpath = os.path.join(dirpath, fname)
+            gr = project_game_rel(fpath, root)
+            if "/" not in gr:
+                gr = _ac.by_name(gr) or gr
+            if gr.lower() not in opts:
+                continue
+            try:
+                with Image.open(fpath) as im:
+                    have = max(im.size)
+            except Exception:
+                continue
+            cb  = _ac.cache_base(gr)
+            top = uptnl_dimension(cb + ".uptnl") if cb and os.path.exists(cb + ".uptnl") else None
+            if top is None:
+                # The paks have a top mip and the work copy does not, so this PNG was decoded
+                # before the DLC. We cannot say how much bigger it should be until the re-extract
+                # happens, only that it is not current.
+                out.append({"game_rel": gr, "name": os.path.basename(gr), "have": have, "full": 0})
+            elif have < top:
+                out.append({"game_rel": gr, "name": os.path.basename(gr), "have": have, "full": top})
+    return out
 
 
 def _purge_ambiguous(game_rel):
@@ -457,9 +558,15 @@ def ensure_work_base(game_rel):
         # Provenance check: the container the index names now vs the one this copy came from. They
         # differ exactly when a game patch has taken the asset over, and the cached bytes are then
         # the pre-patch ones -- the shape of "my materials broke after the update".
-        if os.path.exists(cb + ".uasset") and (not rec or not pak or rec == pak.lower()):
+        stale_mip = missing_optional_mip(game_rel, cb)
+        if os.path.exists(cb + ".uasset") and (not rec or not pak or rec == pak.lower()) \
+                and not stale_mip:
             return cb
-        if rec and pak and rec != pak.lower():
+        if stale_mip:
+            print(f"  [warn] {game_rel}: cached before the HQ texture DLC (no .uptnl, and the paks "
+                  f"now have one) — re-extracting", file=sys.stderr, flush=True)
+            _purge_work(game_rel)
+        elif rec and pak and rec != pak.lower():
             print(f"  [warn] {game_rel}: cached from {rec}, index now says {pak.lower()} — re-extracting",
                   file=sys.stderr, flush=True)
             _purge_work(game_rel)      # the copy on disk is pre-patch too, not just the entry
@@ -468,9 +575,9 @@ def ensure_work_base(game_rel):
     # Full-path extract first wherever it applies: on Linux (UAssetTool cannot read containers
     # without Oodle) and for plugin assets anywhere (a basename cannot tell them from their twins).
     if prefers_retoc() or is_plugin_asset(game_rel):
-        rb = extract_via_retoc([game_rel]).get(game_rel)
-        if rb:
-            cp, pak, pfx = extract_info(game_rel)
+        hit = extract_via_retoc([game_rel]).get(game_rel)
+        if hit:
+            rb, pak, pfx = hit
             _ac.record(game_rel, rb, pak or "", pfx or "")
             return rb
         # Fall through to UAssetTool rather than giving up: retoc cannot currently extract from a
@@ -524,10 +631,169 @@ def decode_to_png(import_base, uasset_base):
         decode_png(import_base, uasset_base)
     return out_png if os.path.exists(out_png) else None
 
-def stage_inject(stage, game_rel):
+# ── per-texture export options ────────────────────────────────────────────────
+# Three requests that all land on the same call (inject_texture) and were each answered with "you
+# need UE for that":
+#   #20 ch3rr13 + hobbyr34 — NoMipMaps / texture group. UAssetTool already takes `--no-mips`
+#       (Mode A: one inline mip, no .ubulk); the texture GROUP is an ordinary LODGroup enum on the
+#       export, so it is a to_json/from_json edit on the asset we just injected.
+#   #21 norskpl — duplicate UI textures into Marvel_LQ, so an LQ-quality client sees the edit too.
+#   #22 pushingpetals — remove a texture rather than replace it.
+#
+# On #22, plainly: a mod pak CANNOT delete an asset. It can only override one. "Remove" therefore
+# means shipping a fully transparent texture over it, which is what people do by hand today — so
+# the option is named for what it does (blank) rather than for what it is wished to be.
+
+# Offered in the UI; anything else the user's asset already declares is preserved rather than
+# forced onto this list. TEXTUREGROUP_UI is the one that matters for the request (UI textures
+# being mip-blurred), the rest are here so a character/VFX texture can be put back.
+TEXTURE_GROUPS = ("TEXTUREGROUP_Character", "TEXTUREGROUP_CharacterNormalMap",
+                  "TEXTUREGROUP_CharacterSpecular", "TEXTUREGROUP_UI", "TEXTUREGROUP_Effects",
+                  "TEXTUREGROUP_EffectsNotFiltered", "TEXTUREGROUP_World",
+                  "TEXTUREGROUP_WorldNormalMap", "TEXTUREGROUP_Skybox")
+
+
+def texture_props(work_base):
+    """{lod_group, filter, srgb} as the vanilla asset declares them, or {} if it can't be read.
+
+    The UI needs the CURRENT texture group to show as the starting value — offering a dropdown
+    that defaults to something the asset isn't is how a user "sets" a group they already had and
+    ships a changed asset for no reason."""
+    out_dir = os.path.join(_CACHE, "texprops")
+    os.makedirs(out_dir, exist_ok=True)
+    jp = os.path.join(out_dir, os.path.basename(work_base) + ".json")
+    try:
+        if os.path.exists(jp):
+            os.remove(jp)
+        uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(out_dir)])
+        import json as _json
+        d = _json.load(open(jp, encoding="utf-8-sig"))
+        ex = d["Exports"][0]
+        props = ex.get("Data") or ex.get("Value") or []
+        got = {}
+        for pr in props:
+            if pr.get("Name") == "LODGroup":   got["lod_group"] = pr.get("Value")
+            elif pr.get("Name") == "Filter":   got["filter"]     = pr.get("Value")
+            elif pr.get("Name") == "SRGB":     got["srgb"]       = pr.get("Value")
+        return got
+    except Exception as e:
+        print(f"  [warn] texture_props failed for {os.path.basename(work_base)}: {e}",
+              file=sys.stderr, flush=True)
+        return {}
+
+
+def set_texture_group(out_ua, group):
+    """Rewrite an already-staged texture's LODGroup in place. Returns True if it was changed.
+
+    Deliberately a SECOND pass over inject_texture's output rather than an edit of the vanilla
+    asset before injection: injection is the step that rebuilds the mip chain and the bulk files,
+    so anything done before it is thrown away. from_json writes only .uasset/.uexp, which is why
+    this can run over a staged asset at all — the .ubulk/.uptnl beside it are left exactly as
+    inject_texture wrote them, and the mips still resolve (verified end to end: inject -> set
+    group -> extract_texture returns the same 1024x1024 image with the new group in its JSON).
+    """
+    if not group or group not in TEXTURE_GROUPS:
+        return False
+    import json as _json
+    work = os.path.join(_CACHE, "texgroup")
+    shutil.rmtree(work, ignore_errors=True)
+    os.makedirs(work, exist_ok=True)
+    stem = os.path.basename(out_ua)[:-7]
+    uat(["to_json", os.path.abspath(out_ua), USMAP, os.path.abspath(work)])
+    jp = os.path.join(work, stem + ".json")
+    if not os.path.exists(jp):
+        raise RuntimeError("texture group: to_json produced no JSON")
+    d = _json.load(open(jp, encoding="utf-8-sig"))
+    ex = d["Exports"][0]
+    props = ex.get("Data") or ex.get("Value") or []
+    hit = next((pr for pr in props if pr.get("Name") == "LODGroup"), None)
+    if hit is None:
+        # The property is only serialised when it differs from the class default, so a texture
+        # sitting on the default group has no LODGroup entry to edit. Say so instead of appending
+        # a property whose wrapper type we would be guessing at.
+        raise RuntimeError("this texture does not serialise a LODGroup, so it cannot be retargeted")
+    if hit.get("Value") == group:
+        return False
+    hit["Value"] = group
+    _json.dump(d, open(jp, "w"))
+    tmp_ua = os.path.join(work, "out", stem + ".uasset")
+    os.makedirs(os.path.dirname(tmp_ua), exist_ok=True)
+    uat(["from_json", os.path.abspath(jp), os.path.abspath(tmp_ua), USMAP])
+    if not os.path.exists(tmp_ua):
+        raise RuntimeError("texture group: from_json produced no uasset")
+    for ext in (".uasset", ".uexp"):                  # NOT .ubulk/.uptnl — those stay as injected
+        src = tmp_ua[:-7] + ext
+        if os.path.exists(src):
+            shutil.copyfile(src, out_ua[:-7] + ext)
+    return True
+
+
+# Which pixel formats carry a real alpha channel. This decides whether "blank" can mean INVISIBLE
+# or only BLACK, and it is not a detail: inject_texture keeps the base asset's pixel format, so a
+# fully transparent PNG injected into a DXT1 texture comes back opaque black (measured on
+# T_1050103_Body_01_D). Shipping that as "removed" would be the same trap thetruedaveed fell into
+# from the other side — a black image that still renders — so the app has to say which of the two
+# it is about to do rather than promise transparency it cannot deliver.
+_ALPHA_FORMATS = {"DXT5", "BC3", "DXT3", "BC2", "BC7", "B8G8R8A8", "R8G8B8A8", "A8R8G8B8", "A8",
+                  "FloatRGBA", "A16B16G16R16"}
+
+
+def texture_format(work_base):
+    """The pixel format UE declares for this texture ('DXT1', 'BC7', …), or '' if unreadable."""
+    try:
+        return _tex_info(work_base)[2] or ""
+    except Exception:
+        return ""
+
+
+def format_has_alpha(fmt):
+    """Whether a texture in this format can be made transparent at all."""
+    return (fmt or "") in _ALPHA_FORMATS
+
+
+def blank_png(out_png, size):
+    """A fully transparent RGBA PNG — the only thing a mod pak can do that reads as "removed"."""
+    from PIL import Image
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    w, h = size
+    Image.new("RGBA", (max(1, int(w)), max(1, int(h))), (0, 0, 0, 0)).save(out_png)
+    return out_png
+
+
+def texture_size(game_rel, work_base=None):
+    """(w, h) for a texture: the project PNG's size if it has one, else what the asset declares.
+
+    The project copy wins because it is what the user is looking at — blanking a texture they have
+    been painting at 2048 should not quietly ship a 4096 one because that is the size in a header
+    whose top mip the game strips (see decode_dds)."""
+    for base in (project_base(game_rel), project_base_legacy(game_rel)):
+        png = base + ".png"
+        if os.path.exists(png):
+            try:
+                from PIL import Image
+                with Image.open(png) as im:
+                    return im.size
+            except Exception:
+                pass
+    if work_base:
+        w, h, _fmt = _tex_info(work_base)
+        if w and h:
+            return (w, h)
+    return (1024, 1024)
+
+
+def stage_inject(stage, game_rel, opts=None):
     """Stage one texture: inject the edited PNG into the vanilla .uasset via UAssetTool.
-    Staged file is placed at the pak game path so create_mod_iostore packs it correctly."""
+    Staged file is placed at the pak game path so create_mod_iostore packs it correctly.
+
+    opts (from project_meta.get_asset_opts) may carry:
+      blank      - ship a fully transparent texture instead of the edited PNG (#22)
+      no_mips    - single inline mip instead of the full chain (#20)
+      lod_group  - retarget the texture's LODGroup (#20)
+      lq_twin    - also stage the Marvel_LQ copy, when this install has that mount (#21)
+    """
     import atelier.asset_cache as _ac
+    opts = opts or {}
     # Prefer the unique subfolder path; fall back to a legacy flat png if that's where it already lives.
     import_base = project_base(game_rel)
     if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):
@@ -535,40 +801,99 @@ def stage_inject(stage, game_rel):
     work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError("no base asset — run 'import' first")
-    # An authored .dds wins over the .png: UAssetTool takes DDS directly and keeps the base's pixel
-    # format, so hand-authored block data ships as-is instead of being recompressed from RGBA. That
-    # matters for index maps like the ColorID/DyeingTexture masks (see decode_dds) — a recompressor
-    # can nudge alpha across one of the 255/7 region steps and reassign the region.
-    src = import_base + ".dds"
-    if not os.path.exists(src):
-        src = import_base + ".png"
+    blank_note = ""
+    if opts.get("blank"):
+        # Generated fresh into the cache, never into the project: the project PNG is the user's
+        # artwork, and blanking is an EXPORT choice they can switch off again without having lost it.
+        src = blank_png(project_base(game_rel, os.path.join(_CACHE, "blank")) + ".png",
+                        texture_size(game_rel, work_base))
+        fmt = texture_format(work_base)
+        blank_note = ("blanked" if format_has_alpha(fmt)
+                      else f"blanked to opaque black — {fmt or 'this format'} has no alpha channel")
+    else:
+        # An authored .dds wins over the .png: UAssetTool takes DDS directly and keeps the base's pixel
+        # format, so hand-authored block data ships as-is instead of being recompressed from RGBA. That
+        # matters for index maps like the ColorID/DyeingTexture masks (see decode_dds) — a recompressor
+        # can nudge alpha across one of the 255/7 region steps and reassign the region.
+        src = import_base + ".dds"
         if not os.path.exists(src):
-            os.makedirs(os.path.dirname(import_base), exist_ok=True)
-            decode_png(import_base, work_base)
+            src = import_base + ".png"
             if not os.path.exists(src):
-                raise RuntimeError("PNG missing and decode failed — re-import this texture")
+                os.makedirs(os.path.dirname(import_base), exist_ok=True)
+                decode_png(import_base, work_base)
+                if not os.path.exists(src):
+                    raise RuntimeError("PNG missing and decode failed — re-import this texture")
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     print(f"[stage_inject] {game_rel}: pak_game_path={pak_gr}  src={os.path.basename(src)}  stage_ua={out_ua}",
           file=sys.stderr, flush=True)
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    r = uat(["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(src),
-             os.path.abspath(out_ua), "--usmap", USMAP])
+    args = ["inject_texture", os.path.abspath(work_base + ".uasset"), os.path.abspath(src),
+            os.path.abspath(out_ua), "--usmap", USMAP]
+    if opts.get("no_mips"):
+        args.append("--no-mips")
+    r = uat(args)
     if not os.path.exists(out_ua):
         raise RuntimeError("inject failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
-    return os.path.basename(game_rel)
+    notes = []
+    if opts.get("no_mips"):
+        notes.append("no mips")
+    if opts.get("lod_group"):
+        # A failure here must not take the texture edit down with it: the injected asset is already
+        # correct and shippable, the group is an extra the user asked for. Report, keep the texture.
+        try:
+            if set_texture_group(out_ua, opts["lod_group"]):
+                notes.append(opts["lod_group"].replace("TEXTUREGROUP_", "group "))
+        except Exception as e:
+            print(f"  [warn] {game_rel}: texture group not applied: {e}", file=sys.stderr, flush=True)
+            notes.append("texture group FAILED: %s" % e)
+    if opts.get("lq_twin"):
+        n = stage_lq_twin(stage, game_rel, out_ua)
+        notes.append("+Marvel_LQ copy" if n else "no Marvel_LQ mount in these paks")
+    name = os.path.basename(game_rel)
+    if blank_note:
+        notes.insert(0, blank_note)
+    return name + (" (" + ", ".join(notes) + ")" if notes else "")
+
+
+def stage_lq_twin(stage, game_rel, staged_ua):
+    """Copy an already-staged asset to its Marvel_LQ path as well. Returns True if it was staged.
+
+    norskpl's ask (#21): a client running low texture quality loads the Marvel_LQ copy, so a mod
+    that only overrides the HQ one does nothing for it. The copy is the same injected bytes at the
+    other mount path — the LQ asset is a lower-res twin, not a different asset, and an override
+    replaces it whole.
+
+    Returns False, and stages nothing, when the install has no Marvel_LQ mount. That is the case on
+    a current install (checked on build 3870120: zero Marvel_LQ paths in any of the 21 containers),
+    and staging into a mount the game does not have would only pad the mod with a path nothing ever
+    looks up."""
+    from atelier.index import has_lq_mount, lq_counterpart, is_lq
+    if is_lq(game_rel) or not has_lq_mount():
+        return False
+    lq_pak = pak_game_path(lq_counterpart(game_rel))
+    dst = os.path.join(stage, *lq_pak.split("/")) + ".uasset"
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    for ext in _WORK_EXTS:
+        src = staged_ua[:-7] + ext
+        if os.path.exists(src):
+            shutil.copyfile(src, dst[:-7] + ext)
+    return True
+
 
 def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-              world_items=None, text_items=None, password=None, mesh_items=None):
+              world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None):
     """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
     edits + StringTable (text) edits + Blender mesh edits into one mod. tex_items: [game_rel];
     mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
-    vfx_items/world_items/text_items/mesh_items: [game_rel] (edits come from the sidecar / .blend)."""
+    vfx_items/world_items/text_items/mesh_items: [game_rel] (edits come from the sidecar / .blend).
+    asset_opts: {game_rel: opts} per-asset export options — see project_meta.get_asset_opts."""
     from atelier.handlers.material import stage_material
     from atelier.handlers.curve import stage_curve
     from atelier.handlers.vfx import stage_vfx
     from atelier.handlers.world import stage_world
     from atelier.handlers.text import stage_text
+    asset_opts = asset_opts or {}
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
     for ext in (".pak", ".ucas", ".utoc"):
         if os.path.exists(base + ext): os.remove(base + ext)
@@ -586,12 +911,22 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
             applied.append(f"mesh {os.path.basename(gr)} ({len(info['applied'])} LODs)")
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     for game_rel in tex_items:
-        try: applied.append("tex " + stage_inject(stage, game_rel))
+        try: applied.append("tex " + stage_inject(stage, game_rel, asset_opts.get(game_rel)))
         except Exception as e: skipped.append(f"{os.path.basename(game_rel)}: {e}")
     for m in mat_items:
-        try: applied.append("mat " + stage_material(stage, m["game_rel"],
+        gr = m["game_rel"]
+        try: applied.append("mat " + stage_material(stage, gr,
                                                     m.get("colors", {}), m.get("scalars", {})))
-        except Exception as e: skipped.append(f"{os.path.basename(m.get('game_rel',''))}: {e}")
+        except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}"); continue
+        # "Turn the dye overlay off" ships a NEUTRAL ColorID mask beside the material, so it is a
+        # second staged asset rather than a parameter on this one — see dye.stage_dye_off for why
+        # there is no material parameter that does this.
+        if (asset_opts.get(gr) or {}).get("dye_off"):
+            try:
+                from atelier.handlers.dye import stage_dye_off
+                applied.append("dye-off " + stage_dye_off(stage, gr))
+            except Exception as e:
+                skipped.append(f"{os.path.basename(gr)}: dye overlay not disabled: {e}")
     for c in (curve_items or []):
         try: applied.append("curve " + stage_curve(stage, c["game_rel"], c.get("edits", {})))
         except Exception as e: skipped.append(f"{os.path.basename(c.get('game_rel',''))}: {e}")

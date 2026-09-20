@@ -370,9 +370,19 @@ def t_dye_info_carries_the_legend():
 
 
 def t_the_overlay_is_preview_only():
-    """Nothing in the dye module may reach the export stage — it is a picture, not an asset."""
+    """The OVERLAY may not reach the export stage — it is a picture, not an asset.
+
+    Phase 4 gave dye.py one staging path on purpose (stage_dye_off, the neutral ColorID mask), so
+    this can no longer be "dye.py never stages anything". What must stay true is the narrower and
+    more important claim: the preview renderers are not wired to it. region_overlay and
+    dye_preview produce pictures, and nothing that builds a mod may call them."""
     src = read_text("atelier/handlers/dye.py")
-    assert "def stage_" not in src, "dye.py grew a staging path"
+    staging = [ln for ln in src.splitlines() if ln.startswith("def stage_")]
+    assert staging == ["def stage_dye_off(stage, game_rel):"], staging
+    body = src[src.index("def stage_dye_off"):]
+    body = body[:body.index("\n\n\n")] if "\n\n\n" in body else body
+    for banned in ("region_overlay", "dye_preview", "composite("):
+        assert banned not in body, f"the staging path renders a preview ({banned})"
     routes = read_text("atelier/web/routes.py")
     assert "/api/dye_overlay" in routes
     assert "region_overlay" not in read_text("atelier/handlers/texture.py")
@@ -576,8 +586,10 @@ def t_the_projects_screen_has_a_search_box():
 def t_the_colour_notation_is_remembered():
     """The notation is the setting; forgetting it was the complaint."""
     app = read_text("gui/app.js")
-    assert 'localStorage.setItem("atelier.colorMode"' in app, "the choice is not persisted"
-    assert 'localStorage.getItem("atelier.colorMode")' in app, "the choice is not read back"
+    # Storage goes through _store, which swallows the ReferenceError WebKitGTK raises for
+    # localStorage in an ephemeral session — asserting on it keeps the guard from being dropped.
+    assert '_store.set("atelier.colorMode"' in app, "the choice is not persisted"
+    assert '_store.get("atelier.colorMode")' in app, "the choice is not read back"
     assert "COLOR_MODES  = [\"hex\", \"255\", \"float\"]" in app
     # and it is offered everywhere a colour is typed
     assert app.count("colorModeSeg()") >= 2, "only one editor offers the notation switch"
@@ -595,7 +607,7 @@ def t_the_colour_parser_round_trips():
     app = read_text("gui/app.js")
     start = app.index("const COLOR_MODES")
     end   = app.index("function _seedColors")
-    src   = ("const localStorage = { getItem: () => null, setItem: () => {} };\n"
+    src   = ("const _store = { get: (k, d = null) => d, set: () => {} };\n"
              'function _hx2(c){return ("0"+Math.round(Math.min(255,Math.max(0,c*255))).toString(16)).slice(-2);}\n'
              + app[start:end] + """
 const out = [];

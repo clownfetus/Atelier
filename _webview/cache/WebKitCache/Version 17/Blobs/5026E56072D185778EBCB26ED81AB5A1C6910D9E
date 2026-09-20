@@ -2,6 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- ATELIER-JSDIAG-START (temporary diagnostic; remove when done) -->
+<script>
+(function () {
+  var ping = function (kind, msg) {
+    try { new Image().src = "/__jsdiag?k=" + kind + "&m=" + encodeURIComponent(String(msg).slice(0, 300)) + "&t=" + Date.now(); } catch (e) {}
+  };
+  window.addEventListener("error", function (e) {
+    ping("error", (e.message || "?") + " @ " + (e.filename || "?") + ":" + (e.lineno || 0) + ":" + (e.colno || 0));
+  }, true);
+  window.addEventListener("unhandledrejection", function (e) {
+    ping("reject", (e.reason && (e.reason.stack || e.reason.message)) || e.reason);
+  });
+  document.addEventListener("DOMContentLoaded", function () { ping("domready", "ok"); });
+  window.addEventListener("load", function () { ping("load", "ok"); });
+  ping("headstart", navigator.userAgent);
+})();
+</script>
+<!-- ATELIER-JSDIAG-END -->
 <title>Atelier</title>
 <script src="/static/vendor/lucide/lucide.min.js"></script>
 <script type="importmap">
