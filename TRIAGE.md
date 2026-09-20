@@ -40,6 +40,17 @@ legitimately carries no directory index, and treating it as a failed container p
 "wrong AES key" warning on screen at every launch *and* stopped the index from ever being cached
 (19 s rebuild every launch instead of a 1.2 s load). Fixed in `io_lib.parse_dir_index`.
 
+Phase 3 (items **11, 14, 15, 16, 17, 18, 19**) and item **35** are also implemented, with
+`tests/test_phase3.py` and `tests/test_patch_override.py`. Item **2** is **superseded, not done**:
+the second-AES-key hypothesis does not hold on a real install — every container reports
+`enc_guid=0`, the patch container's directory index decrypts with the main key, and what actually
+broke patched materials was *resolution*, which #35 fixes. `enc_guid` is now recorded on every
+failed container, so if a genuinely differently-keyed pak ever ships it shows up as a non-zero guid
+in the warning list instead of having to be re-derived.
+
+**All of the above was verified on Linux only.** The Linux port touched code Windows also runs;
+`LINUX.md` → *Still to verify on Windows* lists what that leaves unconfirmed and how to check it.
+
 Everything else below is unstarted.
 
 ---

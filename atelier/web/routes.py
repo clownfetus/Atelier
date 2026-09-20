@@ -1702,7 +1702,7 @@ def api_reset_data():
     try:
         import atelier.index as _idx_mod; _idx_mod._INDEX = None
     except Exception: pass
-    try: _asset_cache._cache.clear()
+    try: _asset_cache.clear()
     except Exception: pass
     try:
         with _pak_thumb_mod._toc_lock:   _pak_thumb_mod._toc_cache.clear()

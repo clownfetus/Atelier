@@ -191,6 +191,16 @@ key, or a season boundary.
 the plumbing is short. The reason it's late isn't difficulty — it's that you can't prove it
 works without a live patch pak that actually uses a different key.
 
+> **Update (2026-09-19): the premise did not survive contact with a real install.** Every container
+> reports `enc_guid=0`, and the patch container's directory index decrypts with the main key — so
+> patched materials were never a second-key problem. The actual cause was *resolution*: which
+> on-disk copy the work cache handed back once a patch had moved an asset. That is item **35**,
+> which is now done (`tests/test_patch_override.py`). Item 2 is therefore **superseded rather than
+> completed** — it stays on the board only because a differently-keyed pak could still ship one day,
+> and `enc_guid` is now recorded on every failed container so that day is a log read, not an
+> investigation. The original reports came from Windows; see `LINUX.md` → *Still to verify on
+> Windows*.
+
 **Still open, per your read:** cartbuddy's inconsistency (new-skin mods working while older
 material edits broke) could be a skin added straight to the base paks rather than patched, or
 one patch pak encrypted and another not. Not decidable from logs. Worth capturing a copy of the

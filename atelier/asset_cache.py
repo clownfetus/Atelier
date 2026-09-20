@@ -53,6 +53,22 @@ def record_many(entries):
             _names[os.path.basename(game_rel).lower()] = game_rel
         _save()
 
+def clear():
+    """Drop every entry, in memory AND on disk — the Reset Data path.
+
+    routes.reset_data() deletes _CACHE wholesale, but this module keeps `_data` in memory and
+    re-saves it on the next record()/remove(), which recreated extracted_assets.json full of
+    entries pointing into the _cache/import tree that had just been deleted.
+    """
+    with _lock:
+        _data.clear()
+        _names.clear()
+        try:
+            if os.path.exists(_PATH): os.remove(_PATH)
+        except OSError:
+            pass
+
+
 def remove(game_rel: str):
     with _lock:
         name_key = os.path.basename(game_rel).lower()
