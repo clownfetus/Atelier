@@ -1732,6 +1732,77 @@ def api_project_delete():
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
+def _safe_project_dir(name):
+    """The folder for `name`, or None when the name is not a plain project name sitting directly
+    in PROJECTS_ROOT. Export is the one project route that takes a list, so a bad entry must fail
+    the request rather than quietly resolve somewhere else on disk."""
+    name = (name or "").strip()
+    if not name or name in (".", "..") or any(c in name for c in r'/\:*?"<>|'):
+        return None
+    path = os.path.join(PROJECTS_ROOT, name)
+    if os.path.dirname(os.path.abspath(path)) != os.path.abspath(PROJECTS_ROOT):
+        return None
+    return path if os.path.isdir(path) else None
+
+def _build_project_zip(names):
+    """Pack the named projects into one .zip under the cache and return its path.
+
+    One project zips its own contents at the root, so unzipping gives the project back as-is;
+    several are each placed in a folder named after the project, so one archive can be handed over
+    whole. Nothing on disk is touched — export is a copy, not a move. Raises ValueError naming the
+    offender when a name is not a project sitting in PROJECTS_ROOT."""
+    import zipfile
+    dirs = []
+    for name in names:
+        d = _safe_project_dir(name)
+        if not d:
+            raise ValueError(f"project not found: {name}")
+        dirs.append((name, d))
+    if not dirs:
+        raise ValueError("no projects given")
+
+    out_dir = os.path.join(_CACHE, "project_export")
+    shutil.rmtree(out_dir, ignore_errors=True)   # one export at a time; the last zip is not worth keeping
+    os.makedirs(out_dir, exist_ok=True)
+    stem = dirs[0][0] if len(dirs) == 1 else f"atelier_projects_{len(dirs)}"
+    zip_path = os.path.join(out_dir, stem + ".zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, d in dirs:
+            prefix = "" if len(dirs) == 1 else name + "/"
+            for root, _subdirs, files in os.walk(d):
+                rel_root = os.path.relpath(root, d)
+                if not files and rel_root != ".":
+                    z.writestr(prefix + rel_root.replace(os.sep, "/") + "/", b"")
+                for fname in files:
+                    arc = os.path.join(rel_root, fname) if rel_root != "." else fname
+                    z.write(os.path.join(root, fname), prefix + arc.replace(os.sep, "/"))
+    return zip_path
+
+@app.post("/api/project/export")
+def api_project_export():
+    """Download one or more projects as a .zip. Errors come back as JSON so the picker can say why."""
+    body  = request.json or {}
+    names = body.get("names")
+    if not isinstance(names, list):
+        names = [body.get("name")] if body.get("name") else []
+    names = [n for n in ((n or "").strip() for n in names) if n]
+    if not names:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"error": "no projects given"})
+    try:
+        zip_path = _build_project_zip(names)
+    except ValueError as e:
+        response.status = 404
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    except OSError as e:
+        response.status = 500
+        response.content_type = "application/json"
+        return json.dumps({"error": str(e)})
+    return static_file(os.path.basename(zip_path), root=os.path.dirname(zip_path),
+                       mimetype="application/zip", download=os.path.basename(zip_path))
+
 @app.get("/api/project/thumb")
 def api_project_thumb():
     project = request.query.get("project", "")

@@ -660,6 +660,91 @@ for t in (t_the_projects_screen_has_a_search_box, t_the_colour_notation_is_remem
     check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
 
 
+# ══ projects screen — list view, multi-select, delete / export ═══════════════
+section("projects screen  list view · multi-select · export")
+
+
+def t_the_picker_offers_both_views_and_a_tick_per_project():
+    """One screen, two shapes: cards with a checkbox on hover, rows with one always showing."""
+    html = read_text("gui/index.html")
+    assert 'id="proj-view-grid"' in html and 'id="proj-view-list"' in html, "no view toggle"
+    app = read_text("gui/app.js")
+    assert "function setProjView(" in app and '_store.set("atelier.projView"' in app, \
+        "the chosen view is not remembered"
+    css = read_text("gui/style.css")
+    # the grid tick is revealed by hover; the list tick is never hidden in the first place
+    assert ".proj-card .proj-check {" in css and ".proj-card:hover .proj-check" in css, \
+        "the grid checkbox is not hover-revealed"
+    assert ".proj-row .proj-check { display: flex;" in css, "the list checkbox is not always visible"
+
+
+def t_a_bulk_action_can_only_reach_visible_projects():
+    """Search narrows the selection with it — otherwise a filtered-out project is deleted unseen."""
+    app = read_text("gui/app.js")
+    body = app[app.index("function _renderProjectPicker"): app.index("function _renderProjSelBar")]
+    assert "visible.has(n)" in body and "_projSel.delete(n)" in body, \
+        "the selection is not pruned to what is on screen"
+
+
+def t_delete_and_export_both_stop_at_a_confirmation():
+    """Both are in the context menu, and neither runs straight off the click."""
+    html = read_text("gui/index.html")
+    assert 'id="proj-export-overlay"' in html and 'id="proj-delete-overlay"' in html, \
+        "a confirmation overlay is missing"
+    app = read_text("gui/app.js")
+    menu = app[app.index("function _ctxItemsProject"): app.index("function _projRename")]
+    assert "_projExportConfirm(names)" in menu and "_projDeleteConfirm(names)" in menu, \
+        "the context menu acts without confirming"
+    for word in ("api(\"/api/project/delete\"", "_projExportRun("):
+        assert word not in menu, f"the menu reaches straight for {word}"
+
+
+def t_an_export_packs_the_project_and_leaves_it_alone():
+    """The zip is a copy: one project unzips as itself, several land in their own folders."""
+    import zipfile
+    tmp = tempfile.mkdtemp()
+    try:
+        for name in ("Alpha", "Beta"):
+            os.makedirs(os.path.join(tmp, "projects", name, "Textures"))
+            open(os.path.join(tmp, "projects", name, "Textures", "T.png"), "w").write(name)
+            open(os.path.join(tmp, "projects", name, "notes.json"), "w").write("{}")
+        saved = (RT.PROJECTS_ROOT, RT._CACHE)
+        RT.PROJECTS_ROOT = os.path.join(tmp, "projects")
+        RT._CACHE        = os.path.join(tmp, "cache")
+        try:
+            one = RT._build_project_zip(["Alpha"])
+            with zipfile.ZipFile(one) as z:
+                assert sorted(z.namelist()) == ["Textures/T.png", "notes.json"], z.namelist()
+                assert z.read("Textures/T.png") == b"Alpha"
+            many = RT._build_project_zip(["Alpha", "Beta"])
+            with zipfile.ZipFile(many) as z:
+                names = sorted(z.namelist())
+                assert names == ["Alpha/Textures/T.png", "Alpha/notes.json",
+                                 "Beta/Textures/T.png", "Beta/notes.json"], names
+            # a name that is not a project in the projects folder fails the whole request
+            for bad in ("../projects", "Gamma", "", "Alpha/../Beta"):
+                try:
+                    RT._build_project_zip([bad])
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError(f"{bad!r} was accepted as a project name")
+            # and the projects themselves are untouched
+            assert os.path.exists(os.path.join(tmp, "projects", "Alpha", "notes.json"))
+            assert os.path.exists(os.path.join(tmp, "projects", "Beta", "Textures", "T.png"))
+        finally:
+            (RT.PROJECTS_ROOT, RT._CACHE) = saved
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+for t in (t_the_picker_offers_both_views_and_a_tick_per_project,
+          t_a_bulk_action_can_only_reach_visible_projects,
+          t_delete_and_export_both_stop_at_a_confirmation,
+          t_an_export_packs_the_project_and_leaves_it_alone):
+    check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
+
+
 # ══ summary ══════════════════════════════════════════════════════════════════
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed" + (f", {len(SKIP)} skipped" if SKIP else ""))
 for name, err in FAIL:

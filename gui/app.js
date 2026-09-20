@@ -2847,7 +2847,8 @@ async function checkUpdate() {
 // ── project picker ────────────────────────────────────────────────────────────
 let _projPickerResolve  = null;
 let _projNameCtx        = null;
-let _projDeleteName     = null;
+let _projDeleteNames    = null;   // the names the delete confirmation is holding
+let _projExportNames    = null;   // …and the export one
 let _activeProjectName  = "";
 
 const _SAFE_NAME_RE = /[/\\:*?"<>|]/g;
@@ -2883,6 +2884,9 @@ function _relTime(mtime) {
 }
 
 let _projAll = [];               // every project, unfiltered — the search box filters this list
+let _projSel      = new Set();   // names ticked for a bulk action
+let _projLastName = null;        // anchor for shift-click ranges
+let _projView     = _store.get("atelier.projView") === "list" ? "list" : "grid";
 
 function _projSearchValue() {
   const el = document.getElementById("proj-search");
@@ -2894,10 +2898,101 @@ function projSearch() {
   _renderProjectPicker(_projAll, true);
 }
 
+// The rows the picker is showing right now — what a shift-range runs over, and the only projects
+// a selection may contain: filtering something out drops it from the selection too, so a bulk
+// delete can never reach a project the user cannot see.
+function _projVisible() {
+  const q = _projSearchValue();
+  return q ? _projAll.filter(p => (p.name || "").toLowerCase().includes(q)) : _projAll;
+}
+
+function setProjView(view) {
+  _projView = view === "list" ? "list" : "grid";
+  _store.set("atelier.projView", _projView);
+  _renderProjectPicker(_projAll, true);
+}
+
+function projSelClear() {
+  _projSel.clear();
+  _projLastName = null;
+  _renderProjectPicker(_projAll, true);
+}
+
+function _projSelClick(name, e) {
+  const names = _projVisible().map(p => p.name);
+  if (e && e.shiftKey && _projLastName) {
+    const a = names.indexOf(_projLastName), b = names.indexOf(name);
+    if (a >= 0 && b >= 0) for (let i = Math.min(a, b); i <= Math.max(a, b); i++) _projSel.add(names[i]);
+  } else {
+    if (_projSel.has(name)) _projSel.delete(name);
+    else _projSel.add(name);
+    _projLastName = name;
+  }
+  _renderProjectPicker(_projAll, true);
+}
+
+// Right-clicking a project inside the selection acts on the whole selection; right-clicking one
+// outside it acts on that project alone, without disturbing what is ticked.
+function _ctxItemsProject(proj) {
+  const names = _projSel.has(proj.name) ? [..._projSel] : [proj.name];
+  const n     = names.length;
+  const items = [];
+  if (n === 1) {
+    items.push({ icon: "folder-open", label: "Open", action: () => _selectProject(proj.name) });
+    items.push({ icon: "pencil", label: "Rename…", action: () => _projRename(proj) });
+    items.push({ icon: "copy", label: "Duplicate…", action: () => _projDuplicate(proj) });
+    items.push("sep");
+  }
+  items.push({ icon: "package", label: n === 1 ? "Export…" : `Export ${n} projects…`,
+               action: () => _projExportConfirm(names) });
+  items.push({ icon: "trash-2", danger: true, label: n === 1 ? "Delete…" : `Delete ${n} projects…`,
+               action: () => _projDeleteConfirm(names) });
+  return items;
+}
+
+function _projRename(proj) {
+  _showProjNameModal({
+    title: "Rename Project", value: proj.name, okLabel: "Rename",
+    action: async newName => {
+      const r = await api("/api/project/rename", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_name: proj.name, new_name: newName }),
+      });
+      if (r.ok) await _projRefresh();
+      else toast(`Rename failed: ${r.error}`, "warning");
+    },
+  });
+}
+
+function _projDuplicate(proj) {
+  _showProjNameModal({
+    title: "Duplicate Project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
+    action: async newName => {
+      const r = await api("/api/project/duplicate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: proj.name, new_name: newName }),
+      });
+      if (r.ok) await _projRefresh();
+      else toast(`Duplicate failed: ${r.error}`, "warning");
+    },
+  });
+}
+
+// Re-read the list from the server, keeping the search query and whatever is still selectable
+async function _projRefresh() {
+  const res = await api("/api/projects");
+  _projAll = res.projects || [];
+  [..._projSel].forEach(n => { if (!_projAll.some(p => p.name === n)) _projSel.delete(n); });
+  _renderProjectPicker(_projAll, true);
+  return res;
+}
+
 function _renderProjectPicker(projects, keepQuery) {
   const grid = document.getElementById("proj-grid");
   if (!keepQuery) {
     _projAll = projects;
+    _projSel.clear();
+    _projLastName = null;
     const el = document.getElementById("proj-search");
     if (el) el.value = "";
   }
@@ -2907,6 +3002,15 @@ function _renderProjectPicker(projects, keepQuery) {
   projects = q ? all.filter(p => (p.name || "").toLowerCase().includes(q)) : all;
   const search = document.getElementById("proj-search-row");
   if (search) search.style.display = all.length > 1 ? "" : "none";   // pointless with one project
+  for (const v of ["grid", "list"]) {
+    const btn = document.getElementById("proj-view-" + v);
+    if (btn) btn.classList.toggle("on", _projView === v);
+  }
+  // a project filtered out of view is out of the selection too
+  const visible = new Set(projects.map(p => p.name));
+  [..._projSel].forEach(n => { if (!visible.has(n)) _projSel.delete(n); });
+  _renderProjSelBar();
+  grid.className = _projView === "list" ? "proj-list-mode" : "proj-grid-mode";
   if (!projects.length) {
     grid.innerHTML = q
       ? `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`
@@ -2916,66 +3020,152 @@ function _renderProjectPicker(projects, keepQuery) {
   }
   projects.forEach(proj => {
     const card = document.createElement("div");
-    card.className = "proj-card";
+    const sel  = _projSel.has(proj.name);
+    card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "");
     card.dataset.name = proj.name;
     const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
-    card.innerHTML = `
+    const check = `<div class="proj-check" title="Select"><input type="checkbox" ${sel ? "checked" : ""}></div>`;
+    const thumb = `
       <div class="proj-thumb">
         <img src="${thumbUrl}" alt="" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">
-        <i data-lucide="folder" size="40" class="proj-thumb-icon"></i>
-      </div>
-      <div class="proj-body">
-        <div class="proj-name" title="${proj.name}">${proj.name}</div>
-        <div class="proj-meta">${assetTxt} &middot; ${_relTime(proj.mtime)}</div>
-      </div>
+        <i data-lucide="folder" size="${_projView === "list" ? 18 : 40}" class="proj-thumb-icon"></i>
+      </div>`;
+    const actions = `
       <div class="proj-actions">
         <button class="proj-action-btn" title="Rename" data-action="rename"><i data-lucide="pencil" size="13"></i></button>
         <button class="proj-action-btn" title="Duplicate" data-action="duplicate"><i data-lucide="copy" size="13"></i></button>
         <button class="proj-action-btn danger" title="Delete" data-action="delete"><i data-lucide="trash-2" size="13"></i></button>
       </div>`;
+    const name = `<div class="proj-name" title="${_esc(proj.name)}">${_esc(proj.name)}</div>`;
+    // same parts either way: the list spreads the two meta fields into their own columns, the
+    // card stacks them under the name
+    card.innerHTML = _projView === "list"
+      ? `${check}${thumb}
+         <div class="proj-body">${name}</div>
+         <div class="proj-meta proj-col-assets">${assetTxt}</div>
+         <div class="proj-meta proj-col-time">${_relTime(proj.mtime)}</div>
+         ${actions}`
+      : `${check}${thumb}
+         <div class="proj-body">
+           ${name}
+           <div class="proj-meta">${assetTxt} &middot; ${_relTime(proj.mtime)}</div>
+         </div>
+         ${actions}`;
+    card.querySelector(".proj-check").addEventListener("click", e => {
+      e.stopPropagation();
+      _projSelClick(proj.name, e);
+    });
     card.addEventListener("click", e => {
-      if (e.target.closest(".proj-action-btn")) return;
+      if (e.target.closest(".proj-action-btn") || e.target.closest(".proj-check")) return;
+      // ctrl/cmd or shift ticks for a bulk action; a plain click still opens the project, and
+      // clears the ticks so the two modes can never be confused for one another.
+      if (e.ctrlKey || e.metaKey || (e.shiftKey && _projLastName)) { _projSelClick(proj.name, e); return; }
+      if (_projSel.size) { projSelClear(); return; }
       _selectProject(proj.name);
     });
+    card.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsProject(proj)));
     card.querySelector("[data-action=rename]").addEventListener("click", e => {
       e.stopPropagation();
-      _showProjNameModal({
-        title: "Rename Project", value: proj.name, okLabel: "Rename",
-        action: async newName => {
-          const r = await api("/api/project/rename", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ old_name: proj.name, new_name: newName }),
-          });
-          if (r.ok) { const res = await api("/api/projects"); _renderProjectPicker(res.projects || []); }
-          else toast(`Rename failed: ${r.error}`, "warning");
-        },
-      });
+      _projRename(proj);
     });
     card.querySelector("[data-action=duplicate]").addEventListener("click", e => {
       e.stopPropagation();
-      _showProjNameModal({
-        title: "Duplicate Project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
-        action: async newName => {
-          const r = await api("/api/project/duplicate", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: proj.name, new_name: newName }),
-          });
-          if (r.ok) { const res = await api("/api/projects"); _renderProjectPicker(res.projects || []); }
-          else toast(`Duplicate failed: ${r.error}`, "warning");
-        },
-      });
+      _projDuplicate(proj);
     });
     card.querySelector("[data-action=delete]").addEventListener("click", e => {
       e.stopPropagation();
-      _projDeleteName = proj.name;
-      document.getElementById("proj-delete-msg").textContent =
-        `Delete project "${proj.name}"? All ${proj.asset_count} edited asset${proj.asset_count !== 1 ? "s" : ""} will be permanently deleted.`;
-      document.getElementById("proj-delete-overlay").classList.add("active");
+      _projDeleteConfirm([proj.name]);
     });
     grid.appendChild(card);
   });
   lucide.createIcons({ nodes: [grid] });
+}
+
+function _renderProjSelBar() {
+  const bar = document.getElementById("proj-selbar");
+  if (!bar) return;
+  if (!_projSel.size) { bar.innerHTML = ""; bar.style.display = "none"; return; }
+  bar.style.display = "flex";   // the stylesheet keeps it at none, so name the layout back
+  bar.innerHTML = `<span>${_projSel.size} selected</span><span class="grow"></span>
+    <button onclick="projSelClear()">Clear</button>
+    <button onclick="projSelExport()">Export</button>
+    <button class="danger" onclick="projSelDelete()">Delete</button>`;
+}
+
+function projSelExport() { _projExportConfirm([..._projSel]); }
+function projSelDelete() { _projDeleteConfirm([..._projSel]); }
+
+// ── delete / export confirmations ─────────────────────────────────────────────
+function _projAssetTotal(names) {
+  return names.reduce((n, name) => {
+    const p = _projAll.find(x => x.name === name);
+    return n + (p ? p.asset_count : 0);
+  }, 0);
+}
+
+// A bulk confirmation has to name what it is about to destroy, but a 40-project selection cannot
+// fit in a dialog — list the first few and count the rest.
+function _projNameList(names, cap = 6) {
+  return names.length <= cap
+    ? names.join(", ")
+    : `${names.slice(0, cap).join(", ")} …and ${names.length - cap} more`;
+}
+
+function _projDeleteConfirm(names) {
+  names = (names || []).filter(Boolean);
+  if (!names.length) return;
+  _projDeleteNames = names;
+  const assets = _projAssetTotal(names);
+  const assetTxt = `${assets} edited asset${assets !== 1 ? "s" : ""}`;
+  document.getElementById("proj-delete-title").textContent =
+    names.length === 1 ? "Delete Project?" : `Delete ${names.length} Projects?`;
+  document.getElementById("proj-delete-msg").textContent = names.length === 1
+    ? `Delete project "${names[0]}"? All ${assetTxt} will be permanently deleted.`
+    : `Delete these ${names.length} projects? All ${assetTxt} across them will be permanently deleted.\n\n${_projNameList(names)}`;
+  document.getElementById("proj-delete-overlay").classList.add("active");
+}
+
+function _projExportConfirm(names) {
+  names = (names || []).filter(Boolean);
+  if (!names.length) return;
+  _projExportNames = names;
+  const assets = _projAssetTotal(names);
+  const assetTxt = `${assets} edited asset${assets !== 1 ? "s" : ""}`;
+  document.getElementById("proj-export-title").textContent =
+    names.length === 1 ? "Export Project?" : `Export ${names.length} Projects?`;
+  document.getElementById("proj-export-msg").textContent = names.length === 1
+    ? `Pack project "${names[0]}" (${assetTxt}) into a .zip you can save or share. Nothing is changed or removed.`
+    : `Pack these ${names.length} projects (${assetTxt}) into one .zip, each in its own folder. Nothing is changed or removed.\n\n${_projNameList(names)}`;
+  document.getElementById("proj-export-overlay").classList.add("active");
+}
+
+async function _projExportRun(names) {
+  const t = toastSpinner(`Packing ${names.length === 1 ? `"${_esc(names[0])}"` : names.length + " projects"}…`);
+  try {
+    const r = await fetch("/api/project/export", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names }),
+    });
+    if (!r.ok) {
+      let msg = "Export failed";
+      try { msg = (await r.json()).error || msg; } catch (_) {}
+      toast(msg, "warning", 6000);
+      return;
+    }
+    const b = await r.blob();
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = names.length === 1 ? `${names[0]}.zip` : `atelier_projects_${names.length}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 8000);
+    toast(`Exported ${a.download}`, "success");
+  } catch (e) {
+    toast(`Export failed: ${e.message}`, "warning", 6000);
+  } finally {
+    t.remove();
+  }
 }
 
 function _applyActiveProject(name) {
@@ -3059,27 +3249,41 @@ document.getElementById("proj-name-input").addEventListener("keydown", e => {
 
 document.getElementById("proj-delete-cancel").addEventListener("click", () => {
   document.getElementById("proj-delete-overlay").classList.remove("active");
-  _projDeleteName = null;
+  _projDeleteNames = null;
 });
 
 document.getElementById("proj-delete-ok").addEventListener("click", async () => {
   document.getElementById("proj-delete-overlay").classList.remove("active");
-  const name = _projDeleteName; _projDeleteName = null;
-  if (!name) return;
-  const r = await api("/api/project/delete", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (r.ok) {
-    toast(`Deleted project "${name}"`, "warning");
-    const res = await api("/api/projects");
-    _renderProjectPicker(res.projects || []);
-    if (!res.active || !res.projects.find(p => p.name === res.active)) {
-      document.getElementById("project-overlay").classList.add("active");
-    }
-  } else {
-    toast(`Delete failed: ${r.error}`, "warning");
+  const names = _projDeleteNames; _projDeleteNames = null;
+  if (!names || !names.length) return;
+  const failed = [];
+  for (const name of names) {
+    const r = await api("/api/project/delete", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) failed.push(`${name} (${r.error})`);
+    else _projSel.delete(name);
   }
+  const done = names.length - failed.length;
+  if (done) toast(done === 1 ? `Deleted project "${names[0]}"` : `Deleted ${done} projects`, "warning");
+  if (failed.length) toast(`Delete failed: ${failed.join("; ")}`, "warning", 6000);
+  const res = await _projRefresh();
+  if (!res.active || !(res.projects || []).find(p => p.name === res.active)) {
+    document.getElementById("project-overlay").classList.add("active");
+  }
+});
+
+document.getElementById("proj-export-cancel").addEventListener("click", () => {
+  document.getElementById("proj-export-overlay").classList.remove("active");
+  _projExportNames = null;
+});
+
+document.getElementById("proj-export-ok").addEventListener("click", async () => {
+  document.getElementById("proj-export-overlay").classList.remove("active");
+  const names = _projExportNames; _projExportNames = null;
+  if (!names || !names.length) return;
+  await _projExportRun(names);
 });
 
 document.getElementById("menu-btn").addEventListener("click", e => {

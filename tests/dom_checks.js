@@ -123,6 +123,82 @@ projSearch();
 if (!document.getElementById("proj-grid").innerHTML.includes("No project matches"))
   throw new Error("empty search result not reported");
 
+// ── projects: view modes, multi-select, context menu ─────────────────────────
+// Cards are appended as nodes, so the markup is read off the children, not the container.
+const projGrid  = document.getElementById("proj-grid");
+const projCards = () => [...projGrid.children];
+const projHtml  = () => projCards().map(c => c.innerHTML).join("");
+_renderProjectPicker([{ name: "Rocket Recolor", asset_count: 2, mtime: 1 },
+                      { name: "Hela UI", asset_count: 1, mtime: 2 }]);
+
+// grid view: the tick is in the markup (CSS reveals it on hover), one per card
+setProjView("grid");
+if (projCards().some(c => c.className !== "proj-card")) throw new Error("grid view did not render cards");
+if ((projHtml().match(/class="proj-check"/g) || []).length !== 2)
+  throw new Error("grid cards are missing the hover checkbox");
+
+// list view: rows, with the tick first — the leftmost column, before the thumbnail
+setProjView("list");
+if (projGrid.className !== "proj-list-mode") throw new Error("list view class not applied");
+if (projCards().some(c => c.className !== "proj-row")) throw new Error("list view did not render rows");
+for (const c of projCards()) {
+  const check = c.innerHTML.indexOf("proj-check"), thumb = c.innerHTML.indexOf("proj-thumb");
+  if (check < 0 || thumb < 0 || check > thumb)
+    throw new Error("the list checkbox must come first, in the leftmost column");
+}
+if (_store.get("atelier.projView") !== "list") throw new Error("view mode not persisted");
+
+// ticking: a click on the box selects without opening; shift extends over what is visible
+_projSelClick("Hela UI", {});
+if (_projSel.size !== 1 || !_projSel.has("Hela UI")) throw new Error("checkbox did not select");
+if (!projCards().some(c => c.className.includes("sel"))) throw new Error("selected row not marked");
+if (!document.getElementById("proj-selbar").innerHTML.includes("1 selected"))
+  throw new Error("the selection bar does not report the count");
+_projSelClick("Rocket Recolor", { shiftKey: true });
+if (_projSel.size !== 2) throw new Error("shift-range did not extend: " + [..._projSel]);
+
+// the context menu acts on the whole selection when the target is part of it
+const ctxMany = _ctxItemsProject({ name: "Hela UI", asset_count: 1 }).filter(i => i !== "sep");
+if (!ctxMany.some(i => i.label === "Export 2 projects…") ||
+    !ctxMany.some(i => i.label === "Delete 2 projects…"))
+  throw new Error("bulk context menu missing Export/Delete: " + ctxMany.map(i => i.label));
+
+// …and on one project alone when it is not
+projSelClear();
+if (_projSel.size !== 0) throw new Error("clear failed");
+const ctxOne = _ctxItemsProject({ name: "Hela UI", asset_count: 1 }).filter(i => i !== "sep");
+for (const l of ["Open", "Rename…", "Duplicate…", "Export…", "Delete…"])
+  if (!ctxOne.some(i => i.label === l)) throw new Error("single context menu missing " + l);
+
+// both destructive-looking actions stop at a confirmation that names what it will act on
+_projDeleteConfirm(["Hela UI", "Rocket Recolor"]);
+const delMsg = document.getElementById("proj-delete-msg").textContent;
+if (!/Delete these 2 projects/.test(delMsg) || !delMsg.includes("3 edited assets"))
+  throw new Error("bulk delete confirmation does not add up: " + delMsg);
+if (!delMsg.includes("Hela UI") || !delMsg.includes("Rocket Recolor"))
+  throw new Error("the delete confirmation must name the projects");
+if (_projDeleteNames.length !== 2) throw new Error("delete confirmation did not hold the names");
+
+_projExportConfirm(["Hela UI"]);
+const expMsg = document.getElementById("proj-export-msg").textContent;
+if (!expMsg.includes('"Hela UI"') || !expMsg.includes("1 edited asset"))
+  throw new Error("export confirmation does not name the project: " + expMsg);
+if (!/Nothing is changed or removed/.test(expMsg))
+  throw new Error("export must say it leaves the project alone");
+if (_projExportNames.length !== 1) throw new Error("export confirmation did not hold the names");
+
+// a project filtered out of view drops out of the selection — a bulk action can only ever
+// reach what the user can see
+_projSelClick("Hela UI", {});
+_projSelClick("Rocket Recolor", {});
+document.getElementById("proj-search").value = "hela";
+projSearch();
+if (_projSel.size !== 1 || !_projSel.has("Hela UI"))
+  throw new Error("search must narrow the selection to the visible rows: " + [..._projSel]);
+document.getElementById("proj-search").value = "";
+projSelClear();
+setProjView("grid");
+
 // ── Phase 4: per-asset export options (#20 mips/group, #21 Marvel_LQ, #22 remove) ───────────
 // The controls are only worth having if they say what they will actually do to THIS asset, so
 // that is what is asserted: the two cases where the honest answer is "not what you might expect".

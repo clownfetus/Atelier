@@ -458,10 +458,21 @@
         <i data-lucide="plus" size="14"></i> New Project
       </button>
     </div>
-    <div id="proj-search-row" style="padding:0 0 10px">
-      <input id="proj-search" class="setup-input" type="text" spellcheck="false"
-             placeholder="Search projects…" oninput="projSearch()">
+    <div id="proj-toolbar">
+      <div id="proj-search-row">
+        <input id="proj-search" class="setup-input" type="text" spellcheck="false"
+               placeholder="Search projects…" oninput="projSearch()">
+      </div>
+      <div class="proj-view-toggle">
+        <button id="proj-view-grid" title="Grid view" onclick="setProjView('grid')">
+          <i data-lucide="layout-grid" size="14"></i>
+        </button>
+        <button id="proj-view-list" title="List view" onclick="setProjView('list')">
+          <i data-lucide="list" size="14"></i>
+        </button>
+      </div>
     </div>
+    <div id="proj-selbar"></div>
     <div id="proj-grid"></div>
   </div>
 </div>
@@ -483,12 +494,28 @@
 <!-- ── project delete confirm ── -->
 <div class="overlay" id="proj-delete-overlay">
   <div class="modal">
-    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i> Delete Project?</h2>
+    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i>
+      <span id="proj-delete-title">Delete Project?</span></h2>
     <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
     <div class="modal-row">
       <button class="btn" id="proj-delete-cancel">Cancel</button>
       <button class="btn primary" id="proj-delete-ok">
         <i data-lucide="trash-2" size="14"></i> Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── project export confirm ── -->
+<div class="overlay" id="proj-export-overlay">
+  <div class="modal">
+    <h2><i data-lucide="package" size="18" style="color:var(--acc)"></i>
+      <span id="proj-export-title">Export Project?</span></h2>
+    <p id="proj-export-msg">This packs the project folder into a .zip you can save anywhere.</p>
+    <div class="modal-row">
+      <button class="btn" id="proj-export-cancel">Cancel</button>
+      <button class="btn primary" id="proj-export-ok">
+        <i data-lucide="download" size="14"></i> Export
       </button>
     </div>
   </div>
