@@ -1,7 +1,8 @@
-# Running Atelier on Linux (development)
+# Running Atelier on Linux
 
-Atelier is a Windows app. This document covers running it from source on Linux for development —
-there is no Linux packaging, and `BUILD.bat` / `Atelier.iss` remain Windows-only.
+Atelier started as a Windows app; this document covers both running it from source on Linux for
+development, and building a packaged Linux copy with `linux/build_appimage.sh` (the Linux
+counterpart to `BUILD.bat`; the output is a single-file AppImage).
 
 The approach is deliberately minimal: the Windows asset tools in `Tools/` are kept as-is, and only
 the things they cannot cover were ported. Where a **native Linux build** of a tool is dropped in
@@ -63,6 +64,71 @@ a real `liboo2corelinux64.so.9`, drop it in `Tools/` (or point `ATELIER_OODLE` a
    .venv/bin/python window.py    # full app
    .venv/bin/python server.py    # headless, http://localhost:8767
    ```
+
+## Building a packaged copy
+
+```sh
+linux/build_appimage.sh            # uses the version already in ./version
+linux/build_appimage.sh 0.3.4      # or pass one explicitly, same N.N.N format BUILD.bat expects
+```
+
+This runs `PyInstaller` against the same `Atelier.spec` Windows uses (no Linux-specific spec
+needed — PyInstaller freezes the GTK/WebKit webview backend the same way it freezes any other
+extension module), then assembles `dist/Atelier/` the way `BUILD.bat` assembles `dist\Atelier\`:
+`Tools/` is copied in, and the same two categories of file are stripped for the same reasons —
+
+- **Game-derived data** (`Tools/Mappings/`, `Tools/AES_KEY.txt`) — never shipped on either
+  platform; the app fetches both itself on first run.
+- **Dead weight for this platform** — mirrored in the other direction from `BUILD.bat`, which
+  drops the *Linux* native builds from a *Windows* dist. Here it's the reverse: `UAssetGUI.exe`
+  and `shaders/dxc.exe`/`dxcompiler.dll`/`dxil.dll` back features (`world.py`, `dxc_ir.py`) that
+  call `hostos.unsupported()` unconditionally on Linux — Wine or not, they're never invoked, so
+  there's no reason to ship them. `UAssetTool.exe` and `shaders/retoc-rivals-cli.exe` are dropped
+  too, but for a different reason: `hostos.native_tool()` always prefers the extensionless native
+  binary sitting beside them when one is present, so once that binary is in `Tools/` the `.exe`
+  is simply dead code, not a fallback.
+
+Output: `dist/Atelier-<version>-x86_64.AppImage` (the intermediate `dist/Atelier/` folder is also runnable directly).
+The prereqs are the same four setup steps above — the script checks each one (venv exists and
+was built `--system-site-packages`, PyInstaller installed, `Tools/` present, `libooz.so` built)
+and fails with a specific message rather than guessing.
+
+### AppImage
+
+```sh
+linux/build_appimage.sh   # -> dist/Atelier-<version>-x86_64.AppImage
+```
+
+The script downloads `appimagetool` into `linux/_appimagetool/` on first use (needs
+network) and wraps `dist/Atelier`. Because an AppImage mounts read-only while Atelier writes its
+config, cache, projects and downloaded mappings beside the executable, `AppRun` stages a writable
+copy of the bootloader and `Tools/` in `~/.local/share/Atelier` (override with `ATELIER_HOME`) and
+links the large read-only `_internal/` back into the image. All user data lives in that directory,
+so deleting it resets the app; upgrading the AppImage refreshes the staged tools without touching
+Mappings, the AES key or your projects.
+
+The AppImage does **not** bundle WebKitGTK, Wine or zenity — install those from the table below.
+Running it needs FUSE 2 (Arch: `sudo pacman -S fuse2`); without it, run
+`./Atelier-*.AppImage --appimage-extract-and-run`.
+
+**What a machine running the packaged build needs installed**, separate from what *building* it
+needs:
+
+| Dependency | Why | If missing |
+|---|---|---|
+| `webkit2gtk-4.1` + `python-gobject` (system, not pip) | pywebview's GTK backend, which is what got frozen in | window fails to open; `server.py`-only use is unaffected since headless mode never touches it |
+| `zenity` | folder/file pickers (Setup's paks path, texture import/export) | pickers raise a clear "zenity is not installed" error when opened; nothing else is affected |
+| **Wine** (`wine64` or `wine`) | only for `Tools/AtelierMesh/AtelierMesh.exe` — the 3D viewport's mesh→glTF decoder has no native Linux build (unlike UAssetTool and retoc, which do, and so never touch Wine at all on a packaged Linux build) | opening the 3D viewport fails with a clear "Wine not found" error; **everything else — browsing, texture/material editing, mod build/install, repatch — works with no Wine installed at all** |
+| `notify-send`, `xdg-open` / `gio`, `dbus-send` | desktop notifications and "show in file manager" | best-effort; their absence is swallowed silently (notify) or falls back to just opening the folder (reveal) |
+
+In short: **Wine is optional**, and the one thing it gates (the 3D skin viewport) is the one
+Linux path nobody has verified yet (see Status below) — a Wine build there is untested, not
+just unwired. Everything else in the table can be skipped if you don't need that specific
+feature, but a normal end user should just install all four system packages up front:
+
+```sh
+sudo pacman -S wine zenity webkit2gtk-4.1 python-gobject   # Arch; adapt for your distro
+```
 
 ## Status
 

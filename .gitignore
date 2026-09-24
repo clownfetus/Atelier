@@ -234,3 +234,4 @@ linux/_ooz/
 retrieval/.env
 retrieval/data/
 retrieval/test.py
+linux/_appimagetool/
