@@ -17,6 +17,10 @@ function mkEl(id) {
   if (els[id]) return els[id];
   const el = {
     id, value: "", textContent: "", _html: "", dataset: {}, style: {}, children: [],
+    attributes: {},
+    setAttribute(name, value){ this.attributes[name] = String(value); },
+    getAttribute(name){ return this.attributes[name] ?? null; },
+    contains(){ return false; },
     classList: { add(){}, remove(){}, toggle(){}, contains(){return false;} },
     addEventListener(){}, removeEventListener(){}, appendChild(c){ this.children.push(c); },
     querySelector(){ return mkEl(id + "-q"); }, querySelectorAll(){ return []; },

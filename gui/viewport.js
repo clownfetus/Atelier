@@ -490,7 +490,10 @@ function buildPanel() {
     if (d.dyeable) {
       // dyeing material — offer to bake+download the composited albedo with the current Region colours
       const dl = document.createElement('button');
-      dl.className = 'vp-mat-dl'; dl.title = 'Download baked dyed texture (2048)'; dl.textContent = '⤓';
+      dl.className = 'vp-mat-dl'; dl.title = 'Download baked dyed texture (2048)';
+      dl.setAttribute('aria-label', dl.title);
+      dl.innerHTML = '<i data-lucide="download" size="18"></i>';
+      window.AtelierIcons.createIcons({ nodes: [dl] });
       dl.addEventListener('click', e => { e.stopPropagation(); dyeDownloadMesh(name); });
       h.appendChild(dl);
     }

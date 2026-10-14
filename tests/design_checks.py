@@ -1,0 +1,98 @@
+"""Material foundation checks run inside browser_smoke's real Bottle/Chromium session."""
+
+
+def run_design_checks(page, context, url, report, checks):
+    picker = page.locator('#topbar [data-theme-picker]')
+    page.set_viewport_size({'width': 1400, 'height': 900})
+    page.wait_for_function('document.fonts.check("14px Roboto")')
+    assert page.evaluate('document.querySelector(".studio-brand img").naturalWidth') > 0
+    for theme in ('light', 'dark'):
+        picker.select_option(theme)
+        assert page.locator('html').get_attribute('data-theme') == theme
+        assert page.locator('#settings-theme').input_value() == theme
+        # Measure actual computed roles, including the brightest container background.
+        contrast = page.evaluate('''() => {
+          const css = getComputedStyle(document.documentElement);
+          const rgb = name => {
+            const probe = document.createElement('span'); probe.style.color = `var(${name})`;
+            document.body.append(probe);
+            const result = getComputedStyle(probe).color.match(/[\\d.]+/g).slice(0,3).map(Number);
+            probe.remove(); return result;
+          };
+          const luminance = name => rgb(name).map(v => v/255).map(v => v<=.04045 ? v/12.92 : ((v+.055)/1.055)**2.4)
+            .reduce((sum,v,i) => sum+v*[.2126,.7152,.0722][i],0);
+          const ratio = (a,b) => (Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
+          const pairs = [['--md-sys-color-on-primary','--md-sys-color-primary'],
+            ['--md-sys-color-on-primary-container','--md-sys-color-primary-container'],
+            ['--md-sys-color-on-secondary-container','--md-sys-color-secondary-container'],
+            ['--md-sys-color-on-error-container','--md-sys-color-error-container']];
+          for (const fg of ['--text','--muted','--acc','--green','--yellow','--blue'])
+            for (const bg of ['--bg','--bg2','--bg3']) pairs.push([fg,bg]);
+          return pairs.map(([a,b])=>({a,b,ratio:ratio(a,b)}));
+        }''')
+        assert all(pair['ratio'] >= 4.5 for pair in contrast), (theme, contrast)
+        for width, height in ((1024,768), (1280,800), (1400,900), (1920,1080)):
+            page.set_viewport_size({'width': width, 'height': height})
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            assert page.locator('#install-btn').is_visible()
+            page.screenshot(path=str(report / f'{theme}-{width}x{height}.png'), animations='disabled')
+    checks.append('Light/dark color pairs pass 4.5:1; shell fits four desktop sizes; local font/logo load')
+
+    page.reload()
+    page.wait_for_selector('#grid-area .card')
+    assert page.locator('html').get_attribute('data-theme') == 'dark'
+    page.emulate_media(color_scheme='light')
+    assert page.locator('html').get_attribute('data-theme') == 'dark'
+    picker.select_option('system')
+    assert page.locator('html').get_attribute('data-theme') == 'light'
+    page.emulate_media(color_scheme='dark')
+    page.wait_for_function('document.documentElement.dataset.theme === "dark"')
+    checks.append('Theme persists across reloads, follows OS in System mode and stays fixed when explicitly selected')
+
+    page.locator('#menu-btn').focus()
+    page.keyboard.press('Enter')
+    page.wait_for_selector('#ctx-menu.active')
+    page.keyboard.press('ArrowDown')
+    assert page.evaluate('document.activeElement.textContent.includes("Refresh View")')
+    page.keyboard.press('Escape')
+    assert page.locator('#menu-btn').evaluate('(el)=>el===document.activeElement')
+    page.locator('#grid-area .card').first.focus()
+    assert page.locator('#grid-area .card').first.evaluate('(el)=>getComputedStyle(el).outlineStyle') == 'solid'
+    assert page.locator('#grid-area .card .studio-icon').first.evaluate('(el)=>el.getBoundingClientRect().width') > 90
+    missing = page.evaluate('''() => [...document.querySelectorAll('[data-lucide]')]
+      .map(el=>el.dataset.lucide).filter(name=>!AtelierSymbolPaths[name])''')
+    assert not missing, missing
+    checks.append('Keyboard menu navigation/focus return work; folder symbols fill tiles; all rendered symbols are mapped')
+
+    page.route('**/api/material_params?*', lambda route: route.fulfill(json={
+        'ok': True, 'colors': [{'name':'Base Color', 'rgba':[0.25,0.5,0.75,1]},
+                                {'name':'Emissive Color', 'rgba':[2,1,0.5,1]}],
+        'scalars': [{'name':'Roughness','value':0.35}, {'name':'Metallic','value':0.8}]}))
+    page.route('**/api/dye_info?*', lambda route: route.fulfill(json={'dyeable':False}))
+    page.set_viewport_size({'width':1400,'height':900})
+    page.evaluate("openMaterialEditor({name:'MI_Body', game_rel:'Characters/1029/1029100/Materials/MI_Body'})")
+    page.wait_for_selector('#mathx0')
+    page.locator('#mathx0').fill('#ab3456')
+    page.locator('#mathx0').press('Tab')
+    draft = page.evaluate('JSON.stringify(matEditor)')
+    # Settings and topbar controls remain synchronized even while an editor is open.
+    for theme in ('light','dark'):
+        page.locator('#settings-theme').evaluate('(el,v)=>{el.value=v;el.dispatchEvent(new Event("change"));}', theme)
+        assert page.evaluate('JSON.stringify(matEditor)') == draft
+        page.screenshot(path=str(report / f'material-{theme}.png'), animations='disabled')
+    page.emulate_media(reduced_motion='reduce')
+    assert page.locator('#material-overlay .modal').evaluate('(el)=>getComputedStyle(el).animationName') == 'none'
+    assert page.locator('#mat-save').evaluate('(el)=>getComputedStyle(el).transitionDuration') == '0s'
+    page.locator('#mat-close').click()
+    page.emulate_media(reduced_motion='no-preference')
+    checks.append('Theme changes preserve a live material draft; reduced motion disables effects')
+
+    isolated = context.new_page()
+    isolated.add_init_script("""Storage.prototype.getItem = () => {throw new Error('storage unavailable')};
+      Storage.prototype.setItem = () => {throw new Error('storage unavailable')};""")
+    isolated.goto(url)
+    isolated.wait_for_selector('#grid-area .card')
+    isolated.locator('#topbar [data-theme-picker]').select_option('light')
+    assert isolated.locator('html').get_attribute('data-theme') == 'light'
+    isolated.close()
+    checks.append('Blocked localStorage does not prevent launch or in-session theme changes')

@@ -1,6 +1,6 @@
 # Local development and reliability checks
 
-This branch implements the environment/baseline and critical reliability work before the Material 3 redesign. The application still uses Bottle, vanilla JavaScript, Three.js and pywebview. Project sidecars, Unreal paths and mod container formats are unchanged.
+This branch includes the environment/baseline and critical reliability work, plus the Phase 2 Material 3 foundation. The application still uses Bottle, vanilla JavaScript, Three.js and pywebview. Project sidecars, Unreal paths and mod container formats are unchanged. See [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for theme, component, icon and artwork-cache decisions.
 
 ## This machine
 
@@ -49,7 +49,21 @@ git diff --check
 
 `run_checks.py` copies the source into a fresh temporary directory for each suite. It never reads the development tools or user projects. Native-dependent legacy cases therefore explicitly skip. Use `--suite test_reliability.py` for focused backend failure tests. Logs, package versions, timings and exit codes are saved with the report.
 
-Browser checks run the real frontend and Bottle server in temporary app data. They use named fixtures for game browsing and native/network services, plus actual project HTTP requests. They exercise failed/partial saves, retry, editing while a save is in flight, project headers, stale preview responses and SSE errors. Test-only viewport access is injected into the intercepted module; production JavaScript has no test hooks. Screenshots cover 1280×800, 1400×900 and 1920×1080. The visual baseline uses `gui/app.js` from commit `2a3f4e2` with the unchanged HTML/CSS/vendor files and deterministic fixture data.
+Browser checks run the real frontend and Bottle server in temporary app data. They use named fixtures for game browsing and native/network services, plus actual project HTTP requests. They exercise failed/partial saves, retry, editing while a save is in flight, project headers, stale preview responses and SSE errors. Test-only viewport access is injected into the intercepted module; production JavaScript has no test hooks. Screenshots cover both themes at 1024×768, 1280×800, 1400×900 and 1920×1080. The visual baseline uses `gui/index.html`, `gui/style.css` and `gui/app.js` from commit `2a3f4e2` with deterministic fixture data.
+
+The Phase 2 checks additionally cover color-pair contrast, fonts/logo, large folder symbols, keyboard menus, theme persistence/OS changes/blocked storage, material draft preservation and reduced motion. Offline catalogue tests verify source parsing, exact ID/name matching, ambiguity, cache reuse and failed updates. These tests never crawl RivalSkins or download game artwork.
+
+Use these report directories for the current phase:
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --report-dir 'D:\AtelierDev\phase-2\checks'
+.\.venv\Scripts\python.exe tests/browser_smoke.py `
+  --report-dir 'D:\AtelierDev\phase-2\browser-checks' `
+  --mesh 'D:\AtelierDev\phase-0-1\native-checks\mesh\Marvel\Content\Marvel\Characters\1029\1029100\Meshes\10291\SK_10291_1029100.glb'
+.\Start-AtelierDev.ps1 -Mode Browser -Port 8770 -DataDir 'D:\AtelierDev\phase-0-1'
+```
+
+Open `http://127.0.0.1:8770`, switch the appearance selector, browse Characters and a skin folder, then open a material/3D preview and verify export controls. The isolated destination remains `test-mods`. Optional portrait metadata checks run in the background at launch; the image cache is independent of projects and exports. Cached artwork works offline; uncached artwork falls back to a symbol if unavailable. Restart Python after changes to the catalogue parser or browse routes.
 
 ## Native checks
 
@@ -61,7 +75,7 @@ $env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
 
 `native_smoke.py` reads a small real game texture, creates a new disposable project, edits it, builds the `.pak/.ucas/.utoc` set, publishes to a test folder, compares hashes, unpacks it and checks texture format/dimensions. The game's global container is copied into the readback fixture so native tools can resolve script imports. Reports stay under `native-checks`. This is a pipeline smoke test; it does not establish every texture format, game patch, material, world or mesh as compatible.
 
-`desktop_smoke.py` opens and closes a hidden WebView2 window. It checks the real asset browser, icons, active project and viewport module; its middleware suppresses update downloads and thumbnail prefetch. The verified run loaded 69 root entries and 154 icons. The report is `desktop-smoke.json`.
+`desktop_smoke.py` opens and closes a hidden WebView2 window. It checks the real asset browser, symbols, font, logo, both themes, active project and viewport module; its middleware suppresses update downloads and thumbnail prefetch. The Phase 2 run loaded 69 root entries and 156 symbols. The report is `desktop-smoke.json`.
 
 AtelierMesh was also exercised on `Characters/1029/1029100/Meshes/10291/SK_10291_1029100`. To repeat Chromium rendering/disposal checks with that decoded file:
 
@@ -82,6 +96,19 @@ This checks geometry rendering and resource disposal through three open/close cy
 ```
 
 The existing spec packages the GUI, vendor libraries and Blender scripts. Native tools remain external. Set `ATELIER_DATA_DIR` before launching the built executable to use the isolated tools/configuration. This command builds a local executable; it does not publish a release or run the installer.
+
+For Phase 2 use `D:\AtelierDev\phase-2\build\dist` and `D:\AtelierDev\phase-2\build\work`. The GUI directory is included recursively, so the local font, symbol paths, theme modules, logo and catalogue seed need no additional packaging rule. Downloaded portraits remain external cache files. A local Phase 2 executable was built successfully; this is separate from testing the installed application or an installer upgrade.
+
+## Phase 2 evidence
+
+- 178 regression checks passed; two native-tool cases explicitly skipped in the isolated runner.
+- 14 Chromium workflow/design checks passed, including a real decoded GLB and repeated preview cleanup.
+- Native WebView2 loaded the real index, local assets and synchronized light/dark/system controls.
+- All 744 distinct artwork URLs in the seed downloaded and passed image validation in the development cache (about 70 MB); ordinary launches fetch images lazily.
+- Live Characters and Magik skin browsing produced no uncaught JavaScript errors. Screenshots are under `D:\AtelierDev\phase-2\live-preview`; deterministic comparisons are under `browser-checks`.
+- Syntax checks, dependency consistency and `git diff --check` passed.
+
+The native export round-trip evidence from Phase 1 remains in `D:\AtelierDev\phase-0-1\native-checks`; this phase does not change encoding or container publication. No additional in-game compatibility claim is made.
 
 ## Review and follow-up
 

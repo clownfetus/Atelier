@@ -90,6 +90,7 @@ def main():
                 '/api/index_warnings': {'failed': []},
                 '/api/stale_mips': {'ok': True, 'count': 0},
                 '/api/usmap_update_check': {'ok': True},
+                '/api/catalogue/status': {'updating': False, 'portraits': 803},
             }.get(path)
             if payload is not None:
                 route.fulfill(json=payload)
@@ -134,6 +135,9 @@ def main():
                     page.screenshot(path=str(report / f'current-{width}x{height}.png'))
                 checks.append('UI loads at three desktop sizes without uncaught JavaScript errors')
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
+
+                from design_checks import run_design_checks
+                run_design_checks(page, context, url, report, checks)
 
                 # Real backend CRUD, with encoded project header rather than a mock bridge.
                 result = page.evaluate("""async () => {
@@ -215,11 +219,15 @@ def main():
                 assert not errors, errors
 
                 # Capture the original frontend against the same deterministic fixture data.
-                baseline = subprocess.run(['git', 'show', '2a3f4e2:gui/app.js'], cwd=ROOT,
-                    capture_output=True, check=True).stdout.decode('utf-8')
                 base_page = context.new_page()
-                base_page.route('**/static/app.js', lambda route: route.fulfill(
-                    body=baseline, content_type='text/javascript'))
+                base_page.set_viewport_size({'width': 1400, 'height': 900})
+                def original(file, mime):
+                    source = subprocess.run(['git', 'show', f'2a3f4e2:gui/{file}'], cwd=ROOT,
+                        capture_output=True, check=True).stdout
+                    return lambda route: route.fulfill(body=source, content_type=mime)
+                base_page.route(url + '/', original('index.html', 'text/html'))
+                base_page.route('**/static/app.js', original('app.js', 'text/javascript'))
+                base_page.route('**/static/style.css', original('style.css', 'text/css'))
                 base_page.goto(url)
                 base_page.wait_for_selector('#grid-area .folder-card, #grid-area .card')
                 base_page.screenshot(path=str(report / 'baseline-1400x900.png'))

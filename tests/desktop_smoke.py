@@ -32,6 +32,7 @@ def main():
                  '/api/download_usmap': {'ok': True, 'path': C.USMAP},
                  '/api/prefetch_thumbs': {'ok': True},
                  '/api/usmap_update_check': {'ok': True}}
+        stubs['/api/catalogue/status'] = {'updating': False, 'portraits': 803}
         if env['PATH_INFO'] in stubs:
             data = json.dumps(stubs[env['PATH_INFO']]).encode()
             respond('200 OK', [('Content-Type', 'application/json'), ('Content-Length', str(len(data)))])
@@ -57,6 +58,8 @@ def main():
                   items: typeof allItems === 'undefined' ? 0 : allItems.length,
                   status: document.querySelector('.overlay.active')?.id || '',
                   icons: document.querySelectorAll('svg.lucide').length,
+                  font: document.fonts.check('14px Roboto'),
+                  logo: document.querySelector('.studio-brand img')?.naturalWidth || 0,
                   renderer: navigator.userAgent
                 })""")
                 if data and data.get('items') and data.get('viewport') and data.get('project') and data.get('icons'):
@@ -65,6 +68,19 @@ def main():
                 time.sleep(0.2)
             if not result:
                 result.update(error='Interface did not become ready within 60 seconds', last_state=data)
+            else:
+                themes = window.evaluate_js("""(() => {
+                  const picker = document.querySelector('#topbar [data-theme-picker]');
+                  return ['light', 'dark', 'system'].map(value => {
+                    picker.value = value; picker.dispatchEvent(new Event('change'));
+                    return {preference:value, theme:document.documentElement.dataset.theme,
+                      settings:document.getElementById('settings-theme').value};
+                  });
+                })()""")
+                assert result['font'] and result['logo'] > 0, result
+                assert all(t['settings'] == t['preference'] for t in themes), themes
+                assert [t['theme'] for t in themes[:2]] == ['light', 'dark'], themes
+                result['themes'] = themes
         except Exception as exc:
             result['error'] = str(exc)
         finally:
@@ -82,7 +98,7 @@ def main():
     report = Path(C.DATA_ROOT) / 'desktop-smoke.json'
     report.write_text(json.dumps(result, indent=2), encoding='utf-8')
     assert 'error' not in result, result
-    print('PASS native WebView2: real asset browser, project, icons and viewport module loaded')
+    print('PASS native WebView2: real asset browser, project, symbols, font, logo, themes and viewport module loaded')
     print('Report:', report)
 
 

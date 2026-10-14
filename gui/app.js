@@ -198,7 +198,7 @@ function renderBreadcrumbs() {
   bc.innerHTML = "";
 
   const crumb = (label, navState) => {
-    const el = document.createElement("span");
+    const el = document.createElement(navState === null ? "span" : "button");
     el.className = "crumb" + (navState === null ? " active" : "");
     el.textContent = label;
     if (navState !== null) el.addEventListener("click", () => pushNav(navState));
@@ -212,10 +212,11 @@ function renderBreadcrumbs() {
   };
 
   const parts = nav.path ? nav.path.split("/") : [];
-  const homeCrumb = document.createElement("span");
+  const homeCrumb = document.createElement(parts.length ? "button" : "span");
   homeCrumb.className = "crumb" + (parts.length === 0 ? " active" : "");
-  homeCrumb.title = "Import";
-  homeCrumb.innerHTML = '<i data-lucide="house" size="12"></i>';
+  homeCrumb.title = "Asset library";
+  homeCrumb.setAttribute("aria-label", "Asset library");
+  homeCrumb.innerHTML = '<i data-lucide="house" size="18"></i>';
   if (parts.length > 0) homeCrumb.addEventListener("click", () => pushNav({ path: "" }));
   bc.appendChild(homeCrumb);
 
@@ -239,6 +240,8 @@ function _makeCard(item) {
       type:    "folder",
       label:   item.label || item.name,
       iconCls: folderIconCls(item.name),
+      thumbnail: item.thumbnail,
+      heroFallback: item.hero_fallback,
       onClick: () => pushNav({ path: item.rel_path }),
     };
   }
@@ -261,6 +264,7 @@ async function renderGrid() {
   const requestId = ++_gridRequest, project = _activeProjectName;
   const area = document.getElementById("grid-area");
   area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
+  document.getElementById("library-count").textContent = "Loading…";
   document.getElementById("import-all-btn").disabled = true;
 
   try {
@@ -303,6 +307,7 @@ async function renderGrid() {
   } catch (e) {
     if (requestId !== _gridRequest || project !== _activeProjectName) return;
     area.innerHTML = `<div id="empty-state" style="color:var(--acc)">${e.message}</div>`;
+    document.getElementById("library-count").textContent = "Could not load assets";
   }
 }
 
@@ -311,6 +316,7 @@ function buildGrid(cards) {
   const q = document.getElementById("search-input").value.trim().toLowerCase();
 
   let filtered = q ? cards.filter(c => c.label.toLowerCase().includes(q)) : cards;
+  document.getElementById("library-count").textContent = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${q ? " matching" : ""}`;
 
   if (!nav.path) {
     const isPinned = c => c.type === "folder" && c.iconCls && c.iconCls !== "folder-icon";
@@ -330,14 +336,30 @@ function buildGrid(cards) {
   grid.className = "grid";
 
   filtered.forEach(card => {
-    const el = document.createElement("div");
+    const el = document.createElement("button");
     el.className = "card" + (card.imported ? " imported" : "");
+    el.type = "button";
     el.title = card.label;
 
     const thumb = document.createElement("div");
     thumb.className = "card-thumb";
 
-    if (card.type === "asset" && handlerFor(card.file_type).preview && card.game_rel) {
+    if (card.type === "folder" && card.thumbnail) {
+      const img = document.createElement("img");
+      img.alt = ""; // The button's visible label already names this hero/skin.
+      img.className = "hero-portrait";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.onload = () => img.classList.add("loaded");
+      img.onerror = () => {
+        img.remove();
+        thumb.appendChild(makeIcon(card));
+        lucide.createIcons({ nodes: [thumb] });
+      };
+      img.src = card.thumbnail;
+      if (card.heroFallback) el.title += " · Hero portrait (skin artwork unavailable)";
+      thumb.appendChild(img);
+    } else if (card.type === "asset" && handlerFor(card.file_type).preview && card.game_rel) {
       const img = document.createElement("img");
       img.dataset.gameRel = card.game_rel;
       img.alt = card.label;
@@ -1745,7 +1767,8 @@ function renderSidebar() {
   list.innerHTML = "";
   const all = Object.values(sidebarData);
   if (!all.length) {
-    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets yet.</div>';
+    list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>No edited assets yet</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
+    lucide.createIcons({ nodes: [list] });
     updateInstallBtn();
     return;
   }
@@ -2539,7 +2562,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
 
   document.addEventListener("mousemove", e => {
     if (!dragging) return;
-    const newW = Math.min(520, Math.max(140, startW + (startX - e.clientX)));
+    const newW = Math.min(520, Math.max(240, startW + (startX - e.clientX)));
     sidebar.style.width = newW + "px";
   });
 
@@ -2554,6 +2577,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
 
 // ── context menu ──────────────────────────────────────────────────────────────
 let _ctxFileTarget = null;
+let _ctxOpener = null;
 const _ctxMenu      = document.getElementById("ctx-menu");
 const _ctxFileInput = document.getElementById("ctx-file-input");
 
@@ -2561,6 +2585,7 @@ function _ctxShow(e, items) {
   e.preventDefault();
   e.stopPropagation();
   if (!items.length) return;
+  _ctxOpener = document.activeElement;
   _ctxMenu.innerHTML = "";
   for (const item of items) {
     if (item === "sep") {
@@ -2569,22 +2594,44 @@ function _ctxShow(e, items) {
       _ctxMenu.appendChild(d);
       continue;
     }
-    const el = document.createElement("div");
+    const el = document.createElement("button");
     el.className = "ctx-item" + (item.danger ? " danger" : "");
     el.innerHTML = `<i data-lucide="${item.icon}" size="13"></i><span>${item.label}</span>`;
     el.addEventListener("click", ev => { ev.stopPropagation(); _ctxHide(); item.action(); });
     _ctxMenu.appendChild(el);
   }
   lucide.createIcons({ nodes: [_ctxMenu] });
-  _ctxMenu.style.left = e.clientX + "px";
-  _ctxMenu.style.top  = e.clientY + "px";
+  const anchor = !e.clientX && !e.clientY ? e.currentTarget?.getBoundingClientRect() : null;
+  const x = anchor ? anchor.left : e.clientX;
+  const y = anchor ? anchor.bottom : e.clientY;
+  _ctxMenu.style.left = x + "px";
+  _ctxMenu.style.top  = y + "px";
   _ctxMenu.classList.add("active");
   const r = _ctxMenu.getBoundingClientRect();
-  if (r.right  > window.innerWidth)  _ctxMenu.style.left = (e.clientX - r.width)  + "px";
-  if (r.bottom > window.innerHeight) _ctxMenu.style.top  = (e.clientY - r.height) + "px";
+  if (r.right  > window.innerWidth)  _ctxMenu.style.left = Math.max(4, x - r.width)  + "px";
+  if (r.bottom > window.innerHeight) _ctxMenu.style.top  = Math.max(4, y - r.height) + "px";
+  _ctxMenu.querySelector("button")?.focus();
 }
 
-function _ctxHide() { _ctxMenu.classList.remove("active"); }
+function _ctxHide() {
+  const restore = _ctxMenu.contains(document.activeElement);
+  _ctxMenu.classList.remove("active");
+  if (restore) _ctxOpener?.focus();
+}
+
+_ctxMenu.addEventListener("keydown", e => {
+  const buttons = [..._ctxMenu.querySelectorAll("button")];
+  const index = buttons.indexOf(document.activeElement);
+  if (e.key === "Escape" || e.key === "Tab") {
+    _ctxHide();
+    if (e.key === "Escape") e.preventDefault();
+  } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+    e.preventDefault();
+    const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1
+      : (index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  }
+});
 
 document.addEventListener("click", _ctxHide);
 document.addEventListener("contextmenu", () => _ctxHide());
