@@ -144,6 +144,26 @@ def _cache_import_base(game_rel):
     return _asset_cache.cache_base(game_rel)
 
 # ── static ────────────────────────────────────────────────────────────────────
+from atelier.catalogue import catalogue
+
+
+@app.get('/api/catalogue/status')
+def catalogue_status():
+    catalogue.start_update()
+    response.content_type = 'application/json'
+    return json.dumps(catalogue.status())
+
+
+@app.get('/api/catalogue/thumbnail/<key>')
+def catalogue_thumbnail(key):
+    path = catalogue.thumbnail(key)
+    if path is None:
+        response.status = 404
+        response.set_header('Cache-Control', 'no-store')
+        return ''
+    result = static_file(path.name, root=str(path.parent), mimetype='image/webp')
+    result.set_header('Cache-Control', 'private, max-age=86400')
+    return result
 
 @app.route("/")
 def index():
