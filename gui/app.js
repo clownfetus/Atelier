@@ -92,8 +92,16 @@ const ICON_CLS_TO_LUCIDE = {
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+let _activeProjectName = "";
+function projectFetch(path, opts = {}, project = _activeProjectName) {
+  return fetch(path, { ...opts, headers: { ...opts.headers,
+    "X-Atelier-Project": encodeURIComponent(project) } });
+}
+window.atelierProject = () => _activeProjectName;
+window.atelierFetch = projectFetch;
 async function api(path, opts = {}) {
-  const res = await fetch(path, opts);
+  const { project = _activeProjectName, ...requestOpts } = opts;
+  const res = await projectFetch(path, requestOpts, project);
   try {
     return await res.json();
   } catch {
@@ -105,7 +113,7 @@ async function api(path, opts = {}) {
 // firing and forgetting — a silent no-op here was reported as "Open in Explorer does nothing".
 async function revealInExplorer(gameRel) {
   try {
-    const r = await fetch(`/api/open_explorer?game_rel=${encodeURIComponent(gameRel)}`);
+    const r = await projectFetch(`/api/open_explorer?game_rel=${encodeURIComponent(gameRel)}`);
     const d = await r.json();
     if (!d.ok) toast(d.error || "Could not open the file manager", "warning", 6000);
   } catch (e) {
@@ -248,13 +256,16 @@ function _makeCard(item) {
   };
 }
 
+let _gridRequest = 0;
 async function renderGrid() {
+  const requestId = ++_gridRequest, project = _activeProjectName;
   const area = document.getElementById("grid-area");
   area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
   document.getElementById("import-all-btn").disabled = true;
 
   try {
     const data = await api(`/api/browse?path=${encodeURIComponent(nav.path || "")}`);
+    if (requestId !== _gridRequest || project !== _activeProjectName) return;
     if (data.error) throw new Error(data.error);
     allItems = data;
     checkIndexWarnings();   // fire-and-forget; reports at most once per session
@@ -276,10 +287,12 @@ async function renderGrid() {
     if (unimportedTextures.length) {
       try {
         const pf = await api("/api/prefetch_thumbs", {
+          project,
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ game_rels: unimportedTextures.map(t => t.game_rel) }),
         });
+        if (requestId !== _gridRequest || project !== _activeProjectName) return;
         (pf.cached || []).forEach(gr => {
           document.querySelectorAll(`img[data-game-rel="${CSS.escape(gr)}"]`).forEach(img => {
             img.src = `/api/thumb?game_rel=${encodeURIComponent(gr)}`;
@@ -288,6 +301,7 @@ async function renderGrid() {
       } catch (_) {}
     }
   } catch (e) {
+    if (requestId !== _gridRequest || project !== _activeProjectName) return;
     area.innerHTML = `<div id="empty-state" style="color:var(--acc)">${e.message}</div>`;
   }
 }
@@ -423,7 +437,7 @@ function handleImportedFileAction(item) {
       openBlend(item.game_rel);   // the edit lives in a .blend, not a .png
       return;
     default:
-      fetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
+      projectFetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
 }
 
@@ -739,7 +753,7 @@ function dyeRefresh(delay = 140) {
     }
     img.dataset.src = "";
     try {
-      const r = await fetch("/api/dye_preview", {
+      const r = await projectFetch("/api/dye_preview", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides(),
                                dye_off: !!matEditor.dyeOff }),
@@ -758,7 +772,7 @@ async function dyeDownload() {
   const st = document.getElementById("mat-status");
   st.textContent = "Baking dyed texture…";
   try {
-    const r = await fetch("/api/dye_download", {
+    const r = await projectFetch("/api/dye_download", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048, overrides: _dyeOverrides(),
                              dye_off: !!matEditor.dyeOff }),
@@ -850,7 +864,7 @@ async function matTexturesDownload() {
   const st = document.getElementById("mat-status");
   st.textContent = "Packing this material's textures…";
   try {
-    const r = await fetch("/api/mat_textures_download", {
+    const r = await projectFetch("/api/mat_textures_download", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: matEditor.game_rel, size: 2048,
                              overrides: _dyeOverrides(), dye_off: !!matEditor.dyeOff }),
@@ -1540,16 +1554,23 @@ window.addEventListener("beforeunload", e => {
 });
 
 // ── SSE ───────────────────────────────────────────────────────────────────────
+let _eventSource = null;
 function connectSSE() {
-  const es = new EventSource("/api/events");
+  if (_eventSource) return;
+  const es = _eventSource = new EventSource("/api/events");
   es.addEventListener("message", e => {
     try {
       const d = JSON.parse(e.data);
       handleSSE(d);
     } catch {}
   });
-  es.onerror = () => setTimeout(connectSSE, 3000);
+  // EventSource already reconnects. Creating another stream here multiplied connections.
+  es.onopen = async () => {
+    if (!importing) return;
+    try { handleSSE(await api("/api/import_status")); } catch (_) {}
+  };
 }
+window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; });
 
 function handleSSE(d) {
   if (d.usmap_updated) {
@@ -1611,8 +1632,11 @@ function handleSSE(d) {
 connectSSE();
 
 // ── sidebar / export ──────────────────────────────────────────────────────────
+let _sidebarRequest = 0;
 async function loadSidebar() {
+  const requestId = ++_sidebarRequest, project = _activeProjectName;
   const data = await api("/api/imported");
+  if (requestId !== _sidebarRequest || project !== _activeProjectName) return;
   data.forEach(item => {
     if (!sidebarData[item.token]) {
       // item.selected comes from the project's saved deselect list (default on for new assets)
@@ -1629,7 +1653,9 @@ async function loadSidebar() {
 }
 
 function refreshSidebarEntry(game_rel, name, skin_id) {
+  const project = _activeProjectName, requestId = ++_sidebarRequest;
   api("/api/imported").then(data => {
+    if (project !== _activeProjectName || requestId !== _sidebarRequest) return;
     data.forEach(item => {
       if (!sidebarData[item.token]) sidebarData[item.token] = { ...item };
       else {
@@ -1798,18 +1824,21 @@ function toggleSelectAll() {
 // Persist the OFF set to the active project. Debounced: toggling several assets in a row is one
 // write, and a failure is deliberately silent -- losing a checkbox state must never interrupt
 // what the user is actually doing.
-let _saveSelTimer = null;
+const _saveSelTimers = new Map();
 function saveSelection() {
-  clearTimeout(_saveSelTimer);
-  _saveSelTimer = setTimeout(() => {
-    const deselected = Object.values(sidebarData)
-      .filter(i => !i.selected && i.game_rel)
-      .map(i => i.game_rel);
+  const project = _activeProjectName;
+  clearTimeout(_saveSelTimers.get(project));
+  const deselected = Object.values(sidebarData)
+    .filter(i => !i.selected && i.game_rel)
+    .map(i => i.game_rel);
+  _saveSelTimers.set(project, setTimeout(() => {
+    _saveSelTimers.delete(project);
     api("/api/project/asset_selection", {
+      project,
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deselected }),
     }).catch(() => {});
-  }, 400);
+  }, 400));
 }
 
 function _modsTopFolderName() {
@@ -1858,12 +1887,13 @@ document.getElementById("toggle-password-row").addEventListener("click", e => {
 document.getElementById("toggle-copy").addEventListener("change", () => _syncToggleRow("toggle-copy"));
 document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
-async function _runInstall(modName, exportable, skipped, copyToMods, password) {
+async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName) {
   document.getElementById("install-btn").disabled = true;
   setStatus(`Installing ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
   const t = toastSpinner(`Installing ${modName}…`);
   try {
     const res = await api("/api/install_mod", {
+      project,
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         mod_name: modName,
@@ -1874,7 +1904,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password) {
     });
     t.remove();
     if (res.ok) {
-      toast(`Installed: ${modName}_9999999_P` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
+      toast(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
       setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
       // A mod can build fine and still be missing a piece — one asset that would not stage. Saying
       // "Installed" and nothing else makes that look identical to the game ignoring the edit.
@@ -1890,8 +1920,8 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password) {
       toast("No mods folder set — opening Settings…", "warning");
       openPaths();
     } else {
-      toast(`Install failed: ${res.error || "unknown error"}`, "warning");
-      setStatus("");
+      toast(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, "warning", 10000);
+      setStatus(res.built ? `Exported → ${res.pak_path || ""}` : "");
     }
   } catch (e) {
     t.remove();
@@ -1902,6 +1932,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password) {
 }
 
 async function doInstallMod() {
+  const project = _activeProjectName;
   const selected = Object.values(sidebarData).filter(i => i.selected);
   if (!selected.length) return;
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
@@ -1924,7 +1955,7 @@ async function doInstallMod() {
     conflict = await (await fetch(q)).json();
   } catch (_) {}
 
-  const proceed = () => _runInstall(modName, exportable, skipped, copyToMods, password);
+  const proceed = () => _runInstall(modName, exportable, skipped, copyToMods, password, project);
 
   if (conflict && (conflict.default || conflict.mods)) {
     const locs = [];
@@ -2094,7 +2125,8 @@ async function checkPrereqs() {
 // ── first-run setup ───────────────────────────────────────────────────────────
 async function _fetchAesKeyValue() {
   try {
-    const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES.json");
+    const r = await fetch("https://raw.githubusercontent.com/SpaceDepot/rivals-depot/refs/heads/main/AES.json",
+      { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return null;
     const data = await r.json();
     const text = String(data.mainKey || "").trim();
@@ -2118,11 +2150,7 @@ async function checkSetup() {
   document.getElementById("setup-overlay").classList.add("active");
   _setSetupLoading(true);
   try {
-    const [statusRes, aes, usmapPath] = await Promise.all([
-      api("/api/setup_status"),
-      _fetchAesKeyValue(),
-      _fetchUsmapPath(),
-    ]);
+    const statusRes = await api("/api/setup_status");
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
     _protectionPassword = statusRes.password_prefill || "";
@@ -2131,6 +2159,7 @@ async function checkSetup() {
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
+    const [aes, usmapPath] = await Promise.all([_fetchAesKeyValue(), _fetchUsmapPath()]);
     _pathsMode = false;
     _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
@@ -2237,7 +2266,7 @@ async function validateSetup() {
   let pakStatus = "", pakMsg = "";
   if (path) {
     try {
-      const r = await fetch(`/api/validate_paks?path=${encodeURIComponent(path)}`);
+      const r = await projectFetch(`/api/validate_paks?path=${encodeURIComponent(path)}`);
       const d = await r.json();
       pakStatus = d.status;
       if (d.status === "wrong_folder") pakMsg = "MarvelRivals folder not found";
@@ -2248,7 +2277,7 @@ async function validateSetup() {
   let usmapStatus = "";
   if (usmap) {
     try {
-      const r = await fetch(`/api/validate_usmap?path=${encodeURIComponent(usmap)}`);
+      const r = await projectFetch(`/api/validate_usmap?path=${encodeURIComponent(usmap)}`);
       const d = await r.json();
       usmapStatus = d.status;
     } catch (_) {}
@@ -2260,7 +2289,7 @@ async function validateSetup() {
     const mods = document.getElementById("setup-mods").value.trim();
     if (mods) {
       try {
-        const r = await fetch(`/api/validate_mods_folder?path=${encodeURIComponent(mods)}`);
+        const r = await projectFetch(`/api/validate_mods_folder?path=${encodeURIComponent(mods)}`);
         const d = await r.json();
         modsStatus = d.status;
       } catch (_) {}
@@ -2268,7 +2297,7 @@ async function validateSetup() {
     const blender = document.getElementById("setup-blender").value.trim();
     if (blender) {
       try {
-        const r = await fetch(`/api/validate_blender?path=${encodeURIComponent(blender)}`);
+        const r = await projectFetch(`/api/validate_blender?path=${encodeURIComponent(blender)}`);
         const d = await r.json();
         blenderStatus = d.status;
       } catch (_) {}
@@ -2572,7 +2601,7 @@ _ctxFileInput.addEventListener("change", async () => {
   suppressedImportGameRels.add(game_rel);
   const t = toastSpinner("Replacing…");
   try {
-    const res  = await fetch("/api/replace_texture", { method: "POST", body: fd });
+    const res  = await projectFetch("/api/replace_texture", { method: "POST", body: fd });
     const data = await res.json();
     t.remove();
     if (data.ok) {
@@ -2849,7 +2878,6 @@ let _projPickerResolve  = null;
 let _projNameCtx        = null;
 let _projDeleteNames    = null;   // the names the delete confirmation is holding
 let _projExportNames    = null;   // …and the export one
-let _activeProjectName  = "";
 
 const _SAFE_NAME_RE = /[/\\:*?"<>|]/g;
 function _enforceSafeName(input) {
@@ -2864,6 +2892,7 @@ _enforceSafeName(document.getElementById("mod-name-input"));
 async function checkProject() {
   const res = await api("/api/projects");
   if (res.active && res.projects.find(p => p.name === res.active)) {
+    _applyActiveProject(res.active);
     toast(`Project: ${res.active}`, "success");
     return;
   }
@@ -3143,7 +3172,7 @@ function _projExportConfirm(names) {
 async function _projExportRun(names) {
   const t = toastSpinner(`Packing ${names.length === 1 ? `"${_esc(names[0])}"` : names.length + " projects"}…`);
   try {
-    const r = await fetch("/api/project/export", {
+    const r = await projectFetch("/api/project/export", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ names }),
     });
@@ -3176,6 +3205,12 @@ function _applyActiveProject(name) {
 }
 
 async function _selectProject(name) {
+  const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
+                     "text-overlay", "texopt-overlay", "viewport-overlay"];
+  if (editorIds.some(id => document.getElementById(id)?.classList.contains("active"))) {
+    toast("Close the active editor before switching projects.", "info");
+    return;
+  }
   const r = await api("/api/project/select", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -3297,8 +3332,8 @@ document.getElementById("menu-btn").addEventListener("click", e => {
         document.getElementById("project-overlay").classList.add("active");
       }},
       { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
-      { icon: "folder-search", label: "Show in Explorer", action: () => { fetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
-      { icon: "package-open", label: "Open Export Folder", action: () => { fetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
+      { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
+      { icon: "package-open", label: "Open Export Folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
       "sep",
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
@@ -3356,7 +3391,7 @@ document.getElementById("repatch-run").addEventListener("click", async () => {
       (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · 🔒 locked' : '') +
       '</span><br><a href="#" id="repatch-open">Open export folder</a>';
     const oa = document.getElementById("repatch-open");
-    if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); fetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });
+    if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });
     toast("Repatched: " + r.mod, "success", 5000);
     if (stage) renderGrid();
     btn.disabled = false;
@@ -3367,7 +3402,8 @@ document.getElementById("reset-ok").addEventListener("click", async () => {
   document.getElementById("reset-overlay").classList.remove("active");
   const t = toastSpinner("Resetting…");
   try {
-    await api("/api/reset_data", { method: "POST" });
+    const res = await api("/api/reset_data", { method: "POST" });
+    if (!res.ok) throw new Error(res.error || "Reset failed");
     t.remove();
     window.location.reload();
   } catch (e) {

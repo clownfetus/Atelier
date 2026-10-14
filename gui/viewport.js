@@ -14,6 +14,35 @@ const texCache  = new Map();   // texGameRel -> THREE.Texture, shared/reused acr
 let renderer, scene, camera, controls, grid, modelRoot;
 let raf = 0, inited = false;
 let generation = 0;   // bumped on every clear/open; async texture loads bail if it changed under them
+let materialGeneration = 0, saving = false, viewportProject = '';
+const liveDyeTextures = new Map(), baselineMaps = new Map();
+const projectUrl = url => url + (url.includes('?') ? '&' : '?') + '_project=' + encodeURIComponent(viewportProject);
+const projectFetch = (url, opts = {}, project = viewportProject) =>
+  window.atelierFetch ? window.atelierFetch(url, opts, project) : fetch(url, opts);
+
+function canLeave() {
+  if (saving) { note('Wait for the save to finish before leaving this preview.', 'warning'); return false; }
+  return !Object.keys(edited).length || window.confirm('Discard unsaved preview recolors?');
+}
+
+function clearLiveDyes() {
+  for (const [name, tex] of liveDyeTextures) {
+    for (const mat of matsByName[name] || []) {
+      if (mat.map === tex) { mat.map = baselineMaps.get(name) || null; mat.needsUpdate = true; }
+    }
+    tex.dispose();
+  }
+  liveDyeTextures.clear();
+}
+
+function trimTextureCache() {
+  const used = new Set(Object.values(matsByName).flatMap(ms => ms.flatMap(m => [m.map, m.emissiveMap])));
+  for (const tex of baselineMaps.values()) used.add(tex);
+  for (const [key, tex] of texCache) {
+    if (texCache.size <= 64) break;
+    if (!used.has(tex)) { texCache.delete(key); tex.dispose(); }
+  }
+}
 
 // ── material state (per open) ─────────────────────────────────────────────────
 let matsByName = {};   // "MI_..." -> [THREE.Material, ...]   (mesh materials sharing that slot)
@@ -128,23 +157,38 @@ function animate() {
 }
 
 function disposeTree(obj) {
-  // Dispose per-load geometry + materials. Do NOT dispose material.map here: our maps all come from
-  // texCache and are reused across opens; disposing them would force re-upload every open (the GPU
-  // churn that froze the desktop). Cached textures live for the session — a small, bounded set.
+  // The glTF owns skeleton bone textures and may contain embedded maps of its own.
+  // Retain shared cached maps, but release every resource allocated by this model load.
+  const keep = new Set(texCache.values()), disposed = new Set();
+  for (const tex of baselineMaps.values()) keep.add(tex);
+  const dispose = resource => {
+    if (resource && !disposed.has(resource)) { disposed.add(resource); resource.dispose(); }
+  };
   obj.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
-    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    dispose(o.geometry);
+    dispose(o.skeleton);
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      for (const value of Object.values(m)) {
+        if (value?.isTexture && !keep.has(value)) dispose(value);
+      }
+      dispose(m);
+    });
   });
 }
 
 function clearModel() {
   generation++;   // invalidate any in-flight texture loads from the previous model
+  materialGeneration++;
+  for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
+  clearLiveDyes();
+  baselineMaps.clear();
   for (const ch of [...modelRoot.children]) { modelRoot.remove(ch); disposeTree(ch); }
   matsByName = {}; matData = {}; edited = {}; currentSkin = null; objects = []; meshMeta = [];
   const list = $('viewport-mat-list'); if (list) list.innerHTML = '';
   const objList = $('viewport-obj-list'); if (objList) objList.innerHTML = '';
   updateSidebarVisibility();
   refreshBlenderBtn();
+  trimTextureCache();
 }
 
 // The footer "Edit In Blender" button targets whichever mesh is currently loaded — the same
@@ -243,28 +287,33 @@ function retint(name) {
 
 async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0', url = null) {
   // Textures are big (2048²) and expensive to upload — load each once, cache, and reuse across opens.
-  // We apply to whatever model is CURRENT (matsByName), so no generation-dispose race: a load that
-  // finishes after the user switched meshes simply applies to the current model's slot of that name
-  // (or nothing if it isn't present). This kills both the "white mesh" race and the GPU churn.
+  // Both the model and material-set generation must still match before applying a texture.
   // The cache key + URL include `ver` (edited-PNG mtime): unedited textures stay cached across opens,
   // but once the user edits one its stamp changes → we refetch and show the edit.
   ver = ver || '0';
-  const key = (url || texGameRel) + '@' + ver;
+  const gen = generation, matGen = materialGeneration;
+  const key = viewportProject + ':' + (url || texGameRel) + '@' + ver;
   let tex = texCache.get(key);
   if (!tex) {
     try {
-      tex = await texLoader.loadAsync(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`);
+      tex = await texLoader.loadAsync(projectUrl(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`));
     } catch (e) { console.warn('viewport: texture load failed', name, slot, texGameRel, e); return; }
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;                              // glTF UV convention (origin top-left)
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    texCache.set(key, tex);
+    // Another request may have completed the same texture while this one loaded.
+    if (texCache.has(key)) { tex.dispose(); tex = texCache.get(key); }
+    else texCache.set(key, tex);
   }
+  if (gen !== generation || matGen !== materialGeneration) { trimTextureCache(); return; }
   const mats = matsByName[name] || [];
   if (!mats.length) return;   // the current model has no slot of this name (user switched meshes)
-  for (const m of mats) { m[slot] = tex; m.needsUpdate = true; }
+  const live = slot === 'map' ? liveDyeTextures.get(name) : null;
+  for (const m of mats) { m[slot] = live || tex; m.needsUpdate = true; }
+  if (slot === 'map') baselineMaps.set(name, tex);
   retint(name);   // re-derive colour/emissive now that the map exists
+  trimTextureCache();
 }
 
 function frameCamera() {
@@ -302,6 +351,7 @@ let chromaSkin = null;      // the skin whose materials are currently applied (n
 let meshSkin   = null;      // the skin the loaded mesh came from
 
 async function buildChromaPicker(skinId, meshGameRel) {
+  const gen = generation;
   const row = $('viewport-chroma-row'), sel = $('viewport-chroma');
   if (!row || !sel) return;
   // Walk up from the LOADED MESH's real path to the folder holding the skin folders, rather than
@@ -311,9 +361,10 @@ async function buildChromaPicker(skinId, meshGameRel) {
   const parent = parts.slice(0, 2).join('/');            // Characters/<char>
   let list = [];
   try {
-    const d = await fetch(`/api/browse_material_dirs?path=${encodeURIComponent(parent)}`).then(r => r.json());
+    const d = await projectFetch(`/api/browse_material_dirs?path=${encodeURIComponent(parent)}`).then(r => r.json());
+    if (gen !== generation) return;
     list = (d && d.dirs) || [];
-  } catch (e) { row.style.display = 'none'; return; }
+  } catch (e) { if (gen === generation) row.style.display = 'none'; return; }
   list = list.filter(s => s.materials > 0);
   if (list.length < 2) { row.style.display = 'none'; return; }
   sel.innerHTML = list.map(s => {
@@ -323,6 +374,7 @@ async function buildChromaPicker(skinId, meshGameRel) {
       + `${s.meshes ? `, ${s.meshes} mesh` : ', no mesh'}</option>`;
   }).join('');
   sel.onchange = () => {
+    if (!canLeave()) { sel.value = chromaSkin || skinId; return; }
     chromaSkin = sel.value;
     $('viewport-status').textContent = `Materials: ${chromaSkin}`;
     loadMaterials(chromaSkin);
@@ -339,6 +391,9 @@ async function loadMaterials(skinId) {
   if (!skinId) return;
   currentSkin = skinId;
   const gen = generation;
+  const matGen = ++materialGeneration;
+  clearLiveDyes(); baselineMaps.clear();
+  matData = {}; edited = {};
   const slots = Object.keys(matsByName);
   const foreign = !!(meshSkin && skinId !== meshSkin);   // applying another skin's materials
   const spinner = typeof window.toastSpinner === 'function' ? window.toastSpinner('Loading materials…') : null;
@@ -346,7 +401,7 @@ async function loadMaterials(skinId) {
 
   let res;
   try {
-    res = await fetch('/api/skin_materials', {
+    res = await projectFetch('/api/skin_materials', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // a foreign skin's MI names won't equal the slot names, so the server-side name filter would
       // drop everything — fetch all of them and match canonically here instead
@@ -357,7 +412,7 @@ async function loadMaterials(skinId) {
     if (spinner) spinner.remove();
     return;
   }
-  if (gen !== generation) { if (spinner) spinner.remove(); return; }   // model changed while fetching params
+  if (gen !== generation || matGen !== materialGeneration) { if (spinner) spinner.remove(); return; }
   if (!res || !res.ok || !res.materials) {
     console.warn('viewport: skin_materials bad response', res);
     if (spinner) spinner.remove();
@@ -400,7 +455,7 @@ async function loadMaterials(skinId) {
     // Materials are matched to the mesh by NAME (glTF slot == MI name). A chroma authored with
     // different MI names matches nothing — say so instead of failing silently, since the picker
     // makes that a normal thing for the user to hit.
-    if (gen === generation && !matched) {
+    if (gen === generation && matGen === materialGeneration && !matched) {
       $('viewport-status').textContent = (chromaSkin && chromaSkin !== meshSkin)
         ? `${chromaSkin}: no materials match this mesh's slot names`
         : 'no materials matched';
@@ -413,11 +468,11 @@ async function loadMaterials(skinId) {
   // for this model has been decoded and applied.
   const total = texJobs.length;
   let done = 0;
-  const tick = () => { if (spinnerMsg && gen === generation) spinnerMsg.textContent = `Loading textures… ${done}/${total}`; };
+  const tick = () => { if (spinnerMsg && gen === generation && matGen === materialGeneration) spinnerMsg.textContent = `Loading textures… ${done}/${total}`; };
   tick();
   await Promise.allSettled(texJobs.map(p => p.then(() => { done++; tick(); })));
   if (spinner) spinner.remove();
-  if (gen === generation) $('viewport-status').textContent = `${matched} part${matched !== 1 ? 's' : ''}`;
+  if (gen === generation && matGen === materialGeneration) $('viewport-status').textContent = `${matched} part${matched !== 1 ? 's' : ''}`;
 }
 
 function buildPanel() {
@@ -478,6 +533,7 @@ function onColorInput(matName, paramName, hex) {
 // Live dye: re-bake this material's ColorID composite with the panel's current Region colours and
 // swap it onto the mesh. Reuses /api/dye_preview (the same compositor the material editor uses).
 const _dyeMeshTimer = {};
+const _dyeMeshRevision = {};
 function _dyeOverridesFor(matName) {
   const ov = {};
   for (const [pname, rgba] of Object.entries(edited[matName] || {})) {
@@ -490,16 +546,22 @@ function dyeRebakeMesh(matName) {
   const d = matData[matName];
   if (!d || !d.dyeable || !d.game_rel) return;
   clearTimeout(_dyeMeshTimer[matName]);
+  const gen = generation, matGen = materialGeneration;
+  const revision = (_dyeMeshRevision[matName] || 0) + 1;
+  _dyeMeshRevision[matName] = revision;
   _dyeMeshTimer[matName] = setTimeout(async () => {
     let blobUrl;
     try {
-      const r = await fetch('/api/dye_preview', {
+      const r = await projectFetch('/api/dye_preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game_rel: d.game_rel, size: 1024, overrides: _dyeOverridesFor(matName) }),
       });
       if (!r.ok) return;
       blobUrl = URL.createObjectURL(await r.blob());
       const tex = await texLoader.loadAsync(blobUrl);
+      if (gen !== generation || matGen !== materialGeneration || revision !== _dyeMeshRevision[matName]) {
+        tex.dispose(); return;
+      }
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.flipY = false;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -507,6 +569,8 @@ function dyeRebakeMesh(matName) {
       for (const mm of (matsByName[matName] || [])) {
         mm.map = tex; mm.color.setHex(0xffffff); mm.needsUpdate = true;
       }
+      liveDyeTextures.get(matName)?.dispose();
+      liveDyeTextures.set(matName, tex);
     } catch (e) { /* keep the last good bake */ }
     finally { if (blobUrl) URL.revokeObjectURL(blobUrl); }
   }, 160);
@@ -516,7 +580,7 @@ async function dyeDownloadMesh(matName) {
   const d = matData[matName];
   if (!d || !d.dyeable || !d.game_rel) return;
   try {
-    const r = await fetch('/api/dye_download', {
+    const r = await projectFetch('/api/dye_download', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ game_rel: d.game_rel, size: 2048, overrides: _dyeOverridesFor(matName) }),
     });
@@ -532,34 +596,57 @@ async function dyeDownloadMesh(matName) {
 function refreshFoot() {
   const n = Object.values(edited).reduce((a, m) => a + Object.keys(m).length, 0);
   const save = $('viewport-mat-save');
-  save.disabled = n === 0;
-  save.textContent = n ? `Save recolors (${n})` : 'Save recolors';
+  save.disabled = saving || n === 0;
+  save.textContent = saving ? 'Saving…' : n ? `Save recolors (${n})` : 'Save recolors';
 }
 
 async function saveEdits() {
+  if (saving) return;
   const names = Object.keys(edited).filter(n => Object.keys(edited[n]).length);
   if (!names.length) return;
-  const save = $('viewport-mat-save');
-  save.disabled = true; save.textContent = 'Saving…';
+  const draft = edited, gen = generation, project = viewportProject;
+  const submitted = JSON.parse(JSON.stringify(edited));
+  saving = true; refreshFoot();
   let ok = 0;
+  const failed = [];
   for (const name of names) {
     const d = matData[name];
     try {
-      const r = await fetch('/api/material_save', {
+      const r = await projectFetch('/api/material_save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_rel: d.game_rel, colors: edited[name], scalars: {} }),
-      }).then(r => r.json());
-      if (r && r.ok) { ok++; d.colors = r.colors; }  // adopt persisted params as the new baseline
-    } catch (e) { console.warn('viewport: material_save failed', name, e); }
+        body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
+      }, project).then(r => r.json());
+      if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
+      ok++; d.colors = r.colors || d.colors;
+      if (gen === generation && edited === draft) {
+        for (const [param, rgba] of Object.entries(submitted[name])) {
+          // A newer edit made during the request is still unsaved.
+          if (JSON.stringify(edited[name]?.[param]) === JSON.stringify(rgba)) delete edited[name][param];
+        }
+        if (!Object.keys(edited[name] || {}).length) delete edited[name];
+      }
+    } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
   }
-  edited = {};
-  note(ok ? `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}` : 'Save failed', ok ? 'success' : 'warning');
+  saving = false;
+  note(failed.length ? `Saved ${ok}; ${failed.length} material(s) could not be saved. Unsaved recolors are retained; retry Save.`
+       : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`, failed.length ? 'warning' : 'success');
   refreshFoot();
 }
 
 function revertEdits() {
+  if (saving) return;
+  for (const name of Object.keys(_dyeMeshTimer)) {
+    clearTimeout(_dyeMeshTimer[name]);
+    _dyeMeshRevision[name] = (_dyeMeshRevision[name] || 0) + 1;
+  }
+  clearLiveDyes();
   edited = {};
-  for (const name of Object.keys(matData)) retint(name);   // no edits left → uses originals
+  for (const name of Object.keys(matData)) {
+    retint(name);
+    // After a successful save the persisted dye may differ from the original cached map.
+    // Rebuild with no draft overrides so Reset shows the last saved material.
+    if (matData[name].dyeable) dyeRebakeMesh(name);
+  }
   buildPanel();                                            // resets the pickers too
   note('Reverted unsaved changes', 'info');
 }
@@ -575,7 +662,10 @@ function skinFromGameRel(gr) {
 }
 
 async function open(skinId, title) {
+  if (!canLeave()) return;
   init();
+  viewportProject = window.atelierProject?.() || '';
+  loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
   meshSkin = skinId; chromaSkin = null;                       // reset the material-set choice
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent  = title || `3D Preview — ${skinId}`;
@@ -585,9 +675,11 @@ async function open(skinId, title) {
   requestAnimationFrame(onResize);
   if (!raf) animate();
   clearModel();
+  const gen = generation;
 
   try {
-    const meshes = await fetch(`/api/skin_meshes?skin_id=${encodeURIComponent(skinId)}`).then(r => r.json());
+    const meshes = await projectFetch(`/api/skin_meshes?skin_id=${encodeURIComponent(skinId)}`).then(r => r.json());
+    if (gen !== generation) return;
     if (!Array.isArray(meshes) || !meshes.length) {
       $('viewport-loading-msg').textContent = 'No meshes found for this skin.';
       return;
@@ -598,13 +690,14 @@ async function open(skinId, title) {
         `Decoding ${meshes[i].name} (${i + 1}/${meshes.length})… first time can take a moment`;
       try {
         const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(meshes[i].game_rel)}`);
+        if (gen !== generation) { disposeTree(gltf.scene); return; }
         collectMats(gltf.scene);
         modelRoot.add(gltf.scene);
         objects.push({ name: meshes[i].name, root: gltf.scene });
         meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
         loaded++;
         frameCamera();
-      } catch (e) { console.warn('viewport: mesh load failed', meshes[i].name, e); }
+      } catch (e) { if (gen !== generation) return; console.warn('viewport: mesh load failed', meshes[i].name, e); }
     }
     $('viewport-status').textContent = loaded ? `${loaded} part${loaded !== 1 ? 's' : ''}` : '';
     if (!loaded) { $('viewport-loading-msg').textContent = 'Failed to load meshes.'; return; }
@@ -616,12 +709,16 @@ async function open(skinId, title) {
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
     buildChromaPicker(skinId, meshes[0] && meshes[0].game_rel);
   } catch (e) {
+    if (gen !== generation) return;
     $('viewport-loading-msg').textContent = 'Error: ' + e.message;
   }
 }
 
 async function openMesh(gameRel, name, skinId) {
+  if (!canLeave()) return;
   init();
+  viewportProject = window.atelierProject?.() || '';
+  loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
   const _sk = skinId || skinFromGameRel(gameRel);
   meshSkin = _sk; chromaSkin = null;                         // reset the material-set choice
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
@@ -633,8 +730,10 @@ async function openMesh(gameRel, name, skinId) {
   requestAnimationFrame(onResize);
   if (!raf) animate();
   clearModel();
+  const gen = generation;
   try {
     const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(gameRel)}`);
+    if (gen !== generation) { disposeTree(gltf.scene); return; }
     collectMats(gltf.scene);
     modelRoot.add(gltf.scene);
     objects.push({ name: name || 'Mesh', root: gltf.scene });
@@ -647,11 +746,14 @@ async function openMesh(gameRel, name, skinId) {
     loadMaterials(_sk);
     buildChromaPicker(_sk, gameRel);   // same "materials from" picker as the skin path
   } catch (e) {
+    if (gen !== generation) return;
     $('viewport-loading-msg').textContent = 'Failed to load: ' + (e && e.message || e);
   }
 }
 
 function close() {
+  if (!canLeave()) return;
+  if (inited) clearModel();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
 }

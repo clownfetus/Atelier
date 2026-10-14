@@ -1,4 +1,5 @@
-import os, sys, re, shutil, struct, concurrent.futures
+import os, sys, re, shutil, struct, concurrent.futures, tempfile, threading
+from atelier.storage import container_files, publish_files, PublicationRecoveryError
 from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE,
                             check_prereqs, get_import_root, project_base, project_base_legacy,
                             dir_glob)
@@ -904,8 +905,56 @@ def stage_lq_twin(stage, game_rel, staged_ua):
     return True
 
 
+_build_lock = threading.Lock()  # legacy staging helpers still share scratch filenames
+
+
 def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-              world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None):
+              world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None,
+              allow_unsafe_world=False):
+    """Build privately, validate every container, then publish with rollback.
+
+    Keep legacy return fields and filenames. `artifacts` additionally names ALL files,
+    including separate world containers when combining is unavailable.
+    """
+    if (not mod_name or os.path.basename(mod_name) != mod_name or mod_name in (".", "..")
+            or any(c in mod_name for c in '/\\:*?"<>|')):
+        return {"ok": False, "error": "invalid mod name"}
+    world_stems = [os.path.basename(gr).removesuffix('.umap').lower() for gr in (world_items or [])]
+    if len(set(world_stems)) != len(world_stems) or (mod_name.lower() in world_stems
+            and any((tex_items, mat_items, curve_items, vfx_items, text_items, mesh_items))):
+        return {"ok": False, "error": "World container names collide; export these levels separately or choose another mod name."}
+    if not _build_lock.acquire(blocking=False):
+        return {"ok": False, "error": "Another mod build is in progress; try again when it finishes."}
+    work = None
+    try:
+        os.makedirs(_CACHE, exist_ok=True)
+        work = tempfile.mkdtemp(prefix="build-", dir=_CACHE)
+        staged_out = os.path.join(work, "output")
+        os.makedirs(staged_out)
+        result = _build_mod_staged(mod_name, tex_items, mat_items, staged_out, force,
+                                   curve_items, vfx_items, world_items, text_items, password,
+                                   mesh_items, asset_opts, stage_dir=os.path.join(work, "assets"),
+                                   allow_unsafe_world=allow_unsafe_world)
+        if not result.get("ok"):
+            return result
+        paks = list(dict.fromkeys([result["pak"]] + result.get("world_mods", [])))
+        sources = [p for pak in paks for p in container_files(pak[:-4])]
+        result["artifacts"] = publish_files(sources, out_dir)
+        result["pak"] = os.path.join(os.path.abspath(out_dir), os.path.basename(result["pak"]))
+        result["world_mods"] = [os.path.join(os.path.abspath(out_dir), os.path.basename(p))
+                                for p in result.get("world_mods", [])]
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+        _build_lock.release()
+
+
+def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
+                      world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None,
+                      stage_dir=None, allow_unsafe_world=False):
     """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
     edits + StringTable (text) edits + Blender mesh edits into one mod. tex_items: [game_rel];
     mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
@@ -918,10 +967,8 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
     from atelier.handlers.text import stage_text
     asset_opts = asset_opts or {}
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
-    for ext in (".pak", ".ucas", ".utoc"):
-        if os.path.exists(base + ext): os.remove(base + ext)
-    stage = os.path.join(_CACHE, "build_stage", mod_name)
-    shutil.rmtree(os.path.join(_CACHE, "build_stage"), ignore_errors=True); os.makedirs(stage)
+    stage = stage_dir
+    os.makedirs(stage)
     applied, skipped = [], []
     # MESH FIRST, before any texture is injected. Staging a mesh runs Blender, which flushes any
     # still-modified image datablock onto the project PNGs stage_inject then reads. Injecting
@@ -982,7 +1029,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
         sub = os.path.basename(gr); sub = sub[:-5] if sub.lower().endswith(".umap") else sub
         try:
             r = build_world_mod(gr, None, os.path.join(out_dir, f"{sub}_9999999_P"))
-            if not r.get("ok"):
+            if not r.get("ok") and allow_unsafe_world:
                 r = build_world_uag(gr, None, os.path.join(out_dir, f"{sub}_9999999_P"))
                 if r.get("ok"):
                     skipped.append(f"{sub}: in-place patch unavailable — used the round-trip builder, "
@@ -992,7 +1039,8 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
                 world_out.append(os.path.join(out_dir, f"{sub}_9999999_P.pak"))
                 skipped += [f"{sub}: {s}" for s in (r.get("skipped") or [])]
             else:
-                skipped.append(f"{sub}: {r.get('error')}")
+                skipped.append(f"{sub}: {r.get('error')}. Unsafe world round-trip fallback was not used."
+                               if not allow_unsafe_world else f"{sub}: {r.get('error')}")
         except Exception as e:
             skipped.append(f"{sub}: {e}")
     if not applied:
@@ -1012,18 +1060,21 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
             from atelier.handlers.container_merge import merge_containers
             tmp = base + "__merge_tmp"
             merge_containers([(c + ".utoc", c + ".ucas") for c in containers], tmp)
-            for ext in (".utoc", ".ucas"):                 # swap merged result into the single base name
-                if os.path.exists(base + ext): os.remove(base + ext)
-                os.replace(tmp + ext, base + ext)
-            if not os.path.exists(base + ".pak"):
-                shutil.copy(containers[0] + ".pak", base + ".pak")
-            for w in world_out:                            # drop the now-merged separate world paks
-                for ext in (".pak", ".ucas", ".utoc"):
-                    p = w[:-4] + ext
-                    if os.path.abspath(p) != os.path.abspath(base + ext) and os.path.exists(p):
-                        os.remove(p)
+            shutil.copy(containers[0] + ".pak", tmp + ".pak")
+            # Even a failed merge publication must leave each original container intact.
+            merge_dir = tempfile.mkdtemp(prefix="merged-", dir=out_dir)
+            merged_sources = []
+            for source in container_files(tmp):
+                target = os.path.join(merge_dir, os.path.basename(base) + os.path.splitext(source)[1])
+                shutil.copy2(source, target)
+                merged_sources.append(target)
+            publish_files(merged_sources, out_dir)
+            # Unneeded private containers disappear with the build workspace. Deleting
+            # them here could fail halfway and leave the separate-paks fallback incomplete.
             pak = base + ".pak"; world_out = []
             applied.append(f"combined {len(containers)} containers into one pak")
+        except PublicationRecoveryError:
+            raise
         except Exception as e:
             skipped.append(f"pak-combine skipped (kept separate paks): {e}")
     if password:                                         # optional soft mod-lock on the exported mod
@@ -1089,7 +1140,7 @@ def cmd_import(arg):
 
     n_png = sum(1 for gr in game_rels
                 if os.path.exists(project_base(gr, IMPORT_ROOT) + ".png"))
-    print(f"Extracted {len(names)} asset(s), decoded {n_png} PNG -> {IMPORT_ROOT}")
+    print(f"Extracted {len(game_rels)} asset(s), decoded {n_png} PNG -> {IMPORT_ROOT}")
 
 def _split_glob_prefix(prefix):
     if "/" in prefix:
@@ -1162,40 +1213,9 @@ def cmd_export(mod_name, tex_args, out_dir, force):
         except EOFError: ans = ""
         if ans != "y":
             print("Aborted."); return
-    for fp in existing:
-        os.remove(fp)
-
-    stage = os.path.join(_CACHE, "cli_export_stage", mod_name)
-    shutil.rmtree(stage, ignore_errors=True); os.makedirs(stage)
-    try:
-        staged = 0; skipped = []
-        for game_rel, label in pairs:
-            try:
-                desc = stage_inject(stage, game_rel)
-                staged += 1
-                print(f"  staged {label} -> {desc}")
-            except Exception as e:
-                skipped.append(f"{label}: {e}")
-        if skipped:
-            for s in skipped: print(f"  [warn] skipped: {s}", file=sys.stderr)
-        if not staged:
-            print("Nothing staged — check warnings above"); return
-
-        os.makedirs(out_dir, exist_ok=True)
-        base = os.path.join(out_dir, stem)
-        r    = uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage),
-                    "--usmap", USMAP])
-        if not os.path.exists(base + ".utoc"):
-            print(f"create_mod_iostore failed:\n{((r.stderr or '') + (r.stdout or '')).strip()[:500]}"); return
-
-        if os.path.exists(base + ".utoc"):
-            print(f"Packed {staged} texture(s) -> {os.path.abspath(base)}.{{pak,ucas,utoc}}")
-        else:
-            made = sorted(dir_glob(out_dir, "*_P.utoc"))
-            if made:
-                base = made[-1][:-5]
-                print(f"Packed {staged} texture(s) -> {os.path.abspath(base)}.{{pak,ucas,utoc}}")
-            else:
-                print(f"retoc exit 0 but no .utoc found in {out_dir}")
-    finally:
-        shutil.rmtree(stage, ignore_errors=True)
+    result = build_mod(mod_name, [gr for gr, _label in pairs], [], out_dir, force=True)
+    for skipped in result.get("skipped", []):
+        print(f"  [warn] skipped: {skipped}", file=sys.stderr)
+    if not result.get("ok"):
+        raise RuntimeError(result.get("error", "Export failed"))
+    print(f"Packed {len(result['applied'])} texture(s) -> {result['pak'][:-4]}.{{pak,ucas,utoc}}")

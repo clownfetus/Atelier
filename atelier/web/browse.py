@@ -1,5 +1,5 @@
 import os, re, hashlib, threading, urllib.request
-from atelier.config import ROOT, get_import_root, project_base, project_base_legacy, project_game_rel
+from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
@@ -55,7 +55,7 @@ def _parse_char_md_text(text):
     return chars
 
 def _parse_char_md():
-    path = os.path.join(ROOT, "Tools", "MarvelRivalsCharacterIDs.md")
+    path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
     try:
         return _parse_char_md_text(open(path, encoding="utf-8").read())
     except Exception:
@@ -86,7 +86,7 @@ def _fetch_char_data():
     if added:
         # write updated file back so next launch starts with fresh data
         try:
-            path = os.path.join(ROOT, "Tools", "MarvelRivalsCharacterIDs.md")
+            path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
         except Exception:

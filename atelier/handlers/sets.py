@@ -23,10 +23,10 @@ Resolving a set returns game_rels, which flow straight into the existing extract
 paths — this module only turns markdown → game_rels + a bit of grouping for the UI.
 """
 import os, re
-from atelier.config import ROOT, dir_glob
+from atelier.config import DATA_ROOT, dir_glob
 from atelier.index import ensure_index
 
-SETS_DIR = os.path.join(ROOT, "Sets")
+SETS_DIR = os.path.join(DATA_ROOT, "Sets")
 
 
 def _to_regex(pattern):

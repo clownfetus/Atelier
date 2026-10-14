@@ -521,11 +521,12 @@ def t_the_mask_is_staged_at_the_masks_own_path():
     """
     with sandbox() as sb:
         write_asset(sb.paks, "pakchunkC-Windows.utoc", "../../../Marvel/Content/Marvel", "Textures", "T_Mask.uasset")
-        saved = (DY.TX.ensure_work_base, DY.TX.texture_format, DY.dye_slots, DY.uat)
+        saved = (DY.TX.ensure_work_base, DY.TX.texture_format, DY.dye_slots, DY.uat, DY.TX.texture_size)
         DY.dye_slots = lambda gr: ("Textures/T_Mask", "Textures/T_D")
         wb = os.path.join(sb.root, "w"); open(wb + ".uasset", "wb").write(b"x")
         DY.TX.ensure_work_base = lambda gr: wb
         DY.TX.texture_format = lambda b: "DXT5"
+        DY.TX.texture_size = lambda *a: (16, 16)
         rec = []
         def fake(args, **kw):
             rec.append(list(args))
@@ -537,7 +538,7 @@ def t_the_mask_is_staged_at_the_masks_own_path():
         try:
             name = DY.stage_dye_off(stage, "Materials/MI_X")
         finally:
-            DY.TX.ensure_work_base, DY.TX.texture_format, DY.dye_slots, DY.uat = saved
+            DY.TX.ensure_work_base, DY.TX.texture_format, DY.dye_slots, DY.uat, DY.TX.texture_size = saved
         assert name == "T_Mask", name
         assert os.path.exists(os.path.join(stage, "Marvel", "Content", "Marvel", "Textures", "T_Mask.uasset"))
         assert not os.path.exists(os.path.join(stage, "Marvel", "Content", "Marvel", "Materials"))
@@ -724,14 +725,15 @@ def t_installing_the_dlc_invalidates_a_cached_copy():
         assert TX.missing_optional_mip("UI/T_A", wb) is True
         # and ensure_work_base acts on it rather than handing the stale copy back
         calls = []
-        saved = (TX.extract_via_retoc, TX.prefers_retoc, TX._purge_work)
+        saved = (TX.extract_via_retoc, TX.prefers_retoc, TX._purge_work, TX.uat)
         TX.prefers_retoc = lambda: True
         TX.extract_via_retoc = lambda grs: (calls.append(list(grs)) or {})
         TX._purge_work = lambda gr: calls.append("purged")
+        TX.uat = lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": "stub"})()
         try:
             TX.ensure_work_base("UI/T_A")
         finally:
-            TX.extract_via_retoc, TX.prefers_retoc, TX._purge_work = saved
+            TX.extract_via_retoc, TX.prefers_retoc, TX._purge_work, TX.uat = saved
         assert "purged" in calls, calls
         assert ["UI/T_A"] in calls, "it did not re-extract"
 

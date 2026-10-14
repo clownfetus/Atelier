@@ -1,4 +1,5 @@
 import os, json, shutil
+from atelier.storage import atomic_json
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
                             project_base, project_base_legacy)
 from atelier.tools import uat
@@ -134,7 +135,7 @@ def save_material(game_rel, colors, scalars):
     jp = mat_json(game_rel)
     d  = json.load(open(jp, encoding="utf-8-sig"))
     _apply_mat_edits(d, colors or {}, scalars or {})
-    json.dump(d, open(jp, "w"))
+    atomic_json(jp, d)
     cols, scals = _mat_params(d)
     return {"colors": cols, "scalars": scals}
 

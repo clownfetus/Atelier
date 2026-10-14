@@ -224,7 +224,8 @@ def save_text(game_rel, edits):
     clean = {str(k): ("" if v is None else str(v)) for k, v in (edits or {}).items()}
     p = text_sidecar(game_rel)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    json.dump({"text_edits": clean}, open(p, "w", encoding="utf-8"))
+    from atelier.storage import atomic_json
+    atomic_json(p, {"text_edits": clean})
     return read_text(game_rel)
 
 def reset_text(game_rel):

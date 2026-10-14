@@ -3,6 +3,11 @@ from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier import hostos
+from atelier import operations
+from atelier.storage import publish_files, container_files
+from contextlib import ExitStack
+from functools import wraps
+from urllib.parse import unquote
 import atelier.config as _c   # module handle: several routes rewrite config globals in place
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
                             CNW,
@@ -60,6 +65,64 @@ from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.project_meta as _project_meta
 import atelier.web.browse as _browse_mod
+
+
+class _ProjectScopePlugin:
+    name, api = "project_scope", 2
+
+    def apply(self, callback, route):
+        if not route.rule.startswith("/api/") or route.rule == "/api/events":
+            return callback
+
+        @wraps(callback)
+        def scoped(*args, **kwargs):
+            try:
+                body = request.json if request.content_type.startswith("application/json") else {}
+                body = body or {}
+                if not isinstance(body, dict):
+                    raise ValueError("request body must be an object")
+                # Validate asset paths before they can reach any cache/project join.
+                gr = body.get("game_rel") or request.query.get("game_rel") or request.forms.get("game_rel")
+                if gr:
+                    _c.validate_game_rel(gr)
+                asset_lists = [body.get(k, []) for k in ("game_rels", "items")]
+                if any(not isinstance(items, list) for items in asset_lists):
+                    raise ValueError("asset lists must be arrays")
+                for item in asset_lists[0] + asset_lists[1]:
+                    gr = item.get("game_rel") if isinstance(item, dict) else item
+                    if gr:
+                        _c.validate_game_rel(gr)
+                if route.rule in ("/api/reset_data", "/api/save_paks"):
+                    with operations.change_all():
+                        return callback(*args, **kwargs)
+                if route.rule in ("/api/project/create", "/api/project/rename",
+                                  "/api/project/delete", "/api/project/duplicate"):
+                    names = [body[k] for k in ("name", "old_name", "new_name") if body.get(k)]
+                    roots = [_c.project_dir(n, PROJECTS_ROOT) for n in names]
+                    with operations.change_projects(*roots):
+                        return callback(*args, **kwargs)
+                if route.rule == "/api/project/select":
+                    root = _c.project_dir(body.get("name", ""), PROJECTS_ROOT)
+                    with operations.project_use(root):
+                        return callback(*args, **kwargs)
+                if route.rule in ("/api/projects", "/api/project/export"):
+                    return callback(*args, **kwargs)
+                header = request.get_header("X-Atelier-Project")
+                name = (unquote(header) if header is not None else
+                        request.query.get("_project", get_active_project()))
+                root = _c.project_dir(name, PROJECTS_ROOT) if name else IMPORT_ROOT
+                with operations.project_use(root, write=request.method == "POST"), _c.project_context(root):
+                    if name and not os.path.isdir(root):
+                        raise ValueError("project not found")
+                    return callback(*args, **kwargs)
+            except (ValueError, operations.BusyError) as e:
+                response.status = 409 if isinstance(e, operations.BusyError) else 400
+                response.content_type = "application/json"
+                return json.dumps({"ok": False, "error": str(e)})
+        return scoped
+
+
+app.install(_ProjectScopePlugin())
 
 # ── extraction helpers ────────────────────────────────────────────────────────
 
@@ -792,7 +855,7 @@ def api_update_check():
         return json.dumps({"available": False})
 
     try:
-        with open(os.path.join(ROOT, "mr_config.json"), encoding="utf-8") as f:
+        with open(_c.CONFIG_FILE, encoding="utf-8") as f:
             _cfg_skip = json.load(f)
         if _cfg_skip.get("skipped_update") == tag:
             print(f"[update] {tag} was skipped by user")
@@ -820,16 +883,7 @@ def api_update_skip():
     if not _update_cache:
         return json.dumps({"ok": False})
     tag = _update_cache["tag"]
-    cfg_path = os.path.join(ROOT, "mr_config.json")
-    cfg = {}
-    try:
-        with open(cfg_path, encoding="utf-8") as f:
-            cfg = json.load(f)
-    except Exception:
-        pass
-    cfg["skipped_update"] = tag
-    with open(cfg_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
+    _c._save_config(skipped_update=tag)
     print(f"[update] skipped version {tag}")
     return json.dumps({"ok": True})
 
@@ -1440,7 +1494,17 @@ def _push_sse(data: dict):
 
 _browse_mod._update_callback = _push_sse
 
-def _run_import_job(items):
+def _run_import_job(items, project_root=None, release=None):
+    root = project_root or get_import_root()
+    try:
+        with operations.project_use(root, write=True), _c.project_context(root):
+            _run_import_job_in_project(items)
+    finally:
+        if release:
+            release()
+
+
+def _run_import_job_in_project(items):
     """items: [{skin_id, rel_path, game_rel, name}] — extract+decode all via UAssetTool."""
     with _job_lock:
         _job.update(running=True, current=0, total=len(items), name="", done=False, error=None, results=[])
@@ -1448,7 +1512,7 @@ def _run_import_job(items):
         _push_sse({"current": 0, "total": len(items), "name": "Extracting from game…", "done": False})
         os.makedirs(get_import_root(), exist_ok=True)
         extract_many([it["game_rel"] for it in items])   # one retoc call per container, or UAT on Windows
-        _asset_cache.record_many(cache_entries)
+        # extract_many records every extracted asset itself.
 
         _push_sse({"current": 0, "total": len(items), "name": "Decoding…", "done": False})
         decode_flat([it["game_rel"] for it in items], get_import_root())
@@ -1470,8 +1534,11 @@ def _run_import_job(items):
         return
 
     with _job_lock:
-        _job.update(running=False, done=True, results=results)
-    _push_sse({"current": current, "total": len(items), "name": "", "done": True, "results": results})
+        missing = len(items) - len(results)
+        error = f"{missing} texture(s) could not be imported" if missing else None
+        _job.update(running=False, done=True, results=results, error=error)
+    _push_sse({"current": current, "total": len(items), "name": "", "done": True,
+               "results": results, "error": error})
 
 @app.post("/api/import_all")
 def api_import_all():
@@ -1484,7 +1551,17 @@ def api_import_all():
         if _job["running"]:
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": "job already running"})
-    threading.Thread(target=_run_import_job, args=(items,), daemon=True).start()
+        root = get_import_root()
+        release = operations.reserve(root)
+        # Claim before starting the thread: a second HTTP request must see it immediately.
+        _job.update(running=True, current=0, total=len(items), done=False, error=None, results=[])
+    try:
+        threading.Thread(target=_run_import_job, args=(items, root, release), daemon=True).start()
+    except Exception:
+        release()
+        with _job_lock:
+            _job.update(running=False, done=True, error="Could not start import worker")
+        raise
     response.content_type = "application/json"
     return json.dumps({"ok": True, "total": len(items)})
 
@@ -1632,7 +1709,7 @@ def api_project_select():
     if not name:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1647,7 +1724,7 @@ def api_project_create():
     if not name or any(c in name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid project name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if os.path.exists(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project already exists"})
@@ -1665,8 +1742,8 @@ def api_project_rename():
     if not old_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid name"})
-    old_dir = os.path.join(PROJECTS_ROOT, old_name)
-    new_dir = os.path.join(PROJECTS_ROOT, new_name)
+    old_dir = _c.project_dir(old_name, PROJECTS_ROOT)
+    new_dir = _c.project_dir(new_name, PROJECTS_ROOT)
     response.content_type = "application/json"
     if not os.path.isdir(old_dir):
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1688,8 +1765,8 @@ def api_project_duplicate():
     if not src_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid name"})
-    src_dir = os.path.join(PROJECTS_ROOT, src_name)
-    dst_dir = os.path.join(PROJECTS_ROOT, new_name)
+    src_dir = _c.project_dir(src_name, PROJECTS_ROOT)
+    dst_dir = _c.project_dir(new_name, PROJECTS_ROOT)
     if not os.path.isdir(src_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "source project not found"})
@@ -1722,7 +1799,7 @@ def api_project_delete():
     if not name:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1736,15 +1813,23 @@ def _safe_project_dir(name):
     """The folder for `name`, or None when the name is not a plain project name sitting directly
     in PROJECTS_ROOT. Export is the one project route that takes a list, so a bad entry must fail
     the request rather than quietly resolve somewhere else on disk."""
-    name = (name or "").strip()
-    if not name or name in (".", "..") or any(c in name for c in r'/\:*?"<>|'):
+    try:
+        return _c.project_dir(name, PROJECTS_ROOT, must_exist=True)
+    except ValueError:
         return None
-    path = os.path.join(PROJECTS_ROOT, name)
-    if os.path.dirname(os.path.abspath(path)) != os.path.abspath(PROJECTS_ROOT):
-        return None
-    return path if os.path.isdir(path) else None
 
 def _build_project_zip(names):
+    with ExitStack() as stack:
+        # Reserve all source projects before reading any files. An unrelated active
+        # project is immaterial to a multi-project archive.
+        # A stable order also prevents two reversed multi-project exports deadlocking.
+        roots = sorted({_c.project_dir(name, PROJECTS_ROOT, must_exist=True) for name in names})
+        for root in roots:
+            stack.enter_context(operations.project_use(root, write=True))
+        return _build_project_zip_reserved(names)
+
+
+def _build_project_zip_reserved(names):
     """Pack the named projects into one .zip under the cache and return its path.
 
     One project zips its own contents at the root, so unzipping gives the project back as-is;
@@ -1762,8 +1847,8 @@ def _build_project_zip(names):
         raise ValueError("no projects given")
 
     out_dir = os.path.join(_CACHE, "project_export")
-    shutil.rmtree(out_dir, ignore_errors=True)   # one export at a time; the last zip is not worth keeping
     os.makedirs(out_dir, exist_ok=True)
+    out_dir = tempfile.mkdtemp(prefix="archive-", dir=out_dir)
     stem = dirs[0][0] if len(dirs) == 1 else f"atelier_projects_{len(dirs)}"
     zip_path = os.path.join(out_dir, stem + ".zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -1808,7 +1893,7 @@ def api_project_thumb():
     project = request.query.get("project", "")
     if not project:
         response.status = 404; return b""
-    project_dir = os.path.join(PROJECTS_ROOT, project)
+    project_dir = _c.project_dir(project, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.status = 404; return b""
     best_file  = None
@@ -1868,7 +1953,7 @@ def api_reset_data():
     paths_to_remove = [
         _c.ASSETS,
         _c._CACHE,
-        os.path.join(ROOT, "_logs"),
+        os.path.join(_c.DATA_ROOT, "_logs"),
         os.path.join(_c.TOOLS, "Mappings"),
         _c.AES_KEY_FILE,
     ]
@@ -2028,9 +2113,9 @@ def _split_export_items(items):
     mesh_items  = [gr for gr in items if _is_mesh_item(gr)]                          # edits from the .blend
     return tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items
 
-def _install_to_mods(mod_name, export_dir):
+def _install_to_mods(mod_name, export_dir, artifacts=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
-    removing any previous version of THIS mod first. Returns (ok, error, dest_dir)."""
+    with verification and rollback of replacements. Returns (ok, error, dest_dir)."""
     mods = get_mods_folder()
     if not mods:
         return False, "No mods folder set — configure one in Menu → Settings.", None
@@ -2039,19 +2124,12 @@ def _install_to_mods(mod_name, export_dir):
         os.makedirs(mods, exist_ok=True)
     except Exception as e:
         return False, f"Mods folder not usable: {e}", None
-    for ext in (".pak", ".ucas", ".utoc"):              # drop the previous version of this mod
-        old = os.path.join(mods, stem + ext)
-        if os.path.exists(old):
-            try: os.remove(old)
-            except Exception as e: return False, f"Couldn't replace old mod ({stem + ext}): {e}", None
-    copied = []
-    for ext in (".pak", ".ucas", ".utoc"):
-        src = os.path.join(export_dir, stem + ext)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(mods, stem + ext)); copied.append(ext)
-    if ".utoc" not in copied:
-        return False, "build produced no .utoc to install", None
-    return True, None, mods
+    try:
+        sources = artifacts or container_files(os.path.join(export_dir, stem))
+        publish_files(sources, mods)
+        return True, None, mods
+    except Exception as e:
+        return False, f"Could not install mod: {e}", None
 
 def _mod_stem(mod_name):
     """Filesystem-safe stem for a mod name.
@@ -2105,7 +2183,8 @@ def api_install_mod():
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
                            text_items=text_items, password=password, mesh_items=mesh_items,
-                           asset_opts=_project_meta.get_asset_opts(get_import_root()))
+                           asset_opts=_project_meta.get_asset_opts(get_import_root()),
+                           allow_unsafe_world=bool(body.get("allow_unsafe_world")))
         if not result.get("ok"):
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
         pak = result.get("pak")
@@ -2115,11 +2194,12 @@ def api_install_mod():
         # missing. That is indistinguishable from the game ignoring the edit, which is exactly the
         # confusion the whole diagnostics phase exists to remove.
         resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
-                "applied": result.get("applied") or [], "skipped": result.get("skipped") or []}
+                "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
+                "artifacts": result.get("artifacts") or []}
         if copy_to_mods:
-            ok, err, dest = _install_to_mods(mod_name, out_dir)
+            ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
             if not ok:
-                return json.dumps({"ok": False, "error": err})
+                return json.dumps({**resp, "ok": False, "built": True, "error": err})
             resp["installed_dir"] = dest.replace("\\", "/")
         return json.dumps(resp)
     except Exception as e:

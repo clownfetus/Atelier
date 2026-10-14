@@ -172,7 +172,8 @@ def save_curve(game_rel, edits):
     jp = curve_json(game_rel)
     d  = json.load(open(jp, encoding="utf-8-sig"))
     _apply_curve_edits(d, edits or {})
-    json.dump(d, open(jp, "w"))
+    from atelier.storage import atomic_json
+    atomic_json(jp, d)
     chans = _channels(d)
     return {"ok": True, "channels": chans, "stops": _stops(chans)}
 
