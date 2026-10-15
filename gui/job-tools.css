@@ -1,4 +1,4 @@
-.job-activity-button { flex: 0 0 auto; min-height: 32px; }
+.job-activity-button { flex: 0 0 auto; min-height: 36px; margin-left: 12px; }
 .modal.job-modal, .modal.bulk-modal { width: min(800px, calc(100vw - 40px)); max-width: min(800px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; }
 .job-body, .bulk-body { display: grid; gap: 12px; margin: 16px 0; }
 .job-body p, .bulk-body p { margin: 4px 0; line-height: 1.5; }
@@ -9,7 +9,7 @@
 .bulk-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
 .bulk-controls label { display: grid; gap: 6px; font-size: 12px; }
 .bulk-controls > [hidden] { display: none; }
-.bulk-controls select, .bulk-controls input { min-height: 36px; background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 6px; }
+.bulk-controls select, .bulk-controls input { min-height: 36px; background: var(--bg2); color: var(--text); border: 1px solid var(--border); padding: 6px; }
 .bulk-list { max-height: 220px; overflow: auto; border: 1px solid var(--border); padding: 8px; }
 .bulk-choice { display: grid; grid-template-columns: 20px 1fr; gap: 6px; padding: 6px; align-items: start; }
 .bulk-choice input { margin-top: 4px; }

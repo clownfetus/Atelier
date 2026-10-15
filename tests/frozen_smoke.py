@@ -132,7 +132,7 @@ def main():
             result['interface'] = info
             result['checks'].append('All workflow modules, six motion sets, local font and logo load from the frozen bundle')
             for theme in ('light', 'dark'):
-                page.locator('#topbar [data-theme-picker]').select_option(theme)
+                page.locator('#settings-theme').select_option(theme, force=True)
                 assert page.evaluate('document.documentElement.dataset.theme') == theme
                 page.screenshot(path=str(report / f'frozen-{theme}.png'))
             result['checks'].append('Light and dark themes render in the native shell')

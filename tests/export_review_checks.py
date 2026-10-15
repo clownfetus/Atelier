@@ -216,7 +216,7 @@ def run_export_review_checks(page, context, url, report, checks):
 
         review.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el => el.remove())")
         for theme in ('light', 'dark'):
-            review.locator('#topbar [data-theme-picker]').select_option(theme)
+            review.locator('#settings-theme').select_option(theme, force=True)
             review.locator('#export-review-refresh').click()
             review.screenshot(path=str(report / f'export-review-{theme}.png'), animations='disabled')
     finally:

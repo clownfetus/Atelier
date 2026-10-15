@@ -2,9 +2,11 @@
 
 Requires ATELIER_DATA_DIR. Updates and thumbnail prefetch are suppressed in this smoke only.
 """
+import argparse
 import json
 import os
 from pathlib import Path
+import socket
 import sys
 import threading
 import time
@@ -14,12 +16,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--fixtures', action='store_true', help='Use synthetic folders in isolated data; no game install required')
+    parser.add_argument('--interactions', action='store_true', help='Exercise real WebView2 mouse/keyboard input through CDP and capture screenshots')
+    args = parser.parse_args()
     if not os.environ.get('ATELIER_DATA_DIR'):
         raise SystemExit('Set ATELIER_DATA_DIR to isolated development data.')
+    if args.interactions:
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            debug_port = listener.getsockname()[1]
+        os.environ['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = f'--remote-debugging-port={debug_port}'
     print('Loading native desktop dependencies...', flush=True)
     from atelier import config as C
     from atelier.web import routes as R
     from atelier.web.app import _ThreadingWSGIServer
+    if args.fixtures:
+        R._get_latest_usmap_from_github = lambda: None
+        Path(C.project_dir('Desktop fixture')).mkdir(parents=True, exist_ok=True)
+        C.set_active_project('Desktop fixture')
     import webview
     print('Starting native WebView2...', flush=True)
 
@@ -33,6 +48,13 @@ def main():
                  '/api/prefetch_thumbs': {'ok': True},
                  '/api/usmap_update_check': {'ok': True}}
         stubs['/api/catalogue/status'] = {'updating': False, 'portraits': 803}
+        if args.fixtures:
+            stubs.update({
+                '/api/setup_status': {'configured': True}, '/api/prereqs': {'issues': []},
+                '/api/index_warnings': {'failed': []}, '/api/stale_mips': {'ok': True, 'count': 0},
+                '/api/browse': [dict(type='folder', name=name, label=name, rel_path=name, count=3)
+                                for name in ('Characters', 'UI', 'VFX', 'Maps')],
+            })
         if env['PATH_INFO'] in stubs:
             data = json.dumps(stubs[env['PATH_INFO']]).encode()
             respond('200 OK', [('Content-Type', 'application/json'), ('Content-Length', str(len(data)))])
@@ -70,7 +92,7 @@ def main():
                 result.update(error='Interface did not become ready within 60 seconds', last_state=data)
             else:
                 themes = window.evaluate_js("""(() => {
-                  const picker = document.querySelector('#topbar [data-theme-picker]');
+                  const picker = document.querySelector('#settings-theme');
                   return ['light', 'dark', 'system'].map(value => {
                     picker.value = value; picker.dispatchEvent(new Event('change'));
                     return {preference:value, theme:document.documentElement.dataset.theme,
@@ -81,6 +103,50 @@ def main():
                 assert all(t['settings'] == t['preference'] for t in themes), themes
                 assert [t['theme'] for t in themes[:2]] == ['light', 'dark'], themes
                 result['themes'] = themes
+                appearance = window.evaluate_js("""(() => {
+                  const picker = document.querySelector('#settings-theme');
+                  const rows = [];
+                  for (const mode of ['light', 'dark']) {
+                    picker.value=mode; picker.dispatchEvent(new Event('change'));
+                    for (const preset of ['studio','darcula','repak']) {
+                      document.querySelector('[data-theme-preset="'+preset+'"]').click();
+                      const select = document.querySelector('#settings-theme'), option=select.options[0];
+                      const probe=document.createElement('span');
+                      probe.style.color=CSS.supports('appearance','base-select') && option.matches(':checked')
+                        ? 'var(--md-sys-color-on-secondary-container)' : 'var(--text)';
+                      document.body.append(probe); const expected=getComputedStyle(probe).color; probe.remove();
+                      rows.push({mode, preset, theme:document.documentElement.dataset.theme,
+                        palette:document.documentElement.dataset.palette,
+                        scheme:getComputedStyle(select).colorScheme,
+                        text:getComputedStyle(select).color, option:getComputedStyle(option).color, expected,
+                        optionBackground:getComputedStyle(option).backgroundColor,
+                        brand:getComputedStyle(document.querySelector('.studio-brand')).color});
+                    }
+                  }
+                  document.querySelector('[data-theme-color="background"]').value='#080808';
+                  document.querySelector('[data-theme-color="background"]').dispatchEvent(new Event('input'));
+                  const customBackground=getComputedStyle(document.body).backgroundColor;
+                  const name=document.getElementById('theme-palette-name');
+                  name.value='Desktop custom'; name.dispatchEvent(new Event('input'));
+                  document.getElementById('theme-palette-save').click();
+                  const saved=document.querySelector('[data-saved-palette]');
+                  const savedPalette=!!saved && saved.getAttribute('aria-pressed')==='true';
+                  document.getElementById('theme-palette-delete').click();
+                  document.querySelector('[data-theme-preset="studio"]').click();
+                  return {rows, customBackground,
+                    savedPalette, enhancedPicker:CSS.supports('appearance','base-select'),
+                    nativeColors:[...document.querySelectorAll('[data-theme-color]')].every(el=>el.type==='color' && typeof el.showPicker==='function'),
+                    menuLast:document.querySelector('#topbar > :last-child').id==='menu-btn',
+                    headerPickers:document.querySelectorAll('#topbar [data-theme-picker]').length};
+                })()""")
+                assert appearance['nativeColors'] and appearance['menuLast'] and appearance['savedPalette'] and appearance['headerPickers'] == 0, appearance
+                assert appearance['customBackground'] == 'rgb(8, 8, 8)', appearance
+                assert all(row['theme'] == row['mode'] and row['palette'] == row['preset']
+                           and row['scheme'] == row['mode'] and row['expected'] == row['option']
+                           and row['optionBackground'] != 'rgba(0, 0, 0, 0)'
+                           and row['brand'] == ('rgb(0, 0, 0)' if row['mode'] == 'light' else 'rgb(255, 255, 255)')
+                           for row in appearance['rows']), appearance
+                result['appearance'] = appearance
                 motion = window.evaluate_js("""(() => {
                   const host = document.createElement('span'); document.body.append(host);
                   const instance = AtelierMotion.exportFeedback.mount(host, {state:'busy', reducedMotion:'reduce'});
@@ -213,6 +279,51 @@ def main():
                 assert empty_motion == {'width': 112, 'state': 'settled', 'hidden': 'true',
                                         'animations': 0, 'sidebarAPI': True, 'clean': True}, empty_motion
                 result['empty_assets_motion'] = empty_motion
+                if args.interactions:
+                    # WebView2 suspends screenshot frames while its native window
+                    # is hidden. Show this isolated fixture window for CDP capture.
+                    window.show()
+                    from playwright.sync_api import sync_playwright
+                    with sync_playwright() as pw:
+                        browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{debug_port}')
+                        context = browser.contexts[0]
+                        context.route('https://**', lambda route: route.fulfill(json={}))
+                        page = next(p for p in context.pages if p.url.startswith('http://127.0.0.1:'))
+                        page_errors = []
+                        page.on('pageerror', lambda error: page_errors.append(str(error)))
+                        page.evaluate('openPaths()')
+                        page.wait_for_function('!document.getElementById("setup-loading").classList.contains("active")')
+                        picker = page.locator('#settings-theme')
+                        picker.select_option('light')
+                        picker.click()
+                        page.screenshot(path=str(Path(C.DATA_ROOT) / 'desktop-dropdown-light.png'), animations='disabled')
+                        page.keyboard.press('ArrowDown'); page.keyboard.press('Enter')
+                        assert picker.input_value() == 'dark'
+                        picker.click(); page.keyboard.press('Escape')
+                        assert picker.input_value() == 'dark'
+                        page.locator('[data-theme-preset="repak"]').click()
+                        page.locator('[data-theme-color="background"]').fill('#080808')
+                        page.locator('#theme-palette-name').fill('Desktop saved palette')
+                        page.locator('#theme-palette-save').click()
+                        selected = page.locator('html').get_attribute('data-palette')
+                        assert selected.startswith('palette-')
+                        page.reload()
+                        page.wait_for_selector('#grid-area .card')
+                        assert page.locator('html').get_attribute('data-palette') == selected
+                        assert page.locator('html').get_attribute('data-theme') == 'dark'
+                        page.evaluate('openPaths()')
+                        page.wait_for_function('!document.getElementById("setup-loading").classList.contains("active")')
+                        assert page.locator('[data-saved-palette]', has_text='Desktop saved palette').is_visible()
+                        for mode in ('light', 'dark'):
+                            picker.select_option(mode)
+                            page.screenshot(path=str(Path(C.DATA_ROOT) / f'desktop-settings-{mode}.png'), animations='disabled')
+                        page.locator('#setup-close').click()
+                        page.screenshot(path=str(Path(C.DATA_ROOT) / 'desktop-workspace-dark.png'), animations='disabled')
+                        assert not page_errors, page_errors
+                        result['interactions'] = ['WebView2 mouse opens the styled dropdown',
+                            'ArrowDown/Enter select Dark; Escape preserves the choice',
+                            'native color input and named palette survive WebView2 reload',
+                            'light/dark Settings and workspace screenshots captured with no page errors']
         except Exception as exc:
             result['error'] = str(exc)
         finally:
@@ -230,7 +341,8 @@ def main():
     report = Path(C.DATA_ROOT) / 'desktop-smoke.json'
     report.write_text(json.dumps(result, indent=2), encoding='utf-8')
     assert 'error' not in result, result
-    print('PASS native WebView2: real asset browser, project, symbols, font, logo, themes and viewport module loaded')
+    print('PASS native WebView2: browser, project, symbols, font, monochrome logo, palettes, dropdown roles and viewport module loaded'
+          + (' (synthetic folder fixtures)' if args.fixtures else ' (real assets)'))
     print('Report:', report)
 
 

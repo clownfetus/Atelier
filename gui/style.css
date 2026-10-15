@@ -82,7 +82,7 @@ body {
   font-size: 13px; font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
-  margin-right: 16px;
+  margin-left: 12px;
   transition: border-color .15s, background .15s, color .15s;
 }
 .menu-btn:hover { border-color: var(--acc); background: var(--bg2); color: var(--text); }
@@ -1321,9 +1321,47 @@ button svg, .btn svg { flex-shrink: 0; width: var(--studio-icon-size); height: v
 .studio-brand { display: flex; align-items: center; gap: 10px; margin-right: 24px; flex-shrink: 0; }
 .studio-brand span { font-size: 18px; font-weight: 600; letter-spacing: -.35px; }
 .studio-brand img { display: block; object-fit: contain; }
-.theme-control { display: flex; align-items: center; gap: 6px; margin-left: 12px; color: var(--muted); }
-.theme-control select { min-height: 36px; background: transparent; color: var(--text); border: 0; border-radius: var(--studio-shape-small); padding: 8px 2px; font-size: 12px; cursor: pointer; }
-.theme-control option { color: var(--text); background: var(--bg2); }
+/* Apply to the static fallback and the animated mark without filtering artwork. */
+:root { --studio-brand-color: #000; --studio-brand-filter: brightness(0); }
+:root[data-theme="dark"] { --studio-brand-color: #fff; --studio-brand-filter: brightness(0) invert(1); }
+.studio-brand > img, .studio-brand > [data-atelier-motion="logo-entrance"] { filter: var(--studio-brand-filter); }
+.studio-brand { color: var(--studio-brand-color); }
+/* Native popup options need explicit roles as well as the closed select. */
+select { color-scheme: inherit; background-color: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-small); min-height: 32px; padding: 6px 8px; cursor: pointer; }
+select option, select optgroup { background-color: var(--bg2); color: var(--text); }
+select:disabled { cursor: default; opacity: .6; }
+select:not(:disabled):hover { border-color: var(--border2); }
+select:focus-visible { border-color: var(--acc); }
+/* Keep real selects and native keyboard/AT semantics. Older WebView2 keeps the
+   OS picker; supported engines also expose its selected/hover/menu surface. */
+@supports (appearance: base-select) {
+  select:not([multiple]):not([size]), select:not([multiple]):not([size])::picker(select) { appearance: base-select; }
+  select::picker(select) { background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-medium); box-shadow: var(--studio-shadow); padding: 4px; max-height: min(360px, 65vh); }
+  select::picker-icon { color: var(--muted); }
+  select option { min-height: 32px; padding: 6px 10px; border-radius: 4px; gap: 8px; font: var(--studio-type-label); }
+  select option:checked { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); font-weight: 600; }
+  select option:hover, select option:focus { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+  select option::checkmark { color: currentColor; }
+}
+.theme-palettes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.theme-preset { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 4px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-medium); cursor: pointer; font-size: 12px; }
+.theme-preset:hover { background: var(--bg3); }
+.theme-preset > span:last-child { overflow-wrap: anywhere; max-width: 100%; }
+.theme-preset[aria-pressed="true"] { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.theme-swatches { display: flex; height: 26px; align-items: center; padding-left: 6px; }
+.theme-swatches i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border2); margin-left: -6px; }
+.theme-add { display: grid; place-items: center; height: 26px; width: 26px; border: 1px dashed currentColor; border-radius: 50%; font-size: 22px; line-height: 1; font-weight: 400; }
+.theme-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin-bottom: 10px; }
+.theme-color { display: flex; flex-direction: column; gap: 6px; font: var(--studio-type-detail); color: var(--muted); }
+.theme-color > span { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); }
+.theme-color input { width: 40px; height: 28px; padding: 2px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px; cursor: pointer; }
+.theme-color output { color: var(--text); font-variant-numeric: tabular-nums; }
+.theme-save-row { display: flex; align-items: end; gap: 8px; margin: 0 0 14px; }
+.theme-name { display: grid; gap: 5px; min-width: 0; flex: 1; font: var(--studio-type-detail); color: var(--muted); }
+.theme-name input { width: 100%; }
+.theme-save-row [hidden] { display: none; }
+.theme-help { margin-bottom: 8px; }
+.theme-contrast { margin-bottom: 12px; color: var(--md-sys-color-error); }
 kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; }
 .library-heading { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .library-heading h1 { font: var(--studio-type-title); }
@@ -1349,6 +1387,9 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }
 .btn.danger.primary { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); border-color: transparent; }
 .ctx-item { width: 100%; border: 0; background: transparent; font-family: inherit; text-align: left; min-height: 36px; }
+.ctx-item:focus-visible { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); outline-offset: -2px; }
+.studio-tooltip { position: fixed; inset: auto; margin: 0; max-width: min(340px, calc(100vw - 16px)); padding: 8px 10px; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-small); box-shadow: var(--studio-shadow); font: var(--studio-type-detail); white-space: pre-wrap; overflow-wrap: anywhere; z-index: 10000; }
+.studio-tooltip[hidden] { display: none; }
 .ctx-item.danger, .setup-field-status.error, #setup-status.error { color: var(--md-sys-color-error); }
 .ctx-item.danger:hover, .sb-clear:hover, .clear-all-btn:hover, .proj-action-btn.danger:hover { color: var(--md-sys-color-on-error-container); }
 #ctx-menu { border-radius: var(--studio-shape-medium); padding: 6px; }

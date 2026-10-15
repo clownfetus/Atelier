@@ -61,6 +61,7 @@ def main():
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
     parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
+    parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -152,6 +153,15 @@ def main():
 
                 from design_checks import run_design_checks
                 run_design_checks(page, context, url, report, checks)
+                from appearance_checks import run_appearance_checks
+                run_appearance_checks(page, context, url, report, checks)
+                if args.appearance_only:
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
                 from export_motion_checks import run_export_motion_checks
                 run_export_motion_checks(page, context, url, report, checks)
                 from viewport_motion_checks import run_viewport_motion_checks

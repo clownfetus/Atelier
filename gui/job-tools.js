@@ -97,7 +97,7 @@
   }
   function init() {
     activityButton = el('button', 'Activity', 'btn job-activity-button'); activityButton.id = 'job-activity';
-    document.getElementById('topbar').append(activityButton);
+    document.getElementById('topbar').insertBefore(activityButton, document.getElementById('menu-btn'));
     overlay = el('div', undefined, 'overlay job-overlay'); overlay.id = 'job-overlay';
     const panel = el('section', undefined, 'modal job-modal'); panel.tabIndex = -1;
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'job-title');

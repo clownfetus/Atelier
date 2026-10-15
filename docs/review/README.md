@@ -1,5 +1,9 @@
 # Review screenshots
 
+The [appearance review](appearance/README.md) contains updated interface,
+Settings, first-run and dropdown captures from Chromium and actual Windows
+WebView2, with the scope and validation report.
+
 These unmodified PNG captures come from the deterministic Chromium checks in
 `tests/browser_smoke.py`. They contain synthetic folder/material fixtures, local
 interface artwork and a disposable `Smoke A` project name. They contain no

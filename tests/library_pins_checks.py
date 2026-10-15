@@ -187,7 +187,7 @@ def run_library_pins_checks(page, context, url, report, checks):
         for width, height in ((1024, 768), (1400, 900)):
             pins_page.set_viewport_size({'width': width, 'height': height})
             for theme in ('light', 'dark'):
-                pins_page.locator('#topbar [data-theme-picker]').select_option(theme)
+                pins_page.locator('#settings-theme').select_option(theme, force=True)
                 assert pins_page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 assert pins_page.locator('.library-pin-open').count() == 3
                 assert folder('Maps').bounding_box()['width'] == 156

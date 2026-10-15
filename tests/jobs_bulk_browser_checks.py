@@ -41,10 +41,16 @@ def run_job_bulk_checks(page, context, url, report, checks):
         assert [path.read_bytes() for path in files] == before
         assert tab.locator('#bulk-results tbody tr, #bulk-results table tr').count() == 3
         for theme in ('dark','light'):
-            tab.locator('[data-theme-picker]').first.select_option(theme)
+            tab.locator('#settings-theme').select_option(theme, force=True)
             tab.screenshot(path=str(report / ('bulk-review-'+theme+'.png')))
         tab.locator('#bulk-apply').click()
-        tab.wait_for_function("document.getElementById('bulk-status').textContent.startsWith('Saved 2')")
+        try:
+            tab.wait_for_function("document.getElementById('bulk-status').textContent.startsWith('Saved 2')")
+        except Exception:
+            tab.screenshot(path=str(report / 'bulk-save-failure.png'))
+            print('Bulk save failure:', tab.locator('#bulk-status').inner_text(), flush=True)
+            print('Jobs:', [(job['kind'], job['state'], job.get('error')) for job in J.manager().list('Smoke A')], flush=True)
+            raise
         for path in files:
             channels = CV._channels(json.loads(path.read_text()))
             assert channels['R'][0]['value'] == 2 and channels['A'][0]['value'] == 1

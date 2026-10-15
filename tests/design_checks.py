@@ -1,13 +1,49 @@
 """Material foundation checks run inside browser_smoke's real Bottle/Chromium session."""
 
 
+def measure_contrast(page):
+    return page.evaluate('''() => {
+      const css = getComputedStyle(document.documentElement);
+      const rgb = name => {
+        const probe = document.createElement('span'); probe.style.color = `var(${name})`;
+        document.body.append(probe);
+        const result = getComputedStyle(probe).color.match(/[\\d.]+/g).slice(0,3).map(Number);
+        probe.remove(); return result;
+      };
+      const luminance = name => rgb(name).map(v => v/255).map(v => v<=.04045 ? v/12.92 : ((v+.055)/1.055)**2.4)
+        .reduce((sum,v,i) => sum+v*[.2126,.7152,.0722][i],0);
+      const ratio = (a,b) => (Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
+      const pairs = [['--md-sys-color-on-primary','--md-sys-color-primary'],
+        ['--md-sys-color-on-primary-container','--md-sys-color-primary-container'],
+        ['--md-sys-color-on-secondary-container','--md-sys-color-secondary-container'],
+        ['--md-sys-color-on-error-container','--md-sys-color-error-container']];
+      for (const fg of ['--text','--muted','--acc','--green','--yellow','--blue'])
+        for (const bg of ['--bg','--bg2','--bg3','--md-sys-color-surface-container-lowest','--md-sys-color-surface-container-highest']) pairs.push([fg,bg]);
+      return pairs.map(([a,b])=>({a,b,ratio:ratio(a,b)}));
+    }''')
+
+
 def run_design_checks(page, context, url, report, checks):
-    picker = page.locator('#topbar [data-theme-picker]')
+    picker = page.locator('#settings-theme')
+    # Other workflow suites set this hidden preference directly; here exercise Settings.
+    def choose(theme):
+        # Startup deliberately leaves remote fetches unresolved. Settings uses the
+        # key service; complete that fixture after every reload as well.
+        page.evaluate('''() => {
+          const fetch = window.fetch;
+          window.fetch = (url, options) => String(url).startsWith('https://')
+            ? Promise.resolve(new Response('{}', {headers:{'Content-Type':'application/json'}}))
+            : fetch(url, options);
+        }''')
+        page.evaluate('openPaths()')
+        page.wait_for_function('!document.getElementById("setup-loading").classList.contains("active")')
+        picker.select_option(theme)
+        page.locator('#setup-close').click()
     page.set_viewport_size({'width': 1400, 'height': 900})
     page.wait_for_function('document.fonts.check("14px Roboto")')
     assert page.evaluate('document.querySelector(".studio-brand img").naturalWidth') > 0
     for theme in ('light', 'dark'):
-        picker.select_option(theme)
+        choose(theme)
         assert page.locator('html').get_attribute('data-theme') == theme
         assert page.locator('#settings-theme').input_value() == theme
         # Restyling must retain the large creative preview.
@@ -15,25 +51,7 @@ def run_design_checks(page, context, url, report, checks):
         assert card.bounding_box()['width'] == 156
         assert card.locator('.card-thumb').bounding_box()['width'] == 134
         # Measure actual computed roles, including the brightest container background.
-        contrast = page.evaluate('''() => {
-          const css = getComputedStyle(document.documentElement);
-          const rgb = name => {
-            const probe = document.createElement('span'); probe.style.color = `var(${name})`;
-            document.body.append(probe);
-            const result = getComputedStyle(probe).color.match(/[\\d.]+/g).slice(0,3).map(Number);
-            probe.remove(); return result;
-          };
-          const luminance = name => rgb(name).map(v => v/255).map(v => v<=.04045 ? v/12.92 : ((v+.055)/1.055)**2.4)
-            .reduce((sum,v,i) => sum+v*[.2126,.7152,.0722][i],0);
-          const ratio = (a,b) => (Math.max(luminance(a),luminance(b))+.05)/(Math.min(luminance(a),luminance(b))+.05);
-          const pairs = [['--md-sys-color-on-primary','--md-sys-color-primary'],
-            ['--md-sys-color-on-primary-container','--md-sys-color-primary-container'],
-            ['--md-sys-color-on-secondary-container','--md-sys-color-secondary-container'],
-            ['--md-sys-color-on-error-container','--md-sys-color-error-container']];
-          for (const fg of ['--text','--muted','--acc','--green','--yellow','--blue'])
-            for (const bg of ['--bg','--bg2','--bg3']) pairs.push([fg,bg]);
-          return pairs.map(([a,b])=>({a,b,ratio:ratio(a,b)}));
-        }''')
+        contrast = measure_contrast(page)
         assert all(pair['ratio'] >= 4.5 for pair in contrast), (theme, contrast)
         for width, height in ((1024,768), (1280,800), (1400,900), (1920,1080)):
             page.set_viewport_size({'width': width, 'height': height})
@@ -47,7 +65,7 @@ def run_design_checks(page, context, url, report, checks):
     assert page.locator('html').get_attribute('data-theme') == 'dark'
     page.emulate_media(color_scheme='light')
     assert page.locator('html').get_attribute('data-theme') == 'dark'
-    picker.select_option('system')
+    choose('system')
     assert page.locator('html').get_attribute('data-theme') == 'light'
     page.emulate_media(color_scheme='dark')
     page.wait_for_function('document.documentElement.dataset.theme === "dark"')
@@ -87,24 +105,27 @@ def run_design_checks(page, context, url, report, checks):
     page.locator('#mathx0').fill('#ab3456')
     page.locator('#mathx0').press('Tab')
     draft = page.evaluate('JSON.stringify(matEditor)')
-    # Settings and topbar controls remain synchronized even while an editor is open.
+    # Appearance changes must preserve editor state.
     for theme in ('light','dark'):
         page.locator('#settings-theme').evaluate('(el,v)=>{el.value=v;el.dispatchEvent(new Event("change"));}', theme)
         assert page.evaluate('JSON.stringify(matEditor)') == draft
         page.screenshot(path=str(report / f'material-{theme}.png'), animations='disabled')
+    for preset in ('repak', 'darcula', 'studio'):
+        page.locator(f'[data-theme-preset="{preset}"]').dispatch_event('click')
+        assert page.evaluate('JSON.stringify(matEditor)') == draft
     page.emulate_media(reduced_motion='reduce')
     assert page.locator('#material-overlay .modal').evaluate('(el)=>getComputedStyle(el).animationName') == 'none'
     assert page.locator('#mat-save').evaluate('(el)=>getComputedStyle(el).transitionDuration') == '0s'
     page.locator('#mat-close').click()
     page.emulate_media(reduced_motion='no-preference')
-    checks.append('Theme changes preserve a live material draft; reduced motion disables effects')
+    checks.append('Mode and palette changes preserve a live material draft; reduced motion disables effects')
 
     isolated = context.new_page()
     isolated.add_init_script("""Storage.prototype.getItem = () => {throw new Error('storage unavailable')};
       Storage.prototype.setItem = () => {throw new Error('storage unavailable')};""")
     isolated.goto(url)
     isolated.wait_for_selector('#grid-area .card')
-    isolated.locator('#topbar [data-theme-picker]').select_option('light')
+    isolated.locator('#settings-theme').select_option('light', force=True)
     assert isolated.locator('html').get_attribute('data-theme') == 'light'
     isolated.close()
     checks.append('Blocked localStorage does not prevent launch or in-session theme changes')

@@ -234,7 +234,7 @@ def run_export_motion_checks(page, context, url, report, checks):
           window.visibleToast = AtelierExportFeedback.toast('Exported: motion fixture', 'success', 5000, 'success');
         }""")
         for theme in ('light', 'dark'):
-            motion_page.locator('#topbar [data-theme-picker]').select_option(theme)
+            motion_page.locator('#settings-theme').select_option(theme, force=True)
             motion_page.evaluate("AtelierExportFeedback.begin(document.getElementById('install-btn'))('success')")
             assert motion_page.locator('#install-btn-motion-host').evaluate('(el)=>el.getBoundingClientRect().width') == 20
             assert motion_page.locator('#toast-area [data-atelier-motion="export-feedback"]').evaluate('(el)=>el.getBoundingClientRect().width') == 24

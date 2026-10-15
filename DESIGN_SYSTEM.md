@@ -4,7 +4,7 @@ Atelier remains a desktop creative application built with vanilla JavaScript, Bo
 
 ## Direction and sources
 
-The palette uses neutral charcoal surfaces, controlled blue primary actions and quiet grey-green secondary containers. Light mode uses cool near-white and grey surfaces with a deeper blue primary. Distinct category hues remain visible as muted pigments; interface chrome stays neutral. Red is reserved for errors and destructive actions. Existing fixed 3D preview surrounds stay unchanged, and interface styling never filters or recolors artwork.
+The default Atelier palette uses neutral charcoal surfaces, controlled blue primary actions and quiet grey-green secondary containers. Light mode uses cool near-white and grey surfaces with a deeper blue primary. Darcula adds warm orange accents, and Repak X uses near-black, dark grey and red. Distinct category hues remain visible as muted pigments. Errors and destructive actions keep dedicated semantic roles even when the chosen accent is red. Existing fixed 3D preview surrounds stay unchanged, and interface styling never filters or recolors artwork.
 
 This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/styles/color/roles), [typography](https://m3.material.io/styles/typography/applying-type), [buttons](https://m3.material.io/components/buttons/overview), [motion](https://m3.material.io/styles/motion/overview/how-it-works) and Google's [Material 3 Expressive research](https://design.google/library/expressive-material-design-google-research). It adopts their hierarchy, containment, shape and purposeful motion principles while keeping desktop density. It is not a claim of full Material component or accessibility conformance.
 
@@ -13,7 +13,8 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | File | Responsibility |
 | --- | --- |
 | `gui/tokens.css` | Semantic color pairs, local font, type, spacing, shape and motion tokens |
-| `gui/theme.js` | System/light/dark preference, OS changes and safe localStorage persistence |
+| `gui/theme.js` | System/light/dark preference, palettes, custom color roles, OS changes and safe localStorage persistence |
+| `gui/tooltips.js` | Delegated theme-aware title tooltips, including dynamically generated controls |
 | `gui/style.css` | Layout and component styling, including existing editors |
 | `gui/icons.js` | Local Material Symbols SVG adapter; compatibility with existing icon calls |
 | `gui/folder-icons.js` | Shared folder categories and symbols for cards and home shortcuts |
@@ -22,7 +23,7 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | `gui/export-review.js` / `.css` | Export review, progress and latest session result; app.js owns requests |
 | `gui/motion/` | Six scoped animation sets and their optional presentation adapters |
 | `gui/vendor/material-symbols/` | Vendored glyph paths, source URLs/hashes and Apache 2.0 license |
-| `gui/brand/atelier-mark.png` | Transparent blue Atelier A mark, also exported as root PNG/ICO |
+| `gui/brand/atelier-mark.png` | Original transparent Atelier A mark; header applies a monochrome filter to both static and animated versions |
 | `atelier/catalogue.py` | Optional character/skin metadata refresh and image cache |
 | `gui/catalogue.js` | Non-blocking launch check and Settings status |
 
@@ -53,7 +54,15 @@ Native buttons, selects and inputs provide keyboard behavior. Asset cards and br
 
 ## Theme and motion
 
-Appearance defaults to System and is persisted under `atelier.theme` in browser/WebView storage. Both selectors stay synchronized; selecting a theme never writes Python configuration or project metadata. The preference is applied before CSS to avoid an opposite-theme flash. Unavailable storage falls back to an in-session preference. Browser mode and the desktop profile have separate preferences.
+Appearance lives in first-run configuration and Menu → Settings. The toolbar ends with Activity and Menu; it has no dedicated theme selector. The header logo and wordmark are black in Light and white in Dark, including the optional logo animation and its fallback.
+
+Light, Dark and System are saved under the existing `atelier.theme` key. Atelier (stored as `studio` for compatibility), Darcula and Repak X display four adjacent color circles for background, surface, foreground and accent. Each preset has light/dark variants. The final + Custom button restores a custom draft or starts from the selected palette. Four native HTML color pickers edit its colors. Name and save up to 24 reusable custom palettes; each contains both light/dark variants and can be selected or deleted independently. Names render as literal text. Editing a saved palette starts a custom draft without overwriting it.
+
+Background keeps the chosen value. Semantic text, supporting text, button foregrounds and accent shades are derived for at least 4.5:1 contrast against their surfaces. If requested text/surface colors conflict, text and surface shades adapt and Settings explains the adjustment; the original choices remain in the saved palette. Presets use the same semantic roles as custom themes. These are curated Material 3 role palettes; the four-color editor does not implement Android wallpaper extraction or HCT tonal palette generation.
+
+Palette selection, custom drafts and named palettes use version 2 of `atelier.appearance` browser/WebView storage. The reader accepts version 1 and validates stored colors, names and IDs. Appearance applies immediately, independently of the Settings path Save/Cancel buttons. It never writes Python configuration or project metadata. The preference is applied before CSS to avoid an opposite-theme flash, follows OS changes in System and synchronizes other windows through storage events. Malformed or unavailable storage falls back safely. Browser mode and the desktop profile have separate preferences.
+
+Global select/option/optgroup roles theme filters and editors as well as Settings. Supporting engines progressively opt into [customizable native selects](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select) using `appearance: base-select` and `::picker(select)`: popup surfaces, checkmarks, selected, hover and keyboard focus states use semantic roles while retaining real HTML select behavior. Older WebView2 falls back to its OS picker, with explicit text/background roles and `color-scheme`; OS-owned hover/highlight and native color-picker chrome cannot be fully styled with page CSS. App context menus, dialogs and delegated title tooltips use the same roles. Tooltips retain accessible descriptions/names, restore title fallbacks on dismissal and support Escape without consuming keyboard navigation.
 
 Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input, animating layout in the asset grid, or adding idle animation to 3D previews. `prefers-reduced-motion: reduce` removes CSS animations and transitions.
 

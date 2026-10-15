@@ -63,7 +63,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert target.locator('#library-sort').input_value() == 'name-desc'
         seed()
         for theme in ('light', 'dark'):
-            target.locator('#topbar [data-theme-picker]').select_option(theme)
+            target.locator('#settings-theme').select_option(theme, force=True)
             target.set_viewport_size({'width': 1024, 'height': 768})
             assert target.evaluate('document.documentElement.scrollWidth<=innerWidth')
             target.screenshot(path=str(report / f'library-workflow-{theme}.png'), animations='disabled')

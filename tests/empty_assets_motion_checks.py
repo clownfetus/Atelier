@@ -71,7 +71,7 @@ def run_empty_assets_motion_checks(page, context, url, report, checks):
         before_themes = empty_page.evaluate('emptyMounts.length')
         empty_page.set_viewport_size({'width': 1400, 'height': 900})
         for theme in ('dark', 'light'):
-            empty_page.locator('#topbar [data-theme-picker]').select_option(theme)
+            empty_page.locator('#settings-theme').select_option(theme, force=True)
             svg = empty_page.locator('#sidebar-list .am-empty-assets-svg')
             box = svg.bounding_box()
             assert box['width'] == 112 and box['height'] == 112
