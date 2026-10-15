@@ -15,39 +15,18 @@ permissions:
   contents: read
 
 jobs:
-  installer:
-    name: Install and upgrade (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-2022, windows-2025]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    env:
-      ATELIER_DISPOSABLE_INSTALLER_TEST: '1'
-      PYTHONUTF8: '1'
+  downloads:
+    name: Stage verified installer inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # GitHub requires write access to download unpublished release assets.
+    # This job only transfers files; installer execution has read-only access.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.12'
-      - name: Install CDP test client
-        run: python -m pip install --disable-pip-version-check playwright==1.64.0
-      - name: Check packaging preservation rules
-        run: python tests/test_packaging.py
-      - name: Record existing WebView2 runtime
-        shell: pwsh
-        run: |
-          $clients = @(
-            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\*',
-            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\*',
-            'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\*'
-          )
-          $runtime = @(Get-ItemProperty -Path $clients -ErrorAction SilentlyContinue |
-            Where-Object { $_.name -like '*WebView2*' } | Select-Object name, pv, PSPath)
-          @{ runtimes = $runtime; runner = '${{ matrix.os }}'; installed_by_test = $false } |
-            ConvertTo-Json -Depth 4 | Set-Content "$env:RUNNER_TEMP/webview2-runtime.json"
-          Get-Content "$env:RUNNER_TEMP/webview2-runtime.json"
+          persist-credentials: false
       - name: Download and verify the exact release installers
         shell: pwsh
         env:
@@ -75,6 +54,53 @@ jobs:
             }
             Write-Host "$($item.name) SHA256 $actual"
           }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-installer-inputs
+          path: ${{ runner.temp }}/atelier-downloads/*.exe
+          compression-level: 0
+          retention-days: 1
+
+  installer:
+    name: Install and upgrade (${{ matrix.os }})
+    needs: downloads
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      ATELIER_DISPOSABLE_INSTALLER_TEST: '1'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-installer-inputs
+          path: ${{ runner.temp }}/atelier-downloads
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install CDP test client
+        run: python -m pip install --disable-pip-version-check playwright==1.64.0
+      - name: Check packaging preservation rules
+        run: python tests/test_packaging.py
+      - name: Record existing WebView2 runtime
+        shell: pwsh
+        run: |
+          $clients = @(
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\*',
+            'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\*',
+            'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\*'
+          )
+          $runtime = @(Get-ItemProperty -Path $clients -ErrorAction SilentlyContinue |
+            Where-Object { $_.name -like '*WebView2*' } | Select-Object name, pv, PSPath)
+          @{ runtimes = $runtime; runner = '${{ matrix.os }}'; installed_by_test = $false } |
+            ConvertTo-Json -Depth 4 | Set-Content "$env:RUNNER_TEMP/webview2-runtime.json"
+          Get-Content "$env:RUNNER_TEMP/webview2-runtime.json"
       - name: Verify clean install, running upgrade, reinstall and uninstall
         shell: pwsh
         run: |
