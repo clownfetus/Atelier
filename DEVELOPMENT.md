@@ -610,3 +610,20 @@ This installer-side compatibility path is necessary for previously shipped
 executables: changing only the new application's close handler cannot repair an
 upgrade while the old executable is still running. Hosted tests must leave the
 old application running so this behavior is exercised by the actual installer.
+
+Verified release candidate (15 October 2026):
+[workflow run 38804866757](https://github.com/tendo625/Atelier/actions/runs/38804866757)
+passed on fresh Windows Server 2022 and 2025 VMs, using their existing WebView2
+131 and 154 runtimes. Both passed all 14 packaging checks and the complete native
+install/upgrade/reinstall/uninstall flow, including usable initial setup,
+shortcuts, retained synthetic files/preferences, and replacement process IDs.
+Each fresh install matched all 414 payload hashes; upgrades/reinstalls matched
+413 program files while retaining the user-edited seed. Both uninstall checks
+removed all 413 owned payload files. Installer logs report no required restart.
+The exact tested EXE is 120,307,350 bytes, SHA-256
+`3f11d382c23f75c3bde291a002bf4ae391a1e6fd7851b4eef814c4ff7b98ff80`.
+Installer source is `6a92e6a310fcd0c88a7fc7e8924b4d65f7e0b24e`; its unchanged
+application payload was built at `7f4898a6f5047942c425225f81fd71fc62b7cf8a`.
+The test harness revision was `d5288ce9d21e54176aabb147dffd96a2f9963a0a`.
+These checks used synthetic projects and fixtures; game rendering/export remains
+outside the installer verification scope.
