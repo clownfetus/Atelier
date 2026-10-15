@@ -99,6 +99,12 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait
 // installed window to close normally, then wait before Restart Manager scans.
 // No process is terminated and no registry key is renamed or written here.
 type
+#if Ver < 0x07000000
+  // Inno Setup 6 is a 32-bit process; version 7 adds native-width script types.
+  TAtelierPointer = LongWord;
+#else
+  TAtelierPointer = NativeInt;
+#endif
   TAtelierWindow = record
     Window: HWND;
     Process: THandle;
@@ -109,7 +115,7 @@ var
   AtelierWindows: array of TAtelierWindow;
   AtelierTargetExe: String;
 
-function AtelierEnumWindows(Callback: NativeInt; Data: LPARAM): BOOL;
+function AtelierEnumWindows(Callback: TAtelierPointer; Data: TAtelierPointer): BOOL;
   external 'EnumWindows@user32.dll stdcall';
 function AtelierWindowProcess(Window: HWND; var ProcessId: DWORD): DWORD;
   external 'GetWindowThreadProcessId@user32.dll stdcall';
@@ -119,14 +125,14 @@ function AtelierOpenProcess(Access: DWORD; Inherit: BOOL; ProcessId: DWORD): THa
   external 'OpenProcess@kernel32.dll stdcall';
 function AtelierProcessImage(Process: THandle; Flags: DWORD; Image: String; var Count: DWORD): BOOL;
   external 'QueryFullProcessImageNameW@kernel32.dll stdcall';
-function AtelierPostClose(Window: HWND; Msg: UINT; WParam: WPARAM; LParam: LPARAM): BOOL;
+function AtelierPostClose(Window: HWND; Msg: UINT; WParam: TAtelierPointer; LParam: TAtelierPointer): BOOL;
   external 'PostMessageW@user32.dll stdcall';
 function AtelierWait(Process: THandle; Milliseconds: DWORD): DWORD;
   external 'WaitForSingleObject@kernel32.dll stdcall';
 function AtelierCloseHandle(Handle: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
 
-function CollectAtelierWindow(Window: HWND; Data: LPARAM): BOOL;
+function CollectAtelierWindow(Window: HWND; Data: TAtelierPointer): BOOL;
 var
   ProcessId, Count: DWORD;
   Process: THandle;
@@ -193,8 +199,11 @@ begin
       if AtelierWait(AtelierWindows[I].Process, 0) <> 0 then begin
         ProcessId := 0;
         AtelierWindowProcess(AtelierWindows[I].Window, ProcessId);
-        if (ProcessId <> AtelierWindows[I].ProcessId) or
-           (not AtelierPostClose(AtelierWindows[I].Window, $0010, 0, 0)) then begin
+        if ProcessId <> AtelierWindows[I].ProcessId then begin
+          Result := 'The Atelier window changed while preparing the update. Close Atelier and try again.';
+          Exit;
+        end;
+        if not AtelierPostClose(AtelierWindows[I].Window, $0010, 0, 0) then begin
           Result := 'Could not request a normal Atelier shutdown. Close Atelier and try again.';
           Exit;
         end;
