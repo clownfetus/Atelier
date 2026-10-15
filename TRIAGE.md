@@ -9,8 +9,8 @@ Interactive version: <https://claude.ai/artifact/Ng5HzAGKBEbQP2yYMCXPbF>
 
 | | |
 |---|---|
-| **Source** | 24,343 messages · 6 DMs · 2 user logs · cross-referenced against the code |
-| **Window** | 2026-03-20 → 2026-09-18 |
+| **Source** | 29,871 messages · 6 DMs · 2 user logs · cross-referenced against the code |
+| **Window** | 2026-03-20 → 2026-10-15 (items 38–49 come from the 09-18 → 10-15 sweep) |
 | **Excludes** | mesh editing and the 3D preview (parked as a unit — see PHASES.md) |
 
 **Scales.** Value: Critical > High > Medium > Low. Effort: Trivial (an afternoon) < Small <
@@ -70,7 +70,38 @@ one look.
 **All of the above was verified on Linux only.** The Linux port touched code Windows also runs;
 `LINUX.md` → *Still to verify on Windows* lists what that leaves unconfirmed and how to check it.
 
-Everything else below is unstarted.
+Phases 1–4 shipped in **0.3.4** (Linux build 2026-09-22, Windows 2026-09-24). Confirmed in game
+by users since: **#20** (diiea, 09-24: NoMipMaps fixed UI blur) and **#22** (pushingpetals, 09-25:
+texture removal works). **#12** still has no in-game confirmation.
+
+Everything else below is unstarted, except **#38**: tendo625's PR #2 (merged 2026-10-15) rebuilt
+thumbnail delivery and `tests/test_thumbnails.py` passes, but it is unreleased and unchecked on a
+real install. **#45** is waiting on kadeschaos's logs.
+
+## New since 2026-09-18
+
+Found in the 2026-10-15 sweep of the thread and 98 new conversations. The same scales apply.
+
+| # | Change | Value | Effort | Reports | Where | Why it's here |
+|---|---|---|---|---|---|---|
+| 38 | Preview thumbnails load forever in 0.3.4 | Critical | Small | 9 | `pak_thumb.py` · `tests/test_thumbnails.py` | Texture and mesh thumbnails spin indefinitely; Edit asset still loads the file. finngmin, lmaolena, everikreal, cjackfury, ekgaguya, shaula4evr, rebelliousred, wandaffx, jan.in, still on 10-15. Some overlap with #39. **Fixed on main, unreleased.** |
+| 39 | 0.3.4 installer ships without UAssetTool.exe and AtelierMesh | Critical | Trivial | 5 | `Atelier.iss` · `scripts/package_release.py` | 0.3.4 is ~44 MB against 0.3.3's ~490 MB. Fresh installs get `[WinError2]`, "UAssetTool.exe not found", no mesh viewer, "cannot find file" on VFX materials. Support answer is "install 0.3.3, then 0.3.4 over it". wei.ch3ng, jtcarc, pyxlu, cjackfury, rentheg. Check the next built installer actually contains them. |
+| 40 | Ability icons export as white boxes under the Plugins tree | High | Small | 3 | index / browse · `texture.py` | Follow-up to #15. People cannot find "Plugins - sepa… > MarvelGas"; Luna and Thor weapon icons come out as white boxes (shafsta, who also gets it from UE); rebelliousred has slotted UI missing or stretched. May be partly the game. |
+| 41 | Re-exporting a VFX project after a game patch does not refresh it | High | Medium | 1 | `vfx.py` · export | finngmin: re-packaging and re-saving every material still gives a broken mod; a fresh project with the same edits works. Likely a cached base material from the old patch. |
+| 42 | Exported textures render brighter than vanilla | Medium | Medium | 2 | `texture.py` | A vanilla _D pasted back unchanged still looks brighter in game (finngmin); doggo.king sees it on an emote prop. Points at sRGB or compression settings. On your 09-28 todo. |
+| 43 | Linux build needs glibc 2.44 | Medium | Small | 1 | `linux/` | Built on Arch, so the tarball and AppImage fail on Fedora (teal_phoenix). Build against an older glibc. |
+| 44 | Mr Fantastic maker skin packs one form into the wrong folder | Medium | Small | 1 | export | tendo625: crashes on load; the pak has one of the three forms outside its folder. Unreal-packed version works. |
+| 45 | Export contains only materials, no textures | High | Medium | 1 | export | kadeschaos, 09-30. **Waiting on logs** (asked 10-01). |
+| 46 | NoMipMaps on by default for UI textures | Medium | Trivial | 1 | `texture.py` | diiea, right after #20 fixed her blur. On your 09-28 todo. |
+| 47 | Remove a whole material part (MI_Hide) | Medium | Medium | 4 | `material.py` · `texture.py` | Remove Texture only hides parts that already have an opacity mask. leagueofthearcane proposed swapping in MI_Hide; chomik88828, zumiku0 and finngmin all wanted it. |
+| 48 | Add textures with new names | Low | Small | 1 | `texture.py` | chopthememegod, for colour variants. You said "not too hard to add". |
+| 49 | Show hair and iris textures in previews | Low | Small | 1 | `pak_thumb` / `dye.py` | finngmin, alongside #38. |
+
+Updates to older open items: **#13** has a third asker (miss_breezy); **#24** a second (teal_phoenix);
+**#28** keeps proving itself (tendo625: "who should I report to?"); **#29** is still the most common
+mod-help question, and the 10-15 ban wave around UI mods gives the export screen something more to
+say; **#33** is on your own 09-28 todo; **#36** is partly covered by PR #2's suite, but nothing tests
+texture paths end to end.
 
 ---
 
