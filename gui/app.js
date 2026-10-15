@@ -3347,6 +3347,12 @@ async function checkUpdate() {
   if (!info.available) { overlay.classList.remove("active"); return false; }
 
   document.getElementById("update-tag").textContent = info.tag;
+  // Non-Windows builds can't update in place: same prompt, but the button opens the release page.
+  if (info.manual) {
+    document.getElementById("update-now").innerHTML =
+      '<i data-lucide="external-link" size="14"></i> Open Release Page';
+    document.getElementById("update-tag").nextSibling.textContent = " is available to download.";
+  }
   _showUpdatePanel("update-confirm");
   lucide.createIcons();
 
@@ -3358,6 +3364,13 @@ async function checkUpdate() {
       try { await api("/api/update_skip", { method: "POST" }); } catch {}
       dismiss();
     };
+    if (info.manual) {
+      document.getElementById("update-now").onclick = async () => {
+        try { await api("/api/update_open_release", { method: "POST" }); } catch {}
+        dismiss();
+      };
+      return;
+    }
     document.getElementById("update-now").onclick = async () => {
       _showUpdatePanel("update-downloading");
       const fill  = document.getElementById("update-dl-fill");

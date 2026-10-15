@@ -963,6 +963,15 @@ def api_update_check():
     except Exception:
         pass
 
+    release_url = data.get("html_url") or f"https://github.com/clownfetus/Atelier/releases/tag/{tag}"
+
+    # Only Windows updates in place (Inno Setup installer). Elsewhere the same prompt sends the
+    # user to the release page to grab the new AppImage by hand.
+    if not hostos.IS_WINDOWS:
+        _update_cache = {"tag": tag, "download_url": None, "release_url": release_url}
+        print(f"[update] update available: {current} -> {remote} (manual, via release page)")
+        return json.dumps({"available": True, "tag": tag, "manual": True})
+
     download_url = None
     for asset in data.get("assets", []):
         if asset["name"] == "AtelierSetup.exe":
@@ -972,9 +981,20 @@ def api_update_check():
         print("[update] AtelierSetup.exe not found in release assets")
         return json.dumps({"available": False})
 
-    _update_cache = {"tag": tag, "download_url": download_url}
+    _update_cache = {"tag": tag, "download_url": download_url, "release_url": release_url}
     print(f"[update] update available: {current} -> {remote}")
     return json.dumps({"available": True, "tag": tag})
+
+
+@app.post("/api/update_open_release")
+def api_update_open_release():
+    response.content_type = "application/json"
+    if not _update_cache:
+        return json.dumps({"ok": False})
+    try: hostos.open_path(_update_cache["release_url"])
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+    return json.dumps({"ok": True})
 
 
 @app.post("/api/update_skip")
@@ -1016,10 +1036,10 @@ def api_update_progress():
 
 def _do_update_download(download_url):
     """Downloads and runs the Inno Setup installer. Windows-only by construction — releases ship
-    an .exe installer and nothing else, so on Linux the caller is told to update via git."""
+    an .exe installer, and on Linux update_check offers the release page instead."""
     global _update_state, _update_progress
     if not hostos.IS_WINDOWS:
-        print("[update] in-app update is Windows-only; update this checkout with git instead")
+        print("[update] in-app update is Windows-only; download the new release from the release page")
         with _update_state_lock:
             _update_state = "error"
         return
