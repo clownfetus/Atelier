@@ -145,3 +145,96 @@ def publish_files(sources, destination):
         # A cleanup failure after commit must not turn a successful publication into a failure.
         shutil.rmtree(folder, ignore_errors=True)
     return [os.path.join(destination, n) for n in names]
+
+
+def recover_destination(destination):
+    with _publish_lock:
+        recover_publications(destination)
+
+
+def _project_target(root, relative):
+    from atelier.config import project_base
+    return os.path.realpath(project_base(relative, root))
+
+
+def recover_project_writes(root):
+    """Roll back an interrupted bulk save before serving project data again."""
+    with _publish_lock:
+        base = _project_target(root, ".atelier/transactions")
+        if not os.path.isdir(base):
+            return
+        for name in os.listdir(base):
+            if not _plain_name(name):
+                continue
+            folder = os.path.join(base, name)
+            journal = os.path.join(folder, "journal.json")
+            if not os.path.isfile(journal) or os.path.islink(folder):
+                continue
+            with open(journal, encoding="utf-8") as stream:
+                data = json.load(stream)
+            if data["state"] != "committed":
+                for i, entry in enumerate(data["entries"]):
+                    target = _project_target(root, entry["path"])
+                    if entry["had_old"]:
+                        backup = os.path.join(folder, str(i) + ".bak")
+                        with open(backup, "rb") as stream:
+                            payload = stream.read()
+                        _atomic_bytes(target, payload)
+                    elif os.path.exists(target):
+                        os.remove(target)
+            shutil.rmtree(folder)
+
+
+def _atomic_bytes(path, payload):
+    parent = os.path.dirname(path)
+    os.makedirs(parent, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".atelier-write-", dir=parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
+def publish_project_json(root, changes):
+    """Compare all previews first, then persist JSON as one recoverable batch.
+
+    changes: [{path: project-relative path, before: SHA256 or None, data: JSON}].
+    A failure restores every previous byte, including files absent before the batch.
+    """
+    import uuid
+    with _publish_lock:
+        recover_project_writes(root)
+        targets = [_project_target(root, c["path"]) for c in changes]
+        if len(set(os.path.normcase(p) for p in targets)) != len(targets):
+            raise ValueError("Duplicate bulk save target")
+        for target, change in zip(targets, changes):
+            actual = _digest(target) if os.path.isfile(target) else None
+            if actual != change["before"]:
+                raise RuntimeError("An asset changed after preview. Review the batch again before saving.")
+        folder = os.path.join(root, ".atelier", "transactions", str(uuid.uuid4()))
+        os.makedirs(folder)
+        entries = []
+        try:
+            for i, (target, change) in enumerate(zip(targets, changes)):
+                had_old = os.path.isfile(target)
+                if had_old:
+                    shutil.copy2(target, os.path.join(folder, str(i) + ".bak"))
+                entries.append({"path": change["path"], "had_old": had_old})
+            journal = os.path.join(folder, "journal.json")
+            atomic_json(journal, {"state": "publishing", "entries": entries})
+            for target, change in zip(targets, changes):
+                atomic_json(target, change["data"], allow_nan=False)
+            atomic_json(journal, {"state": "committed", "entries": entries})
+        except Exception as error:
+            try:
+                recover_project_writes(root)
+            except Exception as rollback_error:
+                raise PublicationRecoveryError(
+                    f"Bulk save failed ({error}); recovery pending at {folder}: {rollback_error}") from error
+            raise
+        shutil.rmtree(folder, ignore_errors=True)

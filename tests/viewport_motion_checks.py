@@ -313,7 +313,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         for width, height in ((1024, 768), (1400, 900)):
             motion_page.set_viewport_size({'width': width, 'height': height})
             for theme in ('light', 'dark'):
-                motion_page.locator('#topbar [data-theme-picker]').select_option(theme)
+                motion_page.locator('#settings-theme').select_option(theme, force=True)
                 dimensions = motion_page.locator('#viewport-loading-motion-host svg').evaluate("""svg => {
                   const rect=svg.getBoundingClientRect();
                   const hull=svg.querySelector('.am-viewport-loader-hull');

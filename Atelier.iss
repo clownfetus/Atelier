@@ -5,6 +5,20 @@
 #define AppPublisher "Atelier"
 #define AppExeName "Atelier.exe"
 
+; Direct compiler invocations must reject incomplete tool staging too.
+#if !FileExists("dist\Atelier\Tools\UAssetTool.exe")
+  #error Required UAssetTool.exe missing; run BUILD.bat with a complete Tools directory
+#endif
+#if !FileExists("dist\Atelier\Tools\AtelierMesh\AtelierMesh.exe")
+  #error Required AtelierMesh.exe missing; run BUILD.bat with a complete Tools directory
+#endif
+#if !FileExists("dist\Atelier\Tools\AtelierMesh\CUE4Parse-Natives.dll")
+  #error Required AtelierMesh native dependency missing
+#endif
+#if !FileExists("dist\Atelier\Tools\AtelierMesh\oo2core_9_win64.dll")
+  #error Required AtelierMesh Oodle dependency missing
+#endif
+
 [Setup]
 AppId={{2E25ABE9-E3D5-4ABA-9E50-725BA75185AF}
 AppName={#AppName}

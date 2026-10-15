@@ -70,6 +70,13 @@ one look.
 **All of the above was verified on Linux only.** The Linux port touched code Windows also runs;
 `LINUX.md` → *Still to verify on Windows* lists what that leaves unconfirmed and how to check it.
 
+**15 October 2026 follow-up:** item **13** now has reviewed bulk multiply/recolor
+editing for curves, Niagara LUT groups and MPC parameters. Preview does not write
+project edits; applying checks for intervening changes and uses a recoverable
+batch save. Real curve/MPC/Niagara exports were unpacked and compared successfully.
+This verifies stored data, with in-game appearance still separate. See the latest
+section in `DEVELOPMENT.md` for the native fixtures and reports.
+
 Phases 1–4 shipped in **0.3.4** (Linux build 2026-09-22, Windows 2026-09-24). Confirmed in game
 by users since: **#20** (diiea, 09-24: NoMipMaps fixed UI blur) and **#22** (pushingpetals, 09-25:
 texture removal works). **#12** still has no in-game confirmation.
@@ -77,7 +84,12 @@ texture removal works). **#12** still has no in-game confirmation.
 **#38** is done: tendo625's PR #2 (merged 2026-10-15) rebuilt thumbnail delivery, confirmed working.
 **#39** is fixed on main in `a712532` (allowlist tool staging; a missing tool fails the build), unreleased.
 **#45** is waiting on kadeschaos's logs, though `a712532`'s re-extract of a missing work copy may
-already cover it. Everything else below is unstarted.
+already cover it. Later implementation notes below supersede these findings where stated.
+
+This PR also refreshes material export bases and recovers missing texture bases;
+the native checks and remaining reporter-specific limits are documented in
+`docs/triage-code-audit-2026-10-15.md`. Historical reports below remain distinct
+from those verified implementation changes.
 
 The shipped 0.3.4 Windows installer also carried two fixes that were never committed: mod-loader
 containers (`!projectgalacta_9999999_p`) kept out of the index, and a mods folder outside the game's
@@ -102,11 +114,11 @@ Found in the 2026-10-15 sweep of the thread and 98 new conversations. The same s
 | 48 | Add textures with new names | Low | Small | 1 | `texture.py` | chopthememegod, for colour variants. You said "not too hard to add". |
 | 49 | Show hair and iris textures in previews | Low | Small | 1 | `pak_thumb` / `dye.py` | finngmin, alongside #38. |
 
-Updates to older open items: **#13** has a third asker (miss_breezy); **#24** a second (teal_phoenix);
+Updates to older items: **#13** has a third asker (miss_breezy), addressed by the reviewed bulk editor above; **#24** a second (teal_phoenix);
 **#28** keeps proving itself (tendo625: "who should I report to?"); **#29** is still the most common
 mod-help question, and the 10-15 ban wave around UI mods gives the export screen something more to
 say; **#33** is on your own 09-28 todo; **#36**: `stage_inject` is tested (phases 3–4 and `a712532`'s re-extract case), but always with
-UAssetTool faked; nothing runs a real inject or checks pak paths across characters.
+UAssetTool faked in the original phase suites. This PR adds opt-in native material/dye and curve/MPC/Niagara export/readback checks (see DEVELOPMENT.md); exhaustive cross-character path coverage remains open.
 
 ---
 

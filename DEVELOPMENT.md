@@ -466,3 +466,74 @@ source revision. The earlier per-phase counts above describe those earlier runs.
 ## Review and follow-up
 
 See [RELIABILITY.md](RELIABILITY.md) for the fixes, evidence, API compatibility and remaining limitations. Before release, manually validate representative texture/material/dye, VFX/curve/text, world, Blender, protected-mod and repatch workflows with a supported game version. In-game verification remains a separate release gate.
+
+## Native export, managed jobs and bulk editing (15 October 2026)
+
+Activity now tracks imports, exports, repatches and bulk reviews/saves by project.
+The desktop waits for managed work during close. A cancellable job stops its own
+native child processes and discards private staging; once publication starts,
+cancellation is disabled and shutdown waits for the file transaction to finish.
+Restart marks unfinished jobs as interrupted, recovers publication journals in
+configured output folders and removes owned private workspaces where possible.
+Interrupted work is never resubmitted automatically. Inputs and passwords are not
+stored in the job journal; terminal results remain available in Activity.
+
+The optional `background: true` field on import/export/repatch requests returns a
+job ID. Existing requests retain synchronous export/repatch behavior and legacy
+import status. `GET /api/jobs`, `GET /api/jobs/<id>` and
+`POST /api/jobs/<id>/cancel` use the same originating-project header as edits.
+Restart Python to register these new routes; refreshing CSS/JS alone is insufficient.
+
+Bulk VFX / curves offers selected edited assets or the filtered current folder.
+Multiply can target color RGB, alpha or all channels/scalars; replacing RGB keeps
+alpha. Curve times/interpolation/weights stay intact, with slopes scaled alongside
+values or zeroed for constant RGB replacement. Niagara edits retain their export
+indices and LUT dimensions. MPCs are visibly labelled as global. Reviews use a
+temporary project copy, expire after 15 minutes and never write project edits.
+Applying rejects any stale target before changing a file. A durable project-local
+journal rolls back a failed/interrupted batch before subsequent project access.
+Intensity metadata changes join that transaction; other export settings remain.
+
+Real native verification exposed a pre-existing zero-scalar bug: changing a
+material parameter omitted as zero retained its old unversioned header and
+produced an unreadable export. Edited parameters now rebuild only their owning
+header, preserving untouched nested headers. The same helper covers MPC defaults.
+
+Validation for this follow-up:
+
+- **225 Python checks passed**, with the two legacy native cases explicitly
+  skipped by the isolated runner. Reports: `_work/native-jobs-bulk/backend-complete`.
+- **81 Chromium groups passed**, including real decoded mesh rendering and three
+  disposal cycles. The final UI changes also passed the focused real-HTTP bulk/job
+  suite. Reports: `_work/native-jobs-bulk/browser-final` and `browser-latest`.
+- A real hidden WebView2 close cancelled an owned child and persisted its final
+  job state before process exit: `_work/native-jobs-bulk/desktop-final`.
+- Storm `MI_1031306_Equip_01`: a changed `BaseTint`, zero-to-nonzero `AOIntensity`,
+  painted 2048-square DXT1 texture and neutral 2048-square DXT5 ColorID survived
+  build, isolated installation and unpack/decode. Material texture references,
+  formats, dimensions, zero mask alpha and existing project hashes matched.
+  This also ran through the managed native-child path with a persisted success
+  result. Report: `D:/AtelierDev/native-jobs-bulk-2026-10-15/material-dye-managed`.
+- A real `C_1032_6_601`, `MPC_1015_6_001` and `NS_103100_Body_01` passed bulk save,
+  native export and readback of curve keys/tangents, MPC parameters and every
+  changed Niagara LUT. Source projects and isolated installation hashes matched.
+  Report: `D:/AtelierDev/native-jobs-bulk-2026-10-15/bulk-native-final`.
+- JavaScript syntax, DOM smoke, dependency consistency and whitespace checks pass.
+
+Repeat the focused and native checks with fresh report directories:
+
+```powershell
+.\.venv\Scripts\python.exe tests/browser_smoke.py --jobs-bulk-only --report-dir _work/jobs-browser
+.\.venv\Scripts\python.exe tests/window_job_smoke.py --report-dir _work/jobs-desktop
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_material_dye.py --report-dir 'D:\AtelierDev\new-material-check'
+.\.venv\Scripts\python.exe tests/native_bulk_smoke.py --report-dir 'D:\AtelierDev\new-bulk-check'
+```
+
+All native installation checks target report-local `test-mods`, never live game
+mods. These are storage/pipeline checks, not an in-game visual certification.
+Managed job locks remain process-local: concurrent instances need separate data
+directories. Legacy untracked callers and shader-index background work are not
+converted into managed jobs. Repatch's optional import-into-project mode becomes
+uncancellable when its legacy project writes start; it is not a bulk-save
+transaction. No new packaged executable or installer was produced in this pass.

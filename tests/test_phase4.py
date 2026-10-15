@@ -773,8 +773,14 @@ def t_an_unproducible_top_mip_is_only_chased_once():
         n = []
         saved = (TX.extract_via_retoc, TX.prefers_retoc)
         TX.prefers_retoc = lambda: True
-        TX.extract_via_retoc = lambda grs: (n.append(1) or {grs[0]: (wb, "pakchunkUI-Windows.utoc",
-                                                                     "Marvel/Content/Marvel/")})
+        def extract_without_top_mip(grs):
+            n.append(1)
+            # A successful extractor recreates the base after invalidation.
+            # The optional top mip remains unavailable in this fixture.
+            os.makedirs(os.path.dirname(wb), exist_ok=True)
+            open(wb + ".uasset", "wb").write(b"fresh base without top mip")
+            return {grs[0]: (wb, "pakchunkUI-Windows.utoc", "Marvel/Content/Marvel/")}
+        TX.extract_via_retoc = extract_without_top_mip
         try:
             TX.ensure_work_base("UI/T_A")
             assert _ac.get("UI/T_A").get("mip_refreshed") is True, "it did not stop asking"

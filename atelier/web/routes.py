@@ -1,11 +1,12 @@
-import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request
+import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
 from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier import hostos
 from atelier import operations
-from atelier.storage import publish_files, container_files
+from atelier import jobs
+from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
 from urllib.parse import unquote
@@ -112,18 +113,69 @@ class _ProjectScopePlugin:
                 name = (unquote(header) if header is not None else
                         request.query.get("_project", get_active_project()))
                 root = _c.project_dir(name, PROJECTS_ROOT) if name else IMPORT_ROOT
-                with operations.project_use(root, write=request.method == "POST"), _c.project_context(root):
+                with operations.project_use(root, write=request.method == "POST" and
+                                            not route.rule.startswith("/api/jobs")), _c.project_context(root):
                     if name and not os.path.isdir(root):
                         raise ValueError("project not found")
+                    from atelier.storage import recover_project_writes
+                    recover_project_writes(root)
                     return callback(*args, **kwargs)
-            except (ValueError, operations.BusyError) as e:
-                response.status = 409 if isinstance(e, operations.BusyError) else 400
+            except (ValueError, operations.BusyError, PublicationRecoveryError) as e:
+                response.status = 400 if isinstance(e, ValueError) else 409
                 response.content_type = "application/json"
                 return json.dumps({"ok": False, "error": str(e)})
         return scoped
 
 
 app.install(_ProjectScopePlugin())
+
+
+@app.get("/api/jobs")
+def api_jobs():
+    return {"ok": True, "jobs": jobs.manager().list(get_active_project_for_request())}
+
+
+def get_active_project_for_request():
+    header = request.get_header("X-Atelier-Project")
+    return unquote(header) if header is not None else request.query.get("_project", get_active_project())
+
+
+@app.get("/api/jobs/<job_id>")
+def api_job_status(job_id):
+    return {"ok": True, "job": jobs.manager().snapshot(job_id, get_active_project_for_request())}
+
+
+@app.post("/api/jobs/<job_id>/cancel")
+def api_job_cancel(job_id):
+    project = get_active_project_for_request()
+    accepted = jobs.manager().cancel(job_id, project)
+    return {"ok": accepted, "job": jobs.manager().snapshot(job_id, project),
+            "error": None if accepted else "This job has finished or is publishing its files; cancellation is unavailable."}
+
+
+def _submit_job(kind, label, work, on_finish=None):
+    job = jobs.manager().submit(kind, label, get_import_root(), get_active_project_for_request(), work, on_finish)
+    return {"ok": True, "job_id": job["id"], "job": job}
+
+
+@app.post("/api/bulk/preview")
+def api_bulk_preview():
+    from atelier import bulk
+    body = request.json or {}
+    if body.get("background"):
+        return _submit_job("bulk-preview", "Review VFX / curve edits",
+                           lambda job: bulk.preview(body.get("items"), body.get("edit")))
+    return bulk.preview(body.get("items"), body.get("edit"))
+
+
+@app.post("/api/bulk/apply")
+def api_bulk_apply():
+    from atelier import bulk
+    body = request.json or {}
+    if body.get("background"):
+        return _submit_job("bulk-save", "Save VFX / curve edits",
+                           lambda job: bulk.apply(body.get("preview_id")))
+    return bulk.apply(body.get("preview_id"))
 
 # ── extraction helpers ────────────────────────────────────────────────────────
 
@@ -1649,6 +1701,7 @@ def _run_import_job_in_project(items):
     with _job_lock:
         _job.update(running=True, current=0, total=len(items), name="", done=False, error=None, results=[])
     try:
+        jobs.progress("Extracting textures…", 0, len(items))
         _push_sse({"current": 0, "total": len(items), "name": "Extracting from game…", "done": False})
         os.makedirs(get_import_root(), exist_ok=True)
         extract_many([it["game_rel"] for it in items])   # one retoc call per container, or UAT on Windows
@@ -1659,8 +1712,10 @@ def _run_import_job_in_project(items):
 
         results = []; current = 0
         for it in items:
+            jobs.checkpoint()
             dst_base = _import_base(it["game_rel"])
             current += 1
+            jobs.progress("Importing " + it["name"], current, len(items))
             if os.path.exists(dst_base + ".png"):
                 results.append({"name": it["name"], "token": token(it["game_rel"]),
                                  "game_rel": it["game_rel"]})
@@ -1687,6 +1742,33 @@ def api_import_all():
     if not items:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no items"})
+    if body.get("background"):
+        owner = uuid.uuid4().hex
+        with _job_lock:
+            if _job["running"]:
+                return {"ok": False, "error": "job already running"}
+            _job.update(running=True, current=0, total=len(items), done=False, error=None, results=[], owner=owner)
+        def run(job):
+            try:
+                _run_import_job_in_project(items)
+                with _job_lock:
+                    return {"ok": not _job["error"], **_job}
+            finally:
+                with _job_lock:
+                    if _job["running"] and _job.get("owner") == owner:
+                        _job.update(running=False, done=True, error="Import cancelled; completed assets are retained.")
+                        _push_sse(dict(_job))
+        try:
+            def settled():
+                with _job_lock:
+                    if _job["running"] and _job.get("owner") == owner:
+                        _job.update(running=False, done=True, error="Import cancelled; completed assets are retained.")
+                        _push_sse(dict(_job))
+            return _submit_job("import", "Import textures", run, settled)
+        except BaseException:
+            with _job_lock:
+                _job.update(running=False, done=True)
+            raise
     with _job_lock:
         if _job["running"]:
             response.content_type = "application/json"
@@ -1694,7 +1776,7 @@ def api_import_all():
         root = get_import_root()
         release = operations.reserve(root)
         # Claim before starting the thread: a second HTTP request must see it immediately.
-        _job.update(running=True, current=0, total=len(items), done=False, error=None, results=[])
+        _job.update(running=True, current=0, total=len(items), done=False, error=None, results=[], owner=None)
     try:
         threading.Thread(target=_run_import_job, args=(items, root, release), daemon=True).start()
     except Exception:
@@ -2304,17 +2386,24 @@ def api_install_mod():
     """Build the selected edits into a mod in the default export folder, then — when copy_to_mods
     is set — also copy it into the configured mods folder, replacing any previous version there.
     Single entry point behind the "Install Mod" button, regardless of toggle state."""
-    body         = request.json or {}
+    body = request.json or {}
+    if body.get("background"):
+        return _submit_job("export", "Export " + _mod_stem(body.get("mod_name")),
+                           lambda job: _install_mod_payload(body))
+    response.content_type = "application/json"
+    return json.dumps(_install_mod_payload(body))
+
+
+def _install_mod_payload(body):
     mod_name     = _mod_stem(body.get("mod_name"))
     items        = body.get("items", [])
     copy_to_mods = bool(body.get("copy_to_mods"))
     password     = (body.get("password") or "").strip() or None
-    response.content_type = "application/json"
     if not items:
-        return json.dumps({"ok": False, "error": "no items selected"})
+        return {"ok": False, "error": "no items selected"}
     if copy_to_mods and not get_mods_folder():
-        return json.dumps({"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
-                           "need_mods_folder": True})
+        return {"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
+                "need_mods_folder": True}
     out_dir = ASSETS_MODS
     os.makedirs(out_dir, exist_ok=True)
     try:
@@ -2326,7 +2415,7 @@ def api_install_mod():
                            asset_opts=_project_meta.get_asset_opts(get_import_root()),
                            allow_unsafe_world=bool(body.get("allow_unsafe_world")))
         if not result.get("ok"):
-            return json.dumps({"ok": False, "error": result.get("error", "build failed")})
+            return {"ok": False, "error": result.get("error", "build failed")}
         pak = result.get("pak")
         # applied/skipped were computed and then dropped on the floor here. A per-item failure --
         # a dye-off whose ColorID would not extract, a texture group that could not be set -- left
@@ -2339,11 +2428,11 @@ def api_install_mod():
         if copy_to_mods:
             ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
             if not ok:
-                return json.dumps({**resp, "ok": False, "built": True, "error": err})
+                return {**resp, "ok": False, "built": True, "error": err}
             resp["installed_dir"] = dest.replace("\\", "/")
-        return json.dumps(resp)
+        return resp
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return {"ok": False, "error": str(e)}
 
 @app.post("/api/pick_mod_file")
 def api_pick_mod_file():
@@ -2363,27 +2452,51 @@ def api_pick_mod_file():
 def api_repatch():
     """Repatch a picked mod for the current patch. body: {path, unlock, stage_as_project, password}."""
     body = request.json or {}
-    src  = (body.get("path") or "").strip()
+    if body.get("background"):
+        return _submit_job("repatch", "Repatch mod", lambda job: _repatch_payload(body))
     response.content_type = "application/json"
+    return json.dumps(_repatch_payload(body))
+
+
+def _repatch_payload(body):
+    src  = (body.get("path") or "").strip()
     if not src or not os.path.exists(src):
-        return json.dumps({"ok": False, "error": "Pick a mod file first."})
+        return {"ok": False, "error": "Pick a mod file first."}
     from atelier.handlers.repatch import repatch_mod
+    from atelier.handlers.texture import _build_lock
+    if not _build_lock.acquire(blocking=False):
+        return {"ok": False, "error": "Another mod build is in progress; wait before repatching."}
     name = re.sub(r'[/\\:*?"<>|.]', '', os.path.splitext(os.path.basename(src))[0])[:60] or "Mod"
-    out_dir = ASSETS_MODS; os.makedirs(out_dir, exist_ok=True)
-    out_base = os.path.join(out_dir, f"{name}_Repatched_9999999_P")
+    work = None
     try:
+        os.makedirs(_CACHE, exist_ok=True)
+        work = jobs.build_workspace(_CACHE)
+        out_base = os.path.join(work, f"{name}_Repatched_9999999_P")
+        if body.get("stage_as_project"):
+            # This legacy option writes each decoded asset into the project.
+            # Once it starts, finish it during shutdown rather than cancelling
+            # halfway through a set of project writes.
+            jobs.begin_publication("Repatching and importing project assets…")
         r = repatch_mod(src, out_base,
                         unlock=(body.get("unlock") or None),
                         stage_as_project=bool(body.get("stage_as_project")),
-                        relock=((body.get("password") or "").strip() or None))
+                        relock=((body.get("password") or "").strip() or None),
+                        work_dir=os.path.join(work, "repatch"))
         if r.get("locked"):
-            return json.dumps({"ok": False, "locked": True, "error": r.get("error")})
+            return {"ok": False, "locked": True, "error": r.get("error")}
         if not r.get("ok"):
-            return json.dumps({"ok": False, "error": r.get("error", "repatch failed"), "manifest": r.get("manifest")})
-        return json.dumps({"ok": True, "manifest": r.get("manifest"), "skipped": r.get("skipped"),
-                           "pak": (r.get("pak") or "").replace("\\", "/"), "mod": f"{name}_Repatched_9999999_P"})
+            return {"ok": False, "error": r.get("error", "repatch failed"), "manifest": r.get("manifest")}
+        jobs.begin_publication("Publishing repatched files…")
+        artifacts = publish_files(container_files(out_base), ASSETS_MODS)
+        pak = next(p for p in artifacts if p.endswith(".pak"))
+        return {"ok": True, "manifest": r.get("manifest"), "skipped": r.get("skipped"),
+                "pak": pak.replace("\\", "/"), "artifacts": artifacts, "mod": f"{name}_Repatched_9999999_P"}
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return {"ok": False, "error": str(e)}
+    finally:
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+        _build_lock.release()
 
 @app.get("/api/open_export_folder")
 def api_open_export_folder():
@@ -2652,3 +2765,15 @@ def api_text_reset():
         return json.dumps(reset_text((request.json or {}).get("game_rel", "")))
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
+
+
+def shutdown(timeout=15):
+    """Stop admission, drain managed jobs, then release native worker/watchers."""
+    if not jobs.shutdown(timeout):
+        return False
+    _thumb_executor.shutdown(wait=False, cancel_futures=True)
+    _observer.stop()
+    _observer.join(timeout=5)
+    from atelier.tools import _shutdown
+    _shutdown()
+    return True

@@ -104,7 +104,7 @@
     const { snapshot, result, callbacks } = current;
     const built = result.ok || result.built;
     const warning = built && (!result.ok || snapshot.skipped || (result.skipped || []).length);
-    reset(built ? (result.installed_dir ? 'Mod installed' : result.ok ? 'Mod exported' : 'Export built; copy failed') : 'Export failed',
+    reset(built ? (result.installed_dir ? 'Mod installed' : result.ok ? 'Mod exported' : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
       built ? warning ? 'warning' : 'success' : 'error');
     metadata(snapshot);
     const status = el('p', result.error || (warning ? 'Review the skipped items below before testing this mod.' : 'The build has finished.'), 'export-review-summary');
@@ -147,8 +147,23 @@
       const progress = el('progress'); progress.setAttribute('aria-label', 'Export in progress'); body.append(progress);
       body.append(el('p', snapshot.copyToMods ? 'Building the selected saved edits, then copying the output to your mods folder.' : 'Building the selected saved edits in the export folder.'));
       body.append(el('p', 'This operation has no percentage estimate. You can hide this window; the build will continue.'));
+      const stage = el('p', 'Starting…'); stage.id = 'export-job-stage'; stage.setAttribute('role','status'); body.append(stage);
+      const cancel = button('Cancel export', async () => {
+        try {
+          const result = await window.AtelierJobs?.cancelCurrent('export', snapshot.project);
+          if (!result?.ok) window.AtelierExportReview.notice(result?.error || 'Job controls are unavailable.');
+        } catch (error) { window.AtelierExportReview.notice(error.message); }
+      });
+      cancel.id = 'export-job-cancel'; cancel.disabled = true;
       button('Hide', hide); show();
       lastButton.hidden = false; lastButton.textContent = 'View export progress';
+    },
+    jobProgress(job) {
+      if (!busy || current?.snapshot?.project !== job.project) return;
+      const stage = document.getElementById('export-job-stage');
+      if (stage) stage.textContent = job.stage;
+      const cancel = document.getElementById('export-job-cancel');
+      if (cancel) cancel.disabled = !job.can_cancel || job.state === 'cancelling';
     },
     finish(snapshot, result) {
       if (current?.snapshot !== snapshot) return;

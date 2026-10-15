@@ -46,14 +46,16 @@ def _float_curves(d):
     """The FloatCurves struct-props of a CurveLinearColor export, in channel order (R,G,B,A)."""
     ex    = d["Exports"][0]
     props = ex.get("Data") or ex.get("Value") or []
-    return [p for p in props if p.get("Name") == "FloatCurves"]
+    return ([p for p in props if p.get("Name") == "FloatCurves"] or
+            [p for p in props if p.get("Name") == "FloatCurve"])
 
 def _keys_of(fc):
     """RichCurveKey struct list for one FloatCurve (the entries under its 'Keys' array)."""
     arr = fc.get("Value")
     if not (isinstance(arr, list) and arr):
         return []
-    return arr[0].get("Value") or []
+    prop = next((p for p in arr if p.get("Name") == "Keys"), arr[0])
+    return prop.get("Value") if isinstance(prop.get("Value"), list) else []
 
 def _rich_key(k):
     """The FRichCurveKey dict inside a RichCurveKey struct (mutating it edits the asset)."""
@@ -133,7 +135,8 @@ def _rebuild_channel(fc, key_list, template):
         if kd.get("tangentMode"):       rk["TangentMode"] = kd["tangentMode"]
         if kd.get("tangentWeightMode"): rk["TangentWeightMode"] = kd["tangentWeightMode"]
         new_keys.append(nk)
-    arr[0]["Value"] = new_keys
+    prop = next((p for p in arr if p.get("Name") == "Keys"), arr[0])
+    prop["Value"] = new_keys
 
 def _stops(channels):
     """Sampled RGBA gradient stops at the union of key times (for preview / colour-stop editing)."""

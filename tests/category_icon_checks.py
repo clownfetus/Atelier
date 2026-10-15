@@ -72,7 +72,7 @@ def run_category_icon_checks(page, context, url, report, checks):
         checks.append('Category aliases resolve case-insensitively without matching custom folder/skin substrings; weapons retain full-size accessible crossed swords')
 
         for theme in ('light', 'dark'):
-            icon_page.locator('#topbar [data-theme-picker]').select_option(theme)
+            icon_page.locator('#settings-theme').select_option(theme, force=True)
             measurements = icon_page.evaluate("""() => {
               const lum = rgb => rgb.match(/[\\d.]+/g).slice(0,3).map(Number).map(v=>v/255)
                 .map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4)

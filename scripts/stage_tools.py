@@ -55,6 +55,12 @@ MANIFEST = {
     ],
 }
 EXECUTABLES = {"linux": ["UAssetTool", "shaders/retoc-rivals-cli"], "windows": []}
+DIRECTORIES = {"AtelierMesh"}
+# Retain the Windows helper API used by verification scripts and older callers.
+# Both APIs use the same allowlist, including all required native dependencies.
+REQUIRED = tuple(rel for rel, required in MANIFEST["windows"] if required and rel not in DIRECTORIES)
+LINUX_ONLY = {"UAssetTool", "liboo2corelinux64.so.9", "libooz.so",
+              "shaders/retoc-rivals-cli", "shaders/liboo2corelinux64.so.9"}
 
 # Python packages the app never imports, kept out of _internal. PyInstaller follows OPTIONAL imports
 # (scipy's array-API layer tries torch; scipy.stats tries matplotlib), and the Linux venv sees the
@@ -78,33 +84,55 @@ FORBIDDEN_DIRS = {"mappings", "_cache", "_logs", "_webview", "assets", "projects
 FORBIDDEN_EXTS = {".usmap", ".uasset", ".uexp", ".ubulk", ".uptnl", ".pak", ".ucas", ".utoc", ".blend"}
 
 
-def stage(platform, src, dist):
-    tools = dist / "Tools"
-    if tools.exists():
-        shutil.rmtree(tools)
-    tools.mkdir(parents=True)
+def validate_tools(root, platform="windows"):
+    root = Path(root)
     missing = []
     for rel, required in MANIFEST[platform]:
-        source, target = src / rel, tools / rel
-        if target.exists():                          # a file inside a directory entry already copied
-            continue
-        if source.is_dir():
-            shutil.copytree(source, target, ignore=_IGNORE)
-        elif source.is_file():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-        elif required:
+        path = root / rel
+        valid = path.is_dir() if rel in DIRECTORIES else path.is_file() and path.stat().st_size > 0
+        if required and not valid:
             missing.append(rel)
-        else:
-            print(f"  [optional] not found, skipped: Tools/{rel}")
-    # Directory entries are copied whole, so re-check their required members after the fact.
-    missing += [rel for rel, required in MANIFEST[platform]
-                if required and rel not in missing and not (tools / rel).exists()]
     if missing:
-        raise SystemExit("Required bundled tools are missing from " + str(src) + ":\n  "
-                         + "\n  ".join(missing))
-    for rel in EXECUTABLES[platform]:
-        os.chmod(tools / rel, 0o755)
+        label = "Windows" if platform == "windows" else "Linux"
+        raise RuntimeError(f"Required {label} tools missing or empty: " + ", ".join(missing))
+
+
+def stage_tools(source, destination, platform="windows"):
+    """Copy only allowlisted tools into a new staging tree; preserve existing trees."""
+    source, destination = Path(source).resolve(), Path(destination).resolve()
+    if source == destination or source in destination.parents or destination in source.parents:
+        raise ValueError("Source and destination Tools directories must be separate")
+    validate_tools(source, platform)
+    if destination.exists():
+        raise ValueError("Tools staging destination already exists; use a clean build directory")
+    created = False
+    try:
+        destination.mkdir(parents=True)
+        created = True
+        for rel, required in MANIFEST[platform]:
+            src, target = source / rel, destination / rel
+            if target.exists():  # A required file already copied inside its directory entry.
+                continue
+            if src.is_dir():
+                shutil.copytree(src, target, ignore=_IGNORE)
+            elif src.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, target)
+            elif not required:
+                print(f"  [optional] not found, skipped: Tools/{rel}")
+        validate_tools(destination, platform)
+        for rel in EXECUTABLES[platform]:
+            os.chmod(destination / rel, 0o755)
+    except Exception:
+        # This resolved, separate target was created by this call. Never delete
+        # an existing build, source tools, or a path inferred from native input.
+        if created:
+            shutil.rmtree(destination)
+        raise
+
+
+def stage(platform, src, dist):
+    stage_tools(src, Path(dist) / "Tools", platform)
 
 
 def audit(platform, dist):
@@ -128,15 +156,29 @@ def audit(platform, dist):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--platform", choices=sorted(MANIFEST), required=True)
-    parser.add_argument("--src", type=Path, default=ROOT / "Tools")
-    parser.add_argument("--dist", type=Path, default=ROOT / "dist" / "Atelier")
+    parser.add_argument("source", type=Path, nargs="?", help="Legacy Windows source Tools directory")
+    parser.add_argument("destination", type=Path, nargs="?", help="Legacy Windows staging Tools directory")
+    parser.add_argument("--platform", choices=sorted(MANIFEST))
+    parser.add_argument("--src", type=Path)
+    parser.add_argument("--dist", type=Path)
     args = parser.parse_args()
-    if not args.dist.is_dir():
-        raise SystemExit(f"No PyInstaller output at {args.dist}; run PyInstaller first.")
-    stage(args.platform, args.src.resolve(), args.dist.resolve())
-    audit(args.platform, args.dist.resolve())
-    print(f"Staged {len(MANIFEST[args.platform])} tool entries for {args.platform} into {args.dist / 'Tools'}")
+    try:
+        if args.source is not None or args.destination is not None:
+            if args.source is None or args.destination is None or args.platform or args.src or args.dist:
+                parser.error("Use source destination, or --platform with optional --src/--dist")
+            stage_tools(args.source, args.destination)
+            print("Required Windows tools staged and validated")
+        else:
+            if not args.platform:
+                parser.error("--platform is required")
+            src, dist = args.src or ROOT / "Tools", args.dist or ROOT / "dist" / "Atelier"
+            if not dist.is_dir():
+                parser.error(f"No PyInstaller output at {dist}; run PyInstaller first.")
+            stage(args.platform, src, dist)
+            audit(args.platform, dist.resolve())
+            print(f"Staged {len(MANIFEST[args.platform])} tool entries for {args.platform} into {dist / 'Tools'}")
+    except (OSError, RuntimeError, ValueError) as error:
+        parser.exit(1, f"Tool staging failed: {error}\n")
 
 
 if __name__ == "__main__":

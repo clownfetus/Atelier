@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="/static/library-tools.css">
 <link rel="stylesheet" href="/static/material-workflow.css">
 <link rel="stylesheet" href="/static/export-review.css">
+<link rel="stylesheet" href="/static/job-tools.css">
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
 <link rel="stylesheet" href="/static/motion/viewport-loader.css">
 <link rel="stylesheet" href="/static/motion/folder-flap.css">
@@ -34,7 +35,6 @@
 <!-- ── top bar ── -->
 <div id="topbar">
   <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
-  <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
   <div id="nav-btns">
     <button class="nav-btn" id="btn-back"    title="Back"    disabled><i data-lucide="arrow-left"  size="15"></i></button>
     <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
@@ -45,12 +45,7 @@
     <input id="search-input" type="search" aria-label="Search assets by name, ID or path" placeholder="Search names, IDs, paths…" aria-keyshortcuts="Control+f Meta+f">
     <kbd>Ctrl F</kbd>
   </div>
-  <label class="theme-control" title="Interface appearance">
-    <i data-lucide="palette" size="18"></i>
-    <select data-theme-picker aria-label="Color theme">
-      <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
-    </select>
-  </label>
+  <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
 </div>
 
 <!-- ── body ── -->
@@ -96,6 +91,7 @@
       <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
       <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
+    <button class="btn" id="bulk-edit-open" type="button">Bulk VFX / curves</button>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
@@ -205,8 +201,9 @@
     <div id="prog-counter" style="font-size:13px;color:var(--muted)">Downloading 0 / 0 assets…</div>
     <div class="warning" style="margin-top:4px">
       <i data-lucide="shield-alert" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>Edit in progress — closing this tab may leave assets in an incomplete state.</span>
+      <span>Completed assets are retained if cancelled. Check Activity after reopening this view.</span>
     </div>
+    <div class="bulk-actions"><button class="btn" id="import-hide" type="button">Hide</button><button class="btn" id="import-cancel" type="button">Cancel import</button></div>
   </div>
 </div>
 
@@ -379,12 +376,33 @@
     <div class="setup-body">
       <div class="setup-section">Appearance</div>
       <div class="setup-field">
-        <label class="setup-label" for="settings-theme">Color theme</label>
+        <label class="setup-label" for="settings-theme">Appearance</label>
         <select id="settings-theme" class="setup-input" data-theme-picker>
-          <option value="system">Follow system</option><option value="light">Light</option><option value="dark">Dark</option>
+          <option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option>
         </select>
-        <span class="opt-help">Applies immediately to this interface.</span>
       </div>
+      <div class="setup-field">
+        <span class="setup-label" id="palette-label">Color palette</span>
+        <div class="theme-palettes" role="group" aria-labelledby="palette-label">
+          <button type="button" class="theme-preset" data-theme-preset="studio" aria-pressed="true"><span class="theme-swatches" aria-hidden="true"></span><span>Atelier</span></button>
+          <button type="button" class="theme-preset" data-theme-preset="darcula" aria-pressed="false"><span class="theme-swatches" aria-hidden="true"></span><span>Darcula</span></button>
+          <button type="button" class="theme-preset" data-theme-preset="repak" aria-pressed="false"><span class="theme-swatches" aria-hidden="true"></span><span>Repak X</span></button>
+          <button type="button" class="theme-preset" data-theme-preset="custom" aria-pressed="false" aria-label="Customize palette"><span class="theme-add" aria-hidden="true">+</span><span>Custom</span></button>
+        </div>
+      </div>
+      <div class="theme-save-row">
+        <label class="theme-name">Palette name<input id="theme-palette-name" class="setup-input" type="text" maxlength="40" placeholder="My palette" autocomplete="off"></label>
+        <button type="button" id="theme-palette-save" class="btn" disabled>Save palette</button>
+        <button type="button" id="theme-palette-delete" class="btn danger" hidden>Delete palette</button>
+      </div>
+      <div class="theme-colors">
+        <label class="theme-color">Background (BG)<span><input type="color" data-theme-color="background" value="#17191d"><output>#17191d</output></span></label>
+        <label class="theme-color">Foreground (FG)<span><input type="color" data-theme-color="foreground" value="#e4e6e9"><output>#e4e6e9</output></span></label>
+        <label class="theme-color">Surface<span><input type="color" data-theme-color="surface" value="#2b2f35"><output>#2b2f35</output></span></label>
+        <label class="theme-color">Accent<span><input type="color" data-theme-color="accent" value="#98b7e2"><output>#98b7e2</output></span></label>
+      </div>
+      <p class="opt-help theme-help">Choose a color to open its native picker. Changes apply and persist immediately. Name and save a palette to reuse it. Light and Dark colors are saved separately; text, accents and surfaces adapt for readable contrast.</p>
+      <p class="opt-help theme-contrast" id="theme-contrast" role="status" hidden></p>
       <div class="setup-section">Hero and skin portraits</div>
       <p id="catalogue-status" class="opt-help" role="status">Using saved portraits.</p>
       <p class="opt-help">Checked in the background at launch. Images are saved locally as you browse.
@@ -773,6 +791,9 @@
 <script src="/static/thumbnails.js"></script>
 <script src="/static/library-tools.js"></script>
 <script src="/static/export-review.js"></script>
+<script src="/static/job-tools.js"></script>
+<script src="/static/bulk-edit.js"></script>
+<script src="/static/tooltips.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>
