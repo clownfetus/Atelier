@@ -1,4 +1,6 @@
 # Atelier: Modding Studio
+For this fork's modernization changes, screenshots, compatibility notes and local review instructions, see the [maintainer contribution guide](CONTRIBUTION_NOTES.md).
+
 This supercharged modding interface allows anyone (seriously anyone) to make mods in seconds!  
 
 - Combines essential functionality from UE and Fmodel into one intuitive interface: 

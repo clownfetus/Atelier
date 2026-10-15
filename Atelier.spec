@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
+from pathlib import Path
 
 datas = [
     ('gui', 'gui'),
@@ -8,8 +9,9 @@ datas = [
     # disk — being importable from the PYZ is not enough. meshedit._SCRIPTS resolves them next to
     # the package, which is <_MEIPASS>/atelier/blender when frozen. Without this the whole .blend
     # round-trip dies with "Python file ... could not be opened" in packaged builds only.
-    ('atelier/blender', 'atelier/blender'),
 ]
+# Do not collect developer __pycache__ files beside the standalone scripts.
+datas += [(str(script), 'atelier/blender') for script in Path('atelier/blender').glob('*.py')]
 binaries = []
 hiddenimports = [
     'io_lib',

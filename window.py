@@ -10,8 +10,8 @@ if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
 import webview
 
 from atelier import hostos
+from atelier.web.app import PORT
 
-PORT = 8767
 URL  = f"http://localhost:{PORT}"
 
 _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)

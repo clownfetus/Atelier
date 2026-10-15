@@ -4,7 +4,7 @@ Atelier remains a desktop creative application built with vanilla JavaScript, Bo
 
 ## Direction and sources
 
-The palette uses graphite and blue-grey surfaces, ice-blue primary actions and muted teal secondary containers. Light mode uses pale blue-grey surfaces and a deeper blue primary. Red is reserved for errors and destructive actions. Texture and 3D preview surrounds remain neutral so changing the interface theme does not change the artwork being evaluated.
+The palette uses neutral charcoal surfaces, controlled blue primary actions and quiet grey-green secondary containers. Light mode uses cool near-white and grey surfaces with a deeper blue primary. Distinct category hues remain visible as muted pigments; interface chrome stays neutral. Red is reserved for errors and destructive actions. Existing fixed 3D preview surrounds stay unchanged, and interface styling never filters or recolors artwork.
 
 This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/styles/color/roles), [typography](https://m3.material.io/styles/typography/applying-type), [buttons](https://m3.material.io/components/buttons/overview), [motion](https://m3.material.io/styles/motion/overview/how-it-works) and Google's [Material 3 Expressive research](https://design.google/library/expressive-material-design-google-research). It adopts their hierarchy, containment, shape and purposeful motion principles while keeping desktop density. It is not a claim of full Material component or accessibility conformance.
 
@@ -16,6 +16,11 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | `gui/theme.js` | System/light/dark preference, OS changes and safe localStorage persistence |
 | `gui/style.css` | Layout and component styling, including existing editors |
 | `gui/icons.js` | Local Material Symbols SVG adapter; compatibility with existing icon calls |
+| `gui/folder-icons.js` | Shared folder categories and symbols for cards and home shortcuts |
+| `gui/library-tools.js` / `.css` | Folder-local filtering, view preferences, keyboard movement and read-only previews |
+| `gui/library-pins.js` / `.css` | Persistent home shortcuts and contextual nested-folder labels |
+| `gui/export-review.js` / `.css` | Export review, progress and latest session result; app.js owns requests |
+| `gui/motion/` | Six scoped animation sets and their optional presentation adapters |
 | `gui/vendor/material-symbols/` | Vendored glyph paths, source URLs/hashes and Apache 2.0 license |
 | `gui/brand/atelier-mark.png` | Transparent blue Atelier A mark, also exported as root PNG/ICO |
 | `atelier/catalogue.py` | Optional character/skin metadata refresh and image cache |
@@ -25,30 +30,124 @@ Use semantic foreground/background pairs instead of adding hexadecimal colors to
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Surface | `#f7f9fd` | `#10141c` |
-| Low container | `#eef2f8` | `#181e29` |
-| High container | `#e1e7f0` | `#283140` |
-| Primary | `#335d9f` | `#accbff` |
-| Primary container | `#d8e6ff` | `#264677` |
-| Secondary container | `#d6e7e4` | `#304b48` |
-| Main text | `#19202b` | `#e3eaf5` |
-| Supporting text | `#454f60` | `#bcc8dc` |
+| Surface | `#f5f6f8` | `#17191d` |
+| Low container | `#eef0f3` | `#1e2126` |
+| High container | `#e4e7eb` | `#2b2f35` |
+| Primary | `#37639d` | `#98b7e2` |
+| Main text | `#23272e` | `#e4e6e9` |
+| Supporting text | `#565e6a` | `#b1b7c0` |
 
-Roboto is bundled locally with its SIL Open Font License; there is no font CDN request. The desktop scale uses 14px body text, 13px controls, 12px supporting labels and 20px titles. Controls are generally 36px tall; compact numeric editor controls remain 30px. The workspace has a 64px toolbar, 12px outer inset, 156px asset tiles and a resizable 240–520px export sidebar. Tested window sizes start at 1024×768.
+Roboto is bundled locally with its SIL Open Font License; there is no font CDN request. The desktop scale uses 14px body text, 13px controls and asset names, 12px supporting labels and 20px titles. Controls are generally 36px tall; compact numeric editor controls remain 30px. The workspace has a 56px toolbar, 12px outer inset, 156px asset tiles with 134px previews and a resizable 240–520px export sidebar. Tested window sizes start at 1024×768.
 
-Native buttons, selects and inputs provide keyboard behavior. Asset cards and breadcrumb ancestors are keyboard-operable buttons. Context menus support arrows, Home/End, Escape and focus return. Focus rings remain visible. Full modal focus containment, screen-reader workflow auditing, high-contrast mode and smaller windows remain follow-up work.
+Resting asset cards enclose the preview and label in a low-container surface with
+a visible border, quiet hover fill and distinct imported-state outline.
+Left-aligned names occupy two lines so long explanatory
+folder labels do not stretch an entire row; full names remain in the card title
+and accessible name, and search still uses the complete text. Shape roles are
+6px for controls/previews, 8px for intermediate surfaces, 10px for asset cards and
+panels, and 12px for dialogs.
+Switches retain their rounded tracks. Hero portraits and category artwork keep
+their existing dimensions.
+
+Native buttons, selects and inputs provide keyboard behavior. Asset cards and breadcrumb ancestors are keyboard-operable buttons. Context menus support arrows, Home/End, Escape and focus return. Focus rings remain visible. Image previews use a native modal dialog; export review contains keyboard focus. Full legacy-modal focus containment, screen-reader workflow auditing, high-contrast mode and smaller windows remain follow-up work.
 
 ## Theme and motion
 
 Appearance defaults to System and is persisted under `atelier.theme` in browser/WebView storage. Both selectors stay synchronized; selecting a theme never writes Python configuration or project metadata. The preference is applied before CSS to avoid an opposite-theme flash. Unavailable storage falls back to an in-session preference. Browser mode and the desktop profile have separate preferences.
 
-Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 8px; buttons change corner shape on press; cards compress slightly and portraits ease into a subtle hover zoom. Loading uses the existing indicators. Avoid delaying input, animating layout in the asset grid, or adding idle animation to 3D previews. `prefers-reduced-motion: reduce` removes CSS animations and transitions.
+Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input, animating layout in the asset grid, or adding idle animation to 3D previews. `prefers-reduced-motion: reduce` removes CSS animations and transitions.
 
 ## Symbols and brand assets
 
-[Material Symbols Rounded](https://developers.google.com/fonts/docs/material_symbols) use filled glyphs for a coherent silhouette. Folder glyphs occupy 76% of their tile; toolbar glyphs stay compact. Existing `data-lucide` markers and `lucide.createIcons` calls are retained as a compatibility boundary; the production page loads the local Material adapter, not the old library. Glyph provenance is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.
+[Material Symbols Sharp](https://developers.google.com/fonts/docs/material_symbols) use unfilled geometry for a precise, angular visual language. Compact controls use 24px optical artwork at weight 400; 41 large aliases use 48px optical artwork at weight 300 when requested at 32px or larger. This keeps large previews from becoming heavy, enlarged toolbar symbols. Folder glyph slots occupy 76% of their thumbnail; toolbar glyphs stay compact. The bundle has 98 aliases, preserving all 72 previous aliases, `data-lucide` markers and `lucide.createIcons` calls as a compatibility boundary. The production page loads the local Material adapter, not the old library. Glyph provenance for both sizes is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.
 
 The new A mark was generated with Image Gen through Creative Production and refined to a clear blue, preserving its rounded silhouette, separated strokes and transparent background. The final refinement prompt requested: "Preserve the exact geometry, negative spaces and transparency; recolor uniform flat clear blue #5487db, no gradients or shadows." `gui/brand/atelier-mark.png` is the working artwork for this implementation; `icon.png` and multi-size `icon.ico` are technical exports of the same image. No new logo/font/icon runtime dependency is required.
+
+Category artwork uses 22 `--studio-icon-*` roles: folder, character, UI,
+texture, VFX, material, curve, mesh, text, nameplate, plugin, weapon, unknown,
+animation, audio, map, light, logic, data, tools, environment and movie.
+Each family has its own color in both themes; folders, assets and home shortcuts
+of the same type share that role. These colors do not change status or editor
+colors. Characters use a hero mask, VFX an angular bolt, materials layered planes,
+textures diagonal hatching, UI a panel grid, plugins a chip and meshes a wireframe
+cube. Weapons/Weapon folders use Sharp crossed swords. Category artwork keeps
+the existing 102px slot. All 22 icon
+colors pass 4.5:1 against the thumbnail background in both themes.
+
+The shared folder registry also covers animation, audio/cues, maps/worlds, lights,
+blueprints, AI, abilities, physics, controls, data, tools, environment, fonts,
+movies, localization, functions, statistics, pipelines, resources, encrypted
+content, mobile/VR, basic shapes, sky, deformers and prototypes. Related engine
+and editor folders share the corresponding identity; technical subtypes such as
+blueprints, functions and AI share the logic color but have distinct symbols.
+Matching uses complete category names, preserving generic folders for unknown
+names and numeric hero/skin IDs. Existing hero portraits remain the primary art.
+The original home category ordering is independent of the new icon coverage.
+
+## Library shortcuts and preview feedback
+
+Search is explicitly scoped to the current folder. It matches combined name,
+hero/skin labels, IDs and full paths without case or accent sensitivity. Type
+and edited/not-edited filters share the visible texture set used by Edit All.
+Navigation clears transient search/filters. Recommended ordering, natural name
+sorting, type sorting and edited-first sorting retain folders first; four card
+widths (128, 156, 196 and 236px) resize previews with their cards. Sort and size
+persist under `atelier.libraryView.v1`; storage failure keeps session behavior.
+
+The grid supports arrows, Home/End, Enter, Backspace to the parent, and
+Shift+F10 for its context menu. Alt+Left/Right traverses history; Alt+Up opens the
+parent. Space/P or the small preview action opens texture/character artwork or
+the existing 3D viewer without importing an asset. Escape closes image previews
+and restores focus. Preview loading failures offer a retry. These shortcuts do
+not replace normal edit actions or change export selection.
+
+Every folder has a separate 26px pin button, shown on hover/keyboard focus and
+always visible when pinned or using touch. The context menu offers the same
+Pin/Unpin action. Home shows compact 32px shortcut chips above the grid; each
+has an independent remove button, and its tooltip exposes the full folder path.
+Original folder tiles and navigation remain available. Home search filters the
+shortcuts as well as the grid; shortcut counts do not inflate the asset count.
+
+Pins use versioned `atelier.homePins.v1` browser/WebView storage, independent of
+project data and exports. They persist across reloads, synchronize across windows
+in the same browser profile, and work for the current session if storage is blocked.
+Browser and desktop profiles have separate pins, just as they have separate themes.
+Previously saved generic pins resolve their current category from the final path
+segment on load. The v1 storage shape, paths and pin ordering stay intact.
+Nested pins use contextual labels such as `Storm · Goddess of Thunder · Textures`.
+Resolved labels omit redundant numeric prefixes; full paths remain in tooltips.
+Unknown ancestors retain their path segments until display labels are available.
+
+Texture tiles request cached previews on every grid build, including search.
+Missed background completion events recover through status polling. Failed or
+timed-out requests show a texture glyph and `Preview unavailable`; the context
+menu offers `Retry preview`. Grid replacement cancels polling and ignores late
+responses. The preview pipeline does not import assets or select them for export.
+
+## Material and export workflows
+
+Material parameters are grouped into surface colors, dye regions and scalars.
+Per-row markers, the title and a live count distinguish unsaved parameters.
+Comparison switches between the last saved project values and read-only original
+game values; unavailable original data is reported instead of borrowing the saved
+baseline. `Use value` changes only the draft. `Revert unsaved` restores the saved
+baseline; resetting to game defaults remains a separate persistence action.
+Partial saves and edits made during a save retain the remaining draft. The 3D
+editor provides saved-color comparison swatches and an explicit unsaved count.
+
+Export first reviews included names/types/paths, exclusions and reasons, project,
+destination and protection state; passwords are never displayed. Confirmation,
+overwrite and retry revalidate the captured project, selection and settings.
+Unsaved material/viewport drafts and in-flight saves return focus to the relevant
+editor without discarding changes. The build remains indeterminate because the
+existing endpoint reports completion rather than a measured progress percentage.
+Its window can be hidden and reopened. The latest result stays available for the
+session, with full applied/skipped details, output paths, reveal, Settings and
+manual retry. A built mod whose copy failed is distinct from a failed build.
+Retry checks existing output again; there is no automatic build retry.
+
+The comparison endpoint is read-only. Existing save/export payloads, project
+headers, project sidecars and mod container formats remain compatible.
 
 ## Character and skin artwork
 
@@ -66,6 +165,47 @@ Network requests have time/size limits, an explicit HTTPS source allowlist, redi
 
 ## Verification and next steps
 
+Export feedback uses a compact SVG tray/download animation at 20px in the button
+and 24px in notifications, with a check, warning triangle or cross based on the
+real result. Button icons inherit the primary foreground; notification icons use
+semantic success/warning/error colors. Reduced motion renders static states.
+The tray and arrow use square corners, with crisp outcome strokes and restrained
+tonal fills to match the Sharp category family.
+See [motion integration](gui/motion/README.md) for ownership, provenance and checks.
+
+The 3D loading overlay uses a larger 72px SVG frame: a short edge assembly followed
+by a calm 1200ms loop. The fixed dark preview surface keeps bright, readable
+linework in both interface themes. Empty/error poses settle to static symbols;
+geometry readiness hides the overlay immediately, independently of texture loading.
+The frame uses right-angle brackets and sharp wireframe joins.
+
+Generic folder tiles crossfade between official Sharp closed/open folder outlines
+on hover or keyboard focus (180ms open, 150ms close), with a 1px open-pose lift.
+The artwork fills about 90px within the existing
+102px icon slot; category symbols and hero/skin portraits retain their rendering.
+Failed portrait requests receive the same folder fallback. Coarse pointers avoid
+hover motion, and reduced motion switches instantly between static poses.
+
+Material-save notifications use a 24px SVG with a 240ms check reveal after confirmed
+persistence. Missing intensity metadata, partial failures and newer unsaved edits
+receive warning feedback; failed dialog saves show an error. The dialog may close
+immediately while its notification settles. Newer edits stay open, and no animation
+is placed inside the viewport Save button whose label/count is updated dynamically.
+Its clipped-corner cartridge, square shutter and pointed warning match the studio
+icon direction while circular progress/success/error rings retain their meaning.
+
+The remaining two sets complete the six-set motion inventory: a one-time 320ms
+logo entrance in the existing 32px brand slot, and a 112px technical tray for a
+confirmed empty Edited Assets sidebar. The logo reuses the unchanged PNG and
+keeps its static fallback until image readiness; neither startup nor APIs wait
+for it. The tray enters briefly on first confirmed emptiness or a genuine
+nonempty-to-empty transition, then stays still. Search returning no matches is
+not an empty project. Hidden/reduced-motion states settle immediately; ordinary
+rerenders must not replay either entrance. See the motion README for the guarded
+integration contracts and required checks.
+
 See `DEVELOPMENT.md` for reproducible commands. Automated coverage includes color contrast, theme persistence, OS preference changes, blocked storage, local fonts/logo, icon coverage, keyboard menus, four desktop sizes, reduced motion and preserving a live material draft while changing themes. Catalogue tests use offline fixtures for parsing, ID boundaries, ambiguity, source validation, failed refreshes and cached images.
 
-This foundation retains the current information architecture. A later phase can improve asset filtering, material panel organization and preview/export workflows independently. Full game-version compatibility and end-to-end manual editor coverage remain release checks; the visual/browser tests do not replace them.
+These workflow additions retain the existing information architecture and native
+pipeline. Full game-version compatibility and end-to-end manual editor coverage
+remain release checks; visual/browser tests do not replace them.

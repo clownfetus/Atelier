@@ -52,3 +52,15 @@ Existing Python handler signatures and routes remain usable. Optional additions:
 - Native checks cover a small BC7 texture and one skeletal mesh. The two skipped legacy native cases, full material/chroma fidelity, world edits, Blender rebuilds, password protection and repatching still need dedicated real-asset fixtures and manual/in-game validation before release.
 - Existing source-string tests remain in the legacy suites. New reliability tests assert filesystem effects, concurrent-operation behavior, actual HTTP responses, browser state and GPU resource counts.
 - The UI remains the baseline design. Material 3 tokens, typography, light/dark themes, components, navigation and expressive motion can now be introduced in reviewable later phases against these checks.
+## Submission follow-up: thumbnail and Windows path races
+
+Thumbnail status rechecks the file when a worker reaches `ready` between the
+initial file lookup and state read. It cannot report a newly published preview as
+missing solely because those observations straddled publication. A deterministic
+test covers that ordering.
+
+On Windows, `realpath()` can retain an extended-length `\\?\` prefix on only one
+path during concurrent directory creation. Project containment compares equivalent
+drive and UNC spellings consistently while preserving the original resolved paths
+for file I/O. Different drives, shares, outside directories and device namespaces
+remain rejected. Regression cases cover both accepted and rejected spellings.
