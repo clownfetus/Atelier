@@ -1,0 +1,41 @@
+<!--
+  Atelier — Material Save Feedback Static Vector (24x24px Production Slot)
+  Base save silhouette and outcome geometry adapted from Google Material Symbols Rounded
+  ("save", "check-circle", "alert-triangle"), licensed under the Apache License, Version 2.0:
+  Atelier studio adaptation uses squared corners and sharp joins; not an unmodified official Sharp glyph.
+  http://www.apache.org/licenses/LICENSE-2.0
+-->
+<svg xmlns="http://www.w3.org/2000/svg" class="am-material-save-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true" focusable="false">
+  <!-- Neutral Idle & Saving Cartridge Group (20x20px footprint within 24x24 viewBox) -->
+  <g class="am-material-save-cartridge-group">
+    <path class="am-material-save-body-fill" d="M 2.5 2.5 H 17 L 21.5 7 V 21.5 H 2.5 Z" fill="currentColor" opacity="0.12" />
+    <path class="am-material-save-body-stroke" d="M 2.5 2.5 H 17 L 21.5 7 V 21.5 H 2.5 Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="butt" stroke-linejoin="miter" />
+    <rect class="am-material-save-shutter" x="6.75" y="2.75" width="8.25" height="4.75" rx="0" fill="currentColor" opacity="0.88" />
+    <circle class="am-material-save-disc" cx="12" cy="14.25" r="3.2" stroke="currentColor" stroke-width="1.9" fill="currentColor" fill-opacity="0.12" />
+  </g>
+
+  <!-- Indeterminate Saving Progress Ring (visible while state="saving") -->
+  <circle class="am-material-save-saving-ring" pathLength="1" cx="12" cy="12" r="9.75" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-dasharray="0.32 0.68" stroke-dashoffset="0" opacity="0" />
+
+  <!-- Terminal Outcome: Success (crisp check reveal within restrained enclosing circle) -->
+  <g class="am-material-save-outcome am-material-save-outcome-success" opacity="0">
+    <circle class="am-material-save-success-disc" cx="12" cy="12" r="9.75" fill="currentColor" opacity="0.12" />
+    <circle class="am-material-save-success-ring" pathLength="1" cx="12" cy="12" r="9.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    <path class="am-material-save-check-path" pathLength="1" d="M 7.5 12.25 L 10.55 15.3 L 16.65 8.85" stroke="currentColor" stroke-width="2.35" stroke-linecap="butt" stroke-linejoin="miter" />
+  </g>
+
+  <!-- Terminal Outcome: Warning (metadata loss, partial failure, or newer unsaved edits retained) -->
+  <g class="am-material-save-outcome am-material-save-outcome-warning" opacity="0">
+    <path class="am-material-save-warning-fill" d="M 12 3.25 L 21.25 19.25 H 2.75 Z" fill="currentColor" opacity="0.12" />
+    <path class="am-material-save-warning-stroke" d="M 12 3.25 L 21.25 19.25 H 2.75 Z" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" />
+    <path class="am-material-save-warning-mark" d="M 12 9.25 V 13.25" stroke="currentColor" stroke-width="2.25" stroke-linecap="butt" />
+    <circle class="am-material-save-warning-dot" cx="12" cy="16.35" r="1.25" fill="currentColor" />
+  </g>
+
+  <!-- Terminal Outcome: Error (failed dialog save request or thrown exception) -->
+  <g class="am-material-save-outcome am-material-save-outcome-error" opacity="0">
+    <circle class="am-material-save-error-disc" cx="12" cy="12" r="9.75" fill="currentColor" opacity="0.12" />
+    <circle class="am-material-save-error-ring" cx="12" cy="12" r="9.75" stroke="currentColor" stroke-width="2" />
+    <path class="am-material-save-error-cross" d="M 8.75 8.75 L 15.25 15.25 M 15.25 8.75 L 8.75 15.25" stroke="currentColor" stroke-width="2.25" stroke-linecap="butt" stroke-linejoin="miter" />
+  </g>
+</svg>

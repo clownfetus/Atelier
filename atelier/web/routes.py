@@ -1,4 +1,5 @@
 import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from bottle import request, response, static_file
 
 from atelier.web.app import app
@@ -56,7 +57,7 @@ import atelier.handlers.pak_thumb as _pak_thumb_mod
 import io_lib as _io_lib_mod
 if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
     _pak_thumb_mod.start_warmup()
-from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
+from atelier.handlers.material import mat_json, is_material, read_material, read_material_original, save_material, reset_material
 from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
 from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
 from atelier.handlers.world import is_world
@@ -1102,136 +1103,218 @@ def api_preview():
 
 # ── thumbnail (low-mip preview, no import required) ──────────────────────────
 
+_thumb_lock = threading.RLock()
+_thumb_states = {}  # cache path -> {state, error, updated}; independent of browser/project navigation
+_thumb_files = {}   # verified PNG path -> (mtime_ns, size)
+_thumb_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="atelier-thumbs")
+_THUMB_RETRY_SECONDS = 30
+
+
+def _thumb_path(game_rel):
+    return project_base(game_rel, THUMBS_DIR) + ".png"
+
+
+def _thumb_key(game_rel):
+    return os.path.normcase(_thumb_path(game_rel))
+
+
+def _valid_thumb(path):
+    """Do not announce an incomplete/invalid old cache file as ready. Verify once per version."""
+    try:
+        stat = os.stat(path)
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        with _thumb_lock:
+            if _thumb_files.get(path) == stamp:
+                return True
+        from PIL import Image
+        with Image.open(path) as image:
+            if image.format != "PNG":
+                return False
+            image.verify()
+        with _thumb_lock:
+            _thumb_files[path] = stamp
+        return True
+    except Exception:
+        return False
+
+
+def _thumb_source(game_rel):
+    # Keep existing priority and legacy project-layout support. Workers never read project state.
+    thumb = _thumb_path(game_rel)
+    if _valid_thumb(thumb):
+        return thumb
+    full_png = _import_base(game_rel) + ".png"
+    return full_png if os.path.isfile(full_png) else None
+
+
 @app.get("/api/thumb")
 def api_thumb():
     game_rel = request.query.get("game_rel", "")
     if not game_rel:
         response.status = 404; return b""
-    thumb    = os.path.join(THUMBS_DIR, *game_rel.split("/")) + ".png"
-    full_png = _import_base(game_rel) + ".png"
-    if os.path.exists(thumb):
+    source = _thumb_source(game_rel)
+    if source:
         response.content_type = "image/png"
-        with open(thumb, "rb") as f: return f.read()
-    if os.path.exists(full_png):
-        response.content_type = "image/png"
-        with open(full_png, "rb") as f: return f.read()
+        with open(source, "rb") as f: return f.read()
     response.status = 404
+    response.set_header("Cache-Control", "no-store")
     return b""
 
-_prefetch_gen      = 0
-_prefetch_gen_lock = threading.Lock()
+
+def _requested_thumbs(body):
+    return list(dict.fromkeys("/".join(_c.validate_game_rel(gr))
+                             for gr in body.get("game_rels", []) if gr))
+
+
+def _thumb_snapshot(game_rels):
+    result = {"ok": True, "cached": [], "pending": [], "failed": [], "missing": [], "errors": {}}
+    for gr in game_rels:
+        if _thumb_source(gr):
+            result["cached"].append(gr)
+            continue
+        with _thumb_lock:
+            job = _thumb_states.get(_thumb_key(gr), {}).copy()
+        # Publication may complete between the first file check and this state read.
+        # Recheck a ready job before classifying it as a removed/missing cache file.
+        if job.get("state") == "ready" and _thumb_source(gr):
+            result["cached"].append(gr)
+        elif job.get("state") == "pending":
+            result["pending"].append(gr)
+        elif job.get("state") == "failed":
+            result["failed"].append(gr)
+            result["errors"][gr] = job["error"]
+        else:
+            # Includes never queued, server restart, and a ready file removed from the cache.
+            result["missing"].append(gr)
+    result["count"] = len(result["pending"])
+    return result
+
+
+@app.post("/api/thumb_status")
+def api_thumb_status():
+    """Read-only recovery for clients that missed an SSE or rebuilt their grid."""
+    response.content_type = "application/json"
+    response.set_header("Cache-Control", "no-store")
+    return json.dumps(_thumb_snapshot(_requested_thumbs(request.json or {})))
+
+
+def _finish_thumb(gr, error=None, run=None):
+    with _thumb_lock:
+        if run is not None and _thumb_states.get(_thumb_key(gr), {}).get("run") is not run:
+            return
+        _thumb_states[_thumb_key(gr)] = {"state": "failed" if error else "ready",
+                                       "error": str(error or ""), "updated": time.monotonic(), "run": run}
+    event = {"game_rel": gr, "thumb_failed" if error else "thumb_ready": True}
+    if error:
+        event["error"] = str(error)
+    # Delivery is best effort. /api/thumb_status remains authoritative if a client disconnects.
+    try: _push_sse(event)
+    except Exception: pass
+
+
+def _publish_thumb(gr, source):
+    """Decode/resize privately, then expose a complete PNG with one atomic replacement."""
+    import io
+    from PIL import Image
+    target = _thumb_path(gr)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    fd, staged = tempfile.mkstemp(prefix=".thumb-", suffix=".png", dir=os.path.dirname(target))
+    os.close(fd)
+    try:
+        with Image.open(io.BytesIO(source) if isinstance(source, bytes) else source) as image:
+            image.load()
+            image.thumbnail((128, 128), Image.Resampling.LANCZOS)
+            image.convert("RGBA").save(staged, "PNG", optimize=False)
+        os.replace(staged, target)
+    finally:
+        if os.path.exists(staged): os.remove(staged)
+
+
+def _decode_cached_thumb(gr, stem, run):
+    try:
+        if not stem or not os.path.isfile(stem + ".uasset"):
+            raise ValueError("Texture data could not be extracted for this preview.")
+        os.makedirs(THUMBS_DIR, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".decode-", dir=THUMBS_DIR) as scratch:
+            decoded = os.path.join(scratch, "preview.png")
+            if not decode_thumb(stem + ".uasset", decoded) or not os.path.isfile(decoded):
+                raise ValueError("This texture could not be decoded for preview.")
+            _publish_thumb(gr, decoded)
+        _finish_thumb(gr, run=run)
+    except Exception as error:
+        _finish_thumb(gr, error, run)
+
+
+def _run_thumb_batch(pending, release, run):
+    try:
+        fallback = []
+        for gr in pending:
+            try:
+                if _valid_thumb(_thumb_path(gr)):
+                    _finish_thumb(gr, run=run)
+                    continue
+                try:
+                    png = decode_thumb_from_pak(gr)
+                    if png:
+                        _publish_thumb(gr, png)
+                        _finish_thumb(gr, run=run)
+                        continue
+                except Exception as error:
+                    print(f"[PREFETCH] pak preview failed for {gr}: {error}", file=sys.stderr, flush=True)
+                stem = _asset_cache.cache_base(gr)
+                if stem and os.path.isfile(stem + ".uasset"):
+                    _decode_cached_thumb(gr, stem, run)
+                else:
+                    fallback.append(gr)
+            except Exception as error:
+                _finish_thumb(gr, error, run)
+        if fallback:
+            # Preserve one native extraction per batch/container, rather than one per tile.
+            try:
+                found = extract_many(fallback)
+            except Exception as error:
+                for gr in fallback: _finish_thumb(gr, error, run)
+            else:
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    list(executor.map(lambda gr: _decode_cached_thumb(gr, found.get(gr) or
+                                      _asset_cache.cache_base(gr), run), fallback))
+    finally:
+        # Unexpected batch errors must not strand any remaining assets in pending.
+        for gr in pending:
+            with _thumb_lock:
+                job = _thumb_states.get(_thumb_key(gr), {})
+                unfinished = job.get("run") is run and job.get("state") == "pending"
+            if unfinished: _finish_thumb(gr, "Thumbnail generation did not complete. Retry preview.", run)
+        release()
+
 
 @app.post("/api/prefetch_thumbs")
 def api_prefetch_thumbs():
-    global _prefetch_gen
     body = request.json or {}
-    game_rels = [gr for gr in body.get("game_rels", []) if gr]
-    if not game_rels:
-        response.content_type = "application/json"
-        return json.dumps({"ok": True, "cached": [], "count": 0})
-
-    with _prefetch_gen_lock:
-        _prefetch_gen += 1
-        my_gen = _prefetch_gen
-
-    cached, pending = [], []
-    for gr in game_rels:
-        thumb    = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-        full_png = _import_base(gr) + ".png"
-        if os.path.exists(thumb) or os.path.exists(full_png):
-            cached.append(gr)
-        else:
+    game_rels = _requested_thumbs(body)
+    candidates = [gr for gr in game_rels if not _thumb_source(gr)]
+    with _thumb_lock:
+        now = time.monotonic()
+        pending = []
+        for gr in candidates:
+            job = _thumb_states.get(_thumb_key(gr), {})
+            if job.get("state") == "pending": continue
+            if (job.get("state") == "failed" and not body.get("retry") and
+                    now - job["updated"] < _THUMB_RETRY_SECONDS): continue
             pending.append(gr)
-
-    def _run():
-        if not pending: return
-        from PIL import Image as _Image
-        import io as _io
-        print(f"[PREFETCH] starting {len(pending)} pending thumbs", file=sys.stderr, flush=True)
-        t_start = time.time()
-
-        # Pass 1: fast pak decode for everything; collect textures whose mips are
-        # inlined in the export-bundle (no separate BulkData chunk) for batch fallback.
-        to_fallback = []  # game_rels that need UAT extraction
-        for gr in pending:
-            with _prefetch_gen_lock:
-                if _prefetch_gen != my_gen:
-                    print(f"[PREFETCH] cancelled after pass-1", file=sys.stderr, flush=True)
-                    return
-            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if os.path.exists(thumb):
-                continue
-            png = decode_thumb_from_pak(gr)
-            if png:
-                os.makedirs(os.path.dirname(thumb), exist_ok=True)
-                with open(thumb, "wb") as f:
-                    f.write(png)
-                _push_sse({"thumb_ready": True, "game_rel": gr})
-            else:
-                cb = _asset_cache.cache_base(gr)
-                uasset = (cb + ".uasset") if cb else ""
-                if uasset and os.path.exists(uasset):
-                    # uasset already on disk (previously imported), just decode
-                    decode_thumb(uasset, thumb)
-                    if os.path.exists(thumb):
-                        _push_sse({"thumb_ready": True, "game_rel": gr})
-                else:
-                    to_fallback.append(gr)
-
-        n_pak = len(pending) - len(to_fallback)
-        print(f"[PREFETCH] pass-1 done: {n_pak} pak-ok, {len(to_fallback)} need UAT  ({time.time()-t_start:.2f}s)",
-              file=sys.stderr, flush=True)
-
-        if not to_fallback:
-            return
-
-        with _prefetch_gen_lock:
-            if _prefetch_gen != my_gen:
-                return
-
-        # Pass 2: batch-extract all no-bulk textures in one UAT call, then
-        # parallel-decode thumbnails per-file to THUMBS_DIR.
-        import concurrent.futures as _cf
-        t_uat = time.time()
-        print(f"[PREFETCH] batch extract {len(to_fallback)} assets...", file=sys.stderr, flush=True)
-        found = extract_many(to_fallback)       # one retoc call per container, or UAT on Windows
-        for gr in to_fallback:
-            print(f"[PREFETCH cache] {gr}: {'-> ' + found[gr] if gr in found else 'uasset NOT FOUND'}",
-                  file=sys.stderr, flush=True)
-        print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
-
-        t_dec = time.time()
-        def _decode_thumb_fallback(gr):
-            cb = _asset_cache.cache_base(gr)
-            if not cb: return
-            uasset = cb + ".uasset"
-            if not os.path.exists(uasset): return
-            th = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            os.makedirs(os.path.dirname(th), exist_ok=True)
-            decode_thumb(uasset, th)
-        with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
-            list(_ex.map(_decode_thumb_fallback, to_fallback))
-        print(f"[PREFETCH] decode done in {time.time()-t_dec:.2f}s", file=sys.stderr, flush=True)
-
-        # Resize decoded PNGs in-place to thumbnail size, fire SSE per asset
-        for gr in to_fallback:
-            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if os.path.exists(thumb):
-                try:
-                    img = _Image.open(thumb)
-                    if img.width > 128 or img.height > 128:
-                        img.thumbnail((128, 128), _Image.LANCZOS)
-                        img.save(thumb, "PNG", optimize=False)
-                except Exception:
-                    pass
-                _push_sse({"thumb_ready": True, "game_rel": gr})
-
-        print(f"[PREFETCH] total {time.time()-t_start:.2f}s  ({len(to_fallback)} batched UAT fallbacks)",
-              file=sys.stderr, flush=True)
-
-    threading.Thread(target=_run, daemon=True).start()
+        if pending:
+            # Shared-cache jobs outlive this HTTP request; Reset Data must wait for them too.
+            release = operations.reserve(_CACHE)
+            run = object()
+            for gr in pending:
+                _thumb_states[_thumb_key(gr)] = {"state": "pending", "updated": now, "run": run}
+            try:
+                _thumb_executor.submit(_run_thumb_batch, pending, release, run)
+            except Exception as error:
+                release()
+                for gr in pending: _finish_thumb(gr, error, run)
     response.content_type = "application/json"
-    return json.dumps({"ok": True, "cached": cached, "count": len(pending)})
+    return json.dumps(_thumb_snapshot(game_rels))
 
 # ── imported list ─────────────────────────────────────────────────────────────
 
@@ -1460,6 +1543,18 @@ def api_material_params():
                            "inten": _get_inten(gr), **p})
     except Exception as e:
         response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/material_original")
+def api_material_original():
+    """Comparison data from the game, never from the current project's saved edits."""
+    response.content_type = "application/json"
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        return json.dumps({"ok": True, "game_rel": gr, **read_material_original(gr)})
+    except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
 @app.post("/api/material_save")

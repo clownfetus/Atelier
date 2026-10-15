@@ -17,6 +17,17 @@
 </script>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/library-pins.css">
+<link rel="stylesheet" href="/static/thumbnails.css">
+<link rel="stylesheet" href="/static/library-tools.css">
+<link rel="stylesheet" href="/static/material-workflow.css">
+<link rel="stylesheet" href="/static/export-review.css">
+<link rel="stylesheet" href="/static/motion/export-feedback.css">
+<link rel="stylesheet" href="/static/motion/viewport-loader.css">
+<link rel="stylesheet" href="/static/motion/folder-flap.css">
+<link rel="stylesheet" href="/static/motion/material-save.css">
+<link rel="stylesheet" href="/static/motion/empty-assets.css">
+<link rel="stylesheet" href="/static/motion/logo-entrance.css">
 </head>
 <body>
 
@@ -31,7 +42,7 @@
   <nav id="breadcrumbs" aria-label="Asset location"></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
-    <input id="search-input" type="search" aria-label="Search assets" placeholder="Search assets…" aria-keyshortcuts="Control+f Meta+f">
+    <input id="search-input" type="search" aria-label="Search assets by name, ID or path" placeholder="Search names, IDs, paths…" aria-keyshortcuts="Control+f Meta+f">
     <kbd>Ctrl F</kbd>
   </div>
   <label class="theme-control" title="Interface appearance">
@@ -48,6 +59,15 @@
   <!-- explorer -->
   <main id="explorer" aria-label="Asset library">
     <div class="library-heading"><h1>Asset library</h1><span id="library-count" aria-live="polite"></span></div>
+    <div class="library-controls" role="group" aria-label="Library view controls">
+      <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
+      <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
+      <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
+      <label>Size <select id="library-size" aria-label="Thumbnail size"><option value="128">Compact</option><option value="156">Standard</option><option value="196">Large</option><option value="236">Extra large</option></select></label>
+      <button class="btn" id="library-clear" type="button">Clear filters</button>
+      <span class="library-scope" title="Search and filters apply to the current folder. Sort and size are remembered.">This folder</span>
+    </div>
+    <section id="home-pins" aria-label="Pinned folders" hidden></section>
     <div id="grid-area">
       <div id="empty-state">
         <i data-lucide="loader" size="32" style="color:var(--muted)"></i>
@@ -81,7 +101,10 @@
       <label class="field-label" for="mod-name-input">Mod filename</label>
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
       <button class="btn primary" id="install-btn" title="Build the mod and install it" disabled>
-        <i data-lucide="hard-drive-download" size="14"></i>
+        <span class="am-export-feedback-slot" aria-hidden="true">
+          <i data-lucide="hard-drive-download" size="20" class="am-export-feedback-fallback"></i>
+          <span id="install-btn-motion-host"></span>
+        </span>
         Export Mod
       </button>
       <div id="install-toggles">
@@ -218,7 +241,10 @@
       <div id="viewport-stage">
         <canvas id="viewport-canvas"></canvas>
         <div id="viewport-loading">
-          <div class="spinner"></div>
+          <div class="am-viewport-loader-slot" id="viewport-loading-slot" aria-hidden="true">
+            <span class="am-viewport-loader-fallback"><i data-lucide="box" size="72"></i></span>
+            <span id="viewport-loading-motion-host"></span>
+          </div>
           <span id="viewport-loading-msg">Decoding model…</span>
         </div>
       </div>
@@ -721,6 +747,32 @@
 <div id="ctx-menu"></div>
 <input type="file" id="ctx-file-input" accept="image/*" style="display:none">
 
+<!-- Folder geometry mirrors motion/folder-flap.svg; Material Symbols Sharp, Apache 2.0. -->
+<template id="folder-flap-template">
+<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon am-folder-flap" viewBox="0 0 96 96" width="96" height="96" fill="currentColor" aria-hidden="true" focusable="false">
+  <g class="am-folder-flap-back" opacity="1">
+    <path transform="translate(-4.8 100.8) scale(.11)" d="M100-180v-600h307.15l65.39 65.39H860V-180H100Zm45.39-45.39h669.22v-443.84H454.08l-65.39-65.38h-243.3v509.22Zm0 0v-509.22V-225.39Z" />
+  </g>
+  <g class="am-folder-flap-front" opacity="0">
+    <path transform="translate(-4.8 100.8) scale(.11)" d="M100-180v-600h307.15l65.39 65.39h384v45.38H453.08l-65.39-65.38h-242.3v508.46l97.76-370h684.16L816.38-180H100Zm93-45.39h588.92l84-325.38H277l-84 325.38Zm0 0 84-325.38-84 325.38Zm-47.61-443.84v-65.38 65.38Z" />
+  </g>
+</svg>
+</template>
+
+<script src="/static/motion/export-feedback.js"></script>
+<script src="/static/motion/export-feedback-ui.js"></script>
+<script src="/static/motion/viewport-loader.js"></script>
+<script src="/static/motion/material-save.js"></script>
+<script src="/static/motion/material-save-ui.js"></script>
+<script src="/static/motion/empty-assets.js"></script>
+<script src="/static/motion/empty-assets-ui.js"></script>
+<script src="/static/motion/logo-entrance.js"></script>
+<script src="/static/motion/logo-entrance-ui.js"></script>
+<script src="/static/folder-icons.js"></script>
+<script src="/static/library-pins.js"></script>
+<script src="/static/thumbnails.js"></script>
+<script src="/static/library-tools.js"></script>
+<script src="/static/export-review.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

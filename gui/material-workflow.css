@@ -1,0 +1,38 @@
+/* Material workflow: compact groups, explicit reference values and draft state. */
+#material-overlay .mat-modal { max-width: 900px; }
+#material-overlay .mat-body { max-height: 67vh; padding-top: 12px; }
+#material-overlay .mat-workflow-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+#material-overlay .mat-dirty { font-size: 12px; color: var(--muted); margin-right: auto; }
+#material-overlay .mat-dirty.dirty { color: var(--acc); font-weight: 600; }
+#material-overlay .mat-compare-controls { display: flex; align-items: center; gap: 2px; }
+#material-overlay .mat-compare-controls > span { margin-right: 6px; font-size: 11px; color: var(--muted); }
+#material-overlay .mat-compare-controls .seg-btn { border: 1px solid var(--border); border-radius: 4px; }
+#material-overlay .mat-reference-note { margin: 8px 0 14px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+#material-overlay .mat-parameter-group { border: 1px solid var(--border); border-radius: 6px; margin: 10px 0; overflow: hidden; }
+#material-overlay .mat-parameter-group > summary { cursor: pointer; padding: 10px 12px; color: var(--text); font-size: 12px; font-weight: 600; background: var(--bg2); }
+#material-overlay .mat-parameter-group > summary > span { color: var(--muted); font-weight: 400; margin-left: 8px; }
+#material-overlay .mat-parameter { padding: 7px 12px; border-top: 1px solid var(--border); border-left: 2px solid transparent; }
+#material-overlay .mat-parameter.is-modified { border-left-color: var(--acc); }
+#material-overlay .mat-row label { flex-basis: 180px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+#material-overlay .mat-changed { display: block; font-size: 10px; font-weight: 500; color: var(--acc); }
+#material-overlay .mat-reference { display: flex; align-items: center; gap: 7px; margin-top: 3px; color: var(--muted); font-size: 11px; }
+#material-overlay .mat-reference code { font-size: 11px; font-variant-numeric: tabular-nums; }
+#material-overlay .mat-reference-swatch { width: 14px; height: 14px; border: 1px solid var(--border2); border-radius: 3px; flex: none; }
+#material-overlay .mat-restore { border: 0; border-radius: 4px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; padding: 4px 7px; cursor: pointer; margin-left: auto; }
+#material-overlay .mat-restore:hover { background: var(--bg3); }
+#material-overlay .mat-foot { flex-wrap: wrap; }
+#material-overlay #mat-status { overflow-wrap: anywhere; }
+#viewport-mat-list .vp-param { border-left: 2px solid transparent; padding-left: 4px; }
+#viewport-mat-list .vp-param.is-modified { border-left-color: var(--acc); }
+#viewport-mat-list .vp-param > span { flex: 1; }
+#viewport-mat-list .vp-saved-swatch { width: 20px; height: 20px; border: 1px solid var(--border2); border-radius: 3px; padding: 3px; background: var(--bg2); flex: none; cursor: pointer; }
+#viewport-mat-list .vp-saved-swatch::before { content: ""; display: block; width: 100%; height: 100%; background: var(--vp-saved-color); }
+#viewport-mat-list .vp-saved-swatch:disabled { cursor: default; }
+#viewport-mat-foot { flex-wrap: wrap; }
+#viewport-unsaved { width: 100%; color: var(--muted); font-size: 11px; line-height: 1.45; }
+@media (max-width: 760px) {
+  #material-overlay .mat-row { flex-wrap: wrap; }
+  #material-overlay .mat-row label { flex: 0 0 100%; }
+  #material-overlay .mat-row input[type=range] { min-width: 50px; }
+  #material-overlay .mat-reference { flex-wrap: wrap; }
+}

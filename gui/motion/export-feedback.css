@@ -1,0 +1,177 @@
+/*
+ * Atelier — Scoped Export Feedback Styles
+ * Scope prefix: am-export-feedback- / [data-atelier-motion="export-feedback"]
+ */
+
+[data-atelier-motion="export-feedback"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--am-export-feedback-size, 20px);
+  height: var(--am-export-feedback-size, 20px);
+  color: currentColor;
+  vertical-align: middle;
+  flex-shrink: 0;
+  line-height: 0;
+  user-select: none;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  fill: currentColor;
+}
+
+/* Neutral toast surface uses semantic outcome tokens; primary button inherits on-primary foreground */
+.toast [data-atelier-motion="export-feedback"],
+[data-am-surface="toast"][data-atelier-motion="export-feedback"] {
+  --am-export-feedback-size: 24px;
+}
+
+.toast [data-atelier-motion="export-feedback"][data-am-state="busy"],
+[data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="busy"] {
+  color: var(--acc, #335d9f);
+}
+
+.toast [data-atelier-motion="export-feedback"][data-am-state="success"],
+[data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="success"] {
+  color: var(--studio-success, #216642);
+}
+
+.toast [data-atelier-motion="export-feedback"][data-am-state="warning"],
+[data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="warning"] {
+  color: var(--studio-warning, #785300);
+}
+
+.toast [data-atelier-motion="export-feedback"][data-am-state="error"],
+[data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="error"] {
+  color: var(--md-sys-color-error, #ba1a1a);
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-tray-group {
+  transform-origin: 12px 17.5px;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-arrow-group {
+  transform-origin: 12px 10px;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-well {
+  opacity: 0.12;
+  transition: opacity 180ms var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-payload {
+  opacity: 0;
+  transform-origin: 12px 16.25px;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-outcome {
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 12px 10px;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-check-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.35;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+[data-atelier-motion="export-feedback"] .am-export-feedback-error-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+}
+
+/* State: idle */
+[data-atelier-motion="export-feedback"][data-am-state="idle"] .am-export-feedback-arrow-group {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* State: busy (static reduced-motion pose) */
+[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-arrow-group {
+  opacity: 1;
+  transform: translateY(1.1px);
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-payload {
+  opacity: 0.42;
+}
+
+/* State: success */
+[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-arrow-group {
+  opacity: 0;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-outcome-success {
+  opacity: 1;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-check-path {
+  stroke-dashoffset: 0;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-payload {
+  opacity: 0.36;
+}
+
+/* State: warning */
+[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-arrow-group {
+  opacity: 0;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-outcome-warning {
+  opacity: 1;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-well {
+  opacity: 0.22;
+}
+
+/* State: error */
+[data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-arrow-group {
+  opacity: 0;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-outcome-error {
+  opacity: 1;
+}
+
+[data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-well {
+  opacity: 0.22;
+}
+
+/* Static fallback sibling helper */
+.am-export-feedback-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.am-export-feedback-slot[data-am-mounted="true"] > .am-export-feedback-fallback {
+  display: none !important;
+}
+
+.toast .am-export-feedback-slot { width: 24px; height: 24px; }
+.toast.am-export-feedback-toast > .am-export-feedback-message { white-space: pre-line; overflow-wrap: anywhere; }
+.toast.am-export-feedback-toast.error { border-color: var(--md-sys-color-error); cursor: pointer; }
+
+/* Forced preference must cover CSS as well as Web Animations API effects. */
+[data-atelier-motion="export-feedback"][data-am-reduced="true"] * { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-atelier-motion="export-feedback"] * { transition: none; }
+}

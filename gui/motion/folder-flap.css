@@ -1,0 +1,79 @@
+/*
+ * Atelier — Scoped Folder Hover & Keyboard Focus Styles (CSS-Only)
+ * Scope prefix: .am-folder-flap / .card[data-atelier-motion="folder-flap"]
+ * Preserves existing 156px .card, 134px .card-thumb, and 76% (~102px) .card-icon slot.
+ * Official Material Symbols Sharp closed/open folders, weight 300, optical size 48.
+ * Outline paths retain their source geometry; only the enclosing fit transform changes.
+ */
+
+.card[data-atelier-motion="folder-flap"] .am-folder-flap {
+  display: block;
+  overflow: visible;
+  fill: currentColor;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Crossfade the outlined closed/open states; retain the existing motion hooks. */
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-back {
+  fill: currentColor;
+  opacity: 1;
+  transform-box: view-box;
+  transform-origin: 48px 82px;
+  transition:
+    transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1)),
+    opacity 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-front {
+  fill: currentColor;
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 48px 82px;
+  transition:
+    transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1)),
+    opacity 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+/* Keyboard :focus-visible open state (180ms smooth deceleration, no bounce/overshoot) */
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
+  opacity: 0;
+  transition-duration: 180ms;
+}
+
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-front {
+  transform: translateY(-1px);
+  opacity: 1;
+  transition-duration: 180ms;
+}
+
+/* Pointer :hover open state gated by fine hover-capable pointer */
+@media (hover: hover) and (pointer: fine) {
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
+    opacity: 0;
+    transition-duration: 180ms;
+  }
+
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-front {
+    transform: translateY(-1px);
+    opacity: 1;
+    transition-duration: 180ms;
+  }
+}
+
+/* Reduced motion: disable movement transitions immediately while keeping distinct static open/closed states */
+@media (prefers-reduced-motion: reduce) {
+  .card[data-atelier-motion="folder-flap"] .am-folder-flap,
+  .card[data-atelier-motion="folder-flap"] .am-folder-flap * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+[data-reduced-motion="reduce"] .card[data-atelier-motion="folder-flap"] .am-folder-flap,
+[data-reduced-motion="reduce"] .card[data-atelier-motion="folder-flap"] .am-folder-flap *,
+.card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap,
+.card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap * {
+  animation: none !important;
+  transition: none !important;
+}

@@ -1,0 +1,22 @@
+.export-review-overlay { z-index: 210; }
+.export-review-modal { max-width: 720px !important; gap: 18px; }
+.export-review-modal:focus { outline: none; }
+.export-review-body { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.export-review-meta { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 13px; }
+.export-review-meta dt { color: var(--muted); }
+.export-review-meta dd { margin: 0; overflow-wrap: anywhere; color: var(--text); }
+.export-review-summary { color: var(--text) !important; }
+.export-review-list { border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); }
+.export-review-list summary { padding: 10px 12px; cursor: pointer; color: var(--text); font-size: 13px; font-weight: 600; }
+.export-review-list ul { list-style: none; padding: 0 12px; margin: 0; max-height: 240px; overflow: auto; }
+.export-review-list li { padding: 10px 0; border-top: 1px solid var(--border); white-space: pre-line; overflow-wrap: anywhere; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.export-review-path { overflow-wrap: anywhere; font-family: var(--studio-font-mono, monospace); font-size: 12px !important; }
+.export-review-notice { color: var(--yellow) !important; padding: 10px 12px; border-left: 3px solid var(--yellow); background: var(--bg); }
+.export-review-actions { flex-wrap: wrap; }
+.export-review-body progress { width: 100%; height: 5px; accent-color: var(--acc); }
+.export-last-result { width: 100%; justify-content: center; font-size: 12px; }
+.export-last-result[hidden] { display: none; }
+@media (max-width: 600px) {
+  .export-review-meta { grid-template-columns: 1fr; gap: 4px; }
+  .export-review-meta dd { margin-bottom: 8px; }
+}

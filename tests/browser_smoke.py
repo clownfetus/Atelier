@@ -138,6 +138,32 @@ def main():
 
                 from design_checks import run_design_checks
                 run_design_checks(page, context, url, report, checks)
+                from export_motion_checks import run_export_motion_checks
+                run_export_motion_checks(page, context, url, report, checks)
+                from viewport_motion_checks import run_viewport_motion_checks
+                run_viewport_motion_checks(page, context, url, report, checks)
+                from folder_motion_checks import run_folder_motion_checks
+                run_folder_motion_checks(page, context, url, report, checks)
+                from material_save_motion_checks import run_material_save_motion_checks
+                run_material_save_motion_checks(page, context, url, report, checks)
+                from library_pins_checks import run_library_pins_checks
+                run_library_pins_checks(page, context, url, report, checks)
+                from thumbnail_checks import run_thumbnail_checks
+                run_thumbnail_checks(page, context, url, report, checks)
+                from category_icon_checks import run_category_icon_checks
+                run_category_icon_checks(page, context, url, report, checks)
+                from library_workflow_checks import run_library_workflow_checks
+                run_library_workflow_checks(page, context, url, report, checks)
+                from pin_label_checks import run_pin_label_checks
+                run_pin_label_checks(page, context, url, report, checks)
+                from material_workflow_checks import run_material_workflow_checks
+                run_material_workflow_checks(page, context, url, report, checks)
+                from export_review_checks import run_export_review_checks
+                run_export_review_checks(page, context, url, report, checks)
+                from empty_assets_motion_checks import run_empty_assets_motion_checks
+                run_empty_assets_motion_checks(page, context, url, report, checks)
+                from logo_motion_checks import run_logo_motion_checks
+                run_logo_motion_checks(page, context, url, report, checks)
 
                 # Real backend CRUD, with encoded project header rather than a mock bridge.
                 result = page.evaluate("""async () => {

@@ -1,4 +1,4 @@
-// All artwork is Google's locally bundled Material Symbols Rounded, FILL=1.
+// All artwork is Google's locally bundled Material Symbols Sharp, FILL=0.
 // Retain the old marker/API as a small compatibility bridge for existing editors.
 // No network requests or icon font are needed to render controls.
 (() => {
@@ -8,7 +8,10 @@
       if (root.matches?.('i[data-lucide]')) candidates.unshift(root);
       for (const node of candidates) {
         const name = node.dataset.lucide;
-        const artwork = window.AtelierSymbolPaths[name] || window.AtelierSymbolPaths['file-question'];
+        const symbol = window.AtelierSymbolPaths[name] || window.AtelierSymbolPaths['file-question'];
+        const size = Number(node.getAttribute('size') || 20);
+        // Large asset artwork uses finer official contours; controls keep a readable weight.
+        const artwork = size >= 32 && symbol.large ? symbol.large : symbol;
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         for (const attr of node.attributes) {
           if (!['size', 'class'].includes(attr.name)) svg.setAttribute(attr.name, attr.value);

@@ -55,33 +55,12 @@ const ASSET_ICON_CLS = {
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
-const FOLDER_ICON_PATTERNS = [
-  [/^characters?$/i,    "char-icon"],
-  [/^ui$/i,             "ui-folder-icon"],
-  [/^textures?$/i,      "texture-folder-icon"],
-  [/^materials?$/i,     "material-folder-icon"],
-  [/^(vfx|effects?)$/i, "vfx-folder-icon"],
-  [/^meshes?$/i,        "mesh-folder-icon"],
-  [/^(text|stringtables?)$/i, "text-folder-icon"],
-  [/^nameplates?$/i,    "nameplate-folder-icon"],
-  [/^plugins$/i,        "plugin-folder-icon"],
-];
 function folderIconCls(name) {
-  const hit = FOLDER_ICON_PATTERNS.find(([re]) => re.test(name));
-  return hit ? hit[1] : "folder-icon";
+  return AtelierFolderIcons.classFor(name);
 }
 
 const ICON_CLS_TO_LUCIDE = {
-  "folder-icon":          "folder",
-  "texture-folder-icon":  "image",
-  "material-folder-icon": "circle-star",
-  "vfx-folder-icon":      "sparkles",
-  "mesh-folder-icon":     "scan-box",
-  "text-folder-icon":     "type-outline",
-  "nameplate-folder-icon": "id-card",
-  "plugin-folder-icon":    "puzzle",
-  "char-icon":            "square-user-round",
-  "ui-folder-icon":       "swatch-book",
+  ...AtelierFolderIcons.symbols,
   "texture-icon":         "image",
   "vfx-icon":             "sparkles",
   "material-icon":        "circle-star",
@@ -148,20 +127,51 @@ function setStatus(msg) {
   document.getElementById("status-msg").textContent = msg;
 }
 
+function toastExportFeedback(msg, type, duration, state) {
+  try {
+    if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state);
+  } catch (error) { console.warn("Export animation unavailable", error); }
+  // Export still works when the optional animation scripts fail to load.
+  const text = _esc(msg);
+  if (state === "busy") return toastSpinner(text);
+  toast(text, type === "error" ? "warning" : type, duration);
+}
+
+function beginExportFeedback(project) {
+  let finish;
+  try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project); }
+  catch (error) { console.warn("Export animation unavailable", error); }
+  return state => {
+    try { finish?.(state); }
+    catch (error) { console.warn("Export animation unavailable", error); }
+  };
+}
+
+function toastMaterialSave(msg, state = "success", duration = 4000) {
+  try {
+    if (window.AtelierMaterialSaveFeedback) return window.AtelierMaterialSaveFeedback.toast(msg, state, duration);
+  } catch (error) { console.warn("Material save feedback unavailable", error); }
+  try { toast(_esc(msg), state === "error" ? "warning" : state, duration); }
+  catch (error) { console.warn("Material save notification unavailable", error); }
+  return null;
+}
+
 function skinIdFromPath(path) {
   const m = (path || "").match(/^Characters\/\d{4}\/(\d{7})/i);
   return m ? m[1] : null;
 }
 
 // ── navigation ────────────────────────────────────────────────────────────────
-function pushNav(newNav) {
+function pushNav(newNav, {focusPath = '__first__'} = {}) {
+  AtelierLibraryTools.closePreview();
+  AtelierLibraryTools.resetFilters(false);
   history = history.slice(0, histIdx + 1);
   history.push({ ...newNav });
   histIdx = history.length - 1;
   nav = { ...newNav };
   updateNavBtns();
   document.getElementById("search-input").value = "";
-  renderGrid();
+  renderGrid(focusPath);
   renderBreadcrumbs();
   renderSidebar();
 }
@@ -173,21 +183,25 @@ function updateNavBtns() {
 
 document.getElementById("btn-back").addEventListener("click", () => {
   if (histIdx <= 0) return;
+  AtelierLibraryTools.closePreview();
+  AtelierLibraryTools.resetFilters(false);
   histIdx--;
   nav = { ...history[histIdx] };
   document.getElementById("search-input").value = "";
   updateNavBtns();
-  renderGrid();
+  renderGrid('__first__');
   renderBreadcrumbs();
   renderSidebar();
 });
 document.getElementById("btn-forward").addEventListener("click", () => {
   if (histIdx >= history.length - 1) return;
+  AtelierLibraryTools.closePreview();
+  AtelierLibraryTools.resetFilters(false);
   histIdx++;
   nav = { ...history[histIdx] };
   document.getElementById("search-input").value = "";
   updateNavBtns();
-  renderGrid();
+  renderGrid('__first__');
   renderBreadcrumbs();
   renderSidebar();
 });
@@ -235,10 +249,17 @@ function renderBreadcrumbs() {
 
 // ── grid rendering ────────────────────────────────────────────────────────────
 function _makeCard(item) {
+  const parts = (item.game_rel || item.rel_path || "").split("/");
+  const searchText = [item.char_name, item.skin_name, item.skin_id,
+    ...parts.map((_, i) => _pathLabels[parts.slice(0, i + 1).join("/")])].filter(Boolean).join(" ");
   if (item.type === "folder") {
     return {
       type:    "folder",
+      name:    item.name,
+      rel_path: item.rel_path,
       label:   item.label || item.name,
+      pinLabel: AtelierLibraryPins.makePinLabel(item.rel_path, _pathLabels),
+      searchText,
       iconCls: folderIconCls(item.name),
       thumbnail: item.thumbnail,
       heroFallback: item.hero_fallback,
@@ -248,6 +269,8 @@ function _makeCard(item) {
   const ft = item.file_type || "other";
   return {
     type:      "asset",
+    name:      item.name,
+    searchText,
     file_type: ft,
     label:     item.name,
     iconCls:   assetIconCls(ft),
@@ -260,8 +283,15 @@ function _makeCard(item) {
 }
 
 let _gridRequest = 0;
-async function renderGrid() {
+let _gridThumbs = null;
+let _gridStatus = 'ready';
+async function renderGrid(focusPath = null) {
   const requestId = ++_gridRequest, project = _activeProjectName;
+  _gridStatus = 'loading';
+  allItems = [];
+  _gridThumbs?.destroy();
+  _gridThumbs = null;
+  renderHomePins();
   const area = document.getElementById("grid-area");
   area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
   document.getElementById("library-count").textContent = "Loading…";
@@ -272,6 +302,7 @@ async function renderGrid() {
     if (requestId !== _gridRequest || project !== _activeProjectName) return;
     if (data.error) throw new Error(data.error);
     allItems = data;
+    _gridStatus = 'ready';
     checkIndexWarnings();   // fire-and-forget; reports at most once per session
     checkStaleMips();       // same: at most once, and only when there is something to say
 
@@ -282,51 +313,53 @@ async function renderGrid() {
       }
     }
 
-    buildGrid(data.map(_makeCard));
+    AtelierLibraryPins.updateLabels(_pathLabels);
 
-    const importable = data.filter(d => d.type === "asset" && d.file_type === "texture");
-    document.getElementById("import-all-btn").disabled = importable.length === 0;
+    // Restore navigation focus unless the user started interacting elsewhere while loading.
+    const focusElsewhere = document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') ||
+      document.querySelector('.overlay.active, dialog[open]');
+    buildGrid(data.map(_makeCard), false, focusElsewhere ? null : focusPath);
 
-    const unimportedTextures = data.filter(d => d.type === "asset" && d.file_type === "texture" && !d.imported);
-    if (unimportedTextures.length) {
-      try {
-        const pf = await api("/api/prefetch_thumbs", {
-          project,
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ game_rels: unimportedTextures.map(t => t.game_rel) }),
-        });
-        if (requestId !== _gridRequest || project !== _activeProjectName) return;
-        (pf.cached || []).forEach(gr => {
-          document.querySelectorAll(`img[data-game-rel="${CSS.escape(gr)}"]`).forEach(img => {
-            img.src = `/api/thumb?game_rel=${encodeURIComponent(gr)}`;
-          });
-        });
-      } catch (_) {}
-    }
+    document.getElementById("import-all-btn").disabled = _shownTextures().length === 0;
+
   } catch (e) {
     if (requestId !== _gridRequest || project !== _activeProjectName) return;
-    area.innerHTML = `<div id="empty-state" style="color:var(--acc)">${e.message}</div>`;
+    _gridStatus = 'error';
+    const failure = document.createElement("div"); failure.id = "empty-state";
+    failure.textContent = e.message; area.replaceChildren(failure);
     document.getElementById("library-count").textContent = "Could not load assets";
   }
 }
 
-function buildGrid(cards) {
+function renderHomePins() {
+  window.AtelierLibraryPins?.render(document.getElementById("home-pins"), {
+    isHome: !nav.path, onNavigate: path => pushNav({path}),
+    filter: document.getElementById("search-input").value.trim(),
+  });
+}
+
+function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
+  _gridThumbs?.destroy();
+  _gridThumbs = null;
+  renderHomePins();
   const area = document.getElementById("grid-area");
   const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
+  let filtered = AtelierLibraryTools.filter(cards, q);
+  const narrowed = !!q || AtelierLibraryTools.hasFilters();
+  document.getElementById("library-count").textContent = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
 
-  let filtered = q ? cards.filter(c => c.label.toLowerCase().includes(q)) : cards;
-  document.getElementById("library-count").textContent = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${q ? " matching" : ""}`;
-
-  if (!nav.path) {
-    const isPinned = c => c.type === "folder" && c.iconCls && c.iconCls !== "folder-icon";
-    filtered = [...filtered.filter(isPinned), ...filtered.filter(c => !isPinned(c))];
+  if (!nav.path && AtelierLibraryTools.preferredSort() === 'recommended') {
+    const isFeatured = c => c.type === "folder" && AtelierFolderIcons.isFeatured(c.name);
+    filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
   }
+  filtered = AtelierLibraryTools.sort(filtered);
+  document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
     area.innerHTML = `<div id="empty-state">
-      <i data-lucide="${q ? "search-x" : "folder-open"}" size="32" style="color:var(--muted)"></i>
-      <div style="margin-top:8px">${q ? "No matches" : "Empty folder"}</div>
+      <i data-lucide="${narrowed ? "search-x" : "folder-open"}" size="32" style="color:var(--muted)"></i>
+      <div style="margin-top:8px">${narrowed ? "No matches in this folder. Clear filters to see all items." : "Empty folder"}</div>
     </div>`;
     lucide.createIcons({ nodes: [area] });
     return;
@@ -334,12 +367,27 @@ function buildGrid(cards) {
 
   const grid = document.createElement("div");
   grid.className = "grid";
+  const project = _activeProjectName;
+  _gridThumbs = window.AtelierThumbnails?.create({
+    project, request: (path, opts) => api(path, {...opts, project}),
+    makeFallback: card => {
+      const fallback = document.createElement("span");
+      fallback.className = "thumbnail-fallback";
+      fallback.appendChild(makeIcon(card));
+      const label = document.createElement("span");
+      label.className = "thumbnail-fallback-label";
+      label.textContent = "Preview unavailable";
+      fallback.appendChild(label);
+      lucide.createIcons({nodes: [fallback]});
+      return fallback;
+    },
+  }) || null;
 
   filtered.forEach(card => {
     const el = document.createElement("button");
     el.className = "card" + (card.imported ? " imported" : "");
     el.type = "button";
-    el.title = card.label;
+    el.title = `${card.label}\n${card.game_rel || card.rel_path || ''}`;
 
     const thumb = document.createElement("div");
     thumb.className = "card-thumb";
@@ -353,7 +401,7 @@ function buildGrid(cards) {
       img.onload = () => img.classList.add("loaded");
       img.onerror = () => {
         img.remove();
-        thumb.appendChild(makeIcon(card));
+        thumb.appendChild(renderCardIcon(card, el));
         lucide.createIcons({ nodes: [thumb] });
       };
       img.src = card.thumbnail;
@@ -363,30 +411,19 @@ function buildGrid(cards) {
       const img = document.createElement("img");
       img.dataset.gameRel = card.game_rel;
       img.alt = card.label;
-      if (card.imported) {
-        if (card.token) img.dataset.token = card.token;
-        img.src    = `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}`;
+      if (card.token) img.dataset.token = card.token;
+      if (_gridThumbs) _gridThumbs.attach(card, img, thumb);
+      else {
         img.onerror = () => {
           img.style.display = "none";
-          const icon = makeIcon(card);
-          thumb.appendChild(icon);
+          thumb.appendChild(makeIcon(card));
           lucide.createIcons({ nodes: [thumb] });
         };
-      } else {
-        img.style.display = "none";
-        const spin = document.createElement("div");
-        spin.className = "spinner";
-        thumb.appendChild(spin);
-        img.onload  = () => { img.style.display = ""; spin.style.display = "none"; };
-        img.onerror = () => {
-          img.style.display = "none";
-          spin.replaceWith(makeIcon(card));
-          lucide.createIcons({ nodes: [thumb] });
-        };
+        img.src = `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(project)}`;
       }
       thumb.appendChild(img);
     } else {
-      thumb.appendChild(makeIcon(card));
+      thumb.appendChild(renderCardIcon(card, el));
     }
 
     const name = document.createElement("div");
@@ -400,15 +437,31 @@ function buildGrid(cards) {
     } else {
       el.addEventListener("click", card.onClick);
     }
-    if (card.type === "asset") {
+    if (card.type === "asset" || card.type === "folder") {
       el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
     }
-    grid.appendChild(el);
+    const wrapper = window.AtelierLibraryPins?.decorate(card, el) || el;
+    grid.appendChild(AtelierLibraryTools.decorate(card, el, wrapper));
   });
 
   area.innerHTML = "";
   area.appendChild(grid);
   lucide.createIcons({ nodes: [grid] });
+  AtelierLibraryTools.ready(grid, focusPath);
+  _gridThumbs?.start(retryThumbs);
+}
+
+function renderCardIcon(card, cardEl) {
+  // Called only when artwork is absent, including failed portrait requests.
+  if (card.type === "folder" && card.iconCls === "folder-icon") {
+    const artwork = document.getElementById("folder-flap-template")?.content?.firstElementChild;
+    if (artwork) {
+      cardEl.dataset.atelierMotion = "folder-flap";
+      return artwork.cloneNode(true);
+    }
+  }
+  delete cardEl.dataset.atelierMotion;
+  return makeIcon(card);
 }
 
 function makeIcon(card) {
@@ -420,15 +473,47 @@ function makeIcon(card) {
 }
 
 // ── search ────────────────────────────────────────────────────────────────────
+function previewLibraryCard(card, opener) {
+  if (card.file_type === 'mesh') {
+    window.AtelierViewport?.openMesh(card.game_rel, card.label, skinIdFromPath(card.game_rel));
+    return;
+  }
+  if (card.type === 'folder' && /^Characters\/\d{4}\/\d{7}$/i.test(card.rel_path || '')) {
+    window.AtelierViewport?.open(skinIdFromPath(card.rel_path), card.label);
+    return;
+  }
+  const imported = card.type === 'asset' && card.imported;
+  const src = card.thumbnail || `${imported ? '/api/preview' : '/api/thumb'}?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`;
+  AtelierLibraryTools.previewImage({label: card.label, path: card.game_rel || card.rel_path, src,
+    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset'}, opener);
+}
+function libraryParent() {
+  if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});
+}
+AtelierLibraryTools.init({
+  change: () => { if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard)); renderSidebar(); },
+  preview: previewLibraryCard,
+  parent: libraryParent,
+  context: (card, button) => {
+    const bounds = button.getBoundingClientRect();
+    _ctxShow({preventDefault() {}, stopPropagation() {}, currentTarget: button, clientX: bounds.left + 12, clientY: bounds.top + 12}, _ctxItemsCard(card));
+  },
+});
 document.getElementById("search-input").addEventListener("input", () => {
-  if (allItems.length) {
+  if (_gridStatus === 'ready') {
     buildGrid(allItems.map(_makeCard));
   }
   renderSidebar();
 });
 
 document.addEventListener("keydown", e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+  if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
+      !e.target.closest('input, textarea, select, [contenteditable="true"]')) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault(); document.getElementById(e.key === 'ArrowLeft' ? 'btn-back' : 'btn-forward').click();
+    } else if (e.key === 'ArrowUp') { e.preventDefault(); libraryParent(); }
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && !document.querySelector('.overlay.active, dialog[open]')) {
     e.preventDefault();
     const si = document.getElementById("search-input");
     si.focus();
@@ -615,6 +700,98 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
 
 // ── material parameter editor ──────────────────────────────────────────────────
 let matEditor = null;
+let _materialOpenRevision = 0, _dyePreviewRevision = 0;
+const _materialReferences = new WeakMap();
+const _matEscape = value => String(value ?? "").replace(/[&<>"']/g, c => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[c]));
+
+function _matRemember(editor, original) {
+  const copy = value => JSON.parse(JSON.stringify(value));
+  const saved = { colors: copy(editor.colors), scalars: copy(editor.scalars) };
+  _materialReferences.set(editor, { saved,
+    original: original ? { colors: _seedColors(original.colors), scalars: _seedScalars(original.scalars) } : null });
+}
+function _matReference(kind, index, mode = matEditor?.compareMode || "saved") {
+  const refs = _materialReferences.get(matEditor);
+  const item = matEditor?.[kind]?.[index];
+  return (refs?.[mode]?.[kind] || []).find(value => value.name === item?.name);
+}
+function _matIsChanged(kind, index) {
+  const item = matEditor?.[kind]?.[index], saved = _matReference(kind, index, "saved");
+  if (!item || !saved) return false;
+  return kind === "colors" ? JSON.stringify([item.rgba, item.inten]) !== JSON.stringify([saved.rgba, saved.inten])
+    : item.value !== saved.value;
+}
+function materialDirtyCount() {
+  return matEditor ? ["colors", "scalars"].reduce((n, kind) => n + matEditor[kind].filter((_, i) => _matIsChanged(kind, i)).length, 0) : 0;
+}
+function _matRefreshDirty() {
+  if (!matEditor) return;
+  const n = materialDirtyCount(), busy = _materialSaving.has(matEditor);
+  const badge = document.getElementById("mat-dirty");
+  if (badge) { badge.textContent = n ? `${n} unsaved parameter${n === 1 ? "" : "s"}` : "All changes saved"; badge.classList.toggle("dirty", n > 0); }
+  document.getElementById("mat-title").textContent = matEditor.name + (n ? " •" : "");
+  const save = document.getElementById("mat-save");
+  save.disabled = busy;
+  save.textContent = busy ? "Saving…" : n ? `Save changes (${n})` : "Save";
+  document.getElementById("mat-reset").disabled = busy;
+  const revert = document.getElementById("mat-revert");
+  if (revert) revert.disabled = busy || !n;
+  ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
+    const row = document.getElementById((kind === "colors" ? "matrow" : "matscalar") + i);
+    row?.classList.toggle("is-modified", _matIsChanged(kind, i));
+    const marker = row?.querySelector(".mat-changed");
+    if (marker) marker.textContent = _matIsChanged(kind, i) ? "Unsaved" : "";
+  }));
+}
+async function matCompare(mode) {
+  if (!matEditor) return;
+  const editor = matEditor, project = _activeProjectName;
+  const refs = _materialReferences.get(editor);
+  if (mode === "original" && !refs?.original) {
+    document.getElementById("mat-status").textContent = "Loading original game values…";
+    try {
+      const result = await api(`/api/material_original?game_rel=${encodeURIComponent(editor.game_rel)}`, { project });
+      if (matEditor !== editor || project !== _activeProjectName) return;
+      if (!result.ok) throw Error(result.error || "Original game values are unavailable");
+      refs.original = { colors: _seedColors(result.colors), scalars: _seedScalars(result.scalars) };
+      document.getElementById("mat-status").textContent = "Comparing with original game values. Use value changes only the draft.";
+    } catch (error) {
+      if (matEditor === editor && project === _activeProjectName)
+        document.getElementById("mat-status").textContent = "Original comparison unavailable: " + error.message;
+      return;
+    }
+  }
+  matEditor.compareMode = mode;
+  renderMatEditor();
+  dyeRefresh(0);
+}
+function matRestoreParameter(kind, index) {
+  const ref = _matReference(kind, index);
+  if (!ref || !matEditor) return;
+  const item = matEditor[kind][index];
+  if (kind === "colors") { item.rgba = ref.rgba.slice(); item.inten = ref.inten; }
+  else item.value = ref.value;
+  renderMatEditor(); dyeRefresh(0);
+}
+function matRevertDraft() {
+  if (!matEditor || _materialSaving.has(matEditor)) return;
+  const saved = _materialReferences.get(matEditor)?.saved;
+  if (!saved) return;
+  matEditor.colors = JSON.parse(JSON.stringify(saved.colors));
+  matEditor.scalars = JSON.parse(JSON.stringify(saved.scalars));
+  renderMatEditor(); dyeRefresh(0);
+  document.getElementById("mat-status").textContent = "Unsaved parameters reverted to their saved values.";
+}
+function _matComparison(kind, index) {
+  const ref = _matReference(kind, index);
+  if (!ref) return "";
+  const value = kind === "colors" ? `${fmtColor01(...ref.rgba.slice(0, 3).map(v => v / Math.max(ref.inten, 1e-6)))} · ×${+ref.inten.toFixed(3)} · A ${+ref.rgba[3].toFixed(3)}` : String(ref.value);
+  const swatch = kind === "colors" ? `<span class="mat-reference-swatch" style="background:${_rgbHex(...ref.rgba.slice(0, 3), ref.inten)}"></span>` : "";
+  return `<div class="mat-reference">${swatch}<span>${matEditor.compareMode === "original" ? "Game original" : "Saved"}: <code>${_matEscape(value)}</code></span>
+    <button type="button" class="mat-restore" onclick="matRestoreParameter('${kind}',${index})" title="Use this reference value in the unsaved draft">Use value</button></div>`;
+}
 
 function _hx2(c) { return ("0" + Math.round(Math.min(255, Math.max(0, c * 255))).toString(16)).slice(-2); }
 function _rgbHex(r, g, b, inten) { const n = Math.max(inten, 1e-6); return "#" + _hx2(r / n) + _hx2(g / n) + _hx2(b / n); }
@@ -711,6 +888,11 @@ function _seedScalars(arr) {
 }
 
 async function openMaterialEditor(item) {
+  if (materialDirtyCount() && !confirm("Discard unsaved material parameters and open another material?")) return;
+  const revision = ++_materialOpenRevision, project = _activeProjectName;
+  const current = () => revision === _materialOpenRevision && project === _activeProjectName;
+  matEditor = null;
+  clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
   document.getElementById("mat-title").textContent = item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
@@ -719,26 +901,30 @@ async function openMaterialEditor(item) {
   ov.classList.add("active");
   let res;
   try { res = await api(`/api/material_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
-  catch (e) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
-  if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read material"}</div>`; return; }
+  catch (e) { if (current()) document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${_matEscape(e.message)}</div>`; return; }
+  if (!current()) return;
+  if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${_matEscape(res.error || "failed to read material")}</div>`; return; }
   matEditor = { game_rel: item.game_rel, name: item.name,
-                colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
+                colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved" };
+  _matRemember(matEditor, res.original);
   renderMatEditor();
   loadSidebar();
   // Dyeing materials (chromas) recolour through the ColorID mask, so the "Region N" pickers below
   // do nothing visible on their own — attach a live composite so the user can see what they're doing.
   try {
     const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`);
-    if (di && di.dyeable && matEditor && matEditor.game_rel === item.game_rel) {
+    if (di && di.dyeable && current() && matEditor) {
+      const editor = matEditor;
       matEditor.dyeable = true;
       matEditor.dyeInfo = di;
       matEditor.dyeView = "preview";
       matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
       try {
         const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`);
+        if (!current() || matEditor !== editor) return;
         matEditor.dyeOff = !!(ao && ao.opts && ao.opts.dye_off);
         matEditor.dyeMask = (ao && ao.mask) || "";
-      } catch (e) { matEditor.dyeOff = false; }
+      } catch (e) { if (!current() || matEditor !== editor) return; matEditor.dyeOff = false; }
       renderMatEditor();
       dyeRefresh(0);
     }
@@ -761,10 +947,11 @@ let _dyeTimer = null;
 function dyeRefresh(delay = 140) {
   if (!matEditor || !matEditor.dyeable) return;
   clearTimeout(_dyeTimer);
+  const editor = matEditor, revision = ++_dyePreviewRevision;
   // debounce: a colour drag fires oninput continuously; the composite is ~80ms server-side
   _dyeTimer = setTimeout(async () => {
     const img = document.getElementById("dye-prev");
-    if (!img || !matEditor) return;
+    if (!img || matEditor !== editor) return;
     const gr = matEditor.game_rel;
     // The region map is fixed by the MASK, not by the colours being edited, so it is a plain GET
     // and no colour drag needs to re-render it.
@@ -780,8 +967,9 @@ function dyeRefresh(delay = 140) {
         body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides(),
                                dye_off: !!matEditor.dyeOff }),
       });
-      if (!r.ok || !matEditor || matEditor.game_rel !== gr) return;   // editor closed/switched
+      if (!r.ok || matEditor !== editor || revision !== _dyePreviewRevision) return;
       const b = await r.blob();
+      if (matEditor !== editor || revision !== _dyePreviewRevision || !img.isConnected) return;
       if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
       const u = URL.createObjectURL(b);
       img.dataset.url = u; img.src = u;
@@ -921,6 +1109,7 @@ function matFocusRegion(idx) {
   if (i < 0) return;
   const row = document.getElementById("matrow" + i);
   if (!row) return;
+  const group = row.closest("details"); if (group) group.open = true;
   row.scrollIntoView({ block: "center", behavior: "smooth" });
   // flash every parameter of the region, not just the first — a region is ColorA + ColorB + channels
   (matEditor.colors || []).forEach((c, j) => {
@@ -933,7 +1122,18 @@ function matFocusRegion(idx) {
 
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
-  let h = "";
+  const body = document.getElementById("mat-body");
+  const expanded = new Map([...body.querySelectorAll("details[data-mat-group]")].map(d => [d.dataset.matGroup, d.open]));
+  const previousPreview = body.querySelector("#dye-prev");
+  if (previousPreview?.dataset.url) URL.revokeObjectURL(previousPreview.dataset.url);
+  let h = `<div class="mat-workflow-toolbar">
+    <span id="mat-dirty" class="mat-dirty" role="status" aria-live="polite"></span>
+    <div class="mat-compare-controls"><span>Compare</span>
+      <button type="button" class="seg-btn ${m.compareMode === "saved" ? "on" : ""}" aria-pressed="${m.compareMode === "saved"}" onclick="matCompare('saved')">Saved values</button>
+      <button type="button" class="seg-btn ${m.compareMode === "original" ? "on" : ""}" aria-pressed="${m.compareMode === "original"}" onclick="matCompare('original')">Game original</button>
+    </div>
+    <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
+  </div><p class="mat-reference-note">${m.compareMode === "original" ? "Game original values are shown below each parameter. Changes apply only when you save." : "Saved values are from this project's last save. Compare Game original to inspect the unmodified material."}</p>`;
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
     const reg  = m.dyeView === "regions";
@@ -962,10 +1162,20 @@ function renderMatEditor() {
       ${_dyeOffHtml(m)}`;
   }
   if (m.colors.length) {
-    h += `<div class="mat-section with-ctl">Colors ${colorModeSeg()}</div>`;
+    h += `<div class="mat-section with-ctl">Color parameters ${colorModeSeg()}</div>`;
+    const groups = new Map();
     m.colors.forEach((c, i) => {
-      h += `<div class="mat-row" id="matrow${i}">
-        <label title="${c.name}">${c.name}</label>
+      const region = /^Region\s+(\d+)\s*-/.exec(c.name);
+      const group = region ? `Dye region ${region[1]}` : "Surface colors";
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push({ c, i });
+    });
+    for (const [name, rows] of groups) {
+      h += `<details class="mat-parameter-group" data-mat-group="${name}" ${expanded.get(name) !== false ? "open" : ""}><summary>${name}<span>${rows.length}</span></summary>`;
+      rows.forEach(({ c, i }) => {
+      const escaped = _matEscape(c.name);
+      h += `<div class="mat-parameter" id="matrow${i}"><div class="mat-row">
+        <label for="mathx${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
         <input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)">
         <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
                title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
@@ -975,26 +1185,39 @@ function renderMatEditor() {
         <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
         <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
         <span class="mat-tag">A</span>
-        <input class="mat-num" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">
-      </div>`;
-    });
+        <input class="mat-num" id="matalpha${i}" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">
+      </div>${_matComparison("colors", i)}</div>`;
+      });
+      h += `</details>`;
+    }
   }
   if (m.scalars.length) {
-    h += `<div class="mat-section">Scalars</div>`;
+    h += `<details class="mat-parameter-group" data-mat-group="Scalars" ${expanded.get("Scalars") !== false ? "open" : ""}><summary>Scalar parameters<span>${m.scalars.length}</span></summary>`;
     m.scalars.forEach((s, i) => {
-      h += `<div class="mat-row">
-        <label title="${s.name}">${s.name}</label>
+      const escaped = _matEscape(s.name);
+      h += `<div class="mat-parameter" id="matscalar${i}"><div class="mat-row">
+        <label for="msn${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
         <input type="range" id="msr${i}" min="${Math.min(0, s.orig)}" max="${s.max}" step="${s.max / 1000}" value="${s.value}" oninput="matScalar(${i},this.value,1)">
         <input class="mat-num wide" id="msn${i}" type="number" step="any" value="${s.value}" oninput="matScalar(${i},this.value,0)">
-      </div>`;
+      </div>${_matComparison("scalars", i)}</div>`;
     });
+    h += `</details>`;
   }
   // Appended, not assigned: a dyeing material with no exposed Region params still has a preview and
   // a dye-off toggle above, and replacing the body would throw both away along with the only
   // controls that material has.
   if (!m.colors.length && !m.scalars.length)
     h += `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
-  document.getElementById("mat-body").innerHTML = h;
+  body.innerHTML = h;
+  m.colors.forEach((c, i) => {
+    for (const [prefix, name] of [["matsw", "Color"], ["mir", "Intensity"], ["min", "Intensity"], ["matalpha", "Alpha"]])
+      document.getElementById(prefix + i)?.setAttribute("aria-label", `${c.name}: ${name}`);
+  });
+  m.scalars.forEach((s, i) => document.getElementById("msr" + i)?.setAttribute("aria-label", s.name));
+  const reset = document.getElementById("mat-reset");
+  reset.textContent = "Restore game defaults";
+  reset.title = "Replace the project's saved material with original game values";
+  _matRefreshDirty();
 }
 
 // Writes one colour row's inputs back from state. `except` is the id of the element the user is
@@ -1007,6 +1230,7 @@ function _matSyncRow(i, except) {
   set("mir" + i, Math.min(c.inten, 10));
   set("min" + i, +c.inten.toFixed(3));
   const t = document.getElementById("mathx" + i); if (t) t.classList.remove("bad");
+  _matRefreshDirty();
 }
 
 function matColor(i, hex) {
@@ -1033,10 +1257,11 @@ function matInten(i, v, fromRange) {
   _matSyncRow(i, (fromRange ? "mir" : "min") + i);
   dyeRefresh();
 }
-function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; dyeRefresh(); }
+function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matRefreshDirty(); dyeRefresh(); }
 function matScalar(i, v, fromRange) {
   matEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
+  _matRefreshDirty();
 }
 
 // The editor must not show a split it cannot guarantee. If the server could not store it (an old
@@ -1049,47 +1274,113 @@ function _warnIntenLost(res, sent) {
           `will reopen with the intensity folded in (same colour in game, different numbers).`, "error");
 }
 
-async function saveMaterial() {
-  if (!matEditor) return;
+const _materialSaving = new WeakSet();
+function materialSaveSnapshot(editor) {
   const colors = {}, scalars = {};
-  matEditor.colors.forEach(c => { colors[c.name] = [c.rgba[0], c.rgba[1], c.rgba[2], c.rgba[3]]; });
-  matEditor.scalars.forEach(s => { scalars[s.name] = s.value; });
-  const inten = _intenMap(matEditor.colors, c => c.name, c => _derivedInten(c.rgba));
+  editor.colors.forEach(c => { colors[c.name] = [c.rgba[0], c.rgba[1], c.rgba[2], c.rgba[3]]; });
+  editor.scalars.forEach(s => { scalars[s.name] = s.value; });
+  const inten = _intenMap(editor.colors, c => c.name, c => _derivedInten(c.rgba));
+  return { game_rel: editor.game_rel, colors, scalars, inten };
+}
+
+async function saveMaterial() {
+  if (!matEditor || _materialSaving.has(matEditor)) return;
+  const editor = matEditor, project = _activeProjectName, name = editor.name;
+  const submitted = materialSaveSnapshot(editor);
+  const body = JSON.stringify(submitted);
+  const isCurrent = () => matEditor === editor && project === _activeProjectName;
+  const notify = (msg, state, duration) => toastMaterialSave(
+    project === _activeProjectName ? msg : `${project}: ${msg}`, state, duration);
+  _materialSaving.add(editor);
+  _matRefreshDirty();
   document.getElementById("mat-status").textContent = "Saving…";
+  let res;
   try {
-    const res = await api("/api/material_save", {
+    res = await api("/api/material_save", {
+      project,
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: matEditor.game_rel, colors, scalars, inten }),
+      body,
     });
-    if (res.ok) {
-      toast(`Saved: ${matEditor.name}`, "success");
-      _warnIntenLost(res, inten);
-      loadSidebar();
-      closeMaterialEditor();
+  } catch (e) { res = { ok: false, error: e.message }; }
+  try {
+    if (res?.ok) {
+      const newerEdits = isCurrent() && JSON.stringify(materialSaveSnapshot(editor)) !== body;
+      const n = Object.keys(submitted.inten).length;
+      const intenLost = n > 0 && res.inten_saved !== true;
+      const status = "Submitted changes saved; newer edits remain unsaved.";
+      let message = newerEdits ? `${name}: ${status}` : `Saved: ${name}`;
+      if (intenLost) message += `\nColour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
+        `will reopen with the intensity folded in (same colour in game, different numbers).`;
+      notify(message, intenLost || newerEdits ? "warning" : "success", intenLost || newerEdits ? 8000 : 3200);
+      if (project === _activeProjectName) loadSidebar();
+      if (isCurrent()) {
+        const refs = _materialReferences.get(editor);
+        if (refs) refs.saved = {
+          colors: _seedColors(Object.entries(submitted.colors).map(([name, rgba]) => ({ name, rgba })), intenLost ? res.inten : submitted.inten),
+          scalars: _seedScalars(Object.entries(submitted.scalars).map(([name, value]) => ({ name, value })))
+        };
+        if (newerEdits) document.getElementById("mat-status").textContent = status;
+        else closeMaterialEditor(true);
+      }
     } else {
-      document.getElementById("mat-status").textContent = "Error: " + (res.error || "save failed");
+      const message = "Error: " + (res?.error || "save failed");
+      if (isCurrent()) document.getElementById("mat-status").textContent = message;
+      notify(`${name} — ${message}`, "error", 6000);
     }
-  } catch (e) { document.getElementById("mat-status").textContent = "Error: " + e.message; }
+  } finally { _materialSaving.delete(editor); if (isCurrent()) { renderMatEditor(); dyeRefresh(0); } }
 }
 
 async function resetMaterial() {
-  if (!matEditor) return;
+  if (!matEditor || _materialSaving.has(matEditor)) return;
+  if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft.")) return;
+  const editor = matEditor, project = _activeProjectName;
+  const submitted = JSON.stringify(materialSaveSnapshot(editor));
+  const current = () => matEditor === editor && project === _activeProjectName;
+  _materialSaving.add(editor); _matRefreshDirty();
   document.getElementById("mat-status").textContent = "Resetting…";
   try {
     const res = await api("/api/material_reset", {
+      project,
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: matEditor.game_rel }),
+      body: JSON.stringify({ game_rel: editor.game_rel }),
     });
+    if (!current()) return;
     if (res.ok) {
-      matEditor.colors = _seedColors(res.colors, res.inten); matEditor.scalars = _seedScalars(res.scalars);
+      const newer = JSON.stringify(materialSaveSnapshot(editor)) !== submitted;
+      if (!newer) { editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars); }
+      const original = { colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
+      _materialReferences.set(editor, { saved: original, original });
       renderMatEditor();
-      document.getElementById("mat-status").textContent = "Reset to vanilla.";
+      dyeRefresh(0); loadSidebar();
+      document.getElementById("mat-status").textContent = newer ? "Game defaults restored; newer edits remain unsaved." : "Restored original game values.";
       toast(`Reset: ${matEditor.name}`, "info");
     } else { document.getElementById("mat-status").textContent = "Error: " + (res.error || "reset failed"); }
-  } catch (e) { document.getElementById("mat-status").textContent = "Error: " + e.message; }
+  } catch (e) { if (current()) document.getElementById("mat-status").textContent = "Error: " + e.message; }
+  finally { _materialSaving.delete(editor); if (current()) _matRefreshDirty(); }
 }
 
-function closeMaterialEditor() { document.getElementById("material-overlay").classList.remove("active"); matEditor = null; }
+function closeMaterialEditor(force = false) {
+  if (force !== true && materialDirtyCount() && !confirm("Discard unsaved material parameters?")) return false;
+  ++_materialOpenRevision; ++_dyePreviewRevision; clearTimeout(_dyeTimer);
+  const img = document.getElementById("dye-prev");
+  if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  document.getElementById("material-overlay").classList.remove("active"); matEditor = null;
+  return true;
+}
+
+window.addEventListener("beforeunload", event => {
+  if (materialDirtyCount() || (matEditor && _materialSaving.has(matEditor))) {
+    event.preventDefault(); event.returnValue = "Material parameters have unsaved changes.";
+  }
+});
+window.addEventListener("keydown", event => {
+  if (!document.getElementById("material-overlay").classList.contains("active")) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault(); saveMaterial();
+  } else if (event.key === "Escape") {
+    event.preventDefault(); closeMaterialEditor();
+  }
+});
 
 document.getElementById("mat-save").addEventListener("click", saveMaterial);
 document.getElementById("mat-reset").addEventListener("click", resetMaterial);
@@ -1502,8 +1793,9 @@ document.getElementById("vfx-overlay").addEventListener("click", e => {
 // ── import all ────────────────────────────────────────────────────────────────
 function _shownTextures() {
   const q = document.getElementById("search-input").value.trim().toLowerCase();
-  return allItems.filter(i => i.type === "asset" && i.file_type === "texture"
-    && (!q || (i.name || i.label || "").toLowerCase().includes(q)));
+  const paths = new Set(AtelierLibraryTools.filter(allItems.map(_makeCard), q)
+    .filter(i => i.type === 'asset' && i.file_type === 'texture').map(i => i.game_rel));
+  return allItems.filter(i => i.type === 'asset' && i.file_type === 'texture' && paths.has(i.game_rel));
 }
 
 document.getElementById("view3d-fab").addEventListener("click", () => {
@@ -1588,11 +1880,12 @@ function connectSSE() {
   });
   // EventSource already reconnects. Creating another stream here multiplied connections.
   es.onopen = async () => {
+    _gridThumbs?.reconcile();
     if (!importing) return;
     try { handleSSE(await api("/api/import_status")); } catch (_) {}
   };
 }
-window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; });
+window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; _gridThumbs?.destroy(); });
 
 function handleSSE(d) {
   if (d.usmap_updated) {
@@ -1610,9 +1903,12 @@ function handleSSE(d) {
     loadSidebar();
     return;
   }
-  if (d.thumb_ready && d.game_rel) {
+  if ((d.thumb_ready || d.thumb_failed) && d.game_rel) {
+    _gridThumbs?.handleEvent(d);
+    if (!d.thumb_ready) return;
     const sel = `img[data-game-rel="${CSS.escape(d.game_rel)}"]`;
     document.querySelectorAll(sel).forEach(img => {
+      if (img.closest("#grid-area") && _gridThumbs) return;
       img.src = `/api/thumb?game_rel=${encodeURIComponent(d.game_rel)}&_t=${Date.now()}`;
     });
     return;
@@ -1657,6 +1953,7 @@ connectSSE();
 let _sidebarRequest = 0;
 async function loadSidebar() {
   const requestId = ++_sidebarRequest, project = _activeProjectName;
+  window.AtelierEmptyAssetsUI?.begin();
   const data = await api("/api/imported");
   if (requestId !== _sidebarRequest || project !== _activeProjectName) return;
   data.forEach(item => {
@@ -1671,11 +1968,13 @@ async function loadSidebar() {
   });
   const live = new Set(data.map(d => d.token));
   Object.keys(sidebarData).forEach(t => { if (!live.has(t)) delete sidebarData[t]; });
+  window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
   renderSidebar();
 }
 
 function refreshSidebarEntry(game_rel, name, skin_id) {
   const project = _activeProjectName, requestId = ++_sidebarRequest;
+  window.AtelierEmptyAssetsUI?.begin();
   api("/api/imported").then(data => {
     if (project !== _activeProjectName || requestId !== _sidebarRequest) return;
     data.forEach(item => {
@@ -1685,6 +1984,7 @@ function refreshSidebarEntry(game_rel, name, skin_id) {
         Object.assign(sidebarData[item.token], item, { selected: wasSelected });
       }
     });
+    window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
     renderSidebar();
   });
 }
@@ -1708,10 +2008,7 @@ let _sbLastTok  = null;          // anchor for shift-click ranges
 function _sbVisible() {
   const all = Object.values(sidebarData);
   const q = document.getElementById("search-input").value.trim().toLowerCase();
-  return q ? all.filter(i =>
-        (i.name || "").toLowerCase().includes(q) ||
-        (i.skin_name || "").toLowerCase().includes(q) ||
-        (i.char_name || "").toLowerCase().includes(q)) : all;
+  return q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
 }
 
 function sbMarkClear() { _sbMarked.clear(); _sbLastTok = null; renderSidebar(); }
@@ -1743,14 +2040,17 @@ function sbDeleteMarked() {
 }
 
 async function performClearMany(items) {
+  const project = _activeProjectName;
   try {
     const res = await api("/api/delete_imported", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rels: items.map(i => i.game_rel) }),
     });
     if (res.ok) {
+      if (project !== _activeProjectName) return;
       items.forEach(i => { delete sidebarData[i.token]; _sbMarked.delete(i.token); });
       _sbLastTok = null;
+      window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
       toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "warning", 3500);
       renderGrid().catch(() => {});
@@ -1764,19 +2064,18 @@ async function performClearMany(items) {
 
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
+  window.AtelierEmptyAssetsUI?.dispose();
   list.innerHTML = "";
   const all = Object.values(sidebarData);
   if (!all.length) {
     list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>No edited assets yet</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
     lucide.createIcons({ nodes: [list] });
+    window.AtelierEmptyAssetsUI?.mount(_activeProjectName, list.querySelector('.sidebar-empty'));
     updateInstallBtn();
     return;
   }
   const q     = document.getElementById("search-input").value.trim().toLowerCase();
-  const items = q ? all.filter(i =>
-        (i.name || "").toLowerCase().includes(q) ||
-        (i.skin_name || "").toLowerCase().includes(q) ||
-        (i.char_name || "").toLowerCase().includes(q)) : all;
+  const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
   if (!items.length) {
     list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets match the search.</div>';
     updateInstallBtn();
@@ -1874,12 +2173,16 @@ function _syncToggleRow(id) {
   cb.closest(".toggle-row").classList.toggle("on", cb.checked);
 }
 
+let _exportRunningCount = 0;
+let _exportReviewChecking = false;
+const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
+
 function updateInstallBtn() {
   const sel = Object.values(sidebarData).filter(i => i.selected).length;
   const badge = document.getElementById("sel-count");
   badge.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
-  document.getElementById("install-btn").disabled = sel === 0;
+  document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
 
   const copyRow = document.getElementById("toggle-copy-row");
   const copyCb  = document.getElementById("toggle-copy");
@@ -1910,10 +2213,13 @@ document.getElementById("toggle-password-row").addEventListener("click", e => {
 document.getElementById("toggle-copy").addEventListener("change", () => _syncToggleRow("toggle-copy"));
 document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
-async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName) {
+async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName, review = null) {
+  _exportRunningCount++;
   document.getElementById("install-btn").disabled = true;
-  setStatus(`Installing ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
-  const t = toastSpinner(`Installing ${modName}…`);
+  if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
+  if (review) window.AtelierExportReview?.start(review);
+  const finishFeedback = beginExportFeedback(project);
+  const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy");
   try {
     const res = await api("/api/install_mod", {
       project,
@@ -1925,76 +2231,187 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         copy_to_mods: copyToMods,
       }),
     });
-    t.remove();
+    t?.remove();
     if (res.ok) {
-      toast(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), "success", 5000);
-      setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
+      const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
+      finishFeedback(outcome);
+      toastExportFeedback(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000, outcome);
+      if (project === _activeProjectName) setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
       // A mod can build fine and still be missing a piece — one asset that would not stage. Saying
       // "Installed" and nothing else makes that look identical to the game ignoring the edit.
       if ((res.skipped || []).length) {
-        toast(`${res.skipped.length} item(s) did NOT go into the mod:\n• ` +
+        toastExportFeedback(`${res.skipped.length} item(s) did NOT go into the mod:\n• ` +
               res.skipped.slice(0, 4).join("\n• ") +
               (res.skipped.length > 4 ? `\n• +${res.skipped.length - 4} more` : ""),
-              "warning", 16000);
+              "warning", 16000, "warning");
       }
       console.log("[export] staged:", res.applied, "\n[export] skipped:", res.skipped);
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
-      toast("No mods folder set — opening Settings…", "warning");
+      finishFeedback("warning");
+      toastExportFeedback("No mods folder set — opening Settings…", "warning", 3200, "warning");
       openPaths();
     } else {
-      toast(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, "warning", 10000);
-      setStatus(res.built ? `Exported → ${res.pak_path || ""}` : "");
+      const outcome = res.built ? "warning" : "error";
+      finishFeedback(outcome);
+      toastExportFeedback(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, outcome, 10000, outcome);
+      if (project === _activeProjectName) setStatus(res.built ? `Exported → ${res.pak_path || ""}` : "");
     }
+    if (review) window.AtelierExportReview?.finish(review, res);
+    return res;
   } catch (e) {
-    t.remove();
-    toast(`Error: ${e.message}`, "warning"); setStatus("");
+    t?.remove();
+    finishFeedback("error");
+    toastExportFeedback(`Error: ${e.message}`, "error", 3200, "error");
+    if (project === _activeProjectName) setStatus("");
+    const res = {ok: false, error: e.message};
+    if (review) window.AtelierExportReview?.finish(review, res);
+    return res;
   } finally {
+    _exportRunningCount--;
     updateInstallBtn();
   }
 }
 
-async function doInstallMod() {
-  const project = _activeProjectName;
-  const selected = Object.values(sidebarData).filter(i => i.selected);
-  if (!selected.length) return;
+function _captureExportReview() {
+  const items = Object.values(sidebarData).map(item => ({...item}));
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const exportable = selected.filter(i => ["texture", "material", "curve", "vfx", "world", "text", "mesh"].includes(i.file_type || ""));
-  const skipped    = selected.length - exportable.length;
-  if (!exportable.length) { toast("Nothing exportable selected", "info"); return; }
-
   const copyToMods = document.getElementById("toggle-copy").checked && _modsFolderSet;
+  const protectedMod = document.getElementById("toggle-password").checked && !!_protectionPassword;
+  const included = [], excluded = [];
+  for (const item of items) {
+    const reason = !item.selected ? "Not selected" : !item.game_rel ? "Missing game asset path" :
+      !_exportTypes.has(item.file_type) ? "Unsupported export type: " + (item.file_type || "unknown") : "";
+    if (reason) excluded.push(Object.freeze({...item, reason}));
+    else included.push(Object.freeze(item));
+  }
+  const fingerprint = JSON.stringify({
+    project: _activeProjectName, modName, copyToMods, protectedMod,
+    modsPath: _modsFolderPath,
+    revision: _sidebarRequest,
+    items: items.sort((a,b) => String(a.game_rel).localeCompare(String(b.game_rel))),
+  });
+  return Object.freeze({project: _activeProjectName, modName, included: Object.freeze(included),
+    excluded: Object.freeze(excluded), skipped: excluded.filter(i => i.selected).length,
+    copyToMods, modsPath: _modsFolderPath, protected: protectedMod, fingerprint});
+}
+
+function _exportReviewCurrent(snapshot, password) {
+  return snapshot.fingerprint === _captureExportReview().fingerprint &&
+    (!snapshot.protected || password === _protectionPassword);
+}
+
+function _blockExportForDrafts(snapshot = null) {
+  const saving = !!matEditor && _materialSaving.has(matEditor);
+  const materialPending = saving || materialDirtyCount() > 0;
+  const viewportPending = window.AtelierViewport?.hasPendingEdits?.();
+  if (!materialPending && !viewportPending) return false;
+  _exportReviewChecking = false;
+  if (snapshot) window.AtelierExportReview?.cancelCheck(snapshot);
+  document.getElementById("export-review-overlay")?.classList.remove("active");
+  if (!materialPending) {
+    window.AtelierViewport.focusPendingEdits();
+    updateInstallBtn();
+    return true;
+  }
+  document.getElementById("material-overlay").classList.add("active");
+  const status = document.getElementById("mat-status");
+  status.textContent = saving ? "Material save in progress. Wait for it to finish before exporting."
+    : "Save or discard these unsaved material parameters before exporting.";
+  status.setAttribute("role", "status");
+  // A disabled Save button cannot receive focus while its request is in flight.
+  if (saving) { status.tabIndex = -1; status.focus(); }
+  else document.getElementById("mat-save").focus();
+  updateInstallBtn();
+  return true;
+}
+
+async function _confirmExportReview(snapshot, password) {
+  if (_exportReviewChecking || _exportRunningCount) return;
+  if (_blockExportForDrafts(snapshot)) return;
+  if (!_exportReviewCurrent(snapshot, password)) {
+    window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
+    return;
+  }
+  _exportReviewChecking = true; updateInstallBtn();
+  window.AtelierExportReview?.checking(snapshot);
+  const proceed = async () => {
+    // This check also covers a project/selection change while overwrite confirmation was open.
+    if (_blockExportForDrafts(snapshot)) return;
+    if (!_exportReviewCurrent(snapshot, password)) {
+      _exportReviewChecking = false; updateInstallBtn();
+      window.AtelierExportReview?.cancelCheck(snapshot);
+      window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
+      return;
+    }
+    _exportReviewChecking = false;
+    await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
+      snapshot.copyToMods, password, snapshot.project, snapshot);
+  };
+  const destinationCheck = new AbortController();
+  const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
+  try {
+    const q = `/api/check_mod_conflict?mod_name=${encodeURIComponent(snapshot.modName)}&copy_to_mods=${snapshot.copyToMods ? "1" : "0"}`;
+    const conflict = await api(q, {project: snapshot.project, signal: destinationCheck.signal});
+    clearTimeout(checkTimeout);
+    if (typeof conflict.default !== "boolean" || typeof conflict.mods !== "boolean") {
+      throw new Error(conflict.error || "Could not check existing output. Retry when the connection is available.");
+    }
+    if (conflict.default || conflict.mods) {
+      const locs = [];
+      if (conflict.default) locs.push("the export folder");
+      if (conflict.mods) locs.push("your mods folder");
+      document.getElementById("confirm-overwrite-msg").textContent =
+        `A mod named "${snapshot.modName}" already exists in ${locs.join(" and ")}. Exporting will replace it.`;
+      _pendingOverwriteConfirm = proceed;
+      _pendingOverwriteConfirm.cancel = () => {
+        _exportReviewChecking = false; updateInstallBtn();
+        window.AtelierExportReview?.cancelCheck(snapshot);
+      };
+      window.AtelierExportReview?.suspend(snapshot);
+      document.getElementById("confirm-overwrite-overlay").classList.add("active");
+      document.getElementById("confirm-overwrite-cancel").focus();
+    } else await proceed();
+  } catch (error) {
+    _exportReviewChecking = false; updateInstallBtn();
+    const message = error.name === "AbortError" ? "The export destination check timed out. Retry when the connection is available." : error.message;
+    window.AtelierExportReview?.finish(snapshot, {ok:false, error: message});
+    if (!window.AtelierExportReview) toast(_esc(message), "warning");
+  } finally {
+    clearTimeout(checkTimeout);
+  }
+}
+
+async function doInstallMod() {
+  if (_exportRunningCount || _exportReviewChecking) return;
+  if (_blockExportForDrafts()) return;
+  if (!Object.values(sidebarData).some(i => i.selected)) {
+    window.AtelierExportReview?.notice("No assets are selected. Close this review and select the changes to export.");
+    return;
+  }
   if (document.getElementById("toggle-copy").checked && !_modsFolderSet) {
     toast("Set a mods folder first — opening Settings…", "info");
     openPaths();
     return;
   }
-  const passwordProtect = document.getElementById("toggle-password").checked && !!_protectionPassword;
-  const password = passwordProtect ? _protectionPassword : "";
-
-  let conflict = null;
-  try {
-    const q = `/api/check_mod_conflict?mod_name=${encodeURIComponent(modName)}&copy_to_mods=${copyToMods ? "1" : "0"}`;
-    conflict = await (await fetch(q)).json();
-  } catch (_) {}
-
-  const proceed = () => _runInstall(modName, exportable, skipped, copyToMods, password, project);
-
-  if (conflict && (conflict.default || conflict.mods)) {
-    const locs = [];
-    if (conflict.default) locs.push("the export folder");
-    if (conflict.mods)    locs.push("your mods folder");
-    document.getElementById("confirm-overwrite-msg").textContent =
-      `A mod named "${modName}" already exists in ${locs.join(" and ")}. Installing will replace it.`;
-    _pendingOverwriteConfirm = proceed;
-    document.getElementById("confirm-overwrite-overlay").classList.add("active");
-  } else {
-    await proceed();
-  }
+  const snapshot = _captureExportReview();
+  if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
+  const password = snapshot.protected ? _protectionPassword : "";
+  if (!window.AtelierExportReview) { await _confirmExportReview(snapshot, password); return; }
+  window.AtelierExportReview.open(snapshot, {
+    confirm: () => _confirmExportReview(snapshot, password), refresh: doInstallMod, settings: openPaths,
+    reveal: async () => {
+      try {
+        const result = await api("/api/open_export_folder", {project: snapshot.project});
+        if (!result.ok) window.AtelierExportReview.notice(result.error || "Could not open the export folder.");
+      } catch (error) { window.AtelierExportReview.notice(error.message); }
+    },
+  });
 }
 
 document.getElementById("confirm-overwrite-cancel").addEventListener("click", () => {
   document.getElementById("confirm-overwrite-overlay").classList.remove("active");
+  _pendingOverwriteConfirm?.cancel?.();
   _pendingOverwriteConfirm = null;
 });
 document.getElementById("confirm-overwrite-ok").addEventListener("click", async () => {
@@ -2028,6 +2445,7 @@ function clearImported(token, skipConfirm) {
 }
 
 async function performClearImported(item) {
+  const project = _activeProjectName;
   try {
     const res = await api("/api/delete_imported", {
       method: "POST",
@@ -2035,7 +2453,9 @@ async function performClearImported(item) {
       body: JSON.stringify({ game_rel: item.game_rel }),
     });
     if (res.ok) {
+      if (project !== _activeProjectName) return;
       delete sidebarData[item.token];
+      window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
       toast(`Deleted: ${item.name}`, "warning", 3000);
       renderGrid().catch(() => {});
@@ -2077,6 +2497,7 @@ document.getElementById("confirm-clear-all-cancel").addEventListener("click", ()
 });
 
 document.getElementById("confirm-clear-all-ok").addEventListener("click", async () => {
+  const project = _activeProjectName;
   document.getElementById("confirm-clear-all-overlay").classList.remove("active");
   try {
     const res = await api("/api/delete_all_imported", {
@@ -2085,7 +2506,9 @@ document.getElementById("confirm-clear-all-ok").addEventListener("click", async 
       body: JSON.stringify({}),
     });
     if (res.ok) {
+      if (project !== _activeProjectName) return;
       sidebarData = {};
+      window.AtelierEmptyAssetsUI?.confirmed(project, 0);
       renderSidebar();
       toast(`Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`, "warning", 4000);
       renderGrid().catch(() => {});
@@ -2677,6 +3100,18 @@ _ctxFileInput.addEventListener("change", async () => {
 
 function _ctxItemsCard(card) {
   const items = [];
+  if (AtelierLibraryTools.supportsPreview(card)) items.push({icon: card.file_type === 'mesh' ? 'box' : 'search',
+    label: card.file_type === 'mesh' ? 'Preview in 3D' : 'Quick preview',
+    action: () => previewLibraryCard(card, document.activeElement)});
+  if (card.type === "folder") {
+    if (window.AtelierLibraryPins && card.rel_path) items.push({
+      icon: "pin", label: window.AtelierLibraryPins.isPinned(card.rel_path) ? "Unpin from home" : "Pin to home",
+      action: () => window.AtelierLibraryPins.toggle(card),
+    });
+    return items;
+  }
+  if (card.file_type === "texture") items.push({icon: "refresh-cw", label: "Retry preview",
+    action: () => buildGrid(allItems.map(_makeCard), true)});
   if (!card.imported) {
     items.push({ icon: card.file_type === "mesh" ? "box" : "download", label: card.file_type === "mesh" ? "View in 3D" : "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
     if (card.file_type === "mesh" && card.game_rel)
@@ -3245,6 +3680,7 @@ async function _projExportRun(names) {
 }
 
 function _applyActiveProject(name) {
+  window.AtelierEmptyAssetsUI?.begin();
   _activeProjectName = name;
   const modInput = document.getElementById("mod-name-input");
   modInput.value       = name;
@@ -3258,6 +3694,8 @@ async function _selectProject(name) {
     toast("Close the active editor before switching projects.", "info");
     return;
   }
+  AtelierLibraryTools.closePreview();
+  AtelierLibraryTools.resetFilters(false);
   const r = await api("/api/project/select", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),

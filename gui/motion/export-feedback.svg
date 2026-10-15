@@ -1,0 +1,27 @@
+<!--
+  Atelier — Export Feedback Static Vector
+  Adapted from Google Material Symbols Rounded ("download"), licensed under the Apache License, Version 2.0:
+  Atelier studio adaptation uses squared corners and sharp joins; not an unmodified official Sharp glyph.
+  http://www.apache.org/licenses/LICENSE-2.0
+-->
+<svg xmlns="http://www.w3.org/2000/svg" class="am-export-feedback-svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false">
+  <g class="am-export-feedback-tray-group">
+    <rect class="am-export-feedback-well" x="5.5" y="13.5" width="13" height="5" rx="0" opacity="0.12" />
+    <rect class="am-export-feedback-payload" x="8" y="15.25" width="8" height="2" rx="0" opacity="0" />
+    <path class="am-export-feedback-tray" d="M4 15H6V18H18V15H20V20H4Z" />
+  </g>
+  <g class="am-export-feedback-arrow-group">
+    <path class="am-export-feedback-arrow" d="M11 4H13V12L15.5 9.5L17 11L12 16L7 11L8.5 9.5L11 12Z" />
+  </g>
+  <g class="am-export-feedback-outcome am-export-feedback-outcome-success" opacity="0">
+    <circle cx="12" cy="9.75" r="5.25" opacity="0.12" />
+    <path class="am-export-feedback-check-path" pathLength="1" d="M8.5 10.1L11.0 12.6L15.75 7.35" fill="none" stroke="currentColor" stroke-width="2.35" stroke-linecap="butt" stroke-linejoin="miter" stroke-dasharray="1" stroke-dashoffset="1" />
+  </g>
+  <g class="am-export-feedback-outcome am-export-feedback-outcome-warning" opacity="0">
+    <path d="M12 3.5L18.35 14.5H5.65ZM11 7V10H13V7ZM11 11.5V13H13V11.5Z" fill-rule="evenodd" />
+  </g>
+  <g class="am-export-feedback-outcome am-export-feedback-outcome-error" opacity="0">
+    <circle cx="12" cy="9.75" r="5.25" opacity="0.12" />
+    <path class="am-export-feedback-error-stroke" d="M9.35 7.1L14.65 12.4M14.65 7.1L9.35 12.4" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="butt" stroke-linejoin="miter" />
+  </g>
+</svg>

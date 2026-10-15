@@ -298,6 +298,22 @@ _active_project = _cfg.get("active_project", "")
 _operation_root = ContextVar("atelier_project_root", default=None)
 
 
+def _path_comparison_key(path):
+    """Compare resolved Windows paths with or without an extended-length prefix.
+
+    During directory creation realpath() can preserve the prefix on only one operand.
+    Normalize the drive/UNC spelling for containment checks, never for file I/O.
+    Other device namespaces are deliberately not treated as ordinary paths.
+    """
+    path = os.path.normcase(path)
+    if os.path.sep == "\\":
+        if path.startswith("\\\\?\\unc\\"):
+            return "\\\\" + path[8:]
+        if re.match(r"^\\\\\?\\[a-z]:\\", path):
+            return path[4:]
+    return path
+
+
 def project_dir(name, root=None, must_exist=False):
     """A plain project name directly inside the project root, never an alias outside it."""
     if (not isinstance(name, str) or not name or name in (".", "..")
@@ -307,7 +323,7 @@ def project_dir(name, root=None, must_exist=False):
         raise ValueError("invalid project name")
     root = os.path.realpath(root or PROJECTS_ROOT)
     path = os.path.join(root, name)
-    if os.path.normcase(os.path.dirname(os.path.realpath(path))) != os.path.normcase(root):
+    if _path_comparison_key(os.path.dirname(os.path.realpath(path))) != _path_comparison_key(root):
         raise ValueError("project must be inside the projects folder")
     if must_exist and not os.path.isdir(path):
         raise ValueError("project not found")
@@ -349,7 +365,8 @@ def project_base(game_rel, root=None):
     parts = validate_game_rel(game_rel)
     root = os.path.realpath(root or get_import_root())
     path = os.path.join(root, *parts)
-    if os.path.commonpath([os.path.normcase(root), os.path.normcase(os.path.realpath(path))]) != os.path.normcase(root):
+    root_key = _path_comparison_key(root)
+    if os.path.commonpath([root_key, _path_comparison_key(os.path.realpath(path))]) != root_key:
         raise ValueError("asset must be inside the project folder")
     return path
 

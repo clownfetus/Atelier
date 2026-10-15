@@ -1,4 +1,4 @@
-/* ── reset / tokens ── */
+/* â”€â”€ reset / tokens â”€â”€ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 /* Shared design roles live in tokens.css; keep editor layout rules here. */
 html, body { height: 100%; overflow: hidden; }
@@ -10,18 +10,18 @@ body {
   flex-direction: column;
 }
 
-/* ── scrollbar ── */
+/* â”€â”€ scrollbar â”€â”€ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
-/* ── top bar ── */
+/* â”€â”€ top bar â”€â”€ */
 #topbar {
   display: flex;
   align-items: center;
   gap: 0;
   padding: 0 20px;
-  height: 64px;
+  height: 56px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -37,7 +37,7 @@ body {
   width: 36px; height: 36px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--studio-shape-full);
+  border-radius: var(--studio-shape-small);
   color: var(--muted);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -77,9 +77,9 @@ body {
   height: 36px; padding: 0 12px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--studio-shape-full);
+  border-radius: var(--studio-shape-small);
   color: var(--muted);
-  font-size: 13px; font-weight: 600;
+  font-size: 13px; font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
   margin-right: 16px;
@@ -93,10 +93,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg3);
-  border: 1px solid transparent;
-  border-radius: var(--studio-shape-full);
-  padding: 0 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-small);
+  padding: 0 10px;
   transition: border-color .15s;
 }
 #searchbar:focus-within { border-color: var(--blue); }
@@ -107,12 +107,12 @@ body {
   border: none;
   color: var(--text);
   font: inherit;
-  padding: 10px 0;
+  padding: 7px 0;
 }
 #search-input:focus { outline: none; }
-#search-input::placeholder { color: var(--muted); font-weight: 500; }
+#search-input::placeholder { color: var(--muted); font-weight: 400; }
 
-/* ── body layout ── */
+/* â”€â”€ body layout â”€â”€ */
 #body {
   display: flex;
   flex: 1;
@@ -122,7 +122,7 @@ body {
   gap: 0;
 }
 
-/* ── explorer pane ── */
+/* â”€â”€ explorer pane â”€â”€ */
 #explorer {
   flex: 1;
   display: flex;
@@ -143,6 +143,7 @@ body {
   flex-wrap: wrap;
   gap: var(--studio-space-3);
   align-content: flex-start;
+  align-items: flex-start;
 }
 .card {
   width: var(--card-w);
@@ -151,19 +152,19 @@ body {
   border-radius: var(--studio-shape-large);
   padding: 10px;
   cursor: pointer;
-  transition: border-color .15s, background .15s, transform .1s;
+  transition: border-color .15s, background .15s;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
 }
 .card:hover { border-color: var(--acc); background: var(--bg3); }
-.card.imported { border-color: var(--green); }
+.card.imported { border-color: color-mix(in srgb, var(--green) 55%, transparent); }
 .card.imported:hover { border-color: var(--green); }
 .card-thumb {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: var(--studio-shape-medium);
+  border-radius: var(--studio-shape-small);
   background: var(--bg3);
   display: flex;
   align-items: center;
@@ -180,43 +181,73 @@ body {
 }
 .card-thumb img.hero-portrait { object-fit: cover; image-rendering: auto; opacity: 0; transition: opacity var(--studio-motion-standard) var(--studio-easing); }
 .card-thumb img.hero-portrait.loaded { opacity: 1; }
-.card:hover .hero-portrait { transform: scale(1.035); }
-.card .hero-portrait { transition: opacity var(--studio-motion-standard) var(--studio-easing), transform 240ms var(--studio-easing); }
-.card:active { transform: scale(.98); }
+.card:active { background: var(--md-sys-color-primary-container); }
 .card-thumb .card-icon {
   color: var(--muted);
   width: 76%; height: 76%;
   opacity: 1;
 }
-.card-thumb .card-icon.folder-icon         { color: var(--yellow); opacity: 1; }
-.card-thumb .card-icon.char-icon           { color: var(--studio-texture);       opacity: 1; }
-.card-thumb .card-icon.ui-folder-icon      { color: var(--acc);       opacity: 1; }
-.card-thumb .card-icon.texture-folder-icon  { color: var(--studio-texture);       opacity: 1; }
-.card-thumb .card-icon.texture-icon         { color: var(--studio-texture);       opacity: 1; }
-.card-thumb .card-icon.vfx-icon             { color: var(--studio-vfx);       opacity: 1; }
-.card-thumb .card-icon.vfx-folder-icon      { color: var(--studio-vfx);       opacity: 1; }
-.card-thumb .card-icon.material-folder-icon { color: var(--green);       opacity: 1; }
-.card-thumb .card-icon.material-icon        { color: var(--green);       opacity: 1; }
-.card-thumb .card-icon.curve-icon           { color: var(--yellow);       opacity: 1; }
-.card-thumb .card-icon.mesh-folder-icon     { color: var(--studio-mesh);       opacity: 1; }
-.card-thumb .card-icon.mesh-icon            { color: var(--studio-mesh);       opacity: 1; }
-.card-thumb .card-icon.text-folder-icon     { color: var(--yellow); opacity: 1; }
-.card-thumb .card-icon.nameplate-folder-icon{ color: var(--blue);      opacity: 1; }
-.card-thumb .card-icon.plugin-folder-icon   { color: var(--studio-vfx);      opacity: 1; }
-.card-thumb .card-icon.text-icon            { color: var(--yellow); opacity: 1; }
-.card-thumb .card-icon.unhandled-icon      { color: var(--muted);  opacity: .7; }
+.card-icon.folder-icon          { color: var(--studio-icon-folder); }
+.card-icon.char-icon            { color: var(--studio-icon-character); }
+.card-icon.ui-folder-icon       { color: var(--studio-icon-ui); }
+.card-icon.texture-folder-icon,
+.card-icon.texture-icon         { color: var(--studio-icon-texture); }
+.card-icon.vfx-folder-icon,
+.card-icon.vfx-icon             { color: var(--studio-icon-vfx); }
+.card-icon.material-folder-icon,
+.card-icon.material-icon        { color: var(--studio-icon-material); }
+.card-icon.curve-icon           { color: var(--studio-icon-curve); }
+.card-icon.mesh-folder-icon,
+.card-icon.mesh-icon            { color: var(--studio-icon-mesh); }
+.card-icon.text-folder-icon,
+.card-icon.text-icon            { color: var(--studio-icon-text); }
+.card-icon.nameplate-folder-icon { color: var(--studio-icon-nameplate); }
+.card-icon.plugin-folder-icon    { color: var(--studio-icon-plugin); }
+.card-icon.weapon-folder-icon    { color: var(--studio-icon-weapon); }
+.card-icon.unhandled-icon        { color: var(--studio-icon-unknown); }
+.card-icon.animation-folder-icon { color: var(--studio-icon-animation); }
+.card-icon.audio-folder-icon     { color: var(--studio-icon-audio); }
+.card-icon.map-folder-icon,
+.card-icon.sky-folder-icon       { color: var(--studio-icon-map); }
+.card-icon.light-folder-icon     { color: var(--studio-icon-light); }
+.card-icon.blueprint-folder-icon,
+.card-icon.ai-folder-icon,
+.card-icon.code-folder-icon,
+.card-icon.pipeline-folder-icon  { color: var(--studio-icon-logic); }
+.card-icon.ability-folder-icon   { color: var(--studio-icon-vfx); }
+.card-icon.physics-folder-icon,
+.card-icon.shapes-folder-icon,
+.card-icon.deformer-folder-icon  { color: var(--studio-icon-mesh); }
+.card-icon.controls-folder-icon,
+.card-icon.tools-folder-icon     { color: var(--studio-icon-tools); }
+.card-icon.data-folder-icon,
+.card-icon.statistics-folder-icon { color: var(--studio-icon-data); }
+.card-icon.environment-folder-icon { color: var(--studio-icon-environment); }
+.card-icon.font-folder-icon,
+.card-icon.language-folder-icon  { color: var(--studio-icon-text); }
+.card-icon.movie-folder-icon     { color: var(--studio-icon-movie); }
+.card-icon.resources-folder-icon { color: var(--studio-icon-folder); }
+.card-icon.security-folder-icon  { color: var(--studio-icon-unknown); }
+.card-icon.mobile-folder-icon,
+.card-icon.vr-folder-icon        { color: var(--studio-icon-ui); }
+.card-icon.prototype-folder-icon { color: var(--studio-icon-curve); }
 .card-name {
-  font-size: 12px;
-  font-weight: 500;
+  font: var(--studio-type-label);
   color: var(--text);
-  text-align: center;
+  text-align: left;
   word-break: break-word;
   line-height: 1.35;
   width: 100%;
+  /* Keep rows aligned; the card title and accessible name retain the full label. */
+  min-height: 2.7em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .card.imported .card-name { color: var(--text); }
 
-/* ── bottom bar ── */
+/* â”€â”€ bottom bar â”€â”€ */
 #bottombar {
   padding: 10px 18px;
   background: var(--bg2);
@@ -229,7 +260,7 @@ body {
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 16px;
-  border-radius: var(--studio-shape-full);
+  border-radius: var(--studio-shape-small);
   border: 1px solid var(--border2);
   background: transparent;
   color: var(--acc);
@@ -245,7 +276,7 @@ body {
 .btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
 #status-msg { font-size: 12px; color: var(--muted); flex: 1; }
 
-/* ── sidebar resize handle ── */
+/* â”€â”€ sidebar resize handle â”€â”€ */
 #sidebar-resize {
   width: 12px;
   background: transparent;
@@ -255,7 +286,7 @@ body {
 }
 #sidebar-resize:hover, #sidebar-resize.dragging { background: var(--acc); }
 
-/* ── export sidebar ── */
+/* â”€â”€ export sidebar â”€â”€ */
 #sidebar {
   width: 300px;
   min-width: 240px;
@@ -331,7 +362,7 @@ body {
 .sb-thumb img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .sb-info { flex: 1; min-width: 0; }
 .sb-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-sub  { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-sub  { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-check {
   width: 30px; height: 30px;
   border: none;
@@ -422,7 +453,7 @@ body {
   min-width: 22px;
   height: 22px;
   padding: 0 5px;
-  border-radius: 11px;
+  border-radius: var(--studio-shape-small);
   background: var(--bg3);
   border: 1px solid var(--border2);
   font-size: 11px;
@@ -438,7 +469,7 @@ body {
   color: var(--acc2);
 }
 
-/* ── overlay ── */
+/* â”€â”€ overlay â”€â”€ */
 .overlay {
   display: none;
   position: fixed; inset: 0;
@@ -485,7 +516,7 @@ body {
 .modal .warning { color: var(--yellow); font-size: 12px; display: flex; align-items: flex-start; gap: 6px; }
 .modal-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
 
-/* ── progress overlay ── */
+/* â”€â”€ progress overlay â”€â”€ */
 #prog-overlay { pointer-events: all; }
 #usmap-update-overlay { pointer-events: all; }
 #usmap-update-box {
@@ -529,7 +560,7 @@ body {
 }
 #prog-counter { font-size: 13px; color: var(--muted); }
 
-/* ── toast ── */
+/* â”€â”€ toast â”€â”€ */
 #toast-area {
   position: fixed;
   bottom: 24px;
@@ -561,7 +592,7 @@ body {
 .toast.warning { border-color: var(--yellow); }
 @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
 
-/* ── loading spinner ── */
+/* â”€â”€ loading spinner â”€â”€ */
 .spinner {
   width: 20px; height: 20px;
   border: 2.5px solid var(--border);
@@ -580,7 +611,7 @@ body {
 }
 #empty-state i { display: block; margin: 0 auto 12px; }
 
-/* ── setup modal ── */
+/* â”€â”€ setup modal â”€â”€ */
 .setup-field { display: flex; flex-direction: column; gap: 5px; }
 .setup-label {
   display: flex; align-items: baseline; gap: 8px;
@@ -656,7 +687,7 @@ body {
 .setup-field-status.ok    { color: var(--green); }
 .setup-field-status.error { color: var(--acc2); }
 
-/* ── material parameter editor ── */
+/* â”€â”€ material parameter editor â”€â”€ */
 .mat-modal { max-width: 660px; width: calc(100% - 40px); max-height: 86vh;
              padding: 0; gap: 0; overflow: hidden; }
 .mat-head { display: flex; align-items: flex-start; justify-content: space-between;
@@ -696,7 +727,7 @@ body {
 .mat-section.with-ctl .seg { margin-left: auto; }
 
 /* segmented switch (preview mode, colour notation) */
-.seg { display: inline-flex; border: 1px solid var(--border2); border-radius: var(--studio-shape-full); overflow: hidden; }
+.seg { display: inline-flex; border: 1px solid var(--border2); border-radius: var(--studio-shape-small); overflow: hidden; }
 .seg-btn { font: var(--studio-type-detail); min-height: 28px;
            padding: 4px 10px; background: transparent; color: var(--muted); border: 0; cursor: pointer; }
 .seg-btn + .seg-btn { border-left: 1px solid var(--border2); }
@@ -738,7 +769,7 @@ body {
 .sb-bulk button.danger { border-color: var(--md-sys-color-error); color: var(--md-sys-color-error); }
 .sb-bulk button:hover { filter: brightness(1.25); }
 
-/* ── project picker ── */
+/* â”€â”€ project picker â”€â”€ */
 .proj-modal {
   max-width: 660px;
   width: calc(100% - 40px);
@@ -832,16 +863,16 @@ body {
 .proj-empty i { color: var(--border2); }
 .proj-card {
   width: 156px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: var(--bg2);
+  border: 1px solid transparent;
+  border-radius: var(--studio-shape-medium);
   overflow: hidden;
   cursor: pointer;
   transition: border-color .15s, background .15s;
   position: relative;
   flex-shrink: 0;
 }
-.proj-card:hover { border-color: var(--acc); }
+.proj-card:hover { border-color: var(--border); background: var(--bg3); }
 .proj-thumb {
   width: 100%;
   aspect-ratio: 1;
@@ -953,7 +984,7 @@ body {
 /* the bulk confirmations list the projects on their own line */
 #proj-delete-msg, #proj-export-msg { white-space: pre-line; }
 
-/* ── context menu ── */
+/* â”€â”€ context menu â”€â”€ */
 #ctx-menu {
   position: fixed;
   z-index: 400;
@@ -983,16 +1014,16 @@ body {
 .ctx-item.danger:hover { background: var(--md-sys-color-error-container); }
 .ctx-sep { height: 1px; background: var(--border); margin: 3px 4px; }
 
-/* ── 3D viewport trigger (floating, bottom-center) + in-popup Blender button share this pill look ── */
+/* â”€â”€ 3D viewport trigger (floating, bottom-center) + in-popup Blender button share this pill look â”€â”€ */
 #view3d-fab, #viewport-blender-btn {
   align-items: center; gap: 8px;
-  padding: 10px 22px; border-radius: 999px;
+  padding: 9px 16px; border-radius: var(--studio-shape-medium);
   background: var(--acc); color: var(--md-sys-color-on-primary); border: none; cursor: pointer;
-  font-size: 13px; font-weight: 600; letter-spacing: .3px;
+  font: var(--studio-type-label);
   box-shadow: var(--studio-shadow);
-  transition: filter .15s ease, transform .15s ease;
+  transition: background-color var(--studio-motion-fast) var(--studio-easing);
 }
-#view3d-fab:hover, #viewport-blender-btn:hover { filter: brightness(1.12); }
+#view3d-fab:hover, #viewport-blender-btn:not(:disabled):hover { background: var(--studio-primary-hover); }
 #viewport-blender-btn:disabled { opacity: .5; cursor: default; filter: none; }
 
 #view3d-fab {
@@ -1000,9 +1031,8 @@ body {
   z-index: 150; display: none;
 }
 #view3d-fab.show { display: inline-flex; }
-#view3d-fab:hover { transform: translateX(-50%) translateY(-1px); }
 
-/* ── 3D viewport ── */
+/* â”€â”€ 3D viewport â”€â”€ */
 #viewport-box {
   width: 92vw; height: 90vh;
   background: var(--bg2);
@@ -1096,7 +1126,7 @@ body {
 #viewport-mat-foot #viewport-mat-save { background: var(--acc); color: var(--md-sys-color-on-primary); border-color: var(--acc); }
 #viewport-mat-save:disabled { opacity: .5; cursor: default; filter: none; }
 
-/* ── Shader Studio ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Shader Studio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .shader-modal {
   width: 92vw; height: 88vh; max-width: 1500px; padding: 0;
   display: flex; flex-direction: column; overflow: hidden;
@@ -1186,7 +1216,7 @@ body {
 }
 .shader-loading { display: flex; align-items: center; gap: 10px; padding: 16px; color: var(--muted); font-size: 12px; }
 
-/* Shader Studio — properties panel + tabs */
+/* Shader Studio â€” properties panel + tabs */
 #shader-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--border); }
 .sh-tab {
   display: flex; align-items: center; gap: 5px; background: none; border: none;
@@ -1221,7 +1251,7 @@ body {
 }
 .sh-pval:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Shader Studio — edit tab */
+/* Shader Studio â€” edit tab */
 #shader-edit { flex: 1; overflow: auto; padding: 12px 16px; display: none; }
 .sh-eval {
   width: 120px; background: var(--bg); border: 1px solid var(--border2); border-radius: 5px;
@@ -1230,7 +1260,7 @@ body {
 .sh-eval:focus { border-color: var(--acc); outline: none; }
 .sh-buildrow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 
-/* Shader Studio — used badge + sticky build row */
+/* Shader Studio â€” used badge + sticky build row */
 .sh-used {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
@@ -1241,7 +1271,7 @@ body {
   padding: 12px 0 4px; margin-top: 12px; border-top: 1px solid var(--border);
 }
 
-/* Shader Studio — IR text editor */
+/* Shader Studio â€” IR text editor */
 .sh-ir {
   width: 100%; min-height: 52vh; display: block;
   background: var(--md-sys-color-surface-container-lowest); color: var(--text);
@@ -1252,7 +1282,7 @@ body {
 .sh-ir:focus { border-color: var(--acc); outline: none; }
 .sh-note code { font-family: ui-monospace, monospace; color: var(--acc2); }
 
-/* Phase 4 — per-asset export options, and the "what did my install actually ship" note */
+/* Phase 4 â€” per-asset export options, and the "what did my install actually ship" note */
 .muted { color: var(--muted); }
 
 .setup-note {
@@ -1281,7 +1311,7 @@ body {
   border-radius: 3px; padding: 0 4px; vertical-align: 1px;
 }
 
-/* ── shared desktop foundation ── */
+/* â”€â”€ shared desktop foundation â”€â”€ */
 button, input, select, textarea { font-family: var(--studio-font); }
 button, select { font-weight: 500; }
 input, select, textarea { accent-color: var(--acc); }
@@ -1289,21 +1319,21 @@ button:disabled { cursor: default; }
 button svg, .btn svg { flex-shrink: 0; width: var(--studio-icon-size); height: var(--studio-icon-size); }
 .studio-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .studio-brand { display: flex; align-items: center; gap: 10px; margin-right: 24px; flex-shrink: 0; }
-.studio-brand span { font-size: 20px; font-weight: 650; letter-spacing: -.5px; }
+.studio-brand span { font-size: 18px; font-weight: 600; letter-spacing: -.35px; }
 .studio-brand img { display: block; object-fit: contain; }
 .theme-control { display: flex; align-items: center; gap: 6px; margin-left: 12px; color: var(--muted); }
-.theme-control select { background: transparent; color: var(--text); border: 0; padding: 8px 2px; font-size: 12px; cursor: pointer; }
+.theme-control select { min-height: 36px; background: transparent; color: var(--text); border: 0; border-radius: var(--studio-shape-small); padding: 8px 2px; font-size: 12px; cursor: pointer; }
 .theme-control option { color: var(--text); background: var(--bg2); }
 kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px; }
-.library-heading { display: flex; align-items: baseline; gap: 12px; padding: 20px 20px 0; flex-shrink: 0; }
+.library-heading { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .library-heading h1 { font: var(--studio-type-title); }
 #library-count { font: var(--studio-type-detail); color: var(--muted); }
 .field-label { font: var(--studio-type-detail); color: var(--muted); }
-.sidebar-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 20px; text-align: center; color: var(--muted); font: var(--studio-type-detail); }
+.sidebar-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 24px 16px; text-align: left; color: var(--muted); font: var(--studio-type-detail); }
 .sidebar-empty strong { color: var(--text); font-weight: 500; font-size: 14px; }
-.sidebar-empty svg { width: 36px; height: 36px; margin-bottom: 4px; color: var(--acc); }
+.sidebar-empty svg { width: 24px; height: 24px; margin-bottom: 4px; color: var(--muted); }
 .toggle-row { min-height: 32px; font-weight: 400; }
-#sel-count { min-width: 28px; height: 28px; }
+#sel-count { min-width: 26px; height: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
 #sidebar-resize:hover, #sidebar-resize.dragging { background: color-mix(in srgb, var(--acc) 24%, transparent); border-radius: var(--studio-shape-full); }
 #mod-name-input, .setup-input { min-height: var(--studio-control-height); }
 .setup-label { font: var(--studio-type-detail); }
@@ -1311,11 +1341,11 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .setup-section, .mat-section { font-weight: 500; }
 .modal:not(.setup-modal):not(.mat-modal):not(.proj-modal):not(.shader-modal) { max-height: calc(100vh - 40px); overflow-y: auto; }
 .overlay.active > :first-child { animation: dialogIn var(--studio-motion-standard) var(--studio-easing); }
-@keyframes dialogIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes dialogIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .btn, .nav-btn, .card, .menu-btn, .ctx-item, .proj-card {
-  transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), border-radius var(--studio-motion-fast) var(--studio-easing), transform var(--studio-motion-fast) var(--studio-easing);
+  transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing);
 }
-.btn:not(:disabled):active, .menu-btn:active { border-radius: var(--studio-shape-medium); }
+.btn:not(:disabled):active, .menu-btn:active { box-shadow: inset 0 0 0 1px currentColor; }
 .btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }
 .btn.danger.primary { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); border-color: transparent; }
 .ctx-item { width: 100%; border: 0; background: transparent; font-family: inherit; text-align: left; min-height: 36px; }
@@ -1330,7 +1360,7 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 #viewport-box { border-radius: var(--studio-shape-dialog); }
 #viewport-chroma-row { padding: 10px 14px; font: var(--studio-type-detail); }
 #viewport-chroma { width: 100%; margin-top: 6px; padding: 6px; border: 1px solid var(--border2); border-radius: var(--studio-shape-small); background: var(--bg3); color: var(--text); }
-#viewport-mat-foot button { min-height: var(--studio-control-height); border-radius: var(--studio-shape-full); font-family: inherit; }
+#viewport-mat-foot button { min-height: var(--studio-control-height); border-radius: var(--studio-shape-small); font-family: inherit; }
 
 /* Kept last: editors previously suppressed native outlines. */
 :focus-visible { outline: 2px solid var(--acc) !important; outline-offset: 3px; }

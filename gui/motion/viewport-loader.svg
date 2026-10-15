@@ -1,0 +1,52 @@
+<!--
+  Atelier — 3D Viewport Loader Static Vector
+  Framing proportions inspired by Google Material Symbols Rounded ("box"), licensed under the Apache License, Version 2.0:
+  Atelier studio adaptation uses squared corners and sharp joins; not an unmodified official Sharp glyph.
+  http://www.apache.org/licenses/LICENSE-2.0
+-->
+<svg xmlns="http://www.w3.org/2000/svg" class="am-viewport-loader-svg" viewBox="0 0 48 48" width="72" height="72" fill="none" aria-hidden="true" focusable="false">
+  <!-- Outer framing corner ticks -->
+  <g class="am-viewport-loader-brackets" stroke="currentColor" stroke-width="1.75" stroke-linecap="butt" stroke-linejoin="miter" opacity="0.38">
+    <path d="M 8 14 V 8 H 14" />
+    <path d="M 34 8 H 40 V 14" />
+    <path d="M 40 34 V 40 H 34" />
+    <path d="M 14 40 H 8 V 34" />
+  </g>
+
+  <!-- Isometric cube assembly group -->
+  <g class="am-viewport-loader-cube-group">
+    <!-- Subtle tonal top face -->
+    <polygon class="am-viewport-loader-top-face" points="24,11 35.25,17.5 24,24 12.75,17.5" fill="currentColor" opacity="0.08" />
+
+    <!-- Rear inverted-Y wireframe ribs -->
+    <g class="am-viewport-loader-rear-group">
+      <path class="am-viewport-loader-rear-ribs" pathLength="1" d="M 24 11 L 24 24 M 12.75 30.5 L 24 24 L 35.25 30.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="butt" stroke-linejoin="miter" opacity="0.32" />
+    </g>
+
+    <!-- Active isometric turn equator ring (used during loading loop) -->
+    <ellipse class="am-viewport-loader-orbit-ring" pathLength="1" cx="24" cy="24" rx="11.25" ry="6.5" stroke="#accbff" stroke-width="1.85" stroke-linecap="round" stroke-dasharray="0.28 0.72" stroke-dashoffset="0" opacity="0" />
+
+    <!-- Outer hexagonal hull -->
+    <path class="am-viewport-loader-hull" pathLength="1" d="M 24 11 L 35.25 17.5 L 35.25 30.5 L 24 37 L 12.75 30.5 L 12.75 17.5 Z" stroke="currentColor" stroke-width="2.15" stroke-linecap="butt" stroke-linejoin="miter" />
+
+    <!-- Front Y-junction wireframe ribs -->
+    <g class="am-viewport-loader-front-group">
+      <path class="am-viewport-loader-front-ribs" pathLength="1" d="M 12.75 17.5 L 24 24 L 35.25 17.5 M 24 24 L 24 37" stroke="currentColor" stroke-width="2.15" stroke-linecap="butt" stroke-linejoin="miter" />
+    </g>
+
+    <!-- Center vertex node -->
+    <circle class="am-viewport-loader-vertex-core" cx="24" cy="24" r="1.75" fill="currentColor" />
+  </g>
+
+  <!-- Static outcome: Empty (no meshes found) -->
+  <g class="am-viewport-loader-outcome am-viewport-loader-outcome-empty" opacity="0">
+    <circle cx="24" cy="24" r="5.5" fill="#14161b" stroke="currentColor" stroke-width="1.75" />
+    <path d="M 21.5 24 H 26.5" stroke="currentColor" stroke-width="2" stroke-linecap="butt" />
+  </g>
+
+  <!-- Static outcome: Error (mesh decode failed) -->
+  <g class="am-viewport-loader-outcome am-viewport-loader-outcome-error" opacity="0">
+    <circle cx="24" cy="24" r="6" fill="#14161b" stroke="currentColor" stroke-width="1.85" />
+    <path d="M 21.75 21.75 L 26.25 26.25 M 26.25 21.75 L 21.75 26.25" stroke="currentColor" stroke-width="2.1" stroke-linecap="butt" stroke-linejoin="miter" />
+  </g>
+</svg>

@@ -10,6 +10,10 @@ def run_design_checks(page, context, url, report, checks):
         picker.select_option(theme)
         assert page.locator('html').get_attribute('data-theme') == theme
         assert page.locator('#settings-theme').input_value() == theme
+        # Restyling must retain the large creative preview.
+        card = page.locator('#grid-area .card').first
+        assert card.bounding_box()['width'] == 156
+        assert card.locator('.card-thumb').bounding_box()['width'] == 134
         # Measure actual computed roles, including the brightest container background.
         contrast = page.evaluate('''() => {
           const css = getComputedStyle(document.documentElement);
@@ -59,6 +63,14 @@ def run_design_checks(page, context, url, report, checks):
     page.locator('#grid-area .card').first.focus()
     assert page.locator('#grid-area .card').first.evaluate('(el)=>getComputedStyle(el).outlineStyle') == 'solid'
     assert page.locator('#grid-area .card .studio-icon').first.evaluate('(el)=>el.getBoundingClientRect().width') > 90
+    card = page.locator('#grid-area .card').first
+    card.hover()
+    page.mouse.down()
+    try:
+        assert card.evaluate('el=>getComputedStyle(el).transform') == 'none'
+    finally:
+        page.mouse.move(1, 1)
+        page.mouse.up()
     missing = page.evaluate('''() => [...document.querySelectorAll('[data-lucide]')]
       .map(el=>el.dataset.lucide).filter(name=>!AtelierSymbolPaths[name])''')
     assert not missing, missing

@@ -176,7 +176,56 @@ function disposeTree(obj) {
   });
 }
 
+// The loader is optional presentation. Its errors must never block model decoding.
+let viewportLoaderMotion = null;
+
+function destroyViewportLoader() {
+  const motion = viewportLoaderMotion;
+  viewportLoaderMotion = null;
+  try { motion?.destroy(); } catch (e) { console.warn('viewport: loader cleanup failed', e); }
+  const host = $('viewport-loading-motion-host');
+  host?.replaceChildren();
+  for (const attr of ['data-atelier-motion', 'data-am-state', 'data-am-reduced']) host?.removeAttribute(attr);
+  $('viewport-loading-slot')?.removeAttribute('data-am-mounted');
+}
+
+function setViewportLoaderFallback(state) {
+  const slot = $('viewport-loading-slot');
+  if (!slot) return;
+  slot.dataset.amState = state;
+  const fallback = slot.querySelector('.am-viewport-loader-fallback');
+  if (!fallback) return;
+  const icon = state === 'error' ? 'alert-triangle' : 'box';
+  if (fallback.dataset.icon === icon) return;
+  fallback.dataset.icon = icon;
+  fallback.innerHTML = `<i data-lucide="${icon}" size="72"></i>`;
+  try { window.AtelierIcons?.createIcons({nodes: [fallback]}); } catch (_) {}
+}
+
+function startViewportLoader() {
+  setViewportLoaderFallback('loading');
+  const host = $('viewport-loading-motion-host');
+  if (!host || !window.AtelierMotion?.viewportLoader) return;
+  try {
+    viewportLoaderMotion = window.AtelierMotion.viewportLoader.mount(host, {state: 'loading'});
+    $('viewport-loading-slot').dataset.amMounted = 'true';
+  } catch (e) {
+    destroyViewportLoader();
+    console.warn('viewport: loader unavailable', e);
+  }
+}
+
+function setViewportLoaderState(state) {
+  setViewportLoaderFallback(state);
+  try { viewportLoaderMotion?.setState(state); }
+  catch (e) {
+    destroyViewportLoader();
+    console.warn('viewport: loader unavailable', e);
+  }
+}
+
 function clearModel() {
+  destroyViewportLoader();
   generation++;   // invalidate any in-flight texture loads from the previous model
   materialGeneration++;
   for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
@@ -502,13 +551,27 @@ function buildPanel() {
       const row = document.createElement('div');
       const kind = idx === d.emiIdx ? ' emissive' : (idx === d.baseIdx ? ' base' : '');
       row.className = 'vp-param' + kind;
+      row.dataset.material = name; row.dataset.parameter = col.name;
       const inp = document.createElement('input');
       inp.type = 'color';
-      inp.value = linToHex(col.rgba);
+      inp.value = linToHex(edited[name]?.[col.name] || col.rgba);
+      inp.setAttribute('aria-label', `${name}: ${col.name}`);
       inp.addEventListener('input', () => onColorInput(name, col.name, inp.value));
       const lbl = document.createElement('span');
       lbl.textContent = col.name; lbl.title = col.name + (idx === d.emiIdx ? '  (glow — previews live)' : idx === d.baseIdx ? '  (base tint — previews live)' : '');
       row.appendChild(inp); row.appendChild(lbl);
+      const saved = document.createElement('button');
+      saved.className = 'vp-saved-swatch'; saved.type = 'button';
+      saved.style.setProperty('--vp-saved-color', linToHex(col.rgba));
+      saved.title = `Restore saved ${col.name}: ${col.rgba.map(v => +v.toFixed(4)).join(', ')}`;
+      saved.setAttribute('aria-label', saved.title);
+      saved.addEventListener('click', () => {
+        if (saving) return;
+        if (edited[name]) { delete edited[name][col.name]; if (!Object.keys(edited[name]).length) delete edited[name]; }
+        inp.value = linToHex(col.rgba);
+        retint(name); if (d.dyeable) dyeRebakeMesh(name); refreshFoot();
+      });
+      row.appendChild(saved);
       wrap.appendChild(row);
     });
     list.appendChild(wrap);
@@ -601,6 +664,21 @@ function refreshFoot() {
   const save = $('viewport-mat-save');
   save.disabled = saving || n === 0;
   save.textContent = saving ? 'Saving…' : n ? `Save recolors (${n})` : 'Save recolors';
+  const reset = $('viewport-mat-reset');
+  reset.textContent = 'Revert unsaved'; reset.title = 'Restore saved colors, preserving existing project edits';
+  reset.disabled = saving || n === 0;
+  document.querySelectorAll('#viewport-mat-list .vp-param').forEach(row => {
+    const changed = !!edited[row.dataset.material]?.[row.dataset.parameter];
+    row.classList.toggle('is-modified', changed);
+    const saved = row.querySelector('.vp-saved-swatch');
+    if (saved) saved.disabled = saving || !changed;
+  });
+  let hint = $('viewport-unsaved');
+  if (!hint) {
+    hint = document.createElement('span'); hint.id = 'viewport-unsaved'; hint.setAttribute('role', 'status');
+    save.parentElement.prepend(hint);
+  }
+  hint.textContent = n ? `${n} unsaved color${n === 1 ? '' : 's'}` : 'Colors saved · swatches compare saved values';
 }
 
 async function saveEdits() {
@@ -609,18 +687,19 @@ async function saveEdits() {
   if (!names.length) return;
   const draft = edited, gen = generation, project = viewportProject;
   const submitted = JSON.parse(JSON.stringify(edited));
+  const targets = Object.fromEntries(names.map(name => [name, matData[name]]));
   saving = true; refreshFoot();
   let ok = 0;
   const failed = [];
   for (const name of names) {
-    const d = matData[name];
+    const d = targets[name];
     try {
       const r = await projectFetch('/api/material_save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
       }, project).then(r => r.json());
       if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
-      ok++; d.colors = r.colors || d.colors;
+      ok++; d.colors = r.colors || d.colors.map(col => ({ ...col, rgba: submitted[name][col.name]?.slice() || col.rgba }));
       if (gen === generation && edited === draft) {
         for (const [param, rgba] of Object.entries(submitted[name])) {
           // A newer edit made during the request is still unsaved.
@@ -630,10 +709,32 @@ async function saveEdits() {
       }
     } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
   }
+  const ownsView = gen === generation && edited === draft && project === viewportProject;
+  const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);
+  const message = failed.length
+    ? `Saved ${ok}; ${failed.length} material(s) could not be saved. Unsaved recolors are retained; retry Save.`
+    : newerEdits ? 'Submitted changes saved; newer edits remain unsaved.'
+    : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`;
+  const state = failed.length || newerEdits ? 'warning' : 'success';
+  const currentProject = project === (window.atelierProject?.() || '');
+  // The singleton saving guard forbids another save until this operation finishes.
   saving = false;
-  note(failed.length ? `Saved ${ok}; ${failed.length} material(s) could not be saved. Unsaved recolors are retained; retry Save.`
-       : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`, failed.length ? 'warning' : 'success');
-  refreshFoot();
+  // Only the originating view owns its controls; old results keep their own notification.
+  if (ownsView) {
+    if (currentProject) $('viewport-status').textContent = message;
+    buildPanel();
+  }
+  const toastMessage = currentProject ? message : `${project}: ${message}`;
+  try {
+    if (typeof window.toastMaterialSave === 'function') {
+      window.toastMaterialSave(toastMessage, state, state === 'warning' ? 8000 : 3600);
+      return;
+    }
+  } catch (error) { console.warn('Viewport save feedback unavailable', error); }
+  try {
+    const escaped = toastMessage.replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
+    if (typeof window.toast === 'function') window.toast(escaped, state);
+  } catch (error) { console.warn('Viewport save notification unavailable', error); }
 }
 
 function revertEdits() {
@@ -679,11 +780,14 @@ async function open(skinId, title) {
   if (!raf) animate();
   clearModel();
   const gen = generation;
+  $('viewport-loading-msg').textContent = 'Decoding model…';
+  startViewportLoader();
 
   try {
     const meshes = await projectFetch(`/api/skin_meshes?skin_id=${encodeURIComponent(skinId)}`).then(r => r.json());
     if (gen !== generation) return;
     if (!Array.isArray(meshes) || !meshes.length) {
+      setViewportLoaderState('empty');
       $('viewport-loading-msg').textContent = 'No meshes found for this skin.';
       return;
     }
@@ -703,16 +807,23 @@ async function open(skinId, title) {
       } catch (e) { if (gen !== generation) return; console.warn('viewport: mesh load failed', meshes[i].name, e); }
     }
     $('viewport-status').textContent = loaded ? `${loaded} part${loaded !== 1 ? 's' : ''}` : '';
-    if (!loaded) { $('viewport-loading-msg').textContent = 'Failed to load meshes.'; return; }
+    if (!loaded) {
+      setViewportLoaderState('error');
+      $('viewport-loading-msg').textContent = 'Failed to load meshes.';
+      return;
+    }
     refreshBlenderBtn();
     buildObjectPanel();
     frameCamera();
+    setViewportLoaderState('ready');
+    destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
     loadMaterials(skinId);
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
     buildChromaPicker(skinId, meshes[0] && meshes[0].game_rel);
   } catch (e) {
     if (gen !== generation) return;
+    setViewportLoaderState('error');
     $('viewport-loading-msg').textContent = 'Error: ' + e.message;
   }
 }
@@ -734,6 +845,7 @@ async function openMesh(gameRel, name, skinId) {
   if (!raf) animate();
   clearModel();
   const gen = generation;
+  startViewportLoader();
   try {
     const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(gameRel)}`);
     if (gen !== generation) { disposeTree(gltf.scene); return; }
@@ -745,11 +857,14 @@ async function openMesh(gameRel, name, skinId) {
     buildObjectPanel();
     frameCamera();
     $('viewport-status').textContent = name || '';
+    setViewportLoaderState('ready');
+    destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
     loadMaterials(_sk);
     buildChromaPicker(_sk, gameRel);   // same "materials from" picker as the skin path
   } catch (e) {
     if (gen !== generation) return;
+    setViewportLoaderState('error');
     $('viewport-loading-msg').textContent = 'Failed to load: ' + (e && e.message || e);
   }
 }
@@ -767,4 +882,30 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('viewport-overlay').classList.contains('active')) close();
 });
 
-window.AtelierViewport = { open, openMesh, close };
+window.addEventListener('beforeunload', event => {
+  if (saving || Object.values(edited).some(params => Object.keys(params).length)) {
+    event.preventDefault(); event.returnValue = 'Preview recolors have unsaved changes.';
+  }
+});
+
+function hasPendingEdits() {
+  return saving || Object.values(edited).some(params => Object.keys(params).length);
+}
+
+function focusPendingEdits() {
+  if (!hasPendingEdits()) return;
+  $('viewport-overlay').classList.add('active');
+  const status = $('viewport-status');
+  status.textContent = saving ? 'Preview save in progress. Wait for it to finish before exporting.'
+    : 'Save or revert these unsaved preview recolors before exporting.';
+  status.setAttribute('role', 'status');
+  const save = $('viewport-mat-save');
+  if (!saving && !save.disabled && save.getClientRects().length) save.focus();
+  else { status.tabIndex = -1; status.focus(); }
+  if (inited) {
+    requestAnimationFrame(onResize);
+    if (!raf) animate();
+  }
+}
+
+window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits };
