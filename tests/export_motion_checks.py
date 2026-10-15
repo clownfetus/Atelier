@@ -139,7 +139,7 @@ def run_export_motion_checks(page, context, url, report, checks):
         run_export({'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}, 'success')
         assert requests[-1]['headers']['x-atelier-project'] == quote(args['project'], safe='')
         assert requests[-1]['body'] == {'mod_name': args['name'], 'items': ['Characters/Fixture/MI_Body'],
-                                        'password': 'test-password', 'copy_to_mods': True}
+                                        'password': 'test-password', 'copy_to_mods': True, 'background': True}
         run_export({'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}, 'warning', client_skipped=1)
         run_export({'ok': True, 'installed_dir': 'fixture/mods', 'skipped': ['A', 'B', 'C', 'D', 'E']}, 'warning')
         assert '+1 more' in motion_page.locator('#toast-area').inner_text()

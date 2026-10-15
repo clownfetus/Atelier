@@ -1,0 +1,20 @@
+.job-activity-button { flex: 0 0 auto; min-height: 32px; }
+.modal.job-modal, .modal.bulk-modal { width: min(800px, calc(100vw - 40px)); max-width: min(800px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; }
+.job-body, .bulk-body { display: grid; gap: 12px; margin: 16px 0; }
+.job-body p, .bulk-body p { margin: 4px 0; line-height: 1.5; }
+.job-row { border: 1px solid var(--border); padding: 14px; border-radius: 6px; }
+.job-state { float: right; font-size: 12px; color: var(--muted); text-transform: capitalize; }
+.job-row .btn { margin: 8px 8px 0 0; }
+.job-path, .bulk-path { font-size: 12px; overflow-wrap: anywhere; color: var(--muted); }
+.bulk-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.bulk-controls label { display: grid; gap: 6px; font-size: 12px; }
+.bulk-controls > [hidden] { display: none; }
+.bulk-controls select, .bulk-controls input { min-height: 36px; background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 6px; }
+.bulk-list { max-height: 220px; overflow: auto; border: 1px solid var(--border); padding: 8px; }
+.bulk-choice { display: grid; grid-template-columns: 20px 1fr; gap: 6px; padding: 6px; align-items: start; }
+.bulk-choice input { margin-top: 4px; }
+.bulk-results { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bulk-results td, .bulk-results th { text-align: left; border-bottom: 1px solid var(--border); padding: 8px; vertical-align: top; }
+.bulk-actions { display: flex; gap: 8px; justify-content: end; }
+#bulk-edit-open { margin: 0 12px 8px; }
+@media (max-width: 1100px) { .job-activity-button { padding: 4px 8px; font-size: 12px; } }

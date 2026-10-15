@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="/static/library-tools.css">
 <link rel="stylesheet" href="/static/material-workflow.css">
 <link rel="stylesheet" href="/static/export-review.css">
+<link rel="stylesheet" href="/static/job-tools.css">
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
 <link rel="stylesheet" href="/static/motion/viewport-loader.css">
 <link rel="stylesheet" href="/static/motion/folder-flap.css">
@@ -96,6 +97,7 @@
       <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
       <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
+    <button class="btn" id="bulk-edit-open" type="button">Bulk VFX / curves</button>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
@@ -205,8 +207,9 @@
     <div id="prog-counter" style="font-size:13px;color:var(--muted)">Downloading 0 / 0 assets…</div>
     <div class="warning" style="margin-top:4px">
       <i data-lucide="shield-alert" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>Edit in progress — closing this tab may leave assets in an incomplete state.</span>
+      <span>Completed assets are retained if cancelled. Check Activity after reopening this view.</span>
     </div>
+    <div class="bulk-actions"><button class="btn" id="import-hide" type="button">Hide</button><button class="btn" id="import-cancel" type="button">Cancel import</button></div>
   </div>
 </div>
 
@@ -773,6 +776,8 @@
 <script src="/static/thumbnails.js"></script>
 <script src="/static/library-tools.js"></script>
 <script src="/static/export-review.js"></script>
+<script src="/static/job-tools.js"></script>
+<script src="/static/bulk-edit.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

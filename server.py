@@ -20,5 +20,5 @@ if __name__ == "__main__":
     try:
         app.run(host="127.0.0.1", port=PORT, quiet=True, server=_ThreadedServer)
     finally:
-        _routes._observer.stop()
-        _routes._observer.join()
+        while not _routes.shutdown(5):
+            pass  # Finish a publication already in progress before process exit.

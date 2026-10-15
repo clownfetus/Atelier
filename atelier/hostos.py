@@ -208,12 +208,13 @@ def _prepare_dotnet_bundle(exe, env):
 def run_exe(args, **kw):
     """subprocess.run for a bundled tool (native build if installed, else Wine)."""
     argv, via_wine = _resolve(args)
+    from atelier.jobs import run_process
     native = None if via_wine or IS_WINDOWS else argv[0]
     if not via_wine or "stdin" in kw:
-        return subprocess.run(argv, **_prep(kw, native))
+        return run_process(argv, **_prep(kw, native))
     master, slave = _open_console_stdin()
     try:
-        return subprocess.run(argv, stdin=slave, **_prep(kw, native))
+        return run_process(argv, stdin=slave, **_prep(kw, native))
     finally:
         for fd in (slave, master):
             try: os.close(fd)

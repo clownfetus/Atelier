@@ -64,3 +64,25 @@ path during concurrent directory creation. Project containment compares equivale
 drive and UNC spellings consistently while preserving the original resolved paths
 for file I/O. Different drives, shares, outside directories and device namespaces
 remain rejected. Regression cases cover both accepted and rejected spellings.
+
+## Managed work and reviewed bulk saves (15 October 2026)
+
+`atelier/jobs.py` now owns the current UI's import/export/repatch and bulk jobs.
+Jobs reserve their originating project through cleanup, persist status/results,
+cancel owned native calls, stop admission during shutdown and protect the final
+publication step from cancellation. Startup marks unfinished jobs interrupted
+and recovers configured publication destinations. No automatic retry runs.
+
+`atelier/bulk.py` previews in temporary project copies and compares content hashes
+before a save. Project-local transaction journals restore every previous JSON
+byte on failure, including metadata; interrupted batches recover before project
+access. Native import decoding publishes only validated complete PNGs and retains
+existing painted textures on retry. `tests/test_jobs_bulk.py` covers cancellation,
+queued ownership, restart recovery, protected publication, stale previews,
+failure rollback, scalar/color curves, MPCs and Niagara groups.
+
+The real native material/dye check also fixed serialization of formerly omitted
+zero parameters. The native curve/MPC/Niagara check verifies the new bulk edits
+through packing and readback. See the final section in `DEVELOPMENT.md` for paths,
+commands and current evidence. Shader appearance still needs an in-game check;
+cross-process locks, unmanaged shader work and a new installer remain separate.

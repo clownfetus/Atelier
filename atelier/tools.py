@@ -208,8 +208,10 @@ def uat_json(req, timeout=None):
     Bounded by `timeout`: on expiry the worker is killed rather than reused, because a late reply
     would desync every subsequent request on the same pipe."""
     secs = UAT_TIMEOUT if timeout is None else timeout
+    from atelier import jobs
     global _proc, _out_q
-    with _lock:
+    with jobs.cancellable_lock(_lock):
+        jobs.checkpoint()
         if _proc is None or _proc.poll() is not None:
             proc, q = _start_worker()
         else:
@@ -223,6 +225,11 @@ def uat_json(req, timeout=None):
         deadline = time.monotonic() + secs
         # Drain lines until the JSON reply (UAssetTool also writes human-readable status to stdout).
         while True:
+            try:
+                jobs.checkpoint()
+            except jobs.Cancelled:
+                _kill_worker()
+                raise
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 _kill_worker()
@@ -231,7 +238,7 @@ def uat_json(req, timeout=None):
                 return {"success": False,
                         "message": f"UAssetTool did not respond within {secs}s"}
             try:
-                line = q.get(timeout=remaining)
+                line = q.get(timeout=min(remaining, 0.2))
             except queue.Empty:
                 continue
             if line is None:                      # EOF
@@ -248,5 +255,9 @@ def uat_json(req, timeout=None):
 @atexit.register
 def _shutdown():
     if _proc and _proc.poll() is None:
-        try: _proc.terminate()
-        except Exception: pass
+        try:
+            _proc.terminate()
+            _proc.wait(timeout=2)
+        except Exception:
+            try: _proc.kill()
+            except Exception: pass

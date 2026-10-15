@@ -107,17 +107,32 @@ def decode_flat(game_rels, output_dir):
     """Parallel-decode extracted uassets to output_dir mirrored by game_rel subfolders (project_base),
     so same-named textures under different skins don't overwrite each other."""
     import atelier.asset_cache as _ac
+    from contextvars import copy_context
+    from atelier import jobs
     os.makedirs(output_dir, exist_ok=True)
     def _one(gr):
+        jobs.checkpoint()
         cb = _ac.cache_base(gr) or find_extracted(gr)
         if not cb or not os.path.exists(cb + ".uasset"): return
         dst = project_base(gr, output_dir)
+        if os.path.exists(dst + ".png"):
+            return  # Existing painted project textures must survive an import retry.
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        decode_png(dst, cb)
+        with tempfile.TemporaryDirectory(prefix=".import-", dir=os.path.dirname(dst)) as scratch:
+            temporary = os.path.join(scratch, os.path.basename(dst))
+            decode_png(temporary, cb)
+            jobs.checkpoint()
+            if os.path.isfile(temporary + ".png") and not os.path.exists(dst + ".png"):
+                from PIL import Image
+                with Image.open(temporary + ".png") as image:
+                    image.verify()
+                os.replace(temporary + ".png", dst + ".png")
     grs = list(game_rels)
     if not grs: return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
-        list(ex.map(_one, grs))
+        futures = [ex.submit(copy_context().run, _one, gr) for gr in grs]
+        for future in futures:
+            future.result()
 
 def decode_thumb(uasset_path, thumb_path):
     """Decode the lowest available mip to a small thumbnail PNG (tries mip 4 → 3 → 2 → 0)."""
@@ -916,6 +931,8 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
     Keep legacy return fields and filenames. `artifacts` additionally names ALL files,
     including separate world containers when combining is unavailable.
     """
+    from atelier import jobs
+    jobs.checkpoint()
     if (not mod_name or os.path.basename(mod_name) != mod_name or mod_name in (".", "..")
             or any(c in mod_name for c in '/\\:*?"<>|')):
         return {"ok": False, "error": "invalid mod name"}
@@ -928,7 +945,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
     work = None
     try:
         os.makedirs(_CACHE, exist_ok=True)
-        work = tempfile.mkdtemp(prefix="build-", dir=_CACHE)
+        work = jobs.build_workspace(_CACHE)
         staged_out = os.path.join(work, "output")
         os.makedirs(staged_out)
         result = _build_mod_staged(mod_name, tex_items, mat_items, staged_out, force,
@@ -939,6 +956,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
             return result
         paks = list(dict.fromkeys([result["pak"]] + result.get("world_mods", [])))
         sources = [p for pak in paks for p in container_files(pak[:-4])]
+        jobs.begin_publication()
         result["artifacts"] = publish_files(sources, out_dir)
         result["pak"] = os.path.join(os.path.abspath(out_dir), os.path.basename(result["pak"]))
         result["world_mods"] = [os.path.join(os.path.abspath(out_dir), os.path.basename(p))
@@ -965,6 +983,7 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
     from atelier.handlers.vfx import stage_vfx
     from atelier.handlers.world import stage_world
     from atelier.handlers.text import stage_text
+    from atelier import jobs
     asset_opts = asset_opts or {}
     out_dir = os.path.abspath(out_dir); stem = f"{mod_name}_9999999_P"; base = os.path.join(out_dir, stem)
     stage = stage_dir
@@ -975,16 +994,19 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
     # first would ship the pre-flush version -- one build behind, looking exactly like "my
     # texture edit didn't apply".
     for gr in (mesh_items or []):
+        jobs.progress("Building mesh " + os.path.basename(gr))
         try:
             from atelier.handlers.meshedit import stage_mesh
             info = stage_mesh(gr, stage)
             applied.append(f"mesh {os.path.basename(gr)} ({len(info['applied'])} LODs)")
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     for game_rel in tex_items:
+        jobs.progress("Encoding texture " + os.path.basename(game_rel))
         try: applied.append("tex " + stage_inject(stage, game_rel, asset_opts.get(game_rel)))
         except Exception as e: skipped.append(f"{os.path.basename(game_rel)}: {e}")
     for m in mat_items:
         gr = m["game_rel"]
+        jobs.progress("Building material " + os.path.basename(gr))
         try: applied.append("mat " + stage_material(stage, gr,
                                                     m.get("colors", {}), m.get("scalars", {})))
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}"); continue
@@ -998,12 +1020,15 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
             except Exception as e:
                 skipped.append(f"{os.path.basename(gr)}: dye overlay not disabled: {e}")
     for c in (curve_items or []):
+        jobs.progress("Building curve " + os.path.basename(c["game_rel"]))
         try: applied.append("curve " + stage_curve(stage, c["game_rel"], c.get("edits", {})))
         except Exception as e: skipped.append(f"{os.path.basename(c.get('game_rel',''))}: {e}")
     for gr in (vfx_items or []):
+        jobs.progress("Building VFX " + os.path.basename(gr))
         try: applied.append("vfx " + stage_vfx(stage, gr))
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     for gr in (text_items or []):
+        jobs.progress("Building text " + os.path.basename(gr))
         try: applied.append("text " + stage_text(stage, gr))
         except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
     staged_any = bool(applied)   # anything that must go through create_mod_iostore (small assets)
@@ -1026,6 +1051,7 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
     from atelier.handlers.world import build_world_mod, build_world_uag
     world_out = []
     for gr in (world_items or []):
+        jobs.progress("Building world " + os.path.basename(gr))
         sub = os.path.basename(gr); sub = sub[:-5] if sub.lower().endswith(".umap") else sub
         try:
             r = build_world_mod(gr, None, os.path.join(out_dir, f"{sub}_9999999_P"))
@@ -1047,6 +1073,7 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
         return {"ok": False, "error": "nothing staged: " + "; ".join(skipped)}
     os.makedirs(out_dir, exist_ok=True)
     if staged_any:
+        jobs.progress("Packing mod containers…")
         uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage), "--usmap", USMAP])
         if not os.path.exists(base + ".utoc"):
             return {"ok": False, "error": "create_mod_iostore failed"}

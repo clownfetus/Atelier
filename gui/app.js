@@ -1842,12 +1842,12 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
   showProgress(0, items.length);
   document.getElementById("prog-overlay").classList.add("active");
 
-  const res = await api("/api/import_all", {
+  const res = await (window.AtelierJobs?.run || api)("/api/import_all", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items }),
   });
-  if (!res.ok) {
+  if (!res.ok && importing) {
     document.getElementById("prog-overlay").classList.remove("active");
     importing = false;
     toast(`Edit failed: ${res.error}`, "warning");
@@ -1860,11 +1860,34 @@ function showProgress(current, total) {
 
 // ── prevent accidental close during import ────────────────────────────────────
 window.addEventListener("beforeunload", e => {
-  if (importing) {
+  if (importing && !window.AtelierJobs) {
     e.preventDefault();
     e.returnValue = "An edit is in progress. Closing may leave assets incomplete.";
     return e.returnValue;
   }
+});
+
+document.getElementById('import-hide').addEventListener('click', () => {
+  document.getElementById('prog-overlay').classList.remove('active');
+});
+document.getElementById('import-cancel').addEventListener('click', async () => {
+  try {
+    const result = await window.AtelierJobs.cancelCurrent('import');
+    if (!result.ok) toast(result.error, 'warning');
+  } catch (error) { toast(error.message, 'warning'); }
+});
+
+document.getElementById('bulk-edit-open').addEventListener('click', () => {
+  if (matEditor || curveEditor || vfxEditor || window.AtelierViewport?.hasPendingEdits?.()) {
+    toast('Close the asset editor and resolve its drafts before bulk editing.', 'warning'); return;
+  }
+  const eligible = item => ['curve','vfx'].includes(item.file_type) && item.game_rel;
+  const query = document.getElementById('search-input').value.trim().toLowerCase();
+  const folder = AtelierLibraryTools.filter(allItems.map(_makeCard), query).filter(eligible);
+  window.AtelierBulkEdit.open({edited:Object.values(sidebarData).filter(i => i.selected && eligible(i)), folder}, _activeProjectName);
+});
+window.addEventListener('atelier-bulk-saved', event => {
+  if (event.detail.project === _activeProjectName) { loadSidebar(); renderGrid(); }
 });
 
 // ── SSE ───────────────────────────────────────────────────────────────────────
@@ -2221,7 +2244,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
   const finishFeedback = beginExportFeedback(project);
   const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy");
   try {
-    const res = await api("/api/install_mod", {
+    const res = await (window.AtelierJobs?.run || api)("/api/install_mod", {
       project,
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2246,6 +2269,10 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
               "warning", 16000, "warning");
       }
       console.log("[export] staged:", res.applied, "\n[export] skipped:", res.skipped);
+    } else if (res.cancelled) {
+      finishFeedback('warning');
+      toastExportFeedback('Export cancelled. Project edits are preserved.', 'warning', 4500, 'warning');
+      if (project === _activeProjectName) setStatus('Export cancelled');
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
       finishFeedback("warning");
@@ -3866,7 +3893,7 @@ document.getElementById("repatch-run").addEventListener("click", async () => {
   const stage = document.getElementById("repatch-stage").checked;
   const pw = document.getElementById("repatch-pw").value.trim();
   try {
-    const r = await api("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await (window.AtelierJobs?.run || api)("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage, password: pw }) });
     if (r.locked) { res.innerHTML = '<span class="warning">Wrong or missing password.</span>'; btn.disabled = false; return; }
     if (!r.ok) { res.innerHTML = '<span class="warning">Failed: ' + (r.error || "unknown") + '</span>'; btn.disabled = false; return; }

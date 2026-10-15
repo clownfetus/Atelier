@@ -72,6 +72,7 @@ def _mat_textures(d):
     return out
 
 def _apply_mat_edits(d, colors, scalars):
+    from atelier.properties import mark_changed
     ex = d["Exports"][0]
     vp = _gn(_ex_props(ex), "VectorParameterValues")
     sp = _gn(_ex_props(ex), "ScalarParameterValues")
@@ -80,13 +81,16 @@ def _apply_mat_edits(d, colors, scalars):
         if nm in colors:
             lc = _mat_color(e)
             if lc:
+                mark_changed(e, _gn(e["Value"], "ParameterValue"))
                 r, g, b, a = colors[nm]
                 lc["R"], lc["G"], lc["B"], lc["A"] = float(r), float(g), float(b), float(a)
     for e in (sp or {}).get("Value", []):
         nm = _mat_pname(e)
         if nm in scalars:
             pv = _gn(e["Value"], "ParameterValue")
-            if pv is not None: pv["Value"] = float(scalars[nm])
+            if pv is not None:
+                mark_changed(e, pv)
+                pv["Value"] = float(scalars[nm])
 
 def mat_json(game_rel, out_dir=None):
     """Extract the MI + convert to JSON as <basename>.json. Returns the json path.

@@ -49,7 +49,7 @@ def _resolve_source(mod_source, work):
             if os.path.exists(base + ext): shutil.copy(base + ext, src)
     return src
 
-def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, relock=None):
+def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, relock=None, work_dir=None):
     """Repatch one mod → out_base.{pak,ucas,utoc}. Returns {ok, applied, skipped, manifest, pak}.
     unlock: password to open a password-protected source mod. stage_as_project: ALSO load each asset
     into the active project (pre-edited) for remixing. relock: password to lock the repatched output."""
@@ -58,7 +58,7 @@ def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, reloc
         return {"ok": False, "locked": True,
                 "error": "This mod is password-protected — enter the password to repatch it."}
     aes = "0x" + get_aes_key()
-    work = os.path.join(_CACHE, "repatch", re.sub(r"\W+", "_", os.path.basename(mod_source))[:48] or "mod")
+    work = work_dir or os.path.join(_CACHE, "repatch", re.sub(r"\W+", "_", os.path.basename(mod_source))[:48] or "mod")
     shutil.rmtree(work, ignore_errors=True); os.makedirs(work)
     src = _resolve_source(mod_source, work)
     utocs = dir_glob(src, "**/*.utoc", recursive=True)

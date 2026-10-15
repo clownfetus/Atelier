@@ -60,12 +60,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
+    parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='atelier-browser-') as data:
         os.environ['ATELIER_DATA_DIR'] = data
         from atelier.web import routes as R
+        # Fixtures must also cover server-side metadata calls, including any
+        # browser retry that reaches the real route during a page transition.
+        R._get_latest_usmap_from_github = lambda: None
         from atelier.web.app import _ThreadingWSGIServer
         from playwright.sync_api import sync_playwright
         for name in ('Smoke A', 'Smoke B'):
@@ -136,6 +140,16 @@ def main():
                 checks.append('UI loads at three desktop sizes without uncaught JavaScript errors')
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
 
+                if args.jobs_bulk_only:
+                    from jobs_bulk_browser_checks import run_job_bulk_checks
+                    run_job_bulk_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
                 from design_checks import run_design_checks
                 run_design_checks(page, context, url, report, checks)
                 from export_motion_checks import run_export_motion_checks
@@ -148,6 +162,8 @@ def main():
                 run_material_save_motion_checks(page, context, url, report, checks)
                 from library_pins_checks import run_library_pins_checks
                 run_library_pins_checks(page, context, url, report, checks)
+                from jobs_bulk_browser_checks import run_job_bulk_checks
+                run_job_bulk_checks(page, context, url, report, checks)
                 from thumbnail_checks import run_thumbnail_checks
                 run_thumbnail_checks(page, context, url, report, checks)
                 from category_icon_checks import run_category_icon_checks

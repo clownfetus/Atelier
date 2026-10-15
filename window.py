@@ -91,6 +91,25 @@ def main():
         sys.exit(1)
 
     window = webview.create_window("Atelier", URL, width=1400, height=900)
+    close_started = threading.Event()
+    close_ready = threading.Event()
+
+    def drain():
+        from atelier.web import routes
+        while not routes.shutdown(5):
+            pass
+        close_ready.set()
+        window.destroy()
+
+    def closing():
+        if close_ready.is_set():
+            return True
+        if not close_started.is_set():
+            close_started.set()
+            threading.Thread(target=drain, name="atelier-shutdown", daemon=True).start()
+        return False
+
+    window.events.closing += closing
 
     def _focus():
         time.sleep(0.3)
@@ -105,7 +124,9 @@ def main():
     # already assumes when it reads them back.
     webview.start(_focus, debug=_debug, private_mode=False,
                   storage_path=os.path.join(_DATA_ROOT, "_webview"))
-    os._exit(0)
+    from atelier.web import routes
+    while not routes.shutdown(5):
+        pass
 
 
 if __name__ == "__main__":

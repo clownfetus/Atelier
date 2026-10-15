@@ -5,6 +5,13 @@ with shared light/dark styling and reliability safeguards underneath. It keeps
 Atelier's existing Bottle, vanilla JavaScript, Three.js and pywebview stack.
 There is no frontend framework migration or project-format migration.
 
+The latest follow-up adds Activity with cancellation/restart status, graceful
+managed-job shutdown and reviewed bulk VFX/curve/MPC editing. Native export/readback
+checks now cover a painted dyeable material plus a curve, MPC and Niagara effect.
+They also identified and fixed serialization of edited zero-valued parameters.
+The final section of `DEVELOPMENT.md` records the new checks and their limits;
+the portable review package described below predates this follow-up.
+
 The contribution starts at upstream commit `2a3f4e2`. Earlier commits separate
 the reliability baseline (`dfe5f5e`), optional portrait catalogue (`6368d68`) and
 initial Material 3 foundation (`9bd5ecf`). The subsequent workflow changes build

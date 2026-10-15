@@ -10,6 +10,9 @@ extracted game portraits/textures or private project data.
 - `material-editor-light.png`: material workflow fixture from
   `tests/material_workflow_checks.py`, 1400 x 900. The remaining unsaved parameter
   and warning demonstrate preservation of edits made during an in-flight save.
+- `bulk-edit-dark.png` and `bulk-edit-light.png`: reviewed two-curve batch from
+  `tests/jobs_bulk_browser_checks.py`, 1400 x 900.
+- `activity.png`: persisted fixture-job outcomes from the same check, 1400 x 900.
 
 The files are copied without cropping, recoloring or other image edits. Run the
 browser suite to regenerate the full evidence set, including both-theme material,

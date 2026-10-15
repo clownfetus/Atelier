@@ -70,7 +70,14 @@ one look.
 **All of the above was verified on Linux only.** The Linux port touched code Windows also runs;
 `LINUX.md` → *Still to verify on Windows* lists what that leaves unconfirmed and how to check it.
 
-Everything else below is unstarted.
+**15 October 2026 follow-up:** item **13** now has reviewed bulk multiply/recolor
+editing for curves, Niagara LUT groups and MPC parameters. Preview does not write
+project edits; applying checks for intervening changes and uses a recoverable
+batch save. Real curve/MPC/Niagara exports were unpacked and compared successfully.
+This verifies stored data, with in-game appearance still separate. See the latest
+section in `DEVELOPMENT.md` for the native fixtures and reports.
+
+Items without a later dated status below remain unstarted.
 
 ---
 

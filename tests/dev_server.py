@@ -19,8 +19,8 @@ def main():
     try:
         app.run(host='127.0.0.1', port=args.port, server=_ThreadedServer, quiet=True)
     finally:
-        routes._observer.stop()
-        routes._observer.join()
+        while not routes.shutdown(5):
+            pass
 
 
 if __name__ == '__main__':

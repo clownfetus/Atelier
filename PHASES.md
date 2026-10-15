@@ -187,6 +187,12 @@ shipping the alpha-ColorID trick as a one-click action rather than a real toggle
 > **Update (2026-09-20): built, and less of it needed the game than this phase assumed.**
 > Items **10, 12, 20, 21, 22, 23** are implemented (`tests/test_phase4.py`, 28 checks). **13 was
 > deliberately left out** and stays on the board.
+
+> **15 October 2026:** item **13** is now implemented as reviewed bulk multiply/RGB
+> replacement for curves, Niagara LUT groups and MPC parameters. Atomic per-file
+> writes, a batch rollback journal and preview hash checks protect saved edits.
+> Real curve/MPC/Niagara export/readback passed; shader appearance remains an
+> in-game check. `DEVELOPMENT.md` records this follow-up separately from Phase 4.
 >
 > The premise that everything here costs an export-plus-a-look turned out to be too pessimistic.
 > What decides whether a mod is *correct* — which path an asset is staged at, what the injected

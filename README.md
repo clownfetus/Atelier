@@ -36,6 +36,11 @@ Atelier automatically un-taints its own bundled tools on launch, so no manual "u
 
 - You can delete imported textures by pressing "X" next to it in sidebar
 - Right-click for option to replace texture with external image
+- Open **Activity** to check exports/imports/repatches, cancel work before file publication,
+  or review an interrupted job after reopening Atelier. Interrupted work never restarts automatically.
+- Choose **Bulk VFX / curves** to review and save a multiplier or RGB replacement across
+  selected edited assets or the current folder. RGB edits preserve alpha. Global parameter
+  collections are labelled because every referencing material can change. Export separately.
 
 ## Help
 This section is only relevant if the current mappings/AES repo is down, until we update to using a different one

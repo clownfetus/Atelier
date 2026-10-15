@@ -278,12 +278,14 @@ def read_mpc(game_rel):
             "summary": {"vector": len(vectors), "scalar": len(scalars)}, "groups": []}
 
 def _apply_mpc_edits(d, scalars, vectors):
+    from atelier.properties import mark_changed
     sl, vl = _mpc_lists(d)
     for e in sl:
         nm = _param_name(e)
         if nm in (scalars or {}):
             dv = _gn(e.get("Value"), "DefaultValue")
             if dv is not None:
+                mark_changed(e, dv)
                 dv["Value"] = float(scalars[nm])
     for e in vl:
         nm = _param_name(e)
@@ -291,6 +293,7 @@ def _apply_mpc_edits(d, scalars, vectors):
             dv = _gn(e.get("Value"), "DefaultValue")
             lc = _unwrap(dv.get("Value")) if dv is not None else None
             if lc:
+                mark_changed(e, dv)
                 r, g, b, a = (list(vectors[nm]) + [0, 0, 0, 1])[:4]
                 lc["R"], lc["G"], lc["B"], lc["A"] = float(r), float(g), float(b), float(a)
 
