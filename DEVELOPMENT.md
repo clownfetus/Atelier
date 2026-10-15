@@ -568,7 +568,7 @@ python tests/installer_smoke.py `
   --installer "$env:RUNNER_TEMP/candidate/AtelierSetup.exe" `
   --previous-installer "$env:RUNNER_TEMP/previous/AtelierSetup.exe" `
   --previous-sha256 c4ddcb3741333b608f353681c1175de3502d847b4f5f8e8c9e2e4b7a746ba177 `
-  --payload-manifest tests/fixtures/installer/cachefix-200d395.json `
+  --payload-manifest tests/fixtures/installer/studio-0.3.4-installerfix.json `
   --report-dir "$env:RUNNER_TEMP/installer-smoke"
 ```
 

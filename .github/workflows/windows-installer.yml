@@ -32,6 +32,8 @@ jobs:
           python-version: '3.12'
       - name: Install CDP test client
         run: python -m pip install --disable-pip-version-check playwright==1.64.0
+      - name: Check packaging preservation rules
+        run: python tests/test_packaging.py
       - name: Record existing WebView2 runtime
         shell: pwsh
         run: |
@@ -45,20 +47,27 @@ jobs:
           @{ runtimes = $runtime; runner = '${{ matrix.os }}'; installed_by_test = $false } |
             ConvertTo-Json -Depth 4 | Set-Content "$env:RUNNER_TEMP/webview2-runtime.json"
           Get-Content "$env:RUNNER_TEMP/webview2-runtime.json"
-      - name: Download and verify the exact published installers
+      - name: Download and verify the exact release installers
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $manifest = Get-Content tests/fixtures/installer/cachefix-200d395.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content tests/fixtures/installer/studio-0.3.4-installerfix.json -Raw | ConvertFrom-Json
           $downloads = Join-Path $env:RUNNER_TEMP 'atelier-downloads'
           New-Item -ItemType Directory -Path $downloads | Out-Null
           $items = @(
-            @{ name = 'candidate.exe'; url = $manifest.installer_url; sha = $manifest.installer_sha256; bytes = $manifest.installer_bytes },
+            @{ name = 'candidate.exe'; url = $manifest.installer_asset_api_url; sha = $manifest.installer_sha256; bytes = $manifest.installer_bytes },
             @{ name = 'previous.exe'; url = $manifest.previous_installer_url; sha = $manifest.previous_installer_sha256; bytes = $manifest.previous_installer_bytes }
           )
           foreach ($item in $items) {
             $target = Join-Path $downloads $item.name
-            Invoke-WebRequest -Uri $item.url -OutFile $target -MaximumRetryCount 3 -RetryIntervalSec 3
+            $headers = @{}
+            if ($item.url.StartsWith('https://api.github.com/repos/tendo625/Atelier/releases/assets/')) {
+              $headers.Authorization = 'Bearer ' + $env:GH_TOKEN
+              $headers.Accept = 'application/octet-stream'
+            }
+            Invoke-WebRequest -Uri $item.url -Headers $headers -OutFile $target -MaximumRetryCount 3 -RetryIntervalSec 3
             $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actual -ne $item.sha -or (Get-Item -LiteralPath $target).Length -ne $item.bytes) {
               throw "Published installer verification failed: $($item.name)"
@@ -68,12 +77,12 @@ jobs:
       - name: Verify clean install, running upgrade, reinstall and uninstall
         shell: pwsh
         run: |
-          $manifest = Get-Content tests/fixtures/installer/cachefix-200d395.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content tests/fixtures/installer/studio-0.3.4-installerfix.json -Raw | ConvertFrom-Json
           python tests/installer_smoke.py `
             --installer "$env:RUNNER_TEMP/atelier-downloads/candidate.exe" `
             --previous-installer "$env:RUNNER_TEMP/atelier-downloads/previous.exe" `
             --previous-sha256 $manifest.previous_installer_sha256 `
-            --payload-manifest tests/fixtures/installer/cachefix-200d395.json `
+            --payload-manifest tests/fixtures/installer/studio-0.3.4-installerfix.json `
             --report-dir "$env:RUNNER_TEMP/atelier-installer-report"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect fixture-only diagnostics

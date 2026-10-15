@@ -1,0 +1,2084 @@
+{
+  "source_commit": "6a92e6a310fcd0c88a7fc7e8924b4d65f7e0b24e",
+  "application_source_commit": "7f4898a6f5047942c425225f81fd71fc62b7cf8a",
+  "release_tag": "atelier-studio-0.3.4-installerfix-20261015-6a92e6a",
+  "installer_url": "https://github.com/tendo625/Atelier/releases/download/atelier-studio-0.3.4-installerfix-20261015-6a92e6a/AtelierSetup.exe",
+  "installer_asset_api_url": "https://api.github.com/repos/tendo625/Atelier/releases/assets/645104519",
+  "installer_bytes": 120307350,
+  "installer_sha256": "3f11d382c23f75c3bde291a002bf4ae391a1e6fd7851b4eef814c4ff7b98ff80",
+  "previous_installer_url": "https://github.com/tendo625/Atelier/releases/download/atelier-studio-0.3.4-preview-20261015-f3c93fd/AtelierSetup.exe",
+  "previous_installer_bytes": 120291944,
+  "previous_installer_sha256": "c4ddcb3741333b608f353681c1175de3502d847b4f5f8e8c9e2e4b7a746ba177",
+  "files": [
+    {
+      "path": "Atelier.exe",
+      "bytes": 12174620,
+      "sha256": "a1eb26a4781a126f570d0a41361175a85b13de3c969c86be35b7031e8f9e1de6"
+    },
+    {
+      "path": "Tools/AtelierMesh/AtelierMesh.exe",
+      "bytes": 90846578,
+      "sha256": "5e47848be9e0d027ee014be50b96c8df85ac05bf06b79eeb593a8028dc708cc5"
+    },
+    {
+      "path": "Tools/AtelierMesh/CUE4Parse-Natives.dll",
+      "bytes": 38912,
+      "sha256": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b"
+    },
+    {
+      "path": "Tools/AtelierMesh/oo2core_9_win64.dll",
+      "bytes": 637952,
+      "sha256": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    },
+    {
+      "path": "Tools/MarvelRivalsCharacterIDs.md",
+      "bytes": 27883,
+      "sha256": "c0c4a6cbf11e17f5bf88dbf6471901e6ccb64fe8ecf054aaca27ac41ad6370d8"
+    },
+    {
+      "path": "Tools/UAssetGUI.exe",
+      "bytes": 13163201,
+      "sha256": "b7d75c0893f1a60e565853ae638bc21f2416cd12c2d9d854e297abb87ceb3263"
+    },
+    {
+      "path": "Tools/UAssetTool.exe",
+      "bytes": 72967783,
+      "sha256": "d011149a2cef5541dd0795c20c335394b93bd87dc76d8a4617543ce5a5aa7dfe"
+    },
+    {
+      "path": "Tools/shaders/dxc.exe",
+      "bytes": 1359640,
+      "sha256": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2"
+    },
+    {
+      "path": "Tools/shaders/dxcompiler.dll",
+      "bytes": 22274872,
+      "sha256": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59"
+    },
+    {
+      "path": "Tools/shaders/dxil.dll",
+      "bytes": 1995584,
+      "sha256": "64be2368211d257a038a7d4ea6bb3e24c878eb8d588c7b8414fccf759b69c2ac"
+    },
+    {
+      "path": "Tools/shaders/oo2core_9_win64.dll",
+      "bytes": 637952,
+      "sha256": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    },
+    {
+      "path": "Tools/shaders/retoc-rivals-cli.exe",
+      "bytes": 12709888,
+      "sha256": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d"
+    },
+    {
+      "path": "_internal/PIL/_avif.cp312-win_amd64.pyd",
+      "bytes": 7893504,
+      "sha256": "6731dce52baab0b96b0eeb3c664844b5b42c2168ea8668af2430e2fbdd2dfbd8"
+    },
+    {
+      "path": "_internal/PIL/_imaging.cp312-win_amd64.pyd",
+      "bytes": 2632704,
+      "sha256": "c8c519ec72bf75b2945b4fc4afa854af2fca8b970a403134f9ddda3e164d85e9"
+    },
+    {
+      "path": "_internal/PIL/_imagingcms.cp312-win_amd64.pyd",
+      "bytes": 272384,
+      "sha256": "c89c633ae1bf3f26a327d14ff688db66628e19c9866ab925479f27dcb60a2d6f"
+    },
+    {
+      "path": "_internal/PIL/_imagingft.cp312-win_amd64.pyd",
+      "bytes": 2174976,
+      "sha256": "77c6d37de41733df40fb36d9af47644989ac17da036515e759303969edb22c48"
+    },
+    {
+      "path": "_internal/PIL/_imagingmath.cp312-win_amd64.pyd",
+      "bytes": 21504,
+      "sha256": "82ac45c41a008854d05f67deda298b65a7bed850d0d79a3af861ed583f6e7d62"
+    },
+    {
+      "path": "_internal/PIL/_imagingtk.cp312-win_amd64.pyd",
+      "bytes": 14848,
+      "sha256": "690cc1cae4a2dc8594a342b9241e691dcc89d81dad4cddcefdf285275365a2b1"
+    },
+    {
+      "path": "_internal/PIL/_webp.cp312-win_amd64.pyd",
+      "bytes": 416256,
+      "sha256": "9823cebb84f425af3ac1e7437259bc176e7ad7e25d7fa829b0e1a3e55c11be70"
+    },
+    {
+      "path": "_internal/VCRUNTIME140.dll",
+      "bytes": 124544,
+      "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+    },
+    {
+      "path": "_internal/VCRUNTIME140_1.dll",
+      "bytes": 49792,
+      "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+    },
+    {
+      "path": "_internal/_asyncio.pyd",
+      "bytes": 75056,
+      "sha256": "72b6942e20ba0043ab66af51dabe4986aeb6402bbbd2513b6a3e2eedbd2b1b3d"
+    },
+    {
+      "path": "_internal/_bz2.pyd",
+      "bytes": 88880,
+      "sha256": "e35113599dcb5518f68c0b753144218c1ec4ec9ce4bc84a1095d0905f178a536"
+    },
+    {
+      "path": "_internal/_cffi_backend.cp312-win_amd64.pyd",
+      "bytes": 181248,
+      "sha256": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec"
+    },
+    {
+      "path": "_internal/_ctypes.pyd",
+      "bytes": 131888,
+      "sha256": "4ce43ac75e6c061f3b20e8dcf4a9772a72d7c7d7408b2ae5881b379246651ebd"
+    },
+    {
+      "path": "_internal/_decimal.pyd",
+      "bytes": 263984,
+      "sha256": "a9608fff35f91a2342c486bd8fccf50dfc159d5514c5d126331248862efa84a5"
+    },
+    {
+      "path": "_internal/_elementtree.pyd",
+      "bytes": 137520,
+      "sha256": "5bbe1c5def736b62d1dcc84755aef0bdb4c283facdffef0536194ef9abcb8489"
+    },
+    {
+      "path": "_internal/_hashlib.pyd",
+      "bytes": 70448,
+      "sha256": "b988077152a33c2d7579f453388abc742675b46f6a9ad65dfd443e96bfac330f"
+    },
+    {
+      "path": "_internal/_lzma.pyd",
+      "bytes": 168240,
+      "sha256": "e695959ee6df09b7f176e43cb7250e6f52662b9149bfc8920b2e749871f3db1f"
+    },
+    {
+      "path": "_internal/_multiprocessing.pyd",
+      "bytes": 39728,
+      "sha256": "8567d5a49b968a0946a4331f52e12a3fefa4b1a6abee59c67bdd61439b11460a"
+    },
+    {
+      "path": "_internal/_overlapped.pyd",
+      "bytes": 59696,
+      "sha256": "9417b7c502983284acee1ec01a1d3a98c130e3a31b9765556357031a6527f65a"
+    },
+    {
+      "path": "_internal/_queue.pyd",
+      "bytes": 36144,
+      "sha256": "646b899b96520b9bddd8dd20c28179282fe4ea69010c30beeafd271027c63b9d"
+    },
+    {
+      "path": "_internal/_socket.pyd",
+      "bytes": 87344,
+      "sha256": "a70f71d899e1050e05bd0b6946f11be08ea377e7a2ff555e9a5b0dfadb563136"
+    },
+    {
+      "path": "_internal/_sqlite3.pyd",
+      "bytes": 127792,
+      "sha256": "d4414a8a19a5068b1dccdb7213617eb030def1c34ee44bbddd732c371f3aa77d"
+    },
+    {
+      "path": "_internal/_ssl.pyd",
+      "bytes": 180528,
+      "sha256": "b937f5273c71143cfcb1af00305a79ec8cc4f6ba37b103c21ee0c96805c6decc"
+    },
+    {
+      "path": "_internal/_uuid.pyd",
+      "bytes": 29488,
+      "sha256": "ca8cbfc9bb87fd5e085886c829a5307a3989666375d66f69ca808b135c5f3d9d"
+    },
+    {
+      "path": "_internal/_wmi.pyd",
+      "bytes": 41264,
+      "sha256": "194cf959a3bfaffd25dafabace44a071316669a1f18056250343e60ed55bce2d"
+    },
+    {
+      "path": "_internal/api-ms-win-core-console-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "015bd08815c7b934a8952c3a7578e9ce59f21136e8a880d42bbd414bec2c6058"
+    },
+    {
+      "path": "_internal/api-ms-win-core-datetime-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "5534812cdbdae94ba45cb216e5eb9af686b853948df54365103555abbbaf9d9a"
+    },
+    {
+      "path": "_internal/api-ms-win-core-debug-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "837d2b1b2cd03e03fc6ccb050698b6b5763af17c201304872342a5eae9e0a2d2"
+    },
+    {
+      "path": "_internal/api-ms-win-core-errorhandling-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "de43b165f568c276c00e95acd454e3092f352a18e95874595f4f4658c06d2ec7"
+    },
+    {
+      "path": "_internal/api-ms-win-core-fibers-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "3cebc45bf479ad74cfabf2c6bfd4994d7ad639ed1221025981d19cedf9ce0416"
+    },
+    {
+      "path": "_internal/api-ms-win-core-fibers-l1-1-1.dll",
+      "bytes": 22872,
+      "sha256": "5ef70308bcca628ce6b0e2856b15b1c7ae340c3f9bbbc4c1071d8c191a34a5c3"
+    },
+    {
+      "path": "_internal/api-ms-win-core-file-l1-1-0.dll",
+      "bytes": 27008,
+      "sha256": "250ac829f2617bcac1c6e5b8c4f630462e20765863ba573526a3e11bbfb94a9a"
+    },
+    {
+      "path": "_internal/api-ms-win-core-file-l1-2-0.dll",
+      "bytes": 22888,
+      "sha256": "ae14079a114733f60ce87b92cba42acd8083c2cd67594e53bc37dc0b97a4b465"
+    },
+    {
+      "path": "_internal/api-ms-win-core-file-l2-1-0.dll",
+      "bytes": 22912,
+      "sha256": "914bf26a298713119477ea0a8e7bd43171b91344ebe24fb47ad77c49686e3d87"
+    },
+    {
+      "path": "_internal/api-ms-win-core-handle-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "ab5489955e371b15f77906c08ec3c7affe2c7a46a08c514ca628768b4478974b"
+    },
+    {
+      "path": "_internal/api-ms-win-core-heap-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "c70f9644d8377fa39c5b71f2e9734c1400d7598904fdeb772e8502099982dcb7"
+    },
+    {
+      "path": "_internal/api-ms-win-core-interlocked-l1-1-0.dll",
+      "bytes": 22888,
+      "sha256": "f8129710188e407bb0e6f46d30aeba277d67b947ece5fe09e883fde2323f3ae6"
+    },
+    {
+      "path": "_internal/api-ms-win-core-kernel32-legacy-l1-1-1.dll",
+      "bytes": 22888,
+      "sha256": "5200b16cb2ddc61cfc07373a9a84aa85a3ab50806ca96c879c883275832944c1"
+    },
+    {
+      "path": "_internal/api-ms-win-core-libraryloader-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "48786fb88b001dcd1f63acea903d3ca9cc0b3060d5a325e3f2f3cbc3bfd53166"
+    },
+    {
+      "path": "_internal/api-ms-win-core-localization-l1-2-0.dll",
+      "bytes": 22872,
+      "sha256": "9ec3898f7eba91faa28b51616c211a2689e3a13aeef8de6e13cb674e49d689eb"
+    },
+    {
+      "path": "_internal/api-ms-win-core-memory-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "3a6cbc524c99e1cd80d5368f5601402a37ad602528b1ab628093573ef638eb3b"
+    },
+    {
+      "path": "_internal/api-ms-win-core-namedpipe-l1-1-0.dll",
+      "bytes": 22888,
+      "sha256": "97145ef89c44949fcf0f04ac834a8bc7d687ef49ee73ae9fc32f3c11136b7201"
+    },
+    {
+      "path": "_internal/api-ms-win-core-processenvironment-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "8bc7c10b1851aea644e9c9f381cdb935e091fee6b0be3d3aedc6fffaac96adb7"
+    },
+    {
+      "path": "_internal/api-ms-win-core-processthreads-l1-1-0.dll",
+      "bytes": 22912,
+      "sha256": "d8030b777617c71f0f94564607699dbf7561487d779db9756aed378c5675213f"
+    },
+    {
+      "path": "_internal/api-ms-win-core-processthreads-l1-1-1.dll",
+      "bytes": 22872,
+      "sha256": "f5e676713340f73a03a3d41a6ec9883b431da7d16c7f07bd0a920fb80e6c0753"
+    },
+    {
+      "path": "_internal/api-ms-win-core-profile-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "f023d47e44d3eea6b0743580f57e8c6ba81e79d5ebfa7da26250076c647b980e"
+    },
+    {
+      "path": "_internal/api-ms-win-core-rtlsupport-l1-1-0.dll",
+      "bytes": 22888,
+      "sha256": "9746d8930704153578a628c010638a5f818ffe5a927e25591b108e256dc6afca"
+    },
+    {
+      "path": "_internal/api-ms-win-core-string-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "7c53ae24c982d16ffd1bf7f918d115b11b7f30e57bc7feaa18cb9781e4abb926"
+    },
+    {
+      "path": "_internal/api-ms-win-core-synch-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "56d9d62ca5dba79a6581b8d574a7d8b2a64a5ecb71e47dcf06ed0285708b1859"
+    },
+    {
+      "path": "_internal/api-ms-win-core-synch-l1-2-0.dll",
+      "bytes": 22888,
+      "sha256": "f6482bbec5612c39ecb4822787a333f2b7570f7a5f922a4059be41ba957bb372"
+    },
+    {
+      "path": "_internal/api-ms-win-core-sysinfo-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "272d02765fdd3582618236c2d309abba069642f9bc1062ede069d0c144e17007"
+    },
+    {
+      "path": "_internal/api-ms-win-core-sysinfo-l1-2-0.dll",
+      "bytes": 22912,
+      "sha256": "8a0900788859d0eb51c2f48f50cc6ed376a120b518100fa20e11d7702ccde260"
+    },
+    {
+      "path": "_internal/api-ms-win-core-timezone-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "ff35de6c03812b332e140f17dade25c5dd4775156da9eeb1eaae3fddd27236ec"
+    },
+    {
+      "path": "_internal/api-ms-win-core-util-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "191ef3e98641a57296f19d572d8eb62489470ff1ef6030d136af170c2f835173"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-conio-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "54ee5ec719a051496ff60aa00dbeaa94b9a7d2cdac27fe9b7317f1a666b6a2aa"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-convert-l1-1-0.dll",
+      "bytes": 26992,
+      "sha256": "8b94662429171019fcd63c70bbf2095a075170599704a5e7dcdbe3da13f3a429"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-environment-l1-1-0.dll",
+      "bytes": 22912,
+      "sha256": "39e5929593709e8af3bc9e0a75ec1155778d6f4a247f4cdfc58928ad6db88434"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-filesystem-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "5a8ecebac32edf4e1f3c5c6c1c8ea1a1add6cda4f9c9cb26f752fb295bea6865"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-heap-l1-1-0.dll",
+      "bytes": 22872,
+      "sha256": "c71080cbcb43bf1f8f3e391deb12a582eb0abefc80946f340675a2c616e4feb4"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-locale-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "6c68648e524187e03c4ad9aaa4a99113c6ee9f29fb39cc0ed93f951975138e63"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-math-l1-1-0.dll",
+      "bytes": 31064,
+      "sha256": "d4fbcccbe29371cbce431e43b2eb4f7ba9a6f04a3d740a071f02457a505e9dc8"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-private-l1-1-0.dll",
+      "bytes": 76120,
+      "sha256": "29bf3d90617d3781d19b332d6ceb9f20ba5ce082ec74bf6c34d5d4aee56e48a1"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-process-l1-1-0.dll",
+      "bytes": 22896,
+      "sha256": "47c1935942e3ac0812e4dcf18c0e265e565f0194a3349111c299712f5565f7ac"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-runtime-l1-1-0.dll",
+      "bytes": 26968,
+      "sha256": "72adc1b3677e0814d9c4ebf0964000e84bb2acf67336c8963061665e44f78029"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-stdio-l1-1-0.dll",
+      "bytes": 26968,
+      "sha256": "900afc3989673c9bb1a687ed38c192f46db9e6ba6d11a668898a539e7fc23798"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-string-l1-1-0.dll",
+      "bytes": 26968,
+      "sha256": "fcf12466cc12fd3b73611fc0763a5a1f9d44e90349513c34a0c83b0f36421793"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-time-l1-1-0.dll",
+      "bytes": 22912,
+      "sha256": "886e57c4a6adb299b38f02945369f590a67da4e79a798359fc60aaa067212d7c"
+    },
+    {
+      "path": "_internal/api-ms-win-crt-utility-l1-1-0.dll",
+      "bytes": 22912,
+      "sha256": "5f8f26b216ade615b67a41f6fbbb910972fc6153315a65bb8f09912be50215b1"
+    },
+    {
+      "path": "_internal/atelier/blender/blend_to_glb.py",
+      "bytes": 6502,
+      "sha256": "85f8fa1c8f480f920610234e1730305f508d2de173fc58273bc092e0ab136fa0"
+    },
+    {
+      "path": "_internal/atelier/blender/glb_to_blend.py",
+      "bytes": 9233,
+      "sha256": "f5fd4376cd3141752ec028cff91ca5c169bf39fbf3be9d1b8996a925ae19d647"
+    },
+    {
+      "path": "_internal/base_library.zip",
+      "bytes": 1333490,
+      "sha256": "10c80a0957920043d27e305a008a978ba74eb0a2190be6e6be74fe559c138dc0"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/INSTALLER",
+      "bytes": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/METADATA",
+      "bytes": 1604,
+      "sha256": "441619180223f6ae8a92d1e88e4bbd48159c452bedae1e7c9c27f0673fa720d1"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/RECORD",
+      "bytes": 998,
+      "sha256": "f81250f0c50debe2a448b924697095446c610c44804fa8e22e6dc22d3461cbf1"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/WHEEL",
+      "bytes": 109,
+      "sha256": "24d5a1d459b551dc08415d3be609429f8315b8246cd2ca2d248abe27aadbc425"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/entry_points.txt",
+      "bytes": 39,
+      "sha256": "875cf070e8c1e00b75c8f2852536ff18fde842942b433e3f874fba283a3da50e"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/licenses/LICENSE",
+      "bytes": 1066,
+      "sha256": "af150257b1f7cce92b6207854f2e8f90ea9ae52d7cac758d13a47bd12e2a2443"
+    },
+    {
+      "path": "_internal/bottle-0.13.4.dist-info/top_level.txt",
+      "bytes": 7,
+      "sha256": "70af26a42d5652f5490152f55ec8c2a021a40fed1873ea5caea7c7d1f4579218"
+    },
+    {
+      "path": "_internal/clr_loader/ffi/dlls/amd64/ClrLoader.dll",
+      "bytes": 10752,
+      "sha256": "07f62bcb1b70320f221ffb2cfc5ce6133815195f3e7cdb8d833222506188c2ac"
+    },
+    {
+      "path": "_internal/clr_loader/ffi/dlls/x86/ClrLoader.dll",
+      "bytes": 10752,
+      "sha256": "3128381d133f4ff746add70100cfef713ce2d78f2b12c02ec24ec453c5dfab0d"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/INSTALLER",
+      "bytes": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/METADATA",
+      "bytes": 4394,
+      "sha256": "047cfc71226409de4318b360aef15c63a2adf609731e3dcf7fe932f14ea042ee"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/RECORD",
+      "bytes": 17959,
+      "sha256": "a3891bd341f4c6624b9f4d0bb94033a8d013439dba26c889f01f171ce1bbef83"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/WHEEL",
+      "bytes": 96,
+      "sha256": "9efe56059dbb731c438c822ac4132a2b670e174db90f09059aa246a8bdd2a575"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/licenses/LICENSE",
+      "bytes": 197,
+      "sha256": "3e0c7c091a948b82533ba98fd7cbb40432d6f1a9acbf85f5922d2f99a93ae6bb"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/licenses/LICENSE.APACHE",
+      "bytes": 11360,
+      "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/licenses/LICENSE.BSD",
+      "bytes": 1532,
+      "sha256": "602c4c7482de6479dd2e9793cda275e5e63d773dacd1eca689232ab7008fb4fb"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/sboms/cryptography-rust.cyclonedx.json",
+      "bytes": 45629,
+      "sha256": "246af194b4c524807c5aaffd2b7ff86c2c9bee3eb3fceeac987709ad76e4e7ef"
+    },
+    {
+      "path": "_internal/cryptography-50.0.2.dist-info/sboms/sbom.json",
+      "bytes": 1223,
+      "sha256": "5b5eea08dd952a16eef188f7a85ad439a4409efa0e2bce9ca339a4de9c8db3f0"
+    },
+    {
+      "path": "_internal/cryptography/hazmat/bindings/_rust.pyd",
+      "bytes": 9897472,
+      "sha256": "1d4332a447cab13dec8e3a533ad579e0e562b79e40822c931f33769758fc7156"
+    },
+    {
+      "path": "_internal/gui/app.js",
+      "bytes": 217181,
+      "sha256": "5650a025d734ff8c885cafdc8c9aa75a214533c63c29db28213727b9f53538b7"
+    },
+    {
+      "path": "_internal/gui/brand/atelier-mark.png",
+      "bytes": 618029,
+      "sha256": "1ab63695ec016afe0562026b3a303d692d6f8fd3790d15e1cbeed24a83f1d00a"
+    },
+    {
+      "path": "_internal/gui/bulk-edit.js",
+      "bytes": 8474,
+      "sha256": "268de9c1909a675c1dcd76198aa21e3fa70efa9be9cccd10d607428f3d904c9e"
+    },
+    {
+      "path": "_internal/gui/catalogue.js",
+      "bytes": 1121,
+      "sha256": "476772419d0232da7331a640a4165030f0401b311b0077144ea776ce07ad1fad"
+    },
+    {
+      "path": "_internal/gui/catalogue.json",
+      "bytes": 279038,
+      "sha256": "1c4265aeb97263c13051bb4cd26198326d7f84316f121c2f2af0c8ba61c7e25e"
+    },
+    {
+      "path": "_internal/gui/export-review.css",
+      "bytes": 1760,
+      "sha256": "9b63ae47884169ebb046864b84a25a5876224eb13c71a24274d652784758611f"
+    },
+    {
+      "path": "_internal/gui/export-review.js",
+      "bytes": 10216,
+      "sha256": "7feea3fc1c0840d6ca17e2844c19717dfb44525474b9093f95fc600c78617a0b"
+    },
+    {
+      "path": "_internal/gui/folder-icons.js",
+      "bytes": 3743,
+      "sha256": "d344d5f08846e02a6d215991c8e160208bfb003f2b17d64b6dc40b7ce65263eb"
+    },
+    {
+      "path": "_internal/gui/icons.js",
+      "bytes": 1807,
+      "sha256": "f2f588a74639e98c87ca14078107023690e2cb0f6d80afd1a86b88e42b7cd810"
+    },
+    {
+      "path": "_internal/gui/index.html",
+      "bytes": 40699,
+      "sha256": "d53ca6a03aaba75af825df3ede3c15a53754b05b18db983fb476f02ef97dbd33"
+    },
+    {
+      "path": "_internal/gui/job-tools.css",
+      "bytes": 1696,
+      "sha256": "c9264fd990bfce335c5717de3193244d92141bb81fa3af1fe50514a673b021d8"
+    },
+    {
+      "path": "_internal/gui/job-tools.js",
+      "bytes": 8866,
+      "sha256": "ee51818528c74f2fa04eb50f6b9f473cd8cb41b7f1d53b573f04639802f86ff3"
+    },
+    {
+      "path": "_internal/gui/library-pins.css",
+      "bytes": 2981,
+      "sha256": "e917d31a9651ee2943832e150f2234c2fc798ce0b29529b3049a059f21da0392"
+    },
+    {
+      "path": "_internal/gui/library-pins.js",
+      "bytes": 9683,
+      "sha256": "5d0c805545102d006bfd49a2e312fef04c99c44096519606e76b6c3280f3c7c9"
+    },
+    {
+      "path": "_internal/gui/library-tools.css",
+      "bytes": 3271,
+      "sha256": "fcd670a10cb92404199d38a8c7712ddd74bbcb1d0eefc621c88f4db12b37b0b9"
+    },
+    {
+      "path": "_internal/gui/library-tools.js",
+      "bytes": 10145,
+      "sha256": "2498dc2676ed3465f31a34ec5efe4c3c878e077cc6d642a9828f0d41353c624b"
+    },
+    {
+      "path": "_internal/gui/material-workflow.css",
+      "bytes": 3487,
+      "sha256": "a7231473921b368e658ac485317677c24311ea5d82fbac21a781e02540775a67"
+    },
+    {
+      "path": "_internal/gui/motion/README.md",
+      "bytes": 17950,
+      "sha256": "92e42314cab2468e7d5cc05907239b51331a1e79ed56a01cf046e97bb8561db3"
+    },
+    {
+      "path": "_internal/gui/motion/empty-assets-ui.js",
+      "bytes": 2355,
+      "sha256": "a90a280a12a9a2ba1e8e1de039e05c816ff78243f816535b35c03f5261ec7a17"
+    },
+    {
+      "path": "_internal/gui/motion/empty-assets.css",
+      "bytes": 3499,
+      "sha256": "adee11d8aa05037c8d069f1bf7ef747ad418177d48a0baff05ec54e83ad2b879"
+    },
+    {
+      "path": "_internal/gui/motion/empty-assets.js",
+      "bytes": 18359,
+      "sha256": "c3a195d6a0571531279bbdbbb5ee81e4e2d945992c0582f0a8def79dbc14d72d"
+    },
+    {
+      "path": "_internal/gui/motion/empty-assets.svg",
+      "bytes": 3276,
+      "sha256": "575139c4fa092039b5a191e06062266d541bdbb7cf8a3407896ef20badfcab66"
+    },
+    {
+      "path": "_internal/gui/motion/export-feedback-ui.js",
+      "bytes": 3703,
+      "sha256": "87ac7178c7e588208995d953183ab659160fe587a8d9c8e0a127e75abf7b20d2"
+    },
+    {
+      "path": "_internal/gui/motion/export-feedback.css",
+      "bytes": 5551,
+      "sha256": "c4ee52d486840d0a9403dd3d9daecd3ec4cf99fa0f8fb36479a55b2c5c3d5b82"
+    },
+    {
+      "path": "_internal/gui/motion/export-feedback.js",
+      "bytes": 13806,
+      "sha256": "19fbf12431ec7428c1d2378f0d202fea5babfbcd435017be5c34c79243298bf2"
+    },
+    {
+      "path": "_internal/gui/motion/export-feedback.svg",
+      "bytes": 1943,
+      "sha256": "2a7c86c2562601bec1ce1f4cb02596efb0ef4cc1e7eb6365010498dfd28bda11"
+    },
+    {
+      "path": "_internal/gui/motion/folder-flap.css",
+      "bytes": 2823,
+      "sha256": "e1f5c83377c8e548fd9dbb471bd421cd34c9a3b9a25a024484e982420edad901"
+    },
+    {
+      "path": "_internal/gui/motion/folder-flap.svg",
+      "bytes": 975,
+      "sha256": "05b271372c88300d687729655ea669aa3cbe61b42a3fa960f86f31a878d0a9a7"
+    },
+    {
+      "path": "_internal/gui/motion/logo-entrance-ui.js",
+      "bytes": 3018,
+      "sha256": "984aac026ffc8c81cada2b1dc4ebe704496faa529f850eef71079c1eb20a60f0"
+    },
+    {
+      "path": "_internal/gui/motion/logo-entrance.css",
+      "bytes": 2721,
+      "sha256": "e22bc7c452b96558847b07d542abc1b5aab5a6e75c835ae2a2e3cea074d9bf8f"
+    },
+    {
+      "path": "_internal/gui/motion/logo-entrance.js",
+      "bytes": 18924,
+      "sha256": "c0758f091ae5e4ba33953832a74f028b3dcf278d5b6b7521fef7237469f6ff11"
+    },
+    {
+      "path": "_internal/gui/motion/logo-entrance.svg",
+      "bytes": 14212,
+      "sha256": "805e5be3e246a9ed518ac1d7d538e974d5583025b3595035d37c49d808b46299"
+    },
+    {
+      "path": "_internal/gui/motion/material-save-ui.js",
+      "bytes": 3785,
+      "sha256": "71f071f2952f8112515c9dbc11c2b4b8a410eaa1d43cb8602e6257e0e3e28e53"
+    },
+    {
+      "path": "_internal/gui/motion/material-save.css",
+      "bytes": 6945,
+      "sha256": "2a0d14b1f66a58dd889fb5f48bae40abcf035e4fe53e71e303f7a66bcb9d0548"
+    },
+    {
+      "path": "_internal/gui/motion/material-save.js",
+      "bytes": 16541,
+      "sha256": "8565e580d3a64ec0db1355b0498a092ddb0036c154cf8bf9ea9dc5038410bc99"
+    },
+    {
+      "path": "_internal/gui/motion/material-save.svg",
+      "bytes": 3630,
+      "sha256": "1429c38d8b305b21f3bbcbe738c73f36c9768a22b56546b6865527297e3866c2"
+    },
+    {
+      "path": "_internal/gui/motion/viewport-loader.css",
+      "bytes": 7010,
+      "sha256": "ba87a722307b087e7069168c790d323f95e4414f862620b9e2f6fc8bac4ffd61"
+    },
+    {
+      "path": "_internal/gui/motion/viewport-loader.js",
+      "bytes": 17188,
+      "sha256": "01ac1373cf39785042ce872c474266efd8af53313e1af06a172ff008c901e795"
+    },
+    {
+      "path": "_internal/gui/motion/viewport-loader.svg",
+      "bytes": 3202,
+      "sha256": "f56b1d1e6dcebe0ec97a3338f767db97d759033540c4fc3624c2c60b973d8a3b"
+    },
+    {
+      "path": "_internal/gui/style.css",
+      "bytes": 58341,
+      "sha256": "a896e25dbc082712c4359a1865a3dae93b00d222924a30b2fb93946535ff40fb"
+    },
+    {
+      "path": "_internal/gui/theme.js",
+      "bytes": 12623,
+      "sha256": "d88a7b2702a2880a77161e945e0a54f05fce8983d06e8720893e03916d3a010f"
+    },
+    {
+      "path": "_internal/gui/thumbnails.css",
+      "bytes": 378,
+      "sha256": "edadec91ef78f689352588604baf4bbba11ae05af26cfdfc2472dd47f0610976"
+    },
+    {
+      "path": "_internal/gui/thumbnails.js",
+      "bytes": 6564,
+      "sha256": "303a1091c398b48ec1bcd669ba46f62a383465edc678b0c5cf20f6da092f0c09"
+    },
+    {
+      "path": "_internal/gui/tokens.css",
+      "bytes": 6127,
+      "sha256": "e5be2eaa00c48b51eaff77f3d4785353d187d76489d6dad4e2a55445a0cc6440"
+    },
+    {
+      "path": "_internal/gui/tooltips.js",
+      "bytes": 3338,
+      "sha256": "cdc3091c20f25a399d907c2273c743912d57deec3ed05531898e1823c591fe49"
+    },
+    {
+      "path": "_internal/gui/vendor/THIRD_PARTY_NOTICES.md",
+      "bytes": 1424,
+      "sha256": "d1bed370136c9a4829aaf1f7d606c4141300b278a29020595d3bb3be04b8bf95"
+    },
+    {
+      "path": "_internal/gui/vendor/lucide/LICENSE",
+      "bytes": 3208,
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+    },
+    {
+      "path": "_internal/gui/vendor/lucide/lucide.min.js",
+      "bytes": 442433,
+      "sha256": "c3291ea757ff3da0fc45a41d3ff60d61da9b257314962c5cdded94ca0df05d7a"
+    },
+    {
+      "path": "_internal/gui/vendor/material-symbols/LICENSE",
+      "bytes": 11357,
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+    },
+    {
+      "path": "_internal/gui/vendor/material-symbols/sources.json",
+      "bytes": 49340,
+      "sha256": "074c2a0dbb5a738ae25ee3a6d820ca748c9038490f2f13423b00a2cd117b79cb"
+    },
+    {
+      "path": "_internal/gui/vendor/material-symbols/symbols.js",
+      "bytes": 61516,
+      "sha256": "0ad6ac96cf2ec6e75945e13c3d58454d99fa943b77f6e78de2579244165b6274"
+    },
+    {
+      "path": "_internal/gui/vendor/roboto/OFL.txt",
+      "bytes": 4394,
+      "sha256": "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41"
+    },
+    {
+      "path": "_internal/gui/vendor/roboto/README.md",
+      "bytes": 504,
+      "sha256": "ae5e5c1035b0352f9891af600d39b0364a4e5f86ca78e0434f5082cd3421f480"
+    },
+    {
+      "path": "_internal/gui/vendor/roboto/Roboto-Variable.ttf",
+      "bytes": 488584,
+      "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134"
+    },
+    {
+      "path": "_internal/gui/vendor/three/LICENSE",
+      "bytes": 1081,
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    },
+    {
+      "path": "_internal/gui/vendor/three/jsm/controls/OrbitControls.js",
+      "bytes": 40504,
+      "sha256": "faabb4e8dfd9235ee4a9fd7c9a3d75f90f1689dbd4944bd6fd32117dacec5f93"
+    },
+    {
+      "path": "_internal/gui/vendor/three/jsm/loaders/GLTFLoader.js",
+      "bytes": 114959,
+      "sha256": "97642d720f16cc9a0c9844934198e4d0c023bea8e89576d0f7545d03b2d103d2"
+    },
+    {
+      "path": "_internal/gui/vendor/three/jsm/utils/BufferGeometryUtils.js",
+      "bytes": 37621,
+      "sha256": "5c552223a9309883743b80538d6e9cdb45e3227f30d3ec56fb2c39b46e78d595"
+    },
+    {
+      "path": "_internal/gui/vendor/three/jsm/utils/SkeletonUtils.js",
+      "bytes": 11535,
+      "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f"
+    },
+    {
+      "path": "_internal/gui/vendor/three/three.core.min.js",
+      "bytes": 385390,
+      "sha256": "0e9dd2793e01d0d9eb4f2ab00b4ffcdd4488275ebebee5c31fa8d347bc29f0bf"
+    },
+    {
+      "path": "_internal/gui/vendor/three/three.module.min.js",
+      "bytes": 365552,
+      "sha256": "86bcee248b64f44bcfc23c331ae74619061957d59cab040171dcb6fb5900beb6"
+    },
+    {
+      "path": "_internal/gui/viewport.js",
+      "bytes": 42704,
+      "sha256": "8c902a796e0520824b1d8bd47af06722bf663a18428f3fd3d7ebc0178cfc52b2"
+    },
+    {
+      "path": "_internal/libcrypto-3-x64.dll",
+      "bytes": 8003376,
+      "sha256": "57df468e551cc2579b73bfdf9cec5e80a8e5fdbbfde46ee6344d3fcd446f7e8a"
+    },
+    {
+      "path": "_internal/libffi-8.dll",
+      "bytes": 43824,
+      "sha256": "adf7d8e3413209755f75a7c69cec9e5eac84a1a6f1c8b60c22cd15e2f1732380"
+    },
+    {
+      "path": "_internal/libssl-3-x64.dll",
+      "bytes": 1599280,
+      "sha256": "91579296b970bf1c7c4947e609d84634d41ba3c38c2ada223d4d9b53ae74c4f9"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/DELVEWHEEL",
+      "bytes": 462,
+      "sha256": "071835e9599badbf48ff13018c74eec31bf7e6e566cf17cc6a131eeff34b09ea"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/INSTALLER",
+      "bytes": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/METADATA",
+      "bytes": 6635,
+      "sha256": "e2b909d6a37d76c2bc130f528d7fed0c517322bce16dc7846b6a6df30e200403"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/RECORD",
+      "bytes": 113361,
+      "sha256": "7a6857883659a24bbf975b4f61c53dd3b61715a1a654a6138bc2743ce6a23225"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/WHEEL",
+      "bytes": 85,
+      "sha256": "e743de01ba6503a3e4234858398a1e69c07d512d51e8482ec9f3a7b1c707d165"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/entry_points.txt",
+      "bytes": 220,
+      "sha256": "ec26fade0c8bdac211a6c1dd003a65eb16885b925395423e93fcaa115af4052c"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/LICENSE.txt",
+      "bytes": 45831,
+      "sha256": "a804dff0ead9fadc5293456410bcbfc32bf024be9c4513459663fb7b442d2341"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt",
+      "bytes": 1039,
+      "sha256": "d544761558b510866c21f7e8a2d5716fca76e0b98117e3b6b86314db7244d150"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING",
+      "bytes": 704,
+      "sha256": "aea41976c720f91bd19725c16916a1ace40eb1ea42620d340e587a5de4bbcea0"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE",
+      "bytes": 21155,
+      "sha256": "d208152e2777ffd0126eacc1bd21c0320d69e4e6b622d21a2a12a47e8ef73763"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt",
+      "bytes": 1441,
+      "sha256": "b0fd592d4ead563148e3977e7b589169d46a5ef2ff133c755a81af880a3fc919"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md",
+      "bytes": 1542,
+      "sha256": "a732977853530066790c42817087f4829b518dd98d340c916acbfd227e39d3cb"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE",
+      "bytes": 1573,
+      "sha256": "585483905b13d4b42f800c55ba99e89d6e2e33ccd5f503e201c07531d148ff41"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md",
+      "bytes": 1523,
+      "sha256": "8db000e158c162e7249787852d8c69764706502ccee725c06641b31c1e95c8af"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt",
+      "bytes": 2314,
+      "sha256": "19060ef465e1797d682ee0fc3081bd25ab1395e995e43d25c9d13c95d9a3cd6b"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE",
+      "bytes": 1616,
+      "sha256": "d78dbb208b80d92b4d333e41a4baae50d12444f46e53199fa7726a91de6e2da7"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md",
+      "bytes": 3582,
+      "sha256": "b4bc2f4fa1c95778f1ed3dd8f14706bece399475b978f9f34b5d3cd72521b48a"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md",
+      "bytes": 2805,
+      "sha256": "cf5619f25b112d5ce7c896efffc8e610bcb345dfadcc19f2c1460aa48fff2c9e"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md",
+      "bytes": 2986,
+      "sha256": "92c10699884321f1c2947fe2a70ab23b0fbf1507f756d89dd08f38c61fc3d4fa"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md",
+      "bytes": 1176,
+      "sha256": "41190663b77bee5302386495a07b7eabfbfa571aa0ae2f11da6764162062fc4f"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md",
+      "bytes": 1540,
+      "sha256": "322ac46d870c8aeead6c53adcccc839296fb3c8e456eae155081297daf7f8013"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md",
+      "bytes": 1253,
+      "sha256": "28cad82ce1379dc529df30da78ec012d7d0d1d576b03ddcb93388aee53659f59"
+    },
+    {
+      "path": "_internal/numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md",
+      "bytes": 340,
+      "sha256": "454ec7350e478e037061850b67395753b425b1cb0a34bbc26290b020bf89d763"
+    },
+    {
+      "path": "_internal/numpy.libs/libscipy_openblas64_-ed4f167a5330424524f45258e7ca2c8d.dll",
+      "bytes": 20589056,
+      "sha256": "ed4f167a5330424524f45258e7ca2c8d7f03c0cba1f30ee4985553ac1f88ecf8"
+    },
+    {
+      "path": "_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+      "bytes": 575056,
+      "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde"
+    },
+    {
+      "path": "_internal/numpy/_core/_multiarray_tests.cp312-win_amd64.pyd",
+      "bytes": 65536,
+      "sha256": "f09f60242eaed510e1af6384284f53ff56ae42770a62e630bd415bc2b6854d66"
+    },
+    {
+      "path": "_internal/numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
+      "bytes": 3855872,
+      "sha256": "9c10617e66e992b5ac6d9f78fe7cedd0011618e1c2f89d09a185bb63073e2c90"
+    },
+    {
+      "path": "_internal/numpy/fft/_pocketfft_umath.cp312-win_amd64.pyd",
+      "bytes": 276480,
+      "sha256": "4f008612d6b9e2ab3820ee17a1c758c499e45e80a36764c9dfb7bf304b066f03"
+    },
+    {
+      "path": "_internal/numpy/linalg/_umath_linalg.cp312-win_amd64.pyd",
+      "bytes": 112640,
+      "sha256": "03bc9de2d6d8e2d9ea3ec781f3c16bcbc9960095cc02ca588f4229cd1560c661"
+    },
+    {
+      "path": "_internal/numpy/random/_bounded_integers.cp312-win_amd64.pyd",
+      "bytes": 208896,
+      "sha256": "927c1673ba698a85e6253b4d8d2223eb019b021792c54604489767c694d2ab93"
+    },
+    {
+      "path": "_internal/numpy/random/_common.cp312-win_amd64.pyd",
+      "bytes": 174080,
+      "sha256": "712a7bb4b2d3e56548cdf255eb4e6c1ca0737d7d81d76f09bdccebb0703ae572"
+    },
+    {
+      "path": "_internal/numpy/random/_generator.cp312-win_amd64.pyd",
+      "bytes": 624640,
+      "sha256": "0fa509dcf5ae21910cb2b3c74271977d0fac7fab15ffd5f32017e08b97e71de6"
+    },
+    {
+      "path": "_internal/numpy/random/_mt19937.cp312-win_amd64.pyd",
+      "bytes": 92672,
+      "sha256": "e6938df4dd3a193b7d9171d3e192702be3a70de2ebe866cf6fcd92f9e368349d"
+    },
+    {
+      "path": "_internal/numpy/random/_pcg64.cp312-win_amd64.pyd",
+      "bytes": 105984,
+      "sha256": "8eb5569b221d40884093def83d897376bddd99c9279f182b9db3145b9b897d34"
+    },
+    {
+      "path": "_internal/numpy/random/_philox.cp312-win_amd64.pyd",
+      "bytes": 89088,
+      "sha256": "cc0c03e2c1443e8981300ddb9cc5ceb504e7f8494323d4ec0a1ad95ae16fbf75"
+    },
+    {
+      "path": "_internal/numpy/random/_sfc64.cp312-win_amd64.pyd",
+      "bytes": 64000,
+      "sha256": "20c551734cd2b2be2425c8773b795f1e92de8826ebbe6c1103cd0fa6b5c94408"
+    },
+    {
+      "path": "_internal/numpy/random/bit_generator.cp312-win_amd64.pyd",
+      "bytes": 173056,
+      "sha256": "c7f637df1fa0db9fe4bba6c05dac680d89aed245401423f1ffd16d93366a35a7"
+    },
+    {
+      "path": "_internal/numpy/random/mtrand.cp312-win_amd64.pyd",
+      "bytes": 522752,
+      "sha256": "e8bdaf22830ceaabc596854a816d39d96d1d60e96c2e12a9a17950b624d480a1"
+    },
+    {
+      "path": "_internal/pyexpat.pyd",
+      "bytes": 226096,
+      "sha256": "ba075a29d03e78a56086b5d240dee445549c4da928d590bfad2b6bed711bb8a1"
+    },
+    {
+      "path": "_internal/python3.dll",
+      "bytes": 71984,
+      "sha256": "fe6a4470d1f6bad6a2bfeb7258884b94538a21a508cf8a23e4ca3ec74962ce49"
+    },
+    {
+      "path": "_internal/python312.dll",
+      "bytes": 6985520,
+      "sha256": "2b6fffde96cf24a57fca642aaefd5788816ab5ef8624ea63b722cbceb94d49b1"
+    },
+    {
+      "path": "_internal/pythonnet/runtime/Python.Runtime.deps.json",
+      "bytes": 5984,
+      "sha256": "1df8757c717cda3d84ba1059d6c0c8d728a64013afcb2564f0edb5fe4582053f"
+    },
+    {
+      "path": "_internal/pythonnet/runtime/Python.Runtime.dll",
+      "bytes": 451584,
+      "sha256": "2ebd4492e28442ef1f1af587afe5b3a090c2ebfa220758ded4f1450f2a27f13a"
+    },
+    {
+      "path": "_internal/pythonnet/runtime/Python.Runtime.xml",
+      "bytes": 189214,
+      "sha256": "e4f896b8c692f79c55a766c4269c74d0bb2149a7fcef327c4eaf9faff8d28677"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/INSTALLER",
+      "bytes": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/METADATA",
+      "bytes": 4937,
+      "sha256": "8e7f87b5e50b992bc44d9f1dc03fb5218f0b6da5d6c4b9f21f93916bf44569c7"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/RECORD",
+      "bytes": 8531,
+      "sha256": "2360f080c9266ce4780ce4ab8b2c4d6c7dcd39748a25e1f0b8da3c1d8889e9f3"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/WHEEL",
+      "bytes": 91,
+      "sha256": "69e6228a0d35958183cc1812f07c565ce837b95eb51bd8a33acba9fa4f68d6c9"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/entry_points.txt",
+      "bytes": 64,
+      "sha256": "f4b0b8e4f0af704f8a11ff469c43a04689bf75e2ec0b1a215163ac5dfe34287f"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/licenses/LICENSE",
+      "bytes": 1518,
+      "sha256": "4a988dd3598832cd3653de20dc33cb677d0fb53ab5551c879ca31280ae653675"
+    },
+    {
+      "path": "_internal/pywebview-6.2.1.dist-info/top_level.txt",
+      "bytes": 8,
+      "sha256": "7794a9695d720645a4ded6abf95ac4397f9b04cf635cf955755369379150af10"
+    },
+    {
+      "path": "_internal/scipy.libs/libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll",
+      "bytes": 20262912,
+      "sha256": "197ee2fc9b4d071f7e048078cac741151a6585d871061cf5f88c0c73e31963a5"
+    },
+    {
+      "path": "_internal/scipy/_cyutility.cp312-win_amd64.pyd",
+      "bytes": 192512,
+      "sha256": "5d31b649995f6e9fb95e15f2ba35de18618347c33aee07b9b3eab506a2fdbd8f"
+    },
+    {
+      "path": "_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd",
+      "bytes": 105984,
+      "sha256": "4ba005064af61e94ad473f09ba67836523db6773458470a6d8d7e5c1234bbdac"
+    },
+    {
+      "path": "_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd",
+      "bytes": 11776,
+      "sha256": "227637208fefd2c1e41e57da4a161ed08c9b4a52dcb5e90f6a75f1a9f6afa4e0"
+    },
+    {
+      "path": "_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd",
+      "bytes": 247296,
+      "sha256": "5b759f7df1ef9d0f61061ed528f6e9d0fe5c8938729ae9fcc26c557302403a23"
+    },
+    {
+      "path": "_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd",
+      "bytes": 62464,
+      "sha256": "a45ee93e69c84e9c198444df93b6f8ffc4ce09c852f3892137b5b6f6034bae6a"
+    },
+    {
+      "path": "_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd",
+      "bytes": 2786816,
+      "sha256": "18398ec2696b44bda1e57036be146534d916a01fdb82d6632c73472a2dfd49af"
+    },
+    {
+      "path": "_internal/scipy/integrate/_dop.cp312-win_amd64.pyd",
+      "bytes": 87040,
+      "sha256": "63cc8187017f0bd2a5e33b7db7d487bb33ae264befb6861467994653dac1e3b1"
+    },
+    {
+      "path": "_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd",
+      "bytes": 98816,
+      "sha256": "8cec2d7783e804794aa7eecc6eb80e3380b350af35c92bc419b977ef35d901c1"
+    },
+    {
+      "path": "_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd",
+      "bytes": 142336,
+      "sha256": "03e0ed70dc1910b227f32676d4f4c8621f4b82ab45429e6f167dc582c4c67dd8"
+    },
+    {
+      "path": "_internal/scipy/integrate/_vode.cp312-win_amd64.pyd",
+      "bytes": 139776,
+      "sha256": "3b858a16e3408b25b6d3ef03066aa222e3c50f96e0526966d715a5fb93e17e5d"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd",
+      "bytes": 292864,
+      "sha256": "608680528ee32e54e13316fdd191c6a94e4bf54c64e389bf2b9f59a0ec3f9c2d"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd",
+      "bytes": 346112,
+      "sha256": "af4120e06472c88e2b44beb834a8e249ecc40de777a2d3d7f74508fa8292b8de"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd",
+      "bytes": 235008,
+      "sha256": "c3976f6cef4d797f6ad156435cba96782fd164695beb5d44dae2ebe138eb48d1"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd",
+      "bytes": 206848,
+      "sha256": "a3ef6ca12445cc777e0d07da7890959509e96905701d87b97f368e045fd6bd0d"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd",
+      "bytes": 1144832,
+      "sha256": "d2392f5b85d9fbf0d3422ee8a531dd805fcb502d64ab04afb6cb0eb21e03b5f7"
+    },
+    {
+      "path": "_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd",
+      "bytes": 122880,
+      "sha256": "430673f962ef25cdfe4587915541fc843ab77c99756af741d1cdf6c9dfe12cdf"
+    },
+    {
+      "path": "_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd",
+      "bytes": 1165824,
+      "sha256": "4ff2e41e64d34a0f34ca4363d48074451e1e9977bfc366bf0b80d4c2f4a50268"
+    },
+    {
+      "path": "_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd",
+      "bytes": 198656,
+      "sha256": "deab4aaecda674e2b45c4a19742da78dc03f624ce023846417b7a18a8339031f"
+    },
+    {
+      "path": "_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd",
+      "bytes": 742400,
+      "sha256": "cd4acc7a49f36691c2aeaa128cbe2bcaa8f85ac71b8cf131ea58ef1291b00166"
+    },
+    {
+      "path": "_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd",
+      "bytes": 303616,
+      "sha256": "2bf6c314edd1a8bf354f238415f3295ae464fde97e1f276ca7efcdc177afe546"
+    },
+    {
+      "path": "_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd",
+      "bytes": 739840,
+      "sha256": "4832bd6d4e8f9ba7317985fdfa8656e8661e98ce952ba757671e3c2d236d9389"
+    },
+    {
+      "path": "_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd",
+      "bytes": 2301440,
+      "sha256": "ea9fc3ba84abfb7bc1be930d94a237ae494df9ede89a919602d661b606f55138"
+    },
+    {
+      "path": "_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd",
+      "bytes": 172032,
+      "sha256": "ad0ec88336620b15d80f8588a212cade3700b90c329c90b26bb10c5d4b8579c8"
+    },
+    {
+      "path": "_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd",
+      "bytes": 1038336,
+      "sha256": "6ac6bea5e09d9f07f9e986bc2edbe2b632cafacdfab9815865573427814a03e4"
+    },
+    {
+      "path": "_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd",
+      "bytes": 107520,
+      "sha256": "ea95b4aa9018f7e059ce81047279d5f569d37ff6fb5eccf9da8511d115c4dc00"
+    },
+    {
+      "path": "_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd",
+      "bytes": 123904,
+      "sha256": "f7627f12ffc46542802ed6940a7c449589226548d32b8db6dd1c9abc04cd0671"
+    },
+    {
+      "path": "_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd",
+      "bytes": 127488,
+      "sha256": "3b74e06f76feab1041954f5b3efedee516bd1259cc97846338d9570ebd39c0a5"
+    },
+    {
+      "path": "_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd",
+      "bytes": 203264,
+      "sha256": "5f9f5128647dc62ebbf518b8f4993061b01497adf19cf26ffa1021f9db88ca5b"
+    },
+    {
+      "path": "_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd",
+      "bytes": 196608,
+      "sha256": "24b51c516e9344dfe459f5fd3932d04049f6ab7f9a131e2789e27c69ea7157fd"
+    },
+    {
+      "path": "_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd",
+      "bytes": 212480,
+      "sha256": "94e09844b8a3371f1b523a0aa2ce32ada0e3627456afd1e785c5a5e67849a27a"
+    },
+    {
+      "path": "_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd",
+      "bytes": 128000,
+      "sha256": "77f996dd45d7f2aa4e563340015791c067cda9971bf55dbaebedc117e26e9dc1"
+    },
+    {
+      "path": "_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd",
+      "bytes": 175616,
+      "sha256": "f1932732b5384833a4d36b4ab715e79d36c941d538ad9379445ede7dca77c7ec"
+    },
+    {
+      "path": "_internal/scipy/optimize/_direct.cp312-win_amd64.pyd",
+      "bytes": 70656,
+      "sha256": "7ccd80c266d65fa2a15b7e11dd998f3a8e81937fafc48c9f1ba4786fc867a4d7"
+    },
+    {
+      "path": "_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd",
+      "bytes": 1007616,
+      "sha256": "7b2ea108304b87833e64c3ba9e5e6e8e6421d0d2e8eda15ed5ea91a1d75ecc4a"
+    },
+    {
+      "path": "_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd",
+      "bytes": 6709248,
+      "sha256": "e6beb8321a4905c9bd0ba0eec2dfa7e27d76a01ab7d0abeab81fcce9ae6732e1"
+    },
+    {
+      "path": "_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd",
+      "bytes": 543232,
+      "sha256": "8b3ca9f9f5c5c56152bcd757a44c574f2e9c907fda564ed9ff6a5552cdf0cfa6"
+    },
+    {
+      "path": "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd",
+      "bytes": 49664,
+      "sha256": "3ab8d1a5a2391952c66a4de2126c3f151c7efdaa2e8f340c465bf79b488a2739"
+    },
+    {
+      "path": "_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd",
+      "bytes": 190976,
+      "sha256": "34e851d39d8c07b071e1206752073b86d29e5cfb63001bc611805ac1d0db7772"
+    },
+    {
+      "path": "_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd",
+      "bytes": 70144,
+      "sha256": "c7a2d232bc5d4e6afed937df153fb36d128f5c2416527f2eb7cc8306ab6bc970"
+    },
+    {
+      "path": "_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd",
+      "bytes": 125952,
+      "sha256": "24fe418dba91526e9aa41cd44902884ba42d63c67261c4c9cab514f608f0ebca"
+    },
+    {
+      "path": "_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",
+      "bytes": 151040,
+      "sha256": "b6d7facc4f94f9c07bade87ad7e9a096a4b112a2ca56fea9b4bc19ded68d0959"
+    },
+    {
+      "path": "_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd",
+      "bytes": 324096,
+      "sha256": "8b63297bce9cb14ebf4d51ac87cdad1eb27ed3b6f6867524fe06554623baff1d"
+    },
+    {
+      "path": "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd",
+      "bytes": 48640,
+      "sha256": "a108ab846bccb35169dc86b37c14e25a2ec4162b0235ea5282ba28ea057ff011"
+    },
+    {
+      "path": "_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd",
+      "bytes": 207872,
+      "sha256": "5a24ca0f7984cfce5ab7b0de61bd4d4f61593d1da1817d4cd168061cee3bc99c"
+    },
+    {
+      "path": "_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd",
+      "bytes": 23040,
+      "sha256": "8d1797a4cf71c48e1c22d38dafeb4cdd9bf882d7c59a16b2d9670a1a0a1808c2"
+    },
+    {
+      "path": "_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd",
+      "bytes": 406528,
+      "sha256": "aed673d21bb62c5c21448c954439522629e6aeba99e031ca60f45731358d2162"
+    },
+    {
+      "path": "_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd",
+      "bytes": 4239360,
+      "sha256": "c582d431dcc2e3f6863de23c1ba875eb88a88b8ba9bda833c15cb0eba306010e"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd",
+      "bytes": 185856,
+      "sha256": "ce057155684ca47b9d27c0f7385e272eae38ea433d642e5c357333cdc7528d04"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd",
+      "bytes": 183296,
+      "sha256": "9023df3bdaeb6aedb9a10803c14e10cb12afdc58c29e82c753bb364426138a6f"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd",
+      "bytes": 104448,
+      "sha256": "18425046fb2de5d66e0c2505ce117ffd8cdd2dc205dfa8b01764f4c2ebccc5ac"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd",
+      "bytes": 152576,
+      "sha256": "573cf78e0d4a66fd11b49b2a33ed020503afb4aece6d703ad08e4830226b6418"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd",
+      "bytes": 657408,
+      "sha256": "c26246270d52776546da89396c8126c906d8b6fe9dfb9c011915e1cfa47f4a6c"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd",
+      "bytes": 159232,
+      "sha256": "d0f89d2f11afeea1d8ee26b2ff68daebbef7060306e6befc05cadca870a8b09b"
+    },
+    {
+      "path": "_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd",
+      "bytes": 504320,
+      "sha256": "4051d206a9080264c95ed2c76e060abd2a7631b34f3a1a4f4fdf7cf0842ad8e1"
+    },
+    {
+      "path": "_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd",
+      "bytes": 425984,
+      "sha256": "44a265b0bf2b4c6e278799a0de9a34fd7cfffd595cb8733736765402781e18bc"
+    },
+    {
+      "path": "_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd",
+      "bytes": 223232,
+      "sha256": "e984176605364e73cc249bbba86424e52da831e6a148b865c1def3690f3a696f"
+    },
+    {
+      "path": "_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd",
+      "bytes": 166912,
+      "sha256": "faf5c9659a05df0d712632f44baa6acc6537c3f4177eed2015839c701a1b70b1"
+    },
+    {
+      "path": "_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd",
+      "bytes": 863232,
+      "sha256": "c7ba13c929c2cc4cf29bec12c35176575dfcd7ab52af3ad850d8262bce0e1cab"
+    },
+    {
+      "path": "_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd",
+      "bytes": 1479168,
+      "sha256": "3f7567c238ca2970586ce8a7a22420053c009f9be1113cb2cb59ccbde2411b64"
+    },
+    {
+      "path": "_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd",
+      "bytes": 128512,
+      "sha256": "eb9331555f5e41913cf427588277fd54ae6abb6e84a67feb66e103efcf3d3967"
+    },
+    {
+      "path": "_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd",
+      "bytes": 94208,
+      "sha256": "e475c94dbb2e89a0349135be436579c718ba51a288709e183f33ba4a3a4c4698"
+    },
+    {
+      "path": "_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd",
+      "bytes": 871936,
+      "sha256": "0fda7b02882cf95ac6e870b4472837366afe8bb45da148c9c7a91fe7f8678f47"
+    },
+    {
+      "path": "_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd",
+      "bytes": 88064,
+      "sha256": "c77df5feaf55ab9c54ef5290e6d5af51e3b92729841ea9db1c6ea9f21410cc84"
+    },
+    {
+      "path": "_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd",
+      "bytes": 236032,
+      "sha256": "7243e5be688306c3c024aef4372e8b7cbcb17880edce50838815d55758eec7b1"
+    },
+    {
+      "path": "_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd",
+      "bytes": 523776,
+      "sha256": "3f9c4835b41355056dfc8e9a0070931edd5f7866063ef9623338a20411f14cd9"
+    },
+    {
+      "path": "_internal/scipy/special/_comb.cp312-win_amd64.pyd",
+      "bytes": 48128,
+      "sha256": "b11317038aba00d901591974e3ff3866be148424300e7324684729af94f5d178"
+    },
+    {
+      "path": "_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd",
+      "bytes": 133632,
+      "sha256": "86df2b3aa07f1fb3fa2849d63a0cc133099a518bf164465360099b1f088c5fe5"
+    },
+    {
+      "path": "_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd",
+      "bytes": 937984,
+      "sha256": "3a0b65590282876be90bcbf6c4e7a0e407faab76f2cf8f99fb7adb715d136c65"
+    },
+    {
+      "path": "_internal/scipy/special/_specfun.cp312-win_amd64.pyd",
+      "bytes": 311296,
+      "sha256": "57218e37f6c0ac1da054745868e6e962e210013aa50d614c80850599a1ee9629"
+    },
+    {
+      "path": "_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd",
+      "bytes": 1630720,
+      "sha256": "7b8968e440aa7d613f0d90f5994f7c72268679409e0ea40685532452383a3cac"
+    },
+    {
+      "path": "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+      "bytes": 1434624,
+      "sha256": "4ee53d84cd5fff84e7c82292aa3e986a91f0309b1952ae800fcb2af68fb2161d"
+    },
+    {
+      "path": "_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd",
+      "bytes": 2673664,
+      "sha256": "11a9cdb4608a02bfef01f68f73aa033ba0e6474a2d9527cd300f0410e9c87f46"
+    },
+    {
+      "path": "_internal/scipy/special/cython_special.cp312-win_amd64.pyd",
+      "bytes": 2271744,
+      "sha256": "4f7b6a5e901044b8ee82bf45a09129598da71478c962e661127cee0549fb9e9f"
+    },
+    {
+      "path": "_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd",
+      "bytes": 107008,
+      "sha256": "6bd2d42b8e6d22a1d4c4ec4af90aee02b8dc6fbaeb0acd62a6319c0797d4b3d5"
+    },
+    {
+      "path": "_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd",
+      "bytes": 374784,
+      "sha256": "6cd89cd9c564e82d07576ccfc7c9447df4ed2e4efce6060228ea6198dcb5d6e7"
+    },
+    {
+      "path": "_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd",
+      "bytes": 46080,
+      "sha256": "17265c24b0978d827b8366f706a54cb005fc8939422cbf0405443bbc66435b4a"
+    },
+    {
+      "path": "_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd",
+      "bytes": 1071616,
+      "sha256": "46cd196028df91704be4ea927178425cb5d83b5041c8cd190163fe038c8ced29"
+    },
+    {
+      "path": "_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd",
+      "bytes": 127488,
+      "sha256": "9b9b0cc4916000266c426460d99c8f1bb9388727ba029bda6cf19d7c78cf607e"
+    },
+    {
+      "path": "_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd",
+      "bytes": 111616,
+      "sha256": "fcfeb902482d2ed3f1cf8733c0e86df4fa9210b51e18bd39b3b34b1e1bace8b9"
+    },
+    {
+      "path": "_internal/scipy/stats/_sobol.cp312-win_amd64.pyd",
+      "bytes": 168960,
+      "sha256": "ee5fcd62c8d7f327aaff3d43ee84ac95d5c507ffcfa795d2eeaba615a33f504a"
+    },
+    {
+      "path": "_internal/scipy/stats/_stats.cp312-win_amd64.pyd",
+      "bytes": 453632,
+      "sha256": "93d050e77912aec0db0cae5d283298a3c0c69910e7e8918a2043e877a632d3a9"
+    },
+    {
+      "path": "_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd",
+      "bytes": 1044992,
+      "sha256": "94a6b599baacd810a57746517ffc56741a9173defd611983553204ffd3ad0128"
+    },
+    {
+      "path": "_internal/select.pyd",
+      "bytes": 34608,
+      "sha256": "b8c10338202d5e3faa7168a48565a98b0dab31fde11e6a842d3dbc31d5193a05"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/INSTALLER",
+      "bytes": 2,
+      "sha256": "e6184ce10e266134fdcfa401e8f1a95005bcd4f18d16b62b757323e2833fe9a9"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/METADATA",
+      "bytes": 4670,
+      "sha256": "a3e38b9ee4326289d4864704f30e299ee769e2309ce9f4a75f0de1a50ad0a356"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/RECORD",
+      "bytes": 1868,
+      "sha256": "52a6b8ee0de15cf7fd99625f43b97cd2e3942ac86f16054ea90de48e66f29355"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/WHEEL",
+      "bytes": 91,
+      "sha256": "ff309ddcdd65ebd02bc724dbf2bcc4a0ff53a5b61792a44548d383e4ebb19d3b"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/licenses/LICENSE",
+      "bytes": 10278,
+      "sha256": "458502e12d97bbf64438606a20044aa85eb05fb0a8a807bb35dbec253fd1fc04"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/top_level.txt",
+      "bytes": 19,
+      "sha256": "08eddf0fdcb29403625e4acca38a872d5fe6a972f6b02e4914a82dd725804fe0"
+    },
+    {
+      "path": "_internal/setuptools/_vendor/jaraco/text/Lorem ipsum.txt",
+      "bytes": 1335,
+      "sha256": "37fedcffbf73c4eb9f058f47677cb33203a436ff9390e4d38a8e01c9dad28e0b"
+    },
+    {
+      "path": "_internal/sqlite3.dll",
+      "bytes": 1623344,
+      "sha256": "b70b696ed2e198dc338e903df2b7569c4bb732e746af36d74d68687b06ccce68"
+    },
+    {
+      "path": "_internal/ucrtbase.dll",
+      "bytes": 1362264,
+      "sha256": "3239227d27667ba20d10a880751924e5719de0078f9fce232d149d383f7681f6"
+    },
+    {
+      "path": "_internal/unicodedata.pyd",
+      "bytes": 1143600,
+      "sha256": "ccde2f354c01e1e5eedf4caa3c84a20d71ed3cb83c7d46ed958166261a8cfb16"
+    },
+    {
+      "path": "_internal/version",
+      "bytes": 6,
+      "sha256": "027a61167f091a427fa7844dcac0c5141bafbcbdcadc7e04a93578147ab956f2"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/AUTHORS",
+      "bytes": 2928,
+      "sha256": "253e0275f6117f5574320f516cd69a18ae8bc8ff69ced12c251e9b43e31f686f"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/COPYING",
+      "bytes": 703,
+      "sha256": "39f081828db6f94c70123fa4fb30c1bce3e215a8fdece53a49991fe076a69c08"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/INSTALLER",
+      "bytes": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/METADATA",
+      "bytes": 44292,
+      "sha256": "ecfde023047e7761dce06d4488abcede89e398399961a052f2fccb39b001e279"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/RECORD",
+      "bytes": 4580,
+      "sha256": "dcfc10dfd4dcde376334e1026ef13ff7d90cc01b3861292fbf80b59965fa01d5"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/REQUESTED",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/WHEEL",
+      "bytes": 97,
+      "sha256": "99115547a04863ee00718f9d8ba67f59e8c3bd28a25481b59546fedf47b2c2a3"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/entry_points.txt",
+      "bytes": 66,
+      "sha256": "aadfce7b65396657f3ecb340dcf1e2a67dffd7395f453a7d764df04d2dc8bdbf"
+    },
+    {
+      "path": "_internal/watchdog-6.0.0.dist-info/top_level.txt",
+      "bytes": 9,
+      "sha256": "395751ec690f1996a4a3cb11b55b8cd0d8acf99204971de17b784a14f6274c68"
+    },
+    {
+      "path": "_internal/watchdog/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/watchdog/events.py",
+      "bytes": 16323,
+      "sha256": "8a0e2808d726fa649eeab2b92cfb0851c30eddd7eaf4429e81f33d2384b056ff"
+    },
+    {
+      "path": "_internal/watchdog/observers/__init__.py",
+      "bytes": 3256,
+      "sha256": "0665ca2f55975a724ff3e591ae13f892618ad3880d00387589f25ecde66ce21b"
+    },
+    {
+      "path": "_internal/watchdog/observers/api.py",
+      "bytes": 13802,
+      "sha256": "b723e1a83873876a6f784902551476079d52697943b2b72997c5baa22750b94b"
+    },
+    {
+      "path": "_internal/watchdog/observers/fsevents.py",
+      "bytes": 14284,
+      "sha256": "ea1a37b20050b7a86cabfd45e9e260b68af90a3655d3d4daa13d35c5e1cd81de"
+    },
+    {
+      "path": "_internal/watchdog/observers/fsevents2.py",
+      "bytes": 9439,
+      "sha256": "7d9f0eef3a2696d060bee70306550764858a444167e0c281df44f98848ac3ec7"
+    },
+    {
+      "path": "_internal/watchdog/observers/inotify.py",
+      "bytes": 10649,
+      "sha256": "8b4ef900f1c8c0851d885adf7687296d8b1e754be1feedc0b4ba94ddbaa58051"
+    },
+    {
+      "path": "_internal/watchdog/observers/inotify_buffer.py",
+      "bytes": 4434,
+      "sha256": "5565ae95e15045a24bfd93348db7001a319d8f59195169948a00b85926cf9b24"
+    },
+    {
+      "path": "_internal/watchdog/observers/inotify_c.py",
+      "bytes": 21129,
+      "sha256": "cace8dad511bc366cf650524cec858e651a57c3653e27cf9f159a7e00e3d7a65"
+    },
+    {
+      "path": "_internal/watchdog/observers/kqueue.py",
+      "bytes": 24425,
+      "sha256": "1d8011cdd17f365bbbdaf4da2016c8be1e5efcded139ddf7543b5973501bda87"
+    },
+    {
+      "path": "_internal/watchdog/observers/polling.py",
+      "bytes": 4932,
+      "sha256": "07c83212dce44621e64927fc75c63fd0ff81bb45398be55641a9c1a885714ecd"
+    },
+    {
+      "path": "_internal/watchdog/observers/read_directory_changes.py",
+      "bytes": 4167,
+      "sha256": "98a1d921f528a42014d1a7bba04f53b6482093b2df4dbf25c2070c24798e5b91"
+    },
+    {
+      "path": "_internal/watchdog/observers/winapi.py",
+      "bytes": 11635,
+      "sha256": "ab69d36762589dbb845220724dc4a6a5bc388a22a1b4d43a51083d0963c85316"
+    },
+    {
+      "path": "_internal/watchdog/py.typed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/watchdog/tricks/__init__.py",
+      "bytes": 9492,
+      "sha256": "ccb16965f5cdfc0de35e51f4d0e9344a96ed5b13f65b0c2cc46ef0d8f5e4c4ff"
+    },
+    {
+      "path": "_internal/watchdog/utils/__init__.py",
+      "bytes": 3513,
+      "sha256": "f6aef01195bbca5f350dbd4270b050277df167662b1b0cb3b0ada0ccd082fa51"
+    },
+    {
+      "path": "_internal/watchdog/utils/bricks.py",
+      "bytes": 2545,
+      "sha256": "719080e13f5ed625afaf7c98e05386b8ecc8a5d3f8738361c748a97e0ca1067a"
+    },
+    {
+      "path": "_internal/watchdog/utils/delayed_queue.py",
+      "bytes": 2615,
+      "sha256": "5eff91728d746fad95b782e72c4999c65a6bf7731e055d995fe536fbe9c74b90"
+    },
+    {
+      "path": "_internal/watchdog/utils/dirsnapshot.py",
+      "bytes": 14740,
+      "sha256": "49a1a7c6ad268996f12d972925c48e8f9b04f2286e9ea8dbe7e9bcc30f45d5a0"
+    },
+    {
+      "path": "_internal/watchdog/utils/echo.py",
+      "bytes": 2210,
+      "sha256": "1802e0528b7dcd75403313302cde429074487639a2a355f7be9a554b5e0ff9e3"
+    },
+    {
+      "path": "_internal/watchdog/utils/event_debouncer.py",
+      "bytes": 2079,
+      "sha256": "a1589f76de743e33a25789fed16d4e64e08d3b88faf3d0514558021ab26f1f41"
+    },
+    {
+      "path": "_internal/watchdog/utils/patterns.py",
+      "bytes": 3672,
+      "sha256": "7e3cbc87f5da52e464a21e3ab852efdfb2738239a62b6573b756556cc35ad1c1"
+    },
+    {
+      "path": "_internal/watchdog/utils/platform.py",
+      "bytes": 885,
+      "sha256": "552378e58da4034352d4dce59abe521c1e02b74c6a2b6291972f63971ec31d28"
+    },
+    {
+      "path": "_internal/watchdog/utils/process_watcher.py",
+      "bytes": 925,
+      "sha256": "aa02ed1192e160b8e92fe1996b02048d5fa9fcf9cc91afe10461ffd6fc57fa09"
+    },
+    {
+      "path": "_internal/watchdog/version.py",
+      "bytes": 349,
+      "sha256": "82ebd033bf7cdc2b99d92e76cc4b5d86c4bf764aa16d8de6a7e190bd53380d1d"
+    },
+    {
+      "path": "_internal/watchdog/watchmedo.py",
+      "bytes": 25452,
+      "sha256": "00c4d4a4d4a542602ac5fe4486d7ca2a1e5e6223d9a03620526d467fcc43dfe8"
+    },
+    {
+      "path": "_internal/webview/__init__.py",
+      "bytes": 16979,
+      "sha256": "53a631a579ce342fb45efbe4ef024b28deabb34f061bcf058fd818ce27aa7e80"
+    },
+    {
+      "path": "_internal/webview/__pyinstaller/__init__.py",
+      "bytes": 72,
+      "sha256": "f9ce19a3c9d018a026f3073f2c3b1cc4cb4aef3aff6216704670bd08caee5011"
+    },
+    {
+      "path": "_internal/webview/__pyinstaller/hook-webview.py",
+      "bytes": 295,
+      "sha256": "d231eec5173e6327b138d17e27d4d61333c88a5b51de29144d4c1c8b916637ba"
+    },
+    {
+      "path": "_internal/webview/_version.py",
+      "bytes": 520,
+      "sha256": "41462c31d385085b195788f1583cff83d60dbdb0a928210a41a9f301f63fc039"
+    },
+    {
+      "path": "_internal/webview/dom/__init__.py",
+      "bytes": 1162,
+      "sha256": "515e69981ea8ba2efea32d473a9f9061854501475c18c33d863501aca99e6fb5"
+    },
+    {
+      "path": "_internal/webview/dom/classlist.py",
+      "bytes": 1495,
+      "sha256": "d44075bd70b819fd3de1fbbccbe0cd66a1b02f6615fb7c6dca682dc9ce73c814"
+    },
+    {
+      "path": "_internal/webview/dom/dom.py",
+      "bytes": 2628,
+      "sha256": "9eb42c3fcf53d958a138cfda2f0950310f1d81528ebcb70dd6bf9024e4865b26"
+    },
+    {
+      "path": "_internal/webview/dom/element.py",
+      "bytes": 15292,
+      "sha256": "b131a7e777187a057eb79f3950aede5dec6303aee213b9cc7f58465717621837"
+    },
+    {
+      "path": "_internal/webview/dom/event.py",
+      "bytes": 1089,
+      "sha256": "d10e8bf78b1ec61bc09f4f2e0dedbeb3ef0af320bd6277e32df2d0d9bade8b03"
+    },
+    {
+      "path": "_internal/webview/dom/propsdict.py",
+      "bytes": 6178,
+      "sha256": "0e70dd71a9d69e0cd9a4d5c9c25e65ce14eed66b849368cc9c3fe4409d54e4ce"
+    },
+    {
+      "path": "_internal/webview/errors.py",
+      "bytes": 93,
+      "sha256": "b319289c54650e4fe92313f798837858c567ddee39bc0cef49056ca528acc11f"
+    },
+    {
+      "path": "_internal/webview/event.py",
+      "bytes": 2462,
+      "sha256": "8af7dc603131e0ab3605ceb9d4545b749e052e0eb5ae9131a50b380e61f8babc"
+    },
+    {
+      "path": "_internal/webview/guilib.py",
+      "bytes": 3823,
+      "sha256": "ac780f92dae8761dd77c4d30306b2d899b7596e6b16875a9d280c7ec17f82ff0"
+    },
+    {
+      "path": "_internal/webview/http.py",
+      "bytes": 8192,
+      "sha256": "e2c1ba12e560b95918536991ec08ba4f468012527f396c435da27e8b5b902b28"
+    },
+    {
+      "path": "_internal/webview/js/api.js",
+      "bytes": 8612,
+      "sha256": "cb68b8bed427fa356aea26376e497552f55d91329c093c026a65230d074e2b27"
+    },
+    {
+      "path": "_internal/webview/js/customize.js",
+      "bytes": 4443,
+      "sha256": "ed14d0b594266dfe3834cc8565b44a8157420432aeef4f733ab505bd6ed89b8a"
+    },
+    {
+      "path": "_internal/webview/js/finish.js",
+      "bytes": 357,
+      "sha256": "751443083dd1d2b2ef4142692f25bc4f6e04f8de4d82c455c73473700f00c8cb"
+    },
+    {
+      "path": "_internal/webview/js/lib/dom_json.js",
+      "bytes": 26097,
+      "sha256": "70fae2a8a8ebc790dc616aa7976074cedd802275c173c90ad4bf3bd14163f9c4"
+    },
+    {
+      "path": "_internal/webview/js/lib/polyfill.js",
+      "bytes": 27434,
+      "sha256": "481a08f5337a770acf49b38c2f58dd0c95f92bf9dbd92bf82b596836ea343ab5"
+    },
+    {
+      "path": "_internal/webview/js/state.js",
+      "bytes": 1828,
+      "sha256": "68ee87ec01563cbcab77a57704a32f19b47436c9d5e254bfba9675a51c132075"
+    },
+    {
+      "path": "_internal/webview/lib/Microsoft.Web.WebView2.Core.dll",
+      "bytes": 649800,
+      "sha256": "8219a3135436c147f8eb02fb831e99596103eebc18b6d7b794ca93f4c67018a2"
+    },
+    {
+      "path": "_internal/webview/lib/Microsoft.Web.WebView2.WinForms.dll",
+      "bytes": 39016,
+      "sha256": "c48f8d729dc531288d2c53a6241effe7922ed1b947850b2442008a945c098c48"
+    },
+    {
+      "path": "_internal/webview/lib/WebBrowserInterop.x64.dll",
+      "bytes": 7168,
+      "sha256": "f6a646470f0e1058224a52e8e2e217501dca46939b30bfc9a5dd4dcdd43f088d"
+    },
+    {
+      "path": "_internal/webview/lib/WebBrowserInterop.x86.dll",
+      "bytes": 7168,
+      "sha256": "4e527297fbea7c5a0419f3a6af307c2681787beb0bf0ef3fea849a7fd85a08dc"
+    },
+    {
+      "path": "_internal/webview/lib/pywebview-android.jar",
+      "bytes": 14309,
+      "sha256": "3f9d3eeeda09ce58badbd742a981a463c067c339c8b4e70b404c00ebb4ec73a3"
+    },
+    {
+      "path": "_internal/webview/lib/runtimes/win-arm64/native/WebView2Loader.dll",
+      "bytes": 147016,
+      "sha256": "0937030efc718f3da77c5e0978fb5046e381d0bb7b01acaad31a535a1b588a33"
+    },
+    {
+      "path": "_internal/webview/lib/runtimes/win-x64/native/WebView2Loader.dll",
+      "bytes": 161864,
+      "sha256": "eb5335edeaa6f2122c044e82aab2351dc8c9b4e0fe5e578c71922fb61be285e7"
+    },
+    {
+      "path": "_internal/webview/lib/runtimes/win-x86/native/WebView2Loader.dll",
+      "bytes": 121928,
+      "sha256": "04814b2c59314c6452d61b821a4a3a5c5f8e8577b55b985f6a7a4b59f8907ec5"
+    },
+    {
+      "path": "_internal/webview/localization.py",
+      "bytes": 926,
+      "sha256": "310feaf4c4a0a99c72eae4c992e9745990ee24400169e1bc8a6b8ffd93ea96be"
+    },
+    {
+      "path": "_internal/webview/menu.py",
+      "bytes": 721,
+      "sha256": "a37d9a6b24c84d9df989c113d8f4516203c1eba5f5f885ff6dd1c602186879e0"
+    },
+    {
+      "path": "_internal/webview/models.py",
+      "bytes": 568,
+      "sha256": "1edc757df94f4cfc5902e93b7a6c1ba9c161747ab46334d747e9af484a5beaf5"
+    },
+    {
+      "path": "_internal/webview/platforms/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/webview/platforms/android/__init__.py",
+      "bytes": 18631,
+      "sha256": "e12c5ce7e96ee78bc5c6a81e5beae80a7bc74e2b99c8f18df06b98447ea22766"
+    },
+    {
+      "path": "_internal/webview/platforms/android/app.py",
+      "bytes": 2352,
+      "sha256": "29bf3fa9be26b206e57b33c9c253ab88d4ece7ef398d7bb7f4ebc227b8a39607"
+    },
+    {
+      "path": "_internal/webview/platforms/android/base.py",
+      "bytes": 1789,
+      "sha256": "bcd3f7db74594f98e62e384871b365c806f745b6df0c44171ff752013274da38"
+    },
+    {
+      "path": "_internal/webview/platforms/android/event.py",
+      "bytes": 2840,
+      "sha256": "433969d3942f19f10cb73d467584e57bc87e01f61f7311a6c7bd6ec9adfee203"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/__init__.py",
+      "bytes": 989,
+      "sha256": "ade3d200e0b23ce260a43b1208ce2b00eaf4d0d1d4834a042dad16100ed61c92"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/app.py",
+      "bytes": 11819,
+      "sha256": "003403da223832fc31ab44ccf1b22cdcbb4301a71fe3279683d78068181d4df1"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/content.py",
+      "bytes": 901,
+      "sha256": "e416b0d4ed6f8e318516679ad927da7a01517674b4080ffd4e2d24f39e09ab26"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/net.py",
+      "bytes": 1140,
+      "sha256": "0711d68118e2deb19a7bc746816bdf7dfb0d71189a199d2da748c3948d4acec4"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/os.py",
+      "bytes": 976,
+      "sha256": "124a6342d24a38b7de7a6aca39d0bb741108e4e2f8c3652de1cb504d0a358547"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/view.py",
+      "bytes": 3822,
+      "sha256": "fb02c0d3b2dc041132cf31cfe1f1ead52b1f0bcab5fc82726eaf8e8c375e3ef2"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jclass/webkit.py",
+      "bytes": 18777,
+      "sha256": "a7ee2c6d997d49a8ec90eb2af8dfe6f48c5718a444494ca4eb3f732166e2a662"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jinterface/__init__.py",
+      "bytes": 510,
+      "sha256": "f564b500241ac452ea6383c394d639e44dca59adc2e7904d75e2babedccfcc9a"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jinterface/pywebview.py",
+      "bytes": 3598,
+      "sha256": "cc6d34094efd7e161b8879c96f88dbaffb182b76df69a0bf454ab2748135a831"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jinterface/view.py",
+      "bytes": 1793,
+      "sha256": "822bb2ea730f4cffb3b0e09795e9a0e2ed03d9eb47e41642501752865c34d631"
+    },
+    {
+      "path": "_internal/webview/platforms/android/jinterface/webkit.py",
+      "bytes": 2434,
+      "sha256": "58301b16344cfa9126c204bbde84a20d1ad25710b62becf59a6b20ac5dcb7e9e"
+    },
+    {
+      "path": "_internal/webview/platforms/cef.py",
+      "bytes": 10786,
+      "sha256": "a9ea3e5e3f597d645d3e237dd43a6d553845160e86b26e3524fe212bd3ee56e4"
+    },
+    {
+      "path": "_internal/webview/platforms/cocoa.py",
+      "bytes": 61743,
+      "sha256": "27a5e95be0816f0bba7bed910eeda11b92de4598419a275f9346023e24ba27af"
+    },
+    {
+      "path": "_internal/webview/platforms/edgechromium.py",
+      "bytes": 14174,
+      "sha256": "f3f9168ecb39f7447566112fd14c5ec55830eddf02053eafef0d86fac509a3a4"
+    },
+    {
+      "path": "_internal/webview/platforms/gtk.py",
+      "bytes": 35877,
+      "sha256": "27803c780847139cb6230aae16ef2b9eed3f7944ca863f6a3f9751aa53ee648f"
+    },
+    {
+      "path": "_internal/webview/platforms/mshtml.py",
+      "bytes": 8989,
+      "sha256": "27ee660d6485d75245e65e7f0be5b631b11d593023d40500a3b991eff44b5328"
+    },
+    {
+      "path": "_internal/webview/platforms/qt.py",
+      "bytes": 39176,
+      "sha256": "0d78b132be416e9df3c562645e958d1be83e11e4518a19a861a2c573d4b0b61c"
+    },
+    {
+      "path": "_internal/webview/platforms/win32.py",
+      "bytes": 2932,
+      "sha256": "c24de9c92278c9d4e48e13045d47225b6d3d6629b0898f2530883a74a5e522e2"
+    },
+    {
+      "path": "_internal/webview/platforms/winforms.py",
+      "bytes": 37327,
+      "sha256": "e3962a59e74532d9266f08d1efb086519877b2d322ea83900036f59794db4b4d"
+    },
+    {
+      "path": "_internal/webview/py.typed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "_internal/webview/screen.py",
+      "bytes": 1228,
+      "sha256": "a6920538487256b022e726ebe87902cf60d6aa0c1471cc4bd9c979f8b6892479"
+    },
+    {
+      "path": "_internal/webview/state.py",
+      "bytes": 4347,
+      "sha256": "79a47b4b6ec17c8ea3c377c3c6d3600c04227208bb737c0fa839cfbe087b862d"
+    },
+    {
+      "path": "_internal/webview/util.py",
+      "bytes": 17225,
+      "sha256": "a652bd05bfb9a7a9521e8ab52f10425161fa6a84077a92ca5dcd255359b836a4"
+    },
+    {
+      "path": "_internal/webview/window.py",
+      "bytes": 19106,
+      "sha256": "00de0b2155308a29e0af42d3e5c40221cd1ea1fb30d2be55a408ab1b314d5b03"
+    }
+  ]
+}
