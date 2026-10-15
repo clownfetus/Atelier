@@ -125,6 +125,13 @@ jobs:
             Get-Process Atelier, msedgewebview2 -ErrorAction SilentlyContinue |
               Select-Object ProcessName, Id, Path |
               ConvertTo-Json | Set-Content -LiteralPath (Join-Path $report 'processes.json')
+            Get-CimInstance Win32_Process -Filter "Name='Atelier.exe' OR Name='msedgewebview2.exe'" |
+              Select-Object Name, ProcessId, ParentProcessId, ExecutablePath, CommandLine |
+              ConvertTo-Json | Set-Content -LiteralPath (Join-Path $report 'process-commands.json')
+            Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+              Where-Object { $_.LocalPort -in 8767, 9354 } |
+              Select-Object LocalAddress, LocalPort, OwningProcess |
+              ConvertTo-Json | Set-Content -LiteralPath (Join-Path $report 'listening-ports.json')
           }
           exit 0
       - name: Preserve results and screenshots

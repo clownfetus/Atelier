@@ -344,14 +344,30 @@ ConvertTo-Json -InputObject $items -Compress
 
     def connect(pw):
         journal('native-connect-start')
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        endpoints = [f'http://127.0.0.1:{args.debug_port}', f'http://localhost:{args.debug_port}']
+        connected = None
+        last_errors = {}
         def debug_ready():
-            try:
-                urllib.request.urlopen(f'http://127.0.0.1:{args.debug_port}/json/version', timeout=.5).close()
-                return True
-            except OSError:
-                return False
-        wait_for(debug_ready, 'Native WebView did not open')
-        browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.debug_port}')
+            nonlocal connected
+            for endpoint in endpoints:
+                try:
+                    with opener.open(endpoint + '/json/version', timeout=2) as response:
+                        version = json.load(response)
+                    if not version.get('webSocketDebuggerUrl'):
+                        raise ValueError('DevTools response omitted its WebSocket endpoint')
+                    connected = version['webSocketDebuggerUrl']
+                    journal('native-debug-ready', endpoint=endpoint, browser=version.get('Browser'))
+                    return True
+                except (OSError, ValueError) as exc:
+                    last_errors[endpoint] = repr(exc)
+            return False
+        try:
+            wait_for(debug_ready, 'Native WebView debugging endpoint did not become available', timeout=60)
+        except AssertionError:
+            journal('native-debug-unavailable', errors=last_errors)
+            raise
+        browser = pw.chromium.connect_over_cdp(connected)
         page = browser.contexts[0].pages[0]
         page.wait_for_load_state('domcontentloaded')
         journal('native-connect-complete', url=page.url)
@@ -368,8 +384,11 @@ ConvertTo-Json -InputObject $items -Compress
             browser, page = connect(pw)
             page.on('pageerror', lambda error: result['page_errors'].append(str(error)))
             page.wait_for_selector('#setup-overlay.active')
+            page.wait_for_selector('#setup-loading.active', state='hidden', timeout=60000)
+            assert page.locator('#setup-path').is_editable(), 'Initial configuration never became usable'
             first = page.evaluate("""() => ({url: location.href, tokens: !!document.querySelector('link[href="/static/tokens.css"]'),
-                font: getComputedStyle(document.body).fontFamily, setup: !!document.querySelector('#setup-overlay.active')})""")
+                font: getComputedStyle(document.body).fontFamily, setup: !!document.querySelector('#setup-overlay.active'),
+                setup_ready: !document.querySelector('#setup-loading.active')})""")
             assert '?ui=' in first['url'] and first['tokens'] and 'Roboto' in first['font'] and first['setup'], first
             page.screenshot(path=str(report / 'clean-first-launch.png'))
             result['clean_first_launch'] = first
