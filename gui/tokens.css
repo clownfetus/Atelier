@@ -1,0 +1,163 @@
+/* Atelier's desktop interpretation of Material 3 color, type, shape and motion.
+   Paired foreground/container roles are deliberate; see DESIGN_SYSTEM.md. */
+@font-face {
+  font-family: 'Roboto';
+  src: url('/static/vendor/roboto/Roboto-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --md-sys-color-primary: #37639d;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #dce6f4;
+  --md-sys-color-on-primary-container: #243a58;
+  --md-sys-color-secondary-container: #e0e7e3;
+  --md-sys-color-on-secondary-container: #35473d;
+  --md-sys-color-surface: #f5f6f8;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #eef0f3;
+  --md-sys-color-surface-container: #e9ecf0;
+  --md-sys-color-surface-container-high: #e4e7eb;
+  --md-sys-color-surface-container-highest: #dce0e6;
+  --md-sys-color-on-surface: #23272e;
+  --md-sys-color-on-surface-variant: #565e6a;
+  --md-sys-color-outline: #747e8b;
+  --md-sys-color-outline-variant: #c8cdd4;
+  --md-sys-color-error: #ad3032;
+  --md-sys-color-error-container: #f4dedd;
+  --md-sys-color-on-error-container: #692527;
+  --studio-success: #3e6d4a;
+  --studio-warning: #786020;
+  --studio-info: #3b6299;
+  --studio-texture: #3f6872;
+  --studio-vfx: #765571;
+  --studio-mesh: #795b48;
+  /* Muted asset identities remain distinct from status and action colors. */
+  --studio-icon-folder: #736038;
+  --studio-icon-character: #486387;
+  --studio-icon-ui: #625879;
+  --studio-icon-texture: #3f6872;
+  --studio-icon-vfx: #765571;
+  --studio-icon-material: #4b6b55;
+  --studio-icon-curve: #646b43;
+  --studio-icon-mesh: #795b48;
+  --studio-icon-text: #6e6153;
+  --studio-icon-nameplate: #7b5864;
+  --studio-icon-plugin: #406b60;
+  --studio-icon-weapon: #855556;
+  --studio-icon-unknown: #5a626d;
+  --studio-icon-animation: #665b8a;
+  --studio-icon-audio: #326d77;
+  --studio-icon-map: #596d40;
+  --studio-icon-light: #80602b;
+  --studio-icon-logic: #4e658b;
+  --studio-icon-data: #486a6c;
+  --studio-icon-tools: #805d4e;
+  --studio-icon-environment: #3e7058;
+  --studio-icon-movie: #735982;
+  --studio-scrim: rgb(20 24 30 / 40%);
+  --studio-shadow: 0 12px 36px rgb(20 24 30 / 14%);
+
+  --studio-font: 'Roboto', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --studio-mono: 'Cascadia Code', ui-monospace, monospace;
+  --studio-type-title: 600 20px/1.4 var(--studio-font);
+  --studio-type-body: 400 14px/1.5 var(--studio-font);
+  --studio-type-label: 500 13px/1.4 var(--studio-font);
+  --studio-type-detail: 400 12px/1.5 var(--studio-font);
+  --studio-space-1: 4px;
+  --studio-space-2: 8px;
+  --studio-space-3: 12px;
+  --studio-space-4: 16px;
+  --studio-space-6: 24px;
+  --studio-shape-small: 6px;
+  --studio-shape-medium: 8px;
+  --studio-shape-large: 10px;
+  --studio-shape-dialog: 12px;
+  --studio-shape-full: 999px;
+  --studio-motion-fast: 120ms;
+  --studio-motion-standard: 200ms;
+  --studio-easing: cubic-bezier(.2, 0, 0, 1);
+  --studio-control-height: 36px;
+  --studio-icon-size: 18px;
+
+  /* Stable preview surrounds: UI themes must not recolor creative content. */
+  --studio-preview-surface: #1a1a1c;
+  --studio-preview-on-surface: #e5e2e4;
+
+  /* Compatibility aliases for existing editors and dynamically generated markup. */
+  --bg: var(--md-sys-color-surface);
+  --bg2: var(--md-sys-color-surface-container-low);
+  --bg3: var(--md-sys-color-surface-container-high);
+  --border: var(--md-sys-color-outline-variant);
+  --border2: var(--md-sys-color-outline);
+  --text: var(--md-sys-color-on-surface);
+  --muted: var(--md-sys-color-on-surface-variant);
+  --acc: var(--md-sys-color-primary);
+  --acc2: var(--md-sys-color-primary);
+  --blue: var(--studio-info);
+  --green: var(--studio-success);
+  --yellow: var(--studio-warning);
+  --orange: var(--studio-warning);
+  --bd: var(--border2);
+  --fg: var(--text);
+  --line: var(--border);
+  --card-w: 156px;
+  --studio-hover: color-mix(in srgb, var(--text) 8%, transparent);
+  --studio-primary-hover: color-mix(in srgb, var(--md-sys-color-on-primary) 8%, var(--acc));
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --md-sys-color-primary: #98b7e2;
+  --md-sys-color-on-primary: #173252;
+  --md-sys-color-primary-container: #30435f;
+  --md-sys-color-on-primary-container: #dce6f4;
+  --md-sys-color-secondary-container: #35443d;
+  --md-sys-color-on-secondary-container: #d6e2d9;
+  --md-sys-color-surface: #17191d;
+  --md-sys-color-surface-container-lowest: #121417;
+  --md-sys-color-surface-container-low: #1e2126;
+  --md-sys-color-surface-container: #24272c;
+  --md-sys-color-surface-container-high: #2b2f35;
+  --md-sys-color-surface-container-highest: #353a42;
+  --md-sys-color-on-surface: #e4e6e9;
+  --md-sys-color-on-surface-variant: #b1b7c0;
+  --md-sys-color-outline: #88929f;
+  --md-sys-color-outline-variant: #434a54;
+  --md-sys-color-error: #df9d99;
+  --md-sys-color-error-container: #643534;
+  --md-sys-color-on-error-container: #f4dedd;
+  --studio-success: #96bfa0;
+  --studio-warning: #c5ad75;
+  --studio-info: #98b7e2;
+  --studio-texture: #7bb4be;
+  --studio-vfx: #b998bd;
+  --studio-mesh: #c2a08b;
+  --studio-icon-folder: #c5ac72;
+  --studio-icon-character: #91aed2;
+  --studio-icon-ui: #ada1c5;
+  --studio-icon-texture: #7bb4be;
+  --studio-icon-vfx: #b998bd;
+  --studio-icon-material: #8eb69a;
+  --studio-icon-curve: #adb57f;
+  --studio-icon-mesh: #c2a08b;
+  --studio-icon-text: #b7ab9c;
+  --studio-icon-nameplate: #c29caa;
+  --studio-icon-plugin: #82b4aa;
+  --studio-icon-weapon: #c39191;
+  --studio-icon-unknown: #a3acb9;
+  --studio-icon-animation: #afa1d2;
+  --studio-icon-audio: #79b9c5;
+  --studio-icon-map: #a3b985;
+  --studio-icon-light: #cfb176;
+  --studio-icon-logic: #9bafd1;
+  --studio-icon-data: #8bb7ba;
+  --studio-icon-tools: #c6a18d;
+  --studio-icon-environment: #83bb9d;
+  --studio-icon-movie: #b9a0cb;
+  --studio-scrim: rgb(0 0 0 / 56%);
+  --studio-shadow: 0 12px 36px rgb(0 0 0 / 36%);
+}

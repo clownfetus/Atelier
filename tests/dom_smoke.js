@@ -16,7 +16,13 @@ const els = {};
 function mkEl(id) {
   if (els[id]) return els[id];
   const el = {
-    id, value: "", textContent: "", _html: "", dataset: {}, style: {}, children: [],
+    id, value: "", textContent: "", _html: "", dataset: {},
+    style: { setProperty(name, value){ this[name] = String(value); }, getPropertyValue(name){ return this[name] || ""; } },
+    children: [],
+    attributes: {},
+    setAttribute(name, value){ this.attributes[name] = String(value); },
+    getAttribute(name){ return this.attributes[name] ?? null; },
+    contains(){ return false; },
     classList: { add(){}, remove(){}, toggle(){}, contains(){return false;} },
     addEventListener(){}, removeEventListener(){}, appendChild(c){ this.children.push(c); },
     querySelector(){ return mkEl(id + "-q"); }, querySelectorAll(){ return []; },
@@ -34,7 +40,10 @@ sandbox.document = {
   addEventListener(){}, querySelectorAll(){ return []; }, querySelector(){ return mkEl("q"); },
   body: mkEl("body"), documentElement: mkEl("html"),
 };
-sandbox.window = { addEventListener(){}, location: { href: "" }, matchMedia: () => ({matches:false, addEventListener(){}}) };
+// Browser classic scripts share the window and global namespace. Shared modules
+// publish their registry on window; app.js uses the corresponding global name.
+Object.assign(sandbox, { addEventListener(){}, location: { href: "" }, matchMedia: () => ({matches:false, addEventListener(){}}) });
+sandbox.window = sandbox;
 sandbox.localStorage = { _d:{}, getItem(k){return this._d[k] ?? null;}, setItem(k,v){this._d[k]=String(v);} };
 sandbox.lucide = { createIcons(){} };
 sandbox.EventSource = class { constructor(){} addEventListener(){} close(){} };
@@ -47,5 +56,8 @@ sandbox.globalThis = sandbox;
 sandbox.clearTimeout = clearTimeout; sandbox.setTimeout = setTimeout;
 
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(ROOT, "gui", "app.js"), "utf8"), sandbox, { filename: "gui/app.js" });
+// Same shared-service order as index.html. Motion/SVG rendering is covered by the
+// real-browser suite; this harness exercises the existing editor render assertions.
+for (const filename of ["folder-icons.js", "library-pins.js", "thumbnails.js", "library-tools.js", "export-review.js", "app.js"])
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "gui", filename), "utf8"), sandbox, { filename: "gui/" + filename });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "dom_checks.js"), "utf8"), sandbox, { filename: "tests/dom_checks.js" });

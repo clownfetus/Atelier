@@ -1,0 +1,47 @@
+/* Folder actions are siblings of the existing card button, never nested controls. */
+.folder-card-wrap { position: relative; display: flex; flex: 0 0 var(--card-w); width: var(--card-w); }
+.library-pin-toggle {
+  position: absolute; top: 16px; right: 16px; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 4px;
+  border: 1px solid var(--border); border-radius: var(--studio-shape-small);
+  background: var(--md-sys-color-surface-container-lowest); color: var(--muted);
+  cursor: pointer;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing);
+}
+.folder-card-wrap:hover > .library-pin-toggle,
+.folder-card-wrap:focus-within > .library-pin-toggle,
+.library-pin-toggle[aria-pressed="true"] { opacity: 1; pointer-events: auto; }
+.library-pin-toggle[aria-pressed="true"] { color: var(--md-sys-color-on-primary-container); background: var(--md-sys-color-primary-container); border-color: var(--acc); }
+.library-pin-toggle:hover { color: var(--acc); }
+.library-pin-toggle svg { width: 16px; height: 16px; pointer-events: none; }
+
+.library-pins {
+  display: flex; align-items: flex-start; gap: 10px; flex: 0 0 auto;
+  margin: 12px 20px 0; padding: 0;
+  max-height: 156px; overflow-y: auto;
+}
+.library-pins[hidden] { display: none; }
+.library-pins-label { color: var(--muted); font-size: 12px; font-weight: 500; padding-top: 8px; }
+.library-pins-items { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.library-pin-chip {
+  display: inline-flex; align-items: center; min-width: 0; max-width: 280px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--studio-shape-medium);
+}
+.library-pin-open, .library-pin-remove {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  color: var(--text); background: transparent; border: 0; cursor: pointer;
+  height: 32px; font: var(--studio-type-detail); padding: 0 9px;
+}
+.library-pin-open { min-width: 0; border-radius: var(--studio-shape-medium) 0 0 var(--studio-shape-medium); }
+.library-pin-open span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-pin-open .card-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+.library-pin-remove { color: var(--muted); width: 28px; flex: 0 0 28px; padding: 6px; border-radius: 0 var(--studio-shape-medium) var(--studio-shape-medium) 0; }
+.library-pin-remove svg { width: 15px; height: 15px; }
+.library-pin-open:hover, .library-pin-remove:hover { background: var(--bg3); }
+.library-pin-open:focus-visible, .library-pin-remove:focus-visible, .library-pin-toggle:focus-visible {
+  outline: 2px solid var(--acc); outline-offset: 2px;
+}
+@media (hover: none) { .library-pin-toggle { opacity: 1; pointer-events: auto; } }
+@media (max-width: 1100px) { .library-pins { margin-inline: 16px; } .library-pin-chip { max-width: 230px; } }

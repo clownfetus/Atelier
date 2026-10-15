@@ -1,9 +1,13 @@
 import os, sys, glob, re, json, fnmatch, threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from atelier import hostos as _hostos
 
 ROOT        = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
                else os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CONFIG_FILE = os.path.join(ROOT, "mr_config.json")
+# Opt-in development/test isolation. Existing installs keep exactly the same layout.
+DATA_ROOT = os.path.realpath(os.environ["ATELIER_DATA_DIR"]) if os.environ.get("ATELIER_DATA_DIR") else ROOT
+CONFIG_FILE = os.path.join(DATA_ROOT, "mr_config.json")
 
 def _load_config():
     try: return json.load(open(CONFIG_FILE, encoding="utf-8"))
@@ -23,6 +27,7 @@ def _save_config(**updates):
         for k, v in updates.items():
             if v is None: cfg.pop(k, None)
             else:         cfg[k] = v
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
         tmp = CONFIG_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
@@ -119,7 +124,7 @@ def save_usmap_checked_at(ts):
 
 _cfg            = _load_config()
 CONFIG_HAS_PAKS = bool(_cfg.get("paks"))
-TOOLS = _cfg.get("tools") or os.path.join(ROOT, "Tools")
+TOOLS = _cfg.get("tools") or os.path.join(DATA_ROOT, "Tools")
 AES_KEY_FILE = os.path.join(TOOLS, "AES_KEY.txt")  # written ONLY by set_aes_key()
 
 def _unblock_bundled_tools():
@@ -276,11 +281,11 @@ else:
     USMAP = max(_usmaps, key=_usmap_build) if _usmaps else ""
 from atelier.hostos import CNW  # noqa: E402  (re-exported: many modules import it from config)
 
-ASSETS           = os.path.join(ROOT, "assets")
-IMPORT_ROOT      = os.path.join(ROOT, "assets", "imported")
-PROJECTS_ROOT    = os.path.join(ROOT, "assets", "projects")
-ASSETS_MODS      = os.path.join(ROOT, "assets", "exported")
-_CACHE           = os.path.join(ROOT, "_cache")
+ASSETS           = os.path.join(DATA_ROOT, "assets")
+IMPORT_ROOT      = os.path.join(ASSETS, "imported")
+PROJECTS_ROOT    = os.path.join(ASSETS, "projects")
+ASSETS_MODS      = os.path.join(ASSETS, "exported")
+_CACHE           = os.path.join(DATA_ROOT, "_cache")
 WORK_IMPORT_ROOT = os.path.join(_CACHE, "import")
 CACHE_3DVIEW     = os.path.join(_CACHE, "3dview")  # material jsons + texture pngs for viewport-only reads
 GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
@@ -290,11 +295,66 @@ GUI_DIR     = os.path.join(getattr(sys, "_MEIPASS", ROOT), "gui")
 VERSION_FILE = os.path.join(getattr(sys, "_MEIPASS", ROOT), "version")
 
 _active_project = _cfg.get("active_project", "")
+_operation_root = ContextVar("atelier_project_root", default=None)
+
+
+def _path_comparison_key(path):
+    """Compare resolved Windows paths with or without an extended-length prefix.
+
+    During directory creation realpath() can preserve the prefix on only one operand.
+    Normalize the drive/UNC spelling for containment checks, never for file I/O.
+    Other device namespaces are deliberately not treated as ordinary paths.
+    """
+    path = os.path.normcase(path)
+    if os.path.sep == "\\":
+        if path.startswith("\\\\?\\unc\\"):
+            return "\\\\" + path[8:]
+        if re.match(r"^\\\\\?\\[a-z]:\\", path):
+            return path[4:]
+    return path
+
+
+def project_dir(name, root=None, must_exist=False):
+    """A plain project name directly inside the project root, never an alias outside it."""
+    if (not isinstance(name, str) or not name or name in (".", "..")
+            or name != name.strip() or name.endswith(".")
+            or any(ord(c) < 32 or c in '/\\:*?"<>|' for c in name)
+            or re.fullmatch(r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", name)):
+        raise ValueError("invalid project name")
+    root = os.path.realpath(root or PROJECTS_ROOT)
+    path = os.path.join(root, name)
+    if _path_comparison_key(os.path.dirname(os.path.realpath(path))) != _path_comparison_key(root):
+        raise ValueError("project must be inside the projects folder")
+    if must_exist and not os.path.isdir(path):
+        raise ValueError("project not found")
+    return path
+
+
+def validate_game_rel(game_rel):
+    if not isinstance(game_rel, str):
+        raise ValueError("invalid asset path")
+    parts = game_rel.replace("\\", "/").split("/")
+    if any(not p or p in (".", "..") or p.endswith((" ", "."))
+           or any(ord(c) < 32 or c in ':*?"<>|' for c in p) for p in parts):
+        raise ValueError("invalid asset path")
+    return parts
+
+
+@contextmanager
+def project_context(root):
+    """Pin a request/worker to the project it started with, independent of UI navigation."""
+    token = _operation_root.set(root)
+    try:
+        yield
+    finally:
+        _operation_root.reset(token)
 
 def get_import_root():
     global _active_project
+    if _operation_root.get() is not None:
+        return _operation_root.get()
     if _active_project:
-        return os.path.join(PROJECTS_ROOT, _active_project)
+        return project_dir(_active_project)
     return IMPORT_ROOT
 
 def project_base(game_rel, root=None):
@@ -302,11 +362,17 @@ def project_base(game_rel, root=None):
     subfolders so two assets that share a basename (e.g. same-named materials under different skins)
     never collide — the old flat basename layout silently overwrote them. Legacy flat files are still
     read via project_base_legacy() for back-compat."""
-    return os.path.join(root or get_import_root(), *game_rel.replace("\\", "/").split("/"))
+    parts = validate_game_rel(game_rel)
+    root = os.path.realpath(root or get_import_root())
+    path = os.path.join(root, *parts)
+    root_key = _path_comparison_key(root)
+    if os.path.commonpath([root_key, _path_comparison_key(os.path.realpath(path))]) != root_key:
+        raise ValueError("asset must be inside the project folder")
+    return path
 
 def project_base_legacy(game_rel, root=None):
     """The old flat layout: <import_root>/<basename>. Kept only so pre-existing projects still load."""
-    return os.path.join(root or get_import_root(), os.path.basename(game_rel.replace("\\", "/")))
+    return project_base(validate_game_rel(game_rel)[-1], root)
 
 def project_game_rel(path, root=None):
     """Reverse of project_base: a project file path -> its game_rel (relative subfolder path, no ext)."""
@@ -319,13 +385,10 @@ def get_active_project():
 
 def set_active_project(name):
     global _active_project
-    _active_project = name
-    cfg = _load_config()
     if name:
-        cfg["active_project"] = name
-    else:
-        cfg.pop("active_project", None)
-    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+        project_dir(name)
+    _save_config(active_project=name or None)
+    _active_project = name
 
 def get_mods_folder():
     """The folder mods are installed into when 'Copy to %s/' is on (the game's ~mods dir, which can
@@ -334,12 +397,7 @@ def get_mods_folder():
     return (_load_config().get("mods_folder", "") or "").replace("\\", "/")
 
 def save_mods_folder(path):
-    cfg = _load_config()
-    if path:
-        cfg["mods_folder"] = path.replace("\\", "/")
-    else:
-        cfg.pop("mods_folder", None)
-    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+    _save_config(mods_folder=path.replace("\\", "/") if path else None)
 
 def get_blender_path():
     """User-configured blender.exe path from Settings, empty string when unset (falls back to
@@ -348,12 +406,7 @@ def get_blender_path():
     return (_load_config().get("blender_path", "") or "").replace("\\", "/")
 
 def save_blender_path(path):
-    cfg = _load_config()
-    if path:
-        cfg["blender_path"] = path.replace("\\", "/")
-    else:
-        cfg.pop("blender_path", None)
-    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+    _save_config(blender_path=path.replace("\\", "/") if path else None)
 
 def get_export_password():
     """The default 'Protection Password' set in Settings, used when Password Protect is toggled
@@ -361,12 +414,7 @@ def get_export_password():
     return _load_config().get("export_password", "") or ""
 
 def save_export_password(password):
-    cfg = _load_config()
-    if password:
-        cfg["export_password"] = password
-    else:
-        cfg.pop("export_password", None)
-    json.dump(cfg, open(CONFIG_FILE, "w", encoding="utf-8"), indent=2)
+    _save_config(export_password=password or None)
 
 def _prereq_issues(need_tool=True):
     issues = []

@@ -9,13 +9,13 @@ Dumping every blob would be ~12GB, so we:
 All three tools (retoc, dxc, oo2core) are bundled standalone under Tools/shaders — nothing external.
 """
 import os, re, json, sqlite3, subprocess, threading, struct, tempfile
-from atelier.config import ROOT, TOOLS, PAKS, CNW, dir_glob
+from atelier.config import ROOT, TOOLS, PAKS, CNW, dir_glob, _CACHE
 
 SHADER_TOOLS = os.path.join(TOOLS, "shaders")
 RETOC        = os.path.join(SHADER_TOOLS, "retoc-rivals-cli.exe")
 DXC          = os.path.join(SHADER_TOOLS, "dxc.exe")
 
-CACHE   = os.path.join(ROOT, "_cache", "shaders")
+CACHE   = os.path.join(_CACHE, "shaders")
 DB_PATH = os.path.join(CACHE, "shaders.db")
 IDX_DIR = os.path.join(CACHE, "idx")
 

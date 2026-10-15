@@ -1,0 +1,105 @@
+/* Atelier — 06 Empty Edited-Assets Illustration Scoped Styles
+   Inherits Atelier tokens (--muted, --acc, --bg2, --text, --studio-easing) from gui/tokens.css.
+   Overrides the 24px .sidebar-empty svg constraint only for this dedicated component. */
+
+[data-atelier-motion="empty-assets"] {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 112px;
+  height: 112px;
+  max-width: 100%;
+  margin: 0 0 4px 0;
+  padding: 0;
+  color: var(--muted, #565e6a);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  position: relative;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sidebar-empty [data-atelier-motion="empty-assets"] > .am-empty-assets-svg,
+[data-atelier-motion="empty-assets"] > .am-empty-assets-svg {
+  display: block;
+  width: 112px;
+  height: 112px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--muted, #565e6a);
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+/* Default static settled pose (requires no JS or WAAPI to render cleanly) */
+[data-atelier-motion="empty-assets"] .am-empty-assets-plane {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  will-change: auto;
+}
+
+[data-atelier-motion="empty-assets"][data-am-state="entering"] .am-empty-assets-plane {
+  will-change: transform, opacity;
+}
+
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__tonal {
+  fill: var(--acc, #37639d);
+  fill-opacity: 0.1;
+}
+
+:root[data-theme="dark"] [data-atelier-motion="empty-assets"] .am-empty-assets-svg__tonal {
+  fill: var(--acc, #98b7e2);
+  fill-opacity: 0.12;
+}
+
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-slot {
+  stroke: var(--acc, #37639d);
+}
+
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__lip,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__bed,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-stroke,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-datum {
+  stroke: currentColor;
+}
+
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+}
+
+/* Scoped helper for hiding the static fallback package glyph only after mount succeeds */
+.sidebar-empty > .am-empty-assets-fallback-hidden,
+.am-empty-assets-fallback-hidden {
+  display: none !important;
+}
+
+/* Reduced motion enforcement */
+@media (prefers-reduced-motion: reduce) {
+  [data-atelier-motion="empty-assets"],
+  [data-atelier-motion="empty-assets"] .am-empty-assets-plane,
+  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
+  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-plane,
+[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__chassis,
+[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__accent-stroke {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  stroke-dasharray: none !important;
+  stroke-dashoffset: 0 !important;
+}

@@ -1,8 +1,14 @@
 import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from bottle import request, response, static_file
 
 from atelier.web.app import app
 from atelier import hostos
+from atelier import operations
+from atelier.storage import publish_files, container_files
+from contextlib import ExitStack
+from functools import wraps
+from urllib.parse import unquote
 import atelier.config as _c   # module handle: several routes rewrite config globals in place
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
                             CNW,
@@ -51,7 +57,7 @@ import atelier.handlers.pak_thumb as _pak_thumb_mod
 import io_lib as _io_lib_mod
 if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
     _pak_thumb_mod.start_warmup()
-from atelier.handlers.material import mat_json, is_material, read_material, save_material, reset_material
+from atelier.handlers.material import mat_json, is_material, read_material, read_material_original, save_material, reset_material
 from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
 from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
 from atelier.handlers.world import is_world
@@ -60,6 +66,64 @@ from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.project_meta as _project_meta
 import atelier.web.browse as _browse_mod
+
+
+class _ProjectScopePlugin:
+    name, api = "project_scope", 2
+
+    def apply(self, callback, route):
+        if not route.rule.startswith("/api/") or route.rule == "/api/events":
+            return callback
+
+        @wraps(callback)
+        def scoped(*args, **kwargs):
+            try:
+                body = request.json if request.content_type.startswith("application/json") else {}
+                body = body or {}
+                if not isinstance(body, dict):
+                    raise ValueError("request body must be an object")
+                # Validate asset paths before they can reach any cache/project join.
+                gr = body.get("game_rel") or request.query.get("game_rel") or request.forms.get("game_rel")
+                if gr:
+                    _c.validate_game_rel(gr)
+                asset_lists = [body.get(k, []) for k in ("game_rels", "items")]
+                if any(not isinstance(items, list) for items in asset_lists):
+                    raise ValueError("asset lists must be arrays")
+                for item in asset_lists[0] + asset_lists[1]:
+                    gr = item.get("game_rel") if isinstance(item, dict) else item
+                    if gr:
+                        _c.validate_game_rel(gr)
+                if route.rule in ("/api/reset_data", "/api/save_paks"):
+                    with operations.change_all():
+                        return callback(*args, **kwargs)
+                if route.rule in ("/api/project/create", "/api/project/rename",
+                                  "/api/project/delete", "/api/project/duplicate"):
+                    names = [body[k] for k in ("name", "old_name", "new_name") if body.get(k)]
+                    roots = [_c.project_dir(n, PROJECTS_ROOT) for n in names]
+                    with operations.change_projects(*roots):
+                        return callback(*args, **kwargs)
+                if route.rule == "/api/project/select":
+                    root = _c.project_dir(body.get("name", ""), PROJECTS_ROOT)
+                    with operations.project_use(root):
+                        return callback(*args, **kwargs)
+                if route.rule in ("/api/projects", "/api/project/export"):
+                    return callback(*args, **kwargs)
+                header = request.get_header("X-Atelier-Project")
+                name = (unquote(header) if header is not None else
+                        request.query.get("_project", get_active_project()))
+                root = _c.project_dir(name, PROJECTS_ROOT) if name else IMPORT_ROOT
+                with operations.project_use(root, write=request.method == "POST"), _c.project_context(root):
+                    if name and not os.path.isdir(root):
+                        raise ValueError("project not found")
+                    return callback(*args, **kwargs)
+            except (ValueError, operations.BusyError) as e:
+                response.status = 409 if isinstance(e, operations.BusyError) else 400
+                response.content_type = "application/json"
+                return json.dumps({"ok": False, "error": str(e)})
+        return scoped
+
+
+app.install(_ProjectScopePlugin())
 
 # ── extraction helpers ────────────────────────────────────────────────────────
 
@@ -81,6 +145,26 @@ def _cache_import_base(game_rel):
     return _asset_cache.cache_base(game_rel)
 
 # ── static ────────────────────────────────────────────────────────────────────
+from atelier.catalogue import catalogue
+
+
+@app.get('/api/catalogue/status')
+def catalogue_status():
+    catalogue.start_update()
+    response.content_type = 'application/json'
+    return json.dumps(catalogue.status())
+
+
+@app.get('/api/catalogue/thumbnail/<key>')
+def catalogue_thumbnail(key):
+    path = catalogue.thumbnail(key)
+    if path is None:
+        response.status = 404
+        response.set_header('Cache-Control', 'no-store')
+        return ''
+    result = static_file(path.name, root=str(path.parent), mimetype='image/webp')
+    result.set_header('Cache-Control', 'private, max-age=86400')
+    return result
 
 @app.route("/")
 def index():
@@ -792,7 +876,7 @@ def api_update_check():
         return json.dumps({"available": False})
 
     try:
-        with open(os.path.join(ROOT, "mr_config.json"), encoding="utf-8") as f:
+        with open(_c.CONFIG_FILE, encoding="utf-8") as f:
             _cfg_skip = json.load(f)
         if _cfg_skip.get("skipped_update") == tag:
             print(f"[update] {tag} was skipped by user")
@@ -820,16 +904,7 @@ def api_update_skip():
     if not _update_cache:
         return json.dumps({"ok": False})
     tag = _update_cache["tag"]
-    cfg_path = os.path.join(ROOT, "mr_config.json")
-    cfg = {}
-    try:
-        with open(cfg_path, encoding="utf-8") as f:
-            cfg = json.load(f)
-    except Exception:
-        pass
-    cfg["skipped_update"] = tag
-    with open(cfg_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
+    _c._save_config(skipped_update=tag)
     print(f"[update] skipped version {tag}")
     return json.dumps({"ok": True})
 
@@ -1028,136 +1103,218 @@ def api_preview():
 
 # ── thumbnail (low-mip preview, no import required) ──────────────────────────
 
+_thumb_lock = threading.RLock()
+_thumb_states = {}  # cache path -> {state, error, updated}; independent of browser/project navigation
+_thumb_files = {}   # verified PNG path -> (mtime_ns, size)
+_thumb_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="atelier-thumbs")
+_THUMB_RETRY_SECONDS = 30
+
+
+def _thumb_path(game_rel):
+    return project_base(game_rel, THUMBS_DIR) + ".png"
+
+
+def _thumb_key(game_rel):
+    return os.path.normcase(_thumb_path(game_rel))
+
+
+def _valid_thumb(path):
+    """Do not announce an incomplete/invalid old cache file as ready. Verify once per version."""
+    try:
+        stat = os.stat(path)
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        with _thumb_lock:
+            if _thumb_files.get(path) == stamp:
+                return True
+        from PIL import Image
+        with Image.open(path) as image:
+            if image.format != "PNG":
+                return False
+            image.verify()
+        with _thumb_lock:
+            _thumb_files[path] = stamp
+        return True
+    except Exception:
+        return False
+
+
+def _thumb_source(game_rel):
+    # Keep existing priority and legacy project-layout support. Workers never read project state.
+    thumb = _thumb_path(game_rel)
+    if _valid_thumb(thumb):
+        return thumb
+    full_png = _import_base(game_rel) + ".png"
+    return full_png if os.path.isfile(full_png) else None
+
+
 @app.get("/api/thumb")
 def api_thumb():
     game_rel = request.query.get("game_rel", "")
     if not game_rel:
         response.status = 404; return b""
-    thumb    = os.path.join(THUMBS_DIR, *game_rel.split("/")) + ".png"
-    full_png = _import_base(game_rel) + ".png"
-    if os.path.exists(thumb):
+    source = _thumb_source(game_rel)
+    if source:
         response.content_type = "image/png"
-        with open(thumb, "rb") as f: return f.read()
-    if os.path.exists(full_png):
-        response.content_type = "image/png"
-        with open(full_png, "rb") as f: return f.read()
+        with open(source, "rb") as f: return f.read()
     response.status = 404
+    response.set_header("Cache-Control", "no-store")
     return b""
 
-_prefetch_gen      = 0
-_prefetch_gen_lock = threading.Lock()
+
+def _requested_thumbs(body):
+    return list(dict.fromkeys("/".join(_c.validate_game_rel(gr))
+                             for gr in body.get("game_rels", []) if gr))
+
+
+def _thumb_snapshot(game_rels):
+    result = {"ok": True, "cached": [], "pending": [], "failed": [], "missing": [], "errors": {}}
+    for gr in game_rels:
+        if _thumb_source(gr):
+            result["cached"].append(gr)
+            continue
+        with _thumb_lock:
+            job = _thumb_states.get(_thumb_key(gr), {}).copy()
+        # Publication may complete between the first file check and this state read.
+        # Recheck a ready job before classifying it as a removed/missing cache file.
+        if job.get("state") == "ready" and _thumb_source(gr):
+            result["cached"].append(gr)
+        elif job.get("state") == "pending":
+            result["pending"].append(gr)
+        elif job.get("state") == "failed":
+            result["failed"].append(gr)
+            result["errors"][gr] = job["error"]
+        else:
+            # Includes never queued, server restart, and a ready file removed from the cache.
+            result["missing"].append(gr)
+    result["count"] = len(result["pending"])
+    return result
+
+
+@app.post("/api/thumb_status")
+def api_thumb_status():
+    """Read-only recovery for clients that missed an SSE or rebuilt their grid."""
+    response.content_type = "application/json"
+    response.set_header("Cache-Control", "no-store")
+    return json.dumps(_thumb_snapshot(_requested_thumbs(request.json or {})))
+
+
+def _finish_thumb(gr, error=None, run=None):
+    with _thumb_lock:
+        if run is not None and _thumb_states.get(_thumb_key(gr), {}).get("run") is not run:
+            return
+        _thumb_states[_thumb_key(gr)] = {"state": "failed" if error else "ready",
+                                       "error": str(error or ""), "updated": time.monotonic(), "run": run}
+    event = {"game_rel": gr, "thumb_failed" if error else "thumb_ready": True}
+    if error:
+        event["error"] = str(error)
+    # Delivery is best effort. /api/thumb_status remains authoritative if a client disconnects.
+    try: _push_sse(event)
+    except Exception: pass
+
+
+def _publish_thumb(gr, source):
+    """Decode/resize privately, then expose a complete PNG with one atomic replacement."""
+    import io
+    from PIL import Image
+    target = _thumb_path(gr)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    fd, staged = tempfile.mkstemp(prefix=".thumb-", suffix=".png", dir=os.path.dirname(target))
+    os.close(fd)
+    try:
+        with Image.open(io.BytesIO(source) if isinstance(source, bytes) else source) as image:
+            image.load()
+            image.thumbnail((128, 128), Image.Resampling.LANCZOS)
+            image.convert("RGBA").save(staged, "PNG", optimize=False)
+        os.replace(staged, target)
+    finally:
+        if os.path.exists(staged): os.remove(staged)
+
+
+def _decode_cached_thumb(gr, stem, run):
+    try:
+        if not stem or not os.path.isfile(stem + ".uasset"):
+            raise ValueError("Texture data could not be extracted for this preview.")
+        os.makedirs(THUMBS_DIR, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".decode-", dir=THUMBS_DIR) as scratch:
+            decoded = os.path.join(scratch, "preview.png")
+            if not decode_thumb(stem + ".uasset", decoded) or not os.path.isfile(decoded):
+                raise ValueError("This texture could not be decoded for preview.")
+            _publish_thumb(gr, decoded)
+        _finish_thumb(gr, run=run)
+    except Exception as error:
+        _finish_thumb(gr, error, run)
+
+
+def _run_thumb_batch(pending, release, run):
+    try:
+        fallback = []
+        for gr in pending:
+            try:
+                if _valid_thumb(_thumb_path(gr)):
+                    _finish_thumb(gr, run=run)
+                    continue
+                try:
+                    png = decode_thumb_from_pak(gr)
+                    if png:
+                        _publish_thumb(gr, png)
+                        _finish_thumb(gr, run=run)
+                        continue
+                except Exception as error:
+                    print(f"[PREFETCH] pak preview failed for {gr}: {error}", file=sys.stderr, flush=True)
+                stem = _asset_cache.cache_base(gr)
+                if stem and os.path.isfile(stem + ".uasset"):
+                    _decode_cached_thumb(gr, stem, run)
+                else:
+                    fallback.append(gr)
+            except Exception as error:
+                _finish_thumb(gr, error, run)
+        if fallback:
+            # Preserve one native extraction per batch/container, rather than one per tile.
+            try:
+                found = extract_many(fallback)
+            except Exception as error:
+                for gr in fallback: _finish_thumb(gr, error, run)
+            else:
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    list(executor.map(lambda gr: _decode_cached_thumb(gr, found.get(gr) or
+                                      _asset_cache.cache_base(gr), run), fallback))
+    finally:
+        # Unexpected batch errors must not strand any remaining assets in pending.
+        for gr in pending:
+            with _thumb_lock:
+                job = _thumb_states.get(_thumb_key(gr), {})
+                unfinished = job.get("run") is run and job.get("state") == "pending"
+            if unfinished: _finish_thumb(gr, "Thumbnail generation did not complete. Retry preview.", run)
+        release()
+
 
 @app.post("/api/prefetch_thumbs")
 def api_prefetch_thumbs():
-    global _prefetch_gen
     body = request.json or {}
-    game_rels = [gr for gr in body.get("game_rels", []) if gr]
-    if not game_rels:
-        response.content_type = "application/json"
-        return json.dumps({"ok": True, "cached": [], "count": 0})
-
-    with _prefetch_gen_lock:
-        _prefetch_gen += 1
-        my_gen = _prefetch_gen
-
-    cached, pending = [], []
-    for gr in game_rels:
-        thumb    = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-        full_png = _import_base(gr) + ".png"
-        if os.path.exists(thumb) or os.path.exists(full_png):
-            cached.append(gr)
-        else:
+    game_rels = _requested_thumbs(body)
+    candidates = [gr for gr in game_rels if not _thumb_source(gr)]
+    with _thumb_lock:
+        now = time.monotonic()
+        pending = []
+        for gr in candidates:
+            job = _thumb_states.get(_thumb_key(gr), {})
+            if job.get("state") == "pending": continue
+            if (job.get("state") == "failed" and not body.get("retry") and
+                    now - job["updated"] < _THUMB_RETRY_SECONDS): continue
             pending.append(gr)
-
-    def _run():
-        if not pending: return
-        from PIL import Image as _Image
-        import io as _io
-        print(f"[PREFETCH] starting {len(pending)} pending thumbs", file=sys.stderr, flush=True)
-        t_start = time.time()
-
-        # Pass 1: fast pak decode for everything; collect textures whose mips are
-        # inlined in the export-bundle (no separate BulkData chunk) for batch fallback.
-        to_fallback = []  # game_rels that need UAT extraction
-        for gr in pending:
-            with _prefetch_gen_lock:
-                if _prefetch_gen != my_gen:
-                    print(f"[PREFETCH] cancelled after pass-1", file=sys.stderr, flush=True)
-                    return
-            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if os.path.exists(thumb):
-                continue
-            png = decode_thumb_from_pak(gr)
-            if png:
-                os.makedirs(os.path.dirname(thumb), exist_ok=True)
-                with open(thumb, "wb") as f:
-                    f.write(png)
-                _push_sse({"thumb_ready": True, "game_rel": gr})
-            else:
-                cb = _asset_cache.cache_base(gr)
-                uasset = (cb + ".uasset") if cb else ""
-                if uasset and os.path.exists(uasset):
-                    # uasset already on disk (previously imported), just decode
-                    decode_thumb(uasset, thumb)
-                    if os.path.exists(thumb):
-                        _push_sse({"thumb_ready": True, "game_rel": gr})
-                else:
-                    to_fallback.append(gr)
-
-        n_pak = len(pending) - len(to_fallback)
-        print(f"[PREFETCH] pass-1 done: {n_pak} pak-ok, {len(to_fallback)} need UAT  ({time.time()-t_start:.2f}s)",
-              file=sys.stderr, flush=True)
-
-        if not to_fallback:
-            return
-
-        with _prefetch_gen_lock:
-            if _prefetch_gen != my_gen:
-                return
-
-        # Pass 2: batch-extract all no-bulk textures in one UAT call, then
-        # parallel-decode thumbnails per-file to THUMBS_DIR.
-        import concurrent.futures as _cf
-        t_uat = time.time()
-        print(f"[PREFETCH] batch extract {len(to_fallback)} assets...", file=sys.stderr, flush=True)
-        found = extract_many(to_fallback)       # one retoc call per container, or UAT on Windows
-        for gr in to_fallback:
-            print(f"[PREFETCH cache] {gr}: {'-> ' + found[gr] if gr in found else 'uasset NOT FOUND'}",
-                  file=sys.stderr, flush=True)
-        print(f"[PREFETCH] extract done in {time.time()-t_uat:.2f}s", file=sys.stderr, flush=True)
-
-        t_dec = time.time()
-        def _decode_thumb_fallback(gr):
-            cb = _asset_cache.cache_base(gr)
-            if not cb: return
-            uasset = cb + ".uasset"
-            if not os.path.exists(uasset): return
-            th = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            os.makedirs(os.path.dirname(th), exist_ok=True)
-            decode_thumb(uasset, th)
-        with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
-            list(_ex.map(_decode_thumb_fallback, to_fallback))
-        print(f"[PREFETCH] decode done in {time.time()-t_dec:.2f}s", file=sys.stderr, flush=True)
-
-        # Resize decoded PNGs in-place to thumbnail size, fire SSE per asset
-        for gr in to_fallback:
-            thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
-            if os.path.exists(thumb):
-                try:
-                    img = _Image.open(thumb)
-                    if img.width > 128 or img.height > 128:
-                        img.thumbnail((128, 128), _Image.LANCZOS)
-                        img.save(thumb, "PNG", optimize=False)
-                except Exception:
-                    pass
-                _push_sse({"thumb_ready": True, "game_rel": gr})
-
-        print(f"[PREFETCH] total {time.time()-t_start:.2f}s  ({len(to_fallback)} batched UAT fallbacks)",
-              file=sys.stderr, flush=True)
-
-    threading.Thread(target=_run, daemon=True).start()
+        if pending:
+            # Shared-cache jobs outlive this HTTP request; Reset Data must wait for them too.
+            release = operations.reserve(_CACHE)
+            run = object()
+            for gr in pending:
+                _thumb_states[_thumb_key(gr)] = {"state": "pending", "updated": now, "run": run}
+            try:
+                _thumb_executor.submit(_run_thumb_batch, pending, release, run)
+            except Exception as error:
+                release()
+                for gr in pending: _finish_thumb(gr, error, run)
     response.content_type = "application/json"
-    return json.dumps({"ok": True, "cached": cached, "count": len(pending)})
+    return json.dumps(_thumb_snapshot(game_rels))
 
 # ── imported list ─────────────────────────────────────────────────────────────
 
@@ -1388,6 +1545,18 @@ def api_material_params():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
 
+@app.get("/api/material_original")
+def api_material_original():
+    """Comparison data from the game, never from the current project's saved edits."""
+    response.content_type = "application/json"
+    gr = request.query.get("game_rel", "")
+    if not gr:
+        return json.dumps({"ok": False, "error": "missing game_rel"})
+    try:
+        return json.dumps({"ok": True, "game_rel": gr, **read_material_original(gr)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
 @app.post("/api/material_save")
 def api_material_save():
     body = request.json or {}
@@ -1440,7 +1609,17 @@ def _push_sse(data: dict):
 
 _browse_mod._update_callback = _push_sse
 
-def _run_import_job(items):
+def _run_import_job(items, project_root=None, release=None):
+    root = project_root or get_import_root()
+    try:
+        with operations.project_use(root, write=True), _c.project_context(root):
+            _run_import_job_in_project(items)
+    finally:
+        if release:
+            release()
+
+
+def _run_import_job_in_project(items):
     """items: [{skin_id, rel_path, game_rel, name}] — extract+decode all via UAssetTool."""
     with _job_lock:
         _job.update(running=True, current=0, total=len(items), name="", done=False, error=None, results=[])
@@ -1448,7 +1627,7 @@ def _run_import_job(items):
         _push_sse({"current": 0, "total": len(items), "name": "Extracting from game…", "done": False})
         os.makedirs(get_import_root(), exist_ok=True)
         extract_many([it["game_rel"] for it in items])   # one retoc call per container, or UAT on Windows
-        _asset_cache.record_many(cache_entries)
+        # extract_many records every extracted asset itself.
 
         _push_sse({"current": 0, "total": len(items), "name": "Decoding…", "done": False})
         decode_flat([it["game_rel"] for it in items], get_import_root())
@@ -1470,8 +1649,11 @@ def _run_import_job(items):
         return
 
     with _job_lock:
-        _job.update(running=False, done=True, results=results)
-    _push_sse({"current": current, "total": len(items), "name": "", "done": True, "results": results})
+        missing = len(items) - len(results)
+        error = f"{missing} texture(s) could not be imported" if missing else None
+        _job.update(running=False, done=True, results=results, error=error)
+    _push_sse({"current": current, "total": len(items), "name": "", "done": True,
+               "results": results, "error": error})
 
 @app.post("/api/import_all")
 def api_import_all():
@@ -1484,7 +1666,17 @@ def api_import_all():
         if _job["running"]:
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": "job already running"})
-    threading.Thread(target=_run_import_job, args=(items,), daemon=True).start()
+        root = get_import_root()
+        release = operations.reserve(root)
+        # Claim before starting the thread: a second HTTP request must see it immediately.
+        _job.update(running=True, current=0, total=len(items), done=False, error=None, results=[])
+    try:
+        threading.Thread(target=_run_import_job, args=(items, root, release), daemon=True).start()
+    except Exception:
+        release()
+        with _job_lock:
+            _job.update(running=False, done=True, error="Could not start import worker")
+        raise
     response.content_type = "application/json"
     return json.dumps({"ok": True, "total": len(items)})
 
@@ -1632,7 +1824,7 @@ def api_project_select():
     if not name:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1647,7 +1839,7 @@ def api_project_create():
     if not name or any(c in name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid project name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if os.path.exists(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project already exists"})
@@ -1665,8 +1857,8 @@ def api_project_rename():
     if not old_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid name"})
-    old_dir = os.path.join(PROJECTS_ROOT, old_name)
-    new_dir = os.path.join(PROJECTS_ROOT, new_name)
+    old_dir = _c.project_dir(old_name, PROJECTS_ROOT)
+    new_dir = _c.project_dir(new_name, PROJECTS_ROOT)
     response.content_type = "application/json"
     if not os.path.isdir(old_dir):
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1688,8 +1880,8 @@ def api_project_duplicate():
     if not src_name or not new_name or any(c in new_name for c in r'/\:*?"<>|'):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "invalid name"})
-    src_dir = os.path.join(PROJECTS_ROOT, src_name)
-    dst_dir = os.path.join(PROJECTS_ROOT, new_name)
+    src_dir = _c.project_dir(src_name, PROJECTS_ROOT)
+    dst_dir = _c.project_dir(new_name, PROJECTS_ROOT)
     if not os.path.isdir(src_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "source project not found"})
@@ -1722,7 +1914,7 @@ def api_project_delete():
     if not name:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no name"})
-    project_dir = os.path.join(PROJECTS_ROOT, name)
+    project_dir = _c.project_dir(name, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
@@ -1736,15 +1928,23 @@ def _safe_project_dir(name):
     """The folder for `name`, or None when the name is not a plain project name sitting directly
     in PROJECTS_ROOT. Export is the one project route that takes a list, so a bad entry must fail
     the request rather than quietly resolve somewhere else on disk."""
-    name = (name or "").strip()
-    if not name or name in (".", "..") or any(c in name for c in r'/\:*?"<>|'):
+    try:
+        return _c.project_dir(name, PROJECTS_ROOT, must_exist=True)
+    except ValueError:
         return None
-    path = os.path.join(PROJECTS_ROOT, name)
-    if os.path.dirname(os.path.abspath(path)) != os.path.abspath(PROJECTS_ROOT):
-        return None
-    return path if os.path.isdir(path) else None
 
 def _build_project_zip(names):
+    with ExitStack() as stack:
+        # Reserve all source projects before reading any files. An unrelated active
+        # project is immaterial to a multi-project archive.
+        # A stable order also prevents two reversed multi-project exports deadlocking.
+        roots = sorted({_c.project_dir(name, PROJECTS_ROOT, must_exist=True) for name in names})
+        for root in roots:
+            stack.enter_context(operations.project_use(root, write=True))
+        return _build_project_zip_reserved(names)
+
+
+def _build_project_zip_reserved(names):
     """Pack the named projects into one .zip under the cache and return its path.
 
     One project zips its own contents at the root, so unzipping gives the project back as-is;
@@ -1762,8 +1962,8 @@ def _build_project_zip(names):
         raise ValueError("no projects given")
 
     out_dir = os.path.join(_CACHE, "project_export")
-    shutil.rmtree(out_dir, ignore_errors=True)   # one export at a time; the last zip is not worth keeping
     os.makedirs(out_dir, exist_ok=True)
+    out_dir = tempfile.mkdtemp(prefix="archive-", dir=out_dir)
     stem = dirs[0][0] if len(dirs) == 1 else f"atelier_projects_{len(dirs)}"
     zip_path = os.path.join(out_dir, stem + ".zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -1808,7 +2008,7 @@ def api_project_thumb():
     project = request.query.get("project", "")
     if not project:
         response.status = 404; return b""
-    project_dir = os.path.join(PROJECTS_ROOT, project)
+    project_dir = _c.project_dir(project, PROJECTS_ROOT)
     if not os.path.isdir(project_dir):
         response.status = 404; return b""
     best_file  = None
@@ -1868,7 +2068,7 @@ def api_reset_data():
     paths_to_remove = [
         _c.ASSETS,
         _c._CACHE,
-        os.path.join(ROOT, "_logs"),
+        os.path.join(_c.DATA_ROOT, "_logs"),
         os.path.join(_c.TOOLS, "Mappings"),
         _c.AES_KEY_FILE,
     ]
@@ -2028,9 +2228,9 @@ def _split_export_items(items):
     mesh_items  = [gr for gr in items if _is_mesh_item(gr)]                          # edits from the .blend
     return tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items
 
-def _install_to_mods(mod_name, export_dir):
+def _install_to_mods(mod_name, export_dir, artifacts=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
-    removing any previous version of THIS mod first. Returns (ok, error, dest_dir)."""
+    with verification and rollback of replacements. Returns (ok, error, dest_dir)."""
     mods = get_mods_folder()
     if not mods:
         return False, "No mods folder set — configure one in Menu → Settings.", None
@@ -2039,19 +2239,12 @@ def _install_to_mods(mod_name, export_dir):
         os.makedirs(mods, exist_ok=True)
     except Exception as e:
         return False, f"Mods folder not usable: {e}", None
-    for ext in (".pak", ".ucas", ".utoc"):              # drop the previous version of this mod
-        old = os.path.join(mods, stem + ext)
-        if os.path.exists(old):
-            try: os.remove(old)
-            except Exception as e: return False, f"Couldn't replace old mod ({stem + ext}): {e}", None
-    copied = []
-    for ext in (".pak", ".ucas", ".utoc"):
-        src = os.path.join(export_dir, stem + ext)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(mods, stem + ext)); copied.append(ext)
-    if ".utoc" not in copied:
-        return False, "build produced no .utoc to install", None
-    return True, None, mods
+    try:
+        sources = artifacts or container_files(os.path.join(export_dir, stem))
+        publish_files(sources, mods)
+        return True, None, mods
+    except Exception as e:
+        return False, f"Could not install mod: {e}", None
 
 def _mod_stem(mod_name):
     """Filesystem-safe stem for a mod name.
@@ -2105,7 +2298,8 @@ def api_install_mod():
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
                            text_items=text_items, password=password, mesh_items=mesh_items,
-                           asset_opts=_project_meta.get_asset_opts(get_import_root()))
+                           asset_opts=_project_meta.get_asset_opts(get_import_root()),
+                           allow_unsafe_world=bool(body.get("allow_unsafe_world")))
         if not result.get("ok"):
             return json.dumps({"ok": False, "error": result.get("error", "build failed")})
         pak = result.get("pak")
@@ -2115,11 +2309,12 @@ def api_install_mod():
         # missing. That is indistinguishable from the game ignoring the edit, which is exactly the
         # confusion the whole diagnostics phase exists to remove.
         resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
-                "applied": result.get("applied") or [], "skipped": result.get("skipped") or []}
+                "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
+                "artifacts": result.get("artifacts") or []}
         if copy_to_mods:
-            ok, err, dest = _install_to_mods(mod_name, out_dir)
+            ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
             if not ok:
-                return json.dumps({"ok": False, "error": err})
+                return json.dumps({**resp, "ok": False, "built": True, "error": err})
             resp["installed_dir"] = dest.replace("\\", "/")
         return json.dumps(resp)
     except Exception as e:

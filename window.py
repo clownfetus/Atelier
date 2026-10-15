@@ -10,12 +10,13 @@ if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
 import webview
 
 from atelier import hostos
+from atelier.web.app import PORT
 
-PORT = 8767
 URL  = f"http://localhost:{PORT}"
 
 _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
          else os.path.dirname(os.path.abspath(__file__)))
+_DATA_ROOT = os.path.realpath(os.environ["ATELIER_DATA_DIR"]) if os.environ.get("ATELIER_DATA_DIR") else _ROOT
 
 
 def _show_launch_toast():
@@ -30,7 +31,7 @@ def _show_launch_toast():
 
 
 def _setup_logging():
-    logs_dir = os.path.join(_ROOT, "_logs")
+    logs_dir = os.path.join(_DATA_ROOT, "_logs")
     os.makedirs(logs_dir, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     lf = open(os.path.join(logs_dir, f"{ts}.txt"), "w", encoding="utf-8", buffering=1)
@@ -103,7 +104,7 @@ def main():
     # A persistent store also keeps the Settings toggles across launches, which is what the UI
     # already assumes when it reads them back.
     webview.start(_focus, debug=_debug, private_mode=False,
-                  storage_path=os.path.join(_ROOT, "_webview"))
+                  storage_path=os.path.join(_DATA_ROOT, "_webview"))
     os._exit(0)
 
 

@@ -2,37 +2,72 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atelier</title>
-<script src="/static/vendor/lucide/lucide.min.js"></script>
+<link rel="icon" type="image/png" href="/static/brand/atelier-mark.png">
+<script src="/static/theme.js"></script>
+<script src="/static/catalogue.js" defer></script>
+<script src="/static/vendor/material-symbols/symbols.js"></script>
+<script src="/static/icons.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "/static/vendor/three/three.module.min.js",
   "three/addons/": "/static/vendor/three/jsm/"
 }}
 </script>
+<link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/library-pins.css">
+<link rel="stylesheet" href="/static/thumbnails.css">
+<link rel="stylesheet" href="/static/library-tools.css">
+<link rel="stylesheet" href="/static/material-workflow.css">
+<link rel="stylesheet" href="/static/export-review.css">
+<link rel="stylesheet" href="/static/motion/export-feedback.css">
+<link rel="stylesheet" href="/static/motion/viewport-loader.css">
+<link rel="stylesheet" href="/static/motion/folder-flap.css">
+<link rel="stylesheet" href="/static/motion/material-save.css">
+<link rel="stylesheet" href="/static/motion/empty-assets.css">
+<link rel="stylesheet" href="/static/motion/logo-entrance.css">
 </head>
 <body>
 
 <!-- ── top bar ── -->
 <div id="topbar">
+  <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
   <div id="nav-btns">
     <button class="nav-btn" id="btn-back"    title="Back"    disabled><i data-lucide="arrow-left"  size="15"></i></button>
     <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
   </div>
-  <div id="breadcrumbs"></div>
+  <nav id="breadcrumbs" aria-label="Asset location"></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
-    <input id="search-input" type="text" placeholder="Search... (Ctrl+F)">
+    <input id="search-input" type="search" aria-label="Search assets by name, ID or path" placeholder="Search names, IDs, paths…" aria-keyshortcuts="Control+f Meta+f">
+    <kbd>Ctrl F</kbd>
   </div>
+  <label class="theme-control" title="Interface appearance">
+    <i data-lucide="palette" size="18"></i>
+    <select data-theme-picker aria-label="Color theme">
+      <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
+    </select>
+  </label>
 </div>
 
 <!-- ── body ── -->
 <div id="body">
 
   <!-- explorer -->
-  <div id="explorer">
+  <main id="explorer" aria-label="Asset library">
+    <div class="library-heading"><h1>Asset library</h1><span id="library-count" aria-live="polite"></span></div>
+    <div class="library-controls" role="group" aria-label="Library view controls">
+      <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
+      <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
+      <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
+      <label>Size <select id="library-size" aria-label="Thumbnail size"><option value="128">Compact</option><option value="156">Standard</option><option value="196">Large</option><option value="236">Extra large</option></select></label>
+      <button class="btn" id="library-clear" type="button">Clear filters</button>
+      <span class="library-scope" title="Search and filters apply to the current folder. Sort and size are remembered.">This folder</span>
+    </div>
+    <section id="home-pins" aria-label="Pinned folders" hidden></section>
     <div id="grid-area">
       <div id="empty-state">
         <i data-lucide="loader" size="32" style="color:var(--muted)"></i>
@@ -46,26 +81,30 @@
       </button>
       <span id="status-msg"></span>
     </div>
-  </div>
+  </main>
 
   <!-- sidebar resize handle -->
   <div id="sidebar-resize"></div>
 
   <!-- sidebar -->
-  <div id="sidebar">
+  <aside id="sidebar" aria-label="Edited assets and mod export">
     <div id="sidebar-header">
       <div style="display:flex;align-items:center;gap:6px">
         <i data-lucide="package" size="13"></i>
         Edited Assets
       </div>
       <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
-      <span id="sel-count" title="Toggle select all/none">0</span>
+      <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
+      <label class="field-label" for="mod-name-input">Mod filename</label>
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
       <button class="btn primary" id="install-btn" title="Build the mod and install it" disabled>
-        <i data-lucide="hard-drive-download" size="14"></i>
+        <span class="am-export-feedback-slot" aria-hidden="true">
+          <i data-lucide="hard-drive-download" size="20" class="am-export-feedback-fallback"></i>
+          <span id="install-btn-motion-host"></span>
+        </span>
         Export Mod
       </button>
       <div id="install-toggles">
@@ -79,7 +118,7 @@
         </label>
       </div>
     </div>
-  </div>
+  </aside>
 </div>
 
 <!-- ── confirm: single import ── -->
@@ -120,7 +159,7 @@
     <p id="confirm-clear-msg">Delete this edited asset from local assets?</p>
     <div class="modal-row">
       <button class="btn" id="confirm-clear-cancel">Cancel</button>
-      <button class="btn primary" id="confirm-clear-ok">Delete</button>
+      <button class="btn primary danger" id="confirm-clear-ok">Delete</button>
     </div>
   </div>
 </div>
@@ -136,7 +175,7 @@
     </div>
     <div class="modal-row">
       <button class="btn" id="confirm-clear-all-cancel">Cancel</button>
-      <button class="btn primary" id="confirm-clear-all-ok">
+      <button class="btn primary danger" id="confirm-clear-all-ok">
         <i data-lucide="trash-2" size="14"></i>
         Delete All
       </button>
@@ -202,7 +241,10 @@
       <div id="viewport-stage">
         <canvas id="viewport-canvas"></canvas>
         <div id="viewport-loading">
-          <div class="spinner"></div>
+          <div class="am-viewport-loader-slot" id="viewport-loading-slot" aria-hidden="true">
+            <span class="am-viewport-loader-fallback"><i data-lucide="box" size="72"></i></span>
+            <span id="viewport-loading-motion-host"></span>
+          </div>
           <span id="viewport-loading-msg">Decoding model…</span>
         </div>
       </div>
@@ -286,7 +328,7 @@
 </div>
 
 <!-- ── toast area ── -->
-<div id="toast-area"></div>
+<div id="toast-area" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <!-- ── update check / download ── -->
 <div class="overlay" id="update-overlay">
@@ -335,6 +377,20 @@
       <button class="sb-clear" id="setup-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
     <div class="setup-body">
+      <div class="setup-section">Appearance</div>
+      <div class="setup-field">
+        <label class="setup-label" for="settings-theme">Color theme</label>
+        <select id="settings-theme" class="setup-input" data-theme-picker>
+          <option value="system">Follow system</option><option value="light">Light</option><option value="dark">Dark</option>
+        </select>
+        <span class="opt-help">Applies immediately to this interface.</span>
+      </div>
+      <div class="setup-section">Hero and skin portraits</div>
+      <p id="catalogue-status" class="opt-help" role="status">Using saved portraits.</p>
+      <p class="opt-help">Checked in the background at launch. Images are saved locally as you browse.
+        Names from <a href="https://github.com/donutman07/MarvelRivalsCharacterIDs" target="_blank" rel="noopener">MarvelRivalsCharacterIDs</a>;
+        artwork from <a href="https://rivalskins.com/heroes/" target="_blank" rel="noopener">RivalSkins</a>.
+      </p>
       <div class="setup-section">Paths</div>
       <div class="setup-field">
         <div class="setup-label">
@@ -499,7 +555,7 @@
     <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
     <div class="modal-row">
       <button class="btn" id="proj-delete-cancel">Cancel</button>
-      <button class="btn primary" id="proj-delete-ok">
+      <button class="btn primary danger" id="proj-delete-ok">
         <i data-lucide="trash-2" size="14"></i> Delete
       </button>
     </div>
@@ -691,6 +747,32 @@
 <div id="ctx-menu"></div>
 <input type="file" id="ctx-file-input" accept="image/*" style="display:none">
 
+<!-- Folder geometry mirrors motion/folder-flap.svg; Material Symbols Sharp, Apache 2.0. -->
+<template id="folder-flap-template">
+<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon am-folder-flap" viewBox="0 0 96 96" width="96" height="96" fill="currentColor" aria-hidden="true" focusable="false">
+  <g class="am-folder-flap-back" opacity="1">
+    <path transform="translate(-4.8 100.8) scale(.11)" d="M100-180v-600h307.15l65.39 65.39H860V-180H100Zm45.39-45.39h669.22v-443.84H454.08l-65.39-65.38h-243.3v509.22Zm0 0v-509.22V-225.39Z" />
+  </g>
+  <g class="am-folder-flap-front" opacity="0">
+    <path transform="translate(-4.8 100.8) scale(.11)" d="M100-180v-600h307.15l65.39 65.39h384v45.38H453.08l-65.39-65.38h-242.3v508.46l97.76-370h684.16L816.38-180H100Zm93-45.39h588.92l84-325.38H277l-84 325.38Zm0 0 84-325.38-84 325.38Zm-47.61-443.84v-65.38 65.38Z" />
+  </g>
+</svg>
+</template>
+
+<script src="/static/motion/export-feedback.js"></script>
+<script src="/static/motion/export-feedback-ui.js"></script>
+<script src="/static/motion/viewport-loader.js"></script>
+<script src="/static/motion/material-save.js"></script>
+<script src="/static/motion/material-save-ui.js"></script>
+<script src="/static/motion/empty-assets.js"></script>
+<script src="/static/motion/empty-assets-ui.js"></script>
+<script src="/static/motion/logo-entrance.js"></script>
+<script src="/static/motion/logo-entrance-ui.js"></script>
+<script src="/static/folder-icons.js"></script>
+<script src="/static/library-pins.js"></script>
+<script src="/static/thumbnails.js"></script>
+<script src="/static/library-tools.js"></script>
+<script src="/static/export-review.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

@@ -1,5 +1,6 @@
 import os, re, hashlib, threading, urllib.request
-from atelier.config import ROOT, get_import_root, project_base, project_base_legacy, project_game_rel
+from atelier.catalogue import catalogue
+from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
@@ -55,7 +56,7 @@ def _parse_char_md_text(text):
     return chars
 
 def _parse_char_md():
-    path = os.path.join(ROOT, "Tools", "MarvelRivalsCharacterIDs.md")
+    path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
     try:
         return _parse_char_md_text(open(path, encoding="utf-8").read())
     except Exception:
@@ -86,7 +87,7 @@ def _fetch_char_data():
     if added:
         # write updated file back so next launch starts with fresh data
         try:
-            path = os.path.join(ROOT, "Tools", "MarvelRivalsCharacterIDs.md")
+            path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
         except Exception:
@@ -218,7 +219,14 @@ def _browse_pak_level(rel_path):
         fname = folders[fname_lower]
         label = _label_folder(rel_path, fname)
         child = f"{rel_path}/{fname}" if rel_path else fname
-        result.append({"type": "folder", "name": fname, "label": label, "rel_path": child})
+        portrait = catalogue.describe(child)
+        item = {"type": "folder", "name": fname, "label": label, "rel_path": child}
+        if portrait:
+            if portrait['name']:
+                label_id = fname[-3:] if len(fname) == 7 else fname
+                item['label'] = f"{label_id} — {portrait['name']}"
+            item.update(thumbnail=portrait['thumbnail'], hero_fallback=portrait['hero_fallback'])
+        result.append(item)
     if not rel_path:
         pinned = [r for r in result if r["name"].lower() in ROOT_PINNED]
         others = [r for r in result if r["name"].lower() not in ROOT_PINNED]

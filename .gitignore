@@ -226,6 +226,7 @@ _logs/
 assets/
 mr_config.json
 _cache/
+_webview/
 Atelier.exe
 # ooz checkout built by linux/build_ooz.sh into Tools/libooz.so
 linux/_ooz/

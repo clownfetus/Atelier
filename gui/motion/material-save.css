@@ -1,0 +1,217 @@
+/*
+ * Atelier — Scoped Material-Save Feedback Styles
+ * Scope prefix: am-material-save- / [data-atelier-motion="material-save"]
+ * Production slot: 24x24 CSS pixels (flex: 0 0 24px) inside save toasts.
+ * Geometry adapted from Google Material Symbols Rounded, Apache License 2.0.
+ */
+
+[data-atelier-motion="material-save"] {
+  --am-material-save-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--am-material-save-size);
+  height: var(--am-material-save-size);
+  flex: 0 0 var(--am-material-save-size);
+  color: currentColor;
+  vertical-align: middle;
+  line-height: 0;
+  user-select: none;
+  position: relative;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  fill: none;
+}
+
+/* Semantic role colors on neutral notification surfaces */
+.toast [data-atelier-motion="material-save"][data-am-state="idle"],
+[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="idle"],
+.toast [data-atelier-motion="material-save"][data-am-state="saving"],
+[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="saving"] {
+  color: var(--acc, var(--md-sys-color-primary, #335d9f));
+}
+
+.toast [data-atelier-motion="material-save"][data-am-state="success"],
+[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="success"] {
+  color: var(--studio-success, #216642);
+}
+
+.toast [data-atelier-motion="material-save"][data-am-state="warning"],
+[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="warning"] {
+  color: var(--studio-warning, #785300);
+}
+
+.toast [data-atelier-motion="material-save"][data-am-state="error"],
+[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="error"] {
+  color: var(--md-sys-color-error, #ba1a1a);
+}
+
+/* Coordinate space transform origins (24x24 viewBox) */
+[data-atelier-motion="material-save"] .am-material-save-cartridge-group,
+[data-atelier-motion="material-save"] .am-material-save-disc,
+[data-atelier-motion="material-save"] .am-material-save-saving-ring,
+[data-atelier-motion="material-save"] .am-material-save-outcome,
+[data-atelier-motion="material-save"] .am-material-save-success-ring,
+[data-atelier-motion="material-save"] .am-material-save-check-path,
+[data-atelier-motion="material-save"] .am-material-save-error-cross {
+  transform-origin: 12px 12px;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-shutter {
+  transform-origin: 10.875px 5.125px;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-disc {
+  transform-origin: 12px 14.25px;
+}
+
+/* Base layer defaults */
+[data-atelier-motion="material-save"] .am-material-save-cartridge-group {
+  opacity: 1;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-saving-ring {
+  opacity: 0;
+  stroke-dasharray: 0.32 0.68;
+  stroke-dashoffset: 0;
+  pointer-events: none;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-outcome {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-success-ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-atelier-motion="material-save"] .am-material-save-check-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+/* State: idle (neutral static save glyph) */
+[data-atelier-motion="material-save"][data-am-state="idle"] .am-material-save-cartridge-group {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* State: saving (indeterminate saving pose; static when reduced-motion is active) */
+[data-atelier-motion="material-save"][data-am-state="saving"] .am-material-save-cartridge-group {
+  opacity: 0.86;
+  transform: scale(0.76);
+}
+
+[data-atelier-motion="material-save"][data-am-state="saving"] .am-material-save-saving-ring {
+  opacity: 0.92;
+}
+
+/* State: success (crisp check inside enclosing ring) */
+[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-cartridge-group,
+[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-saving-ring {
+  opacity: 0;
+}
+
+[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-outcome-success {
+  opacity: 1;
+}
+
+[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-check-path {
+  stroke-dashoffset: 0;
+}
+
+/* State: warning (metadata warning, partial save, or newer unsaved edits retained) */
+[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-cartridge-group,
+[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-saving-ring {
+  opacity: 0;
+}
+
+[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-outcome-warning {
+  opacity: 1;
+}
+
+/* State: error (dialog save failure / exception) */
+[data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-cartridge-group,
+[data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-saving-ring {
+  opacity: 0;
+}
+
+[data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-outcome-error {
+  opacity: 1;
+}
+
+/* Save-specific 24x24 fallback wrapper and toast styling */
+.am-material-save-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  line-height: 0;
+  position: relative;
+}
+
+.am-material-save-slot > .am-material-save-fallback {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: block;
+}
+
+.am-material-save-slot[data-am-mounted="true"] > .am-material-save-fallback {
+  display: none !important;
+}
+
+.toast.am-material-save-toast {
+  max-width: 340px;
+}
+
+.toast.am-material-save-toast > .am-material-save-message {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.toast.am-material-save-toast.error {
+  border-color: var(--md-sys-color-error, #ba1a1a);
+  cursor: pointer;
+}
+
+.toast.am-material-save-toast.success .am-material-save-fallback {
+  color: var(--studio-success, #216642);
+}
+
+.toast.am-material-save-toast.warning .am-material-save-fallback {
+  color: var(--studio-warning, #785300);
+}
+
+.toast.am-material-save-toast.error .am-material-save-fallback {
+  color: var(--md-sys-color-error, #ba1a1a);
+}
+
+/* Reduced motion: disable CSS transitions/animations immediately alongside JS WAAPI cancellation */
+[data-atelier-motion="material-save"][data-am-reduced="true"],
+[data-atelier-motion="material-save"][data-am-reduced="true"] *,
+[data-atelier-motion="material-save"][data-am-reduced="true"] *::before,
+[data-atelier-motion="material-save"][data-am-reduced="true"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-atelier-motion="material-save"],
+  [data-atelier-motion="material-save"] *,
+  [data-atelier-motion="material-save"] *::before,
+  [data-atelier-motion="material-save"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

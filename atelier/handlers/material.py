@@ -1,8 +1,11 @@
-import os, json, shutil
+import os, json, shutil, tempfile, threading
+from atelier.storage import atomic_json
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
                             project_base, project_base_legacy)
 from atelier.tools import uat
 from atelier.paths import pak_game_path
+
+_original_lock = threading.Lock()
 
 def is_material(path_or_name):
     return os.path.basename(path_or_name).upper().startswith("MI_")
@@ -129,12 +132,57 @@ def read_material(game_rel, cache_only=False):
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
 
+def read_material_original(game_rel):
+    """Read pristine game parameters without creating, changing or resetting a project copy.
+
+    mat_json() deliberately prioritizes project edits, even for cache-only reads, so
+    original comparison must use the vanilla viewport cache/extractor directly.
+    Native output is parsed before atomic publication; failure keeps every existing
+    project file and cache entry intact, and the next request can retry.
+    """
+    from atelier.handlers.texture import ensure_work_base, missing_reason
+    from atelier.tools import tex_semaphore
+
+    jp = project_base(game_rel, CACHE_3DVIEW) + ".json"
+
+    def read(path):
+        with open(path, encoding="utf-8-sig") as stream:
+            data = json.load(stream)
+        colors, scalars = _mat_params(data)
+        return data, {"colors": colors, "scalars": scalars, "textures": _mat_textures(data)}
+
+    # One original conversion at a time prevents duplicate work and same-asset
+    # races without an unbounded table of per-asset locks.
+    with _original_lock:
+        if os.path.isfile(jp):
+            try:
+                return read(jp)[1]
+            except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                pass  # An incomplete old cache can be repaired after a successful decode.
+        with tex_semaphore:
+            work_base = ensure_work_base(game_rel)
+            if not work_base or not os.path.isfile(work_base + ".uasset"):
+                raise RuntimeError(missing_reason(game_rel, "material"))
+            os.makedirs(CACHE_3DVIEW, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix=".material-original-", dir=CACHE_3DVIEW) as temporary:
+                result = uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP,
+                              os.path.abspath(temporary)])
+                if result.returncode != 0:
+                    raise RuntimeError("Could not read original material: " +
+                                       ((result.stderr or result.stdout or "to_json failed").strip()[-500:]))
+                output = os.path.join(temporary, os.path.basename(jp))
+                if not os.path.isfile(output):
+                    raise RuntimeError("Original material conversion produced no JSON")
+                data, params = read(output)
+                atomic_json(jp, data)
+                return params
+
 def save_material(game_rel, colors, scalars):
     """Apply color/scalar edits and PERSIST them into the material's on-disk JSON."""
     jp = mat_json(game_rel)
     d  = json.load(open(jp, encoding="utf-8-sig"))
     _apply_mat_edits(d, colors or {}, scalars or {})
-    json.dump(d, open(jp, "w"))
+    atomic_json(jp, d)
     cols, scals = _mat_params(d)
     return {"colors": cols, "scalars": scals}
 

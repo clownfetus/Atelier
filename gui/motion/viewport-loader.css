@@ -1,0 +1,212 @@
+/*
+ * Atelier — Scoped 3D Viewport Loader Styles
+ * Scope prefix: am-viewport-loader- / [data-atelier-motion="viewport-loader"]
+ * Designed for the fixed dark #viewport-loading preview surface in both UI themes.
+ */
+
+[data-atelier-motion="viewport-loader"] {
+  --am-viewport-loader-size: 72px;
+  --am-viewport-loader-fg: var(--studio-preview-on-surface, #e5e2e4);
+  --am-viewport-loader-accent: #accbff;
+  --am-viewport-loader-empty: #9aa8be;
+  --am-viewport-loader-error: #ffb4ab;
+  --am-viewport-loader-badge-bg: #14161b;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--am-viewport-loader-size);
+  height: var(--am-viewport-loader-size);
+  color: var(--am-viewport-loader-fg);
+  vertical-align: middle;
+  flex-shrink: 0;
+  line-height: 0;
+  user-select: none;
+  position: relative;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  fill: none;
+}
+
+/* Transform origins in the 48x48 coordinate space */
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-brackets,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-cube-group,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-rear-group,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-front-group,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-orbit-ring,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome {
+  transform-origin: 24px 24px;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome > circle {
+  fill: var(--am-viewport-loader-badge-bg);
+}
+
+/* Wireframe stroke defaults */
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-hull {
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-front-ribs {
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-rear-ribs {
+  stroke: var(--am-viewport-loader-accent);
+  stroke-width: 1.75;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  opacity: 0.34;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-top-face {
+  fill: var(--am-viewport-loader-accent);
+  opacity: 0.08;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-orbit-ring {
+  stroke: var(--am-viewport-loader-accent);
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-dasharray: 0.28 0.72;
+  stroke-dashoffset: 0;
+  opacity: 0;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-vertex-core {
+  fill: var(--am-viewport-loader-accent);
+  opacity: 0.9;
+}
+
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* State: idle & ready (static assembled resting frame) */
+[data-atelier-motion="viewport-loader"][data-am-state="idle"],
+[data-atelier-motion="viewport-loader"][data-am-state="ready"] {
+  color: var(--am-viewport-loader-fg);
+}
+
+/* State: loading */
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] {
+  color: var(--am-viewport-loader-fg);
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-orbit-ring {
+  opacity: 0.78;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-brackets {
+  stroke: var(--am-viewport-loader-accent);
+  opacity: 0.55;
+}
+
+/* State: empty (distinct static blueprint pose when no meshes exist) */
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] {
+  color: var(--am-viewport-loader-empty);
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-hull {
+  stroke-dasharray: 0.09 0.075;
+  opacity: 0.72;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-front-ribs,
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-rear-ribs {
+  opacity: 0.24;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-top-face,
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-orbit-ring,
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-vertex-core {
+  opacity: 0;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-outcome-empty {
+  opacity: 1;
+}
+
+/* State: error (distinct static error pose legible on dark viewport surface) */
+[data-atelier-motion="viewport-loader"][data-am-state="error"] {
+  color: var(--am-viewport-loader-error);
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-hull {
+  opacity: 0.88;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-front-ribs,
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-rear-ribs {
+  stroke: currentColor;
+  opacity: 0.25;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-top-face {
+  fill: currentColor;
+  opacity: 0.1;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-orbit-ring,
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-vertex-core {
+  opacity: 0;
+}
+
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-outcome-error {
+  opacity: 1;
+}
+
+/* Forced or OS reduced motion stops CSS transitions as well as JS animations */
+[data-atelier-motion="viewport-loader"][data-am-reduced="true"],
+[data-atelier-motion="viewport-loader"][data-am-reduced="true"] *,
+[data-atelier-motion="viewport-loader"][data-am-reduced="true"] *::before,
+[data-atelier-motion="viewport-loader"][data-am-reduced="true"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-atelier-motion="viewport-loader"],
+  [data-atelier-motion="viewport-loader"] *,
+  [data-atelier-motion="viewport-loader"] *::before,
+  [data-atelier-motion="viewport-loader"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Static fallback sibling wrapper */
+.am-viewport-loader-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.am-viewport-loader-slot[data-am-mounted="true"] > .am-viewport-loader-fallback {
+  display: none !important;
+}
+
+.am-viewport-loader-fallback { display: inline-flex; color: var(--studio-preview-on-surface); }
+.am-viewport-loader-slot[data-am-state="error"] > .am-viewport-loader-fallback { color: #ffb4ab; }

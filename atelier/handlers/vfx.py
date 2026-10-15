@@ -299,7 +299,8 @@ def save_mpc(game_rel, scalars, vectors):
     jp = mpc_json(game_rel)
     d  = json.load(open(jp, encoding="utf-8-sig"))
     _apply_mpc_edits(d, scalars or {}, vectors or {})
-    json.dump(d, open(jp, "w"))
+    from atelier.storage import atomic_json
+    atomic_json(jp, d)
     return read_mpc(game_rel)
 
 def reset_mpc(game_rel):
@@ -408,7 +409,8 @@ def save_vfx(game_rel, groups, scalars=None, vectors=None):
              for g in (groups or []) if g.get("export_indices") and g.get("stops")]
     p = vfx_sidecar(game_rel)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    json.dump({"vfx_edits": clean}, open(p, "w"))
+    from atelier.storage import atomic_json
+    atomic_json(p, {"vfx_edits": clean})
     return read_vfx(game_rel)
 
 def reset_vfx(game_rel):

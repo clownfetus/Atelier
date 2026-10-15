@@ -324,7 +324,8 @@ def save_world(game_rel, edits):
     }
     p = world_sidecar(game_rel)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    json.dump({"world_edits": clean}, open(p, "w"))
+    from atelier.storage import atomic_json
+    atomic_json(p, {"world_edits": clean})
     return read_world(game_rel)
 
 def reset_world(game_rel):
