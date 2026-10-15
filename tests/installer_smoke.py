@@ -185,9 +185,13 @@ def execute_checks(args, report, result, journal):
     result['payload_files_expected'] = len(manifest_files)
     for port in (args.app_port, args.debug_port):
         with socket.socket() as sock:
-            sock.settimeout(1)
-            if sock.connect_ex(('127.0.0.1', port)) != 10061:
-                raise RuntimeError(f'Port {port} is occupied or its availability is uncertain')
+            # A refused connection can time out under the runner firewall.
+            # An exclusive bind directly proves that this local port is free.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            try:
+                sock.bind(('127.0.0.1', port))
+            except OSError as exc:
+                raise RuntimeError(f'Port {port} is unavailable: {exc}') from exc
     env = dict(os.environ, ATELIER_PORT=str(args.app_port), PYTHONUTF8='1',
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.debug_port}',
                HTTP_PROXY='http://127.0.0.1:9', HTTPS_PROXY='http://127.0.0.1:9', NO_PROXY='localhost,127.0.0.1')
