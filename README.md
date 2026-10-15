@@ -157,6 +157,10 @@ Drafts and prereleases are not the stable update channel. The Windows installer
 verification workflow checks candidate installers; it does not build or publish
 a release automatically.
 
+## Collaborators
+
+- Tendo ([tendo625](https://github.com/tendo625))
+
 ## Credits
 
 - Noobmaster and Clownfetus
