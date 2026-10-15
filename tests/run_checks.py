@@ -33,10 +33,10 @@ def main():
             parser.error(f"Unknown test script: {suite}")
         with tempfile.TemporaryDirectory(prefix="atelier-check-") as scratch:
             checkout = Path(scratch)
-            for name in ("atelier", "gui", "tests"):
+            for name in ("atelier", "gui", "tests", "scripts"):
                 shutil.copytree(ROOT / name, checkout / name,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            for name in ("io_lib.py", "main.py", "version"):
+            for name in ("io_lib.py", "main.py", "version", "BUILD.bat", "Atelier.iss"):
                 shutil.copy2(ROOT / name, checkout / name)
             env = dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1")
             env.pop("MR_TOOLS", None)

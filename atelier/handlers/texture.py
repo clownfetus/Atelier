@@ -595,17 +595,26 @@ def ensure_work_base(game_rel):
         # differ exactly when a game patch has taken the asset over, and the cached bytes are then
         # the pre-patch ones -- the shape of "my materials broke after the update".
         stale_mip = missing_optional_mip(game_rel, cb)
+        stale_source = bool(pak and cached.get("source_stamp") != _ac.source_stamp(pak))
         if os.path.exists(cb + ".uasset") and (not rec or not pak or rec == pak.lower()) \
-                and not stale_mip:
+                and not stale_mip and not stale_source:
             return cb
         if stale_mip:
             print(f"  [warn] {game_rel}: cached before the HQ texture DLC (no .uptnl, and the paks "
                   f"now have one) — re-extracting", file=sys.stderr, flush=True)
             _purge_work(game_rel)
-        elif rec and pak and rec != pak.lower():
+        elif stale_source or (rec and pak and rec != pak.lower()):
             print(f"  [warn] {game_rel}: cached from {rec}, index now says {pak.lower()} — re-extracting",
                   file=sys.stderr, flush=True)
             _purge_work(game_rel)      # the copy on disk is pre-patch too, not just the entry
+        # Older tools sometimes emitted an unpredicted layout. Purge the
+        # recorded copy too so find_extracted cannot rediscover stale bytes.
+        if stale_mip or stale_source or (rec and pak and rec != pak.lower()):
+            cache_root = os.path.normcase(os.path.realpath(WORK_IMPORT_ROOT)) + os.sep
+            if cb and os.path.normcase(os.path.realpath(cb)).startswith(cache_root):
+                for ext in _WORK_EXTS:
+                    try: os.remove(cb + ext)
+                    except FileNotFoundError: pass
         _ac.remove(game_rel)
     _purge_ambiguous(game_rel)
     # Full-path extract first wherever it applies: on Linux (UAssetTool cannot read containers
@@ -831,15 +840,16 @@ def stage_inject(stage, game_rel, opts=None):
       lod_group  - retarget the texture's LODGroup (#20)
       lq_twin    - also stage the Marvel_LQ copy, when this install has that mount (#21)
     """
-    import atelier.asset_cache as _ac
     opts = opts or {}
     # Prefer the unique subfolder path; fall back to a legacy flat png if that's where it already lives.
     import_base = project_base(game_rel)
     if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):
         import_base = project_base_legacy(game_rel)
-    work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
+    # Export must work after the disposable extraction cache was cleared, and
+    # must use the same provenance/mip checks as import after a game update.
+    work_base = ensure_work_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
-        raise RuntimeError("no base asset — run 'import' first")
+        raise RuntimeError(missing_reason(game_rel, "texture"))
     blank_note = ""
     if opts.get("blank"):
         # Generated fresh into the cache, never into the project: the project PNG is the user's

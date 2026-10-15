@@ -39,9 +39,26 @@ def cache_base(game_rel: str) -> str:
     e = get(game_rel)
     return e["cache_path"] if e else ""
 
+def source_stamp(pak):
+    """Fingerprint a container even when a game update keeps its filename."""
+    if not pak:
+        return None
+    from atelier.config import PAKS
+    stem = os.path.splitext(os.path.join(PAKS, pak))[0]
+    stamp = []
+    for ext in (".utoc", ".ucas"):
+        try:
+            info = os.stat(stem + ext)
+            stamp.append([info.st_size, info.st_mtime_ns])
+        except OSError:
+            stamp.append(None)
+    return stamp
+
+
 def record(game_rel: str, cache_path: str, pak: str, pfx: str):
     with _lock:
-        _data[game_rel] = {"cache_path": os.path.abspath(cache_path), "pak": pak, "pfx": pfx}
+        _data[game_rel] = {"cache_path": os.path.abspath(cache_path), "pak": pak, "pfx": pfx,
+                          "source_stamp": source_stamp(pak)}
         _names[os.path.basename(game_rel).lower()] = game_rel
         _save()
 
@@ -64,7 +81,8 @@ def record_many(entries):
     """entries: iterable of (game_rel, cache_path, pak, pfx)"""
     with _lock:
         for game_rel, cache_path, pak, pfx in entries:
-            _data[game_rel] = {"cache_path": os.path.abspath(cache_path), "pak": pak, "pfx": pfx}
+            _data[game_rel] = {"cache_path": os.path.abspath(cache_path), "pak": pak, "pfx": pfx,
+                              "source_stamp": source_stamp(pak)}
             _names[os.path.basename(game_rel).lower()] = game_rel
         _save()
 

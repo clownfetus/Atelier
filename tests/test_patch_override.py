@@ -212,16 +212,26 @@ def t_a_matching_cache_entry_is_still_a_fast_path():
             TX.uat = saved_uat
 
 
-def t_a_legacy_entry_without_provenance_still_works():
-    """Entries written before `pak` was recorded have nothing to compare; they must keep working
-    rather than force a re-extract of every asset in an existing project."""
+def t_a_legacy_entry_without_provenance_refreshes_once():
+    """Entries without a source fingerprint refresh once, then retain the cache fast path.
+    Keeping an unverifiable pre-patch copy would defeat material rebasing (#41)."""
     with sandbox() as sb:
         good = stage(sb.work, "Marvel/Content/Marvel/", "current copy")
         AC.record(GR, good, "", "")
+        AC.get(GR).pop("source_stamp", None)
+        calls = []
         saved_uat = TX.uat
-        TX.uat = lambda *a, **k: (_ for _ in ()).throw(AssertionError("re-extracted a legacy entry"))
+        def extract(args, **kw):
+            calls.append(args[0])
+            stage(sb.work, "Marvel/Content/Marvel/", "refreshed current copy")
+            return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        TX.uat = extract
         try:
             assert TX.ensure_work_base(GR) == good
+            assert read(good) == "refreshed current copy"
+            assert TX.ensure_work_base(GR) == good
+            assert calls == ["extract_iostore_legacy"], calls
+            assert AC.get(GR)["source_stamp"] == AC.source_stamp(PATCH_C)
         finally:
             TX.uat = saved_uat
 
@@ -246,7 +256,7 @@ def t_the_fallback_path_records_the_cache():
 
 for t in (t_a_cache_entry_from_another_container_is_dropped,
           t_a_matching_cache_entry_is_still_a_fast_path,
-          t_a_legacy_entry_without_provenance_still_works,
+          t_a_legacy_entry_without_provenance_refreshes_once,
           t_the_fallback_path_records_the_cache):
     check(t.__doc__.splitlines()[0].strip(), t)
 

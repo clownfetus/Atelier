@@ -1,5 +1,5 @@
 import os, json, shutil, tempfile, threading
-from atelier.storage import atomic_json
+from atelier.storage import atomic_json, publish_files
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
                             project_base, project_base_legacy)
 from atelier.tools import uat
@@ -196,14 +196,54 @@ def reset_material(game_rel):
         if os.path.exists(jp): os.remove(jp)
     return read_material(game_rel)
 
-def stage_material(stage, game_rel, colors, scalars):
-    """Apply color/scalar edits to the MI and from_json it into the export stage at pak game path."""
-    d = json.load(open(mat_json(game_rel), encoding="utf-8-sig"))
-    _apply_mat_edits(d, colors or {}, scalars or {})
-    ej = os.path.join(_CACHE, "_mat_edit.json"); json.dump(d, open(ej, "w"))
+def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
+    """Rebase saved values onto current vanilla, never serialize an old project package."""
+    from atelier.handlers.texture import ensure_work_base, missing_reason
+    saved_colors, saved_scalars = {}, {}
+    project_bases = (project_base(game_rel), project_base_legacy(game_rel)) if use_project else ()
+    for base in project_bases:
+        if os.path.isfile(base + ".json"):
+            with open(base + ".json", encoding="utf-8-sig") as stream:
+                cols, scals = _mat_params(json.load(stream))
+            saved_colors = {c["name"]: c["rgba"] for c in cols}
+            saved_scalars = {s["name"]: s["value"] for s in scals}
+            break
+    # Explicit callers (including the repatcher) override project values.
+    saved_colors.update(colors or {})
+    saved_scalars.update(scalars or {})
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    uat(["from_json", os.path.abspath(ej), os.path.abspath(out_ua), USMAP])
-    if not os.path.exists(out_ua): raise RuntimeError("from_json produced no uasset")
+    work_base = ensure_work_base(game_rel)
+    if not work_base or not os.path.isfile(work_base + ".uasset"):
+        raise RuntimeError(missing_reason(game_rel, "material"))
+    os.makedirs(_CACHE, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".material-export-", dir=_CACHE) as temporary:
+        result = uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, temporary])
+        if result.returncode != 0:
+            raise RuntimeError("Could not decode current material: " +
+                               ((result.stderr or result.stdout or "to_json failed").strip()[-500:]))
+        jp = os.path.join(temporary, os.path.basename(game_rel) + ".json")
+        if not os.path.isfile(jp):
+            raise RuntimeError("Current material conversion produced no JSON")
+        with open(jp, encoding="utf-8-sig") as stream:
+            d = json.load(stream)
+        current_colors, current_scalars = _mat_params(d)
+        missing = sorted((saved_colors.keys() - {c["name"] for c in current_colors}) |
+                         (saved_scalars.keys() - {s["name"] for s in current_scalars}))
+        if missing:
+            raise RuntimeError("Current material no longer has saved parameters: " + ", ".join(missing))
+        _apply_mat_edits(d, saved_colors, saved_scalars)
+        with open(jp, "w", encoding="utf-8") as stream:
+            json.dump(d, stream)
+        compiled = os.path.join(temporary, "compiled", os.path.basename(out_ua))
+        os.makedirs(os.path.dirname(compiled))
+        result = uat(["from_json", jp, compiled, USMAP])
+        if result.returncode != 0 or not os.path.isfile(compiled):
+            raise RuntimeError("Material build failed: " +
+                               ((result.stderr or result.stdout or "from_json produced no uasset").strip()[-500:]))
+        # Failed conversions never leave partial packages in the shared stage.
+        sources = [compiled[:-7] + ext for ext in (".uasset", ".uexp", ".ubulk", ".uptnl")
+                   if os.path.isfile(compiled[:-7] + ext)]
+        publish_files(sources, os.path.dirname(out_ua))
     return os.path.basename(game_rel)

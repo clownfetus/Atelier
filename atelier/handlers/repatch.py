@@ -93,7 +93,7 @@ def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, reloc
                 cols, scals = _mat_params(d)
                 cd = {c["name"]: c["rgba"] for c in cols}
                 sd = {s["name"]: s["value"] for s in scals}
-                stage_material(stage, gr, cd, sd)          # extract CURRENT vanilla + apply + stage
+                stage_material(stage, gr, cd, sd, use_project=False)  # no unrelated project values
                 if stage_as_project:
                     from atelier.handlers.material import save_material
                     save_material(gr, cd, sd); manifest["staged_project"] += 1
