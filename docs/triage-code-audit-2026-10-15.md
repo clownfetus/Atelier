@@ -75,7 +75,7 @@ Implemented on 15 October 2026 after the initial audit, on branch `codex/triage-
 - Staging excludes mappings, AES keys, caches and the Linux binaries previously stripped by the batch file. Contributor review ZIPs continue to intentionally exclude tools.
 - Verified the actual Windows batch’s failure gate in a disposable fixture, with only PyInstaller replaced by a fixture module. Verified every required-file omission, empty binary, copy failure and destination/source preservation.
 - Successfully staged the real development Tools directory into `D:/AtelierDev/triage-fixes-20261015-tools`; confirmed required files, source/staged UAssetTool and AtelierMesh executable SHA-256 equality, and absence of `AES_KEY.txt`/Mappings.
-- **Not verified:** a newly compiled Inno installer or clean installation. Inno Setup’s compiler is unavailable on this machine. Direct-compiler guards were inspected, not executed.
+- At the initial implementation check, Inno Setup was unavailable and direct-compiler guards had only been inspected. The later [installer build and archive verification](installer-verification-2026-10-15.md) supersedes that limitation: compilation, payload hashes and all four compiler guards passed. A clean installation remains untested.
 
 ### #41 — old material JSON after a patch
 
@@ -109,4 +109,10 @@ Implemented on 15 October 2026 after the initial audit, on branch `codex/triage-
 - Real native material-rebase and missing-texture-base checks **both passed**. Machine-readable result: `D:/AtelierDev/triage-fixes-20261015-native-final/results.json` (`ok: true`, `in_game_verified: false`). All test projects/caches/staged assets were new and report-local. No live mods were installed.
 - The initial native run under the long OneDrive worktree path failed during extraction with a native “Could not find file” error. The successful checks used a short path under `D:/AtelierDev`. This remains a native path-length limitation, not a successful check at the long path.
 - Full-suite source fingerprint validation exposed two obsolete fixtures: one demanded indefinite reuse of cache entries without provenance; the other returned a supposedly successful extracted base without recreating its file. The former now verifies a single legacy refresh plus subsequent cache reuse; the latter recreates the base while continuing to omit its optional top mip. Both pass with the existing patch/mip coverage.
-- No in-game appearance, real historical-patch upgrade, new installer, Linux runtime or reporter-specific reproduction is claimed. Native checks establish the data paths and preserved source files described above.
+- No in-game appearance, real historical-patch upgrade, Linux runtime or reporter-specific reproduction is claimed. Native checks establish the data paths and preserved source files described above.
+
+### Installer verification follow-up
+
+Inno Setup 6.7.3 was subsequently installed and source commit `1ecdc40` was built successfully into `dist/AtelierSetup.exe` (148,666,585 bytes). The finished installer was unpacked: all 23 staged tool files matched, including UAssetTool, AtelierMesh and both required native DLLs. Required files also matched their development-tool sources by SHA-256. All four missing-file compiler guards were tested successfully. Keys and mappings were absent from the archive.
+
+Installer SHA-256: `5b4c19adb7fea3e3dd95fa50012f1dbc13bdea96f25e6aef0cf7d6ab3ba2bad4`. Full [build provenance, commands, required-file hashes, evidence paths and remaining limits](installer-verification-2026-10-15.md) are recorded separately. No existing Atelier installation was changed, and no binary release was published.
