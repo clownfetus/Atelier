@@ -1,0 +1,85 @@
+name: Linux AppImage build and verification
+
+on:
+  push:
+    branches: [codex/linux-appimage-release]
+    paths:
+      - .github/workflows/linux-appimage.yml
+      - tests/linux_appimage_smoke.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appimage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONUTF8: '1'
+      SOURCE_COMMIT: 1f7ad72f67f59c4bd6b7e2751bc93ed85cf82b2b
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out the exact 0.3.5 release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 1f7ad72f67f59c4bd6b7e2751bc93ed85cf82b2b
+          path: source
+          persist-credentials: false
+      - name: Install Linux desktop and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-gi python3-gi-cairo python3-pyatspi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 libfuse2t64 zenity xvfb xdotool scrot dbus-x11 openbox
+          /usr/bin/python3 -m venv --system-site-packages source/.venv
+          source/.venv/bin/python -m pip install --disable-pip-version-check -r source/requirements.txt pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8
+          source/.venv/bin/python -m pip check
+      - name: Reuse the verified native tools from the official Linux release
+        working-directory: source
+        run: |
+          mkdir -p ../report
+          curl --fail --location --retry 3 -o ../previous.AppImage https://github.com/clownfetus/Atelier/releases/download/0.3.4/Atelier-0.3.4-x86_64.AppImage
+          echo '9a4f82b3ff3f2ded0f87c6258d3be6b93950040955518e318d63c7d9fcce7459  ../previous.AppImage' | sha256sum --check
+          chmod +x ../previous.AppImage
+          (cd .. && ./previous.AppImage --appimage-extract >/dev/null)
+          cp -a ../squashfs-root/usr/Atelier/Tools Tools
+          .venv/bin/python -c "import sys; sys.path.insert(0, 'scripts'); from stage_tools import validate_tools; validate_tools('Tools', 'linux')"
+          sha256sum Tools/UAssetTool Tools/liboo2corelinux64.so.9 Tools/shaders/retoc-rivals-cli Tools/shaders/liboo2corelinux64.so.9 > ../report/native-tool-inputs.sha256
+          mkdir -p linux/_appimagetool
+          curl --fail --location --retry 3 -o linux/_appimagetool/appimagetool-x86_64.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          echo '95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6  linux/_appimagetool/appimagetool-x86_64.AppImage' | sha256sum --check
+          chmod +x linux/_appimagetool/appimagetool-x86_64.AppImage
+      - name: Run Linux source regressions
+        working-directory: source
+        run: .venv/bin/python tests/run_checks.py --report-dir ../report/source
+      - name: Build the release AppImage
+        working-directory: source
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test "$(cat version)" = '0.3.5'
+          bash linux/build_appimage.sh 0.3.5 2>&1 | tee ../report/build.log
+      - name: Verify the actual AppImage with native GTK and WebKit
+        run: |
+          xvfb-run -a -s '-screen 0 1600x1000x24' dbus-run-session -- bash -c '
+            openbox > report/openbox.log 2>&1 &
+            source/.venv/bin/python tests/linux_appimage_smoke.py --appimage source/dist/Atelier-0.3.5-x86_64.AppImage --source source --report-dir report/appimage
+          '
+          cd source/dist
+          sha256sum Atelier-0.3.5-x86_64.AppImage > SHA256SUMS-linux.txt
+      - name: Preserve build and verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-appimage-verification
+          path: report
+          retention-days: 30
+      - name: Preserve the verified release binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Atelier-0.3.5-linux-x86_64
+          path: |
+            source/dist/Atelier-0.3.5-x86_64.AppImage
+            source/dist/SHA256SUMS-linux.txt
+          compression-level: 0
+          retention-days: 30
