@@ -1,0 +1,41 @@
+name: Publish verified Linux 0.3.5 AppImage
+
+on:
+  push:
+    branches: [codex/linux-appimage-release]
+    paths: [.github/workflows/linux-appimage-publish.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'clownfetus/Atelier'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERIFIED_RUN: '38814312222'
+      VERIFIED_WORKFLOW_COMMIT: b165e8bd4f23df42d30925377a70bff976b70527
+      RELEASE_SOURCE_COMMIT: 1f7ad72f67f59c4bd6b7e2751bc93ed85cf82b2b
+    steps:
+      - name: Confirm the verified build and existing release
+        run: |
+          test "$(gh api repos/$GH_REPO/actions/runs/$VERIFIED_RUN --jq .conclusion)" = success
+          test "$(gh api repos/$GH_REPO/actions/runs/$VERIFIED_RUN --jq .head_sha)" = "$VERIFIED_WORKFLOW_COMMIT"
+          test "$(gh api repos/$GH_REPO/releases/tags/0.3.5 --jq .target_commitish)" = "$RELEASE_SOURCE_COMMIT"
+          test "$(gh api repos/$GH_REPO/releases/tags/0.3.5 --jq .draft)" = false
+      - name: Download the exact verified artifact and check its hash
+        run: |
+          gh run download "$VERIFIED_RUN" --name Atelier-0.3.5-linux-x86_64 --dir payload
+          cd payload
+          sha256sum --check SHA256SUMS-linux.txt
+      - name: Add Linux downloads to the existing 0.3.5 release
+        run: |
+          gh release upload 0.3.5 payload/Atelier-0.3.5-x86_64.AppImage payload/SHA256SUMS-linux.txt
+          gh release view 0.3.5 --json tagName,assets,url
