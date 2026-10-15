@@ -74,9 +74,14 @@ Phases 1–4 shipped in **0.3.4** (Linux build 2026-09-22, Windows 2026-09-24). 
 by users since: **#20** (diiea, 09-24: NoMipMaps fixed UI blur) and **#22** (pushingpetals, 09-25:
 texture removal works). **#12** still has no in-game confirmation.
 
-Everything else below is unstarted, except **#38**: tendo625's PR #2 (merged 2026-10-15) rebuilt
-thumbnail delivery and `tests/test_thumbnails.py` passes, but it is unreleased and unchecked on a
-real install. **#45** is waiting on kadeschaos's logs.
+**#38** is done: tendo625's PR #2 (merged 2026-10-15) rebuilt thumbnail delivery, confirmed working.
+**#39** is fixed on main in `a712532` (allowlist tool staging; a missing tool fails the build), unreleased.
+**#45** is waiting on kadeschaos's logs, though `a712532`'s re-extract of a missing work copy may
+already cover it. Everything else below is unstarted.
+
+The shipped 0.3.4 Windows installer also carried two fixes that were never committed: mod-loader
+containers (`!projectgalacta_9999999_p`) kept out of the index, and a mods folder outside the game's
+Paks dir re-pointed to `<Paks>/~mods`. Both were recovered from its bytecode and restored in `4f2e007`.
 
 ## New since 2026-09-18
 
@@ -84,8 +89,8 @@ Found in the 2026-10-15 sweep of the thread and 98 new conversations. The same s
 
 | # | Change | Value | Effort | Reports | Where | Why it's here |
 |---|---|---|---|---|---|---|
-| 38 | Preview thumbnails load forever in 0.3.4 | Critical | Small | 9 | `pak_thumb.py` · `tests/test_thumbnails.py` | Texture and mesh thumbnails spin indefinitely; Edit asset still loads the file. finngmin, lmaolena, everikreal, cjackfury, ekgaguya, shaula4evr, rebelliousred, wandaffx, jan.in, still on 10-15. Some overlap with #39. **Fixed on main, unreleased.** |
-| 39 | 0.3.4 installer ships without UAssetTool.exe and AtelierMesh | Critical | Trivial | 5 | `Atelier.iss` · `scripts/package_release.py` | 0.3.4 is ~44 MB against 0.3.3's ~490 MB. Fresh installs get `[WinError2]`, "UAssetTool.exe not found", no mesh viewer, "cannot find file" on VFX materials. Support answer is "install 0.3.3, then 0.3.4 over it". wei.ch3ng, jtcarc, pyxlu, cjackfury, rentheg. Check the next built installer actually contains them. |
+| 38 | Preview thumbnails load forever in 0.3.4 | Critical | Small | 9 | `pak_thumb.py` · `tests/test_thumbnails.py` | Texture and mesh thumbnails spin indefinitely; Edit asset still loads the file. finngmin, lmaolena, everikreal, cjackfury, ekgaguya, shaula4evr, rebelliousred, wandaffx, jan.in, still on 10-15. Some overlap with #39. **Done** (PR #2). |
+| 39 | 0.3.4 installer ships without UAssetTool.exe and AtelierMesh | Critical | Trivial | 5 | `Atelier.iss` · `scripts/package_release.py` | 0.3.4 is ~44 MB against 0.3.3's ~490 MB. Fresh installs get `[WinError2]`, "UAssetTool.exe not found", no mesh viewer, "cannot find file" on VFX materials. Support answer is "install 0.3.3, then 0.3.4 over it". wei.ch3ng, jtcarc, pyxlu, cjackfury, rentheg. The shipped installer has no `Tools/` at all. **Fixed on main** (`a712532`). |
 | 40 | Ability icons export as white boxes under the Plugins tree | High | Small | 3 | index / browse · `texture.py` | Follow-up to #15. People cannot find "Plugins - sepa… > MarvelGas"; Luna and Thor weapon icons come out as white boxes (shafsta, who also gets it from UE); rebelliousred has slotted UI missing or stretched. May be partly the game. |
 | 41 | Re-exporting a VFX project after a game patch does not refresh it | High | Medium | 1 | `vfx.py` · export | finngmin: re-packaging and re-saving every material still gives a broken mod; a fresh project with the same edits works. Likely a cached base material from the old patch. |
 | 42 | Exported textures render brighter than vanilla | Medium | Medium | 2 | `texture.py` | A vanilla _D pasted back unchanged still looks brighter in game (finngmin); doggo.king sees it on an emote prop. Points at sRGB or compression settings. On your 09-28 todo. |
