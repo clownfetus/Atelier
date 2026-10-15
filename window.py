@@ -10,13 +10,12 @@ if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
 import webview
 
 from atelier import hostos
-from atelier.web.app import PORT
-
-URL  = f"http://localhost:{PORT}"
+from atelier.web.app import PORT, frontend_url
 
 _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
          else os.path.dirname(os.path.abspath(__file__)))
 _DATA_ROOT = os.path.realpath(os.environ["ATELIER_DATA_DIR"]) if os.environ.get("ATELIER_DATA_DIR") else _ROOT
+URL = frontend_url(os.path.join(getattr(sys, "_MEIPASS", _ROOT), "gui"))
 
 
 def _show_launch_toast():

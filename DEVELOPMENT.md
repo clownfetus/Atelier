@@ -1,5 +1,16 @@
 # Local development and reliability checks
 
+Desktop upgrades retain the existing WebView profile. The launcher uses a URL
+derived from the bundled HTML, and both HTML and frontend assets disable HTTP
+storage, so an old cached page cannot mix with the new scripts and styles.
+`tests/test_frontend_cache.py` checks the HTML, conditional responses and CSS.
+The frozen smoke checks the first native navigation before reloading, and accepts
+`--profile-source <old-_webview-directory>` to test an existing profile. Add
+`--expected-theme dark` to verify the saved theme, and
+`--expect-storage-canary` when that profile was seeded with localStorage key
+`atelier.upgrade-canary` set to `preserve-me`. Profiles are copied into isolated
+test data; the supplied original is never changed.
+
 This branch includes the environment/baseline and critical reliability work, plus the Phase 2 Material 3 foundation. The application still uses Bottle, vanilla JavaScript, Three.js and pywebview. Project sidecars, Unreal paths and mod container formats are unchanged. See [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for theme, component, icon and artwork-cache decisions.
 
 ## This machine

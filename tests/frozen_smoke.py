@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import threading
 import time
@@ -37,6 +38,9 @@ def main():
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--debug-port', type=int, default=9338)
     parser.add_argument('--app-port', type=int, default=8778)
+    parser.add_argument('--profile-source', type=Path, help='Copy an existing _webview directory to exercise an upgrade')
+    parser.add_argument('--expected-theme', choices=('light', 'dark'))
+    parser.add_argument('--expect-storage-canary', action='store_true', help='Require the seeded atelier.upgrade-canary preference')
     args = parser.parse_args()
     if os.name != 'nt':
         raise SystemExit('The frozen desktop smoke requires Windows.')
@@ -45,6 +49,8 @@ def main():
     report.mkdir(parents=True, exist_ok=True)
     data = report / 'isolated-data'
     data.mkdir(exist_ok=False)
+    if args.profile_source:
+        shutil.copytree(args.profile_source.resolve(strict=True), data / '_webview')
     for port in (args.app_port, args.debug_port):
         with socket.socket() as sock:
             if sock.connect_ex(('127.0.0.1', port)) == 0:
@@ -90,6 +96,23 @@ def main():
             context = browser.contexts[0]
             page = context.pages[0]
             page.on('pageerror', lambda error: result['page_errors'].append(str(error)))
+            page.wait_for_load_state('domcontentloaded')
+            # Check the first navigation before reload can hide a stale cached page.
+            page.wait_for_function("!!document.querySelector('.studio-brand')", timeout=15000)
+            initial = page.evaluate("""() => ({
+                url: location.href,
+                tokens: !!document.querySelector('link[href="/static/tokens.css"]'),
+                storedTheme: localStorage.getItem('atelier.theme'),
+                upgradeCanary: localStorage.getItem('atelier.upgrade-canary')
+            })""")
+            assert '?ui=' in initial['url'] and initial['tokens'], initial
+            if args.expected_theme:
+                assert initial['storedTheme'] == args.expected_theme, initial
+            if args.expect_storage_canary:
+                assert initial['upgradeCanary'] == 'preserve-me', initial
+            result['initial_navigation'] = initial
+            result['existing_profile'] = bool(args.profile_source)
+            result['checks'].append('First native navigation bypasses cached HTML and preserves browser preferences')
             fixture_items = [dict(type='folder', name=n, label=n, rel_path=n, count=3)
                              for n in ('Characters', 'Textures', 'Materials', 'Weapons', 'Audio', 'Maps')]
             fixtures = {
@@ -147,6 +170,10 @@ def main():
             assert rejected.get('ok') is False and rejected.get('error'), rejected
             result['checks'].append('Frozen Python backend includes original-material comparison and rejects traversal')
             assert not result['page_errors'], result['page_errors']
+            for path in ('/', '/?ui=upgrade-check', '/static/tokens.css'):
+                with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}{path}') as reply:
+                    assert 'no-store' in reply.headers.get('Cache-Control', ''), path
+            result['checks'].append('HTML and frontend assets prevent stale caching after the upgrade')
             browser.close()
     except Exception as exc:
         result['error'] = str(exc)
