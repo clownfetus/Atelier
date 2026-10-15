@@ -6,7 +6,7 @@
 # Usage: linux/build_appimage.sh [version]     (defaults to the contents of ./version)
 #
 # Prereqs (see LINUX.md "Setup"): venv built with --system-site-packages and PyInstaller installed,
-# Tools/ populated, Tools/libooz.so built (linux/build_ooz.sh). appimagetool is downloaded on first use.
+# Tools/ populated (scripts/stage_tools.py lists what must be there). appimagetool is downloaded on first use.
 #
 # An AppImage mounts read-only, but Atelier keeps its user data (mr_config.json, _cache, assets/,
 # downloaded Mappings, AES_KEY.txt) next to the executable. So AppRun stages a writable copy of the
@@ -46,44 +46,15 @@ if [ ! -d Tools ]; then
     echo "Tools/ is missing -- see LINUX.md Setup step 4." >&2
     exit 1
 fi
-if [ ! -f Tools/libooz.so ] && [ -z "${ATELIER_OODLE:-}" ]; then
-    echo "Tools/libooz.so is missing. Run linux/build_ooz.sh first (or set ATELIER_OODLE)." >&2
-    exit 1
-fi
-
 echo "$VERSION" > version
 rm -rf build dist
 "$PYTHON" -m PyInstaller --noconfirm --clean Atelier.spec
 
-cp -a Tools dist/Atelier/Tools
-
-# Game-derived data -- never ship. Same two exclusions as BUILD.bat / Atelier.iss: the app
-# fetches both itself on first run (Setup -> Download).
-rm -rf dist/Atelier/Tools/Mappings
-rm -f  dist/Atelier/Tools/AES_KEY.txt
-if [ -e dist/Atelier/Tools/Mappings ] || [ -e dist/Atelier/Tools/AES_KEY.txt ]; then
-    echo "FAILED to remove bundled Mappings/AES_KEY.txt" >&2
-    exit 1
-fi
-
-# UAssetGUI.exe (world.py) and shaders/dxc.exe + dxcompiler.dll + dxil.dll (dxc_ir.py) back
-# features hostos.unsupported() refuses unconditionally on Linux -- see the docstring at the top
-# of atelier/hostos.py. They are never invoked here, Wine or not, so they're dead weight.
-rm -f dist/Atelier/Tools/UAssetGUI.exe
-rm -f dist/Atelier/Tools/shaders/dxc.exe
-rm -f dist/Atelier/Tools/shaders/dxcompiler.dll
-rm -f dist/Atelier/Tools/shaders/dxil.dll
-
-# .exe siblings of a native Linux build are also dead weight: hostos.native_tool() prefers the
-# extensionless native binary unconditionally, so the .exe is never invoked once it's present.
-if [ -x dist/Atelier/Tools/UAssetTool ]; then
-    rm -f dist/Atelier/Tools/UAssetTool.exe
-fi
-if [ -x dist/Atelier/Tools/shaders/retoc-rivals-cli ]; then
-    rm -f dist/Atelier/Tools/shaders/retoc-rivals-cli.exe
-fi
-
-chmod +x dist/Atelier/Atelier dist/Atelier/Tools/UAssetTool dist/Atelier/Tools/shaders/retoc-rivals-cli 2>/dev/null || true
+# Tools come from the explicit allowlist in scripts/stage_tools.py (shared with BUILD.bat), never a
+# wholesale copy: a missing UAssetTool/Oodle/AtelierMesh fails the build, and Mappings, the AES key,
+# caches and the Windows-only tools in the dev Tools/ folder are never picked up.
+chmod +x dist/Atelier/Atelier
+"$PYTHON" scripts/stage_tools.py --platform linux
 
 TOOL_DIR="$ROOT/linux/_appimagetool"
 TOOL="$TOOL_DIR/appimagetool-x86_64.AppImage"

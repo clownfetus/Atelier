@@ -822,9 +822,12 @@ def stage_inject(stage, game_rel, opts=None):
     import_base = project_base(game_rel)
     if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):
         import_base = project_base_legacy(game_rel)
-    work_base   = _ac.cache_base(game_rel) or find_extracted(game_rel)
+    # Re-extract on a miss like every other stager does: _cache is disposable (Reset Data, a fresh
+    # install, a cleared cache), and the edited PNG lives in the project, so a missing work copy
+    # must not turn into a skipped texture.
+    work_base   = ensure_work_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
-        raise RuntimeError("no base asset — run 'import' first")
+        raise RuntimeError(missing_reason(game_rel, "texture"))
     blank_note = ""
     if opts.get("blank"):
         # Generated fresh into the cache, never into the project: the project PNG is the user's

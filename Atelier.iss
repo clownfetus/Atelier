@@ -28,19 +28,31 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
-; Excludes game-derived data — shipping either of these in the installer is a copyright risk, and
-; the app already obtains both remotely, so neither needs to ship:
-;   Tools\Mappings\*.usmap — pulled by api_download_usmap on first run, kept current by the 3-day
-;                            check (api_usmap_update_check).
-;   Tools\AES_KEY.txt      — Setup prefills the key from the rivals-depot (_fetchAesKeyValue in
-;                            app.js) and save_paks writes the file + updates io_lib.AES_KEY live;
-;                            config._auto_fetch_aes then refreshes it on each frozen launch.
-; Neither absence blocks first run: setup_status reports configured=false (it keys off
-; mr_config.json and USMAP, never off these files), so the Setup overlay opens and collects both.
-; BUILD.bat also strips them from dist before this runs — belt and braces, since a stale dist would
-; otherwise leak them.
+; Every source is listed by name -- never "dist\Atelier\*". Running dist\Atelier\Atelier.exe to test
+; a build writes assets\, _cache\ and mr_config.json beside it, and a wildcard would ship them.
+; Tools entries mirror scripts/stage_tools.py's Windows manifest (tests/test_packaging.py checks
+; both stay in sync). None carries skipifsourcedoesntexist on purpose: a missing tool fails the
+; compile instead of producing an installer without UAssetTool (TRIAGE #39).
+; Mappings and AES_KEY.txt are game-derived and never ship; the app fetches both on first run.
 [Files]
-Source: "dist\Atelier\*"; DestDir: "{app}"; Excludes: "Tools\Mappings\*,Tools\AES_KEY.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Atelier\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Atelier\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Atelier\Tools\UAssetTool.exe"; DestDir: "{app}\Tools"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\UAssetGUI.exe"; DestDir: "{app}\Tools"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierMesh\*"; DestDir: "{app}\Tools\AtelierMesh"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Atelier\Tools\shaders\retoc-rivals-cli.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\oo2core_9_win64.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\dxc.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\dxcompiler.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\dxil.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+; A seed only: browse._fetch_char_data writes fetched IDs back into it, so never overwrite.
+Source: "dist\Atelier\Tools\MarvelRivalsCharacterIDs.md"; DestDir: "{app}\Tools"; Flags: onlyifdoesntexist uninsneveruninstall
+
+; User data lives beside the exe. These are never installed, never deleted by an upgrade, and
+; uninsneveruninstall keeps even an uninstall from removing them.
+[Dirs]
+Name: "{app}\assets\projects"; Flags: uninsneveruninstall
+Name: "{app}\assets\exported"; Flags: uninsneveruninstall
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -48,28 +60,21 @@ Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 
 ; Clear stale payload so a removed/renamed .pyd/.dll from an older build can't shadow the new
 ; one. [Files] uses ignoreversion, which overwrites everything that still ships but never removes
-; what no longer does — that gap is what this closes.
+; what no longer does -- that gap is what this closes.
 ;
-; THE RULE: only list a path the app never writes to at runtime. NEVER "{app}" — user data lives
-; there (assets\projects, assets\exported, _cache, mr_config.json) and a filesandordirs wipe of
-; {app} deletes every project the user has ever made.
-;
-; Tools\ is listed per-subdir, NOT wholesale, because three things in it are runtime-authored:
-;   Tools\Mappings\*.usmap        — downloaded on the 3-day check (routes.api_usmap_update_check)
-;   Tools\AES_KEY.txt             — rewritten on a key rotation (config._auto_fetch_aes)
-;   Tools\MarvelRivalsCharacterIDs.md — written back with fetched IDs (browse._fetch_char_data)
-; Mappings must never be listed here. Nothing ships into it (see [Files] Excludes), so a wipe does
-; not fall back to a bundled copy — it leaves the user with NO mappings at all, and since
-; save_usmap_config() has already pinned the deleted path in mr_config.json while usmap_checked_at
-; is still fresh, the 3-day gate blocks an automatic re-fetch. The app would sit unusable behind a
-; Setup prereq error until the user re-downloads by hand.
-; The loose exes (UAssetTool, UAssetGUI) always ship, so ignoreversion covers them. texconv.exe
-; used to sit beside them and was never invoked by anything -- removed rather than kept shipping.
+; THE RULE: only list a folder the installer owns outright and the app never writes to. NEVER
+; "{app}", "{app}\Tools" or anything under assets\ -- user data lives in {app} (assets\projects,
+; assets\exported, _cache, mr_config.json, Tools\Mappings, Tools\AES_KEY.txt) and a wipe of a
+; parent deletes every project the user has ever made. tests/test_packaging.py enforces this list.
+;   _internal                 PyInstaller output, read-only at runtime
+;   Tools\AtelierMesh         vendor drop, shipped whole
+;   Tools\retoc-rivals-cli    retired layout; nothing reads it any more
+; Tools\shaders is NOT wiped: its files are overwritten by name above, and wiping the folder would
+; also take anything a user put there. Mappings must never be listed: nothing ships into it.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\_internal"
 Type: filesandordirs; Name: "{app}\Tools\AtelierMesh"
 Type: filesandordirs; Name: "{app}\Tools\retoc-rivals-cli"
-Type: filesandordirs; Name: "{app}\Tools\shaders"
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall

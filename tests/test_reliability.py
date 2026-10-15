@@ -317,6 +317,19 @@ class Reliability(unittest.TestCase):
         self.assertTrue(all(Path(p).read_bytes().startswith(b"old") for p in old))
         self.assertEqual(marker.read_text(), "keep")
 
+    def test_texture_export_re_extracts_a_missing_work_copy(self):
+        """_cache is disposable; a texture whose work copy is gone must re-extract, not be skipped."""
+        work = self.cache / "import" / "T_A"
+        work.parent.mkdir(parents=True, exist_ok=True)
+        def extract(game_rel):
+            work.with_suffix(".uasset").write_bytes(b"x")
+            return str(work)
+        with patch.object(T, "ensure_work_base", side_effect=extract) as ensure, \
+                patch.object(T, "uat", side_effect=RuntimeError("stop after resolving the base")):
+            with self.assertRaisesRegex(RuntimeError, "stop after"):
+                T.stage_inject(str(self.cache / "stage"), "UI/T_A")
+        ensure.assert_called_once_with("UI/T_A")
+
     def test_overlapping_build_is_rejected_without_touching_output(self):
         with T._build_lock:
             result = T.build_mod("Demo", ["UI/T_A"], [], str(self.out))

@@ -27,27 +27,10 @@ echo %VERSION%> version
 rmdir /s /q build dist 2>nul
 python -m PyInstaller --noconfirm --clean Atelier.spec
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-xcopy /E /I /Y Tools dist\Atelier\Tools
-rem Mappings and the AES key are game-derived data -- never ship them. The dev's local copies come
-rem across with the xcopy above, so drop them here: both must be absent from dist, and therefore
-rem from the installer. The app obtains each remotely (usmap: api_download_usmap + the 3-day check;
-rem AES: Setup prefills from the rivals-depot, then config._auto_fetch_aes refreshes it).
-rem Atelier.iss excludes the same two paths, so a stale dist can't leak them either -- both guards
-rem are deliberate, don't remove one because the other exists.
-if exist dist\Atelier\Tools\Mappings rmdir /s /q dist\Atelier\Tools\Mappings
-if exist dist\Atelier\Tools\AES_KEY.txt del /q dist\Atelier\Tools\AES_KEY.txt
-if exist dist\Atelier\Tools\Mappings echo FAILED to remove bundled Mappings & exit /b 1
-if exist dist\Atelier\Tools\AES_KEY.txt echo FAILED to remove bundled AES_KEY.txt & exit /b 1
-rem Native LINUX builds of the same tools sit beside the .exes for development on Linux (they are
-rem picked up by hostos.native_tool, which prefers an extensionless sibling over Wine). The xcopy
-rem above takes them too, and they are ELF binaries -- useless in a Windows installer and ~155 MB
-rem of it. Drop them here rather than teaching xcopy an exclude list.
-if exist dist\Atelier\Tools\UAssetTool del /q dist\Atelier\Tools\UAssetTool
-if exist dist\Atelier\Tools\liboo2corelinux64.so.9 del /q dist\Atelier\Tools\liboo2corelinux64.so.9
-if exist dist\Atelier\Tools\libooz.so del /q dist\Atelier\Tools\libooz.so
-if exist dist\Atelier\Tools\shaders\retoc-rivals-cli del /q dist\Atelier\Tools\shaders\retoc-rivals-cli
-if exist dist\Atelier\Tools\shaders\liboo2corelinux64.so.9 del /q dist\Atelier\Tools\shaders\liboo2corelinux64.so.9
-if exist dist\Atelier\Tools\UAssetTool echo FAILED to remove the Linux UAssetTool & exit /b 1
-if exist dist\Atelier\Tools\shaders\retoc-rivals-cli echo FAILED to remove the Linux retoc & exit /b 1
+rem Tools are staged from an explicit allowlist (scripts\stage_tools.py), never copied wholesale:
+rem a missing UAssetTool/Oodle/AtelierMesh fails here, and Mappings, the AES key, caches and the
+rem Linux builds sitting in the dev Tools\ folder are simply never picked up.
+python scripts\stage_tools.py --platform windows
+if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
