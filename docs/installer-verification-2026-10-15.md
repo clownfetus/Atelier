@@ -6,15 +6,15 @@
 
 | Field | Value |
 |---|---|
-| Source commit | `1ecdc4094841fb0fcdf5d1d1889f4e7c0b57910b` |
+| Source commit | `de6f8857c69ccbc03734c70282217eca9e438544` (includes reconciled upstream packaging changes) |
 | Source worktree | `C:/Users/thiag/OneDrive/Documents(1)/GitHub/Atelier-triage-fixes` |
 | Application version | `0.3.4` (unchanged source version; local fixes build) |
 | Python / PyInstaller | 3.12.14 / 6.22.3 |
 | Inno Setup | 6.7.3, installed for the current user with winget |
 | Compiler | `C:/Users/thiag/AppData/Local/Programs/Inno Setup 6/ISCC.exe` |
 | Installer | `dist/AtelierSetup.exe` in the fixes worktree |
-| Size | 148,666,585 bytes |
-| SHA-256 | `5b4c19adb7fea3e3dd95fa50012f1dbc13bdea96f25e6aef0cf7d6ab3ba2bad4` |
+| Size | 120,291,944 bytes |
+| SHA-256 | `c4ddcb3741333b608f353681c1175de3502d847b4f5f8e8c9e2e4b7a746ba177` |
 | Adjacent checksum file | `dist/AtelierSetup.exe.sha256` |
 | Native tools source | `D:/AtelierDev/phase-0-1/Tools` |
 | Archive verification tool | Inno Unpacker 2.71.1, already present in the isolated development downloads |
@@ -25,20 +25,27 @@ The source worktree was clean during the build. PyInstaller’s module table ide
 
 ## Build commands
 
-Executed from the fixes worktree, with logs redirected under `_work/installer-verification`:
+Executed from the fixes worktree, with logs redirected under `_work/installer-verification-reconciled`. The build uses a fresh output directory and an exact copy of the committed Inno script:
 
 ```powershell
-& '..\Atelier\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean Atelier.spec
+Copy-Item Atelier.iss _work/installer-build-reconciled/Atelier.iss
+& '..\Atelier\.venv\Scripts\python.exe' -m PyInstaller --noconfirm `
+  --distpath _work/installer-build-reconciled/dist `
+  --workpath _work/installer-build-reconciled/build Atelier.spec
 & '..\Atelier\.venv\Scripts\python.exe' scripts/stage_tools.py `
-  'D:\AtelierDev\phase-0-1\Tools' 'dist\Atelier\Tools'
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" '/DAppVersion=0.3.4' Atelier.iss
+  --platform windows --src 'D:\AtelierDev\phase-0-1\Tools' `
+  --dist _work/installer-build-reconciled/dist/Atelier
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" '/DAppVersion=0.3.4' `
+  _work/installer-build-reconciled/Atelier.iss
 ```
 
-The compiler completed successfully in 81.172 seconds. These are the build pipeline’s PyInstaller/staging/Inno steps executed explicitly with the external development tools and the installed per-user compiler. `BUILD.bat` itself still assumes a worktree-local Tools folder and a compiler under Program Files (x86).
+The compiler completed successfully in 79.937 seconds. The compiled Inno script was hash-checked against the committed source script. After verification, the installer was copied to `dist/AtelierSetup.exe` for delivery. These are the build pipeline’s PyInstaller/staging/audit/Inno steps executed explicitly with the external development tools and the installed per-user compiler. `BUILD.bat` itself still assumes a worktree-local Tools folder and a compiler under Program Files (x86).
+
+An initial build at `1ecdc40` passed verification with 23 tools and a 148,666,585-byte installer. The remote branch advanced during the task; its upstream packaging reconciliation was preserved and the installer rebuilt. The delivered build uses the current allowlist (11 files), and the first installer is retained under `D:/AtelierDev/triage-installer-20261015/first-build-1ecdc40`. Its earlier reports remain under `_work/installer-verification`.
 
 ## Verified contents
 
-The finished installer was listed and extracted with Inno Unpacker. All **23 tool files** in the staged Tools directory were present in the extracted installer payload with identical SHA-256 hashes. The following required files also matched their original development-tool copies:
+The finished installer was listed and extracted with Inno Unpacker. All **11 tool files** in the allowlisted staging directory were present in the extracted installer payload with identical SHA-256 hashes, and all 11 matched their original development-tool copies. The four files specifically relevant to the original missing-tool defect are:
 
 | Archive path under `{app}/Tools/` | Bytes | SHA-256 |
 |---|---:|---|
@@ -53,10 +60,11 @@ Each of the four Inno preprocessor guards was exercised by compiling a disposabl
 
 ## Evidence and limits
 
-- Worktree-local report: `_work/installer-verification/results.json`, containing installer hash, all tool hashes and compiler-guard outcomes.
+- Worktree-local report: `_work/installer-verification-reconciled/results.json`, containing installer hash, all tool hashes and compiler-guard outcomes.
 - Logs: `pyinstaller.log`, `inno-compile.log`, `installer-contents.txt`, `installer-extraction.log`, and `compiler-guard-0.log` through `compiler-guard-3.log` in that same directory.
-- Verification procedure: `_work/installer-verification/verify_installer.py`.
-- Extracted tools: `D:/AtelierDev/triage-installer-20261015/unpacked/{app}/Tools`.
+- Verification procedure: `_work/installer-verification-reconciled/verify_installer.py`.
+- Extracted tools: `D:/AtelierDev/triage-installer-20261015-reconciled/unpacked/{app}/Tools`.
+- Current packaging and triage export regressions: 35 passed (14 packaging, 21 triage); reports under `_work/installer-reconciled-checks`.
 - Installer and reports remain local; no binary release was published. Existing Atelier installations, projects and game mods were not changed.
 - Verified archive contents and compiler guards. A clean install, installed-app launch, upgrade behavior and in-game appearance were not tested.
 
