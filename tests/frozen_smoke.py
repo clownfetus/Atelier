@@ -134,6 +134,7 @@ def main():
             page.wait_for_function("window.AtelierViewport && window.atelierProject?.() === 'Frozen smoke'")
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 6")
             page.wait_for_function("!document.querySelector('.overlay.active')")
+            page.wait_for_function("document.querySelector('[data-atelier-motion=\"empty-assets\"]')?.getBoundingClientRect().width === 112")
             result['renderer'] = page.evaluate('navigator.userAgent')
             result['checks'].append('Actual frozen executable serves the interface in native WebView2')
             info = page.evaluate("""() => ({
