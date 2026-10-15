@@ -9,6 +9,7 @@ MOD = ("mod-help", "mod-general", "mod-suggestions", "mod-ui", "mod-vfx",
 
 cs = json.loads((ROOT / "clusters.json").read_text())
 which = sys.argv[1] if len(sys.argv) > 1 else "priority"
+since = sys.argv[2] if len(sys.argv) > 2 else None   # ISO ts; only clusters starting at/after it
 
 def prio(c):
     if c["kw"]:
@@ -17,6 +18,8 @@ def prio(c):
     return any(m in ch for m in MOD) or ch.isdigit()
 
 todo = [c for c in cs if prio(c)] if which == "priority" else cs
+if since:
+    todo = [c for c in todo if c["ts"] >= since]
 done = json.loads((ROOT / "harvested.json").read_text()) if (ROOT / "harvested.json").exists() else []
 doneset = {f"{d['cid']}:{d['start']}" for d in done}
 todo = [c for c in todo if f"{c['cid']}:{c['start']}" not in doneset]
