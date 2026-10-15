@@ -72,7 +72,14 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-appimage-verification
-          path: report
+          path: |
+            report/*.log
+            report/*.sha256
+            report/source
+            report/appimage/*.json
+            report/appimage/*.txt
+            report/appimage/*.log
+            report/appimage/*.png
           retention-days: 30
       - name: Preserve the verified release binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -90,13 +90,21 @@ def main():
                 matches[relative.as_posix()] = sha256(frozen)
         (report / 'source-hashes.json').write_text(json.dumps(matches, indent=2))
         result['checks'].append({'name': 'payload audit and exact source files', 'files': len(matches)})
-        for tool, required in (('UAssetTool', ('extract',)), ('shaders/retoc-rivals-cli', ('dump-shaders', 'extract-shader'))):
+        # Linux intentionally omits DXC and disables shader editing. Check the
+        # native retoc commands used by text extraction and repatching instead.
+        for tool, required in (('UAssetTool', ('extract',)), ('shaders/retoc-rivals-cli', ('pack', 'unpack'))):
             completed = subprocess.run([str(payload / 'Tools' / tool), '--help'], cwd=payload / 'Tools',
                                        capture_output=True, text=True, timeout=60)
             (report / (Path(tool).name + '-help.txt')).write_text(completed.stdout + completed.stderr)
             if completed.returncode or not all(word in completed.stdout + completed.stderr for word in required):
-                raise RuntimeError(f'Native tool failed to launch: {tool}: {completed.stderr}')
-        result['checks'].append({'name': 'native UAssetTool and custom shader retoc launch'})
+                raise RuntimeError(f'Native tool failed to launch: {tool}: {completed.stdout} {completed.stderr}')
+        for command in ('pack', 'unpack'):
+            completed = subprocess.run([str(payload / 'Tools/shaders/retoc-rivals-cli'), command, '--help'],
+                                       capture_output=True, text=True, timeout=30)
+            (report / f'retoc-{command}-help.txt').write_text(completed.stdout + completed.stderr)
+            if completed.returncode or '--game-paks-dir' not in completed.stdout + completed.stderr:
+                raise RuntimeError(f'Native retoc lacks the Rivals {command} interface')
+        result['checks'].append({'name': 'native UAssetTool and Rivals retoc launch'})
         data = report / 'user-data'
         with socket.socket() as port_probe:
             port_probe.bind(('127.0.0.1', 0))
@@ -148,6 +156,7 @@ def main():
         return 0
     except Exception as exc:
         result.update(ok=False, error=str(exc))
+        subprocess.run(['scrot', str(report / 'failure.png')], check=False)
         raise
     finally:
         if process is not None and process.poll() is None:
