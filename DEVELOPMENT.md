@@ -592,3 +592,16 @@ startup errors.
 Native tests require WebView2 and Playwright's Python package for CDP attachment;
 they do not launch a separate Playwright Chromium browser. Test success must come
 from the workflow result, not from source inspection or a syntax parse.
+
+The installer handles older native windows that defer closing while managed jobs
+drain. Its `PrepareToInstall` hook matches the full running executable path to
+the chosen installation directory and additionally checks the main window title.
+It requests normal `WM_CLOSE`, retains process handles, and waits up to 90 seconds
+before Restart Manager checks for in-use files. Refusal or timeout stops the update
+before payload changes; it never force-kills the application. Other installations
+are not selected by title alone, and `/NOCLOSEAPPLICATIONS` skips this hook.
+
+This installer-side compatibility path is necessary for previously shipped
+executables: changing only the new application's close handler cannot repair an
+upgrade while the old executable is still running. Hosted tests must leave the
+old application running so this behavior is exercised by the actual installer.
