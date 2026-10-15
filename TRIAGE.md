@@ -91,12 +91,12 @@ Found in the 2026-10-15 sweep of the thread and 98 new conversations. The same s
 |---|---|---|---|---|---|---|
 | 38 | Preview thumbnails load forever in 0.3.4 | Critical | Small | 9 | `pak_thumb.py` · `tests/test_thumbnails.py` | Texture and mesh thumbnails spin indefinitely; Edit asset still loads the file. finngmin, lmaolena, everikreal, cjackfury, ekgaguya, shaula4evr, rebelliousred, wandaffx, jan.in, still on 10-15. Some overlap with #39. **Done** (PR #2). |
 | 39 | 0.3.4 installer ships without UAssetTool.exe and AtelierMesh | Critical | Trivial | 5 | `Atelier.iss` · `scripts/package_release.py` | 0.3.4 is ~44 MB against 0.3.3's ~490 MB. Fresh installs get `[WinError2]`, "UAssetTool.exe not found", no mesh viewer, "cannot find file" on VFX materials. Support answer is "install 0.3.3, then 0.3.4 over it". wei.ch3ng, jtcarc, pyxlu, cjackfury, rentheg. The shipped installer has no `Tools/` at all. **Fixed on main** (`a712532`). |
-| 40 | Ability icons export as white boxes under the Plugins tree | High | Small | 3 | index / browse · `texture.py` | Follow-up to #15. People cannot find "Plugins - sepa… > MarvelGas"; Luna and Thor weapon icons come out as white boxes (shafsta, who also gets it from UE); rebelliousred has slotted UI missing or stretched. May be partly the game. |
-| 41 | Re-exporting a VFX project after a game patch does not refresh it | High | Medium | 1 | `vfx.py` · export | finngmin: re-packaging and re-saving every material still gives a broken mod; a fresh project with the same edits works. Likely a cached base material from the old patch. |
-| 42 | Exported textures render brighter than vanilla | Medium | Medium | 2 | `texture.py` | A vanilla _D pasted back unchanged still looks brighter in game (finngmin); doggo.king sees it on an emote prop. Points at sRGB or compression settings. On your 09-28 todo. |
-| 43 | Linux build needs glibc 2.44 | Medium | Small | 1 | `linux/` | Built on Arch, so the tarball and AppImage fail on Fedora (teal_phoenix). Build against an older glibc. |
+| 40 | Ability icons export as white boxes under the Plugins tree | High | Small | 3 | index / browse · `texture.py` | Follow-up to #15. People cannot find "Plugins - sepa… > MarvelGas"; Luna and Thor weapon icons come out as white boxes (shafsta, who also gets it from UE); rebelliousred has slotted UI missing or stretched. *Cause not investigated.* |
+| 41 | Re-exporting a VFX project after a game patch does not refresh it | High | Medium | 1 | `material.py:91-205` · `repatch.py` | finngmin: re-packaging and re-saving every material still gives a broken mod; a fresh project with the same edits works. **Cause found in code (not reproduced):** the project stores each edited material as a full JSON copy from when the project was created, and `stage_material` rebuilds from it via `mat_json`, which never reads the current game files, so a post-patch export rebuilds the pre-patch material against the new usmap. Fix: take the edited values from the project JSON and apply them to freshly extracted vanilla, as `repatch.py` already does. |
+| 42 | Exported textures render brighter than vanilla | Medium | Medium | 2 | `texture.py` | A vanilla _D pasted back unchanged still looks brighter in game (finngmin); doggo.king sees it on an emote prop. On your 09-28 todo. *Cause not investigated:* Atelier sets no sRGB or compression itself (UAssetTool's `inject_texture` keeps the vanilla asset's), so it would be in that tool or the PNG decode. |
+| 43 | Linux build needs glibc 2.44 | Medium | Small | 1 | `linux/` | The tarball and AppImage fail on Fedora asking for glibc 2.44 (teal_phoenix); you build on Arch. *From the error message; the AppImage was not inspected.* |
 | 44 | Mr Fantastic maker skin packs one form into the wrong folder | Medium | Small | 1 | export | tendo625: crashes on load; the pak has one of the three forms outside its folder. Unreal-packed version works. |
-| 45 | Export contains only materials, no textures | High | Medium | 1 | export | kadeschaos, 09-30. **Waiting on logs** (asked 10-01). |
+| 45 | Export contains only materials, no textures | High | Medium | 1 | export | kadeschaos, 09-30. **Waiting on logs** (asked 10-01). Before `a712532`, `stage_inject` raised "no base asset" when the cached copy was missing, skipping the texture while materials still exported, which matches; unconfirmed without logs. |
 | 46 | NoMipMaps on by default for UI textures | Medium | Trivial | 1 | `texture.py` | diiea, right after #20 fixed her blur. On your 09-28 todo. |
 | 47 | Remove a whole material part (MI_Hide) | Medium | Medium | 4 | `material.py` · `texture.py` | Remove Texture only hides parts that already have an opacity mask. leagueofthearcane proposed swapping in MI_Hide; chomik88828, zumiku0 and finngmin all wanted it. |
 | 48 | Add textures with new names | Low | Small | 1 | `texture.py` | chopthememegod, for colour variants. You said "not too hard to add". |
@@ -105,8 +105,8 @@ Found in the 2026-10-15 sweep of the thread and 98 new conversations. The same s
 Updates to older open items: **#13** has a third asker (miss_breezy); **#24** a second (teal_phoenix);
 **#28** keeps proving itself (tendo625: "who should I report to?"); **#29** is still the most common
 mod-help question, and the 10-15 ban wave around UI mods gives the export screen something more to
-say; **#33** is on your own 09-28 todo; **#36** is partly covered by PR #2's suite, but nothing tests
-texture paths end to end.
+say; **#33** is on your own 09-28 todo; **#36**: `stage_inject` is tested (phases 3–4 and `a712532`'s re-extract case), but always with
+UAssetTool faked; nothing runs a real inject or checks pak paths across characters.
 
 ---
 
