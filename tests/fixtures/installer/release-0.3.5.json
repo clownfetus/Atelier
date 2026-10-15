@@ -1,11 +1,11 @@
 {
-  "source_commit": "7ad6f5c6a8832a93d8b676e188b06ba096889b0d",
-  "application_source_commit": "7ad6f5c6a8832a93d8b676e188b06ba096889b0d",
+  "source_commit": "ef3666eaeae6306939fa0a38295e7b7e88a9a270",
+  "application_source_commit": "ef3666eaeae6306939fa0a38295e7b7e88a9a270",
   "application_version": "0.3.5",
   "release_tag": "0.3.5",
   "installer_url": "https://github.com/clownfetus/Atelier/releases/download/0.3.5/AtelierSetup.exe",
-  "installer_bytes": 120292427,
-  "installer_sha256": "b6854fa5731c8d7a2fcb19a1c75373d0b8c2dc0413cf25f023b53590411e14ba",
+  "installer_bytes": 120308858,
+  "installer_sha256": "602b14f13f10094d681d60a9e0f35aef6b4b8895c7b9d63520b8452e0a43c14d",
   "previous_installer_url": "https://github.com/clownfetus/Atelier/releases/download/0.3.4/AtelierSetup.exe",
   "previous_installer_bytes": 46839114,
   "previous_installer_sha256": "7f094cf9d723c1f40a5c6f0f28260cd6f35afd2430deef3c9370c3dbdaff339f",
@@ -318,7 +318,7 @@
     {
       "path": "_internal/base_library.zip",
       "bytes": 1333490,
-      "sha256": "88667754f341d91514712feaf06eeb4c174d3641e531c5ac522bba44ba8f44b4"
+      "sha256": "261f9b09ecdac8b08698a2f9395a2802ea299e9768b1b1860d04e87f2cb6fdac"
     },
     {
       "path": "_internal/bottle-0.13.4.dist-info/entry_points.txt",
@@ -427,8 +427,8 @@
     },
     {
       "path": "_internal/gui/app.js",
-      "bytes": 217181,
-      "sha256": "5650a025d734ff8c885cafdc8c9aa75a214533c63c29db28213727b9f53538b7"
+      "bytes": 217753,
+      "sha256": "2a53a0ff99652254a51afa595d6dbdba56affcfc9eb11252a3407cba75a4cc16"
     },
     {
       "path": "_internal/gui/brand/atelier-mark.png",
@@ -2022,8 +2022,8 @@
     },
     {
       "path": "Atelier.exe",
-      "bytes": 12174620,
-      "sha256": "25275e21b91cdeaa73151a00185523a862b511b43d4e48ae3b4946d4df2d3c10"
+      "bytes": 12174988,
+      "sha256": "da922a82789ec455c1b7fa811195270950e3888e4bacca882369bb5f28f45eea"
     },
     {
       "path": "Tools/AtelierMesh/AtelierMesh.exe",
@@ -2081,5 +2081,5 @@
       "sha256": "d011149a2cef5541dd0795c20c335394b93bd87dc76d8a4617543ce5a5aa7dfe"
     }
   ],
-  "installer_asset_api_url": "https://api.github.com/repos/clownfetus/Atelier/releases/assets/645224905"
+  "installer_asset_api_url": "https://api.github.com/repos/clownfetus/Atelier/releases/assets/645248271"
 }
