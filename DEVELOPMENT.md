@@ -1,5 +1,16 @@
 # Local development and reliability checks
 
+Desktop upgrades retain the existing WebView profile. The launcher uses a URL
+derived from the bundled HTML, and both HTML and frontend assets disable HTTP
+storage, so an old cached page cannot mix with the new scripts and styles.
+`tests/test_frontend_cache.py` checks the HTML, conditional responses and CSS.
+The frozen smoke checks the first native navigation before reloading, and accepts
+`--profile-source <old-_webview-directory>` to test an existing profile. Add
+`--expected-theme dark` to verify the saved theme, and
+`--expect-storage-canary` when that profile was seeded with localStorage key
+`atelier.upgrade-canary` set to `preserve-me`. Profiles are copied into isolated
+test data; the supplied original is never changed.
+
 This branch includes the environment/baseline and critical reliability work, plus the Phase 2 Material 3 foundation. The application still uses Bottle, vanilla JavaScript, Three.js and pywebview. Project sidecars, Unreal paths and mod container formats are unchanged. See [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for theme, component, icon and artwork-cache decisions.
 
 ## This machine
@@ -537,3 +548,82 @@ directories. Legacy untracked callers and shader-index background work are not
 converted into managed jobs. Repatch's optional import-into-project mode becomes
 uncancellable when its legacy project writes start; it is not a bulk-save
 transaction. No new packaged executable or installer was produced in this pass.
+
+## Disposable Windows installer verification
+
+`tests/installer_smoke.py` runs only in a deliberately configured GitHub-hosted
+Windows runner, with `ATELIER_DISPOSABLE_INSTALLER_TEST=1` and a new report
+directory beneath `RUNNER_TEMP`. Do not set hosted-runner variables on a local
+machine to bypass this restriction. An existing Atelier uninstall registration
+in either user or machine registry view causes refusal; the helper never renames
+or restores the host's registration. Failed fixtures are left for VM disposal.
+
+The `.github/workflows/windows-installer.yml` workflow runs on its verification
+branch or by manual dispatch. It downloads the exact
+candidate and previous installers, validates their hashes, and supplies this form
+of invocation inside its disposable VM:
+
+```powershell
+python tests/installer_smoke.py `
+  --installer "$env:RUNNER_TEMP/candidate/AtelierSetup.exe" `
+  --previous-installer "$env:RUNNER_TEMP/previous/AtelierSetup.exe" `
+  --previous-sha256 c4ddcb3741333b608f353681c1175de3502d847b4f5f8e8c9e2e4b7a746ba177 `
+  --payload-manifest tests/fixtures/installer/studio-0.3.4-installerfix.json `
+  --report-dir "$env:RUNNER_TEMP/installer-smoke"
+```
+
+The check exercises real clean installation, native WebView2 first launch,
+running-app upgrade from the previous installer, same-version reinstallation,
+and uninstall. It verifies manifest payload hashes, selected-directory detection,
+stale program-file removal, synthetic project/configuration preservation, and
+browser preference preservation before any reload of the upgraded first page.
+Desktop and Start Menu shortcuts must target each installed fixture and disappear
+on uninstall; reinstallation must replace the running native window's process.
+Uninstall must remove every manifest program file except the retained seed file.
+The previous application creates its own browser profile. No personal browser
+cache or real game/project data is imported; this does not claim reproduction of
+a historical stale HTTP cache. Python optimization must remain disabled because
+functional checks use assertions.
+
+Reports include a flushed `stages.jsonl`, `results.json` with both installers'
+before/after SHA-256 hashes, installer logs, and native-window screenshots.
+Page-error results cover errors observed after listeners attach, not all early
+startup errors.
+Native tests require WebView2 and Playwright's Python package for CDP attachment;
+they do not launch a separate Playwright Chromium browser. Test success must come
+from the workflow result, not from source inspection or a syntax parse.
+Recent WebView2 releases ignore environment debugging flags for elevated apps.
+After admission, the helper sets an `Atelier.exe`-specific HKLM WebView2 debugging
+policy inside the disposable VM only; VM disposal removes it. The shipped
+installer never adds this policy. See Microsoft's
+[elevated-host override rules](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
+
+The installer handles older native windows that defer closing while managed jobs
+drain. Its `PrepareToInstall` hook matches the full running executable path to
+the chosen installation directory and additionally checks the main window title.
+It requests normal `WM_CLOSE`, retains process handles, and waits up to 90 seconds
+before Restart Manager checks for in-use files. Refusal or timeout stops the update
+before payload changes; it never force-kills the application. Other installations
+are not selected by title alone, and `/NOCLOSEAPPLICATIONS` skips this hook.
+
+This installer-side compatibility path is necessary for previously shipped
+executables: changing only the new application's close handler cannot repair an
+upgrade while the old executable is still running. Hosted tests must leave the
+old application running so this behavior is exercised by the actual installer.
+
+Verified release candidate (15 October 2026):
+[workflow run 38804866757](https://github.com/tendo625/Atelier/actions/runs/38804866757)
+passed on fresh Windows Server 2022 and 2025 VMs, using their existing WebView2
+131 and 154 runtimes. Both passed all 14 packaging checks and the complete native
+install/upgrade/reinstall/uninstall flow, including usable initial setup,
+shortcuts, retained synthetic files/preferences, and replacement process IDs.
+Each fresh install matched all 414 payload hashes; upgrades/reinstalls matched
+413 program files while retaining the user-edited seed. Both uninstall checks
+removed all 413 owned payload files. Installer logs report no required restart.
+The exact tested EXE is 120,307,350 bytes, SHA-256
+`3f11d382c23f75c3bde291a002bf4ae391a1e6fd7851b4eef814c4ff7b98ff80`.
+Installer source is `6a92e6a310fcd0c88a7fc7e8924b4d65f7e0b24e`; its unchanged
+application payload was built at `7f4898a6f5047942c425225f81fd71fc62b7cf8a`.
+The test harness revision was `d5288ce9d21e54176aabb147dffd96a2f9963a0a`.
+These checks used synthetic projects and fixtures; game rendering/export remains
+outside the installer verification scope.

@@ -108,7 +108,8 @@ class InstallerShipsTools(unittest.TestCase):
                     patch.object(io_lib.ctypes, "WinDLL", side_effect=lambda p: loaded.append(p) or Mock(),
                                  create=True):
                 io_lib._load_oodle()
-        self.assertEqual([Path(p) for p in loaded], [dll.resolve()])
+        # Windows runners may expose TEMP through its 8.3 path alias.
+        self.assertEqual([Path(p).resolve() for p in loaded], [dll.resolve()])
         self.assertIn("shaders/oo2core_9_win64.dll", {rel for rel, _ in ST.MANIFEST["windows"]})
 
 

@@ -1,4 +1,6 @@
 import os
+import hashlib
+from pathlib import Path
 from bottle import Bottle, ServerAdapter
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, make_server
 from socketserver import ThreadingMixIn
@@ -16,6 +18,12 @@ def _configured_port():
 
 PORT = _configured_port()
 app  = Bottle()
+
+
+def frontend_url(gui_dir):
+    """Bypass old HTML cached by an existing desktop browser profile."""
+    revision = hashlib.sha256((Path(gui_dir) / "index.html").read_bytes()).hexdigest()[:16]
+    return f"http://localhost:{PORT}/?ui={revision}"
 
 class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
     daemon_threads = True

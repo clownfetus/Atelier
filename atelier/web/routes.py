@@ -220,7 +220,9 @@ def catalogue_thumbnail(key):
 
 @app.route("/")
 def index():
-    return static_file("index.html", root=GUI_DIR)
+    r = static_file("index.html", root=GUI_DIR)
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return r
 
 @app.route("/static/<path:path>")
 def static(path):
