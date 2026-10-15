@@ -192,6 +192,15 @@ def execute_checks(args, report, result, journal):
                 sock.bind(('127.0.0.1', port))
             except OSError as exc:
                 raise RuntimeError(f'Port {port} is unavailable: {exc}') from exc
+    # Hosted Windows jobs run elevated. Recent WebView2 versions intentionally
+    # ignore WEBVIEW2_* environment overrides for elevated hosts, but honor this
+    # application-specific machine policy. This is configured ONLY after the
+    # disposable-runner gate; the entire VM (including this policy) is discarded.
+    debug_policy = r'Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+    for view in (winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY):
+        with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, debug_policy, 0, winreg.KEY_SET_VALUE | view) as key:
+            winreg.SetValueEx(key, 'Atelier.exe', 0, winreg.REG_SZ, f'--remote-debugging-port={args.debug_port}')
+    journal('fixture-debug-policy-configured', executable='Atelier.exe', port=args.debug_port)
     env = dict(os.environ, ATELIER_PORT=str(args.app_port), PYTHONUTF8='1',
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.debug_port}',
                HTTP_PROXY='http://127.0.0.1:9', HTTPS_PROXY='http://127.0.0.1:9', NO_PROXY='localhost,127.0.0.1')

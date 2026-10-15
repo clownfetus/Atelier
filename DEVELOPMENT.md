@@ -592,6 +592,11 @@ startup errors.
 Native tests require WebView2 and Playwright's Python package for CDP attachment;
 they do not launch a separate Playwright Chromium browser. Test success must come
 from the workflow result, not from source inspection or a syntax parse.
+Recent WebView2 releases ignore environment debugging flags for elevated apps.
+After admission, the helper sets an `Atelier.exe`-specific HKLM WebView2 debugging
+policy inside the disposable VM only; VM disposal removes it. The shipped
+installer never adds this policy. See Microsoft's
+[elevated-host override rules](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
 The installer handles older native windows that defer closing while managed jobs
 drain. Its `PrepareToInstall` hook matches the full running executable path to
