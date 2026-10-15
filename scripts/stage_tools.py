@@ -56,6 +56,18 @@ MANIFEST = {
 }
 EXECUTABLES = {"linux": ["UAssetTool", "shaders/retoc-rivals-cli"], "windows": []}
 
+# Python packages the app never imports, kept out of _internal. PyInstaller follows OPTIONAL imports
+# (scipy's array-API layer tries torch; scipy.stats tries matplotlib), and the Linux venv sees the
+# system site-packages, so whatever happens to be installed system-wide got frozen in: one build
+# grew _internal from 0.5 GB to 2.5 GB with torch, pandas, pyarrow, LLVM and MKL. Atelier.spec
+# excludes these; audit() fails the build if one gets in anyway.
+UNUSED_PACKAGES = [
+    "torch", "torchvision", "torchaudio", "functorch", "torchgen", "safetensors", "onnxruntime",
+    "tensorflow", "jax", "jaxlib", "cupy", "dask", "numba", "llvmlite", "sklearn",
+    "pandas", "pyarrow", "matplotlib", "mpl_toolkits", "sympy", "networkx",
+    "IPython", "jedi", "tkinter", "_tkinter", "botocore", "boto3", "s3fs", "mpi4py", "grpc",
+]
+
 _IGNORE = shutil.ignore_patterns("_cache", "__pycache__", "*.log", "*.tmp")
 
 # Dev/run data that must never be in a dist, at any depth.
@@ -107,6 +119,9 @@ def audit(platform, dist):
         if (path.is_file() and (name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_EXTS)) \
                 or (path.is_dir() and name in FORBIDDEN_DIRS and rel.parts[0] != "_internal"):
             problems.append(f"dev/run data in dist: {rel.as_posix()}")
+    internal = dist / "_internal"
+    problems += [f"unused package frozen into _internal: {name} -- see UNUSED_PACKAGES"
+                 for name in UNUSED_PACKAGES if (internal / name).exists()]
     if problems:
         raise SystemExit("Dist audit failed:\n  " + "\n  ".join(problems))
 
