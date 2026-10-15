@@ -548,3 +548,47 @@ directories. Legacy untracked callers and shader-index background work are not
 converted into managed jobs. Repatch's optional import-into-project mode becomes
 uncancellable when its legacy project writes start; it is not a bulk-save
 transaction. No new packaged executable or installer was produced in this pass.
+
+## Disposable Windows installer verification
+
+`tests/installer_smoke.py` runs only in a deliberately configured GitHub-hosted
+Windows runner, with `ATELIER_DISPOSABLE_INSTALLER_TEST=1` and a new report
+directory beneath `RUNNER_TEMP`. Do not set hosted-runner variables on a local
+machine to bypass this restriction. An existing Atelier uninstall registration
+in either user or machine registry view causes refusal; the helper never renames
+or restores the host's registration. Failed fixtures are left for VM disposal.
+
+The `.github/workflows/windows-installer.yml` workflow runs on its verification
+branch or by manual dispatch. It downloads the exact
+candidate and previous installers, validates their hashes, and supplies this form
+of invocation inside its disposable VM:
+
+```powershell
+python tests/installer_smoke.py `
+  --installer "$env:RUNNER_TEMP/candidate/AtelierSetup.exe" `
+  --previous-installer "$env:RUNNER_TEMP/previous/AtelierSetup.exe" `
+  --previous-sha256 c4ddcb3741333b608f353681c1175de3502d847b4f5f8e8c9e2e4b7a746ba177 `
+  --payload-manifest tests/fixtures/installer/cachefix-200d395.json `
+  --report-dir "$env:RUNNER_TEMP/installer-smoke"
+```
+
+The check exercises real clean installation, native WebView2 first launch,
+running-app upgrade from the previous installer, same-version reinstallation,
+and uninstall. It verifies manifest payload hashes, selected-directory detection,
+stale program-file removal, synthetic project/configuration preservation, and
+browser preference preservation before any reload of the upgraded first page.
+Desktop and Start Menu shortcuts must target each installed fixture and disappear
+on uninstall; reinstallation must replace the running native window's process.
+Uninstall must remove every manifest program file except the retained seed file.
+The previous application creates its own browser profile. No personal browser
+cache or real game/project data is imported; this does not claim reproduction of
+a historical stale HTTP cache. Python optimization must remain disabled because
+functional checks use assertions.
+
+Reports include a flushed `stages.jsonl`, `results.json` with both installers'
+before/after SHA-256 hashes, installer logs, and native-window screenshots.
+Page-error results cover errors observed after listeners attach, not all early
+startup errors.
+Native tests require WebView2 and Playwright's Python package for CDP attachment;
+they do not launch a separate Playwright Chromium browser. Test success must come
+from the workflow result, not from source inspection or a syntax parse.
