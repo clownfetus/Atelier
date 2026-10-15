@@ -74,23 +74,24 @@ linux/build_appimage.sh 0.3.4      # or pass one explicitly, same N.N.N format B
 
 This runs `PyInstaller` against the same `Atelier.spec` Windows uses (no Linux-specific spec
 needed — PyInstaller freezes the GTK/WebKit webview backend the same way it freezes any other
-extension module), then assembles `dist/Atelier/` the way `BUILD.bat` assembles `dist\Atelier\`:
-`Tools/` is copied in, and the same two categories of file are stripped for the same reasons —
+extension module), then stages `dist/Atelier/Tools/` with `scripts/stage_tools.py --platform linux`,
+the same script `BUILD.bat` runs with `--platform windows`. It copies only what its manifest lists:
 
-- **Game-derived data** (`Tools/Mappings/`, `Tools/AES_KEY.txt`) — never shipped on either
-  platform; the app fetches both itself on first run.
-- **Dead weight for this platform** — mirrored in the other direction from `BUILD.bat`, which
-  drops the *Linux* native builds from a *Windows* dist. Here it's the reverse: `UAssetGUI.exe`
-  and `shaders/dxc.exe`/`dxcompiler.dll`/`dxil.dll` back features (`world.py`, `dxc_ir.py`) that
-  call `hostos.unsupported()` unconditionally on Linux — Wine or not, they're never invoked, so
-  there's no reason to ship them. `UAssetTool.exe` and `shaders/retoc-rivals-cli.exe` are dropped
-  too, but for a different reason: `hostos.native_tool()` always prefers the extensionless native
-  binary sitting beside them when one is present, so once that binary is in `Tools/` the `.exe`
-  is simply dead code, not a fallback.
+- **Always shipped, build fails if missing** — the native `UAssetTool`, `liboo2corelinux64.so.9`
+  (UAssetTool decompresses nothing without it), `shaders/retoc-rivals-cli` with its Oodle,
+  `AtelierMesh/` (run under Wine) and the `MarvelRivalsCharacterIDs.md` seed. `libooz.so` ships
+  when present.
+- **Never shipped, because they are never listed** — `Tools/Mappings/`, `Tools/AES_KEY.txt`, any
+  `_cache/`, and the Windows-only `UAssetGUI.exe`/DXC (their features call `hostos.unsupported()`
+  on Linux) and `.exe` twins of the native tools.
+
+It then audits the whole dist. Only the bootloader, `_internal/` and `Tools/` may sit at the top
+level, so data from a test run of `dist/Atelier/Atelier` (`assets/`, `_cache/`, `mr_config.json`)
+fails the build instead of shipping.
 
 Output: `dist/Atelier-<version>-x86_64.AppImage` (the intermediate `dist/Atelier/` folder is also runnable directly).
 The prereqs are the same four setup steps above — the script checks each one (venv exists and
-was built `--system-site-packages`, PyInstaller installed, `Tools/` present, `libooz.so` built)
+was built `--system-site-packages`, PyInstaller installed, `Tools/` present, every required tool in it)
 and fails with a specific message rather than guessing.
 
 ### AppImage

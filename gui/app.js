@@ -2971,6 +2971,11 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       _modsFolderPath      = res.mods_folder || "";
       _modsFolderSet       = !!res.mods_folder;
       _protectionPassword  = res.export_password || "";
+      if (res.mods_folder_reset) {
+        // The old mods folder wasn't under this game's Paks dir (e.g. a path carried over from
+        // another machine), so it could never have loaded. Say where it now points.
+        toast(`Mods folder re-pointed to the game's own ~mods:\n${res.mods_folder}`, "info", 9000);
+      }
       if (!wasModsSet && _modsFolderSet) document.getElementById("toggle-copy").checked = true;
       if (wasPaths) {
         toast("Settings saved", "success");

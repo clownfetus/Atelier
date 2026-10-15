@@ -795,6 +795,17 @@ def _validate_and_build_paks(path):
         return None, f"no pakchunk*.utoc containers found in {paks} — wrong folder"
     return paks, None
 
+def _path_under(child, parent):
+    """True when child is parent or inside it (case- and separator-insensitive on Windows)."""
+    if not child or not parent:
+        return False
+    try:
+        c = os.path.normcase(os.path.normpath(child))
+        p = os.path.normcase(os.path.normpath(parent))
+        return c == p or c.startswith(p + os.sep)
+    except Exception:
+        return False
+
 @app.post("/api/save_paks")
 def api_save_paks():
     body       = request.json or {}
@@ -827,12 +838,25 @@ def api_save_paks():
     try:
         save_setup_config(paks_path, aes_key,
                           usmap_path if (usmap_path and os.path.exists(usmap_path)) else None)
-        if has_mods:
-            save_mods_folder(mods_folder)   # empty string clears it
-        elif not get_mods_folder():
-            # Initial setup (mods_folder not sent yet, nothing configured) — default to the
-            # game's own ~mods dir so "Copy to ~mods/" works without a trip to Settings.
-            save_mods_folder(paks_path + "/~mods")
+        mods_now = mods_folder if has_mods else get_mods_folder()
+        mods_reset = False
+        if has_mods and mods_folder == "":
+            save_mods_folder("")   # empty string clears it
+        else:
+            # The game only loads mods from under its own Paks dir. A folder anywhere else (e.g. a
+            # path carried over from another machine or an old install) can never have worked, so
+            # re-point it to this game's ~mods and tell the user. Nothing configured yet is the
+            # initial-setup case: default there too, so "Copy to ~mods/" works without Settings.
+            if _path_under(mods_now, paks_path):
+                target = mods_now
+            else:
+                target = paks_path + "/~mods"
+                mods_reset = bool(mods_now)
+            try:
+                os.makedirs(target, exist_ok=True)
+            except OSError:
+                pass
+            save_mods_folder(target)
         if has_pw:
             save_export_password(export_password)   # empty string clears it
         if has_blender:
@@ -870,6 +894,7 @@ def api_save_paks():
 
         response.content_type = "application/json"
         return json.dumps({"ok": True, "mods_folder": get_mods_folder(),
+                           "mods_folder_reset": mods_reset,
                            "export_password": get_export_password()})
     except Exception as e:
         response.content_type = "application/json"

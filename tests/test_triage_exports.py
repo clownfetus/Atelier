@@ -321,7 +321,7 @@ class ToolStaging(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("UAssetTool.exe", result.stderr)
         batch = (ROOT / "BUILD.bat").read_text()
-        self.assertIn('python scripts\\stage_tools.py Tools dist\\Atelier\\Tools\nif %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%', batch)
+        self.assertIn('python scripts\\stage_tools.py --platform windows\nif %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%', batch)
 
     @unittest.skipUnless(os.name == "nt", "BUILD.bat runs on Windows")
     def test_actual_batch_stops_before_compiler_when_tool_staging_fails(self):

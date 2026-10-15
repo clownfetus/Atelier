@@ -121,13 +121,20 @@ def _virtual_path(raw):
         return ((root + "/" + sub) if root else sub), mount
     return None, None
 
+# Containers a mod loader drops into Paks. They are not game content: indexing them would let a
+# loader's own assets shadow vanilla paths, and every loader update would invalidate the cache.
+_MODLOADER_STEMS = {"!projectgalacta_9999999_p"}
+
 def _index_utocs():
     # Ascending ASCII/Unicode order (case-insensitive): '-' (45) before '_' (95), so base paks
     # (pakchunkFoo-Windows) sort before patch paks (Patch_-Windows_YYYYMMDD_P), and patch paks
     # sort chronologically.  Later entries override earlier ones for the same virtual path.
     # dir_glob, not glob: PAKS is user-supplied and a library under D:/[Steam]/... would otherwise
     # match zero containers and index nothing, silently.
-    return sorted(dir_glob(PAKS, "*.utoc"), key=lambda p: os.path.basename(p).lower())
+    utocs = dir_glob(PAKS, "*.utoc")
+    utocs = [f for f in utocs
+             if os.path.splitext(os.path.basename(f))[0].lower() not in _MODLOADER_STEMS]
+    return sorted(utocs, key=lambda p: os.path.basename(p).lower())
 
 def _aes_fingerprint():
     """Identifies the key an index was built under, without writing the key itself into the cache.

@@ -52,6 +52,7 @@ ingest what they see, so browsing grows the archive.
     .venv/bin/python retrieval/fetch.py 1519707061854670908   # refresh the thread
     .venv/bin/python retrieval/plan.py                        # re-cluster
     .venv/bin/python retrieval/harvest.py priority            # fetch new conversations
+    .venv/bin/python retrieval/harvest.py priority <iso-ts>   # ...only clusters starting at/after ts
     .venv/bin/python retrieval/report.py                      # regenerate REPORT.md
 
 Anything already stored is skipped, so re-runs are cheap.

@@ -105,6 +105,6 @@ projects or extracted game artwork.
 | [Dark workspace](workspace-dark.png), [light workspace](workspace-light.png) | [Dark workspace](windows-workspace-dark.png) |
 | [Open light dropdown](dropdown-light.png), [first-run setup](first-run.png) | [Open light dropdown](windows-dropdown-light.png) |
 
-The existing PR branch remains based on its previous upstream revision. Upstream
-has since advanced and reports a merge conflict; that unrelated backend/packaging
-overlap was left untouched for this interface-only review.
+Upstream main through `d592133` is now integrated into the PR branch. The
+[merge-resolution report](../pr3-merge.md) records how both tool-staging changes
+were retained and the complete checks run after resolving the conflicts.

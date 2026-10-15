@@ -5,7 +5,7 @@ decryption. Both are loaded IN-PROCESS via ctypes, so unlike the .exe tools in T
 be run under Wine — a Linux Python process cannot load a Windows DLL. Each therefore has a backend
 per platform, chosen once at first use:
 
-  Oodle   Windows: Tools/retoc-rivals-cli/oo2core_9_win64.dll (the real Oodle).
+  Oodle   Windows: Tools/shaders/oo2core_9_win64.dll (the real Oodle, shipped beside retoc).
           Linux:   a real liboo2corelinux64.so if one is present (ATELIER_OODLE or Tools/),
                    else Tools/libooz.so — powzix/ooz, an open-source decoder for the
                    Kraken/Mermaid/Selkie/Leviathan codecs UE5 containers use. Decode-only,
@@ -32,7 +32,14 @@ _oodle_fn = None
 def _load_oodle():
     """Returns f(comp: bytes, raw_len: int) -> bytes."""
     if IS_WINDOWS:
-        dll = os.path.join(_TOOLS, "retoc-rivals-cli", "oo2core_9_win64.dll")
+        # shaders/ is where the installer ships it (beside retoc). retoc-rivals-cli/ is the old
+        # layout: it is no longer shipped and the installer deletes it, so it is a last resort only.
+        cands = [os.path.join(_TOOLS, *rel, "oo2core_9_win64.dll")
+                 for rel in (("shaders",), ("AtelierMesh",), (), ("retoc-rivals-cli",))]
+        dll = next((c for c in cands if os.path.exists(c)), None)
+        if not dll:
+            raise RuntimeError("No Oodle DLL (oo2core_9_win64.dll) in " + os.path.join(_TOOLS, "shaders")
+                               + " -- reinstall Atelier to restore the bundled tools.")
         oo = ctypes.WinDLL(os.path.abspath(dll))
         oo.OodleLZ_Decompress.restype = ctypes.c_int64
         def _decomp(comp, raw_len):

@@ -27,9 +27,10 @@ echo %VERSION%> version
 rmdir /s /q build dist 2>nul
 python -m PyInstaller --noconfirm --clean Atelier.spec
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-rem Reject incomplete bundles before Inno Setup can create an unusable installer.
-rem The staging helper also excludes game-derived keys/mappings and Linux binaries.
-python scripts\stage_tools.py Tools dist\Atelier\Tools
+rem Tools are staged from an explicit allowlist (scripts\stage_tools.py), never copied wholesale:
+rem a missing UAssetTool/Oodle/AtelierMesh fails here, and Mappings, the AES key, caches and the
+rem Linux builds sitting in the dev Tools\ folder are simply never picked up.
+python scripts\stage_tools.py --platform windows
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%

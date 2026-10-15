@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 from pathlib import Path
+import sys
+
+# One list, shared with the dist audit in scripts/stage_tools.py.
+sys.path.insert(0, str(Path(SPECPATH) / 'scripts'))
+from stage_tools import UNUSED_PACKAGES
 
 datas = [
     ('gui', 'gui'),
@@ -57,7 +62,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=UNUSED_PACKAGES,
     noarchive=False,
     optimize=0,
 )
