@@ -10,6 +10,12 @@ on:
       - tests/fixtures/installer/**
       - Atelier.iss
   workflow_dispatch:
+    inputs:
+      manifest:
+        description: Repository path to the installer payload manifest
+        required: true
+        default: tests/fixtures/installer/release-0.3.5.json
+        type: string
 
 permissions:
   contents: read
@@ -31,9 +37,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ATELIER_INSTALLER_MANIFEST: ${{ inputs.manifest || 'tests/fixtures/installer/studio-0.3.4-installerfix.json' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $manifest = Get-Content tests/fixtures/installer/studio-0.3.4-installerfix.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content -LiteralPath $env:ATELIER_INSTALLER_MANIFEST -Raw | ConvertFrom-Json
           $downloads = Join-Path $env:RUNNER_TEMP 'atelier-downloads'
           New-Item -ItemType Directory -Path $downloads | Out-Null
           $items = @(
@@ -43,7 +51,7 @@ jobs:
           foreach ($item in $items) {
             $target = Join-Path $downloads $item.name
             $headers = @{}
-            if ($item.url.StartsWith('https://api.github.com/repos/tendo625/Atelier/releases/assets/')) {
+            if ($item.url.StartsWith("https://api.github.com/repos/$env:GH_REPO/releases/assets/")) {
               $headers.Authorization = 'Bearer ' + $env:GH_TOKEN
               $headers.Accept = 'application/octet-stream'
             }
@@ -103,13 +111,15 @@ jobs:
           Get-Content "$env:RUNNER_TEMP/webview2-runtime.json"
       - name: Verify clean install, running upgrade, reinstall and uninstall
         shell: pwsh
+        env:
+          ATELIER_INSTALLER_MANIFEST: ${{ inputs.manifest || 'tests/fixtures/installer/studio-0.3.4-installerfix.json' }}
         run: |
-          $manifest = Get-Content tests/fixtures/installer/studio-0.3.4-installerfix.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content -LiteralPath $env:ATELIER_INSTALLER_MANIFEST -Raw | ConvertFrom-Json
           python tests/installer_smoke.py `
             --installer "$env:RUNNER_TEMP/atelier-downloads/candidate.exe" `
             --previous-installer "$env:RUNNER_TEMP/atelier-downloads/previous.exe" `
             --previous-sha256 $manifest.previous_installer_sha256 `
-            --payload-manifest tests/fixtures/installer/studio-0.3.4-installerfix.json `
+            --payload-manifest $env:ATELIER_INSTALLER_MANIFEST `
             --report-dir "$env:RUNNER_TEMP/atelier-installer-report"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect fixture-only diagnostics
