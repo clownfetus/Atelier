@@ -237,8 +237,11 @@ $items = @($paths | ForEach-Object {
 })
 ConvertTo-Json -InputObject $items -Compress
 """
-        inspected = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', script],
-                                   capture_output=True, text=True, timeout=20, check=True)
+        journal('shortcut-inspection-start', step=label)
+        # PowerShell 7 is already initialized by the hosted workflow. Avoid a
+        # second, cold Windows PowerShell/.NET Framework startup during launch.
+        inspected = subprocess.run(['pwsh.exe', '-NoProfile', '-NonInteractive', '-Command', script],
+                                   capture_output=True, text=True, timeout=60, check=True)
         shortcuts = json.loads(inspected.stdout)
         if len(shortcuts) != 2:
             raise RuntimeError('Expected desktop and Start Menu shortcut inspection')
