@@ -5,6 +5,7 @@ textures and material parameters, preview models, and build mods from one interf
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
 · [Development guide](DEVELOPMENT.md)
+· [Changelog](CHANGELOG.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
 ![Atelier asset library in dark mode, with category folders, search, filters and edited assets](images/studio-dark.png)
@@ -13,6 +14,11 @@ Screenshots show the current source interface with example data. The published
 installer can contain an earlier interface until a new release is published.
 See [screenshot details](images/README.md).
 
+**Atelier 0.4 (0.4.0)** adds the redesigned Model Studio, model replacement with
+default-on skeleton/weight/morph preservation, automatic texture-resolution
+recovery, and texture imports that keep the screen stable. See the
+[release notes](docs/release-0.4.0.md) for details and verification.
+
 ## Features
 
 - **Find assets:** character and skin names, current-folder search by name, ID or
@@ -20,11 +26,13 @@ See [screenshot details](images/README.md).
 - **Edit materials:** grouped color, dye-region and scalar parameters, explicit
   unsaved changes, comparison with saved values or the original game material,
   and individual value restoration.
-- **Work with textures and meshes:** import replacement textures, use read-only
-  image/3D previews, and open supported mesh workflows in Blender.
+- **Work with textures and meshes:** import replacement textures, add meshes to
+  the edit list, replace them with BLEND/FBX/GLB/PSK or cooked Unreal models,
+  and open supported mesh workflows in Blender.
 - **Inspect models:** switch Original/Edited textures or drag a before/after wipe,
   click a material on the model, inspect labelled dye regions, choose lighting,
-  isolate objects, play a standing idle, and capture a poster or turntable.
+  isolate objects, loop a compatible standing idle automatically, and capture a
+  poster or turntable. Select a part or material to reveal its editing controls.
 - **Review exports:** choose which edited assets to include, check the destination
   before building, and optionally copy the mod into your configured mods folder.
 - **Track work:** Activity records imports, exports and repatches. Bulk VFX / curves
@@ -172,12 +180,12 @@ must be extracted in full; `Atelier.exe` needs its adjacent `_internal` director
 
 To make a Windows release discoverable by existing installations:
 
-1. Build the intended source with a higher numeric version, such as `0.3.5`.
+1. Build the intended source with a higher numeric version, such as `0.4.0`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
    using the [installer checks](DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`0.3.5` or `v0.3.5`) and attaching the installer named **AtelierSetup.exe**.
+   (`0.4.0` or `v0.4.0`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the
    installed version; replacing an EXE under the same version will not trigger it.
 

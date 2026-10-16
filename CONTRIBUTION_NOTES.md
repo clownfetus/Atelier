@@ -1,5 +1,10 @@
 # Atelier studio modernization: maintainer handoff
 
+For 0.4, start with [CHANGELOG.md](CHANGELOG.md) and
+[the release notes](docs/release-0.4.0.md). They cover Model Studio, mesh replacement
+and morph preservation, texture recovery, stable import thumbnails, and final
+Windows/Linux packaging checks. The sections below retain earlier history.
+
 This contribution improves asset browsing, material editing and export review,
 with shared light/dark styling and reliability safeguards underneath. It keeps
 Atelier's existing Bottle, vanilla JavaScript, Three.js and pywebview stack.

@@ -741,3 +741,22 @@ counts. `tools-src/AtelierMorphCheck` is an independent CUE4Parse-based verifica
 reader, not a shipped runtime dependency. Native checks rebuild available LODs,
 package and independently extract a mod, and compare its morph identities, CPU
 counts, skeleton and decoded deltas against that reader.
+
+## 0.4 release verification (16 October 2026)
+
+The [final release workflow](https://github.com/clownfetus/Atelier/actions/runs/38870854575)
+built application commit `8e26d87636c735320b553ffbfeeb12e8d901c55c` for Windows and Linux.
+All 22 backend suites and 10 focused browser checks passed. The browser regression
+imports consecutive textures and checks that the grid, thumbnails, banner and
+existing sidebar rows retain their DOM identity.
+
+Windows 2022 and 2025 passed clean install, running upgrade from 0.3.5, reinstall
+and uninstall, including all 503 payload hashes and retained synthetic user data
+and browser preferences. Linux passed its AppImage build and native startup on
+Ubuntu 24.04; Wine-dependent asset workflows remain a separate runtime check.
+The installer SHA-256 is
+`9aa8fe4918b680337b233bdfb04584f01cd55acba4b6644e923275ba26af1cad`.
+The AppImage SHA-256 is
+`76717d20eebd47b6e25006e80e7928c314f32b5fd370a510af0263ad947aee9e`.
+Release documentation changes after that build do not alter the tested payload.
+The release assets include source, SHA256SUMS.txt and VERIFICATION.json.

@@ -1,5 +1,11 @@
 # Running Atelier on Linux
 
+For 0.4 (0.4.0), the AppImage was built and its native startup checked on Ubuntu
+24.04 in the [release workflow](https://github.com/clownfetus/Atelier/actions/runs/38870854575).
+Wine-dependent 3D and model-replacement paths still require separate runtime
+verification. Both `AtelierMesh.exe` and `AtelierAnimation.exe` use Wine; the latter
+provides standing-idle decoding. See [the release notes](docs/release-0.4.0.md).
+
 Atelier started as a Windows app; this document covers both running it from source on Linux for
 development, and building a packaged Linux copy with `linux/build_appimage.sh` (the Linux
 counterpart to `BUILD.bat`; the output is a single-file AppImage).
@@ -119,13 +125,11 @@ needs:
 |---|---|---|
 | `webkit2gtk-4.1` + `python-gobject` (system, not pip) | pywebview's GTK backend, which is what got frozen in | window fails to open; `server.py`-only use is unaffected since headless mode never touches it |
 | `zenity` | folder/file pickers (Setup's paks path, texture import/export) | pickers raise a clear "zenity is not installed" error when opened; nothing else is affected |
-| **Wine** (`wine64` or `wine`) | only for `Tools/AtelierMesh/AtelierMesh.exe` — the 3D viewport's mesh→glTF decoder has no native Linux build (unlike UAssetTool and retoc, which do, and so never touch Wine at all on a packaged Linux build) | opening the 3D viewport fails with a clear "Wine not found" error; **everything else — browsing, texture/material editing, mod build/install, repatch — works with no Wine installed at all** |
+| **Wine** (`wine64` or `wine`) | `AtelierMesh.exe` and `AtelierAnimation.exe` provide mesh and idle-animation decoding; UAssetTool and retoc have native builds | 3D decoding and dependent model workflows need Wine; ordinary native asset tools remain separate |
 | `notify-send`, `xdg-open` / `gio`, `dbus-send` | desktop notifications and "show in file manager" | best-effort; their absence is swallowed silently (notify) or falls back to just opening the folder (reveal) |
 
-In short: **Wine is optional**, and the one thing it gates (the 3D skin viewport) is the one
-Linux path nobody has verified yet (see Status below) — a Wine build there is untested, not
-just unwired. Everything else in the table can be skipped if you don't need that specific
-feature, but a normal end user should just install all four system packages up front:
+Wine-dependent 3D and model workflows remain unverified on Linux. Install the
+dependencies for the features you use; a normal desktop setup includes:
 
 ```sh
 sudo pacman -S wine zenity webkit2gtk-4.1 python-gobject   # Arch; adapt for your distro
