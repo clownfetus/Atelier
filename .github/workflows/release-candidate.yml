@@ -107,7 +107,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/appimage-smoke"
           cd "$RUNNER_TEMP/appimage-smoke"
-          "$GITHUB_WORKSPACE/dist/Atelier-0.4.0-x86_64.AppImage" --appimage-extract > /dev/null
+          "$GITHUB_WORKSPACE/dist/Atelier-$(tr -d "[:space:]" < "$GITHUB_WORKSPACE/version")-x86_64.AppImage" --appimage-extract > /dev/null
           export ATELIER_DATA_DIR="$RUNNER_TEMP/atelier-smoke-data"
           export ATELIER_PORT=8897
           xvfb-run -a ./squashfs-root/usr/Atelier/Atelier --help > startup.log 2>&1 &

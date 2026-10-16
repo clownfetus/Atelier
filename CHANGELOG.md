@@ -1,6 +1,46 @@
 # Changelog
 
-Version 0.4 uses **0.4.0** in the app, installers and update checker.
+The app, installers and update checker identify each release by its full number, such as
+**0.4.1**.
+
+## 0.4.1 — 16 October 2026
+
+### Your own images in material texture slots (experimental)
+
+- The material editor now lists the material's texture slots. Any 2D slot can use
+  **your own image** as a new texture that only that material uses. The game
+  texture is left untouched, so other skins and chromas sharing it don't change.
+- Your image is encoded like the game texture it replaces (same format, colour
+  space and texture group), so a normal map stays a normal map. Each side must be
+  a power of two between 4 and 8192; other sizes are refused with the reason.
+- Change or remove the image per slot. **Restore game defaults** removes them all.
+  Materials using your images show **own textures** in the edit list.
+- Experimental: the export was checked against a stand-in for the native tools,
+  not yet in game. It refuses to ship a texture whose rename changed its pixels.
+  Model Studio doesn't show these textures yet, and repatching an older mod
+  doesn't carry them.
+
+### Fixes
+
+- Fixed mesh editing (**Open in Blender** and mesh extraction) failing with
+  "all the input array dimensions … must match exactly" in Blender 4.5–5.1. A
+  Blender importer bug, triggered by the morph tracking added in 0.4.0, failed
+  about every other attempt and could otherwise swap two tracking values.
+- Model Studio says why a model can't load — the mesh isn't in the indexed game
+  files, or the decoder's own error — instead of "404: Not Found", and finds a
+  decoded model saved under a different path.
+- The Curve, VFX, Level and Text editors ask before closing with unsaved changes,
+  as the Material editor already did. Their **Reset** buttons and **Revert to
+  original** ask before replacing saved edits.
+
+### Look and feel
+
+- Progress, success, warning and error feedback, empty states and the export and
+  import dialogs use the Krackle design language: comic-style energy and bubbles
+  without outlines. It is kept for substantial feedback; routine interaction
+  stays plain.
+- Spinners are a charge ring. Outcomes are named in text, such as **Mod exported
+  with warnings** and **Succeeded with warnings** in Activity.
 
 ## 0.4.0 — 16 October 2026
 
