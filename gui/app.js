@@ -1030,7 +1030,9 @@ async function openMaterialEditor(item) {
   if (!current()) return;
   if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${_matEscape(res.error || "failed to read material")}</div>`; return; }
   matEditor = { game_rel: item.game_rel, name: item.name,
-                colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved" };
+                colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved",
+                textures: res.textures || {}, textureClasses: res.texture_classes || {},
+                custom: res.custom_textures || {} };
   _matRemember(matEditor, res.original);
   renderMatEditor();
   loadSidebar();
@@ -1194,6 +1196,107 @@ async function matDyeOff(on) {
   } catch (e) { st.textContent = "Error: " + e.message; }
 }
 
+// ── custom textures: the user's own image as a NEW texture for one slot ──────────────────────
+// The material's texture slots were never listed here, so there was nowhere to give a slot an
+// image the game has no texture for. Assigned on upload like dye-off: an export option on the
+// material, not a parameter edit for Save. See handlers/custom_texture.py for what ships.
+const _matTexInput = Object.assign(document.createElement("input"),
+  { type: "file", accept: ".png,.jpg,.jpeg,.tga,.bmp,.tif,.tiff,.webp", hidden: true });
+document.body.appendChild(_matTexInput);
+let _matTexTarget = null;
+
+function _matTextureSlots(m) { return Object.keys(m.textures || {}).sort((a, b) => a.localeCompare(b)); }
+
+function _matTexturesHtml(m, expanded) {
+  const slots = _matTextureSlots(m);
+  if (!slots.length) return "";
+  const custom = m.custom || {};
+  const used = slots.filter(s => custom[s]).length;
+  let h = `<details class="mat-parameter-group mat-textures" data-mat-group="Textures" ${expanded.get("Textures") !== false ? "open" : ""}>
+    <summary>Texture slots<span>${used ? `${used} of ${slots.length} using your images` : slots.length}</span></summary>
+    <p class="mat-texture-help">Give a slot your own image and it ships as a <b>new texture</b> that only this
+      material uses. The game texture stays as it is, so other skins that share it don't change. Your image is
+      encoded like the game texture in that slot (a normal map stays a normal map), and each side must be a
+      power of two, such as 1024 or 2048.</p>`;
+  slots.forEach((slot, i) => {
+    const own = custom[slot], cls = (m.textureClasses || {})[slot] || "Texture2D", is2d = cls === "Texture2D";
+    const thumb = own
+      ? `<img src="/api/material_custom_texture/preview?game_rel=${encodeURIComponent(m.game_rel)}&slot=${encodeURIComponent(slot)}&_project=${encodeURIComponent(_activeProjectName)}&v=${encodeURIComponent(own.file)}" alt="">`
+      : `<i data-lucide="image" size="18"></i>`;
+    const size = own && own.size && own.size.length === 2 ? ` · ${own.size[0]}×${own.size[1]}` : "";
+    const what = own
+      ? `<b>${_matEscape(own.name)}</b><span class="mat-tag">your image${size}${own.source ? ` · ${_matEscape(own.source)}` : ""}</span>`
+      : `${_matEscape(String(m.textures[slot]).split("/").pop())}<span class="mat-tag">game texture${is2d ? "" : ` · ${_matEscape(cls)}`}</span>`;
+    const where = own ? `Ships as ${own.game_rel}` : m.textures[slot];
+    h += `<div class="mat-parameter mat-texture${own ? " is-custom" : ""}" id="mattex${i}"><div class="mat-row">
+      <label title="${_matEscape(slot)}">${_matEscape(slot)}</label>
+      <span class="mat-texture-thumb">${thumb}</span>
+      <span class="mat-texture-name" title="${_matEscape(where)}">${what}</span>
+      ${is2d ? `<button type="button" class="btn" onclick="matCustomTexturePick(${i})"><i data-lucide="image-plus" size="13"></i> ${own ? "Change image…" : "Use my own image…"}</button>`
+             : `<span class="mat-tag">Only 2D textures can use your own image</span>`}
+      ${own ? `<button type="button" class="btn" onclick="matCustomTextureClear(${i})"><i data-lucide="rotate-ccw" size="13"></i> Use game texture</button>` : ""}
+    </div></div>`;
+  });
+  return h + `</details>`;
+}
+
+function matCustomTexturePick(i) {
+  if (!matEditor) return;
+  const slot = _matTextureSlots(matEditor)[i];
+  if (!slot) return;
+  _matTexTarget = { editor: matEditor, slot, project: _activeProjectName };
+  _matTexInput.value = "";
+  _matTexInput.click();
+}
+
+_matTexInput.addEventListener("change", () => {
+  const file = _matTexInput.files && _matTexInput.files[0], target = _matTexTarget;
+  _matTexTarget = null;
+  if (file && target) matCustomTextureUpload(target, file);
+  _matTexInput.value = "";
+});
+
+async function matCustomTextureUpload({ editor, slot, project }, file) {
+  const current = () => matEditor === editor && project === _activeProjectName;
+  const st = document.getElementById("mat-status");
+  st.textContent = `Adding ${file.name} to ${slot}…`;
+  const fd = new FormData();
+  fd.append("game_rel", editor.game_rel);
+  fd.append("slot", slot);
+  fd.append("file", file);
+  let res;
+  try { res = await (await projectFetch("/api/material_custom_texture", { method: "POST", body: fd }, project)).json(); }
+  catch (e) { res = { ok: false, error: e.message }; }
+  if (!current()) return;
+  if (!res.ok) { st.textContent = "Error: " + (res.error || "could not add the image"); return; }
+  editor.custom = res.custom_textures || {};
+  renderMatEditor();
+  const name = (editor.custom[slot] || {}).name || file.name;
+  st.textContent = `${slot} now uses ${name}. It ships as a new texture when this material is exported.`;
+  toast(`${slot}: using ${name}`, "success");
+  loadSidebar();
+}
+
+async function matCustomTextureClear(i) {
+  if (!matEditor) return;
+  const editor = matEditor, project = _activeProjectName, slot = _matTextureSlots(editor)[i];
+  const own = slot && (editor.custom || {})[slot];
+  if (!own) return;
+  if (!confirm(`Use the game texture in ${slot} again? Your image ${own.source || own.name} is removed from this material.`)) return;
+  const st = document.getElementById("mat-status");
+  let res;
+  try {
+    res = await api("/api/material_custom_texture/clear", { project, method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game_rel: editor.game_rel, slot }) });
+  } catch (e) { res = { ok: false, error: e.message }; }
+  if (matEditor !== editor || project !== _activeProjectName) return;
+  if (!res.ok) { st.textContent = "Error: " + (res.error || "could not remove the image"); return; }
+  editor.custom = res.custom_textures || {};
+  renderMatEditor();
+  st.textContent = `${slot} uses the game texture again.`;
+  loadSidebar();
+}
+
 async function matTexturesDownload() {
   if (!matEditor) return;
   const st = document.getElementById("mat-status");
@@ -1329,12 +1432,14 @@ function renderMatEditor() {
     });
     h += `</details>`;
   }
+  h += _matTexturesHtml(m, expanded);
   // Appended, not assigned: a dyeing material with no exposed Region params still has a preview and
   // a dye-off toggle above, and replacing the body would throw both away along with the only
   // controls that material has.
   if (!m.colors.length && !m.scalars.length)
     h += `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
   body.innerHTML = h;
+  lucide.createIcons({ nodes: [body] });
   window.AtelierPolish?.swatchesAfter(previousSwatches, m.colors);
   m.colors.forEach((c, i) => {
     for (const [prefix, name] of [["matsw", "Color"], ["mir", "Intensity"], ["min", "Intensity"], ["matalpha", "Alpha"]])
@@ -1461,7 +1566,9 @@ async function saveMaterial() {
 
 async function resetMaterial() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
-  if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft.")) return;
+  const ownTextures = Object.keys(matEditor.custom || {}).length;
+  if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
+               + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""))) return;
   const editor = matEditor, project = _activeProjectName;
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;
@@ -1479,6 +1586,8 @@ async function resetMaterial() {
       if (!newer) { editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars); }
       const original = { colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
       _materialReferences.set(editor, { saved: original, original });
+      editor.custom = res.custom_textures || {};
+      if (res.textures) { editor.textures = res.textures; editor.textureClasses = res.texture_classes || {}; }
       renderMatEditor();
       dyeRefresh(0); loadSidebar();
       document.getElementById("mat-status").textContent = newer ? "Game defaults restored; newer edits remain unsaved." : "Restored original game values.";
@@ -3498,7 +3607,7 @@ function _ctxItemsSidebar(item) {
 // ASSET, not on the app: two projects can ship the same texture differently, so these are stored
 // per project (see project_meta.asset_opts) and shown wherever the asset is.
 const TEXOPT_LABELS = { blank: "blank", no_mips: "no mips", lod_group: "group", dye_off: "no dye",
-                        lq_twin: "LQ" };
+                        lq_twin: "LQ", custom_textures: "own textures" };
 
 function _sbOptBadge(item) {
   const o = item.opts || {};

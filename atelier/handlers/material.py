@@ -47,10 +47,12 @@ def _mat_params(d):
             scalars.append({"name": nm, "value": round(_f(pv.get("Value")), 5)})
     return colors, scalars
 
-def _mat_textures(d):
-    """{slot: game_rel} for the MI's texture params (BaseColor/Normal/ORM/…), resolved through the
-    Imports table. Each TextureParameterValue's ParameterValue is an import link (negative index);
-    that import's outer Package holds the /Game/Marvel/… path → storage-relative game_rel."""
+def texture_slots(d):
+    """{slot: {entry, value, import, package, game_rel, class}} for the MI's texture params
+    (BaseColor/Normal/ORM/…), resolved through the Imports table. Each TextureParameterValue's
+    ParameterValue is an import link (negative index); that import's outer Package holds the
+    /Game/Marvel/… path → storage-relative game_rel. `entry`/`value` are the live JSON nodes, so a
+    caller can repoint the slot (custom_texture does); only slots under /Game/Marvel are listed."""
     ex = d["Exports"][0]
     tp = _gn(_ex_props(ex), "TextureParameterValues")
     imports = d.get("Imports", [])
@@ -65,12 +67,24 @@ def _mat_textures(d):
         if not (0 <= ii < len(imports)):
             continue
         outer = imports[ii].get("OuterIndex")
-        pkg = None
+        pkg_import = None
         if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
-            pkg = imports[-outer - 1].get("ObjectName")
+            pkg_import = imports[-outer - 1]
+        pkg = (pkg_import or {}).get("ObjectName")
         if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
-            out[nm] = pkg[len("/Game/Marvel/"):]
+            out[nm] = {"entry": e, "value": pv, "import": imports[ii], "package": pkg_import,
+                       "game_rel": pkg[len("/Game/Marvel/"):],
+                       "class": imports[ii].get("ClassName") or ""}
     return out
+
+def _mat_textures(d):
+    """{slot: game_rel} for the MI's texture params — see texture_slots."""
+    return {slot: s["game_rel"] for slot, s in texture_slots(d).items()}
+
+def _mat_texture_classes(d):
+    """{slot: UE class name} ('Texture2D', 'TextureCube', …) — only Texture2D slots can take a
+    custom texture, and the editor says so instead of offering a button that would fail."""
+    return {slot: s["class"] for slot, s in texture_slots(d).items()}
 
 def _apply_mat_edits(d, colors, scalars):
     from atelier.properties import mark_changed
@@ -141,7 +155,8 @@ def read_material(game_rel, cache_only=False):
     folder — used by the 3D viewport's automatic per-mesh material reads."""
     d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
-    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
+    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d),
+            "texture_classes": _mat_texture_classes(d)}
 
 def read_material_original(game_rel):
     """Read pristine game parameters without creating, changing or resetting a project copy.
@@ -204,8 +219,14 @@ def reset_material(game_rel):
     return read_material(game_rel)
 
 def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
-    """Rebase saved values onto current vanilla, never serialize an old project package."""
+    """Rebase saved values onto current vanilla, never serialize an old project package.
+
+    Custom textures assigned to the material's slots (custom_texture) are built and staged with it.
+    The repatcher passes use_project=False and so ships none: it rebuilds a mod from that mod's own
+    material values, which name no project images."""
     from atelier.handlers.texture import ensure_work_base, missing_reason
+    from atelier.handlers import custom_texture
+    custom = custom_texture.assignments(game_rel) if use_project else {}
     saved_colors, saved_scalars = {}, {}
     project_bases = (project_base(game_rel), project_base_legacy(game_rel)) if use_project else ()
     for base in project_bases:
@@ -241,6 +262,7 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
         if missing:
             raise RuntimeError("Current material no longer has saved parameters: " + ", ".join(missing))
         _apply_mat_edits(d, saved_colors, saved_scalars)
+        textures = custom_texture.apply(d, game_rel, custom, os.path.join(temporary, "custom"))
         with open(jp, "w", encoding="utf-8") as stream:
             json.dump(d, stream)
         compiled = os.path.join(temporary, "compiled", os.path.basename(out_ua))
@@ -249,8 +271,15 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
         if result.returncode != 0 or not os.path.isfile(compiled):
             raise RuntimeError("Material build failed: " +
                                ((result.stderr or result.stdout or "from_json produced no uasset").strip()[-500:]))
-        # Failed conversions never leave partial packages in the shared stage.
+        # Failed conversions never leave partial packages in the shared stage. Custom textures go
+        # in first: an orphaned texture is inert, a material pointing at a missing one is not.
+        for files, tex_gr in textures:
+            tex_ua = os.path.join(stage, *pak_game_path(tex_gr).split("/")) + ".uasset"
+            os.makedirs(os.path.dirname(tex_ua), exist_ok=True)
+            publish_files(files, os.path.dirname(tex_ua))
         sources = [compiled[:-7] + ext for ext in (".uasset", ".uexp", ".ubulk", ".uptnl")
                    if os.path.isfile(compiled[:-7] + ext)]
         publish_files(sources, os.path.dirname(out_ua))
+    if textures:
+        return f"{os.path.basename(game_rel)} (+{len(textures)} custom texture{'s' if len(textures) != 1 else ''})"
     return os.path.basename(game_rel)

@@ -60,6 +60,8 @@ import io_lib as _io_lib_mod
 if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
     _pak_thumb_mod.start_warmup()
 from atelier.handlers.material import mat_json, is_material, read_material, read_material_original, save_material, reset_material
+import atelier.handlers.material as _material_mod
+import atelier.handlers.custom_texture as _custom_tex
 from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
 from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
 from atelier.handlers.world import is_world
@@ -1790,7 +1792,7 @@ def api_material_params():
         p = read_material(gr)
         response.content_type = "application/json"
         return json.dumps({"ok": True, "game_rel": gr, "token": token(gr),
-                           "inten": _get_inten(gr), **p})
+                           "inten": _get_inten(gr), "custom_textures": _custom_tex.public(gr), **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -1835,11 +1837,69 @@ def api_material_reset():
     try:
         p = reset_material(gr)
         _put_inten(gr, {})
+        custom = _custom_tex.clear(gr)        # "game defaults" includes the game's own textures
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), "inten": {}, **p})
+        return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), "inten": {},
+                           "custom_textures": custom, **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
+
+# ── custom textures: the user's own image as a NEW texture for one material slot ─────────────
+# See handlers/custom_texture.py. Assigned on upload, like dye-off: it is an export option on the
+# material, not one of the parameter edits the editor's Save writes into the material JSON.
+
+def _custom_tex_slot(gr, slot):
+    """The slot's current game texture, or ValueError naming why it cannot take a custom one."""
+    if not is_material(gr):
+        raise ValueError("custom textures can only be assigned to a material (MI_…)")
+    with open(mat_json(gr), encoding="utf-8-sig") as stream:
+        slots = _material_mod.texture_slots(json.load(stream))
+    if slot not in slots:
+        raise ValueError(f"this material has no texture slot named {slot!r}")
+    if slots[slot]["class"] != "Texture2D":
+        raise ValueError(f"{slot} holds a {slots[slot]['class'] or 'non-texture'} asset; "
+                         f"only Texture2D slots can use your own image")
+    return slots[slot]["game_rel"]
+
+@app.post("/api/material_custom_texture")
+def api_material_custom_texture():
+    response.content_type = "application/json"
+    gr     = request.forms.get("game_rel", "").strip()
+    slot   = (request.forms.getunicode("slot") or "").strip()
+    upload = request.files.get("file")
+    if not gr or not slot or not upload:
+        return json.dumps({"ok": False, "error": "missing game_rel, slot or file"})
+    try:
+        template = _custom_tex_slot(gr, slot)
+        custom = _custom_tex.assign(gr, slot, upload.raw_filename or upload.filename,
+                                    upload.file.read(), template)
+        return json.dumps({"ok": True, "game_rel": gr, "custom_textures": custom})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/material_custom_texture/clear")
+def api_material_custom_texture_clear():
+    response.content_type = "application/json"
+    body = request.json or {}
+    gr, slot = body.get("game_rel", ""), body.get("slot", "")
+    if not gr or not isinstance(slot, str) or not slot:
+        return json.dumps({"ok": False, "error": "missing game_rel or slot"})
+    try:
+        return json.dumps({"ok": True, "game_rel": gr, "custom_textures": _custom_tex.clear(gr, slot)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+@app.get("/api/material_custom_texture/preview")
+def api_material_custom_texture_preview():
+    gr, slot = request.query.get("game_rel", ""), request.query.getunicode("slot") or ""
+    path = _custom_tex.image_path(gr, slot) if gr and slot else None
+    if not path or not os.path.isfile(path):
+        response.status = 404
+        return ""
+    result = static_file(os.path.basename(path), root=os.path.dirname(path), mimetype="image/png")
+    result.set_header("Cache-Control", "no-store")
+    return result
 
 # ── bulk import (job) ─────────────────────────────────────────────────────────
 

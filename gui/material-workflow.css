@@ -20,6 +20,13 @@
 #material-overlay .mat-reference-swatch { width: 14px; height: 14px; border: 1px solid var(--border2); border-radius: 3px; flex: none; }
 #material-overlay .mat-restore { border: 0; border-radius: 4px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; padding: 4px 7px; cursor: pointer; margin-left: auto; }
 #material-overlay .mat-restore:hover { background: var(--bg3); }
+#material-overlay .mat-texture-help { margin: 0; padding: 9px 12px; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.5; color: var(--muted); }
+#material-overlay .mat-texture.is-custom { border-left-color: var(--acc); }
+#material-overlay .mat-texture-thumb { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: 1px solid var(--border2); border-radius: 4px; color: var(--muted); overflow: hidden;
+  background: repeating-conic-gradient(var(--bg3) 0 25%, var(--bg2) 0 50%) 0 0 / 10px 10px; }
+#material-overlay .mat-texture-thumb img { width: 100%; height: 100%; object-fit: contain; }
+#material-overlay .mat-texture-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; overflow-wrap: anywhere; }
+#material-overlay .mat-texture .btn { flex: none; }
 #material-overlay .mat-foot { flex-wrap: wrap; }
 #material-overlay #mat-status { overflow-wrap: anywhere; }
 #viewport-mat-list .vp-param { border-left: 2px solid transparent; padding-left: 4px; }

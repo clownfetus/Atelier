@@ -303,4 +303,75 @@ if (!mh.includes("no editable color or scalar parameters"))
   delete globalThis.confirm;
 }
 
-console.log("DOM smoke: all render paths OK");
+// ── material texture slots: a slot can take the user's own image as a new texture ─────────────
+(async () => {
+  const realApi = api, realFetch = projectFetch;
+  matEditor = { game_rel: "Characters/1015/MI_Body", name: "MI_Body", colors: [], scalars: [],
+                textures: { Normal: "Characters/1015/T_Body_N", BaseColor: "Characters/1015/T_Body_D",
+                            Env: "Env/T_<Cube>" },
+                textureClasses: { Normal: "Texture2D", BaseColor: "Texture2D", Env: "TextureCube" },
+                custom: { BaseColor: { name: "T_Hood", file: "0123456789abcdef0123.png", source: "Hood <1>.png",
+                                       size: [1024, 512], game_rel: "Atelier/Custom/k/T_Hood" } } };
+  renderMatEditor();
+  let th = document.getElementById("mat-body").innerHTML.replace(/\s+/g, " ");
+  if (!th.includes("Texture slots") || !th.includes("1 of 3 using your images"))
+    throw new Error("the texture slot group is missing or miscounted");
+  if (th.indexOf(">BaseColor<") > th.indexOf(">Env<") || th.indexOf(">Env<") > th.indexOf(">Normal<"))
+    throw new Error("slots must be listed in a stable, sorted order");
+  if (!th.includes("T_Hood") || !th.includes("1024×512") || !th.includes("Use game texture") || !th.includes("Change image…"))
+    throw new Error("a slot using the user's image must name it and offer to change or remove it");
+  if (!th.includes("material_custom_texture/preview") || !th.includes("v=0123456789abcdef0123.png"))
+    throw new Error("a custom slot must preview the stored image, cache-busted by its content hash");
+  if (!th.includes("Use my own image…") || !th.includes("T_Body_N"))
+    throw new Error("a game-texture slot must name its texture and offer an image");
+  if (!th.includes("Only 2D textures can use your own image"))
+    throw new Error("a non-2D slot must say why it cannot take an image");
+  if (th.includes("Hood <1>") || th.includes("T_<Cube>"))
+    throw new Error("asset and file names must be escaped");
+
+  // Choosing a file uploads it for that slot and re-renders from the server's answer.
+  const sent = [];
+  globalThis.FormData = class { constructor() { this.parts = {}; } append(k, v) { this.parts[k] = v; } };
+  projectFetch = async (path, opts = {}) => {
+    if (path !== "/api/material_custom_texture") return { json: async () => [] };   // the sidebar refresh's empty list
+    sent.push([path, opts.body.parts]);
+    return { json: async () => ({ ok: true, custom_textures: { ...matEditor.custom,
+      Normal: { name: "T_Scales", file: "abcdef0123456789abcd.png", size: [512, 512], game_rel: "Atelier/Custom/n/T_Scales" } } }) }; };
+  _matTexInput.click = () => {};                 // the stub element has no file dialog
+  matCustomTexturePick(2);                       // sorted: BaseColor, Env, Normal
+  await matCustomTextureUpload(_matTexTarget, { name: "scales.png" });
+  if (sent.length !== 1 || sent[0][0] !== "/api/material_custom_texture" || sent[0][1].slot !== "Normal"
+      || sent[0][1].game_rel !== "Characters/1015/MI_Body")
+    throw new Error("the upload must name the material and the chosen slot");
+  if (!matEditor.custom.Normal || !document.getElementById("mat-body").innerHTML.includes("T_Scales"))
+    throw new Error("the editor must show the newly assigned image");
+
+  // Removing asks first; declining sends nothing.
+  const prompts = []; let answer = false, cleared = [];
+  globalThis.confirm = m => { prompts.push(m); return answer; };
+  api = async (path, opts = {}) => {
+    if (path !== "/api/material_custom_texture/clear") return [];
+    cleared.push([path, JSON.parse(opts.body)]);
+    return { ok: true, custom_textures: { BaseColor: matEditor.custom.BaseColor } };
+  };
+  await matCustomTextureClear(2);
+  if (cleared.length || !prompts[0].includes("Normal") || !prompts[0].includes("T_Scales"))
+    throw new Error("removing an image must ask first, naming the slot and image");
+  answer = true;
+  await matCustomTextureClear(2);
+  if (cleared.length !== 1 || cleared[0][0] !== "/api/material_custom_texture/clear" || cleared[0][1].slot !== "Normal"
+      || matEditor.custom.Normal)
+    throw new Error("an accepted removal must clear that slot only");
+  await matCustomTextureClear(1);                // Env has no image: nothing to remove
+  if (cleared.length !== 1) throw new Error("a slot without an image must not send a removal");
+
+  // Restoring game defaults warns that the user's images go too.
+  answer = false; prompts.length = 0;
+  await resetMaterial();
+  if (!prompts[0] || !prompts[0].includes("image is also removed from its texture slots"))
+    throw new Error("the reset prompt must mention the images it removes");
+
+  api = realApi; projectFetch = realFetch; delete globalThis.confirm; delete globalThis.FormData;
+  matEditor = null;
+  console.log("DOM smoke: all render paths OK");
+})();   // a rejection here is unhandled, so node exits non-zero with the error
