@@ -359,8 +359,21 @@ def api_browse_material_dirs():
                        "up": "/".join(path.split("/")[:-1]) if path else None,
                        "dirs": out})
 
+def _decoded_elsewhere(out_dir, name, since):
+    """A <name>.glb the decoder wrote during this run somewhere other than the expected path (a
+    different mount prefix or letter case), newest first — or None."""
+    want, hits = (name + ".glb").lower(), []
+    for dirpath, _dirs, files in os.walk(out_dir):
+        for f in files:
+            p = os.path.join(dirpath, f)
+            if f.lower() == want and os.path.getmtime(p) >= since - 1:
+                hits.append(p)
+    return max(hits, key=os.path.getmtime) if hits else None
+
 def _model_glb(game_rel):
-    """Decode (cached) a mesh game_rel to a .glb; return its path or None."""
+    """Decode (cached) a mesh game_rel to a .glb and return its path, or raise saying why there is
+    no model. The decoder's failure used to be dropped and the route answered a bare 404, which
+    the viewer could only show as 'fetch ... responded with 404: Not Found'."""
     if os.path.isfile(project_base(game_rel)+'.blend'):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
@@ -369,9 +382,22 @@ def _model_glb(game_rel):
     glb     = os.path.join(out_dir, *asset.split("/")) + ".glb"
     if os.path.exists(glb):
         return glb
+    name = os.path.basename(game_rel)
+    from atelier.index import index_lookup
+    if (game_rel.lower() + ".uasset") not in index_lookup():
+        raise LookupError(f"{name} is not in the game files Atelier has indexed ({game_rel}), "
+                          f"so there is no model to decode.")
     os.makedirs(out_dir, exist_ok=True)
-    atelier_mesh(asset, out_dir)
-    return glb if os.path.exists(glb) else None
+    started = time.time()
+    r = atelier_mesh(asset, out_dir)
+    if os.path.exists(glb):
+        return glb
+    elsewhere = _decoded_elsewhere(out_dir, name, started)
+    if elsewhere:
+        return elsewhere
+    detail = "\n".join(l for l in ((r.stderr or "") + (r.stdout or "")).splitlines() if l.strip())[-600:]
+    raise RuntimeError(f"AtelierMesh could not decode {name} (exit code {r.returncode})"
+                       + (f":\n{detail}" if detail else ", and it gave no reason."))
 
 @app.get("/api/model_gltf")
 def api_model_gltf():
@@ -382,7 +408,7 @@ def api_model_gltf():
     try:
         glb = _model_glb(gr)
     except Exception as e:
-        response.status = 500
+        response.status = 404 if isinstance(e, LookupError) else 500
         response.content_type = "application/json"
         return json.dumps({"error": str(e)})
     if glb and os.path.exists(glb):
@@ -390,7 +416,8 @@ def api_model_gltf():
         result.headers['Cache-Control']='no-store'
         return result
     response.status = 404
-    return b""
+    response.content_type = "application/json"
+    return json.dumps({"error": f"No model is available for {os.path.basename(gr)}."})
 
 @app.post("/api/skin_materials")
 def api_skin_materials():

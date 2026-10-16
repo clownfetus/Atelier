@@ -10,16 +10,120 @@ injects, so painting it here and saving is the edit that ships.
 """
 import json
 import os
+import struct
 import sys
+import tempfile
 
 import bpy
+import numpy as np
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 src, dst = argv[0], argv[1]
 manifest_path = argv[2] if len(argv) > 2 else None
 
+
+# ── morph tracking attributes, past Blender's importer ─────────────────────────
+# mesh.export_glb writes three per-vertex custom attributes the rebuild needs back:
+# _ATELIER_MORPH_REST (VEC3), _ATELIER_MORPH_ID and _ATELIER_MORPH_LOD (SCALAR). Blender's glTF
+# importer (4.5 through 5.1) collects custom attribute NAMES into a set but their DATA into a list
+# in file order, then zips the two -- so whenever a primitive has two or more, the pairing follows
+# the interpreter's per-run string hashing. One run in two crashes concatenating a VEC3 with a
+# SCALAR ("along dimension 1, the array at index 0 has size 3 and ... size 1"); some of the rest
+# swap the ID and LOD columns without any error. Upstream later fixed the ordering, but the user's
+# Blender is whatever it is.
+#
+# With ONE custom attribute there is nothing to mispair. _ATELIER_MORPH_ID is a vertex's index in
+# the cooked LOD, unique across every primitive, so it alone goes through the importer and the
+# other two are rebuilt from the GLB's own data by looking each vertex up by its ID.
+_RESTORED = ("_ATELIER_MORPH_REST", "_ATELIER_MORPH_LOD")
+_WIDTH = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+
+
+def _read_glb(path):
+    data = open(path, "rb").read()
+    magic, _version, _total = struct.unpack_from("<III", data, 0)
+    jlen, jtype = struct.unpack_from("<II", data, 12)
+    if magic != 0x46546C67 or jtype != 0x4E4F534A:
+        raise SystemExit(f"{path} is not a binary glTF")
+    gltf = json.loads(data[20:20 + jlen])
+    off = 20 + jlen
+    blen = struct.unpack_from("<I", data, off)[0] if off + 8 <= len(data) else 0
+    return gltf, data[off + 8:off + 8 + blen]
+
+
+def _float_accessor(gltf, binary, index):
+    a = gltf["accessors"][index]
+    view = gltf["bufferViews"][a["bufferView"]]
+    width = _WIDTH[a["type"]]
+    if a.get("componentType") != 5126 or view.get("byteStride", 4 * width) != 4 * width:
+        raise SystemExit("morph tracking attributes must be tightly packed float32")
+    start = view.get("byteOffset", 0) + a.get("byteOffset", 0)
+    return np.frombuffer(binary, "<f4", a["count"] * width, start).reshape(a["count"], width)
+
+
+def _strip_tracking(path):
+    """(path to import, {id: (rest xyz, lod)} or None). Writes a copy whose primitives carry only
+    _ATELIER_MORPH_ID; the buffer is untouched, so every other accessor reads exactly as before."""
+    gltf, binary = _read_glb(path)
+    ids, rests, lods = [], [], []
+    for mesh in gltf.get("meshes", []):
+        for prim in mesh.get("primitives", []):
+            at = prim.get("attributes", {})
+            if "_ATELIER_MORPH_ID" not in at or not all(k in at for k in _RESTORED):
+                continue
+            ids.append(_float_accessor(gltf, binary, at["_ATELIER_MORPH_ID"])[:, 0])
+            rests.append(_float_accessor(gltf, binary, at["_ATELIER_MORPH_REST"]))
+            lods.append(_float_accessor(gltf, binary, at["_ATELIER_MORPH_LOD"])[:, 0])
+            for k in _RESTORED:
+                del at[k]
+    if not ids:
+        return path, None
+    ids = np.rint(np.concatenate(ids)).astype(np.int64)
+    if ids.min() < 0 or len(np.unique(ids)) != len(ids):
+        raise SystemExit("morph tracking IDs are not unique vertex indices; cannot import safely")
+    table = {"ids": ids, "rest": np.concatenate(rests), "lod": np.concatenate(lods)}
+    js = json.dumps(gltf).encode("utf-8")
+    js += b" " * (-len(js) % 4)
+    fd, out = tempfile.mkstemp(prefix="atelier-import-", suffix=".glb")   # never in the project folder
+    with os.fdopen(fd, "wb") as f:
+        f.write(struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(binary)))
+        f.write(struct.pack("<II", len(js), 0x4E4F534A)); f.write(js)
+        f.write(struct.pack("<II", len(binary), 0x004E4942)); f.write(binary)
+    return out, table
+
+
+def _restore_tracking(me, table):
+    """Recreate REST/LOD on the imported mesh, keyed by each vertex's _ATELIER_MORPH_ID -- the same
+    names, types and POINT domain the importer itself would have created."""
+    idattr = me.attributes.get("_ATELIER_MORPH_ID")
+    if idattr is None or idattr.domain != "POINT":
+        # An importer that skips custom attributes altogether: the mesh still edits and rebuilds
+        # (mesh.glb_to_sections falls back without them), exactly as it did before this existed.
+        print("[glb_to_blend] warning: the importer kept no custom attributes; morph tracking skipped",
+              flush=True)
+        return
+    n = len(me.vertices)
+    got = np.empty(n, np.float32)
+    idattr.data.foreach_get("value", got)
+    got = np.rint(got).astype(np.int64)
+    slot = np.full(int(max(table["ids"].max(), got.max(initial=0))) + 1, -1, np.int64)
+    slot[table["ids"]] = np.arange(len(table["ids"]))
+    rows = slot[np.clip(got, 0, len(slot) - 1)]
+    if (got < 0).any() or (rows < 0).any():
+        raise SystemExit("imported vertices carry IDs the GLB never wrote; morph tracking would be wrong")
+    rest = me.attributes.new("_ATELIER_MORPH_REST", "FLOAT_VECTOR", "POINT")
+    rest.data.foreach_set("vector", table["rest"][rows].astype(np.float32).ravel())
+    lod = me.attributes.new("_ATELIER_MORPH_LOD", "FLOAT", "POINT")
+    lod.data.foreach_set("value", table["lod"][rows].astype(np.float32))
+
+
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=src)
+import_path, tracking = _strip_tracking(src)
+try:
+    bpy.ops.import_scene.gltf(filepath=import_path)
+finally:
+    if import_path != src and os.path.exists(import_path):
+        os.remove(import_path)
 
 # Third-party add-ons in the user's Blender profile can drop helper objects into an
 # otherwise-empty scene (fast64 adds a bone-shape Icosphere). Anything that is not ours
@@ -33,6 +137,8 @@ mesh_obj = bpy.data.objects.get("SkeletalMesh")
 arm_obj = bpy.data.objects.get("Armature")
 if mesh_obj is None or arm_obj is None:
     raise SystemExit("expected both 'SkeletalMesh' and 'Armature' after import")
+if tracking is not None:
+    _restore_tracking(mesh_obj.data, tracking)
 
 # UNBIND the armature for editing.
 #

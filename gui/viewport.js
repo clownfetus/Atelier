@@ -11,6 +11,18 @@ import { createViewportAnimation } from './viewport-animation.js';
 import { createViewportFloor } from './viewport-effects.js';
 
 const $ = id => document.getElementById(id);
+// The server says why a model is unavailable in the JSON body; three.js only reports the status
+// line ("responded with 404: Not Found") and keeps the Response on the error, unread.
+async function loadErrorText(e) {
+  const response = e && e.response;
+  if (response && typeof response.clone === 'function') {
+    try {
+      const body = await response.clone().json();
+      if (body && body.error) return String(body.error);
+    } catch (_) { /* not JSON: fall back to the loader's own message */ }
+  }
+  return String(e && e.message || e);
+}
 const loader    = new GLTFLoader();
 const texLoader = new THREE.TextureLoader();
 const texCache  = new Map();   // texGameRel -> THREE.Texture, shared/reused across opens (never re-uploaded)
@@ -1152,7 +1164,7 @@ async function open(skinId, title) {
       $('viewport-loading-msg').textContent = 'No meshes found for this skin.';
       return;
     }
-    let loaded = 0;
+    let loaded = 0, firstError = '';
     for (let i = 0; i < meshes.length; i++) {
       $('viewport-loading-msg').textContent =
         `Decoding ${meshes[i].name} (${i + 1}/${meshes.length})… first time can take a moment`;
@@ -1167,12 +1179,18 @@ async function open(skinId, title) {
         meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
         loaded++;
         frameCamera();
-      } catch (e) { if (gen !== generation) return; console.warn('viewport: mesh load failed', meshes[i].name, e); }
+      } catch (e) {
+        if (gen !== generation) return;
+        const reason = await loadErrorText(e);
+        if (gen !== generation) return;
+        firstError = firstError || `${meshes[i].name}: ${reason}`;
+        console.warn('viewport: mesh load failed', meshes[i].name, reason);
+      }
     }
     $('viewport-status').textContent = loaded ? `${loaded} part${loaded !== 1 ? 's' : ''}` : '';
     if (!loaded) {
       setViewportLoaderState('error');
-      $('viewport-loading-msg').textContent = 'Failed to load meshes.';
+      $('viewport-loading-msg').textContent = 'Failed to load meshes.' + (firstError ? ' ' + firstError : '');
       return;
     }
     refreshBlenderBtn();
@@ -1233,8 +1251,10 @@ async function openMesh(gameRel, name, skinId) {
     buildChromaPicker(_sk, gameRel);   // same "materials from" picker as the skin path
   } catch (e) {
     if (gen !== generation) return;
+    const reason = await loadErrorText(e);
+    if (gen !== generation) return;
     setViewportLoaderState('error');
-    $('viewport-loading-msg').textContent = 'Failed to load: ' + (e && e.message || e);
+    $('viewport-loading-msg').textContent = 'Failed to load: ' + reason;
   }
 }
 
