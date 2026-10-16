@@ -21,7 +21,7 @@ def download(url,path,sha,authenticated=False):
     if actual!=sha:raise RuntimeError('Release input hash mismatch: '+path.name)
 
 def main():
-    inputs=json.loads((ROOT/'tests/fixtures/installer/release-0.4.0-inputs.json').read_text())
+    inputs=json.loads((ROOT/'tests/fixtures/installer'/f"release-{(ROOT/'version').read_text().strip()}-inputs.json").read_text())
     with tempfile.TemporaryDirectory(prefix='atelier-release-inputs-') as folder:
         work=Path(folder);seed=work/'windows-tools.zip'
         download(inputs['tools_seed_api_url'],seed,inputs['tools_seed_sha256'],True)
