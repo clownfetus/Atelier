@@ -1,5 +1,5 @@
 /* Atelier — 06 Empty Edited-Assets Illustration Scoped Styles
-   Inherits Atelier tokens (--muted, --acc, --bg2, --text, --studio-easing) from gui/tokens.css.
+   Krackle tray. Inherits Atelier tokens (--muted, --acc, --bg2) from gui/tokens.css.
    Overrides the 24px .sidebar-empty svg constraint only for this dedicated component. */
 
 [data-atelier-motion="empty-assets"] {
@@ -43,33 +43,27 @@
   will-change: transform, opacity;
 }
 
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__tonal {
-  fill: var(--acc, #37639d);
-  fill-opacity: 0.1;
-}
+/* Krackle tray: the tray is muted energy, its cargo is accent energy. Bubbles show the sidebar. */
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__face { fill: currentColor; }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__well { fill: currentColor; opacity: 0.38; }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-dot { fill: currentColor; opacity: 0.55; }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__charge,
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__drop { fill: var(--krackle-charge, var(--acc, #37639d)); }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__hole { fill: var(--bg2, #eef0f3); }
+:root[data-theme="dark"] [data-atelier-motion="empty-assets"] .am-empty-assets-svg__hole { fill: #121216; }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__speck { fill: var(--krackle-glint, #fbf6ea); opacity: 0.85; }
 
-:root[data-theme="dark"] [data-atelier-motion="empty-assets"] .am-empty-assets-svg__tonal {
-  fill: var(--acc, #98b7e2);
-  fill-opacity: 0.12;
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__bubble {
+  transform-box: fill-box;
+  transform-origin: center bottom;
 }
-
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-slot {
-  stroke: var(--acc, #37639d);
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__drop-group {
+  transform-box: fill-box;
+  transform-origin: center top;
 }
-
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__lip,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__bed,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-stroke,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-datum {
-  stroke: currentColor;
-}
-
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke {
-  stroke-dasharray: none;
-  stroke-dashoffset: 0;
+[data-atelier-motion="empty-assets"] .am-empty-assets-plane--tray {
+  transform-box: view-box;
+  transform-origin: 56px 96px;
 }
 
 /* Scoped helper for hiding the static fallback package glyph only after mount succeeds */
@@ -82,24 +76,16 @@
 @media (prefers-reduced-motion: reduce) {
   [data-atelier-motion="empty-assets"],
   [data-atelier-motion="empty-assets"] .am-empty-assets-plane,
-  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__chassis,
-  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__accent-stroke {
+  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__bubble,
+  [data-atelier-motion="empty-assets"] .am-empty-assets-svg__drop-group {
     animation: none !important;
     transition: none !important;
-    transform: none !important;
-    opacity: 1 !important;
-    stroke-dasharray: none !important;
-    stroke-dashoffset: 0 !important;
   }
 }
 
 [data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-plane,
-[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__chassis,
-[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__accent-stroke {
+[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__bubble,
+[data-atelier-motion="empty-assets"][data-am-reduced-motion="reduce"] .am-empty-assets-svg__drop-group {
   animation: none !important;
   transition: none !important;
-  transform: none !important;
-  opacity: 1 !important;
-  stroke-dasharray: none !important;
-  stroke-dashoffset: 0 !important;
 }

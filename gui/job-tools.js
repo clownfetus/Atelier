@@ -4,6 +4,24 @@
   const active = new Set(['queued', 'running', 'cancelling']);
   const live = new Map();
   let timer, hidden = false, overlay, body, activityButton, rendered = '';
+  // Krackle row glyphs: a job's glyph animates only when its state changes.
+  const shownStates = new Map();
+  function jobGlyph(job) {
+    if (active.has(job.state)) return 'busy';
+    if (job.state === 'succeeded') return (job.result?.skipped || []).length ? 'warning' : 'success';
+    if (job.state === 'cancelled') return 'info';
+    return 'error';
+  }
+  function decorateState(row, job) {
+    if (!window.AtelierMotion?.krackleGlyph) return;
+    const host = el('span', undefined, 'job-state-glyph'); host.setAttribute('aria-hidden', 'true');
+    const state = jobGlyph(job), seen = shownStates.get(job.id) === state;
+    shownStates.set(job.id, state);
+    try {
+      row.querySelector('.job-state').prepend(host);
+      window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});
+    } catch (_) { host.remove(); }
+  }
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   function el(tag, text, cls) {
     const node = document.createElement(tag);
@@ -59,7 +77,11 @@
     if (!rows.length) { const empty=el('div'); body.append(empty); window.AtelierPolish?.empty(empty,'No jobs yet.','Imports and exports will appear here.'); }
     for (const job of rows) {
       const row = el('article', undefined, 'job-row'); row.dataset.jobId = job.id;
-      row.append(el('strong', job.label), el('span', job.state, 'job-state'));
+      // The label carries the outcome; the glyph beside it only gives it character.
+      const warned = jobGlyph(job) === 'warning', state = el('span', warned ? 'Succeeded with warnings' : job.state, 'job-state');
+      if (warned) state.dataset.outcome = 'warning';
+      row.append(el('strong', job.label), state);
+      decorateState(row, job);
       const stage = el('p', job.stage); stage.setAttribute('role', 'status'); row.append(stage);
       if (job.total) row.append(el('p', job.current + ' / ' + job.total));
       if (job.error) row.append(el('p', job.error, 'warning'));

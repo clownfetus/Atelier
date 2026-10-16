@@ -272,6 +272,8 @@ def main():
                 run_empty_assets_motion_checks(page, context, url, report, checks)
                 from logo_motion_checks import run_logo_motion_checks
                 run_logo_motion_checks(page, context, url, report, checks)
+                from krackle_motion_checks import run_krackle_motion_checks
+                run_krackle_motion_checks(page, context, url, report, checks)
 
                 # Real backend CRUD, with encoded project header rather than a mock bridge.
                 result = page.evaluate("""async () => {

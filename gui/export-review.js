@@ -1,7 +1,7 @@
 /* Export review and latest session result. No build logic or credentials live here. */
 (function () {
   'use strict';
-  let overlay, panel, body, title, actions, lastButton, opener;
+  let overlay, panel, body, title, actions, lastButton, opener, stageHost, stage = null;
   let current = null, busy = false, lastResult = null;
 
   function el(tag, text, className) {
@@ -25,7 +25,8 @@
     title = el('h2'); title.id = 'export-review-title';
     body = el('div', undefined, 'export-review-body');
     actions = el('div', undefined, 'modal-row export-review-actions');
-    panel.append(title, body, actions); overlay.append(panel); document.body.append(overlay);
+    stageHost = el('div', undefined, 'export-review-stage');
+    panel.append(title, stageHost, body, actions); overlay.append(panel); document.body.append(overlay);
     lastButton = el('button', 'Last export', 'btn export-last-result');
     lastButton.id = 'export-last-result'; lastButton.type = 'button'; lastButton.hidden = true;
     lastButton.addEventListener('click', () => {
@@ -62,6 +63,19 @@
   function reset(heading, state) {
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
+    showStage(state === 'review' ? 'idle' : state);
+  }
+  // Krackle stage: the build charges as a ring, then pops, cracks or splats. Decorative
+  // only; the progress bar and status text stay the accessible record of the build.
+  function showStage(state) {
+    try {
+      if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
+        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156});
+      }
+      stage?.setState(state);
+    } catch (_) {
+      stage = null; stageHost.replaceChildren();
+    }
   }
   function metadata(snapshot) {
     const dl = el('dl', undefined, 'export-review-meta');
@@ -104,8 +118,11 @@
     const { snapshot, result, callbacks } = current;
     const built = result.ok || result.built;
     const warning = built && (!result.ok || snapshot.skipped || (result.skipped || []).length);
-    reset(built ? (result.installed_dir ? 'Mod installed' : result.ok ? 'Mod exported' : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
+    // The heading carries the outcome; the stage only gives it a physical character.
+    const suffix = warning && result.ok ? ' with warnings' : '';
+    reset(built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
       built ? warning ? 'warning' : 'success' : 'error');
+    if (result.cancelled && !built) showStage('idle');
     metadata(snapshot);
     const status = el('p', result.error || (warning ? 'Review the skipped items below before testing this mod.' : 'The build has finished.'), 'export-review-summary');
     status.setAttribute('role', 'status'); body.append(status);

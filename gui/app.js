@@ -113,6 +113,7 @@ function toastSpinner(msg) {
     el.firstElementChild.remove(); el.lastElementChild.textContent = message;
     const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
     el.prepend(icon); lucide.createIcons({nodes:[el]});
+    try { window.AtelierKrackleGlyph?.toastIcon(el, state === 'error' ? 'error' : state); } catch (_) {}
     setTimeout(() => el.remove(), duration);
   };
   document.getElementById("toast-area").appendChild(el);
@@ -380,8 +381,24 @@ async function renderGrid(focusPath = null, direction = 'forward') {
     area.setAttribute('aria-busy', 'false');
     window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
     renderBreadcrumbs();
+    _mountEmptyArt(failure, "error");
     document.getElementById("library-count").textContent = "Could not load assets";
     window.AtelierPolish?.startupDone();
+  }
+}
+
+// Krackle art for the grid's empty, no-match and failed states. The text and any
+// existing icon stay authoritative; the art is decorative and optional.
+function _mountEmptyArt(container, kind) {
+  if (!container || !window.AtelierMotion?.emptyState) return;
+  const host = document.createElement("span");
+  host.className = "am-empty-state-host";
+  try {
+    container.prepend(host);
+    window.AtelierMotion.emptyState.mount(host, {kind});
+    container.querySelector(":scope > svg.lucide, :scope > i[data-lucide]")?.remove();
+  } catch (_) {
+    host.remove();
   }
 }
 
@@ -419,7 +436,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       <div style="margin-top:8px">${narrowed ? "No matches in this folder. Clear filters to see all items." : "Empty folder"}</div>
     </div>`;
     lucide.createIcons({ nodes: [area] });
-    window.AtelierPolish?.empty(area.firstElementChild, narrowed ? 'No matches in this folder' : 'Empty folder', narrowed ? 'Clear filters to see all items.' : 'Choose another folder to continue exploring.');
+    window.AtelierPolish?.empty(area.firstElementChild, narrowed ? 'No matches in this folder' : 'Empty folder', narrowed ? 'Clear filters to see all items.' : 'Choose another folder to continue exploring.', narrowed ? 'none' : 'empty');
     return;
   }
 

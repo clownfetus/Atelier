@@ -2,7 +2,7 @@
  * Atelier — Scoped Material-Save Feedback Styles
  * Scope prefix: am-material-save- / [data-atelier-motion="material-save"]
  * Production slot: 24x24 CSS pixels (flex: 0 0 24px) inside save toasts.
- * Geometry adapted from Google Material Symbols Rounded, Apache License 2.0.
+ * Krackle artwork: energy is currentColor, bubbles are --krackle-hole.
  */
 
 [data-atelier-motion="material-save"] {
@@ -25,127 +25,87 @@
   height: 100%;
   display: block;
   overflow: visible;
-  fill: none;
+  fill: currentColor;
 }
 
-/* Semantic role colors on neutral notification surfaces */
-.toast [data-atelier-motion="material-save"][data-am-state="idle"],
-[data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="idle"],
+/* Toast outcomes use semantic tokens through the Krackle palette. */
 .toast [data-atelier-motion="material-save"][data-am-state="saving"],
 [data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="saving"] {
-  color: var(--acc, var(--md-sys-color-primary, #335d9f));
+  color: var(--krackle-charge, var(--acc, #335d9f));
 }
 
 .toast [data-atelier-motion="material-save"][data-am-state="success"],
 [data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="success"] {
-  color: var(--studio-success, #216642);
+  color: var(--krackle-success, var(--studio-success, #216642));
 }
 
 .toast [data-atelier-motion="material-save"][data-am-state="warning"],
 [data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="warning"] {
-  color: var(--studio-warning, #785300);
+  color: var(--krackle-warn, var(--studio-warning, #785300));
 }
 
 .toast [data-atelier-motion="material-save"][data-am-state="error"],
 [data-am-surface="toast"][data-atelier-motion="material-save"][data-am-state="error"] {
-  color: var(--md-sys-color-error, #ba1a1a);
+  color: var(--krackle-fault, var(--md-sys-color-error, #ba1a1a));
 }
 
-/* Coordinate space transform origins (24x24 viewBox) */
-[data-atelier-motion="material-save"] .am-material-save-cartridge-group,
-[data-atelier-motion="material-save"] .am-material-save-disc,
+[data-atelier-motion="material-save"] .am-material-save-energy { fill: currentColor; }
+[data-atelier-motion="material-save"] .am-material-save-hole { fill: var(--krackle-hole, #121216); }
+[data-atelier-motion="material-save"] .am-material-save-glint { fill: var(--krackle-glint, #fbf6ea); }
+[data-atelier-motion="material-save"] .am-material-save-arc,
+[data-atelier-motion="material-save"] .am-material-save-drip-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+[data-atelier-motion="material-save"] .am-material-save-arc { stroke-width: 4.1; }
+[data-atelier-motion="material-save"] .am-material-save-drip-line { stroke-width: 2.16; }
+
+[data-atelier-motion="material-save"] .am-material-save-dot,
+[data-atelier-motion="material-save"] .am-material-save-dot-hole,
+[data-atelier-motion="material-save"] .am-material-save-burst-hole,
+[data-atelier-motion="material-save"] .am-material-save-fleck,
+[data-atelier-motion="material-save"] .am-material-save-sat {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+[data-atelier-motion="material-save"] .am-material-save-idle,
 [data-atelier-motion="material-save"] .am-material-save-saving-ring,
-[data-atelier-motion="material-save"] .am-material-save-outcome,
-[data-atelier-motion="material-save"] .am-material-save-success-ring,
-[data-atelier-motion="material-save"] .am-material-save-check-path,
-[data-atelier-motion="material-save"] .am-material-save-error-cross {
+[data-atelier-motion="material-save"] .am-material-save-mini,
+[data-atelier-motion="material-save"] .am-material-save-burst,
+[data-atelier-motion="material-save"] .am-material-save-splat {
+  transform-box: view-box;
   transform-origin: 12px 12px;
 }
-
-[data-atelier-motion="material-save"] .am-material-save-shutter {
-  transform-origin: 10.875px 5.125px;
+[data-atelier-motion="material-save"] .am-material-save-ring {
+  transform-box: view-box;
+  transform-origin: 12px 10.8px;
 }
-
-[data-atelier-motion="material-save"] .am-material-save-disc {
-  transform-origin: 12px 14.25px;
+[data-atelier-motion="material-save"] .am-material-save-drip {
+  transform-box: fill-box;
+  transform-origin: center top;
 }
+[data-atelier-motion="material-save"] .am-material-save-dot-hole { transform: scale(0); }
 
-/* Base layer defaults */
-[data-atelier-motion="material-save"] .am-material-save-cartridge-group {
-  opacity: 1;
-}
-
-[data-atelier-motion="material-save"] .am-material-save-saving-ring {
-  opacity: 0;
-  stroke-dasharray: 0.32 0.68;
-  stroke-dashoffset: 0;
-  pointer-events: none;
-}
-
+[data-atelier-motion="material-save"] .am-material-save-idle,
+[data-atelier-motion="material-save"] .am-material-save-saving-ring,
 [data-atelier-motion="material-save"] .am-material-save-outcome {
   opacity: 0;
   pointer-events: none;
 }
+[data-atelier-motion="material-save"] .am-material-save-fleck { opacity: 0; }
 
-[data-atelier-motion="material-save"] .am-material-save-success-ring {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-}
-
-[data-atelier-motion="material-save"] .am-material-save-check-path {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-}
-
-/* State: idle (neutral static save glyph) */
-[data-atelier-motion="material-save"][data-am-state="idle"] .am-material-save-cartridge-group {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* State: saving (indeterminate saving pose; static when reduced-motion is active) */
-[data-atelier-motion="material-save"][data-am-state="saving"] .am-material-save-cartridge-group {
-  opacity: 0.86;
-  transform: scale(0.76);
-}
-
-[data-atelier-motion="material-save"][data-am-state="saving"] .am-material-save-saving-ring {
-  opacity: 0.92;
-}
-
-/* State: success (crisp check inside enclosing ring) */
-[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-cartridge-group,
-[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-saving-ring {
-  opacity: 0;
-}
-
-[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-outcome-success {
-  opacity: 1;
-}
-
-[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-check-path {
-  stroke-dashoffset: 0;
-}
-
-/* State: warning (metadata warning, partial save, or newer unsaved edits retained) */
-[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-cartridge-group,
-[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-saving-ring {
-  opacity: 0;
-}
-
-[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-outcome-warning {
-  opacity: 1;
-}
-
-/* State: error (dialog save failure / exception) */
-[data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-cartridge-group,
-[data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-saving-ring {
-  opacity: 0;
-}
-
+/* Resting poses: swatch, charge ring, starburst, cracked ring and splat. */
+[data-atelier-motion="material-save"][data-am-state="idle"] .am-material-save-idle,
+[data-atelier-motion="material-save"][data-am-state="saving"] .am-material-save-saving-ring,
+[data-atelier-motion="material-save"][data-am-state="success"] .am-material-save-outcome-success,
+[data-atelier-motion="material-save"][data-am-state="warning"] .am-material-save-outcome-warning,
 [data-atelier-motion="material-save"][data-am-state="error"] .am-material-save-outcome-error {
   opacity: 1;
 }
+[data-atelier-motion="material-save"][data-am-state="saving"][data-am-reduced="true"] .am-material-save-dot-0 { transform: scale(1.62); }
+[data-atelier-motion="material-save"][data-am-state="saving"][data-am-reduced="true"] .am-material-save-dot-5 { transform: scale(1.25); }
+[data-atelier-motion="material-save"][data-am-state="saving"][data-am-reduced="true"] .am-material-save-dot-hole-0 { transform: scale(1); }
 
 /* Save-specific 24x24 fallback wrapper and toast styling */
 .am-material-save-slot {

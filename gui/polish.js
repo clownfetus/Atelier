@@ -160,13 +160,18 @@
       play(wipe,[{clipPath:'inset(0 0 0 0)'},{clipPath:'inset(0 0 0 100%)'}],120); setTimeout(()=>wipe.remove(),140);
     }
   }
-  function empty(host, title, description='') {
+  function empty(host, title, description='', kind='empty') {
     host.classList.add('polish-empty');
     const art=document.createElementNS('http://www.w3.org/2000/svg','svg'); art.setAttribute('viewBox','0 0 96 64'); art.setAttribute('aria-hidden','true');
     art.innerHTML='<path d="M12 18h23l9 8h40v28H12Z M12 42h72 M25 18V9h44v17 M34 18h26 M42 32h12 M48 26v12" fill="none" stroke="currentColor" stroke-width="1.5"/>';
     const text=document.createElement('strong'); text.textContent=title;
     const detail=document.createElement('span'); detail.textContent=description;
     host.replaceChildren(art,text,detail);
+    // Krackle art replaces the outline drawing when available; the outline stays as the fallback.
+    if (!window.AtelierMotion?.emptyState) return;
+    const krackle=document.createElement('span'); krackle.className='am-empty-state-host';
+    try { host.prepend(krackle); window.AtelierMotion.emptyState.mount(krackle,{kind}); art.remove(); }
+    catch (_) { krackle.remove(); }
   }
   function importStart(items) {
     const host=document.getElementById('import-segments'); if (!host) return;

@@ -316,18 +316,19 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                 motion_page.locator('#settings-theme').select_option(theme, force=True)
                 dimensions = motion_page.locator('#viewport-loading-motion-host svg').evaluate("""svg => {
                   const rect=svg.getBoundingClientRect();
-                  const hull=svg.querySelector('.am-viewport-loader-hull');
-                  return {width:rect.width, height:rect.height, stroke:parseFloat(getComputedStyle(hull).strokeWidth),
+                  // Krackle has no strokes: the smallest charge dot must stay a readable comic dot.
+                  const dots=[...svg.querySelectorAll('.am-viewport-loader-dot')].map(dot=>Number(dot.getAttribute('r')));
+                  return {width:rect.width, height:rect.height, dot:Math.min(...dots), dots:dots.length,
                     viewBox:svg.viewBox.baseVal.width};
                 }""")
                 assert dimensions['width'] == 72 and dimensions['height'] == 72, dimensions
-                assert dimensions['stroke'] * dimensions['width'] / dimensions['viewBox'] >= 2, dimensions
+                assert dimensions['dots'] == 12 and dimensions['dot'] * dimensions['width'] / dimensions['viewBox'] >= 2.5, dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
                 assert motion_page.locator('#viewport-inspect-tools').is_hidden()
                 assert motion_page.locator('#viewport-tools').is_hidden()
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         close_preview()
-        checks.append('Viewport loader remains 72px with readable strokes in both themes at compact and standard desktop sizes')
+        checks.append('Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes')
         assert not errors, errors
     finally:
         motion_page.close()
