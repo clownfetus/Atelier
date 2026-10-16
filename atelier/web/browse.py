@@ -7,7 +7,7 @@ from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
 
 def _imported_exists(game_rel, ext):
     """A project copy exists at the unique subfolder path, or at the legacy flat path (back-compat)."""
-    return (os.path.exists(project_base(game_rel) + ext)
+    return (ext == '.blend' and os.path.exists(project_base(game_rel)+'.mesh.json')) or (os.path.exists(project_base(game_rel) + ext)
             or os.path.exists(project_base_legacy(game_rel) + ext))
 
 _REMOTE_MD_URL   = "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/refs/heads/main/MarvelRivalsCharacterIDs.md"
@@ -238,7 +238,7 @@ def _browse_pak_level(rel_path):
             continue
         gr       = f"{rel_path}/{name}" if rel_path else name
         is_mat   = ft == "material"
-        imported = _imported_exists(gr, ".json" if ft in JSON_EDIT_TYPES else ".png")
+        imported = _imported_exists(gr, ".blend" if ft == 'mesh' else ".json" if ft in JSON_EDIT_TYPES else ".png")
         result.append({
             "type":      "asset",
             "file_type": ft,
@@ -284,7 +284,7 @@ def _browse_skin(skin_id, subpath):
         if ft not in LISTED_FILE_TYPES:        # hide meshes/curves/blueprints/vfx/etc.
             continue
         is_mat   = ft == "material"
-        imported = _imported_exists(td["game_rel"], ".json" if ft in JSON_EDIT_TYPES else ".png")
+        imported = _imported_exists(td["game_rel"], ".blend" if ft == 'mesh' else ".json" if ft in JSON_EDIT_TYPES else ".png")
         tok      = token(td["game_rel"]) if imported else None
         result.append({
             "type":      "asset",
@@ -427,7 +427,12 @@ def all_imported():
         _dirs[:] = [d for d in _dirs if d != ".atelier"]
         for fname in sorted(files):
             fpath = os.path.join(dirpath, fname)
-            if fname.endswith(".png"):
+            if fname.endswith('.mesh.json'):
+                gr=project_game_rel(fpath[:-len('.mesh.json')]+'.blend',import_root)
+                ext='.blend'
+            elif fname.endswith('.blend') and fname[:-len('.blend')]+'.mesh.json' in files:
+                continue
+            elif fname.endswith(".png"):
                 ext = ".png"
             elif fname.endswith(".blend.mat.json"):
                 continue                                # meshedit's texture manifest, not an edit
@@ -437,7 +442,7 @@ def all_imported():
                 ext = ".blend"
             else:
                 continue
-            gr = project_game_rel(fpath, import_root)   # subfolder path -> game_rel; flat -> basename
+            if not fname.endswith('.mesh.json'):gr = project_game_rel(fpath, import_root)
             if "/" not in gr:                           # legacy flat file: resolve via asset_cache
                 gr = _ac.by_name(gr) or gr
             name = os.path.basename(gr)

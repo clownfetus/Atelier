@@ -61,7 +61,7 @@
     var motionUnavailable = false;
 
     var mql = typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)')
+      ? (window.AtelierMotionPolicy?.query() || window.matchMedia('(prefers-reduced-motion: reduce)'))
       : null;
 
     function isReducedMotion() {

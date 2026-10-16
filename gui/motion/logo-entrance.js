@@ -444,7 +444,7 @@
 
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       try {
-        mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+        mql = (window.AtelierMotionPolicy?.query() || window.matchMedia('(prefers-reduced-motion: reduce)'));
         if (mql) {
           if (typeof mql.addEventListener === 'function') {
             mql.addEventListener('change', onMediaQueryChange);

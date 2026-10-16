@@ -23,6 +23,21 @@
     live.set(job.id, job);
     window.dispatchEvent(new CustomEvent('atelier-job', {detail: job}));
     if (job.kind === 'export') window.AtelierExportReview?.jobProgress?.(job);
+    updateActivity();
+  }
+  function updateActivity() {
+    if (!activityButton) return;
+    const jobs = [...live.values()].filter(job=>job.project===window.atelierProject() && active.has(job.state));
+    const previous = activityButton.querySelector('.activity-pip')?.textContent || '';
+    activityButton.replaceChildren(document.createTextNode('Activity'));
+    activityButton.setAttribute('aria-label', jobs.length ? `Activity · ${jobs.length} running` : 'Activity');
+    if (!jobs.length) return;
+    const ring=el('span',undefined,'activity-ring'); ring.setAttribute('aria-hidden','true');
+    const determinate=jobs.every(job=>Number(job.total)>0);
+    if (determinate) ring.style.setProperty('--job-progress', Math.min(100,jobs.reduce((n,j)=>n+Math.max(0,Number(j.current)||0),0)/jobs.reduce((n,j)=>n+Number(j.total),0)*100)+'%');
+    else ring.classList.add('indeterminate');
+    const pip=el('span',previous,'activity-pip'); window.AtelierPolish?.count(pip,jobs.length); if(!pip.textContent) pip.textContent=jobs.length;
+    activityButton.prepend(ring); activityButton.append(pip);
   }
   async function cancel(job, project = job.project) {
     const response = await request('/api/jobs/' + encodeURIComponent(job.id) + '/cancel', {
@@ -41,7 +56,7 @@
     body.replaceChildren();
     body.append(el('p', 'Project: ' + (window.atelierProject() || 'Default project')));
     body.append(el('p', 'Jobs belong to this project. Completed results remain available after reopening Atelier.'));
-    if (!rows.length) body.append(el('p', 'No jobs yet.', 'muted'));
+    if (!rows.length) { const empty=el('div'); body.append(empty); window.AtelierPolish?.empty(empty,'No jobs yet.','Imports and exports will appear here.'); }
     for (const job of rows) {
       const row = el('article', undefined, 'job-row'); row.dataset.jobId = job.id;
       row.append(el('strong', job.label), el('span', job.state, 'job-state'));
@@ -49,6 +64,12 @@
       if (job.total) row.append(el('p', job.current + ' / ' + job.total));
       if (job.error) row.append(el('p', job.error, 'warning'));
       const result = job.result || {};
+      if (job.kind === 's-map-process' && result.ok) {
+        row.append(el('p', `${result.processed.length} S maps processed; ${result.skipped.length} skipped.`));
+        for (const pair of result.processed) row.append(el('p', `${pair.d} → ${pair.s}`, 'job-path'));
+        for (const skipped of result.skipped) row.append(el('p', `${skipped.d || skipped.s}: ${skipped.reason}`, 'job-path'));
+        if (result.backup) row.append(el('p', 'Backups: ' + result.backup, 'job-path'));
+      }
       if (result.pak_path || result.pak) row.append(el('p', result.pak_path || result.pak, 'job-path'));
       if (active.has(job.state)) {
         const button = el('button', job.can_cancel ? 'Cancel' : 'Finishing file publication…', 'btn');
@@ -73,8 +94,7 @@
       }
       body.append(row);
     }
-    const count = rows.filter(job => active.has(job.state)).length;
-    activityButton.textContent = count ? 'Activity · ' + count : 'Activity';
+    updateActivity();
     if (focusJob) {
       const row = [...body.querySelectorAll('.job-row')].find(node => node.dataset.jobId === focusJob);
       const buttons = [...(row?.querySelectorAll('button:not(:disabled)') || [])];
@@ -131,8 +151,9 @@
   window.AtelierJobs = {
     async run(path, options = {}) {
       const {project = window.atelierProject(), ...opts} = options;
-      const input = JSON.parse(opts.body || '{}');
-      const result = await request(path, {...opts, body: JSON.stringify({...input, background: true})}, project);
+      const form=opts.body instanceof FormData;
+      const input = form ? null : JSON.parse(opts.body || '{}');
+      const result = await request(path, {...opts, body:form ? opts.body : JSON.stringify({...input, background: true})}, project);
       // Keep old callers and fixture responses compatible.
       if (!result.job_id) return result;
       if (result.job) notify(result.job);

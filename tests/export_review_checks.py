@@ -94,6 +94,7 @@ def run_export_review_checks(page, context, url, report, checks):
         review.keyboard.press('Shift+Tab')
         assert review.locator('#export-review-confirm').evaluate('el => el === document.activeElement')
         review.keyboard.press('Escape')
+        overlay.wait_for(state='hidden')
         assert not overlay.is_visible()
         assert review.locator('#install-btn').evaluate('el => el === document.activeElement')
         checks.append('Export review lists included/excluded types and paths, keeps credentials private and supports keyboard cancellation')
@@ -137,6 +138,7 @@ def run_export_review_checks(page, context, url, report, checks):
         assert review.locator('#install-btn').is_disabled()
         assert overlay.locator('progress').get_attribute('value') is None
         review.keyboard.press('Escape')
+        overlay.wait_for(state='hidden')
         assert not overlay.is_visible()
         review.locator('#export-last-result').click()
         assert overlay.locator('progress').is_visible()

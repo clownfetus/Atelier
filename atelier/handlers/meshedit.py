@@ -103,8 +103,9 @@ def find_blender():
 
 def _run_blender(script, args, label):
     exe = find_blender()
-    cmd = [exe, "--background", "--python", os.path.join(_SCRIPTS, script), "--"] + list(args)
-    r = subprocess.run(cmd, capture_output=True, text=True, creationflags=CNW)
+    cmd = [exe, "--factory-startup", "--background", "--disable-autoexec", "--python", os.path.join(_SCRIPTS, script), "--"] + list(args)
+    from atelier import jobs
+    r = jobs.run_process(cmd, capture_output=True, text=True, creationflags=CNW,timeout=900)
     out = (r.stdout or "") + (r.stderr or "")
     # Blender exits 0 even when the embedded script raises, so success must be judged by
     # the marker the script prints -- never by the return code alone.
@@ -177,6 +178,9 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     material edits for the same character (texture.build_mod), instead of shipping a second
     mod that competes with the first.
     """
+    if blend_path is None:
+        from atelier.handlers.meshreplace import is_original, stage_original
+        if is_original(game_rel): return stage_original(game_rel,stage)
     base = base_path or _resolve_base(game_rel)
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     if not os.path.exists(blend_path):
@@ -195,6 +199,9 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
         if os.path.exists(glb):
             os.remove(glb)        # never let a previous run's output be mistaken for fresh
         out = _run_blender("blend_to_glb.py", [blend_path, glb, f"{ratio:.6f}"], "GLB")
+        from atelier.handlers.meshreplace import import_options
+        options=import_options(json.loads(next((line[len('ATELIER_IMPORT_OPTIONS '):] for line in out.splitlines() if line.startswith('ATELIER_IMPORT_OPTIONS ')),'{}')))
+        if i==0 and not options['keep_skeleton']:m.apply_skeleton_from_glb(glb)
         mats = next((l[len("MATERIALS "):] for l in out.splitlines()
                      if l.startswith("MATERIALS ")), "")
         have = set(mats.split("|")) if mats else set()
@@ -206,7 +213,7 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
                 f"That section would be empty, which the engine does not tolerate. Give those "
                 f"materials more geometry, or raise the LOD ratio.")
         secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight)
-        info = m.rebuild_lod(i, secs)
+        info = m.rebuild_lod(i, secs,keep_morphs=options['keep_morphs'])
         applied.append({"lod": i, "ratio": round(ratio, 4), **info})
         os.remove(glb)
 

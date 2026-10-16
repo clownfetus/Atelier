@@ -4,6 +4,19 @@ import io_lib
 
 _INDEX      = None
 _INDEX_LOCK = threading.Lock()  # serialises ensure_index builds across request threads
+_PROGRESS = {"stage": "idle", "current": 0, "total": 0}
+_PROGRESS_LOCK = threading.Lock()
+
+
+def index_progress():
+    with _PROGRESS_LOCK:
+        return dict(_PROGRESS)
+
+
+def _progress(stage, current=0, total=0):
+    with _PROGRESS_LOCK:
+        _PROGRESS.update(stage=stage, current=current, total=total)
+
 _FAILED     = []    # [{container, error}] from the most recent build — see index_warnings()
 _OPT_MIPS   = set() # virtual paths (lower, no ext) with a .uptnl available — see has_optional_mip
 _CACHE_FILE = os.path.join(_CACHE, "cli_index_cache.json")
@@ -204,6 +217,7 @@ def ensure_index():
         # so without this a second request arriving during a build (the threaded server runs
         # each one in its own thread) sees None and redundantly indexes every container again.
         if _INDEX is not None: return _INDEX
+        _progress('loading-cache')
         key = _utoc_key()
         try:
             c = json.load(open(_CACHE_FILE, encoding="utf-8"))
@@ -211,6 +225,7 @@ def ensure_index():
                 _INDEX = [tuple(e) for e in c["entries"]]
                 _FAILED = [dict(f) for f in c.get("failed", [])]
                 _OPT_MIPS = set(c.get("optional_mips") or [])
+                _progress('ready')
                 return _INDEX
         except Exception: pass
         utocs = _index_utocs()
@@ -224,7 +239,8 @@ def ensure_index():
         seen = {}  # virt_lower -> (virt, cont, pfx)
         opt_mips = set()
         failed = []
-        for utoc in utocs:
+        for number, utoc in enumerate(utocs):
+            _progress('indexing', number, len(utocs))
             t = None
             try:
                 t    = io_lib.parse_toc(utoc)
@@ -266,6 +282,7 @@ def ensure_index():
         # and the cache key (_utoc_key) covers only the .utoc files — so caching that result pins the
         # damage until the paks change or _cache is wiped, which is why "reinstall it" was the only
         # cure. Leaving it uncached costs one re-index per launch and lets fixing the key recover.
+        _progress('ready', len(utocs), len(utocs))
         if failed:
             print(f"  [warn] {len(failed)} of {len(utocs)} containers failed to index — "
                   f"not caching this build", file=sys.stderr)

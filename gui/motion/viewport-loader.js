@@ -75,7 +75,7 @@
     var mql = null;
     try {
       if (typeof window.matchMedia === 'function') {
-        mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+        mql = (window.AtelierMotionPolicy?.query() || window.matchMedia('(prefers-reduced-motion: reduce)'));
       }
     } catch (_) {}
 

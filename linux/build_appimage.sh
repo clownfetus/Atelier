@@ -55,6 +55,7 @@ rm -rf build dist
 # caches and the Windows-only tools in the dev Tools/ folder are never picked up.
 chmod +x dist/Atelier/Atelier
 "$PYTHON" scripts/stage_tools.py --platform linux
+"$PYTHON" scripts/release_manifest.py
 
 TOOL_DIR="$ROOT/linux/_appimagetool"
 TOOL="$TOOL_DIR/appimagetool-x86_64.AppImage"

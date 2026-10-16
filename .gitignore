@@ -220,6 +220,8 @@ __marimo__/
 
 # Custom for this project
 Tools/
+tools-src/**/bin/
+tools-src/**/obj/
 extracted/
 _work/
 _logs/

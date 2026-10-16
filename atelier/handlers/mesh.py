@@ -348,7 +348,9 @@ class Mesh:
         # partition its position buffer exactly, so close a group the moment the running
         # vertex total equals one of the buffer sizes we found.
         self.lods, run, grp = [], 0, []
+        self._layout=[]
         for s in find_sections(self.uexp):
+            if s['base_vertex']==0:run,grp=0,[]
             grp.append(s)
             run += s["num_verts"]
             if run in pos:
@@ -356,6 +358,18 @@ class Mesh:
                 self.lods.append({"sections": grp, "num_verts": run,
                                   "buf": where, "pos_off": off})
                 run, grp = 0, []
+        if os.path.isfile(base+'.uasset'):
+            from atelier.handlers.meshsurvey import probe
+            report=probe(base,read_tails=False,include_layout=True)
+            if report['status']=='error':raise ValueError(report['error'])
+            self._layout=report.get('_layout',[])
+            self.lods=[]
+            for record in self._layout:
+                if record['blob']=='missing':continue
+                start=record['blob_start'];stride=record['idx_stride'];count=record['n_indices']
+                self.lods.append({'sections':record['sections'],'num_verts':record['num_verts'],'buf':record['blob'],
+                    'pos_off':start+11+count*stride+POS_HEADER,'layout':record})
+            if not self.lods:raise ValueError('No geometry LOD data is available for this mesh')
         for lod in self.lods:
             self._locate_index_buffer(lod)
             self._locate_vertex_buffers(lod)
@@ -399,12 +413,15 @@ class Mesh:
         for entry_i, lod_i in enumerate(streamed):
             if entry_i < len(self._drm_entries):
                 self._drm_map[lod_i] = entry_i
+            record=self.lods[lod_i].get('layout')
+            if record and record.get('data_resource') is not None:self._drm_map[lod_i]=record['data_resource']
         for i, lod in enumerate(self.lods):
             self._locate_tail(i, lod)
 
     def _lod_blob_end(self, lod_index, lod):
         """A LOD blob's exclusive end offset within its file: from the DataResourceMap for
         a streamed LOD, or the .uexp's 4-byte package tag for the inline one."""
+        if lod['buf']=='uexp' and lod.get('layout'):return lod['layout']['blob_end']
         if lod["buf"] == "ubulk":
             rec = self._drm_entries[self._drm_map[lod_index]]["rec_off"]
             (off,) = struct.unpack_from("<q", self.uasset, rec + 4)
@@ -437,6 +454,7 @@ class Mesh:
         (rt,) = struct.unpack_from("<I", blob, o); o += 4 + rt
         prefix_end = o
         (has_morphs,) = struct.unpack_from("<i", blob, o); o += 4
+        morph_start=o-4
         if has_morphs:
             (nwords,) = struct.unpack_from("<i", blob, o); o += 4 + nwords * 4
             for _ in range(2):                                    # Min/MaximumValuePerMorph
@@ -445,6 +463,7 @@ class Mesh:
                 (c,) = struct.unpack_from("<i", blob, o); o += 4 + c * 4
             o += 12                                               # NumTotalBatches + 2 precisions
         lod["tail_prefix"] = bytes(blob[start:prefix_end])
+        lod["tail_morph"] = bytes(blob[morph_start:o])
         lod["tail_suffix"] = bytes(blob[o:end])
         lod["had_morphs"] = bool(has_morphs)
 
@@ -592,12 +611,10 @@ class Mesh:
         return normal_w[:, :3], tangent[:, :3], normal_w[:, 3]
 
     def uvs(self, lod):
-        """[N, NumTexCoords, 2] float32. Always full-precision on this game; a
-        half-precision path would need decoding here if fullPrecUV is ever 0."""
+        """[N, NumTexCoords, 2] float32, decoding either cooked UV precision."""
         n, c = lod["num_verts"], lod["num_tex_coords"]
-        if not lod["full_prec_uv"]:
-            raise NotImplementedError("half-precision UVs not encountered/decoded yet")
-        return np.frombuffer(bytes(self._blob(lod)), "<f4", n * c * 2, lod["uv_off"]).reshape(n, c, 2)
+        dtype='<f4' if lod['full_prec_uv'] else '<f2'
+        return np.frombuffer(bytes(self._blob(lod)), dtype, n * c * 2, lod["uv_off"]).reshape(n, c, 2).astype('f4',copy=False)
 
     def colors(self, lod):
         """[N,4] float32 RGBA in [0,1], or None if the LOD has no color buffer.
@@ -665,7 +682,7 @@ class Mesh:
 
     # ── general rebuild (vertex add/remove/move, any section, fixed BoneMaps) ──────
 
-    def rebuild_lod(self, lod_index, sections_in):
+    def rebuild_lod(self, lod_index, sections_in, *, keep_morphs=True):
         """Replace one LOD's geometry entirely. `sections_in` is the FULL per-section-
         local data for EVERY section in this LOD, edited or not, in original section
         order -- see rebuild_lod_buffers for the per-section dict shape and the fixed-
@@ -685,8 +702,21 @@ class Mesh:
             if si["mat"] != osec["mat"]:
                 raise ValueError("section order/materials must match the original")
 
+        morph_tail=lod.get('tail_morph',struct.pack('<i',0));morph_count=morph_vertices=0;mode='none'
+        if lod.get('had_morphs'):
+            from atelier.handlers import morph
+            original=morph.decode(morph_tail[4:],lod['num_verts'])
+            if keep_morphs and original['targets']:
+                packed,targets,identity=morph.remap(self,lod,sections_in,original)
+                morph_tail=struct.pack('<i',1)+packed
+                morph_count=len(targets);morph_vertices=sum(len(target['indices']) for target in targets)
+                mode='preserved' if identity else 'transferred'
+                if not identity:morph.patch_metadata(self,lod,targets,sum(len(section['positions']) for section in sections_in))
+            elif not keep_morphs:
+                morph_tail=struct.pack('<i',0);mode='removed'
+                if original['targets']:morph.patch_metadata(self,lod,[],sum(len(section['positions']) for section in sections_in))
         new_blob, new_secs, total_nv, idx_stride, n_idx = rebuild_lod_buffers(
-            sections_in, lod["tail_prefix"], lod["tail_suffix"])
+            sections_in, lod["tail_prefix"], lod["tail_suffix"],morph_tail=morph_tail)
 
         blob_start = lod["idx_off"] - 11      # index buffer's own strip+dts+bulk header
         old_nv, old_n_idx = lod["num_verts"], lod["n_indices"]
@@ -705,9 +735,22 @@ class Mesh:
                 struct.pack_into("<q", self.uasset, later["rec_off"] + 4, o + delta)
             self._patch_mirror(lod, old_size, len(new_blob), old_n_idx, n_idx, old_nv, total_nv)
         else:
-            old_size = (len(self.uexp) - 4) - blob_start
+            old_size = self._lod_blob_end(lod_index,lod) - blob_start
             self.uexp[blob_start:blob_start + old_size] = new_blob
             delta = len(new_blob) - old_size
+            record=lod.get('layout')
+            if record:
+                struct.pack_into('<I',self.uexp,record['size_offset'],len(new_blob))
+                boundary=blob_start+old_size
+                for other in self._layout:
+                    for field in ('size_offset',):
+                        if other[field]>=boundary:other[field]+=delta
+                    if other['blob']=='uexp':
+                        for field in ('blob_start','blob_end'):
+                            if other[field]>=boundary:other[field]+=delta
+                    for section in other['sections']:
+                        for field in ('off','bm','bonemap_off','tris_off','base_index_off','base_vertex_off','num_verts_off','after'):
+                            if section[field]>=boundary:section[field]+=delta
             (old_ss,) = struct.unpack_from("<q", self.uasset, self._export_ss_off)
             struct.pack_into("<q", self.uasset, self._export_ss_off, old_ss + delta)
             (old_bd,) = struct.unpack_from("<q", self.uasset, self._bulk_start_off)
@@ -723,7 +766,8 @@ class Mesh:
 
         lod["num_verts"], lod["n_indices"], lod["idx_stride"] = total_nv, n_idx, idx_stride
         self._reindex_after_resize()
-        return {"total_nv": total_nv, "idx_stride": idx_stride, "n_idx": n_idx}
+        return {"total_nv": total_nv, "idx_stride": idx_stride, "n_idx": n_idx,
+                'morph_targets':morph_count,'morph_vertices':morph_vertices,'morph_mode':mode}
 
     def _patch_mirror(self, lod, old_size, new_size, old_n_idx, new_n_idx, old_nv, new_nv):
         """The .uexp carries small mirrors of a streamed LOD's blob size + derived counts
@@ -761,9 +805,38 @@ class Mesh:
             lod["buf"], lod["pos_off"] = pos[n]
             self._locate_index_buffer(lod)
             self._locate_vertex_buffers(lod)
-            # Re-split the tail too: it now holds a cleared morph gate, and _lod_blob_end
+            # Re-split the tail too: morph data may have been remapped, and _lod_blob_end
             # reads the DataResourceMap entries this rebuild has already updated.
             self._locate_tail(i, lod)
+
+    def apply_skeleton_from_glb(self,path):
+        """Use a donor bind pose only when its named hierarchy matches the game skeleton."""
+        from scipy.spatial.transform import Rotation
+        document,_=load_glb(path);nodes=document.get('nodes',[])
+        if not document.get('skins'):raise ValueError('The replacement has no skeleton')
+        joints=document['skins'][0]['joints'];parents={child:i for i,node in enumerate(nodes) for child in node.get('children',[])}
+        by_name={nodes[index].get('name'):index for index in joints}
+        names=[bone['name'] for bone in self.bones]
+        if len(set(names))!=len(names) or set(by_name)!=set(names):raise ValueError('Replacement skeleton names must match the character exactly')
+        from atelier.handlers.meshsurvey import find_extras as locate
+        pose_offset=locate(bytes(self.uexp))['pose_off']
+        inverse_axis=np.array([-_AXIS_Q[0],-_AXIS_Q[1],-_AXIS_Q[2],_AXIS_Q[3]])
+        for i,bone in enumerate(self.bones):
+            node_index=by_name[bone['name']];node=nodes[node_index];parent=parents.get(node_index)
+            parent_name=nodes[parent].get('name') if parent in joints else None
+            expected=names[bone['parent']] if bone['parent']>=0 else None
+            if parent_name!=expected:raise ValueError('Replacement skeleton hierarchy does not match the character')
+            if 'matrix' in node:
+                matrix=np.array(node['matrix'],dtype='f8').reshape(4,4).T
+                scale=np.linalg.norm(matrix[:3,:3],axis=0);rotation=Rotation.from_matrix(matrix[:3,:3]/scale).as_quat();translation=matrix[:3,3]
+            else:
+                translation=np.array(node.get('translation',[0,0,0]),dtype='f8');rotation=np.array(node.get('rotation',[0,0,0,1]),dtype='f8');scale=np.array(node.get('scale',[1,1,1]),dtype='f8')
+            if parent_name is None:translation=_AXIS_R.T@translation;rotation=_qmul(inverse_axis,rotation)
+            translation*=100
+            values=np.concatenate((rotation,translation,scale))
+            if not np.isfinite(values).all() or np.any(scale<=0):raise ValueError('Invalid replacement skeleton bind pose')
+            struct.pack_into('<10d',self.uexp,pose_offset+i*80,*values)
+            bone.update(rotation=tuple(rotation),translation=tuple(translation),scale=tuple(scale))
 
     def save(self, out_dir, name):
         os.makedirs(out_dir, exist_ok=True)
@@ -929,7 +1002,7 @@ def map_to_fixed_bonemap(global_idx, weight, bonemap, section_label=""):
     return np.where(local < 0, 0, local).astype(global_idx.dtype)
 
 
-def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_stride=None):
+def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_stride=None, *, morph_tail=None):
     """Build a complete LOD blob + section metadata from PER-SECTION-LOCAL vertex data --
     each section owns its own vertex arrays (indices 0..Ni-1), not a shared cross-section
     pool. This matches how real glTF exporters (Blender included) actually emit a multi-
@@ -1030,13 +1103,10 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
         o += bulk(4, np.clip(np.round(bgra), 0, 255).astype(np.uint8).tobytes())
 
     # Tail: replay the ORIGINAL surrounding structures byte-for-byte (see
-    # Mesh._locate_tail) and only clear the int32 bSerializeCompressedMorphTargets gate
-    # between them. Morphs must go because their deltas are vertex-indexed and this
-    # rebuild can renumber/drop vertices, which would silently misapply them; everything
-    # else in the tail is preserved rather than re-synthesised, since guessing its
-    # composition is exactly what produced a serial-size mismatch on the first attempt.
+    # Mesh._locate_tail). The caller supplies preserved/remapped vertex-indexed morph
+    # data, or explicitly disables it. Unrelated tail structures remain byte-identical.
     o += tail_prefix
-    o += struct.pack("<i", 0)
+    o += morph_tail if morph_tail is not None else struct.pack("<i", 0)
     o += tail_suffix
 
     return bytes(o), sections, total_nv, idx_stride, idx.size
@@ -1239,12 +1309,16 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
         if not prims:
             raise ValueError(f"no primitive in the glb uses material {slot!r} -- every "
                             "original material must still be present")
-        P, N, T, TW, UV, C, GI, W, TRI = [], [], [], [], [], [], [], [], []
+        P, N, T, TW, UV, C, GI, W, TRI, REST, IDS, LODS = [], [], [], [], [], [], [], [], [], [], [], []
         voff = 0
         for prim in prims:
             at = prim["attributes"]
             pos = gltf_accessor(g, bin_, at["POSITION"]).astype("f8")
+            rest=(gltf_accessor(g,bin_,at['_ATELIER_MORPH_REST']).astype('f8') if '_ATELIER_MORPH_REST' in at else (pos@_AXIS_R)*100)
+            REST.append(rest)
             nv = len(pos)
+            IDS.append(gltf_accessor(g,bin_,at['_ATELIER_MORPH_ID']).reshape(-1) if '_ATELIER_MORPH_ID' in at else np.full(nv,-1))
+            LODS.append(gltf_accessor(g,bin_,at['_ATELIER_MORPH_LOD']).reshape(-1) if '_ATELIER_MORPH_LOD' in at else np.full(nv,-1))
             # export_glb swaps winding CW->CCW for glTF; undo it here so the rebuilt UE
             # index buffer keeps the game's CW winding (export-flip + import-flip is the
             # identity on untouched geometry, preserving the byte-exact null round-trip).
@@ -1353,6 +1427,8 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
         sections_in.append({
             "mat": sec["mat"],
             "positions": pos,
+            'morph_rest':np.concatenate(REST).astype('f4'),
+            'morph_ids':np.concatenate(IDS),'morph_lods':np.concatenate(LODS),
             "normal": np.concatenate(N).astype("f4"),
             "tangent": np.concatenate(T).astype("f4"),
             "tan_w": np.concatenate(TW).astype("f4"),
@@ -1417,7 +1493,7 @@ def _bone_world_matrices(bones):
     return world, node_trs
 
 
-def export_glb(mesh, lod_index, out_path):
+def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
     """Write a fully skinned glTF binary for one LOD: real bone hierarchy (names, rest
     pose, inverse bind matrices), one primitive per material section, true UV channel
     count, vertex colors, and up to 8 bone influences via JOINTS_0/1 + WEIGHTS_0/1."""
@@ -1464,6 +1540,29 @@ def export_glb(mesh, lod_index, out_path):
 
     ARRAY, ELEM = 34962, 34963
     F32, U16 = 5126, 5123
+    morph_targets=[];morph_names=[]
+    if with_morphs and lod.get('had_morphs'):
+        from atelier.handlers import morph
+        decoded=morph.decode(lod['tail_morph'][4:],lod['num_verts'])
+        morph_targets=decoded['targets']
+        if morph_targets:
+            morph_names=morph.metadata(mesh.base)['names']
+            if len(morph_names)!=len(morph_targets):raise ValueError('Morph target identities do not match preview geometry')
+
+    def sparse_morph(target,lo,hi,normal_delta=False):
+        ids=target['indices'];use=(ids>=lo)&(ids<hi);indices=(ids[use]-lo).astype('<u4')
+        columns=slice(3,6) if normal_delta else slice(0,3)
+        values=target['deltas'][use,columns]
+        values=(values.astype('f8')@_AXIS_R.T)/(1 if normal_delta else 100)
+        nonzero=np.any(values!=0,axis=1);indices=indices[nonzero];values=values[nonzero].astype('<f4')
+        entry={'componentType':F32,'count':hi-lo,'type':'VEC3'}
+        if not normal_delta:
+            entry['min']=np.minimum(values.min(0),0).tolist() if len(values) else [0,0,0]
+            entry['max']=np.maximum(values.max(0),0).tolist() if len(values) else [0,0,0]
+        if len(indices):
+            io,il=add(indices);vo,vl=add(values)
+            entry['sparse']={'count':len(indices),'indices':{'bufferView':bv(io,il),'componentType':5125},'values':{'bufferView':bv(vo,vl)}}
+        accessors.append(entry);return len(accessors)-1
 
     # One glTF material PER SLOT, indexed by slot -- NOT keyed by the material ASSET the slot
     # points at. Several slots can share one asset (SK_1033_1033504 does it four times over:
@@ -1499,6 +1598,9 @@ def export_glb(mesh, lod_index, out_path):
         idx = idx.reshape(-1, 3)[:, [0, 2, 1]].reshape(-1)
         attrs = {
             "POSITION":  accessor(pos[lo:hi].astype("f4"), F32, "VEC3", ARRAY, minmax=True),
+            '_ATELIER_MORPH_REST':accessor(mesh.positions(lod)[lo:hi].astype('f4'),F32,'VEC3',ARRAY),
+            '_ATELIER_MORPH_ID':accessor(np.arange(lo,hi,dtype='f4'),F32,'SCALAR',ARRAY),
+            '_ATELIER_MORPH_LOD':accessor(np.full(hi-lo,lod.get('layout',{}).get('source_index',lod_index),dtype='f4'),F32,'SCALAR',ARRAY),
             "NORMAL":    accessor(normal[lo:hi].astype("f4"), F32, "VEC3", ARRAY),
             # glTF requires TANGENT.w to be exactly +-1; the cooked value is +-0.992.
             "TANGENT":   accessor(np.concatenate(
@@ -1521,6 +1623,8 @@ def export_glb(mesh, lod_index, out_path):
             "material": (sec["mat"] if sec["mat"] < len(materials_json) else 0)
                         if materials_json else None,
         })
+        if morph_targets:
+            primitives[-1]['targets']=[{'POSITION':sparse_morph(target,lo,hi),'NORMAL':sparse_morph(target,lo,hi,True)} for target in morph_targets]
 
     nodes = [{"name": b["name"], "children": [], "translation": t.tolist(),
              "rotation": q.tolist(), "scale": s.tolist()}
@@ -1545,6 +1649,9 @@ def export_glb(mesh, lod_index, out_path):
         "accessors": accessors, "bufferViews": bufferViews,
         "buffers": [{"byteLength": len(buf)}],
     }
+    if morph_names:
+        gltf['meshes'][0]['extras']={'targetNames':morph_names}
+        gltf['meshes'][0]['weights']=[0]*len(morph_names)
 
     json_bytes = json.dumps(gltf).encode("utf-8")
     while len(json_bytes) % 4: json_bytes += b" "

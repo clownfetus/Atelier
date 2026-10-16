@@ -60,6 +60,10 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         material_page.evaluate("name=>openMaterialEditor({name,game_rel:'Fixture/'+name})", name)
         material_page.wait_for_selector('#mathx0')
 
+    def wait_editor_closed():
+        # Editor transitions may commit their class change after saveMaterial resolves.
+        material_page.locator('#material-overlay.active').wait_for(state='detached')
+
     def state_toasts(state):
         return material_page.locator(f'#toast-area [data-atelier-motion="material-save"][data-am-state="{state}"]')
 
@@ -148,7 +152,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         clear_toasts()
         open_editor()
         material_page.evaluate('saveMaterial()')
-        assert material_page.locator('#material-overlay').evaluate('el=>!el.classList.contains("active")')
+        wait_editor_closed()
         assert state_toasts('success').count() == 1
         assert requests[-1] == {'project': quote('Save Ω', safe=''), 'body': {
             'game_rel': 'Fixture/MI_Fixture', 'colors': {'Tint': [.25, .5, .75, 1]},
@@ -176,7 +180,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
             response.update(payload={'ok': True, 'inten_saved': True}, abort=False)
             material_page.evaluate('saveMaterial()')
             assert requests[-1]['body']['colors']['Tint'] == [.8, .2, .1, 1]
-            assert material_page.locator('#material-overlay').evaluate('el=>!el.classList.contains("active")')
+            wait_editor_closed()
         checks.append('Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state')
 
         clear_toasts()
@@ -197,7 +201,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         assert requests[-1]['body']['colors']['Tint'] == [0, 0, 1, 1]
         second.fulfill(json={'ok': True, 'inten_saved': True})
         material_page.evaluate('materialSavePending')
-        assert material_page.locator('#material-overlay').evaluate('el=>!el.classList.contains("active")')
+        wait_editor_closed()
         for stale_case in ('closed', 'reopened', 'project'):
             open_editor('MI_Origin')
             old = start_save()
@@ -280,7 +284,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
             assert name in material_page.locator('#toast-area').inner_text()
             assert material_page.locator('#toast-area img').count() == 0
             assert not material_page.evaluate('materialInjected')
-            assert material_page.locator('#material-overlay').evaluate('el=>!el.classList.contains("active")')
+            wait_editor_closed()
             open_editor(name)
             message = '<img src=x onerror="window.materialInjected=true"> fixture error & Ω'
             response['payload'] = {'ok': False, 'error': message}

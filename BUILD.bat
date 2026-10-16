@@ -32,5 +32,7 @@ rem a missing UAssetTool/Oodle/AtelierMesh fails here, and Mappings, the AES key
 rem Linux builds sitting in the dev Tools\ folder are simply never picked up.
 python scripts\stage_tools.py --platform windows
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
+python scripts\release_manifest.py
+if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%

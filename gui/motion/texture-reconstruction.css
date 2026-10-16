@@ -1,0 +1,16 @@
+/* Temporary presentation layer only; the updated image remains underneath. */
+.card-thumb.texture-reconstructing, .sb-thumb.texture-reconstructing { position: relative; }
+.texture-reconstruction {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--bg3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .texture-reconstruction { display: none; }
+}

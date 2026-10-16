@@ -44,6 +44,10 @@ hiddenimports = [
     'atelier.web.app',
     'atelier.web.browse',
     'atelier.web.routes',
+    'atelier.web.showcase',
+    'atelier.handlers.animation',
+    'atelier.handlers.meshreplace', 'atelier.handlers.projectedit', 'atelier.handlers.texturerefresh',
+    'atelier.handlers.morph',
 ]
 tmp_ret = collect_all('watchdog')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

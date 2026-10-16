@@ -4,7 +4,7 @@
   if (window.AtelierLogoEntranceUI) return;
   let started = false, destroyed = false, instance, host, fallback;
   const hidden = () => document.hidden || document.visibilityState === 'hidden';
-  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const reduced = () => (window.AtelierMotionPolicy?.query() || window.matchMedia?.('(prefers-reduced-motion: reduce)')).matches;
 
   function restore() {
     if (fallback) { fallback.hidden = false; fallback.classList.remove('am-logo-entrance-fallback'); }
@@ -49,6 +49,17 @@
     if (started || destroyed) return;
     started = true; // Record before waiting/mounting: a hidden startup never replays later.
     fallback = document.querySelector('#topbar .studio-brand > img');
+    const brand = fallback?.parentElement;
+    if (brand) {
+      brand.setAttribute('role','button'); brand.tabIndex=0; brand.setAttribute('aria-label','Replay Atelier logo entrance');
+      const replay = () => {
+        if (destroyed || hidden() || reduced()) return;
+        if (instance) instance.replay();
+        else mount();
+      };
+      brand.addEventListener('click', replay);
+      brand.addEventListener('keydown', event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();replay();}});
+    }
     if (!fallback || hidden() || reduced() || !window.AtelierMotion?.logoEntrance) return;
     if (fallback.complete) { if (fallback.naturalWidth) mount(); }
     else { fallback.addEventListener('load', mount, { once: true }); fallback.addEventListener('error', restore, { once: true }); }

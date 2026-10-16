@@ -41,6 +41,11 @@ def main():
     parser.add_argument('--profile-source', type=Path, help='Copy an existing _webview directory to exercise an upgrade')
     parser.add_argument('--expected-theme', choices=('light', 'dark'))
     parser.add_argument('--expect-storage-canary', action='store_true', help='Require the seeded atelier.upgrade-canary preference')
+    parser.add_argument('--viewer-checks', action='store_true', help='Exercise real Three.js controls, effects and capture in the packaged WebView2')
+    parser.add_argument('--roster-checks', action='store_true', help='Exercise roster arrows and artwork colours in native WebView2')
+    parser.add_argument('--viewer-followups',action='store_true',help='Verify texture recovery, contextual controls and model replacement in WebView2')
+    parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for viewer verification')
+    parser.add_argument('--idle', type=Path, help='Optional real decoded standing idle tracks')
     args = parser.parse_args()
     if os.name != 'nt':
         raise SystemExit('The frozen desktop smoke requires Windows.')
@@ -151,7 +156,7 @@ def main():
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info
-            assert info['motions'] == ['emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'viewportLoader'], info
+            assert info['motions'] == ['emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader'], info
             assert info['logo'] > 0 and info['emptyTray'] == 112 and info['singleMark'] == 1, info
             result['interface'] = info
             result['checks'].append('All workflow modules, six motion sets, local font and logo load from the frozen bundle')
@@ -162,7 +167,7 @@ def main():
             result['checks'].append('Light and dark themes render in the native shell')
             # Confirm the real frozen backend registered the new endpoint, without native tools.
             try:
-                urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/material_original?game_rel=../outside')
+                urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/material_original?game_rel=../outside',timeout=10)
             except urllib.error.HTTPError as response:
                 assert response.code == 400, response.code
                 rejected = json.load(response)
@@ -172,9 +177,35 @@ def main():
             result['checks'].append('Frozen Python backend includes original-material comparison and rejects traversal')
             assert not result['page_errors'], result['page_errors']
             for path in ('/', '/?ui=upgrade-check', '/static/tokens.css'):
-                with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}{path}') as reply:
+                with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}{path}',timeout=10) as reply:
                     assert 'no-store' in reply.headers.get('Cache-Control', ''), path
             result['checks'].append('HTML and frontend assets prevent stale caching after the upgrade')
+            if args.viewer_checks or args.roster_checks or args.viewer_followups:
+                # WebView2 throttles animation frames in hidden native windows.
+                # Show only this isolated test window, without taking focus.
+                stop_hiding.set(); hider.join(timeout=2)
+                @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                def show_viewer(hwnd, _):
+                    pid=ctypes.c_ulong();ctypes.windll.user32.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
+                    if pid.value==process.pid:ctypes.windll.user32.ShowWindow(hwnd,4)
+                    return True
+                ctypes.windll.user32.EnumWindows(show_viewer,0)
+            if args.viewer_checks:
+                from viewport_inspection_checks import run_viewport_inspection_checks
+                source=Path(__file__).resolve().parents[1]/'gui'
+                for name in ('index.html','viewport.js','viewport-inspection.js','viewport-animation.js','viewport-effects.js','viewport.css','vendor/material-symbols/symbols.js'):
+                    assert (source/name).read_bytes()==(exe.parent/'_internal'/'gui'/name).read_bytes(),name
+                run_viewport_inspection_checks(page,context,f'http://127.0.0.1:{args.app_port}',report,result['checks'],args.mesh,args.idle,reuse_page=True)
+            if args.viewer_followups:
+                from viewer_followup_checks import run_viewer_followup_checks
+                run_viewer_followup_checks(page,context,f'http://127.0.0.1:{args.app_port}',report,result['checks'],reuse_page=True)
+            if args.roster_checks:
+                from viewport_loading_checks import run_hero_artwork_checks
+                source=Path(__file__).resolve().parents[1]/'gui'
+                for name in ('roster.js','roster.css','polish.js'):
+                    assert (source/name).read_bytes()==(exe.parent/'_internal'/'gui'/name).read_bytes(),name
+                run_hero_artwork_checks(page,context,f'http://127.0.0.1:{args.app_port}',report,result['checks'],reuse_page=True)
+                result['checks'].append('Packaged roster and colour sampler match the verified source')
             browser.close()
     except Exception as exc:
         result['error'] = str(exc)

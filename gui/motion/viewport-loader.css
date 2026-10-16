@@ -7,7 +7,7 @@
 [data-atelier-motion="viewport-loader"] {
   --am-viewport-loader-size: 72px;
   --am-viewport-loader-fg: var(--studio-preview-on-surface, #e5e2e4);
-  --am-viewport-loader-accent: #accbff;
+  --am-viewport-loader-accent: var(--skin-loader-accent, #accbff);
   --am-viewport-loader-empty: #9aa8be;
   --am-viewport-loader-error: #ffb4ab;
   --am-viewport-loader-badge-bg: #14161b;

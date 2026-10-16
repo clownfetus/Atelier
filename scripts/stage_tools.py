@@ -34,6 +34,9 @@ MANIFEST = {
         ("AtelierMesh/AtelierMesh.exe", True),
         ("AtelierMesh/CUE4Parse-Natives.dll", True),
         ("AtelierMesh/oo2core_9_win64.dll", True),
+        ("AtelierAnimation/AtelierAnimation.exe", True),
+        ("AtelierAnimation/CUE4Parse-Natives.dll", True),
+        ("AtelierAnimation/oo2core_9_win64.dll", True),
         ("shaders/retoc-rivals-cli.exe", True),      # world.RETOC + plugin/text extracts
         ("shaders/oo2core_9_win64.dll", True),       # Oodle for retoc and io_lib
         ("shaders/dxc.exe", True),                   # shaders.DXC
@@ -50,6 +53,9 @@ MANIFEST = {
         ("AtelierMesh", True),
         ("AtelierMesh/AtelierMesh.exe", True),
         ("shaders/retoc-rivals-cli", True),
+        ("AtelierAnimation/AtelierAnimation.exe", True),
+        ("AtelierAnimation/CUE4Parse-Natives.dll", True),
+        ("AtelierAnimation/oo2core_9_win64.dll", True),
         ("shaders/liboo2corelinux64.so.9", True),
         ("MarvelRivalsCharacterIDs.md", True),
     ],

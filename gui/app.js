@@ -27,6 +27,7 @@ let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
 let   _pathLabels = {};      // "Characters/1234" -> "1234 — Spider-Man" (cached from browse results)
+const _folderArtwork = {};  // Reuse the catalogue artwork already shown on folder cards.
 let   _modsFolderSet   = false; // whether a mods folder is configured (gates "Copy to %s/")
 let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/" label
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
@@ -101,14 +102,27 @@ async function revealInExplorer(gameRel) {
 }
 
 function toastSpinner(msg) {
+  try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy'); }
+  catch (_) { /* Static operation feedback remains available. */ }
   const el = document.createElement("div");
   el.className = "toast";
-  el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+  el.innerHTML = '<div class="spinner"></div><span></span>';
+  el.lastElementChild.textContent = msg;
+  el.resolve = (message, state = 'success', duration = 4000) => {
+    el.className = `toast ${state === 'error' ? 'warning' : state}`;
+    el.firstElementChild.remove(); el.lastElementChild.textContent = message;
+    const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
+    el.prepend(icon); lucide.createIcons({nodes:[el]});
+    setTimeout(() => el.remove(), duration);
+  };
   document.getElementById("toast-area").appendChild(el);
   return el;
 }
 
+const _collatedToasts = new Map();
 function toast(msg, type = "info", duration = 3200) {
+  const key = type + '\n' + msg, existing = _collatedToasts.get(key);
+  if (existing?.el.isConnected) { existing.repeat(); return existing.el; }
   const el = document.createElement("div");
   el.className = `toast ${type}`;
   const icon = type === "success" ? "check-circle"
@@ -117,10 +131,26 @@ function toast(msg, type = "info", duration = 3200) {
   el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span>${msg}</span>`;
   document.getElementById("toast-area").appendChild(el);
   lucide.createIcons({ nodes: [el] });
-  let remaining = duration, start = Date.now(), t = setTimeout(() => el.remove(), duration);
-  el.addEventListener("mouseenter", () => { clearTimeout(t); remaining -= Date.now() - start; });
-  el.addEventListener("mouseleave", () => { start = Date.now(); t = setTimeout(() => el.remove(), remaining); });
-  el.addEventListener("click", () => { clearTimeout(t); el.remove(); });
+  el.setAttribute('role','status'); el.setAttribute('aria-atomic','true');
+  let remaining = duration, start = Date.now(), t, repeats = 1, hovered = false;
+  const remove = el.remove.bind(el);
+  el.remove = () => { clearTimeout(t); if (_collatedToasts.get(key)?.el === el) _collatedToasts.delete(key); remove(); };
+  const reset = () => {
+    clearTimeout(t); remaining = duration; start = Date.now();
+    el.classList.remove('toast-timed'); el.style.setProperty('--toast-duration', duration+'ms'); void el.offsetWidth; el.classList.add('toast-timed');
+    if (!hovered) t = setTimeout(() => el.remove(), remaining);
+  };
+  _collatedToasts.set(key,{el,repeat:() => {
+    let badge = el.querySelector('.toast-repeat');
+    if (!badge) { badge = document.createElement('span'); badge.className = 'toast-repeat'; el.append(badge); }
+    badge.textContent = '×' + (++repeats); reset();
+    window.AtelierPolish?.play(badge,[{transform:'scale(.85)'},{transform:'scale(1)'}],120);
+  }});
+  reset();
+  el.addEventListener("mouseenter", () => { hovered = true; clearTimeout(t); remaining = Math.max(0, remaining-(Date.now()-start)); });
+  el.addEventListener("mouseleave", () => { hovered = false; start = Date.now(); t = setTimeout(() => el.remove(), remaining); });
+  el.addEventListener("click", () => el.remove());
+  return el;
 }
 
 function setStatus(msg) {
@@ -138,6 +168,7 @@ function toastExportFeedback(msg, type, duration, state) {
 }
 
 function beginExportFeedback(project) {
+  window.AtelierPolish?.packing();
   let finish;
   try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project); }
   catch (error) { console.warn("Export animation unavailable", error); }
@@ -148,6 +179,7 @@ function beginExportFeedback(project) {
 }
 
 function toastMaterialSave(msg, state = "success", duration = 4000) {
+  if (state === 'success' && matEditor?.game_rel) window.AtelierPolish?.fly(matEditor.game_rel);
   try {
     if (window.AtelierMaterialSaveFeedback) return window.AtelierMaterialSaveFeedback.toast(msg, state, duration);
   } catch (error) { console.warn("Material save feedback unavailable", error); }
@@ -163,6 +195,7 @@ function skinIdFromPath(path) {
 
 // ── navigation ────────────────────────────────────────────────────────────────
 function pushNav(newNav, {focusPath = '__first__'} = {}) {
+  const direction = nav.path && (!newNav.path || nav.path.startsWith(newNav.path + '/')) ? 'back' : 'forward';
   AtelierLibraryTools.closePreview();
   AtelierLibraryTools.resetFilters(false);
   history = history.slice(0, histIdx + 1);
@@ -171,8 +204,7 @@ function pushNav(newNav, {focusPath = '__first__'} = {}) {
   nav = { ...newNav };
   updateNavBtns();
   document.getElementById("search-input").value = "";
-  renderGrid(focusPath);
-  renderBreadcrumbs();
+  renderGrid(focusPath, direction);
   renderSidebar();
 }
 
@@ -189,8 +221,7 @@ document.getElementById("btn-back").addEventListener("click", () => {
   nav = { ...history[histIdx] };
   document.getElementById("search-input").value = "";
   updateNavBtns();
-  renderGrid('__first__');
-  renderBreadcrumbs();
+  renderGrid('__first__', 'back');
   renderSidebar();
 });
 document.getElementById("btn-forward").addEventListener("click", () => {
@@ -201,8 +232,7 @@ document.getElementById("btn-forward").addEventListener("click", () => {
   nav = { ...history[histIdx] };
   document.getElementById("search-input").value = "";
   updateNavBtns();
-  renderGrid('__first__');
-  renderBreadcrumbs();
+  renderGrid('__first__', 'forward');
   renderSidebar();
 });
 
@@ -285,24 +315,27 @@ function _makeCard(item) {
 let _gridRequest = 0;
 let _gridThumbs = null;
 let _gridStatus = 'ready';
-async function renderGrid(focusPath = null) {
-  const requestId = ++_gridRequest, project = _activeProjectName;
+let _gridRenderedPath = '';
+async function renderGrid(focusPath = null, direction = 'forward') {
+  const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
   allItems = [];
   _gridThumbs?.destroy();
   _gridThumbs = null;
   renderHomePins();
   const area = document.getElementById("grid-area");
-  area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
+  window.AtelierTextureReconstruction?.disposeWithin(area);
+  // Retain the old grid until the response can be committed in one transition.
+  area.setAttribute('aria-busy', 'true');
+  if (!area.querySelector('.grid')) area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
   document.getElementById("library-count").textContent = "Loading…";
   document.getElementById("import-all-btn").disabled = true;
 
   try {
-    const data = await api(`/api/browse?path=${encodeURIComponent(nav.path || "")}`);
+    const data = await api(`/api/browse?path=${encodeURIComponent(path)}`);
     if (requestId !== _gridRequest || project !== _activeProjectName) return;
     if (data.error) throw new Error(data.error);
     allItems = data;
-    _gridStatus = 'ready';
     checkIndexWarnings();   // fire-and-forget; reports at most once per session
     checkStaleMips();       // same: at most once, and only when there is something to say
 
@@ -311,6 +344,7 @@ async function renderGrid(focusPath = null) {
       if (item.type === "folder" && item.label && item.label !== item.name) {
         _pathLabels[item.rel_path] = item.label;
       }
+      if (item.type === 'folder' && item.thumbnail) _folderArtwork[item.rel_path] = {thumbnail:item.thumbnail, heroFallback:item.hero_fallback};
     }
 
     AtelierLibraryPins.updateLabels(_pathLabels);
@@ -318,7 +352,23 @@ async function renderGrid(focusPath = null) {
     // Restore navigation focus unless the user started interacting elsewhere while loading.
     const focusElsewhere = document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') ||
       document.querySelector('.overlay.active, dialog[open]');
-    buildGrid(data.map(_makeCard), false, focusElsewhere ? null : focusPath);
+    const commit = () => {
+      if (requestId !== _gridRequest || project !== _activeProjectName) return;
+      const bannerReady = window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
+      const category = path.split('/').reverse().map(part=>folderIconCls(part)).find(cls=>cls!=='folder-icon') || 'folder-icon';
+      document.getElementById('library-category-line').className = 'card-icon ' + category;
+      window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}));
+      buildGrid(data.map(_makeCard), false, focusElsewhere ? null : focusPath);
+      _gridStatus = 'ready';
+      renderBreadcrumbs();
+      _gridRenderedPath = path;
+      area.setAttribute('aria-busy', 'false');
+      window.AtelierPolish?.startupDone();
+      return bannerReady;
+    };
+    if (_gridRenderedPath !== path && window.AtelierContinuity) {
+      await window.AtelierContinuity.library(_gridRenderedPath, path, direction, commit);
+    } else commit();
 
     document.getElementById("import-all-btn").disabled = _shownTextures().length === 0;
 
@@ -327,7 +377,11 @@ async function renderGrid(focusPath = null) {
     _gridStatus = 'error';
     const failure = document.createElement("div"); failure.id = "empty-state";
     failure.textContent = e.message; area.replaceChildren(failure);
+    area.setAttribute('aria-busy', 'false');
+    window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
+    renderBreadcrumbs();
     document.getElementById("library-count").textContent = "Could not load assets";
+    window.AtelierPolish?.startupDone();
   }
 }
 
@@ -343,11 +397,14 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs = null;
   renderHomePins();
   const area = document.getElementById("grid-area");
+  window.AtelierTextureReconstruction?.disposeWithin(area);
   const q = document.getElementById("search-input").value.trim().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
   let filtered = AtelierLibraryTools.filter(cards, q);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
-  document.getElementById("library-count").textContent = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
+  const countLabel = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
+  if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('library-count'), countLabel);
+  else document.getElementById('library-count').textContent = countLabel;
 
   if (!nav.path && AtelierLibraryTools.preferredSort() === 'recommended') {
     const isFeatured = c => c.type === "folder" && AtelierFolderIcons.isFeatured(c.name);
@@ -362,6 +419,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       <div style="margin-top:8px">${narrowed ? "No matches in this folder. Clear filters to see all items." : "Empty folder"}</div>
     </div>`;
     lucide.createIcons({ nodes: [area] });
+    window.AtelierPolish?.empty(area.firstElementChild, narrowed ? 'No matches in this folder' : 'Empty folder', narrowed ? 'Clear filters to see all items.' : 'Choose another folder to continue exploring.');
     return;
   }
 
@@ -432,6 +490,18 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
 
     el.appendChild(thumb);
     el.appendChild(name);
+    if (card.imported) {
+      const editing = document.createElement('span');
+      editing.className = 'card-editing-badge'; editing.textContent = 'Editing';
+      thumb.appendChild(editing);
+      el.title += '\nIn your edit list';
+    }
+    if (card.type === 'asset') {
+      const badge = document.createElement('span'); badge.className = 'card-type-badge'; badge.setAttribute('aria-hidden','true');
+      const glyph = makeIcon(card); glyph.classList.remove('card-icon'); glyph.classList.add('card-type-glyph');
+      badge.style.color = `var(--studio-icon-${['texture','vfx','material','mesh','curve','text'].includes(card.file_type) ? card.file_type : 'unknown'})`;
+      badge.appendChild(glyph); thumb.appendChild(badge);
+    }
     if (card.type === "asset" && card.file_type === "mesh") {
       el.addEventListener("click", e => _ctxShow(e, _ctxItemsCard(card)));
     } else {
@@ -490,8 +560,17 @@ function previewLibraryCard(card, opener) {
 function libraryParent() {
   if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});
 }
+function applyLibraryView() {
+  if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard));
+  else if (_gridStatus === 'loading') {
+    const area=document.getElementById('grid-area');
+    window.AtelierTextureReconstruction?.disposeWithin(area);
+    area.innerHTML='<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
+  }
+  renderSidebar();
+}
 AtelierLibraryTools.init({
-  change: () => { if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard)); renderSidebar(); },
+  change: applyLibraryView,
   preview: previewLibraryCard,
   parent: libraryParent,
   context: (card, button) => {
@@ -499,12 +578,7 @@ AtelierLibraryTools.init({
     _ctxShow({preventDefault() {}, stopPropagation() {}, currentTarget: button, clientX: bounds.left + 12, clientY: bounds.top + 12}, _ctxItemsCard(card));
   },
 });
-document.getElementById("search-input").addEventListener("input", () => {
-  if (_gridStatus === 'ready') {
-    buildGrid(allItems.map(_makeCard));
-  }
-  renderSidebar();
-});
+document.getElementById("search-input").addEventListener("input", applyLibraryView);
 
 document.addEventListener("keydown", e => {
   if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
@@ -541,7 +615,7 @@ function handleImportedFileAction(item) {
       openTextEditor(item);
       return;
     case "mesh":
-      openBlend(item.game_rel);   // the edit lives in a .blend, not a .png
+      window.AtelierMeshEdit?.open(item);
       return;
     default:
       projectFetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
@@ -577,21 +651,21 @@ async function meshBlendExtract(game_rel, name, force = false) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel, force: force ? 1 : 0 }),
     });
-    t.remove();
     setStatus("");
     if (!res.ok) {
       if (res.can_force) {
         // The preflight refuses formats the rebuilder can't pack. Extracting anyway is useful for
         // INSPECTING such a mesh, so offer it -- but say plainly that a build will not work.
+        t.resolve(res.error || 'Extraction needs confirmation', 'warning', 8000);
         if (confirm(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`))
           return meshBlendExtract(game_rel, name, true);
         return;
       }
-      toast(res.error || "extract failed", "warning", 8000);
+      t.resolve(res.error || "extract failed", "error", 8000);
       return;
     }
     const n = (res.textures || []).length, m = (res.materials || []).length;
-    toast(`${name} ready in Blender — ${m} material${m === 1 ? "" : "s"}, ${n} texture${n === 1 ? "" : "s"}`, "success", 6000);
+    t.resolve(`${name} ready in Blender — ${m} material${m === 1 ? "" : "s"}, ${n} texture${n === 1 ? "" : "s"}`, "success", 6000);
     // Blender keeps painted pixels only in memory for LINKED images: saving the .blend does not
     // save them, and reopening silently restores the original. Say so once, up front, because
     // the failure is invisible until the user has already lost the work.
@@ -601,9 +675,8 @@ async function meshBlendExtract(game_rel, name, force = false) {
     renderGrid();
     openBlend(game_rel);   // queuing a mesh means editing it now, same as a texture's auto "Open With"
   } catch (e) {
-    t.remove();
     setStatus("");
-    toast(`Error: ${e.message}`, "warning");
+    t.resolve(`Error: ${e.message}`, "error");
   }
 }
 
@@ -670,11 +743,10 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
         body: JSON.stringify({ skin_id: item.skin_id, rel_path: item.rel_path, game_rel: item.game_rel }),
       });
     }
-    loadingToast.remove();
     if (res.ok) {
       suppressChangeToastUntil = Date.now() + 1500;
       suppressedImportGameRels.delete(item.game_rel);
-      toast(`Loaded: ${item.name}`, "success");
+      loadingToast.resolve(`Loaded: ${item.name}`, "success");
       setStatus("");
       refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
       const gridArea   = document.getElementById("grid-area");
@@ -687,13 +759,12 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
       }
     } else {
       suppressedImportGameRels.delete(item.game_rel);
-      toast(`Edit failed: ${res.error}`, "warning");
+      loadingToast.resolve(`Edit failed: ${res.error}`, "error");
       setStatus("");
     }
   } catch (e) {
-    loadingToast.remove();
     suppressedImportGameRels.delete(item.game_rel);
-    toast(`Error: ${e.message}`, "warning");
+    loadingToast.resolve(`Error: ${e.message}`, "error");
     setStatus("");
   }
 });
@@ -898,7 +969,8 @@ async function openMaterialEditor(item) {
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
   document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
-  ov.classList.add("active");
+  if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
+  else ov.classList.add("active");
   let res;
   try { res = await api(`/api/material_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
   catch (e) { if (current()) document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${_matEscape(e.message)}</div>`; return; }
@@ -1123,6 +1195,7 @@ function matFocusRegion(idx) {
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   const body = document.getElementById("mat-body");
+  const previousSwatches = window.AtelierPolish?.swatchesBefore();
   const expanded = new Map([...body.querySelectorAll("details[data-mat-group]")].map(d => [d.dataset.matGroup, d.open]));
   const previousPreview = body.querySelector("#dye-prev");
   if (previousPreview?.dataset.url) URL.revokeObjectURL(previousPreview.dataset.url);
@@ -1176,7 +1249,7 @@ function renderMatEditor() {
       const escaped = _matEscape(c.name);
       h += `<div class="mat-parameter" id="matrow${i}"><div class="mat-row">
         <label for="mathx${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
-        <input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)">
+        <span class="mat-color-well"><input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)"></span>
         <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
                title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
                value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
@@ -1209,6 +1282,7 @@ function renderMatEditor() {
   if (!m.colors.length && !m.scalars.length)
     h += `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
   body.innerHTML = h;
+  window.AtelierPolish?.swatchesAfter(previousSwatches, m.colors);
   m.colors.forEach((c, i) => {
     for (const [prefix, name] of [["matsw", "Color"], ["mir", "Intensity"], ["min", "Intensity"], ["matalpha", "Alpha"]])
       document.getElementById(prefix + i)?.setAttribute("aria-label", `${c.name}: ${name}`);
@@ -1223,6 +1297,7 @@ function renderMatEditor() {
 // Writes one colour row's inputs back from state. `except` is the id of the element the user is
 // typing into — rewriting that one under the cursor eats half-typed values ("1." -> "1").
 function _matSyncRow(i, except) {
+  const oldSwatches = window.AtelierPolish?.swatchesBefore();
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   const set = (id, val) => { const el = document.getElementById(id); if (el && id !== except) el.value = val; };
   set("mathx" + i, fmtColor01(c.rgba[0] / n, c.rgba[1] / n, c.rgba[2] / n));
@@ -1231,6 +1306,7 @@ function _matSyncRow(i, except) {
   set("min" + i, +c.inten.toFixed(3));
   const t = document.getElementById("mathx" + i); if (t) t.classList.remove("bad");
   _matRefreshDirty();
+  window.AtelierPolish?.swatchesAfter(oldSwatches, matEditor.colors);
 }
 
 function matColor(i, hex) {
@@ -1364,7 +1440,10 @@ function closeMaterialEditor(force = false) {
   ++_materialOpenRevision; ++_dyePreviewRevision; clearTimeout(_dyeTimer);
   const img = document.getElementById("dye-prev");
   if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
-  document.getElementById("material-overlay").classList.remove("active"); matEditor = null;
+  const overlay = document.getElementById('material-overlay');
+  if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
+  else overlay.classList.remove('active');
+  matEditor = null;
   return true;
 }
 
@@ -1422,18 +1501,21 @@ function _resampleStops(channels) {
 }
 
 async function openCurveEditor(item) {
+  _syncBulkEditorAction();
   const ov = document.getElementById("curve-overlay");
   document.getElementById("curve-title").textContent = item.name;
   document.getElementById("curve-sub").textContent = item.game_rel || "";
   document.getElementById("curve-status").textContent = "";
   document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
-  ov.classList.add("active");
+  if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
+  else ov.classList.add("active");
   let res;
   try { res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
   catch (e) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
   if (!res.ok) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read curve"}</div>`; return; }
   curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
   renderCurveEditor();
+  _syncBulkEditorAction('curve');
   loadSidebar();
 }
 
@@ -1514,13 +1596,19 @@ async function resetCurve() {
   try {
     const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: c.game_rel }) });
-    if (res.ok) { c.channels = res.channels || {}; c.stops = res.stops || []; c.dirty = {}; renderCurveEditor();
+    if (res.ok) { c.channels = res.channels || {}; c.stops = res.stops || []; c.dirty = {}; renderCurveEditor(); _syncBulkEditorAction('curve');
       document.getElementById("curve-status").textContent = "Reset to vanilla."; toast(`Reset: ${c.name}`, "info"); }
     else document.getElementById("curve-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
 }
 
-function closeCurveEditor() { document.getElementById("curve-overlay").classList.remove("active"); curveEditor = null; }
+function closeCurveEditor() {
+  const overlay = document.getElementById('curve-overlay');
+  if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
+  else overlay.classList.remove('active');
+  curveEditor = null;
+  _syncBulkEditorAction();
+}
 
 document.getElementById("curve-save").addEventListener("click", saveCurve);
 document.getElementById("curve-reset").addEventListener("click", resetCurve);
@@ -1557,12 +1645,14 @@ function _vfxGradCss(g) {
 }
 
 async function openVfxEditor(item) {
+  _syncBulkEditorAction();
   const ov = document.getElementById("vfx-overlay");
   document.getElementById("vfx-title").textContent = item.name;
   document.getElementById("vfx-sub").textContent = item.game_rel || "";
   document.getElementById("vfx-status").textContent = "";
   document.getElementById("vfx-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
-  ov.classList.add("active");
+  if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
+  else ov.classList.add("active");
   let res;
   try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
   catch (e) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
@@ -1572,6 +1662,7 @@ async function openVfxEditor(item) {
                 vectors: (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) })),
                 groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) })) };
   renderVfxEditor();
+  _syncBulkEditorAction('vfx');
   loadSidebar();
 }
 
@@ -1776,12 +1867,18 @@ async function resetVfx() {
     if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) }));
                   v.scalars = (res.scalars || []).map(x => ({ ...x }));
                   v.vectors = (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) }));
-                  renderVfxEditor();
+                  renderVfxEditor(); _syncBulkEditorAction('vfx');
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
-function closeVfxEditor() { document.getElementById("vfx-overlay").classList.remove("active"); vfxEditor = null; }
+function closeVfxEditor() {
+  const overlay = document.getElementById('vfx-overlay');
+  if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
+  else overlay.classList.remove('active');
+  vfxEditor = null;
+  _syncBulkEditorAction();
+}
 
 document.getElementById("vfx-save").addEventListener("click", saveVfx);
 document.getElementById("vfx-reset").addEventListener("click", resetVfx);
@@ -1839,6 +1936,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
   }));
 
   importing = true;
+  window.AtelierPolish?.importStart(items);
   showProgress(0, items.length);
   document.getElementById("prog-overlay").classList.add("active");
 
@@ -1855,7 +1953,9 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
 });
 
 function showProgress(current, total) {
-  document.getElementById("prog-counter").textContent = `Downloading ${current} / ${total} assets…`;
+  const label = `Importing ${current} / ${total} assets…`;
+  if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('prog-counter'), label);
+  else document.getElementById('prog-counter').textContent = label;
 }
 
 // ── prevent accidental close during import ────────────────────────────────────
@@ -1877,17 +1977,63 @@ document.getElementById('import-cancel').addEventListener('click', async () => {
   } catch (error) { toast(error.message, 'warning'); }
 });
 
+let _bulkEditorKind = null, _bulkEditorSavedState = null;
+function _bulkEditorState() {
+  return JSON.stringify(_bulkEditorKind === 'curve' ? curveEditor?.channels
+    : vfxEditor && [vfxEditor.groups, vfxEditor.scalars, vfxEditor.vectors]);
+}
+function _syncBulkEditorAction(kind = null) {
+  const button = document.getElementById('bulk-edit-open');
+  const compatible = kind === 'curve' ? !!curveEditor : kind === 'vfx' && vfxEditor &&
+    (vfxEditor.groups.length || vfxEditor.scalars.length || vfxEditor.vectors.length);
+  _bulkEditorKind = compatible && document.getElementById(kind+'-overlay').classList.contains('active') ? kind : null;
+  button.hidden = !_bulkEditorKind;
+  if (_bulkEditorKind) {
+    document.getElementById(kind+'-reset').before(button);
+    _bulkEditorSavedState = _bulkEditorState();
+  }
+}
 document.getElementById('bulk-edit-open').addEventListener('click', () => {
-  if (matEditor || curveEditor || vfxEditor || window.AtelierViewport?.hasPendingEdits?.()) {
-    toast('Close the asset editor and resolve its drafts before bulk editing.', 'warning'); return;
+  if (!_bulkEditorKind) return;
+  if (_bulkEditorState() !== _bulkEditorSavedState) {
+    toast('Save or reset this file’s changes before bulk editing.', 'warning'); return;
   }
   const eligible = item => ['curve','vfx'].includes(item.file_type) && item.game_rel;
   const query = document.getElementById('search-input').value.trim().toLowerCase();
   const folder = AtelierLibraryTools.filter(allItems.map(_makeCard), query).filter(eligible);
-  window.AtelierBulkEdit.open({edited:Object.values(sidebarData).filter(i => i.selected && eligible(i)), folder}, _activeProjectName);
+  const current = _bulkEditorKind === 'curve' ? curveEditor : vfxEditor;
+  const edited = Object.values(sidebarData).filter(i => i.selected && eligible(i) && i.game_rel !== current.game_rel);
+  edited.unshift({name:current.name,game_rel:current.game_rel,file_type:_bulkEditorKind});
+  window.AtelierBulkEdit.open({edited, folder}, _activeProjectName);
 });
 window.addEventListener('atelier-bulk-saved', event => {
-  if (event.detail.project === _activeProjectName) { loadSidebar(); renderGrid(); }
+  if (event.detail.project === _activeProjectName) {
+    loadSidebar(); renderGrid();
+    if (_bulkEditorKind === 'curve' && curveEditor) openCurveEditor(curveEditor);
+    else if (_bulkEditorKind === 'vfx' && vfxEditor) openVfxEditor(vfxEditor);
+  }
+});
+document.getElementById('process-s-maps').addEventListener('click', () => {
+  if (matEditor || curveEditor || vfxEditor || window.AtelierViewport?.hasPendingEdits?.()) {
+    toast('Close the asset editor and resolve its drafts before processing S maps.', 'warning'); return;
+  }
+  window.AtelierSMapsUI.process();
+});
+window.addEventListener('atelier-s-maps-error', event => {
+  if (event.detail.project === _activeProjectName) toast(_esc(event.detail.error), 'warning', 8000);
+});
+window.addEventListener('atelier-s-maps-processed', async event => {
+  const result = event.detail, project = result.project;
+  if (project !== _activeProjectName) return;
+  try {
+    await loadSidebar();
+    if (project !== _activeProjectName) return;
+    await renderGrid();
+    if (project !== _activeProjectName) return;
+    for (const row of result.processed) refreshEditedTexture(row.s, Object.values(sidebarData).find(i => i.game_rel === row.s)?.token);
+    const skipped = result.skipped.length ? ` ${result.skipped.length} unmatched or skipped.` : '';
+    toast(`Processed ${result.processed.length} S maps.${skipped}`, result.processed.length ? 'success' : 'warning', 7000);
+  } catch (error) { toast(_esc('S maps saved; could not refresh previews: ' + error.message), 'warning', 8000); }
 });
 
 // ── SSE ───────────────────────────────────────────────────────────────────────
@@ -1910,7 +2056,32 @@ function connectSSE() {
 }
 window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; _gridThumbs?.destroy(); });
 
+function refreshEditedTexture(gameRel, tok, animate = true) {
+  if (!gameRel) return;
+  const images = new Set(document.querySelectorAll(
+    `#grid-area img[data-game-rel="${CSS.escape(gameRel)}"]`));
+  if (tok) {
+    document.querySelectorAll(`img[data-token="${CSS.escape(tok)}"],
+      #sidebar-list .sb-item[data-token="${CSS.escape(tok)}"] .sb-thumb img`)
+      .forEach(img => images.add(img));
+  }
+  const project = _activeProjectName;
+  const query = new URLSearchParams({game_rel: gameRel, _project: project, _t: String(Date.now())});
+  const src = `/api/preview?${query}`;
+  for (const img of images) {
+    try {
+      if (!animate) window.AtelierTextureReconstruction?.disposeWithin(img.parentElement);
+      if (animate && window.AtelierTextureReconstruction) {
+        window.AtelierTextureReconstruction.refresh(img, src, {project, mode:'wipe'});
+        continue;
+      }
+    } catch (error) { console.warn('Texture reconstruction unavailable', error); }
+    img.src = src;
+  }
+}
+
 function handleSSE(d) {
+  window.AtelierPolish?.importProgress(d);
   if (d.usmap_updated) {
     const ov = document.getElementById("usmap-update-overlay");
     document.getElementById("usmap-update-name").textContent = d.name || "";
@@ -1937,13 +2108,8 @@ function handleSSE(d) {
     return;
   }
   if (d.file_changed) {
-    const bust = `?token=${d.token}&gr=${encodeURIComponent(d.game_rel)}&t=${Date.now()}`;
-    document.querySelectorAll(`img[data-token="${d.token}"]`).forEach(img => {
-      img.src = `/api/preview${bust}`;
-    });
-    document.querySelectorAll(`#sidebar-list .sb-item[data-token="${d.token}"] .sb-thumb img`).forEach(img => {
-      img.src = `/api/preview${bust}`;
-    });
+    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressedImportGameRels.has(d.game_rel));
+    if (!importing && !suppressedImportGameRels.has(d.game_rel)) window.AtelierPolish?.fly(d.game_rel);
     if (!importing && !suppressedImportGameRels.has(d.game_rel) && Date.now() >= suppressChangeToastUntil) {
       toast("Asset edited", "warning", 4000);
     }
@@ -2009,6 +2175,7 @@ function refreshSidebarEntry(game_rel, name, skin_id) {
     });
     window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
     renderSidebar();
+    window.AtelierPolish?.fly(game_rel);
   });
 }
 
@@ -2087,9 +2254,14 @@ async function performClearMany(items) {
 
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
+  const previousRows = window.AtelierPolish?.sidebarBefore(list);
+  // Observe this synchronous render's final state, including empty/search branches.
+  if (window.AtelierPolish) Promise.resolve().then(() => window.AtelierPolish.sidebarAfter(previousRows, list));
   window.AtelierEmptyAssetsUI?.dispose();
+  window.AtelierTextureReconstruction?.disposeWithin(list);
   list.innerHTML = "";
   const all = Object.values(sidebarData);
+  window.AtelierSMapsUI?.update(all);
   if (!all.length) {
     list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>No edited assets yet</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
     lucide.createIcons({ nodes: [list] });
@@ -2117,6 +2289,7 @@ function renderSidebar() {
     const el = document.createElement("div");
     el.className = "sb-item" + (item.selected ? " selected" : "") + (_sbMarked.has(item.token) ? " marked" : "");
     el.dataset.token = item.token;
+    el.dataset.gameRel = item.game_rel;
     const h = handlerFor(item.file_type);
     el.innerHTML = `
       <button class="sb-clear" title="Delete"><i data-lucide="x" size="12"></i></button>
@@ -2136,6 +2309,19 @@ function renderSidebar() {
       e.stopPropagation();
       clearImported(item.token, e.shiftKey);
     });
+    const preview = item.ui_preview;
+    if (preview?.colors?.length) {
+      const mosaic = document.createElement('span'); mosaic.className = 'sb-color-mosaic'; mosaic.setAttribute('aria-hidden','true');
+      for (const color of preview.colors.slice(0,4)) {
+        if (!Array.isArray(color) || !color.slice(0,3).every(Number.isFinite)) continue;
+        const chip = document.createElement('span'); const hex = _rgbHex(...color.slice(0,3), Math.max(1,...color.slice(0,3)));
+        chip.style.setProperty('--swatch-color',hex); chip.dataset.swatchColor = hex; mosaic.append(chip);
+      }
+      if (mosaic.childNodes.length) el.querySelector('.sb-thumb').replaceChildren(mosaic);
+    } else if (preview?.points?.length) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.classList.add('sb-sparkline'); svg.setAttribute('viewBox','0 0 40 28'); svg.setAttribute('aria-hidden','true');
+      const line = document.createElementNS(svg.namespaceURI,'polyline'); line.setAttribute('points',preview.points.map(p=>p.join(',')).join(' ')); line.setAttribute('fill','none'); line.setAttribute('stroke','currentColor'); line.setAttribute('stroke-width','1.5'); svg.append(line); el.querySelector('.sb-thumb').replaceChildren(svg);
+    }
     el.querySelector(".sb-check").addEventListener("click", e => {
       e.stopPropagation();
       item.selected = !item.selected;
@@ -2203,7 +2389,7 @@ const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "t
 function updateInstallBtn() {
   const sel = Object.values(sidebarData).filter(i => i.selected).length;
   const badge = document.getElementById("sel-count");
-  badge.textContent = `${sel}`;
+  if (window.AtelierPolish) window.AtelierPolish.count(badge, sel); else badge.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
 
@@ -2257,6 +2443,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
     t?.remove();
     if (res.ok) {
       const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
+      if (outcome === 'success') window.AtelierPolish?.exported();
       finishFeedback(outcome);
       toastExportFeedback(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000, outcome);
       if (project === _activeProjectName) setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
@@ -2564,23 +2751,30 @@ async function checkIndexWarnings() {
 }
 
 // ── higher-resolution textures became available ──────────────────────────────
-// The HQ texture DLC ships the top mip of existing textures in separate containers. Install it
-// after importing something and the project keeps the smaller PNG it was decoded from — the work
-// cache repairs itself, the user's artwork cannot be repaired for them. Say so once per session;
-// re-importing is their call, because for an edited texture it means redoing the edit.
-let _staleMipShown = false;
+// Repair each project's smaller imports once per session. The server preserves paint and backs
+// up the old PNG before publishing a larger one. Failed repairs never replace the saved edit.
+const _staleMipChecked = new Set();
 async function checkStaleMips() {
-  if (_staleMipShown) return;
+  const project = _activeProjectName;
+  if (_staleMipChecked.has(project)) return;
+  _staleMipChecked.add(project);
+  let progress;
   try {
     const res = await api("/api/stale_mips");
-    if (!res.ok || !res.count) return;
-    _staleMipShown = true;
-    const names = res.items.slice(0, 3).map(i => i.name).join(", ");
-    const more  = res.count > 3 ? ` +${res.count - 3} more` : "";
-    toast(`${res.count} imported texture(s) are below the resolution your paks now hold ` +
-          `(${names}${more}) — the high-res texture pack arrived after they were imported. ` +
-          `Delete and re-import one to get the full-size version.`, "info", 14000);
-  } catch (e) {}
+    if (project !== _activeProjectName || !res.ok || !res.count) return;
+    progress = toastSpinner('Updating textures to the available resolution…');
+    const result = await AtelierJobs.run('/api/refresh_texture_mips', {project, method:'POST',
+      headers:{'Content-Type':'application/json'},body:'{}'});
+    if (project !== _activeProjectName) { progress.remove(); return; }
+    if (!result.ok) throw new Error(result.error || 'Texture refresh failed');
+    for (const item of result.repaired || []) refreshEditedTexture(item.game_rel, Object.values(sidebarData).find(i=>i.game_rel===item.game_rel)?.token);
+    const count = result.repaired?.length || 0;
+    if (result.skipped?.length) progress.resolve(`${count ? count+' texture(s) updated. ' : ''}Some textures could not be refreshed safely; saved edits are intact. ${result.skipped[0].reason}`, 'warning', 14000);
+    else progress.resolve(`${count} texture(s) updated. Painted areas preserved; smaller originals backed up.`, 'success');
+  } catch (error) {
+    if (progress) progress.resolve(`Texture refresh: ${error.message}. Saved edits are intact.`, 'warning');
+    else _staleMipChecked.delete(project);
+  }
 }
 
 // ── prereq check ─────────────────────────────────────────────────────────────
@@ -3065,6 +3259,7 @@ function _ctxShow(e, items) {
   const r = _ctxMenu.getBoundingClientRect();
   if (r.right  > window.innerWidth)  _ctxMenu.style.left = Math.max(4, x - r.width)  + "px";
   if (r.bottom > window.innerHeight) _ctxMenu.style.top  = Math.max(4, y - r.height) + "px";
+  window.AtelierContinuity?.menu(_ctxMenu, x, y);
   _ctxMenu.querySelector("button")?.focus();
 }
 
@@ -3096,6 +3291,7 @@ _ctxFileInput.addEventListener("change", async () => {
   _ctxFileInput.value = "";
   if (!file || !_ctxFileTarget) return;
   const game_rel = _ctxFileTarget;
+  const project = _activeProjectName;
   _ctxFileTarget = null;
   const fd = new FormData();
   fd.append("file", file);
@@ -3103,37 +3299,42 @@ _ctxFileInput.addEventListener("change", async () => {
   suppressedImportGameRels.add(game_rel);
   const t = toastSpinner("Replacing…");
   try {
-    const res  = await projectFetch("/api/replace_texture", { method: "POST", body: fd });
+    const res  = await projectFetch("/api/replace_texture", { method: "POST", body: fd }, project);
     const data = await res.json();
-    t.remove();
+    if (project !== _activeProjectName) { t.remove(); suppressedImportGameRels.delete(game_rel); return; }
     if (data.ok) {
       suppressChangeToastUntil = Date.now() + 1500;
       suppressedImportGameRels.delete(game_rel);
-      toast("Texture replaced", "success");
-      const bust = `&_t=${Date.now()}`;
-      document.querySelectorAll(`img[data-game-rel="${CSS.escape(game_rel)}"]`).forEach(img => {
-        img.src = `/api/thumb?game_rel=${encodeURIComponent(game_rel)}${bust}`;
-      });
-      if (data.token) {
-        document.querySelectorAll(`img[data-token="${data.token}"]`).forEach(img => {
-          img.src = `/api/preview?token=${data.token}&game_rel=${encodeURIComponent(game_rel)}${bust}`;
-        });
-      }
+      t.resolve("Texture replaced", "success");
+      refreshEditedTexture(game_rel, data.token);
     } else {
       suppressedImportGameRels.delete(game_rel);
-      toast(`Replace failed: ${data.error}`, "warning");
+      t.resolve(`Replace failed: ${data.error}`, "error");
     }
   } catch (err) {
-    t.remove();
     suppressedImportGameRels.delete(game_rel);
-    toast(`Error: ${err.message}`, "warning");
+    t.resolve(`Error: ${err.message}`, "error");
   }
 });
+
+async function revertImported(item) {
+  const project = _activeProjectName;
+  const progress = toastSpinner('Restoring original…');
+  try {
+    const result = await AtelierJobs.run('/api/revert_imported', {project, method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:item.game_rel})});
+    if (project !== _activeProjectName) { progress.remove(); return; }
+    if (!result.ok) throw new Error(result.error || 'Restore failed');
+    await loadSidebar(); await renderGrid();
+    if (item.file_type === 'texture') refreshEditedTexture(item.game_rel,item.token);
+    progress.resolve('Original restored · kept in your edit list', 'success');
+  } catch (error) { progress.resolve(`Could not restore original: ${error.message}`, 'error'); }
+}
 
 function _ctxItemsCard(card) {
   const items = [];
   if (AtelierLibraryTools.supportsPreview(card)) items.push({icon: card.file_type === 'mesh' ? 'box' : 'search',
-    label: card.file_type === 'mesh' ? 'Preview in 3D' : 'Quick preview',
+    label: card.file_type === 'mesh' ? 'View in 3D' : 'Quick preview',
     action: () => previewLibraryCard(card, document.activeElement)});
   if (card.type === "folder") {
     if (window.AtelierLibraryPins && card.rel_path) items.push({
@@ -3145,11 +3346,15 @@ function _ctxItemsCard(card) {
   if (card.file_type === "texture") items.push({icon: "refresh-cw", label: "Retry preview",
     action: () => buildGrid(allItems.map(_makeCard), true)});
   if (!card.imported) {
-    items.push({ icon: card.file_type === "mesh" ? "box" : "download", label: card.file_type === "mesh" ? "View in 3D" : "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    if (card.file_type !== 'mesh') items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
+    if (card.file_type === "mesh" && card.game_rel)
+      items.push({icon:'plus',label:'Add to edit list',action:()=>window.AtelierMeshEdit?.add({game_rel:card.game_rel,name:card.label})});
     if (card.file_type === "mesh" && card.game_rel)
       items.push({ icon: "download", label: "Edit in Blender", action: () => meshBlendExtract(card.game_rel, card.label) });
     return items;
   }
+  if (card.file_type === "mesh" && card.game_rel)
+    items.push({icon:'box',label:'Replace model…',action:()=>window.AtelierMeshEdit?.open({game_rel:card.game_rel,name:card.label})});
   if (card.file_type === "mesh" && card.game_rel)
     items.push({ icon: "download", label: "Open in Blender", action: () => openBlend(card.game_rel) });
   if (card.game_rel)
@@ -3162,6 +3367,7 @@ function _ctxItemsCard(card) {
   }
   if (card.imported && card.token) {
     if (items.length && items[items.length - 1] !== "sep") items.push("sep");
+    items.push({ icon:'rotate-ccw', label:'Revert to original', action:()=>revertImported(card) });
     items.push({ icon: "trash-2", label: "Delete edits", danger: true, action: () => clearImported(card.token) });
   }
   return items;
@@ -3169,6 +3375,10 @@ function _ctxItemsCard(card) {
 
 function _ctxItemsSidebar(item) {
   const items = [];
+  if (item.file_type === 'mesh' && item.game_rel) {
+    items.push({icon:'box',label:'View in 3D',action:()=>AtelierViewport.openMesh(item.game_rel,item.name)});
+    items.push({icon:'box',label:'Replace model…',action:()=>AtelierMeshEdit.open(item)});
+  }
   if (item.file_type === "mesh" && item.game_rel)
     items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(item.game_rel) });
   if (item.game_rel)
@@ -3181,6 +3391,7 @@ function _ctxItemsSidebar(item) {
     items.push({ icon: "sliders-horizontal", label: "Export options…", action: () => openTexOpts(item) });
   }
   if (items.length) items.push("sep");
+  items.push({ icon:'rotate-ccw', label:'Revert to original', action:()=>revertImported(item) });
   items.push({ icon: _sbMarked.has(item.token) ? "square-check" : "square",
                label: _sbMarked.has(item.token) ? "Unmark" : "Mark for bulk delete",
                action: () => _sbMarkClick(item, {}) });
@@ -3572,6 +3783,7 @@ function _renderProjectPicker(projects, keepQuery) {
       ? `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`
       : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
     lucide.createIcons({ nodes: [grid] });
+    window.AtelierPolish?.empty(grid.firstElementChild, q ? 'No project matches your search' : 'No projects yet', q ? 'Try another project name.' : 'Create one to get started.');
     return;
   }
   projects.forEach(proj => {
@@ -3697,7 +3909,7 @@ function _projExportConfirm(names) {
 }
 
 async function _projExportRun(names) {
-  const t = toastSpinner(`Packing ${names.length === 1 ? `"${_esc(names[0])}"` : names.length + " projects"}…`);
+  const t = toastSpinner(`Packing ${names.length === 1 ? `"${names[0]}"` : names.length + " projects"}…`);
   try {
     const r = await projectFetch("/api/project/export", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -3706,7 +3918,7 @@ async function _projExportRun(names) {
     if (!r.ok) {
       let msg = "Export failed";
       try { msg = (await r.json()).error || msg; } catch (_) {}
-      toast(msg, "warning", 6000);
+      t.resolve(msg, "error", 6000);
       return;
     }
     const b = await r.blob();
@@ -3716,11 +3928,9 @@ async function _projExportRun(names) {
     a.download = names.length === 1 ? `${names[0]}.zip` : `atelier_projects_${names.length}.zip`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(u), 8000);
-    toast(`Exported ${a.download}`, "success");
+    t.resolve(`Exported ${a.download}`, "success");
   } catch (e) {
-    toast(`Export failed: ${e.message}`, "warning", 6000);
-  } finally {
-    t.remove();
+    t.resolve(`Export failed: ${e.message}`, "error", 6000);
   }
 }
 
@@ -3934,20 +4144,20 @@ document.getElementById("reset-ok").addEventListener("click", async () => {
   try {
     const res = await api("/api/reset_data", { method: "POST" });
     if (!res.ok) throw new Error(res.error || "Reset failed");
-    t.remove();
+    t.resolve('Reset complete', 'success');
     window.location.reload();
   } catch (e) {
-    t.remove();
-    toast(`Reset failed: ${e.message}`, "warning");
+    t.resolve(`Reset failed: ${e.message}`, "error");
   }
 });
 
 // ── initial load ──────────────────────────────────────────────────────────────
 async function init() {
+  window.AtelierPolish?.startup();
   console.log("[init] starting");
   renderBreadcrumbs();
   if (await checkUpdate()) { console.log("[init] update in progress"); return; }
-  if (await checkSetup()) { console.log("[init] halted for setup"); return; }
+  if (await checkSetup()) { window.AtelierPolish?.startupDone(); console.log("[init] halted for setup"); return; }
   await checkProject();
   await checkPrereqs();
   await renderGrid();
@@ -4160,10 +4370,10 @@ async function buildShaderMod() {
       body: JSON.stringify({ lib: _sh.cur.lib, idx: _sh.cur.idx,
                              name: (_shEl("sh-mod-name").value || "").trim(), ir: ta.value }),
     });
-  } catch (e) { t.remove(); btn.disabled = false; toast("Build failed: " + e.message, "warning"); return; }
-  t.remove(); btn.disabled = false;
-  if (!res.ok) { toast("Build failed: " + res.error, "warning", 7000); return; }
-  toast(`${res.signed ? "Signed" : "UNSIGNED"} shader mod built → ${res.files.join(", ")}`,
+  } catch (e) { t.resolve("Build failed: " + e.message, "error"); btn.disabled = false; return; }
+  btn.disabled = false;
+  if (!res.ok) { t.resolve("Build failed: " + res.error, "error", 7000); return; }
+  t.resolve(`${res.signed ? "Signed" : "UNSIGNED"} shader mod built → ${res.files.join(", ")}`,
         res.signed ? "success" : "warning", 8000);
   if (res.note) toast(res.note, "info", 9000);
 }

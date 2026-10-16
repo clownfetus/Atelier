@@ -1,0 +1,7 @@
+#process-s-maps { margin: 0 12px 8px; }
+.modal.s-maps-modal { width: min(780px, calc(100vw - 40px)); max-width: 780px; padding: 24px; }
+.s-maps-modal p { margin: 12px 0; line-height: 1.5; }
+.s-maps-pairings { display: grid; gap: 16px; margin: 20px 0; }
+.s-maps-pairing { display: grid; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.s-maps-pairing select { width: 100%; min-height: 36px; color: var(--text); background: var(--bg2); border: 1px solid var(--border); padding: 6px; }
+.s-maps-status { color: var(--muted); font-size: 13px; }

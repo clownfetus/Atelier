@@ -249,10 +249,12 @@ def _walk_sections(d, o, nsec, limit):
                 raise ValueError("cloth vert count")
             o += 4 + c * CLOTH_VERT_SIZE
             cloth_lods.append(c)
+        bonemap_offset=o
         n_bonemap = _i32(d, o)
         if not 0 <= n_bonemap <= 65536:
             raise ValueError("bonemap count")
         o += 4 + n_bonemap * 2
+        num_verts_offset=o
         num_verts = _i32(d, o); o += 4
         packed = _u32(d, o); o += 4
         cloth_asset = _i16(d, o); o += 2 + CLOTHING_SECTION_DATA
@@ -269,6 +271,9 @@ def _walk_sections(d, o, nsec, limit):
             raise ValueError("section overruns export")
         secs.append({
             "off": start, "mat": mat, "base_index": base_index, "num_tris": num_tris,
+            "bm":bonemap_offset,"bonemap_off":bonemap_offset+4,
+            "tris_off":start+8,"base_index_off":start+4,"base_vertex_off":start+25,
+            "num_verts_off":num_verts_offset,"after":o,
             "base_vertex": base_vertex, "num_verts": num_verts,
             "bonemap_count": n_bonemap,
             "max_infl": packed & 0x7FFFFFFF, "unified_bonemap": packed >> 31,
@@ -475,7 +480,7 @@ UNSUPPORTED = {
 }
 
 WARNINGS = {
-    "morphs": "morph targets present -- a Blender rebuild drops them",
+    "morphs": "morph targets present -- preserved and remapped by default",
     "index_16_headroom": "a 16-bit LOD is close to the 65,536-vertex ceiling",
     "cooked_out_lod": "a LOD is cooked out (bIsLODCookedOut)",
     "disabled_section": "a section is flagged bDisabled",
@@ -485,7 +490,7 @@ WARNINGS = {
 }
 
 
-def probe(base, read_tails=True):
+def probe(base, read_tails=True, include_layout=False):
     """Parse one mesh and report its format. Never raises: a failure is a result.
 
     `base` is a path with no extension; `base + '.uasset'` and `.uexp` must exist.
@@ -538,7 +543,7 @@ def probe(base, read_tails=True):
     rec["data_resources"] = len(drm)
 
     limit = len(uexp) - 4
-    lods, ubulk_fh = [], None
+    lods, ubulk_fh, layout = [], None, []
     try:
         for i in range(n_lods):
             h = _try_lod(uexp, o, limit)
@@ -546,6 +551,7 @@ def probe(base, read_tails=True):
                 raise ValueError(f"LOD{i} header/section chain did not validate at {o}")
             p = h["after_sections"]
             n_active = _i32(uexp, p); p += 4 + n_active * 2
+            size_offset=p
             buffers_size = _u32(uexp, p); p += 4
             has_cloth = any(s["cloth_lods"] for s in h["sections"])
             lod = {"index": i, "inlined": bool(h["inlined"]),
@@ -609,6 +615,9 @@ def probe(base, read_tails=True):
             lod["num_bones"] = a["num_bones"]
             lod["num_lookup_verts"] = a.get("num_lookup_verts", 0)
             lod["blob"] = where
+            if include_layout:layout.append({'source_index':i,'blob':where,'blob_start':blob_start,'blob_end':blob_end,
+                'size_offset':size_offset,'sections':h['sections'],'num_verts':h['num_verts'],
+                'n_indices':h['n_indices'],'idx_stride':a['idx_stride'],'data_resource':lod.get('data_resource')})
 
             if read_tails and blob_start is not None:
                 cands = _tail_candidates(a) if where == "ubulk" else a["_tail_offs"]
@@ -636,6 +645,7 @@ def probe(base, read_tails=True):
             ubulk_fh.close()
 
     rec["lods"] = lods
+    if include_layout:rec['_layout']=layout
     _classify(rec)
     return rec
 
@@ -682,8 +692,6 @@ def _classify(rec):
     for lod in rec["lods"]:
         if lod["has_cloth"]:
             bad.add("cloth")
-        if not lod["full_prec_uv"]:
-            bad.add("half_precision_uv")
         if lod["hi_prec_tangent"]:
             bad.add("high_precision_tangent")
         if lod["bone_index_16"]:

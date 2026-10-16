@@ -22,6 +22,7 @@ from atelier.storage import atomic_json
 
 ACTIVE = {"queued", "running", "cancelling"}
 _current = ContextVar("atelier_job", default=None)
+_cancellation = ContextVar("atelier_request_cancellation", default=None)
 _instance = None
 _instance_lock = threading.Lock()
 
@@ -35,9 +36,23 @@ def current():
 
 
 def checkpoint():
+    cancelled = _cancellation.get()
+    if cancelled is not None and cancelled.is_set():
+        raise Cancelled()
     job = current()
     if job:
         job.checkpoint()
+
+
+@contextmanager
+def cancellation_scope(cancelled):
+    """Let temporary previews cancel their own native work without creating project jobs."""
+    token = _cancellation.set(cancelled)
+    try:
+        checkpoint()
+        yield
+    finally:
+        _cancellation.reset(token)
 
 
 @contextmanager
@@ -266,7 +281,7 @@ def shutdown(timeout=15):
 
 def run_process(args, **kwargs):
     """subprocess.run semantics, with cancellation only for the current job's child."""
-    if current() is None:
+    if current() is None and _cancellation.get() is None:
         return subprocess.run(args, **kwargs)
     checkpoint()
     timeout = kwargs.pop("timeout", None)

@@ -39,6 +39,7 @@ def run_appearance_checks(page, context, url, report, checks):
             for preset in ('studio', 'darcula', 'repak'):
                 button = tab.locator(f'[data-theme-preset="{preset}"]')
                 button.click()
+                tab.wait_for_function("([mode,preset])=>document.documentElement.dataset.theme===mode && document.documentElement.dataset.palette===preset", arg=[mode,preset])
                 assert button.get_attribute('aria-pressed') == 'true'
                 assert button.locator('.theme-swatches i').count() == 4
                 assert all(pair['ratio'] >= 4.5 for pair in measure_contrast(tab)), (mode, preset)
@@ -46,8 +47,8 @@ def run_appearance_checks(page, context, url, report, checks):
                 styles = tab.evaluate('''() => [...document.querySelectorAll('select')].map(select => {
                   const option = select.querySelector('option');
                   const probe = document.createElement('span'); probe.style.color='var(--text)';
-                  document.body.append(probe); const text=getComputedStyle(probe).color;
-                  probe.style.color='var(--md-sys-color-on-secondary-container)'; const selected=getComputedStyle(probe).color; probe.remove();
+                  (select.closest('#viewport-box') || document.body).append(probe); const text=getComputedStyle(probe).color;
+                  probe.style.color=select.closest('#viewport-box') ? 'var(--acc)' : 'var(--md-sys-color-on-secondary-container)'; const selected=getComputedStyle(probe).color; probe.remove();
                   return {scheme:getComputedStyle(select).colorScheme, color:getComputedStyle(select).color,
                     option:option ? getComputedStyle(option).color : text,
                     expected:option?.matches(':checked') && CSS.supports('appearance','base-select') ? selected : text,
@@ -89,10 +90,12 @@ def run_appearance_checks(page, context, url, report, checks):
         picker.select_option('light')
         color('background', '#fff9ef')
         picker.select_option('dark')
+        tab.wait_for_function("document.documentElement.dataset.theme==='dark'")
         assert tab.locator('[data-theme-color="background"]').input_value() == '#080808'
         # Visiting a preset must not discard the saved custom palette.
         tab.locator('[data-theme-preset="studio"]').click()
         tab.locator('[data-theme-preset="custom"]').click()
+        tab.wait_for_function("document.documentElement.dataset.palette==='custom'")
         assert tab.locator('[data-theme-color="background"]').input_value() == '#080808'
         tab.reload()
         tab.wait_for_selector('#grid-area .card')
@@ -104,6 +107,7 @@ def run_appearance_checks(page, context, url, report, checks):
         page.wait_for_function('document.documentElement.dataset.palette === "darcula"')
         tab.emulate_media(color_scheme='light')
         picker.select_option('system')
+        tab.wait_for_function("document.documentElement.dataset.theme==='light'")
         assert tab.locator('html').get_attribute('data-theme') == 'light'
         tab.emulate_media(color_scheme='dark')
         tab.wait_for_function('document.documentElement.dataset.theme === "dark"')
@@ -132,6 +136,7 @@ def run_appearance_checks(page, context, url, report, checks):
         settings()
         assert tab.locator('[data-saved-palette]').count() == 2
         tab.locator('[data-saved-palette]').first.click()
+        tab.wait_for_function("document.querySelector('[data-saved-palette]').getAttribute('aria-pressed')==='true'")
         assert tab.locator('[data-saved-palette]').first.get_attribute('aria-pressed') == 'true'
         tab.locator('#theme-palette-delete').click()
         assert tab.locator('[data-saved-palette]').count() == 1
@@ -142,6 +147,8 @@ def run_appearance_checks(page, context, url, report, checks):
         for mode in ('light', 'dark'):
             picker.select_option(mode)
             tab.locator('[data-theme-preset="repak"]').click()
+            tab.wait_for_function("document.documentElement.dataset.palette==='repak'")
+            tab.evaluate("Promise.allSettled(document.getAnimations().filter(animation=>animation.effect?.pseudoElement).map(animation=>animation.finished))")
             help_button = tab.locator('.setup-help-btn')
             help_button.focus()
             tab.wait_for_selector('#atelier-tooltip:visible')
@@ -174,6 +181,7 @@ def run_appearance_checks(page, context, url, report, checks):
             assert setup.locator('#setup-title').inner_text() == 'Initial Configuration'
             setup.locator('#settings-theme').select_option('dark')
             setup.locator('[data-theme-preset="repak"]').click()
+            setup.wait_for_function("document.documentElement.dataset.palette==='repak'")
             assert setup.locator('html').get_attribute('data-palette') == 'repak'
             setup.screenshot(path=str(report / 'appearance-first-run.png'), animations='disabled')
         finally:

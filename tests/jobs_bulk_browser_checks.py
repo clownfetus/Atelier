@@ -33,6 +33,10 @@ def run_job_bulk_checks(page, context, url, report, checks):
         tab.wait_for_function("window.atelierProject() === 'Smoke A' && window.AtelierBulkEdit")
         tab.wait_for_function("!document.querySelector('.overlay.active')")
         tab.wait_for_function("Object.keys(sidebarData).length===2")
+        assert tab.locator('#bulk-edit-open').is_hidden()
+        with patch.object(R,'read_curve',return_value={'ok':True,'channels':{'R':[{'time':0,'value':1}]},'stops':[]}):
+            tab.evaluate('(item)=>openCurveEditor(item)',items[0])
+            tab.wait_for_selector('#bulk-edit-open:not([hidden])')
         tab.locator('#bulk-edit-open').click()
         tab.locator('#bulk-factor').fill('2')
         before = [path.read_bytes() for path in files]
@@ -71,6 +75,7 @@ def run_job_bulk_checks(page, context, url, report, checks):
         assert CV._channels(json.loads(files[0].read_text()))['R'][0]['value'] == 9
         checks.append('Changing bulk controls invalidates approval; an external edit rejects the entire stale batch')
         tab.locator('#bulk-close').click()
+        tab.evaluate('closeCurveEditor()')
 
         started = threading.Event()
         def slow_export(body):
@@ -102,6 +107,9 @@ def run_job_bulk_checks(page, context, url, report, checks):
         tab.screenshot(path=str(report/'activity-history.png'))
         checks.append('Reloading restores project job history and cancelled/failed outcomes without resubmitting work')
         tab.locator('#job-overlay').get_by_role('button',name='Close',exact=True).click()
+        with patch.object(R,'read_curve',return_value={'ok':True,'channels':{'R':[{'time':0,'value':1}]},'stops':[]}):
+            tab.evaluate('(item)=>openCurveEditor(item)',items[0])
+            tab.wait_for_selector('#bulk-edit-open:not([hidden])')
         tab.locator('#bulk-edit-open').click()
         tab.set_viewport_size({'width':1024,'height':768})
         tab.keyboard.press('Tab');tab.keyboard.press('Shift+Tab');tab.keyboard.press('Escape')

@@ -1,3 +1,9 @@
+Presentation goals completed on 16 October 2026 are tracked in
+[the checked goal list](docs/goal-list-2026-10-16.md). The notes below are a
+historical backlog; several presentation items already have implementations and
+regression checks. The viewer now offers explicit standing-idle playback while
+opening in Rest pose.
+
 charID manual refresh option
 auto-refreshing usmap/aes fetch
 confirm version/auto-update works

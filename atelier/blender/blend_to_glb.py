@@ -8,6 +8,7 @@ and that interferes with exporting clean skinning data.
     blender --background --python blend_to_glb.py -- <in.blend> <out.glb> [ratio]
 """
 import sys
+import json
 
 import bpy
 
@@ -24,6 +25,7 @@ for o in list(bpy.data.objects):
 obj = bpy.data.objects.get("SkeletalMesh")
 if obj is None:
     raise SystemExit("no 'SkeletalMesh' object in the .blend -- do not rename it")
+print('ATELIER_IMPORT_OPTIONS '+obj.get('atelier_import_options','{}'))
 
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
@@ -31,6 +33,12 @@ if obj.mode != "OBJECT":
     bpy.ops.object.mode_set(mode="OBJECT")
 
 before = (len(obj.data.vertices), len(obj.data.polygons))
+if obj.data.shape_keys:
+    # This export is base geometry. The cooker remaps the game's original morph
+    # buffers after topology changes; Blender cannot apply Decimate to shape keys.
+    basis=obj.data.shape_keys.reference_key
+    for vertex in obj.data.vertices:vertex.co=basis.data[vertex.index].co
+    obj.shape_key_clear()
 if ratio < 1.0:
     mod = obj.modifiers.new(name="AtelierLOD", type="DECIMATE")
     mod.decimate_type = "COLLAPSE"
@@ -68,7 +76,7 @@ if obj.parent is None:
 # PACKED or generated images, where the pixels do live in the .blend. Users must save painted
 # images themselves (Image > Save, or Alt+S); that is Blender's rule, not this pipeline's.
 for img in bpy.data.images:
-    if img.is_dirty and img.filepath:
+    if img.is_dirty and img.filepath and 'preview' not in argv[3:]:
         try:
             img.save()
             print("SAVED_IMG " + bpy.path.abspath(img.filepath))
@@ -107,7 +115,7 @@ bpy.ops.object.mode_set(mode="OBJECT")
 
 bpy.ops.export_scene.gltf(
     filepath=dst, export_format="GLB", use_selection=False, export_apply=False,
-    export_yup=True, export_texcoords=True, export_normals=True, export_tangents=True,
+    export_yup=True, export_texcoords=True, export_normals=True, export_tangents=True, export_attributes=True,
     export_vertex_color="ACTIVE", export_all_vertex_colors=True,
     export_skins=True,
     # The cooked mesh stores up to 8 influences. Blender defaults to 4 and only warns that

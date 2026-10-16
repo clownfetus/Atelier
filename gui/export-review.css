@@ -16,6 +16,17 @@
 .export-review-body progress { width: 100%; height: 5px; accent-color: var(--acc); }
 .export-last-result { width: 100%; justify-content: center; font-size: 12px; }
 .export-last-result[hidden] { display: none; }
+.export-review-modal[data-state='success'] {
+  --acc:var(--studio-success);
+  --border:color-mix(in srgb,var(--studio-success) 48%,var(--md-sys-color-outline-variant));
+  --bg:color-mix(in srgb,var(--studio-success) 7%,var(--md-sys-color-surface));
+  background:color-mix(in srgb,var(--studio-success) 12%,var(--md-sys-color-surface-container));
+  border:2px solid var(--studio-success);
+}
+.export-review-modal[data-state='success'] h2 { color:var(--studio-success); }
+.export-review-modal[data-state='success'] .export-review-summary { color:var(--studio-success) !important; font-weight:600; }
+.export-review-modal[data-state='success'] .btn { color:var(--studio-success); border-color:var(--border); }
+.export-review-modal[data-state='success'] .btn:hover { background:color-mix(in srgb,var(--studio-success) 14%,var(--bg)); }
 @media (max-width: 600px) {
   .export-review-meta { grid-template-columns: 1fr; gap: 4px; }
   .export-review-meta dd { margin-bottom: 8px; }

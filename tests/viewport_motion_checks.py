@@ -323,6 +323,8 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                 assert dimensions['width'] == 72 and dimensions['height'] == 72, dimensions
                 assert dimensions['stroke'] * dimensions['width'] / dimensions['viewBox'] >= 2, dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
+                assert motion_page.locator('#viewport-inspect-tools').is_hidden()
+                assert motion_page.locator('#viewport-tools').is_hidden()
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         close_preview()
         checks.append('Viewport loader remains 72px with readable strokes in both themes at compact and standard desktop sizes')

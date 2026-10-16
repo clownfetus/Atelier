@@ -1,0 +1,201 @@
+// Truthful, optional presentation. Every transient effect owns a disposable mount.
+(() => {
+  'use strict';
+  const reduced = () => (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)')).matches;
+  const mounts = new Map();
+  function mount(host, {frames = [], duration = 160, state = 'idle'} = {}) {
+    mounts.get(host)?.destroy(); let animation = null, destroyed = false;
+    const instance = {
+      get finished() { return animation?.finished || Promise.resolve(); },
+      setState(value) {
+        if (destroyed) return;
+        state = value; host.dataset.polishState = value; animation?.cancel();
+        if (frames.length && !reduced()) {
+          try { animation = host.animate(frames, {duration, easing:'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+        }
+      },
+      destroy() { if (destroyed) return; destroyed = true; animation?.cancel(); mounts.delete(host); delete host.dataset.polishState; },
+    };
+    mounts.set(host, instance); instance.setState(state); return instance;
+  }
+  const removals = new MutationObserver(() => { for (const [host, instance] of mounts) if (!host.isConnected) instance.destroy(); });
+  removals.observe(document.documentElement, {childList:true, subtree:true});
+  const play = (host, frames, duration = 160) => {
+    const instance = mount(host, {frames,duration,state:'playing'});
+    setTimeout(() => instance.destroy(), duration + 20); return instance;
+  };
+  window.AtelierMotion ||= {}; window.AtelierMotion.polish = Object.freeze({mount});
+  window.AtelierMotionPolicy?.query().addEventListener('change', () => { if (reduced()) for (const instance of mounts.values()) instance.destroy(); });
+  window.addEventListener('pagehide', () => { removals.disconnect(); for (const instance of mounts.values()) instance.destroy(); });
+
+  function count(host, value) {
+    if (!host) return;
+    const text = String(value), previous = host.textContent;
+    if (text === previous) return;
+    host.replaceChildren(); host.classList.add('rolling-count');
+    [...text].forEach((digit,index) => {
+      if (!/\d/.test(digit)) { host.append(document.createTextNode(digit)); return; }
+      const slot = document.createElement('span'); slot.className = 'rolling-digit'; slot.textContent = digit;
+      if (previous && previous[index] !== digit && /\d/.test(previous[index] || '')) {
+        slot.dataset.previous = previous[index]; slot.classList.add('rolling-change');
+        setTimeout(() => { delete slot.dataset.previous; slot.classList.remove('rolling-change'); }, 180);
+      }
+      host.append(slot);
+    });
+  }
+  function sample(image) {
+    if (!image?.complete || !image.naturalWidth) return null;
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
+      const ctx = canvas.getContext('2d', {willReadFrequently:true}); ctx.drawImage(image,0,0,16,16);
+      const data = ctx.getImageData(0,0,16,16).data, buckets = new Map();
+      for (let i=0;i<data.length;i+=4) {
+        if (data[i+3]<128 || Math.max(...data.slice(i,i+3))<35 || Math.min(...data.slice(i,i+3))>235) continue;
+        const key = [data[i],data[i+1],data[i+2]].map(n=>Math.round(n/32)*32).map(n=>Math.min(255,n));
+        const color = '#'+key.map(n=>n.toString(16).padStart(2,'0')).join(''); buckets.set(color,(buckets.get(color)||0)+1);
+      }
+      return [...buckets].sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+    } catch (_) { return null; }
+  }
+  function artwork(image) {
+    const accent = sample(image);
+    window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent}}));
+    let loader = accent || '#accbff';
+    const rgb = loader.slice(1).match(/../g).map(n=>parseInt(n,16));
+    const luminance = values => values.map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+    for (let step=0;step<=100;step++) {
+      const values=rgb.map(n=>Math.round(n+(255-n)*step/100));
+      if ((luminance(values)+.05)/(luminance([20,22,27])+.05)>=4.5) {loader='#'+values.map(n=>n.toString(16).padStart(2,'0')).join('');break;}
+    }
+    document.documentElement.style.setProperty('--skin-loader-accent', loader);
+  }
+  function ghost(source) {
+    const rect = source.getBoundingClientRect(), copy = source.cloneNode(true);
+    copy.removeAttribute('id'); copy.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+    copy.querySelectorAll('.texture-reconstruction,.swatch-wipe').forEach(node=>node.remove());
+    for (const node of [copy,...copy.querySelectorAll('.texture-reconstructing')]) node.classList.remove('texture-reconstructing');
+    copy.querySelectorAll('[name]').forEach(node=>node.removeAttribute('name'));
+    for (const node of [copy,...copy.querySelectorAll('[data-token],[data-game-rel],[data-library-path]')]) {
+      for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
+    }
+    copy.inert = true; copy.setAttribute('aria-hidden','true'); copy.classList.add('polish-ghost');
+    Object.assign(copy.style,{left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px',margin:'0'});
+    document.body.append(copy); return {copy,rect};
+  }
+  function fly(path) {
+    requestAnimationFrame(() => {
+      const source = [...document.querySelectorAll('#grid-area .card')].find(node=>node.dataset.libraryPath===path)?.querySelector('.card-thumb');
+      const destination = [...document.querySelectorAll('.sb-item')].find(node=>node.dataset.gameRel===path)?.querySelector('.sb-thumb');
+      if (!destination) return;
+      play(destination,[{boxShadow:'0 0 0 0 var(--acc)'},{boxShadow:'0 0 0 3px transparent'}],220);
+      if (!source || reduced()) return;
+      const {copy,rect} = ghost(source), end = destination.getBoundingClientRect();
+      play(copy,[{opacity:.85,transformOrigin:'top left',transform:'none'},
+        {opacity:.65,offset:.6,transformOrigin:'top left',transform:`translate(${(end.x-rect.x)*.55}px,${end.y-rect.y-55}px) scale(.6)`},
+        {opacity:0,transformOrigin:'top left',transform:`translate(${end.x-rect.x}px,${end.y-rect.y}px) scale(${end.width/rect.width},${end.height/rect.height})`}],320);
+      setTimeout(()=>copy.remove(),340);
+    });
+  }
+  function sidebarBefore(list) {
+    return [...list.querySelectorAll('.sb-item')].map(row=>({token:row.dataset.token,rect:row.getBoundingClientRect(),row}));
+  }
+  function sidebarAfter(previous, list) {
+    if (reduced() || !list.getClientRects().length) return;
+    for (const entry of previous || []) {
+      const next = [...list.querySelectorAll('.sb-item')].find(row=>row.dataset.token===entry.token);
+      if (next) {
+        const dy = entry.rect.y-next.getBoundingClientRect().y;
+        if (dy) play(next,[{transform:`translateY(${dy}px)`},{transform:'none'}],120);
+      } else {
+        const copy = entry.row.cloneNode(true); copy.classList.add('polish-ghost'); copy.inert=true; copy.setAttribute('aria-hidden','true');
+        copy.querySelectorAll('.texture-reconstruction,.swatch-wipe').forEach(node=>node.remove());
+        for (const node of [copy,...copy.querySelectorAll('.texture-reconstructing')]) node.classList.remove('texture-reconstructing');
+        for (const node of [copy,...copy.querySelectorAll('[data-token],[data-game-rel],[data-library-path]')]) {
+          for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
+        }
+        Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden'});
+        document.body.append(copy); play(copy,[{opacity:1,transformOrigin:'top',transform:'scaleY(1)'},{opacity:0,transformOrigin:'top',transform:'scaleY(0)'}],120);
+        setTimeout(()=>copy.remove(),140);
+      }
+    }
+  }
+  function packing() {
+    if (reduced()) return;
+    const tray = document.querySelector('#install-btn .am-export-feedback-slot'); if (!tray) return;
+    const target = tray.getBoundingClientRect();
+    [...document.querySelectorAll('.sb-item.selected')].slice(0,6).forEach((source,index)=>{
+      const {copy,rect}=ghost(source);
+      play(copy,[{opacity:.6,transformOrigin:'left center',transform:'none'},
+        {opacity:0,transformOrigin:'left center',transform:`translate(${target.x-rect.x}px,${target.y-rect.y}px) scale(.06,.15)`}],220+index*12);
+      setTimeout(()=>copy.remove(),320);
+    });
+  }
+  function exported() {
+    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return; localStorage.setItem('atelier.firstExportCelebrated','1'); } catch (_) {}
+    const colors = [...new Set([...document.querySelectorAll('.sb-item.selected img')].map(sample).concat(
+      [...document.querySelectorAll('.sb-item.selected [data-swatch-color]')].map(node=>node.dataset.swatchColor)).filter(Boolean))].slice(0,6);
+    if (!colors.length) return;
+    const button=document.getElementById('install-btn'), rect=button.getBoundingClientRect();
+    colors.forEach((color,index)=>{
+      const dot=document.createElement('span'); dot.className='export-color-moment'; dot.style.background=color; dot.setAttribute('aria-hidden','true');
+      dot.style.left=(rect.x+rect.width/2)+'px'; dot.style.top=(rect.y+rect.height/2)+'px'; document.body.append(dot);
+      if (!reduced()) play(dot,[{opacity:1,transform:'translate(0,0) scale(.6)'},{opacity:0,transform:`translate(${(index-(colors.length-1)/2)*30}px,${-60-index%2*15}px) scale(1)`}],460);
+      else dot.style.transform=`translate(${index*10}px,-12px)`;
+      setTimeout(()=>dot.remove(),reduced()?1800:480);
+    });
+  }
+  function swatchesBefore() { return new Map([...document.querySelectorAll('#mat-body input[type=color]')].map(node=>[node.id,node.value])); }
+  function swatchesAfter(previous, colors=[]) {
+    for (const node of document.querySelectorAll('#mat-body input[type=color]')) {
+      const index=Number(node.id.replace('matsw','')), value=colors[index];
+      const parent=node.parentElement;
+      if (value) {
+        parent.style.setProperty('--swatch-color',node.value); parent.style.setProperty('--swatch-alpha',value.rgba[3] ?? 1);
+        node.style.boxShadow = `0 0 ${Math.min(14,Math.log2((value.inten||1)+1)*3)}px ${value.inten>1?node.value:'transparent'}`;
+        node.style.opacity = String(Math.max(0, Math.min(1,value.rgba[3] ?? 1)));
+        node.title=`${value.name} · intensity ${+(value.inten||1).toFixed(2)} · alpha ${+(value.rgba[3]??1).toFixed(2)}`;
+      }
+      const old=previous?.get(node.id); if (!old || old===node.value || reduced()) continue;
+      const wipe=document.createElement('span'); wipe.className='swatch-wipe'; wipe.style.background=old; parent.append(wipe);
+      play(wipe,[{clipPath:'inset(0 0 0 0)'},{clipPath:'inset(0 0 0 100%)'}],120); setTimeout(()=>wipe.remove(),140);
+    }
+  }
+  function empty(host, title, description='') {
+    host.classList.add('polish-empty');
+    const art=document.createElementNS('http://www.w3.org/2000/svg','svg'); art.setAttribute('viewBox','0 0 96 64'); art.setAttribute('aria-hidden','true');
+    art.innerHTML='<path d="M12 18h23l9 8h40v28H12Z M12 42h72 M25 18V9h44v17 M34 18h26 M42 32h12 M48 26v12" fill="none" stroke="currentColor" stroke-width="1.5"/>';
+    const text=document.createElement('strong'); text.textContent=title;
+    const detail=document.createElement('span'); detail.textContent=description;
+    host.replaceChildren(art,text,detail);
+  }
+  function importStart(items) {
+    const host=document.getElementById('import-segments'); if (!host) return;
+    host.replaceChildren(); host.setAttribute('aria-label',`${items.length} assets to import`);
+    items.forEach(item=>{const segment=document.createElement('span'); segment.title=item.name; segment.dataset.path=item.game_rel; segment.dataset.state='pending'; host.append(segment);});
+  }
+  function importProgress(data) {
+    const host=document.getElementById('import-segments'); if (!host) return;
+    if (data.game_rel) {
+      const segment=[...host.children].find(node=>node.dataset.path===data.game_rel);
+      if (segment) segment.dataset.state=data.ok===false?'failed':'done';
+    }
+    if (data.done && Array.isArray(data.results)) {
+      const success=new Set(data.results.map(item=>item.game_rel));
+      for (const segment of host.children) if (success.has(segment.dataset.path)) segment.dataset.state='done'; else if (segment.dataset.state!=='done') segment.dataset.state='failed';
+    }
+  }
+  let startupTimer, startupEnded=false;
+  async function startup() {
+    if (startupEnded) return;
+    try {
+      const data=await fetch('/api/startup_progress').then(r=>r.json());
+      const label=document.getElementById('startup-label'), progress=document.getElementById('startup-progress');
+      if (label) label.textContent=data.total ? `Reading container ${data.current} / ${data.total}` : data.stage==='ready'?'Library ready':'Opening your library…';
+      if (progress) { if(data.total) {progress.max=data.total;progress.value=data.current;} else progress.removeAttribute('value'); }
+    } catch (_) { /* Startup errors remain visible in the normal library error state. */ }
+    if (!startupEnded) startupTimer=setTimeout(startup,300);
+  }
+  function startupDone() { startupEnded=true; clearTimeout(startupTimer); document.getElementById('startup-splash')?.remove(); }
+  window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
+  window.AtelierPolish=Object.freeze({count,sample,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play});
+})();

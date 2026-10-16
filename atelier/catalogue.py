@@ -66,7 +66,11 @@ def allowed_url(url):
     if parsed.scheme != 'https' or parsed.username or parsed.password or port:
         return False
     return (parsed.netloc == 'rivalskins.com' and (
-        parsed.path == '/heroes/' or parsed.path.startswith(('/hero/', '/item/', '/wp-content/uploads/marvel-assets/items/costume/'))
+        parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/')
+        or parsed.path.startswith(('/hero/', '/item/', '/wp-content/uploads/marvel-assets/items/costume/',
+                                   '/wp-content/uploads/marvel-assets/assets/hero-logos/',
+                                   '/wp-content/uploads/marvel-assets/assets/hero-icons-avatars/',
+                                   '/wp-content/uploads/marvel-assets/assets/hero-story-images/'))
     )) or url == IDS_URL
 
 

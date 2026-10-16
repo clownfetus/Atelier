@@ -10,6 +10,7 @@ if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
 import webview
 
 from atelier import hostos
+from atelier.window_theme import WindowTheme
 from atelier.web.app import PORT, frontend_url
 
 _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
@@ -79,7 +80,7 @@ def _run_server():
 
 
 def main():
-    _show_launch_toast()
+    webview.settings['ALLOW_DOWNLOADS'] = True  # Viewer captures use the native Save As dialog.
     _setup_logging()
 
     t = threading.Thread(target=_run_server, daemon=True)
@@ -89,7 +90,10 @@ def main():
         print("Server did not start in time.", file=sys.stderr)
         sys.exit(1)
 
-    window = webview.create_window("Atelier", URL, width=1400, height=900)
+    appearance = WindowTheme(_DATA_ROOT)
+    window = webview.create_window("Atelier", URL, width=1400, height=900,
+                                   background_color=appearance._background(), js_api=appearance)
+    appearance._attach(window)
     close_started = threading.Event()
     close_ready = threading.Event()
 

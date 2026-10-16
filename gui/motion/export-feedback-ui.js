@@ -51,6 +51,8 @@
   function toast(msg, type, duration, state) {
     const el = document.createElement('div');
     el.className = `toast am-export-feedback-toast ${type}`;
+    el.setAttribute('role', 'status'); el.setAttribute('aria-atomic', 'true');
+    el.dataset.operationState = state;
     const slot = document.createElement('span');
     slot.className = 'am-export-feedback-slot';
     slot.setAttribute('aria-hidden', 'true');
@@ -65,7 +67,7 @@
     el.append(slot, label);
     document.getElementById('toast-area').appendChild(el);
     window.AtelierIcons?.createIcons({nodes: [slot]});
-    const motion = mountSlot(slot, state);
+    let motion = mountSlot(slot, state);
 
     let disposed = false, timer = null, remaining = duration, start = Date.now();
     const remove = el.remove.bind(el);
@@ -78,19 +80,38 @@
     }
     // Existing _runInstall's t.remove(), click and timeout share one cleanup path.
     el.remove = dispose;
-    if (duration > 0) {
-      timer = setTimeout(dispose, remaining);
-      el.addEventListener('mouseenter', () => {
+    function schedule(ms) {
+      clearTimeout(timer); remaining = ms; start = Date.now();
+      el.style.setProperty('--toast-duration', ms + 'ms');
+      el.classList.remove('toast-timed'); void el.offsetWidth;
+      if (ms > 0) { el.classList.add('toast-timed'); timer = setTimeout(dispose, ms); }
+    }
+    el.addEventListener('mouseenter', () => {
+        if (!duration) return;
         clearTimeout(timer);
         remaining = Math.max(0, remaining - (Date.now() - start));
-      });
-      el.addEventListener('mouseleave', () => {
-        if (disposed) return;
+    });
+    el.addEventListener('mouseleave', () => {
+        if (disposed || !duration) return;
         start = Date.now();
         timer = setTimeout(dispose, remaining);
-      });
-      el.addEventListener('click', dispose);
-    }
+    });
+    el.addEventListener('click', () => { if (duration) dispose(); });
+    el.resolve = (message, outcome = 'success', ms = 4000) => {
+      if (disposed) return;
+      label.textContent = message; state = outcome; duration = ms;
+      el.className = `toast am-export-feedback-toast ${outcome === 'error' ? 'warning' : outcome}`;
+      el.dataset.operationState = outcome;
+      try { motion?.setState(outcome); }
+      catch (_) { try { motion?.destroy(); } catch (_) {} motion=null; delete slot.dataset.amMounted; }
+      const fallback = slot.firstElementChild;
+      fallback?.remove();
+      const icon = document.createElement('i'); icon.dataset.lucide = outcome === 'success' ? 'check-circle' : 'alert-triangle';
+      icon.className = 'am-export-feedback-fallback'; slot.prepend(icon);
+      window.AtelierIcons?.createIcons({nodes:[slot]});
+      schedule(ms);
+    };
+    schedule(duration);
     return el;
   }
 

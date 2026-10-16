@@ -18,6 +18,12 @@
 #if !FileExists("dist\Atelier\Tools\AtelierMesh\oo2core_9_win64.dll")
   #error Required AtelierMesh Oodle dependency missing
 #endif
+#if !FileExists("dist\Atelier\Tools\AtelierAnimation\AtelierAnimation.exe")
+  #error Required standing idle decoder missing; run scripts/build_animation_decoder.py
+#endif
+#if !FileExists("dist\Atelier\Tools\AtelierAnimation\CUE4Parse-Natives.dll") || !FileExists("dist\Atelier\Tools\AtelierAnimation\oo2core_9_win64.dll")
+  #error Required animation decoder native dependencies missing
+#endif
 
 [Setup]
 AppId={{2E25ABE9-E3D5-4ABA-9E50-725BA75185AF}
@@ -51,9 +57,14 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 [Files]
 Source: "dist\Atelier\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Atelier\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Atelier\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Atelier\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "dist\Atelier\Tools\UAssetTool.exe"; DestDir: "{app}\Tools"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\UAssetGUI.exe"; DestDir: "{app}\Tools"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\AtelierMesh\*"; DestDir: "{app}\Tools\AtelierMesh"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Atelier\Tools\AtelierAnimation\AtelierAnimation.exe"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierAnimation\CUE4Parse-Natives.dll"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierAnimation\oo2core_9_win64.dll"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\retoc-rivals-cli.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\oo2core_9_win64.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\dxc.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion

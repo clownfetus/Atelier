@@ -48,6 +48,7 @@ def main():
                  '/api/prefetch_thumbs': {'ok': True},
                  '/api/usmap_update_check': {'ok': True}}
         stubs['/api/catalogue/status'] = {'updating': False, 'portraits': 803}
+        if args.fixtures: stubs['/api/catalogue/library'] = {'heroes': []}
         if args.fixtures:
             stubs.update({
                 '/api/setup_status': {'configured': True}, '/api/prereqs': {'issues': []},
@@ -63,8 +64,12 @@ def main():
 
     server = make_server('127.0.0.1', 0, app, _ThreadingWSGIServer, Quiet)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    from atelier.window_theme import WindowTheme
+    native_appearance = WindowTheme(C.DATA_ROOT)
     window = webview.create_window('Atelier development smoke',
-        f'http://127.0.0.1:{server.server_port}', hidden=True, width=1400, height=900)
+        f'http://127.0.0.1:{server.server_port}', hidden=True, width=1400, height=900,
+        background_color=native_appearance._background(), js_api=native_appearance)
+    native_appearance._attach(window)
     result = {}
 
     def verify():
@@ -279,6 +284,46 @@ def main():
                 assert empty_motion == {'width': 112, 'state': 'settled', 'hidden': 'true',
                                         'animations': 0, 'sidebarAPI': True, 'clean': True}, empty_motion
                 result['empty_assets_motion'] = empty_motion
+                polish = window.evaluate_js("""(() => {
+                  const motion=document.getElementById('settings-motion');motion.value='reduce';motion.dispatchEvent(new Event('change'));
+                  const density=document.getElementById('settings-density');density.value='compact';density.dispatchEvent(new Event('change'));
+                  const operation=toastSpinner('Native packing fixture');operation.resolve('Native complete','success',4000);
+                  const same=operation.isConnected && operation.dataset.operationState==='success';operation.remove();
+                  toast('Native repeat fixture','info');toast('Native repeat fixture','info');
+                  const repeated=document.querySelector('.toast-repeat')?.textContent==='×2';
+                  document.getElementById('toast-area').replaceChildren();
+                  const host=document.createElement('div');document.body.append(host);
+                  const instance=AtelierMotion.polish.mount(host,{frames:[{opacity:0},{opacity:1}],state:'playing'});
+                  const staticMotion=host.getAnimations().length===0;instance.destroy();instance.destroy();host.remove();
+                  AtelierPolish.importStart([{name:'A',game_rel:'A'},{name:'B',game_rel:'B'}]);
+                  AtelierPolish.importProgress({game_rel:'A',ok:true});AtelierPolish.importProgress({game_rel:'B',ok:false});
+                  const segments=document.querySelectorAll('#import-segments [data-state=done]').length===1 && document.querySelectorAll('#import-segments [data-state=failed]').length===1;
+                  const palette=document.querySelector('[data-theme-preset=blueprint]');palette.click();
+                  const newPalette=document.documentElement.dataset.palette==='blueprint';
+                  document.querySelector('[data-theme-preset=studio]').click();
+                  const theme=document.getElementById('settings-theme');theme.value='dark';theme.dispatchEvent(new Event('change'));
+                  return {same,repeated,staticMotion,segments,newPalette,compact:document.documentElement.dataset.density==='compact',
+                    continuity:typeof AtelierContinuity.closeEditor==='function',roster:typeof AtelierRoster.show==='function',
+                    logoReplay:document.querySelector('.studio-brand').getAttribute('role')==='button'};
+                })()""")
+                assert all(polish.values()), polish
+                deadline=time.monotonic()+5
+                while time.monotonic()<deadline:
+                    saved=json.loads(native_appearance._path.read_text(encoding='utf-8')) if native_appearance._path.exists() else {}
+                    if saved.get('preference')=='dark' and saved.get('dark')=='#17191d': break
+                    time.sleep(.05)
+                assert saved.get('preference')=='dark', saved
+                import ctypes
+                from ctypes import wintypes
+                hwnd=int(window.native.Handle.ToInt64())
+                get_attribute=ctypes.windll.dwmapi.DwmGetWindowAttribute
+                get_attribute.argtypes=[wintypes.HWND,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD]
+                dark=ctypes.c_int(); caption=ctypes.c_int()
+                assert get_attribute(hwnd,20,ctypes.byref(dark),4)==0 and dark.value==1
+                caption_supported=get_attribute(hwnd,35,ctypes.byref(caption),4)==0
+                if caption_supported:
+                    assert caption.value==0x1d1917, hex(caption.value)
+                result['polish']={**polish,'native_dark':dark.value,'caption_supported':caption_supported,'caption_color':caption.value if caption_supported else None,'launch_background':WindowTheme(C.DATA_ROOT)._background()}
                 if args.interactions:
                     # WebView2 suspends screenshot frames while its native window
                     # is hidden. Show this isolated fixture window for CDP capture.
@@ -320,6 +365,10 @@ def main():
                         page.locator('#setup-close').click()
                         page.screenshot(path=str(Path(C.DATA_ROOT) / 'desktop-workspace-dark.png'), animations='disabled')
                         assert not page_errors, page_errors
+                        from viewport_inspection_checks import run_viewport_inspection_checks
+                        viewer_checks=[]
+                        run_viewport_inspection_checks(page,context,f'http://127.0.0.1:{server.server_port}',Path(C.DATA_ROOT),viewer_checks,reuse_page=True)
+                        result['viewer_checks']=viewer_checks
                         result['interactions'] = ['WebView2 mouse opens the styled dropdown',
                             'ArrowDown/Enter select Dark; Escape preserves the choice',
                             'native color input and named palette survive WebView2 reload',

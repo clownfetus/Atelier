@@ -22,10 +22,15 @@ See [screenshot details](images/README.md).
   and individual value restoration.
 - **Work with textures and meshes:** import replacement textures, use read-only
   image/3D previews, and open supported mesh workflows in Blender.
+- **Inspect models:** switch Original/Edited textures or drag a before/after wipe,
+  click a material on the model, inspect labelled dye regions, choose lighting,
+  isolate objects, play a standing idle, and capture a poster or turntable.
 - **Review exports:** choose which edited assets to include, check the destination
   before building, and optionally copy the mod into your configured mods folder.
 - **Track work:** Activity records imports, exports and repatches. Bulk VFX / curves
   previews supported parameter changes before saving them to the project.
+- **Process S maps:** pair edited D textures with S maps in the same folder,
+  resize with Bicubic, and apply Color blending at 100% inside Atelier.
 - **Choose your appearance:** Light, Dark or System mode, Atelier/Darcula/Repak X
   palettes, and saved custom palettes with separate light and dark colors.
 
@@ -37,6 +42,29 @@ See [screenshot details](images/README.md).
 </details>
 
 ## Material editing
+
+### Process S maps
+
+Click **Process S maps** under **Edited Assets** to process every imported texture
+whose name ends in `_D`. The export checkboxes and library filters do not limit
+this action. Matching uses the same game folder and the corresponding `_S` name;
+numbered D maps can share an unnumbered S map, with a pairing chooser whenever
+several D maps could drive the same S map. Unmatched textures are skipped.
+
+Atelier uses a saved project S map when present, otherwise imports it from the
+game. Each D is resized to the S map's dimensions using Bicubic, then applied
+with built-in Color blending at 100% opacity. D files remain unchanged; S alpha
+is retained and transparent D pixels mask the color change. Photoshop is not
+required. The blend follows the [standard non-separable Color formula](https://www.w3.org/TR/compositing-1/#blendingcolor),
+rather than relying on a native Photoshop document or its color-profile settings.
+
+Processed S maps appear in Edited Assets for normal export. Activity lists the
+pairings and skipped paths. Original S inputs and a batch record are retained
+inside the project's `.atelier/s-map-backups/` directory. Cancellation and failures
+before publication leave project images untouched; a failed publication rolls
+back the batch.
+
+### Material parameters
 
 Inspect surface colors, dye regions and scalar groups together. Compare against
 the project's saved values or **Game original**, restore individual values, and

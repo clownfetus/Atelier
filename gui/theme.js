@@ -18,6 +18,9 @@
       light: ['#faf7f7', '#ece5e5', '#272326', '#aa2436'],
       dark: ['#101012', '#252527', '#f2eeee', '#ff5c68'],
     },
+    contrast: {light:['#ffffff','#ededed','#000000','#003c99'], dark:['#080808','#181818','#ffffff','#afd2ff']},
+    blueprint: {light:['#edf4fa','#dce8f2','#152e48','#215f9b'], dark:['#102235','#1b344c','#e4eff9','#88c5ff']},
+    comic: {light:['#faf5e8','#e9e0ca','#201d17','#a12b24'], dark:['#201e19','#343028','#fff3d7','#ff9a80']},
   };
   const defaults = () => ({preset: 'studio', custom: {}, saved: []});
   const validColors = p => p && colors.every(key => typeof p[key] === 'string' && /^#[0-9a-f]{6}$/i.test(p[key]));
@@ -42,7 +45,7 @@
             colors: Object.fromEntries(modes.map(mode => [mode, copyColors(entry.colors[mode])]))});
         }
       }
-      if (['studio', 'darcula', 'repak', 'custom', ...clean.saved.map(p => p.id)].includes(saved.preset)) clean.preset = saved.preset;
+      if ([...Object.keys(palettes), 'custom', ...clean.saved.map(p => p.id)].includes(saved.preset)) clean.preset = saved.preset;
       if (saved.preset === 'dracula') clean.preset = 'darcula';
       for (const mode of modes) {
         const candidate = saved.custom?.[mode];
@@ -56,6 +59,20 @@
   let appearance = parseAppearance(read(paletteKey));
   const applied = new Set();
   const resolvedMode = () => preference === 'system' ? (system.matches ? 'dark' : 'light') : preference;
+  let nativeScheduled = false, lastNative = '';
+  function syncNative() {
+    if (!window.pywebview?.api?.set_window_theme) return;
+    if (nativeScheduled) return;
+    nativeScheduled = true;
+    queueMicrotask(() => {
+      nativeScheduled = false;
+      const mode = resolvedMode(), payload = [mode, palette(appearance.preset, mode).background, preference,
+        palette(appearance.preset, 'light').background, palette(appearance.preset, 'dark').background];
+      const signature = JSON.stringify(payload); if (signature === lastNative) return; lastNative = signature;
+      window.pywebview.api.set_window_theme(...payload).catch(() => {lastNative = '';});
+    });
+  }
+  window.addEventListener('pywebviewready', syncNative);
   function palette(preset, mode) {
     const saved = appearance.saved.find(p => p.id === preset);
     if (saved) return {...saved.colors[mode]};
@@ -106,14 +123,19 @@
       'error': error, 'error-container': errorContainer, 'on-error-container': readable(fg, [errorContainer]),
     };
   }
-  function apply() {
+  let artworkAccent = null;
+  window.addEventListener('atelier:artwork', event => { artworkAccent = event.detail?.accent || null; applyNow(); });
+  window.addEventListener('atelier:preferences', () => applyNow());
+  function apply() { if (!window.AtelierPreferences?.revealTheme(applyNow)) applyNow(); }
+  function applyNow() {
     const mode = resolvedMode(), p = palette(appearance.preset, mode), root = document.documentElement;
     root.dataset.theme = mode;
     root.dataset.palette = appearance.preset;
     applied.forEach(key => root.style.removeProperty(key));
     applied.clear();
     const set = (key, value) => { root.style.setProperty(key, value); applied.add(key); };
-    if (appearance.preset !== 'studio') {
+    if (window.AtelierPreferences?.adaptive() && artworkAccent) p.accent = artworkAccent;
+    if (appearance.preset !== 'studio' || window.AtelierPreferences?.adaptive() && artworkAccent) {
       const derived = roles(p, mode);
       for (const [key, value] of Object.entries(derived)) set('--md-sys-color-' + key, value);
       const backgrounds = [derived.surface, derived['surface-container-low'], derived['surface-container-high']];
@@ -146,6 +168,7 @@
     }
     const remove = document.getElementById('theme-palette-delete');
     if (remove) remove.hidden = !appearance.saved.some(p => p.id === appearance.preset);
+    syncNative();
   }
   function save() {
     write(paletteKey, JSON.stringify({version: 2, ...appearance}));

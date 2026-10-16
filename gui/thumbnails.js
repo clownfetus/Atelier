@@ -56,6 +56,7 @@
         entry.fallback?.remove(); entry.fallback = null;
         thumb.dataset.previewState = 'ready';
         thumb.removeAttribute('title');
+        window.AtelierPolish?.play(img,[{opacity:0},{opacity:1}],120);
         if (!remaining().length) clearTimeout(timer);
       };
       img.onerror = () => {

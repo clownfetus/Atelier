@@ -1,0 +1,134 @@
+name: Build and verify release candidate
+on:
+  push:
+    branches: [codex/release-0.3.6]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      PYTHONUTF8: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pyinstaller==6.22.3 playwright==1.64.0 setuptools
+      - run: python tests/run_checks.py --report-dir reports/backend
+      - run: python scripts/release_inputs.py
+      - run: python -m PyInstaller --noconfirm --clean Atelier.spec
+      - run: python scripts/stage_tools.py --platform windows
+      - run: python scripts/release_manifest.py
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $version = (Get-Content version -Raw).Trim()
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' Atelier.iss "/DAppVersion=$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_manifest.py --manifest
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-installer
+          path: |
+            dist/AtelierSetup.exe
+            dist/installer-manifest.json
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: windows-backend-report
+          path: reports
+  installer:
+    needs: windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      ATELIER_DISPOSABLE_INSTALLER_TEST: '1'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-installer
+          path: ${{ runner.temp }}/candidate
+      - run: python -m pip install playwright==1.64.0
+      - name: Verify clean install, running upgrade, reinstall and uninstall
+        shell: pwsh
+        run: |
+          $manifest = Get-Content "$env:RUNNER_TEMP/candidate/installer-manifest.json" -Raw | ConvertFrom-Json
+          Invoke-WebRequest -Uri $manifest.previous_installer_url -OutFile "$env:RUNNER_TEMP/previous.exe"
+          python tests/installer_smoke.py --installer "$env:RUNNER_TEMP/candidate/AtelierSetup.exe" --previous-installer "$env:RUNNER_TEMP/previous.exe" --previous-sha256 $manifest.previous_installer_sha256 --payload-manifest "$env:RUNNER_TEMP/candidate/installer-manifest.json" --report-dir "$env:RUNNER_TEMP/installer-report"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: installer-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/installer-report
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install native Linux GUI build dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb
+      - run: python3 -m venv --system-site-packages .venv
+      - run: .venv/bin/python -m pip install -r requirements.txt pyinstaller==6.22.3 setuptools
+      - run: .venv/bin/python tests/run_checks.py --suite test_morphs.py --suite test_packaging.py --report-dir reports/linux
+      - run: .venv/bin/python scripts/release_inputs.py
+      - run: bash linux/build_appimage.sh
+      - run: .venv/bin/python scripts/release_manifest.py
+      - name: Check native AppImage startup
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/appimage-smoke"
+          cd "$RUNNER_TEMP/appimage-smoke"
+          "$GITHUB_WORKSPACE/dist/Atelier-0.3.6-x86_64.AppImage" --appimage-extract > /dev/null
+          export ATELIER_DATA_DIR="$RUNNER_TEMP/atelier-smoke-data"
+          export ATELIER_PORT=8897
+          xvfb-run -a ./squashfs-root/usr/Atelier/Atelier --help > startup.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8897/ > index.html; then
+              grep -q mesh-edit.js index.html
+              exit 0
+            fi
+            sleep 1
+          done
+          cat startup.log
+          exit 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: linux-appimage
+          path: dist/Atelier-*-x86_64.AppImage
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: linux-reports
+          path: |
+            reports
+            ${{ runner.temp }}/appimage-smoke/startup.log

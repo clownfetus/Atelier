@@ -99,7 +99,12 @@
     "folder-shapes": "category",
     "folder-sky": "cloud",
     "folder-deformer": "polyline",
-    "folder-prototype": "science"
+    "folder-prototype": "science",
+    "camera": "photo_camera",
+    "columns-2": "compare",
+    "chevron-down": "expand_more",
+    "mouse-pointer-2": "arrow_selector_tool",
+    "layers": "layers"
   },
   "largeMapping": {
     "folder": "folder",
@@ -684,6 +689,22 @@
       "sha256": "0212c59cfa1e2da887b0b36c7d89886de94b019feaaba5c063ec8dc7d32be436",
       "opticalSize": 24,
       "weight": 400
+    },
+    "photo_camera": {
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/symbols/web/photo_camera/materialsymbolssharp/photo_camera_24px.svg",
+      "sha256": "75ecadf7a931fa38aca3adb2e0db9f43231fe30f5e5413aa60b70edbd28bfd49"
+    },
+    "compare": {
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/symbols/web/compare/materialsymbolssharp/compare_24px.svg",
+      "sha256": "648a57fd98050e9516644c5ccf652a2a21519e5bb9bbb50c0990be7bef70e27c"
+    },
+    "expand_more": {
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/symbols/web/expand_more/materialsymbolssharp/expand_more_24px.svg",
+      "sha256": "6760bd2307f7ec3c1a5f2905af907aa7a12ad5ad7448289c8624f5d5ec6057e4"
+    },
+    "arrow_selector_tool": {
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/symbols/web/arrow_selector_tool/materialsymbolssharp/arrow_selector_tool_24px.svg",
+      "sha256": "5bacd95bbe0b491c6b3be36ecc4963e3dedea2b8adadb8a7f5742be4b5950219"
     }
   },
   "largeSources": {

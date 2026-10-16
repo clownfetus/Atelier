@@ -8,9 +8,9 @@ window.__materialWorkflowViewport = {
   seed() {
     generation++; materialGeneration++; saving=false; viewportProject=window.atelierProject();
     matsByName={}; edited={}; matData={Body:{game_rel:'Fixture/MI_Body', baseIdx:0, emiIdx:-1,
-      colors:[{name:'Tint',rgba:[.2,.3,.4,1]}],scalars:[]}}; buildPanel();
+      colors:[{name:'Tint',rgba:[.2,.3,.4,1]}],scalars:[]}}; selectedMaterial='Body'; buildPanel();
   }, edit:()=>onColorInput('Body','Tint','#ff0000'),
-  state:()=>({edited,colors:matData.Body.colors}), save:saveEdits
+  state:()=>({edited,colors:matData.Body.colors,hex:linToHex(matData.Body.colors[0].rgba)}), save:saveEdits
 };
 """
 
@@ -160,7 +160,10 @@ def run_material_workflow_checks(page, context, url, report, checks):
         old = pending(delayed_saves)
         old.fulfill(json={'ok': True})
         tab.evaluate('workflowViewportSave')
-        assert tab.evaluate('__materialWorkflowViewport.state().colors[0].rgba') == [1, 0, 0, 1]
+        saved=tab.evaluate('__materialWorkflowViewport.state()')
+        assert saved['colors'][0]['rgba']==writes[-1]['colors']['Tint']
+        assert saved['hex']=='#ff0000' and saved['colors'][0]['rgba'][0]>1
+        assert saved['colors'][0]['rgba'][1:]==[0,0,1]
         assert tab.evaluate('Object.keys(__materialWorkflowViewport.state().edited).length') == 0
         checks.append('Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save')
         assert not errors, errors

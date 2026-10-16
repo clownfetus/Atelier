@@ -6,6 +6,7 @@ from atelier.web.app import app
 from atelier import hostos
 from atelier import operations
 from atelier import jobs
+from atelier import preview
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
@@ -73,7 +74,7 @@ class _ProjectScopePlugin:
     name, api = "project_scope", 2
 
     def apply(self, callback, route):
-        if not route.rule.startswith("/api/") or route.rule == "/api/events":
+        if not route.rule.startswith("/api/") or route.rule in ("/api/events", "/api/showcase_webp"):
             return callback
 
         @wraps(callback)
@@ -83,6 +84,9 @@ class _ProjectScopePlugin:
                 body = body or {}
                 if not isinstance(body, dict):
                     raise ValueError("request body must be an object")
+                # Cancellation must reach a load even while that load holds the project lock.
+                if route.rule == '/api/viewport_cancel':
+                    return callback(*args, **kwargs)
                 # Validate asset paths before they can reach any cache/project join.
                 gr = body.get("game_rel") or request.query.get("game_rel") or request.forms.get("game_rel")
                 if gr:
@@ -113,13 +117,18 @@ class _ProjectScopePlugin:
                 name = (unquote(header) if header is not None else
                         request.query.get("_project", get_active_project()))
                 root = _c.project_dir(name, PROJECTS_ROOT) if name else IMPORT_ROOT
-                with operations.project_use(root, write=request.method == "POST" and
+                preview_id = request.get_header('X-Atelier-Preview')
+                with preview.scope(name, preview_id), operations.project_use(root, write=request.method == "POST" and
                                             not route.rule.startswith("/api/jobs")), _c.project_context(root):
                     if name and not os.path.isdir(root):
                         raise ValueError("project not found")
                     from atelier.storage import recover_project_writes
                     recover_project_writes(root)
+                    jobs.checkpoint()
                     return callback(*args, **kwargs)
+            except jobs.Cancelled:
+                response.status = 409
+                return {'ok': False, 'cancelled': True}
             except (ValueError, operations.BusyError, PublicationRecoveryError) as e:
                 response.status = 400 if isinstance(e, ValueError) else 409
                 response.content_type = "application/json"
@@ -138,6 +147,12 @@ def api_jobs():
 def get_active_project_for_request():
     header = request.get_header("X-Atelier-Project")
     return unquote(header) if header is not None else request.query.get("_project", get_active_project())
+
+
+@app.post('/api/viewport_cancel')
+def api_viewport_cancel():
+    preview.cancel(get_active_project_for_request(), (request.json or {}).get('id'))
+    return {'ok': True}
 
 
 @app.get("/api/jobs/<job_id>")
@@ -179,6 +194,24 @@ def api_bulk_apply():
 
 # ── extraction helpers ────────────────────────────────────────────────────────
 
+@app.post('/api/s_maps/plan')
+def api_s_maps_plan():
+    from atelier import s_maps
+    body = request.json or {}
+    if body.get('background'):
+        return _submit_job('s-map-plan', 'Find D/S texture pairs', lambda job: s_maps.plan())
+    return s_maps.plan()
+
+
+@app.post('/api/s_maps/process')
+def api_s_maps_process():
+    from atelier import s_maps
+    body = request.json or {}
+    work = lambda job: s_maps.process(body.get('plan_id'), body.get('choices'))
+    if body.get('background'):
+        return _submit_job('s-map-process', 'Process S maps', work)
+    return work(None)
+
 def _import_base(game_rel):
     """Full disk path (no ext) for a game_rel's project file, subfolder-mirrored by game_rel so
     same-named assets under different skins never collide. Prefers whichever layout already holds a
@@ -198,13 +231,30 @@ def _cache_import_base(game_rel):
 
 # ── static ────────────────────────────────────────────────────────────────────
 from atelier.catalogue import catalogue
+from atelier.hero_artwork import hero_artwork
 
 
 @app.get('/api/catalogue/status')
 def catalogue_status():
     catalogue.start_update()
+    with catalogue.lock:
+        hero_artwork.start_update(dict(catalogue.data.get('entries', {})))
     response.content_type = 'application/json'
-    return json.dumps(catalogue.status())
+    status = catalogue.status()
+    status['hero_artwork'] = hero_artwork.status()
+    status['updating'] = status['updating'] or status['hero_artwork']['updating']
+    return json.dumps(status)
+
+
+@app.get('/api/catalogue/hero/<cid>/<kind>')
+def catalogue_hero_artwork(cid, kind):
+    path = hero_artwork.image(cid, kind)
+    if not path:
+        response.status = 404
+        return b''
+    result = static_file(path.name, root=str(path.parent), mimetype='image/webp')
+    result.headers['Cache-Control'] = 'no-cache'
+    return result
 
 
 @app.get('/api/catalogue/thumbnail/<key>')
@@ -311,6 +361,9 @@ def api_browse_material_dirs():
 
 def _model_glb(game_rel):
     """Decode (cached) a mesh game_rel to a .glb; return its path or None."""
+    if os.path.isfile(project_base(game_rel)+'.blend'):
+        from atelier.handlers.meshreplace import preview as edited_mesh_preview
+        return edited_mesh_preview(game_rel)
     asset   = pak_game_path(game_rel)                        # Marvel/Content/Marvel/.../SK_...
     out_dir = os.path.join(_CACHE, "gltf")
     glb     = os.path.join(out_dir, *asset.split("/")) + ".glb"
@@ -333,8 +386,9 @@ def api_model_gltf():
         response.content_type = "application/json"
         return json.dumps({"error": str(e)})
     if glb and os.path.exists(glb):
-        return static_file(os.path.basename(glb), root=os.path.dirname(glb),
-                           mimetype="model/gltf-binary")
+        result=static_file(os.path.basename(glb), root=os.path.dirname(glb),mimetype="model/gltf-binary")
+        result.headers['Cache-Control']='no-store'
+        return result
     response.status = 404
     return b""
 
@@ -351,6 +405,7 @@ def api_skin_materials():
         return json.dumps({"ok": False, "error": "missing skin_id"})
     out, seen = {}, set()
     for p, _c in skin_entries(skin_id):
+        jobs.checkpoint()
         nm = os.path.basename(p)
         if not nm.upper().startswith("MI_") or not nm.lower().endswith(".uasset"):
             continue
@@ -361,6 +416,7 @@ def api_skin_materials():
         gr = game_rel_for_skin(skin_id, skin_rel(p, skin_id))
         try:
             params = read_material(gr, cache_only=True)
+            jobs.checkpoint()
             texs   = params.get("textures", {}) or {}
             tvers  = {g: _tex_version(g) for g in texs.values()}   # edited-mtime stamps for cache-busting
             # Dyeing materials must render the COMPOSITE, not the raw diffuse. Chromas differ only in
@@ -374,13 +430,32 @@ def api_skin_materials():
             print(f"[skin_materials] {base}: {e}", file=sys.stderr, flush=True)
     return json.dumps({"ok": True, "materials": out})
 
+
+@app.get("/api/idle_animations")
+def api_idle_animations():
+    from atelier.handlers.animation import idle_candidates
+    try:
+        return {"ok": True, "animations": idle_candidates(request.query.get('game_rel', ''))}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@app.post("/api/idle_animation")
+def api_idle_animation():
+    from atelier.handlers.animation import decode_idle
+    body = request.json or {}
+    try:
+        return {"ok": True, **decode_idle(body.get('game_rel', ''), body.get('animation_rel', ''))}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
 def _tex_version(game_rel):
     """Cache-busting stamp for a texture: mtime of the user's edited PNG if one exists, else '0'
     (vanilla). The viewport keys its GPU-texture cache on this, so edits invalidate while vanilla
     textures stay cached across opens."""
     edited = _import_base(game_rel) + ".png"
     try:
-        return str(int(os.path.getmtime(edited))) if os.path.exists(edited) else "0"
+        return str(os.stat(edited).st_mtime_ns) if os.path.exists(edited) else "0"
     except OSError:
         return "0"
 
@@ -399,12 +474,12 @@ def _dye_version(game_rel, texs):
             parts.append(_tex_version(g))
     return "-".join(parts)
 
-def _texture_png(game_rel):
+def _texture_png(game_rel, original=False):
     """PNG path for a texture game_rel. Prefers the user's EDITED/imported PNG in the active project
     (so viewport shows their edits); otherwise extracts + decodes the vanilla texture from the paks
     (cached in CACHE_3DVIEW). Returns a path or None."""
     edited = _import_base(game_rel) + ".png"
-    if os.path.exists(edited):
+    if not original and os.path.exists(edited):
         return edited
     out_dir = CACHE_3DVIEW
     base    = project_base(game_rel, out_dir)   # no ext, subfolder-mirrored (no basename collisions)
@@ -416,10 +491,11 @@ def _texture_png(game_rel):
     # processes/memory — that swarm is what crashes the viewport on big skins. Re-check the cache
     # inside the gate: a sibling request for the same texture may have finished while we waited.
     from atelier.tools import tex_semaphore
-    with tex_semaphore:
+    with jobs.cancellable_lock(tex_semaphore):
         if os.path.exists(out_png):
             return out_png
         cb = ensure_work_base(game_rel)     # retoc or UAssetTool per host; caches the result
+        jobs.checkpoint()
         if not cb or not os.path.exists(cb + ".uasset"):
             return None
         return _decode_texture_png(game_rel, base, out_png, cb)
@@ -429,7 +505,17 @@ def _decode_texture_png(game_rel, base, out_png, cb):
     # and the viewport shows a solid smear. decode_to_png recovers the largest SHIPPED mip from the
     # .uptnl/.ubulk and only falls back to UAssetTool when there's no recoverable block data.
     from atelier.handlers.texture import decode_to_png
-    return decode_to_png(base, cb)
+    from PIL import Image
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.viewport-texture-', dir=os.path.dirname(out_png)) as scratch:
+        decoded = decode_to_png(os.path.join(scratch, os.path.basename(base)), cb)
+        if not decoded:
+            return None
+        with Image.open(decoded) as image:
+            image.verify()
+        jobs.checkpoint()
+        os.replace(decoded, out_png)
+    return out_png
 
 @app.get("/api/texture_png")
 def api_texture_png():
@@ -439,7 +525,7 @@ def api_texture_png():
         response.status = 400
         return b""
     try:
-        png = _texture_png(gr)
+        png = _texture_png(gr, original=True) if request.query.get("original") == "1" else _texture_png(gr)
     except Exception as e:
         response.status = 500
         response.content_type = "application/json"
@@ -448,6 +534,22 @@ def api_texture_png():
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""
+
+@app.post("/api/showcase_webp")
+def api_showcase_webp():
+    from atelier.web.showcase import MAX_CAPTURE_BYTES, encode_turntable, capture_frames
+    if request.content_length > MAX_CAPTURE_BYTES:
+        response.status = 413
+        return {"ok": False, "error": "Capture exceeds 24 MB"}
+    try:
+        data = encode_turntable(capture_frames(request.body))
+    except (ValueError, OSError) as exc:
+        response.status = 400
+        return {"ok": False, "error": str(exc)}
+    response.content_type = "image/webp"
+    response.set_header("Content-Disposition", 'attachment; filename="showcase.webp"')
+    return data
+
 
 # ── dyeing / ID-mask preview ──────────────────────────────────────────────────
 @app.get("/api/dye_texture")
@@ -461,7 +563,8 @@ def api_dye_texture():
     try:
         from atelier.handlers.dye import dye_preview
         png = dye_preview(gr, size=int(request.query.get("size") or 1024),
-                          dye_off=request.query.get("dye_off") == "1")
+                          dye_off=request.query.get("dye_off") == "1",
+                          original=request.query.get("original") == "1")
     except Exception as e:
         print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
         response.status = 404
@@ -641,6 +744,20 @@ def api_stale_mips():
         return json.dumps({"ok": True, "items": items, "count": len(items)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e), "items": [], "count": 0})
+
+@app.post('/api/refresh_texture_mips')
+def api_refresh_texture_mips():
+    from atelier.handlers.texturerefresh import repair
+    return _submit_job('texture-refresh','Refresh high-resolution textures',lambda job:repair())
+
+
+@app.post('/api/revert_imported')
+def api_revert_imported():
+    from atelier.handlers.projectedit import revert
+    game_rel=(request.json or {}).get('game_rel','')
+    _c.validate_game_rel(game_rel)
+    return _submit_job('asset-revert','Revert '+os.path.basename(game_rel),lambda job:revert(game_rel))
+
 
 @app.get("/api/prereqs")
 def api_prereqs():
@@ -1168,6 +1285,35 @@ def api_usmap_update_check():
 
 # ── browse (unified) ──────────────────────────────────────────────────────────
 
+@app.get('/api/startup_progress')
+def api_startup_progress():
+    from atelier.index import index_progress
+    response.content_type = 'application/json'
+    return json.dumps(index_progress())
+
+
+@app.get('/api/catalogue/library')
+def api_catalogue_library():
+    from atelier.catalogue import catalogue
+    with catalogue.lock:
+        entries = dict(catalogue.data.get('entries', {}))
+    def describe(key, entry):
+        path = 'Characters/' + (key if len(key) == 4 else key[:4] + '/' + key)
+        return {'name': entry.get('name') or key, 'path': path,
+                'thumbnail': '/api/catalogue/thumbnail/' + key, 'hero_fallback': entry.get('hero_fallback', False)}
+    heroes = []
+    for key, entry in entries.items():
+        if not re.fullmatch(r'10\d{2}', key) or entry.get('kind') != 'hero' or not entry.get('image'):
+            continue
+        hero = describe(key, entry)
+        hero['avatar'] = '/api/catalogue/hero/' + key + '/avatar'
+        hero['logo'] = '/api/catalogue/hero/' + key + '/logo'
+        hero['skins'] = [describe(sid, skin) for sid, skin in entries.items()
+                         if re.fullmatch(r'\d{7}', sid) and skin.get('hero') == key and skin.get('image')]
+        heroes.append(hero)
+    response.content_type = 'application/json'
+    return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold())})
+
 @app.get("/api/browse")
 def api_browse():
     path = request.query.get("path", "")
@@ -1420,7 +1566,12 @@ def api_prefetch_thumbs():
 @app.get("/api/imported")
 def api_imported():
     response.content_type = "application/json"
-    return json.dumps(all_imported())
+    items = all_imported()
+    from atelier.ui_preview import saved_preview
+    for item in items:
+        preview = saved_preview(item['game_rel'], item['file_type'])
+        if preview: item['ui_preview'] = preview
+    return json.dumps(items)
 
 # ── single import (texture) ────────────────────────────────────────────────────
 
@@ -1743,7 +1894,8 @@ def _run_import_job_in_project(items):
                                  "game_rel": it["game_rel"]})
             with _job_lock:
                 _job.update(current=current, name=it["name"])
-            _push_sse({"current": current, "total": len(items), "name": it["name"], "done": False})
+            _push_sse({"current": current, "total": len(items), "name": it["name"], "done": False,
+                       "game_rel": it['game_rel'], "ok": os.path.exists(dst_base + '.png')})
     except Exception as e:
         with _job_lock:
             _job.update(running=False, done=True, error=str(e))
@@ -2291,6 +2443,39 @@ def api_open_with():
 
 # ── Blender mesh editing ──────────────────────────────────────────────────────
 
+@app.post('/api/mesh_add')
+def api_mesh_add():
+    from atelier.handlers.meshreplace import add
+    return add((request.json or {}).get('game_rel',''))
+
+
+@app.post('/api/mesh_replace')
+def api_mesh_replace():
+    from atelier.handlers.meshreplace import prepare,import_options,MODEL_EXTENSIONS,COMPANIONS
+    game_rel=request.forms.get('game_rel','')
+    files=request.files.getall('files')
+    if not game_rel or not files:return {'ok':False,'error':'Choose a mesh and replacement files'}
+    import tempfile
+    upload=tempfile.TemporaryDirectory(prefix='atelier-model-upload-')
+    try:
+        options=import_options(json.loads(request.forms.get('options','{}')))
+        sources=[];seen=set();total=0
+        for entry in files:
+            name=os.path.basename(entry.filename.replace('\\','/'));extension=os.path.splitext(name)[1].lower()
+            if extension not in MODEL_EXTENSIONS|COMPANIONS or name.lower() in seen:raise ValueError('Unexpected or duplicate replacement file')
+            seen.add(name.lower());target=os.path.join(upload.name,name)
+            with open(target,'wb') as output:
+                while chunk:=entry.file.read(1024*1024):
+                    total+=len(chunk)
+                    if total>2*1024**3:raise ValueError('Replacement files exceed 2 GB')
+                    output.write(chunk)
+            if extension in MODEL_EXTENSIONS:sources.append(target)
+        if len(sources)!=1:raise ValueError('Choose one model file, plus its cooked companions when needed')
+        def run(job):return prepare(game_rel,sources[0],options)
+        return _submit_job('mesh-replace','Replace '+os.path.basename(game_rel),run,upload.cleanup)
+    except BaseException:
+        upload.cleanup();raise
+
 @app.post("/api/mesh_blend_extract")
 def api_mesh_blend_extract():
     """Decode a SkeletalMesh into an editable .blend in the active project, with its materials'
@@ -2540,7 +2725,7 @@ def api_open_export_folder():
 # Every on-disk form a project edit can take. A mesh's edit is a .blend (plus Blender's .blend1
 # backup and the texture manifest beside it), so deleting one has to clear those too -- otherwise
 # the asset returns on the next sidebar refresh and "Delete" looks like it did nothing.
-_EDIT_EXTS = (".png", ".json", ".blend", ".blend.mat.json", ".blend1")
+_EDIT_EXTS = (".png", ".json", ".blend", ".blend.mat.json", ".blend1", ".mesh.json", ".mesh.glb")
 
 def _delete_one_imported(gr):
     """Remove every on-disk trace of one edited asset (both project layouts + the work copy)."""

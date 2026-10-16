@@ -1,6 +1,6 @@
 # Motion inventory
 
-The six supplied animation sets have scoped production assets in this directory.
+The animation sets have scoped production assets in this directory.
 Presentation owns artwork and animation lifecycle; application code owns project
 state, requests and outcomes. The static interface remains usable when an optional
 controller, image or animation API fails. No demo exporter, theme override or
@@ -14,6 +14,50 @@ simulated progress loop is part of the application.
 | Material save | Save-result notifications | 24px, actual persistence result |
 | Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance |
 | Empty assets | Confirmed empty Edited Assets sidebar | 112px technical tray, brief entrance then still |
+| Texture reconstruction | Edited texture previews in the grid and sidebar | Image blocks assemble after an external save or successful replacement |
+| Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
+
+## Continuity and polish lifecycle
+
+`AtelierMotion.polish.mount(host, {state, frames, duration})` returns `setState`,
+`destroy` and a completion promise. Replacing or removing a host cancels its
+previous effect; page hide and forced/OS reduced motion release active effects.
+View Transition names are transient and cleaned after completion or cancellation.
+The actual request/close is independent of the visual completion. Dialogs retain
+plain CSS exits when discrete transitions are supported; older engines close
+immediately. Existing save/export controllers also follow the shared motion policy.
+
+The optional first-export color burst requires a confirmed successful export and
+real selected-preview colors, persists its one-time flag locally, and becomes
+static chips with reduced motion. Logo replay is an explicit click/keyboard
+action. The loader's artwork tint remains contrast-corrected on its fixed surround.
+
+Browser coverage: `tests/browser_smoke.py --polish-only --report-dir <folder>`.
+Native coverage: `tests/desktop_smoke.py --fixtures` with isolated
+`ATELIER_DATA_DIR`; its `polish` report checks static lifecycle, operation identity,
+collation, segments, preferences and the actual native launch/title-bar bridge.
+
+# Texture reconstruction
+
+`texture-reconstruction.js` exposes `AtelierTextureReconstruction.refresh(image,
+src, {project})`, `disposeWithin(container)` and `clear()`. Only edit notifications
+and successful Replace Texture actions call it; ordinary browsing and initial
+imports do not animate. Grid and sidebar refreshes use the same project-bound
+edited PNG URL and wait for the real image load before starting.
+
+The updated image remains underneath a temporary, non-interactive canvas. Its
+pixels assemble in 64 blocks (16 in the compact sidebar), settling in about
+640ms/430ms. Rectangular maps retain contain fit and transparency. At most four
+canvases animate concurrently; offscreen, hidden and reduced-motion views update
+statically. Repeated saves replace the previous effect. Navigation, list redraw,
+project changes, failed reads, missing canvas support and page hide release the
+temporary layers. Presentation does not write textures or delay image requests.
+
+`tests/texture_reconstruction_checks.py` covers actual image arrival, external
+save and replacement integration, exact final pixels, repeated saves, reduced
+motion, optional component failures and abandoned project/grid updates. Run the
+focused browser checks with `tests/browser_smoke.py --texture-reconstruction-only
+--report-dir _work/texture-reconstruction-checks`.
 
 # Export feedback
 
@@ -282,3 +326,18 @@ trigger empty-state motion, and that no new API/project writes are introduced.
 Run the combined browser suite and native smoke before claiming end-to-end
 integration; asset presence and the older four-set test counts alone are not
 validation of these two adapters.
+
+Saved-preview swaps pass the mode 'wipe' to AtelierTextureReconstruction.refresh.
+The controller retains a small previous-preview snapshot until the real image
+loads, then wipes to the new pixels over 320ms. Alpha, contain fit and lifecycle
+cleanup remain intact. Block assembly remains the default for direct consumers.
+
+The viewport's existing render lifecycle also owns its 420ms wireframe/shaded
+clipping sweep, 150ms linear colour and texture blends, and 260ms camera framing.
+`viewport-effects.js` owns disposable display variants and bounded optional bloom
+targets. Model/project replacement and close release these resources; the hidden
+viewer stops rendering. Reduced motion selects the final shaded colours and
+camera position immediately. No additional idle loop or automatic standing-idle
+playback is introduced. Browser and native viewer checks include rendering,
+interruption, alpha captures and target disposal. Native automation intercepts
+only the final download click to inspect real encoded bytes before an OS dialog.

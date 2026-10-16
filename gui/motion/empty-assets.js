@@ -438,7 +438,7 @@
 
     if (typeof global.matchMedia === 'function') {
       try {
-        mql = global.matchMedia('(prefers-reduced-motion: reduce)');
+        mql = global.AtelierMotionPolicy?.query() || global.matchMedia('(prefers-reduced-motion: reduce)');
         if (typeof mql.addEventListener === 'function') {
           mql.addEventListener('change', onMediaQueryChange);
         } else if (typeof mql.addListener === 'function') {

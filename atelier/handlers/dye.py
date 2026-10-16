@@ -14,6 +14,7 @@ are edited/shipped through the normal material path (material.save_material / st
 """
 import os, json, collections
 import numpy as np
+from atelier import jobs
 from PIL import Image, ImageDraw, ImageFont
 
 from atelier.config import _CACHE, PAKS, WORK_IMPORT_ROOT, project_base
@@ -56,8 +57,11 @@ def region_hex(idx):
     return "#%02x%02x%02x" % (r, g, b)
 
 
-def dye_slots(game_rel):
+def dye_slots(game_rel, original=False):
     """(mask_game_rel, diffuse_game_rel) for a dyeing MI, or (None, None)."""
+    if original:
+        tex = M.read_material_original(game_rel).get("textures") or {}
+        return tex.get(MASK_SLOT), tex.get(DIFF_SLOT)
     try:
         d = json.load(open(M.mat_json(game_rel), encoding="utf-8-sig"))
     except Exception:
@@ -70,9 +74,9 @@ def is_dyeable(game_rel):
     return bool(dye_slots(game_rel)[0])
 
 
-def dye_regions(game_rel):
+def dye_regions(game_rel, original=False):
     """{region_idx: {'ColorA': rgba, 'ColorB': rgba, 'ColorGChannel': rgba, ...}} from the MI."""
-    r = M.read_material(game_rel)
+    r = M.read_material_original(game_rel) if original else M.read_material(game_rel)
     out = collections.defaultdict(dict)
     for c in (r.get("colors") or []):
         n = c.get("name") or ""
@@ -117,29 +121,30 @@ def _stamp(game_rel):
         return ("edit", png, 0)
 
 
-def _tex_image(game_rel):
+def _tex_image(game_rel, original=False):
     """Extract + decode a texture to a PIL image. decode_dds first: MR strips the top mip, and
     UAssetTool maps mip[i]->DataResource[i], so with mip0 absent it degrades to the 4x4 tail."""
-    stamp = _stamp(game_rel)
-    hit = _IMCACHE.get(game_rel)
+    stamp = ("vanilla",) if original else _stamp(game_rel)
+    key = (game_rel, "original") if original else game_rel
+    hit = _IMCACHE.get(key)
     if hit is not None and hit[0] == stamp:
         return hit[1]
-    im = _tex_image_uncached(game_rel)
+    im = _tex_image_uncached(game_rel, original=True) if original else _tex_image_uncached(game_rel)
     if im is not None:
-        _IMCACHE[game_rel] = (stamp, im)
+        _IMCACHE[key] = (stamp, im)
     return im
 
-def _tex_image_uncached(game_rel):
+def _tex_image_uncached(game_rel, original=False):
     import atelier.asset_cache as _ac
     from atelier.tools import tex_semaphore
     # Same swarm hazard as the viewport's albedo path: dye previews extract+decode a mask AND a
     # diffuse, fired concurrently. Gate the heavy work so we don't pile up UAssetTool processes /
     # full-res textures in RAM (the thing that crashes the viewport on big skins).
-    edited = edited_png(game_rel)
+    edited = None if original else edited_png(game_rel)
     if edited:
         im = Image.open(edited); im.load()
         return im
-    with tex_semaphore:
+    with jobs.cancellable_lock(tex_semaphore):
         cb = TX.ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
         if not cb or not os.path.exists(cb + ".uasset"):
             return None
@@ -246,20 +251,20 @@ def composite(mask_im, diff_im, regions, size=1024):
     return Image.fromarray(np.clip(srgb * 255.0, 0, 255).astype(np.uint8), "RGB")
 
 
-def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=False):
+def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=False, original=False):
     """Composite a dye preview. `overrides` = {region_idx: {param: rgba}} applied over the MI's own
     values so the UI can preview an unsaved colour pick. Returns the PNG path.
 
     dye_off previews what stage_dye_off() ships: no dyeing at all, the BaseColor exactly as it is
     on disk. That is the whole point of the toggle, so the preview has to show it — a "disabled"
     checkbox next to a still-dyed picture is the same non-answer finngmin already has."""
-    mask_gr, diff_gr = dye_slots(game_rel)
+    mask_gr, diff_gr = dye_slots(game_rel, original=True) if original else dye_slots(game_rel)
     if not mask_gr:
         raise RuntimeError("not a dyeing material (no %s slot): %s" % (MASK_SLOT, game_rel))
-    mask_im = _tex_image(mask_gr)
+    mask_im = _tex_image(mask_gr, original=True) if original else _tex_image(mask_gr)
     if mask_im is None:
         raise RuntimeError("could not decode the ColorID mask: " + mask_gr)
-    diff_im = _tex_image(diff_gr) if diff_gr else None
+    diff_im = (_tex_image(diff_gr, original=True) if original else _tex_image(diff_gr)) if diff_gr else None
     if diff_im is None:                                  # dye-only preview if the diffuse is missing
         diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
     if dye_off:
@@ -268,11 +273,11 @@ def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=Fals
         os.makedirs(os.path.dirname(out), exist_ok=True)
         im.save(out)
         return out
-    regions = dye_regions(game_rel)
+    regions = dye_regions(game_rel, original=True) if original else dye_regions(game_rel)
     for k, v in (overrides or {}).items():
         regions.setdefault(int(k), {}).update(v)
     im = composite(mask_im, diff_im, regions, size=size)
-    out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "preview")) + ".png")
+    out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "original" if original else "preview")) + ".png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     im.save(out)
     return out

@@ -1,0 +1,42 @@
+#library-hero[hidden] { display: none; }
+#library-hero {
+  position: relative; isolation: isolate; overflow: hidden; flex: 0 0 auto;
+  min-height: 156px; margin: 0 16px 12px; border: 1px solid var(--border);
+  border-radius: var(--studio-shape-large); background: var(--md-sys-color-surface-container);
+}
+.library-hero-art { position: absolute; inset: 0 0 0 auto; width: 62%; height: 100%; object-fit: cover; object-position: center 30%; opacity: 0; mask-image:linear-gradient(90deg,transparent,#000 55%); }
+.has-art .library-hero-art { opacity: 1; }
+#library-hero::after {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(90deg, var(--md-sys-color-surface-container) 25%, transparent 100%);
+}
+.library-hero-copy { position: relative; z-index: 2; width: fit-content; max-width: 65%; padding: 22px 24px; }
+.library-hero-copy > span { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); }
+.library-hero-copy h2 { display:flex; align-items:center; gap:10px; margin: 8px 0; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
+.library-hero-copy p { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+@media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 14px 20px; } .library-hero-copy h2 { font-size: 24px; } }
+
+/* Only the grid container moves. Shared elements have their own named snapshots. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition { pointer-events:none; }
+::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2,0,0,1); }
+::view-transition-old(atelier-grid) { animation: library-grid-out 120ms ease both; }
+::view-transition-new(atelier-grid) { animation: library-grid-in 160ms cubic-bezier(.2,0,0,1) both; }
+:root[data-library-direction="back"] { --library-entry: -8px; }
+:root[data-library-direction="forward"] { --library-entry: 8px; }
+@keyframes library-grid-out { to { opacity: 0; } }
+@keyframes library-grid-in { from { opacity: 0; transform: translateX(var(--library-entry, 8px)); } to { opacity: 1; transform: none; } }
+
+/* Native display transitions keep a closing overlay painted for its 120ms exit.
+   Engines without discrete transitions retain the existing immediate close. */
+@supports (transition-behavior: allow-discrete) {
+  .overlay { opacity: 0; transition: opacity 120ms ease, display 120ms allow-discrete; }
+  .overlay.active { opacity: 1; }
+  .overlay:not(.active) { pointer-events: none; }
+  @starting-style { .overlay.active { opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .library-hero-art { transition: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+:root[data-motion=reduce]::view-transition-group(*), :root[data-motion=reduce]::view-transition-old(*), :root[data-motion=reduce]::view-transition-new(*) { animation:none !important; }

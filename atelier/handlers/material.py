@@ -3,6 +3,7 @@ from atelier.storage import atomic_json, publish_files
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
                             project_base, project_base_legacy)
 from atelier.tools import uat
+from atelier import jobs
 from atelier.paths import pak_game_path
 
 _original_lock = threading.Lock()
@@ -124,8 +125,14 @@ def mat_json(game_rel, out_dir=None):
         raise RuntimeError(TX_missing_reason(game_rel, "material"))
     sub = os.path.dirname(jp)                         # the game_rel subfolder under out_dir
     os.makedirs(sub, exist_ok=True)
-    uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])
-    if not os.path.exists(jp): raise RuntimeError("to_json produced no JSON")
+    with tempfile.TemporaryDirectory(prefix='.material-', dir=sub) as scratch:
+        uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(scratch)])
+        converted = os.path.join(scratch, os.path.basename(jp))
+        if not os.path.exists(converted): raise RuntimeError("to_json produced no JSON")
+        with open(converted, encoding='utf-8-sig') as stream:
+            json.load(stream)
+        jobs.checkpoint()
+        os.replace(converted, jp)
     return jp
 
 def read_material(game_rel, cache_only=False):

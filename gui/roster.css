@@ -1,0 +1,21 @@
+#hero-roster { flex:0 0 auto; margin:0 16px 8px; min-width:0; }
+#hero-roster[hidden] { display:none; }
+#hero-roster summary { color:var(--muted); font-size:12px; cursor:pointer; padding:4px 0 8px; }
+.roster-carousel { display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:center;gap:6px;margin-bottom:6px;min-width:0; }
+.roster-strip,.roster-skins { display:flex;overflow-x:auto;gap:8px;padding:2px;scrollbar-width:none;min-width:0; }
+.roster-strip::-webkit-scrollbar,.roster-skins::-webkit-scrollbar { display:none; }
+.roster-scroll { display:grid;place-items:center;width:28px;min-height:32px;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text);cursor:pointer; }
+.roster-scroll:hover:not(:disabled) { border-color:var(--acc);color:var(--acc);background:var(--bg3); }
+.roster-scroll:disabled { opacity:.3;cursor:default; }
+.roster-scroll:focus-visible,.roster-portrait:focus-visible,.roster-skin:focus-visible { outline:2px solid var(--acc);outline-offset:2px; }
+.roster-portrait,.roster-skin,.roster-open { border:1px solid var(--border); background:var(--bg2); color:var(--text); border-radius:6px; cursor:pointer; flex-shrink:0; font:inherit; }
+.roster-portrait { position:relative; width:70px; height:76px; overflow:hidden; padding:0; }
+.roster-portrait img { width:100%; height:calc(100% - 24px); object-fit:contain; object-position:center; }
+.roster-portrait span { position:absolute; inset:auto 0 0; padding:4px 2px; font-size:10px; line-height:1.1; background:var(--bg2); }
+.roster-portrait[aria-pressed=true] { border-color:var(--acc); outline:1px solid var(--acc); outline-offset:-2px; }
+.roster-skin { display:flex; align-items:center; max-width:220px; min-height:32px; padding:5px 10px; font-size:11px; }
+.roster-skin[data-artwork-colour] { background:var(--roster-skin-background,var(--bg2));color:var(--roster-skin-foreground,var(--text));border-color:var(--roster-skin-border,var(--border)); }
+.roster-skin:hover { border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc); }
+.roster-skin span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.roster-open { padding:4px 10px; font-size:11px; }
+@media(max-height:800px) { .roster-portrait { height:62px;width:62px; } }

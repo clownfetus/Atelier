@@ -49,6 +49,74 @@ For a fresh directory, use Atelier's Setup/Settings to select the game Paks fold
 
 ## Automated checks
 
+### Interface polish and continuity
+
+```powershell
+.\.venv\Scripts\python.exe tests/browser_smoke.py --polish-only --report-dir 'D:\AtelierDev\polish\browser'
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_presentation.py --report-dir 'D:\AtelierDev\polish\backend'
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\polish\native'
+.\.venv\Scripts\python.exe tests/desktop_smoke.py --fixtures
+```
+
+The polish browser fixtures label their synthetic hero artwork and saved color/
+curve previews. They cover navigation/editor continuity, real toast lifecycle,
+collation/countdown pause, import outcomes, inert snapshots, preferences, fallback
+navigation and both themes at 1024×768 and 1400×900. `test_presentation.py` checks
+launch-cache validation/System resolution, read-only saved previews, metadata-only
+roster responses and completed-container progress. Native smoke reads the actual
+DWM dark-caption state and the next-launch cache; custom caption color is checked
+only on Windows versions that expose that attribute. These source checks do not
+rebuild or install the packaged application.
+
+### Model viewer and standing idles
+
+The viewer uses `gui/viewport-inspection.js` for camera framing, picking, lighting,
+Original/Edited comparison, dye overlays and showcase capture. Original material
+reads bypass project edits; original textures and dye composites use dedicated
+cache paths. Display modes never become project edits. The wipe supports both
+dragging its vertical divider and the keyboard-accessible range control.
+
+`gui/viewport-effects.js` owns the fading grid, soft floor shadow, silhouette
+outline, linear display transitions and optional emissive bloom. Fit eases to the
+visible bounds; double-click frames a part. Click selects a material, and its
+Edit button opens the existing editor. Bloom starts off and releases its bounded
+render targets when disabled or closed. Stage backdrops can be a theme gradient,
+a chosen plain colour, or a transparency checker; PNG and WebP preserve alpha.
+Reduced motion settles transitions immediately. The checked implementation
+inventory is in `docs/goal-list-2026-10-16.md`.
+
+Pass `--viewer-checks` to `tests/frozen_smoke.py` to run the viewer interaction,
+shader, capture and cleanup checks in the packaged WebView2 shell. Optional
+`--mesh <decoded.glb> --idle <decoded-idle.json>` verifies real geometry and idle
+playback. Packaged viewer files must match the source used by the checks.
+
+`gui/viewport-animation.js` plays real bone tracks using Three.js AnimationMixer.
+Standing idle candidates come from the local pak index. Playback checks the mesh's
+bone hierarchy and converts motion through the mesh's actual exported bind matrices.
+Unmatched accessory bones retain their bind offsets and follow their parent. It supports
+pause and Rest pose, starts the first compatible standing idle on repeat, cancels stale
+loads, and stops when the viewer closes. Camera rotation happens only during a
+turntable capture. Poster PNG and 48-frame WebP downloads include a mod name and
+palette; capture restores camera, controls and playback, and can be cancelled.
+The preview retains the mesh exporter's unit bone scales and does not simulate
+runtime cloth/hair physics. Native desktop captures use the WebView Save As dialog.
+
+Build the native decoder once before development or packaging, using .NET SDK 10
+and the exact CUE4Parse libraries bundled in your existing AtelierMesh:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/build_animation_decoder.py --tools 'D:\AtelierDev\phase-0-1\Tools'
+.\.venv\Scripts\python.exe tests/browser_smoke.py --viewport-only --report-dir 'D:\AtelierDev\viewer-checks'
+```
+
+The builder writes a new `Tools/AtelierAnimation` directory and refuses to replace
+an existing one. Pass `--dotnet <path-to-dotnet.exe>` for a local SDK. Release
+staging and the Windows installer require the decoder and its native dependencies.
+Linux/Wine animation playback still needs native validation. No game assets,
+animation tracks, keys or mappings belong in source control or release packages.
+Use optional `--mesh <decoded.glb> --idle <decoded-idle.json>` with browser checks
+to verify real game geometry, bone motion, pause and rest-pose restoration.
+
 ```powershell
 .\.venv\Scripts\python.exe tests/run_checks.py --report-dir 'D:\AtelierDev\phase-0-1\checks'
 .\.venv\Scripts\python.exe tests/browser_smoke.py --report-dir 'D:\AtelierDev\phase-0-1\browser-checks'
@@ -627,3 +695,49 @@ application payload was built at `7f4898a6f5047942c425225f81fd71fc62b7cf8a`.
 The test harness revision was `d5288ce9d21e54176aabb147dffd96a2f9963a0a`.
 These checks used synthetic projects and fixtures; game rendering/export remains
 outside the installer verification scope.
+
+
+## Contextual Model Studio (16 October 2026)
+
+The viewer is a separate editing workspace using local surface tokens in
+`gui/viewport.css`. Header Save changes owns all pending colours, including
+materials hidden by a different mesh choice. Select a part or material group
+to reveal its inspector; Advanced parameters retains exact shader controls
+and the existing full material editor. Model and View settings are exclusive
+menus. Loading and save feedback is inline; closing or replacing a material
+load still cancels browser and native work. Skins open with one mesh; combine
+parts explicitly in Model. Rig identifiers are preserved when pairing chromas.
+
+`tests/viewport_inspection_checks.py` covers grouped part drafts, entered hex
+roundtrips through the ACES display curve, both themes, compact layouts,
+menu dismissal/focus, camera framing, comparison, capture/restore/cancel,
+bloom cleanup and real decoded idle tracks. `tests/native_viewer_smoke.py
+--design-checks` uses configured game data to verify actual material matching,
+mesh selection, original/wipe comparisons and standing-idle playback in the
+packaged WebView2. All writes in the UI regression tests use disposable data
+or intercepted save requests. Native design checks create only in-memory
+colour drafts and revert them; they never save or install a game mod.
+
+Native capture checks verify the actual encoded PNG/WebP before intercepting
+the final download anchor, so Windows Save As itself is a manual check.
+The standalone browser suite verifies actual downloads.
+
+Model replacement import offers three independent options, all enabled initially:
+keep the original skeleton, preserve compatible weights, and keep original morph
+targets. Choices are stored on the replacement object in the saved Blender model
+and respected by subsequent builds. Disabling the skeleton option still requires
+matching bone names and hierarchy; disabling weights transfers all weights from
+the original. Morph preservation decodes UE5 compressed GPU morph buffers, maps
+their position and normal deltas to replacement geometry, updates cooked CPU
+counts, and preserves original names and reference order. Saved rest positions,
+vertex IDs and source LODs maintain correspondence through editing and decimation.
+The preview GLB includes sparse morph accessors. Unsupported metadata layouts fail
+validation before publication. Changed facial geometry still requires an in-game
+animation review; automated checks do not establish facial likeness or rig quality.
+
+`tests/test_morphs.py` covers known-format bit packing, malformed data, vertex
+reordering, saved correspondence, UV seams, barycentric projection and quantized
+counts. `tools-src/AtelierMorphCheck` is an independent CUE4Parse-based verification
+reader, not a shipped runtime dependency. Native checks rebuild available LODs,
+package and independently extract a mod, and compare its morph identities, CPU
+counts, skeleton and decoded deltas against that reader.

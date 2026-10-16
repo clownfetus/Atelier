@@ -728,16 +728,28 @@ previewed in Blender. Fix: convert each bone's quaternion for the LH→RH change
 rotating only the root. Currently worked around by unbinding the armature. **No effect on
 shipped mods.**
 
-### 5.2 Morph target preservation — **78.8% of characters carry morphs**
+### 5.2 Morph target preservation — implemented 16 October 2026
 Magik's 22 body correctives made this look like a minor cosmetic loss; the survey shows
-405 of 514 body meshes ship morph data, so a rebuild degrades four characters in five.
-Morphs are dropped unconditionally. Two tiers worth having:
-- **Same topology** (deform-only edits): carry the morph block through verbatim; the
-  vertex indices are still valid. Cheap and would cover most proportion edits.
-- **Changed topology**: rebuild deltas by nearest-surface transfer. The stored format is
-  UE5's bit-packed quantised GPU morph data (`FMorphTargetVertexInfoBuffers`:
-  `MorphData` word array, per-morph min/max `FVector4`, batch offsets, `NumTotalBatches`,
-  `PositionPrecision`, `TangentZPrecision`), so this needs a **decoder and an encoder**.
+The historical strip-only behavior described earlier in this investigation is
+superseded. `atelier/handlers/morph.py` reads and writes quantized UE5 GPU batches,
+keeps the original MorphTargets reference order and names, and updates stripped
+CPU LOD counts/base-vertex metadata. Identical mappings retain original compressed
+bytes. Reordered or added vertices receive remapped/interpolated deltas within
+their original material section, with UV/normal disambiguation at coincident points.
+Original rest coordinates and vertex/LOD IDs survive Blender edits and decimation.
+Replacement previews include sparse glTF position/normal morph targets.
+
+Import defaults skeleton, compatible weights, and morph preservation on. These
+choices are stored inside the editable blend and respected by later builds. A
+replacement armature is accepted only with matching names and hierarchy. Turning
+weight preservation off transfers all weights; turning morph preservation off
+clears the rebuilt morph data and its CPU counts deliberately.
+
+`tests/test_morphs.py` covers packing, malformed input, index changes, new vertices,
+coincident points, sculpted rest bindings and quantization counts. The independent
+CUE4Parse reader in `tools-src/AtelierMorphCheck` checks native binary output.
+These checks establish data integrity; modified facial silhouettes still need
+animation review in the game.
 
 ### 5.3 Index-width promotion on growth — **29.6% of characters, do this first**
 `rebuild_lod_buffers` picks 16-bit indices when a LOD fits under 65,536 vertices and raises

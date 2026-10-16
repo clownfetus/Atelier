@@ -52,6 +52,7 @@
     // All application removal paths use this element's remove(), never a last-toast query.
     el.remove = dispose;
     area.appendChild(el);
+    if (duration > 0) { el.classList.add('toast-timed'); el.style.setProperty('--toast-duration', duration+'ms'); }
     try {
       if (window.AtelierMotion?.materialSave) {
         motion = window.AtelierMotion.materialSave.mount(host, {state});

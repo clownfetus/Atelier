@@ -33,17 +33,17 @@ window.__vp = {
   renderStats: () => ({geometries: renderer?.info.memory.geometries,
                        textures: renderer?.info.memory.textures, animating: !!raf}),
   async staleTexture() {
-    const original = texLoader.loadAsync;
+    const original = materialTexture;
     const fresh = new THREE.Texture();
     let complete;
-    texLoader.loadAsync = () => new Promise(r => complete = r);
+    materialTexture = () => new Promise(r => complete = r);
     matsByName = {Body: [{map: fresh, color: new THREE.Color()}]};
     const pending = applyMatTexture('Body', 'Test/Old');
     materialGeneration++;
     const stale = new THREE.Texture();
     complete(stale); await pending;
     const kept = matsByName.Body[0].map === fresh;
-    texLoader.loadAsync = original;
+    materialTexture = original;
     matsByName = {};
     return kept;
   }
@@ -60,8 +60,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
+    parser.add_argument('--idle', type=Path, help='Optional real decoded standing-idle JSON for playback verification')
     parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
+    parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
+    parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
+    parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
+    parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
+    parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
+    parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -96,6 +103,7 @@ def main():
                 '/api/stale_mips': {'ok': True, 'count': 0},
                 '/api/usmap_update_check': {'ok': True},
                 '/api/catalogue/status': {'updating': False, 'portraits': 803},
+                '/api/catalogue/library': {'heroes': []},
             }.get(path)
             if payload is not None:
                 route.fulfill(json=payload)
@@ -141,6 +149,72 @@ def main():
                 checks.append('UI loads at three desktop sizes without uncaught JavaScript errors')
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
 
+                if args.viewer_followups_only:
+                    from viewer_followup_checks import run_viewer_followup_checks
+                    run_viewer_followup_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
+
+                if args.polish_only:
+                    from polish_checks import run_polish_checks
+                    run_polish_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.viewport_loading_only:
+                    from viewport_loading_checks import run_viewport_loading_checks, run_hero_artwork_checks
+                    run_viewport_loading_checks(page, context, url, report, checks)
+                    run_hero_artwork_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.viewport_only:
+                    from viewport_loading_checks import run_viewport_loading_checks, run_hero_artwork_checks
+                    from viewport_inspection_checks import run_viewport_inspection_checks
+                    from viewport_motion_checks import run_viewport_motion_checks
+                    from material_workflow_checks import run_material_workflow_checks
+                    from material_save_motion_checks import run_material_save_motion_checks
+                    run_viewport_inspection_checks(page, context, url, report, checks, args.mesh, args.idle)
+                    run_viewport_loading_checks(page, context, url, report, checks)
+                    run_hero_artwork_checks(page, context, url, report, checks)
+                    run_viewport_motion_checks(page, context, url, report, checks)
+                    run_material_workflow_checks(page, context, url, report, checks)
+                    run_material_save_motion_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.s_maps_only:
+                    from s_maps_browser_checks import run_s_maps_checks
+                    run_s_maps_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.texture_reconstruction_only:
+                    from texture_reconstruction_checks import run_texture_reconstruction_checks
+                    run_texture_reconstruction_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.jobs_bulk_only:
                     from jobs_bulk_browser_checks import run_job_bulk_checks
                     run_job_bulk_checks(page, context, url, report, checks)
@@ -162,6 +236,10 @@ def main():
                         print('PASS '+check)
                     browser.close()
                     return
+                from polish_checks import run_polish_checks
+                run_polish_checks(page, context, url, report, checks)
+                from viewport_inspection_checks import run_viewport_inspection_checks
+                run_viewport_inspection_checks(page, context, url, report, checks, args.mesh, args.idle)
                 from export_motion_checks import run_export_motion_checks
                 run_export_motion_checks(page, context, url, report, checks)
                 from viewport_motion_checks import run_viewport_motion_checks
@@ -176,6 +254,10 @@ def main():
                 run_job_bulk_checks(page, context, url, report, checks)
                 from thumbnail_checks import run_thumbnail_checks
                 run_thumbnail_checks(page, context, url, report, checks)
+                from texture_reconstruction_checks import run_texture_reconstruction_checks
+                run_texture_reconstruction_checks(page, context, url, report, checks)
+                from s_maps_browser_checks import run_s_maps_checks
+                run_s_maps_checks(page, context, url, report, checks)
                 from category_icon_checks import run_category_icon_checks
                 run_category_icon_checks(page, context, url, report, checks)
                 from library_workflow_checks import run_library_workflow_checks

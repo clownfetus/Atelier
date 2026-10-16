@@ -4,7 +4,7 @@ Atelier remains a desktop creative application built with vanilla JavaScript, Bo
 
 ## Direction and sources
 
-The default Atelier palette uses neutral charcoal surfaces, controlled blue primary actions and quiet grey-green secondary containers. Light mode uses cool near-white and grey surfaces with a deeper blue primary. Darcula adds warm orange accents, and Repak X uses near-black, dark grey and red. Distinct category hues remain visible as muted pigments. Errors and destructive actions keep dedicated semantic roles even when the chosen accent is red. Existing fixed 3D preview surrounds stay unchanged, and interface styling never filters or recolors artwork.
+The default Atelier palette uses neutral charcoal surfaces, controlled blue primary actions and quiet grey-green secondary containers. Light mode uses cool near-white and grey surfaces with a deeper blue primary. Darcula adds warm orange accents, and Repak X uses near-black, dark grey and red. Distinct category hues remain visible as muted pigments. Errors and destructive actions keep dedicated semantic roles even when the chosen accent is red. The model stage offers a theme gradient, plain colour or transparent checker; interface styling never filters or recolors artwork.
 
 This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/styles/color/roles), [typography](https://m3.material.io/styles/typography/applying-type), [buttons](https://m3.material.io/components/buttons/overview), [motion](https://m3.material.io/styles/motion/overview/how-it-works) and Google's [Material 3 Expressive research](https://design.google/library/expressive-material-design-google-research). It adopts their hierarchy, containment, shape and purposeful motion principles while keeping desktop density. It is not a claim of full Material component or accessibility conformance.
 
@@ -19,6 +19,8 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | `gui/icons.js` | Local Material Symbols SVG adapter; compatibility with existing icon calls |
 | `gui/folder-icons.js` | Shared folder categories and symbols for cards and home shortcuts |
 | `gui/library-tools.js` / `.css` | Folder-local filtering, view preferences, keyboard movement and read-only previews |
+| `gui/viewport-inspection.js` / `viewport.css` | Model inspection, camera framing, texture comparison, picking and capture |
+| `gui/viewport-animation.js` | Real standing-idle playback, pause and rest pose |
 | `gui/library-pins.js` / `.css` | Persistent home shortcuts and contextual nested-folder labels |
 | `gui/export-review.js` / `.css` | Export review, progress and latest session result; app.js owns requests |
 | `gui/motion/` | Six scoped animation sets and their optional presentation adapters |
@@ -64,11 +66,90 @@ Palette selection, custom drafts and named palettes use version 2 of `atelier.ap
 
 Global select/option/optgroup roles theme filters and editors as well as Settings. Supporting engines progressively opt into [customizable native selects](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select) using `appearance: base-select` and `::picker(select)`: popup surfaces, checkmarks, selected, hover and keyboard focus states use semantic roles while retaining real HTML select behavior. Older WebView2 falls back to its OS picker, with explicit text/background roles and `color-scheme`; OS-owned hover/highlight and native color-picker chrome cannot be fully styled with page CSS. App context menus, dialogs and delegated title tooltips use the same roles. Tooltips retain accessible descriptions/names, restore title fallbacks on dismissal and support Escape without consuming keyboard navigation.
 
-Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input, animating layout in the asset grid, or adding idle animation to 3D previews. `prefers-reduced-motion: reduce` removes CSS animations and transitions.
+Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input and animating layout in the asset grid. At the user's updated request, the 3D viewer starts a compatible standing idle on repeat; Play, Pause and Rest pose remain available. The camera rotates only during a requested turntable capture. Both `prefers-reduced-motion: reduce` and Settings → Motion → Reduce motion select static interface presentation.
+
+## Continuity and presentation preferences
+
+`continuity.js` moves the replaced grid container 8px over 160ms, with reverse
+direction for Back/parent navigation. Feature-detected View Transitions connect
+folder names to breadcrumbs, portraits to the contextual hero banner and cards
+to the material/curve/VFX editors. Logical close and requests do not wait for an
+animation to finish. Unsupported engines use short CSS/WAAPI transitions; no
+card layout or asset geometry is animated. Dialogs have a 120ms discrete exit
+where supported, and context menus scale from the actual pointer/keyboard anchor.
+
+The home roster reads existing catalogue metadata; it never scans containers,
+imports an asset or refreshes the remote catalogue. Selecting a hero reveals its
+costumes, with separate buttons to open the hero or a costume. Missing catalogue
+art leaves folder browsing available. Banners use the current hero/skin artwork;
+the category rule and asset glyphs reuse the existing 22 category colors. Edited
+cards and sidebar rows share a clipped-corner marker. Sidebar material mosaics
+and curve sparklines read existing saved JSON only, with generic symbols on error.
+
+Both roster rows use side arrows, disabled at their scroll limits, with keyboard
+activation and reduced-motion support. Costume-name backgrounds sample their own
+cached artwork, blend it with the current surface and keep text at 4.5:1 contrast.
+These local colours follow theme changes independently of the optional global
+artwork accent. Missing artwork retains the normal surface. The Hood uses the
+published 0011 avatar because its default 0010 asset is a blank silhouette.
+
+High contrast, Blueprint and Comic ink extend the preset list. Comfortable keeps
+the existing density; Compact reduces control and row padding. Preferences use
+`atelier.motion`, `atelier.density` and `atelier.adaptiveAccent`, remain local to
+the browser profile, and synchronize across its windows. Optional artwork accent
+sampling is an explicit exception to the previous no-extraction guideline: it
+only runs on already loaded catalogue artwork in a hero/skin context, changes UI
+accent roles through the existing contrast correction, and never recolors images
+or project data. Outside that context, the selected palette's accent returns.
+
+Native launch colors are mirrored into `_webview/window-theme.json`, independently
+of project/config data. The cache validates colors and resolves System against
+the current OS at launch. The desktop bridge updates Windows dark title bars;
+caption and caption-text colors additionally use Windows 11 DWM attributes where
+supported. Other hosts retain their native chrome.
+
+The viewport uses ACES filmic output and one offline, prefiltered Three.js r185
+RoomEnvironment. A 420ms clipping plane sweeps from wireframe to shaded materials.
+Display colour and dye-texture changes blend for 150ms in linear space; exact
+project values stay unchanged. Fit and double-click framing ease for 260ms and
+yield immediately to camera input. Hover uses a thin silhouette outline; click
+selects a material and reveals its contextual inspector. Advanced parameters
+contain the full material editor. The grid fades with distance and has a soft
+grounding shadow; small camera axes orient the stage. Optional emissive bloom defaults off, caps three temporary
+render targets at 512px per side, and releases them on disable or close. Flat
+albedo and dye-region modes bypass bloom. Transparent captures retain alpha.
+Reduced motion settles reveal, camera and colours immediately. Lighting,
+comparison and capture never persist these display choices.
+
+Model Studio has its own blue/slate surface tokens, labelled header, broad stage,
+contextual right inspector and bottom playback bar. Its main action is Save changes.
+Model/part visibility and material-set choices live in Model; camera, lighting,
+backdrop, wireframe, grid, dye regions and bloom live in View settings. Menus open
+one at a time, close on outside click and consume Escape before the workspace closes.
+Related materials share a readable group and expose a part picker only when needed.
+No material is selected on open. Colour and hex inputs, Saved/Current swatches and
+per-material restore appear after selection; exact shader parameters stay collapsed.
+Progress, save results and warnings stay in the studio status bar. Opening a skin
+shows one mesh; explicit choices can switch forms or combine mesh parts. Rig IDs
+remain distinct when matching recolour material sets, and switching meshes resets
+idle discovery/playback for the selected rig. Colour inputs invert the preview's
+ACES curve so the chosen hex survives selection and save; untouched HDR values
+and per-parameter saved restores keep their exact source floats.
+
+`polish.js` exposes disposable `mount`, `setState` and `destroy` handles through
+`AtelierMotion.polish`. Toasts resolve on the same operation mount; repeated
+ordinary notices merge with a counter and reset their hover-paused timer line.
+Import segments and Activity rings reflect actual server outcomes/progress, and
+the launch splash polls completed container reads rather than estimating time.
+Save/import fly effects, sidebar row exits and export packing use inert snapshots
+and never postpone the underlying action. The first successful export can show a
+single brief burst sampled from the mod's selected previews; reduced motion uses
+static color chips. Clicking the A mark explicitly replays its entrance. The
+viewport loader samples the current artwork and lightens its accent for contrast.
 
 ## Symbols and brand assets
 
-[Material Symbols Sharp](https://developers.google.com/fonts/docs/material_symbols) use unfilled geometry for a precise, angular visual language. Compact controls use 24px optical artwork at weight 400; 41 large aliases use 48px optical artwork at weight 300 when requested at 32px or larger. This keeps large previews from becoming heavy, enlarged toolbar symbols. Folder glyph slots occupy 76% of their thumbnail; toolbar glyphs stay compact. The bundle has 98 aliases, preserving all 72 previous aliases, `data-lucide` markers and `lucide.createIcons` calls as a compatibility boundary. The production page loads the local Material adapter, not the old library. Glyph provenance for both sizes is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.
+[Material Symbols Sharp](https://developers.google.com/fonts/docs/material_symbols) use unfilled geometry for a precise, angular visual language. Compact controls use 24px optical artwork at weight 400; 41 large aliases use 48px optical artwork at weight 300 when requested at 32px or larger. This keeps large previews from becoming heavy, enlarged toolbar symbols. Folder glyph slots occupy 76% of their thumbnail; toolbar glyphs stay compact. The bundle has 103 aliases, preserving all 72 previous aliases, `data-lucide` markers and `lucide.createIcons` calls as a compatibility boundary. The production page loads the local Material adapter, not the old library. Glyph provenance for both sizes is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.
 
 The new A mark was generated with Image Gen through Creative Production and refined to a clear blue, preserving its rounded silhouette, separated strokes and transparent background. The final refinement prompt requested: "Preserve the exact geometry, negative spaces and transparency; recolor uniform flat clear blue #5487db, no gradients or shadows." `gui/brand/atelier-mark.png` is the working artwork for this implementation; `icon.png` and multi-size `icon.ico` are technical exports of the same image. No new logo/font/icon runtime dependency is required.
 

@@ -1,5 +1,6 @@
 /* â”€â”€ reset / tokens â”€â”€ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+#bulk-edit-open[hidden] { display:none!important; }
 /* Shared design roles live in tokens.css; keep editor layout rules here. */
 html, body { height: 100%; overflow: hidden; }
 body {

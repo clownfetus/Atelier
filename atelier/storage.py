@@ -206,6 +206,19 @@ def publish_project_json(root, changes):
     changes: [{path: project-relative path, before: SHA256 or None, data: JSON}].
     A failure restores every previous byte, including files absent before the batch.
     """
+    return _publish_project_changes(root, changes,
+                                    lambda target, change: atomic_json(target, change["data"], allow_nan=False))
+
+
+def publish_project_files(root, changes):
+    """Recoverably publish staged project files, checking previous hashes before any write."""
+    def write(target, change):
+        with open(change["source"], "rb") as stream:
+            _atomic_bytes(target, stream.read())
+    return _publish_project_changes(root, changes, write)
+
+
+def _publish_project_changes(root, changes, write):
     import uuid
     with _publish_lock:
         recover_project_writes(root)
@@ -228,7 +241,7 @@ def publish_project_json(root, changes):
             journal = os.path.join(folder, "journal.json")
             atomic_json(journal, {"state": "publishing", "entries": entries})
             for target, change in zip(targets, changes):
-                atomic_json(target, change["data"], allow_nan=False)
+                write(target, change)
             atomic_json(journal, {"state": "committed", "entries": entries})
         except Exception as error:
             try:

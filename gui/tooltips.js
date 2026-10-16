@@ -50,7 +50,12 @@
     owner.removeAttribute('title');
     timer = setTimeout(show, 400);
   }
-  document.addEventListener('pointerover', event => begin(event.target));
+  document.addEventListener('pointerover', event => {
+    // A view transition can retarget the stationary pointer after keyboard focus
+    // moved. Preserve the focused control's description until focus/click leaves it.
+    if (owner?.contains(document.activeElement) && !owner.contains(event.target)) return;
+    begin(event.target);
+  });
   document.addEventListener('focusin', event => begin(event.target));
   for (const type of ['pointerout', 'focusout']) document.addEventListener(type, event => {
     if ((owner?.contains(event.target) || tooltip?.contains(event.target))
