@@ -83,6 +83,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
             assert 'Revert to original' in labels,kind
             labels=tab.evaluate("kind=>_ctxItemsSidebar({file_type:kind,token:'kept',game_rel:'Fixture/T_Painted'}).filter(x=>typeof x==='object').map(x=>x.label)",kind)
             assert 'Revert to original' in labels,kind
+        tab.once('dialog', lambda dialog: dialog.accept())   # Revert replaces the edit, so it asks first
         tab.evaluate("revertImported({file_type:'texture',game_rel:'Fixture/T_Painted',token:'kept'})")
         tab.wait_for_function("[...document.querySelectorAll('.toast')].some(el=>el.textContent.includes('Original restored'))")
         assert reverted[0]['game_rel']=='Fixture/T_Painted'

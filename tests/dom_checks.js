@@ -255,4 +255,52 @@ if (!/toggle-row on/.test(mh)) throw new Error("the toggle does not reflect its 
 if (!mh.includes("no editable color or scalar parameters"))
   throw new Error("the empty-parameter note went missing");
 
+// ── curve / VFX / level / text editors: unsaved drafts and destructive resets ─────────────────
+// Closing with unsaved edits must ask before discarding them, and Reset (which deletes the
+// project's saved sidecar) and Revert must ask before doing anything — as the material editor does.
+{
+  const prompts = []; let answer = false; let apiCalls = 0;
+  globalThis.confirm = message => { prompts.push(message); return answer; };
+  const realApi = api;
+  api = async () => { apiCalls++; return { ok: false, error: "stub" }; };
+
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
+  if (closeCurveEditor() !== true || prompts.length) throw new Error("a clean curve editor must close without asking");
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: { R: true } };
+  if (closeCurveEditor() !== false || !curveEditor) throw new Error("declining must keep an edited curve open");
+  answer = true;
+  if (closeCurveEditor() !== true || curveEditor) throw new Error("accepting must close the edited curve");
+  answer = false;
+
+  vfxEditor = { game_rel: "Fx/NS", name: "NS", groups: [{ stops: [0] }], scalars: [], vectors: [] };
+  vfxEditor.baseline = _vfxSnapshot(vfxEditor);
+  if (_vfxDirty()) throw new Error("a freshly loaded VFX editor must not be dirty");
+  vfxEditor.groups[0].stops.push(1);
+  if (!_vfxDirty() || closeVfxEditor() !== false || !vfxEditor) throw new Error("an edited VFX draft closed silently");
+  if (closeVfxEditor(true) !== true || vfxEditor) throw new Error("a forced VFX close (after save) must not ask");
+
+  worldEditor = { game_rel: "Maps/L", name: "L", edits: { lights: {}, fog: {}, grade: {}, visibility: {} } };
+  worldEditor.baseline = _editSnapshot(worldEditor.edits);
+  worldEditor.edits.fog.density = 0.2;
+  if (closeWorldEditor() !== false) throw new Error("edited level lighting closed silently");
+  worldEditor.baseline = _editSnapshot(worldEditor.edits);
+  const before = prompts.length;
+  if (closeWorldEditor() !== true || prompts.length !== before) throw new Error("a saved level editor must close without asking");
+
+  textEditor = { game_rel: "Text/ST", name: "ST", entries: [], edits: {} };
+  textEditor.baseline = _editSnapshot(textEditor.edits);
+  textEditor.edits.KEY = "changed";
+  if (closeTextEditor() !== false) throw new Error("edited strings closed silently");
+
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
+  vfxEditor = { game_rel: "Fx/NS", name: "NS", groups: [], scalars: [], vectors: [] };
+  resetCurve(); resetVfx();
+  revertImported({ name: "T_Painted", game_rel: "Fixture/T_Painted", token: "kept" });
+  if (apiCalls) throw new Error("a declined Reset/Revert still reached the server");
+  if (!prompts.some(p => p.includes("T_Painted"))) throw new Error("the revert prompt must name the asset");
+
+  api = realApi; curveEditor = vfxEditor = worldEditor = textEditor = null;
+  delete globalThis.confirm;
+}
+
 console.log("DOM smoke: all render paths OK");
