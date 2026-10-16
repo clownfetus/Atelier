@@ -121,23 +121,33 @@ progress:not([value])::-webkit-progress-bar { background: transparent; }
 progress:not([value])::-moz-progress-bar { background: transparent; }
 @keyframes krackle-indeterminate { to { background-position: 48px 0, 62px 0, 8px 0; } }
 
-/* ── Activity: a small ring charges beside the label while jobs run ────────── */
-.job-activity-button[data-krackle-busy] { position: relative; }
-.job-activity-button[data-krackle-busy]::before,
-.job-activity-button[data-krackle-busy]::after {
-  content: '';
-  width: 14px;
-  height: 14px;
-  background: var(--krackle-charge);
+/* ── Activity: the running-jobs ring is six dots; progress fills them clockwise ── */
+#job-activity .activity-ring {
+  position: relative;
+  border-radius: 0;
+  background: conic-gradient(var(--krackle-charge) var(--job-progress, 25%), color-mix(in srgb, var(--krackle-charge) 32%, transparent) 0);
   -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
   mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
 }
-.job-activity-button[data-krackle-busy]::before { opacity: 0.5; flex: 0 0 14px; }
-.job-activity-button[data-krackle-busy]::after {
+/* Indeterminate work: the crest counts round the dots instead of a spinning arc. */
+#job-activity .activity-ring.indeterminate {
+  animation: none;
+  background: color-mix(in srgb, var(--krackle-charge) 45%, transparent);
+  -webkit-mask: none;
+  mask: none;
+}
+#job-activity .activity-ring.indeterminate::before,
+#job-activity .activity-ring.indeterminate::after {
+  content: '';
   position: absolute;
-  left: 16px;
-  top: 50%;
-  margin-top: -7px;
+  inset: 0;
+  background: color-mix(in srgb, var(--krackle-charge) 45%, transparent);
+  -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
+  mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
+}
+#job-activity .activity-ring.indeterminate { background: none; }
+#job-activity .activity-ring.indeterminate::after {
+  background: var(--krackle-charge);
   -webkit-mask-image: var(--krackle-crest-mask);
   mask-image: var(--krackle-crest-mask);
   animation: krackle-charge 1.04s steps(6, end) infinite;
@@ -159,30 +169,14 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 }
 .am-krackle-glyph-slot[data-am-mounted='true'] > .am-krackle-glyph-fallback { display: none !important; }
 
-/* ── Primary button press: a short pop of bubbles from the click point ─────── */
-.krackle-press-pop {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 10000;
-}
-.krackle-press-pop > i {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle at 58% 56%, var(--krackle-pop-hole, #121216) 0 32%, var(--krackle-pop-energy, #37639d) 36%);
-}
-
 /* Forced and OS reduced motion stop every CSS-only Krackle loop. */
-[data-reduced-motion='reduce'] .spinner::after,
-[data-reduced-motion='reduce'] .job-activity-button[data-krackle-busy]::after,
-[data-reduced-motion='reduce'] .progress-bar-fill,
-[data-reduced-motion='reduce'] progress:not([value]) { animation: none !important; }
+[data-motion='reduce'] .spinner::after,
+[data-motion='reduce'] #job-activity .activity-ring::after,
+[data-motion='reduce'] .progress-bar-fill,
+[data-motion='reduce'] progress:not([value]) { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .spinner::after,
-  .job-activity-button[data-krackle-busy]::after,
+  #job-activity .activity-ring::after,
   .progress-bar-fill,
   progress:not([value]) { animation: none !important; }
 }
@@ -253,71 +247,49 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   [data-atelier-motion="krackle-glyph"] *, [data-atelier-motion="empty-state"] * { transition: none !important; }
 }
 
-/* ── Across the app: still Krackle on existing surfaces (tier 0) ───────────── */
-/* Dialog scrims print as a faint 45° halftone screen. Behind dialogs only, never behind text. */
-.overlay {
-  background-image:
-    radial-gradient(circle, rgb(0 0 0 / 9%) 0 1.1px, transparent 1.5px),
-    radial-gradient(circle, rgb(0 0 0 / 9%) 0 1.1px, transparent 1.5px);
-  background-size: 10px 10px, 10px 10px;
-  background-position: 0 0, 5px 5px;
-}
-:root[data-theme='dark'] .overlay {
-  background-image:
-    radial-gradient(circle, rgb(255 255 255 / 5%) 0 1.1px, transparent 1.5px),
-    radial-gradient(circle, rgb(255 255 255 / 5%) 0 1.1px, transparent 1.5px);
-}
-
-/* Notifications carry a column of energy dots in their state colour along the left edge. */
-.toast { position: relative; }
-.toast::before {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 6px;
-  bottom: 6px;
-  width: 4px;
-  border-radius: 2px;
-  background: radial-gradient(circle, var(--krackle-edge, var(--krackle-charge)) 0 1.6px, transparent 2px) center top / 4px 6px repeat-y;
-  opacity: 0.85;
-  pointer-events: none;
-}
-.toast.success { --krackle-edge: var(--krackle-success); }
-.toast.warning { --krackle-edge: var(--krackle-warn); }
-.toast.error { --krackle-edge: var(--krackle-fault); }
-
-/* Edited assets wear a clipped corner of energy with three bubbles: this one is yours. */
-.card.imported .card-thumb::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
-  pointer-events: none;
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-  background:
-    radial-gradient(circle at 70% 26%, var(--krackle-hole) 0 2.4px, transparent 2.8px),
-    radial-gradient(circle at 45% 13%, var(--krackle-hole) 0 1.4px, transparent 1.7px),
-    radial-gradient(circle at 87% 54%, var(--krackle-hole) 0 1.2px, transparent 1.5px),
-    var(--krackle-success);
-}
-:root:not([data-theme='dark']) .card.imported .card-thumb::after { --krackle-hole: var(--bg3); }
-
 /* The import progress dialog's stage replaces its small heading spinner. */
 .prog-krackle-stage { display: flex; justify-content: center; }
 .prog-krackle-stage:empty { display: none; }
 #prog-box[data-krackle-stage] h2 > .spinner { display: none; }
 
-/* Theme switch: a halftone wave in the new accent sweeps out from the control. */
-.krackle-theme-wave {
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  pointer-events: none;
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--krackle-charge) 55%, transparent) 0 2.6px, transparent 3.2px),
-    radial-gradient(circle, color-mix(in srgb, var(--krackle-charge) 55%, transparent) 0 2.6px, transparent 3.2px);
-  background-size: 16px 16px, 16px 16px;
-  background-position: 0 0, 8px 8px;
+/* ── Krackle on the 0.4 polish surfaces ────────────────────────────────────── */
+/* The startup splash's progress is a run of dots, tall enough to read as Krackle. */
+#startup-progress:not([value]) { height: 10px; }
+/* Edited sidebar rows: the corner of energy carries a bubble. */
+.sb-item::after {
+  background: radial-gradient(circle at 72% 28%, var(--krackle-hole) 0 1.3px, transparent 1.6px), var(--krackle-charge);
+}
+/* First export: the skin's colours burst out of the button as Krackle bubbles. */
+.export-color-moment {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+}
+.export-color-moment::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: var(--krackle-hole);
+}
+/* Import results: one dot per asset; done dots are success energy with a bubble. */
+#import-segments { gap: 4px; }
+#import-segments span {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--krackle-charge) 28%, transparent);
+}
+#import-segments [data-state=done] {
+  background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 1.5px, var(--krackle-success) 1.9px);
+}
+#import-segments [data-state=failed] {
+  border-radius: 50% 50% 50% 0;
+  background: radial-gradient(circle at 50% 50%, var(--krackle-hole) 0 1.6px, var(--krackle-warn) 2px);
 }

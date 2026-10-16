@@ -41,7 +41,7 @@
     var generation = 0;
     var active = [];
     var mql = null;
-    try { mql = window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
+    try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
 
     function reduced() { return unavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches); }
     function hidden() { return Boolean(document.hidden); }

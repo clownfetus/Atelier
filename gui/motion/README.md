@@ -1,21 +1,79 @@
 # Motion inventory
 
-The animation sets have scoped production assets in this directory.
+Atelier's job feedback, ownership markers, empty states and brand moments speak
+**Krackle**. Energy defines the silhouette; bubbles give it texture and movement;
+at small sizes the silhouette survives with minimal texture. There are no outlines,
+gradients or symbols: busy is a ring of dots a charge travels around; success is a
+starburst; *completed with warnings* is a cracked ring whose broken chunk falls out
+(the work finished, but something broke off); failure is a splat that drips. The
+shapes give each outcome its personality; the text beside them says what happened.
+
+Krackle is concentrated, not ambient. It appears for substantial job feedback
+(export, import, saves, loading, Activity), restrained ownership markers (edited
+rows), empty states and occasional showcase moments (the logo entrance, the first
+export). Routine typing, hovering, pressing and theme changes stay responsive
+without it, and chrome (toolbar, menus, form controls, category emblems) keeps its
+Material Sharp glyphs. Artwork being edited stays visually trustworthy: Krackle
+never textures a colour swatch or the material-inspection viewport.
+
 Presentation owns artwork and animation lifecycle; application code owns project
 state, requests and outcomes. The static interface remains usable when an optional
 controller, image or animation API fails. No demo exporter, theme override or
 simulated progress loop is part of the application.
 
+**Interruption and ownership.** An animation is never entitled to finish its
+performance. A real result replaces whatever is playing at once (mid-drop, mid-
+coalesce or mid-loop), and readable status text and controls render immediately,
+before the formation settles. A busy state that follows another busy state (a
+destination check running straight into a build) continues the current animation
+rather than dropping new ink. Only busy states loop; results animate once and hold
+still, and a settled or hidden stage stops drawing. The large Krackle stage belongs
+to the dialog the user has open (export review or edit import); other jobs that
+finish or fail meanwhile report through their own toasts and Activity rows and
+never take over that stage.
+
 | Set | Production use | Slot / behavior |
 | --- | --- | --- |
-| Export feedback | Export button and notifications | 20px / 24px, actual busy/result states |
-| Viewport loader | Existing 3D loading overlay | 72px, indeterminate while model work runs |
-| Folder flap | Generic folder cards | 76% of thumbnail, closed/open outlines |
-| Material save | Save-result notifications | 24px, actual persistence result |
-| Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance |
-| Empty assets | Confirmed empty Edited Assets sidebar | 112px technical tray, brief entrance then still |
-| Texture reconstruction | Edited texture previews in the grid and sidebar | Image blocks assemble after an external save or successful replacement |
+| Export feedback | Export button and notifications | 20px / 24px, charge ring, starburst, cracked ring, splat |
+| Viewport loader | Existing 3D loading overlay | 72px, twelve-dot ring around a boiling ball; resting bubbles; KO splat |
+| Folder flap | Generic folder cards | 76% of thumbnail, Krackle folder whose front panel tips open |
+| Material save | Save-result notifications | 24px, swatch, charge ring, same result shapes |
+| Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance with a bubble splash |
+| Empty assets | Confirmed empty Edited Assets sidebar | 112px tray of bubbles, brief entrance then still |
+| Texture reconstruction | Edited texture previews in the grid and sidebar | New pixels arrive through swelling halftone dots |
 | Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
+| Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
+| Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
+| Krackle stage | Export review and edit import dialogs | 132-156px canvas particle formations |
+| `krackle.css` | Every `.spinner`, progress bars, the Activity ring, import segments, edited rows | CSS only |
+
+## Artwork source and rules
+
+`scripts/krackle_art.py` draws every Krackle illustration once. It writes the
+standalone `.svg` files here and the copies embedded in the controllers, in
+`krackle.css` (spinner masks) and in `index.html` (`folder-flap-template`), so the
+editable and embedded artwork cannot drift. Run it after any geometry change;
+`python scripts/krackle_art.py --check` fails when a copy is stale and is part of
+the browser checks.
+
+- **Composition:** bubbles gather into one or two deliberate dark masses on the
+  shadow side and thin into isolated satellites, leaving broad clean energy
+  elsewhere. No bubble touches a silhouette's edge: in the stage a bubble may only
+  sit on a dot at least one lattice step inside the shape, and its size is capped by
+  that depth, so thin bands such as the ring keep a sparse centreline. Success stays
+  mostly clean, a warning darkens the fracture and a failure carries one substantial
+  mass, always with its outline intact. Highlights are crisp Paper specks (the
+  charge crest swells and catches a few), never a soft glow or gradient.
+- **Inks:** a formation uses one energy ink (two at most while one state hands over
+  to the next). Bubbles and glints are not inks: bubbles are holes that show the
+  surface behind (`--krackle-hole`, ink black on dark surfaces, the surface or button
+  colour on light ones) and glints are a small fixed Paper highlight.
+- **Colour:** energy uses Atelier's semantic tokens through the `--krackle-*`
+  variables in `krackle.css`, so every palette, including custom palettes, keeps its
+  tested contrast. Any future skin-derived accent and its clash guard change only
+  interface accents, never an asset's colour values.
+- **Sizes:** at 48px and below glyphs are drawn by hand rather than sampled from a
+  formation; the large stage keeps its dots about 8px on screen.
 
 ## Continuity and polish lifecycle
 
@@ -46,8 +104,10 @@ imports do not animate. Grid and sidebar refreshes use the same project-bound
 edited PNG URL and wait for the real image load before starting.
 
 The updated image remains underneath a temporary, non-interactive canvas. Its
-pixels assemble in 64 blocks (16 in the compact sidebar), settling in about
-640ms/430ms. Rectangular maps retain contain fit and transparency. At most four
+pixels arrive through a 45° halftone screen (about 14 dots across a tile, 8 in the
+compact sidebar): each dot swells from nothing, outward from the centre, until the
+dots overlap into the finished image, settling in about 640ms/430ms. The wipe swap
+sends the same swelling dots across the old preview from left to right. Rectangular maps retain contain fit and transparency. At most four
 canvases animate concurrently; offscreen, hidden and reduced-motion views update
 statically. Repeated saves replace the previous effect. Navigation, list redraw,
 project changes, failed reads, missing canvas support and page hide release the
@@ -61,24 +121,16 @@ focused browser checks with `tests/browser_smoke.py --texture-reconstruction-onl
 
 # Export feedback
 
-Adapted from the user's Gemini files `export_feedback_production_controller.js`,
-`export_feedback_production_styles.md`, `export_feedback_standalone_svg.md` and
-`export_feedback_self_contained_preview.html` (15 October 2026). The downloaded
-preview and integration notes are reference material; their simulated exporter,
-theme overrides and demo controls are not application code.
-
-The download/tray geometry derives from Google Material Symbols Rounded under
-Apache 2.0; retain the [bundled license](../vendor/material-symbols/LICENSE) and
-upstream attribution. The SVG is the editable static resting vector; the
-controller embeds the same geometry so startup needs no fetch or external SVG
-resource. It adds separate success, warning and error groups. Update both files
-if the artwork changes. CSS uses Atelier's existing semantic color tokens.
-
-The studio polish squares the tray, payload and arrow, sharpens check/error
-strokes and uses a pointed warning triangle with quieter tonal fills. This is
-an Atelier adaptation of the original artwork, not an unmodified official Sharp
-glyph. The embedded and standalone geometry remain identical; animation states,
-timings and application integration are unchanged.
+Lifecycle adapted from the user's Gemini export feedback controller (15 October
+2026); the artwork is now Krackle. Idle is a drop of ink above a tray of energy.
+Busy is the six-dot charge ring: each dot swells and shows a bubble as the charge
+passes, clockwise, every 1040ms. Success pops a starburst (420ms) with four flecks
+thrown out; completed-with-warnings stamps a cracked ring and drops its chunk,
+which bounces twice (620ms); failure squeezes to a point, bursts into a splat with
+satellites and a drip, and leaves one dazed bubble circling to rest (about 1.4s,
+decorative; the toast text is already there). The SVG is the editable static
+resting vector; the controller embeds the same geometry, both generated by
+`scripts/krackle_art.py`. CSS uses Atelier's semantic colour tokens.
 
 ## Ownership and integration
 
@@ -87,7 +139,8 @@ timings and application integration are unchanged.
   `setReducedMotion` and idempotent `destroy`. It owns only its inline SVG,
   animation effects and lifecycle listeners. There are no API or storage calls.
 - States are `idle`, `busy`, `success`, `warning`, `error`. The busy loop is
-  indeterminate (1040ms); terminal transitions finish within 240ms. Both OS
+  indeterminate (1040ms); terminal transitions are one-shots of 420ms to about
+  1.4s, released when they finish. Both OS
   reduced motion and the forced `reduce` setting select static poses. Hidden
   documents stop loops, resuming only still-busy work. Unavailable/throwing WAAPI
   degrades to static artwork. Finished effects are released; detached/replaced
@@ -128,16 +181,14 @@ native WebView2. In-game compatibility is a separate release check.
 
 # 3D viewport loader
 
-Adapted from the user's Gemini `viewport_loader_production_controller.js`,
-`viewport_loader_production_styles.md`, `viewport_loader_standalone_svg.svg` and
-`viewport_loader_self_contained_preview.html` (15 October 2026). Preserve the
-Material Symbols attribution in the source; the corner framing references that
-visual family. The standalone SVG and embedded controller markup share geometry.
-Demo simulations and token overrides are excluded from the application.
-
-The studio polish replaces rounded bracket corners with right angles and uses
-sharp wireframe joins, preserving the original 72px slot and assembly/loading
-timing. Circular progress and empty/error indicators keep their meaning.
+Lifecycle adapted from the user's Gemini viewport loader controller (15 October
+2026); the artwork is now Krackle and shares geometry with `viewport-loader.svg`.
+Loading coalesces twelve dots out of the centre around a ball of energy (220ms),
+then the charge travels the ring while the ball bobs, its bubbles boil out of step
+and three loose bubbles drift. Empty drains the ball away: the ring fades and three
+bubbles drop to the floor and bounce. Error squeezes and bursts into a dripping
+splat, then three dazed bubbles circle above it and slow to a stop; the existing
+message and controls appear immediately.
 
 The user requested clearly visible animation sizes. The loader occupies **72px**
 (a 48-unit viewBox with approximately 48px outer framing on screen), compared to
@@ -148,9 +199,9 @@ toasts. Fixed dimensions prevent layout movement during state changes.
 same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape. It extends
 the existing namespace without replacing export feedback. States are `idle`,
 `loading`, `ready`, `empty` and `error`; replay only repeats loading assembly.
-The 220ms assembly transitions into five synchronized 1200ms effects. These
-are indeterminate decoration, not a percentage or model progress measurement.
-Ready cancels immediately; empty/error settle in 180ms. Finished effects are
+The 220ms assembly transitions into the 1200ms charge loop. These are
+indeterminate decoration, not a percentage or model progress measurement.
+Ready cancels immediately; empty settles in about 640ms and error in about 1.6s. Finished effects are
 released, duplicate mounts destroy their predecessor, and a partial WAAPI failure
 cancels all effects and selects a static pose for that instance. OS/forced reduced
 motion and hidden-document behavior are handled explicitly.
@@ -180,14 +231,10 @@ smoke checks static states, dimensions and teardown in WebView2.
 
 # Folder flap
 
-The interaction was initially adapted from the user's Gemini
-`folder_flap_standalone_svg.md` and `folder_flap_production_styles.md`
-(15 October 2026). The supplied HTML preview and integration notes were references;
-demo controls, fixtures and layout overrides are excluded. The current artwork
-replaces the filled pocket with official Google Material Symbols Sharp `folder`
-and `folder_open` paths at optical size 48, weight 300, fill 0. Both sources are
-recorded in `../vendor/material-symbols/sources.json`; retain the bundled
-Apache 2.0 license and SVG attribution.
+The interaction was initially adapted from the user's Gemini folder flap
+(15 October 2026). The artwork is now a Krackle folder: back and front panels of
+energy in the folder colour, a bubbly top edge on the front panel, and one composed
+mass of bubbles punched through to the tile in the lower right.
 
 `folder-flap.svg` is the editable static vector. Its geometry is also embedded in
 `index.html`'s `folder-flap-template`, avoiding an extra request per folder or a
@@ -199,8 +246,9 @@ Loaded hero/skin portraits, category symbols, asset previews and their fallbacks
 keep their existing rendering. The inline SVG has no IDs, events or external
 references, and the icon adapter leaves it alone.
 
-Scoped CSS crossfades closed/open outlines, with a 1px open-pose lift, in 180ms on
-fine-pointer hover or keyboard `:focus-visible`, returning in 150ms.
+Scoped CSS tips the front panel open (a skew and squash from its base, 220ms with a
+small overshoot) on fine-pointer hover or keyboard `:focus-visible`, returning in
+150ms. Hover adds no particles.
 Focus retains the open pose after the
 pointer leaves. Coarse pointers have no hover pose. OS/forced reduced motion
 selects immediate static poses. The existing native button owns clicks, Enter,
@@ -222,23 +270,19 @@ behavior is tested in Chromium because the native smoke window is hidden.
 
 # Material-save feedback
 
-Adapted from the user's Gemini `material_save_production_controller.js`,
-`material_save_production_styles.md` and `material_save_standalone_svg.md`
-(15 October 2026). The supplied self-contained preview and integration notes are
-references, not application code. Keep the Material Symbols Rounded attribution
-and bundled Apache 2.0 license. The standalone SVG and embedded controller markup
-share geometry; update both if changing artwork.
-
-The studio polish gives the cartridge a clipped corner and square shutter, with
-crisp check/error strokes and a pointed warning triangle. Quiet tonal fills and
-circular progress/outcome rings remain. Sizes, states, lifecycle and save hooks
-are unchanged; retain the original attribution for this adapted artwork.
+Lifecycle adapted from the user's Gemini material save controller (15 October
+2026); the artwork is now Krackle and shares geometry with `material-save.svg`.
+Idle is a swatch: a ball of energy shaded by bubbles, with a glint. Saving runs the
+charge ring around a small pulsing swatch. Results use the same starburst, cracked
+ring (saved, with something lost such as intensity metadata) and splat as export
+feedback. The glyph is decoration beside the save message, never the material's
+own colour.
 
 `AtelierMotion.materialSave.mount(emptyHost, {state, reducedMotion})` returns the
 same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape as the other
 components. States are `idle`, `saving`, `success`, `warning`, `error`. The icon
-occupies **24px**, with about **21.5px** painted width. Success draws the check in
-240ms; warning/error settle in 210ms. Saving has an optional 960ms loop, but actual
+occupies **24px**, with about **22px** painted width. Success pops in 420ms, warning
+drops its chunk in 620ms and error splats in about 1.4s. Saving has an optional 960ms loop, but actual
 save hooks retain their existing `Saving…` text and use only completion toasts.
 
 Direct terminal mounts animate once; identical states do not replay. Finite
@@ -286,7 +330,8 @@ redrawing the Atelier mark. The controller uses the caller's unchanged PNG insid
 an inline SVG and exposes `AtelierMotion.logoEntrance.mount(emptyHost, options)`.
 States are `settled` and `entering`; the handle provides the common state/replay/
 reduced-motion/destroy methods and a `ready` promise. The entrance fades from
-0.58 opacity and translates 2px over 320ms. The topbar keeps its existing 32px
+0.58 opacity and translates 2px over 320ms while six charge bubbles pop out from
+behind the mark and fade inside the slot; settling cancels them with the entrance. The topbar keeps its existing 32px
 slot, avoiding layout movement or an enlarged startup splash.
 
 `logo-entrance-ui.js` owns a single document-start attempt. It keeps the original
@@ -298,12 +343,14 @@ destroys its effects/listeners and restores the caller-owned fallback.
 
 # Empty Edited Assets
 
-`empty-assets.js`, `.css` and `.svg` adapt the supplied Gemini technical tray.
-Retain the source's Material Design Icons/Apache 2.0 attribution. The 112px SVG
-uses sharp guides and a tray/deck with restrained tonal fill. Scoped selectors
-override the sidebar's ordinary small-icon size only for this illustration.
-`AtelierMotion.emptyAssets.mount(emptyHost, options)` accepts `settled` and
-`entering`; its brief layered entrance finishes within 340ms and has no idle loop.
+`empty-assets.js`, `.css` and `.svg` keep the supplied Gemini controller's
+lifecycle with Krackle artwork: a tray of energy holding four loose accent bubbles,
+a drop of ink waiting above it and halftone registration dots in the corners.
+Scoped selectors override the sidebar's ordinary small-icon size only for this
+illustration. `AtelierMotion.emptyAssets.mount(emptyHost, options)` accepts
+`settled` and `entering`; the entrance stamps the tray up, drops the bubbles in one
+after another with a bounce and swings the drop in, finishing in about 480ms, with
+no idle loop.
 Reduced motion, hidden/offscreen hosts or unavailable animation settle statically.
 Duplicate mounts and explicit destroy release owned effects/listeners/observers.
 
@@ -341,3 +388,60 @@ camera position immediately. No additional idle loop or automatic standing-idle
 playback is introduced. Browser and native viewer checks include rendering,
 interruption, alpha captures and target disposal. Native automation intercepts
 only the final download click to inspect real encoded bytes before an OS dialog.
+
+# Krackle glyphs, empty states and the stage
+
+`krackle-glyph.js` (`AtelierMotion.krackleGlyph`) renders the micro shapes for job
+outcomes: `busy`, `info` (a drop), `success`, `warning` and `error`.
+Operation toasts (`toastSpinner(...)`) are owned by the export-feedback set, which
+charges and then resolves into the same result shapes. When that controller is
+absent, `AtelierKrackleGlyph.toastIcon(toast, type)` swaps the resolved toast's icon
+for a glyph instead; the original icon stays in the slot as the fallback and
+removing the toast destroys the glyph. Ordinary informational and warning toasts
+keep their Material icons, because "warning" in those messages also covers cautions
+and failures. Activity job rows show a 16px glyph beside each state label,
+animating only when that job's state changes; a job that succeeded with skipped
+items is labelled "Succeeded with warnings", the only place its cracked ring
+appears.
+
+`empty-state.js` (`AtelierMotion.emptyState`) supplies the art for
+`AtelierPolish.empty`: an empty folder or project list (a tray with two bubbles
+dropped in), no matches (three loose bubbles bounce to the floor) and a failed
+folder load (a splat). Titles and descriptions stay authoritative; a failed mount
+keeps the original outline drawing.
+
+`krackle-stage.js` (`AtelierMotion.krackleStage`) is the full particle language
+from the Krackle prototype, ported to plain Canvas 2D without p5.js. `mount(host,
+{state, size, reducedMotion})` accepts `idle`, `busy`, `success`, `warning` and
+`error`. A fresh busy starts as a drop of ink that splashes into a puddle and is
+drawn out into a charging ring of comic-sized dots; results pop into a starburst
+with a ripple, crack the ring so its chunk falls, or squeeze and burst into a
+knocked-out splat with three dazed bubbles. Ink merging uses a blur-and-threshold
+canvas filter where available and falls back to separate haloed bubbles when
+unsupported or slow (WebKitGTK). Settled results stop the frame loop
+(`data-am-sleeping="true"`), and an IntersectionObserver stops a stage whose
+dialog is hidden. Hidden documents pause; reduced motion jumps to each formation.
+`mount` throws without canvas, so callers keep their static progress UI. The export
+review shows a 156px stage while checking and building, then the result formation
+(cancelled exports hide it) under a heading that names the outcome ("Mod exported
+with warnings"); long reports scroll inside the dialog so the heading and actions
+stay visible. The edit import dialog shows a 132px stage while open.
+
+`krackle.css` restyles existing feedback rather than adding new effects: every
+`.spinner` becomes the six-dot charge ring, whose crest counts round dot by dot;
+the update download bar is energy with drifting bubbles and an ink-blob leading
+edge; indeterminate `<progress>` runs dots along the bar; the Activity ring is six
+dots that fill clockwise with progress; import results are one dot per asset; the
+first-export colour moment throws the skin's colours as bubbles; edited sidebar
+rows keep their accent corner with a single bubble. Every loop stops under OS or
+Atelier reduced motion (`[data-motion=reduce]`).
+
+Deliberately not Krackle: button presses, hover, typing, search, theme changes,
+dialog backdrops, category emblems, colour swatches and the material-inspection
+viewport. A comic render mode for the viewport would be an explicitly chosen
+showcase mode, separate from inspection.
+
+`tests/krackle_motion_checks.py` (via `tests/browser_smoke.py`) covers the spinner,
+job toast glyphs and fallbacks, empty states, the stage's sleep, hidden-dialog and
+cleanup behaviour and the Activity ring, and fails if the generated artwork is
+stale.

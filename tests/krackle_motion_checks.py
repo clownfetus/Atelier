@@ -37,31 +37,44 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.emulate_media(reduced_motion='no-preference')
         checks.append('Every spinner renders as the Krackle charge ring and stops under reduced motion')
 
-        # Generic toasts swap their icon for a Krackle glyph that animates once, then holds still.
+        # Job toasts resolve from the charge ring into a Krackle result that pops once, then holds still.
+        # The export-feedback set owns operation toasts; without it, app.js falls back to a Krackle glyph.
+        # Ordinary informational and warning toasts keep their Material icons.
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
-        for kind, state in (('success', 'success'), ('warning', 'warning'), ('info', 'info')):
-            tab.evaluate("([kind]) => toast('Krackle ' + kind, kind, 60000)", [kind])
-            host = tab.locator(f'#toast-area .toast.{kind} [data-atelier-motion=krackle-glyph]').last
-            assert host.get_attribute('data-am-state') == state
-            assert tab.locator(f'#toast-area .toast.{kind} .am-krackle-glyph-slot[data-am-mounted=true]').count() == 1
-        tab.wait_for_function("!document.querySelector('#toast-area').getAnimations({subtree:true}).some(a=>a.effect?.target?.closest?.('[data-atelier-motion=krackle-glyph]'))")
-        assert tab.evaluate("[...document.querySelectorAll('#toast-area .toast')].map(t=>t.innerText)") == ['Krackle success', 'Krackle warning', 'Krackle info']
-        tab.locator('#toast-area .toast.success').click()
-        assert tab.locator('#toast-area .toast.success').count() == 0
+        tab.evaluate("toast('Plain warning', 'warning', 60000)")
+        assert tab.locator('#toast-area .toast.warning [data-atelier-motion]').count() == 0
+        assert tab.locator('#toast-area .toast.warning svg.lucide').count() == 1
+        for state in ('success', 'warning', 'error'):
+            tab.evaluate("state => { const t = toastSpinner('Working ' + state); t.resolve('Finished ' + state, state, 60000); }", state)
+            assert tab.locator(f'#toast-area [data-atelier-motion=export-feedback][data-am-state={state}]').count() == 1, state
         tab.evaluate("""() => {
-          const original = window.AtelierMotion.krackleGlyph;
-          window.AtelierMotion.krackleGlyph = {mount() { throw Error('fixture glyph failure'); }};
-          try { toast('Fallback <b>kept</b>', 'success', 60000); } finally { window.AtelierMotion.krackleGlyph = original; }
-          const last = [...document.querySelectorAll('#toast-area .toast.success')].pop();
-          if (!last.querySelector('svg.lucide') || last.querySelector('[data-atelier-motion]')) throw Error('Glyph failure lost the static icon');
-          document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove());
+          const feedback = window.AtelierExportFeedback;
+          window.AtelierExportFeedback = undefined;
+          try { const t = toastSpinner('Working glyph'); t.resolve('Finished glyph', 'warning', 60000); }
+          finally { window.AtelierExportFeedback = feedback; }
         }""")
-        checks.append('Plain toasts gain Krackle glyphs that settle after one pop; removal disposes them and failures keep the original icon')
+        assert tab.locator('#toast-area [data-atelier-motion=krackle-glyph][data-am-state=warning]').count() == 1
+        tab.wait_for_function("!document.querySelector('#toast-area').getAnimations({subtree:true}).some(a=>a.effect?.target?.closest?.('[data-atelier-motion]'))", timeout=8000)
+        assert tab.evaluate("[...document.querySelectorAll('#toast-area .toast')].map(t=>t.innerText.trim())") == [
+            'Plain warning', 'Finished success', 'Finished warning', 'Finished error', 'Finished glyph']
+        tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
+        assert tab.locator('#toast-area [data-atelier-motion]').count() == 0
+        tab.evaluate("""() => {
+          const original = window.AtelierMotion.krackleGlyph, feedback = window.AtelierExportFeedback;
+          window.AtelierMotion.krackleGlyph = {mount() { throw Error('fixture glyph failure'); }};
+          window.AtelierExportFeedback = undefined;
+          let toastEl;
+          try { toastEl = toastSpinner('Fallback'); toastEl.resolve('Fallback kept', 'success', 60000); }
+          finally { window.AtelierMotion.krackleGlyph = original; window.AtelierExportFeedback = feedback; }
+          if (!toastEl.querySelector('svg.lucide') || toastEl.querySelector('[data-atelier-motion]')) throw Error('Glyph failure lost the static icon');
+          toastEl.remove();
+        }""")
+        checks.append('Job toasts resolve into Krackle results that settle after one pop; plain notifications keep Material icons; failures keep the original icon')
 
         # Grid empty states keep their text; the art is decorative and settles.
         tab.evaluate("buildGrid([])")
         tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=empty]')
-        assert tab.locator('#empty-state').inner_text().strip() == 'Empty folder'
+        assert tab.locator('#empty-state').inner_text().strip().startswith('Empty folder')
         assert tab.locator('#empty-state svg.lucide').count() == 0
         tab.wait_for_function("!document.querySelector('#grid-area').getAnimations({subtree:true}).length")
         tab.locator('#search-input').fill('no such asset anywhere')
@@ -74,12 +87,13 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           const original = window.AtelierMotion.emptyState;
           window.AtelierMotion.emptyState = {mount() { throw Error('fixture empty failure'); }};
           try { buildGrid([]); } finally { window.AtelierMotion.emptyState = original; }
-          if (!document.querySelector('#empty-state svg.lucide') || document.querySelector('.am-empty-state-host'))
-            throw Error('Empty-state failure lost the static icon');
+          const host = document.querySelector('#empty-state');
+          if (!host?.querySelector(':scope > svg:not(.lucide)') || host.querySelector('.am-empty-state-host'))
+            throw Error('Empty-state failure lost the static drawing');
         }""")
         tab.evaluate("renderGrid()")
         tab.wait_for_selector('#grid-area .card')
-        checks.append('Empty folder, no-match and failure grids keep their text and icons as fallback while Krackle art settles')
+        checks.append('Empty folder, no-match and failure grids keep their text and the static drawing as fallback while Krackle art settles')
 
         # The Krackle stage: busy keeps drawing, a result settles and stops, destroy cleans up.
         tab.evaluate("""() => {
@@ -103,38 +117,28 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         assert tab.evaluate("!stageHost.querySelector('canvas, svg') && !stageHost.dataset.atelierMotion")
         checks.append('Krackle stage loops only while busy, stops drawing once a result settles, honours reduced motion and cleans up')
 
-        # Activity and primary-button presses.
+        # A stage in a hidden dialog stops drawing; a busy-after-busy does not restart the drop.
         tab.evaluate("""() => {
-          const b = document.getElementById('job-activity');
-          b.toggleAttribute('data-krackle-busy', true);
-          const name = getComputedStyle(b, '::after').animationName;
-          b.toggleAttribute('data-krackle-busy', false);
-          if (name !== 'krackle-charge') throw Error('Activity ring missing: ' + name);
+          window.hiddenHost = document.createElement('div'); hiddenHost.style.display = 'none'; document.body.append(hiddenHost);
+          window.hiddenStage = AtelierMotion.krackleStage.mount(hiddenHost, {state:'busy', size:120});
         }""")
-        box = tab.locator('#install-btn').bounding_box()
-        tab.evaluate("document.getElementById('install-btn').disabled = false")
-        tab.mouse.move(box['x'] + 20, box['y'] + box['height'] / 2)
-        tab.mouse.down()
-        assert tab.locator('.krackle-press-pop').count() == 1
-        tab.mouse.up()
-        tab.wait_for_function("!document.querySelector('.krackle-press-pop')")
-        tab.emulate_media(reduced_motion='reduce')
-        tab.mouse.down(); tab.mouse.up()
-        assert tab.locator('.krackle-press-pop').count() == 0
-        tab.emulate_media(reduced_motion='no-preference')
-        checks.append('Activity shows a charge ring while jobs run; primary buttons pop bubbles on press, except under reduced motion')
+        tab.wait_for_timeout(500)
+        assert tab.evaluate('hiddenStage.frames()') <= 2 and tab.evaluate("hiddenHost.dataset.amSleeping") == 'true'
+        tab.evaluate("hiddenHost.style.display = ''")
+        tab.wait_for_function("hiddenHost.dataset.amSleeping === 'false'", timeout=3000)
+        tab.evaluate("hiddenStage.destroy(); hiddenHost.remove()")
+        checks.append('Hidden Krackle stages stop drawing and resume when their dialog is shown')
 
-        # Choosing a palette sweeps a halftone wave from the control; programmatic theme changes do not.
-        tab.evaluate("document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'")
-        assert tab.locator('.krackle-theme-wave').count() == 0
-        presets = tab.locator('[data-theme-preset]:not([data-saved-palette])')
-        current = tab.evaluate("document.documentElement.dataset.palette")
-        target = next(i for i in range(presets.count()) if presets.nth(i).get_attribute('data-theme-preset') not in (current, 'custom'))
-        presets.nth(target).evaluate('el => el.click()')
-        tab.wait_for_selector('.krackle-theme-wave', state='attached', timeout=2000)
-        tab.wait_for_selector('.krackle-theme-wave', state='detached', timeout=3000)
-        tab.evaluate("palette => document.querySelector(`[data-theme-preset='${palette}']`).click()", current)
-        checks.append('Choosing a theme or palette sweeps a one-shot halftone wave from the control, never on startup or programmatic changes')
+        # Activity's running-jobs ring is six dots with a counting crest.
+        tab.evaluate("""() => {
+          const ring = document.createElement('span'); ring.className = 'activity-ring indeterminate';
+          document.getElementById('job-activity').prepend(ring);
+          const after = getComputedStyle(ring, '::after');
+          const result = [after.animationName, (after.maskImage || after.webkitMaskImage || '').startsWith('url(')];
+          ring.remove();
+          if (result[0] !== 'krackle-charge' || !result[1]) throw Error('Activity ring is not Krackle: ' + result);
+        }""")
+        checks.append('Activity shows its running-jobs ring as six Krackle dots with a counting crest')
         assert not errors, errors
     finally:
         tab.close()

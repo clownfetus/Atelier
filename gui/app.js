@@ -113,6 +113,7 @@ function toastSpinner(msg) {
     el.firstElementChild.remove(); el.lastElementChild.textContent = message;
     const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
     el.prepend(icon); lucide.createIcons({nodes:[el]});
+    try { window.AtelierKrackleGlyph?.toastIcon(el, state === 'error' ? 'error' : state); } catch (_) {}
     setTimeout(() => el.remove(), duration);
   };
   document.getElementById("toast-area").appendChild(el);
@@ -131,8 +132,6 @@ function toast(msg, type = "info", duration = 3200) {
   el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span>${msg}</span>`;
   document.getElementById("toast-area").appendChild(el);
   lucide.createIcons({ nodes: [el] });
-  // Optional Krackle glyph; the lucide icon remains if presentation is unavailable.
-  try { window.AtelierKrackleGlyph?.toastIcon(el, type); } catch (_) {}
   el.setAttribute('role','status'); el.setAttribute('aria-atomic','true');
   let remaining = duration, start = Date.now(), t, repeats = 1, hovered = false;
   const remove = el.remove.bind(el);

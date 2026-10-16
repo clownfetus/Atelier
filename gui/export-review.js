@@ -70,7 +70,7 @@
   function showStage(state) {
     try {
       if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
-        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 180});
+        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156});
       }
       stage?.setState(state);
     } catch (_) {
@@ -118,7 +118,9 @@
     const { snapshot, result, callbacks } = current;
     const built = result.ok || result.built;
     const warning = built && (!result.ok || snapshot.skipped || (result.skipped || []).length);
-    reset(built ? (result.installed_dir ? 'Mod installed' : result.ok ? 'Mod exported' : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
+    // The heading carries the outcome; the stage only gives it a physical character.
+    const suffix = warning && result.ok ? ' with warnings' : '';
+    reset(built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
       built ? warning ? 'warning' : 'success' : 'error');
     if (result.cancelled && !built) showStage('idle');
     metadata(snapshot);

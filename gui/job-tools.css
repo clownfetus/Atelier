@@ -21,4 +21,5 @@
 
 /* Krackle state glyph beside each job's state label. */
 .job-state { display: inline-flex; align-items: center; gap: 6px; }
+.job-state[data-outcome='warning'] { text-transform: none; }
 .job-state-glyph { display: inline-flex; width: 16px; height: 16px; flex: 0 0 16px; }

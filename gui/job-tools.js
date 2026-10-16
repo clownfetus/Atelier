@@ -77,7 +77,10 @@
     if (!rows.length) { const empty=el('div'); body.append(empty); window.AtelierPolish?.empty(empty,'No jobs yet.','Imports and exports will appear here.'); }
     for (const job of rows) {
       const row = el('article', undefined, 'job-row'); row.dataset.jobId = job.id;
-      row.append(el('strong', job.label), el('span', job.state, 'job-state'));
+      // The label carries the outcome; the glyph beside it only gives it character.
+      const warned = jobGlyph(job) === 'warning', state = el('span', warned ? 'Succeeded with warnings' : job.state, 'job-state');
+      if (warned) state.dataset.outcome = 'warning';
+      row.append(el('strong', job.label), state);
       decorateState(row, job);
       const stage = el('p', job.stage); stage.setAttribute('role', 'status'); row.append(stage);
       if (job.total) row.append(el('p', job.current + ' / ' + job.total));

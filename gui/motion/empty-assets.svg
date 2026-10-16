@@ -47,16 +47,16 @@
 <circle class="am-empty-assets-svg__face" cx="76" cy="68.4" r="3.3" />
 <circle class="am-empty-assets-svg__face" cx="87" cy="68.4" r="2.4" />
 <circle class="am-empty-assets-svg__face" cx="98.5" cy="68.4" r="2.9" />
-<circle class="am-empty-assets-svg__hole" cx="80" cy="85.5" r="4.6" />
-<circle class="am-empty-assets-svg__hole" cx="67.5" cy="89" r="2.8" />
-<circle class="am-empty-assets-svg__hole" cx="90.5" cy="78.5" r="2.4" />
-<circle class="am-empty-assets-svg__hole" cx="58.5" cy="81" r="2" />
-<circle class="am-empty-assets-svg__hole" cx="45" cy="88" r="2.3" />
-<circle class="am-empty-assets-svg__hole" cx="32" cy="82" r="1.5" />
-<circle class="am-empty-assets-svg__hole" cx="23.5" cy="89" r="1.3" />
-<circle class="am-empty-assets-svg__hole" cx="71.5" cy="76.5" r="1.6" />
-<circle class="am-empty-assets-svg__hole" cx="40" cy="76" r="1.1" />
-<circle class="am-empty-assets-svg__speck" cx="78.6" cy="84.2" r="1.1" />
-<circle class="am-empty-assets-svg__speck" cx="66.6" cy="88" r="0.7" />
+<circle class="am-empty-assets-svg__hole" cx="82" cy="85" r="5" />
+<circle class="am-empty-assets-svg__hole" cx="75" cy="88.5" r="3.6" />
+<circle class="am-empty-assets-svg__hole" cx="88" cy="79" r="3" />
+<circle class="am-empty-assets-svg__hole" cx="76.5" cy="80" r="2.2" />
+<circle class="am-empty-assets-svg__hole" cx="89.5" cy="87" r="2.4" />
+<circle class="am-empty-assets-svg__hole" cx="66" cy="89" r="1.8" />
+<circle class="am-empty-assets-svg__hole" cx="70" cy="77" r="1.3" />
+<circle class="am-empty-assets-svg__hole" cx="58" cy="86" r="1.1" />
+<circle class="am-empty-assets-svg__hole" cx="93" cy="73.5" r="1" />
+<circle class="am-empty-assets-svg__speck" cx="80.6" cy="83.7" r="1.2" />
+<circle class="am-empty-assets-svg__speck" cx="74" cy="87.5" r="0.7" />
 </g>
 </svg>

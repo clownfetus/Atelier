@@ -207,21 +207,17 @@ def viewport_loader():
 def folder_flap():
     p = 'am-folder-flap'
     back = path('M6 13.5 Q6 11 8.5 11 H32.5 L39.5 18 H87.5 Q90 18 90 20.5 V80 H6 Z', f'{p}-energy {p}-panel')
-    back_holes = ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in
-                         ((14.5, 16.4, 1.7), (23.6, 15.2, 1.05), (57.5, 24.4, 1.6), (69.4, 23.2, 1.0), (81.6, 25.6, 1.3)))
-    pop = ''.join(f'<g class="{p}-pop-bubble {p}-pop-{k}">' + circle(x, y, r, f'{p}-pop-energy') +
-                  circle(x + r * .22, y + r * .18, r * .42, f'{p}-hole') + '</g>'
-                  for k, (x, y, r) in enumerate(((35, 24.5, 4.1), (49.5, 19.5, 5.2), (63.5, 25, 3.5))))
+    back_holes = ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in ((80.5, 25.2, 1.5), (73.6, 24.6, 0.9)))
     front_body = path('M6 31 H90 V77.5 Q90 80 87.5 80 H8.5 Q6 80 6 77.5 Z', f'{p}-energy {p}-panel')
     bumps = ''.join(circle(x, 31.2, r, f'{p}-energy') for x, r in
                     ((10.5, 3.1), (19, 2.4), (27.5, 3.3), (37, 2.2), (46, 3.0), (55.5, 2.5), (64.5, 3.2), (74, 2.3), (83, 3.0), (88.2, 1.9)))
+    # One overlapping mass in the lower right, a trail of satellites, and clean energy elsewhere.
     front_holes = ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in
-                          ((71.5, 64.5, 5.4), (58.6, 70.8, 3.5), (80.4, 51.5, 3.1), (50.8, 61.2, 2.5), (65.2, 48.5, 2.1),
-                           (39.6, 70.2, 2.3), (83.4, 71.2, 2.5), (29.4, 63.4, 1.7), (19.6, 71.6, 1.45), (45.6, 49.4, 1.35),
-                           (75.6, 39.6, 1.25), (24.6, 46.2, 1.0), (14.2, 58.6, 1.1)))
-    specks = circle(69.9, 62.6, 1.25, f'{p}-speck') + circle(57.6, 69.6, .8, f'{p}-speck') + circle(79.5, 50.4, .7, f'{p}-speck')
+                          ((72, 65, 5.6), (64.5, 69.5, 4.2), (78.5, 58.5, 3.6), (68.5, 58.5, 2.6), (80.5, 69.5, 3.0),
+                           (56, 72.5, 2.0), (59.5, 61.5, 1.5), (83.5, 50.5, 1.6), (51.5, 66.5, 1.1), (46, 72.5, 1.0),
+                           (76.5, 47.5, 1.0), (40.5, 74, 0.8)))
+    specks = circle(70.2, 63.2, 1.3, f'{p}-speck') + circle(63.4, 68.3, .8, f'{p}-speck')
     body = (f'<g class="{p}-back" opacity="1">{back}{back_holes}</g>'
-            f'<g class="{p}-pop" opacity="0">{pop}</g>'
             f'<g class="{p}-front" opacity="1">{front_body}{bumps}{front_holes}{specks}</g>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon {p}" viewBox="0 0 96 96" '
             f'width="96" height="96" fill="currentColor" aria-hidden="true" focusable="false">{body}</svg>')
@@ -243,9 +239,9 @@ def empty_assets():
     bumps = ''.join(circle(x, 68.4, r, f'{p}-svg__face') for x, r in
                     ((12.5, 3.0), (22, 2.4), (32, 3.2), (43, 2.3), (54, 3.1), (65, 2.4), (76, 3.3), (87, 2.4), (98.5, 2.9)))
     face_holes = ''.join(circle(x, y, r, f'{p}-svg__hole') for x, y, r in
-                         ((80, 85.5, 4.6), (67.5, 89, 2.8), (90.5, 78.5, 2.4), (58.5, 81, 2.0), (45, 88, 2.3),
-                          (32, 82, 1.5), (23.5, 89, 1.3), (71.5, 76.5, 1.6), (40, 76, 1.1)))
-    specks = circle(78.6, 84.2, 1.1, f'{p}-svg__speck') + circle(66.6, 88, .7, f'{p}-svg__speck')
+                         ((82, 85, 5.0), (75, 88.5, 3.6), (88, 79, 3.0), (76.5, 80, 2.2), (89.5, 87, 2.4),
+                          (66, 89, 1.8), (70, 77, 1.3), (58, 86, 1.1), (93, 73.5, 1.0)))
+    specks = circle(80.6, 83.7, 1.2, f'{p}-svg__speck') + circle(74, 87.5, .7, f'{p}-svg__speck')
     body = (f'<g class="{p}-plane {p}-plane--guides">{guides}</g>'
             f'<g class="{p}-plane {p}-plane--deck"><g class="{p}-svg__drop-group">{drop}{drop_hole}</g>{bubbles}</g>'
             f'<g class="{p}-plane {p}-plane--tray">{well}{face}{bumps}{face_holes}{specks}</g>')
@@ -260,7 +256,7 @@ def empty_state():
     tray = (path('M10 40 H54 L59 47 H5 Z', f'{p}-energy {p}-well') +
             path('M5 47 H59 L55.5 60 Q55 62 53 62 H11 Q9 62 8.5 60 Z', f'{p}-energy {p}-face') +
             ''.join(circle(x, 47.3, r, f'{p}-energy {p}-face') for x, r in ((9, 2), (17, 1.6), (25, 2.1), (33, 1.5), (41, 2.0), (49, 1.6), (56.5, 1.9))) +
-            ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in ((45, 56, 2.6), (37.5, 58.5, 1.5), (51.5, 52, 1.4), (27, 55, 1.1), (18, 58, 1.0))))
+            ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in ((46, 56, 2.8), (41.5, 58.5, 2.0), (50, 52.5, 1.8), (36, 57, 1.1), (53, 57.5, 1.2))))
     empty = (f'<g class="{p}-kind {p}-kind-empty"><g class="{p}-tray">{tray}</g>' +
              bubble(26, 37, 3.6, f'{p}-drop-a') + bubble(36.5, 35.5, 4.6, f'{p}-drop-b') + '</g>')
     none = (f'<g class="{p}-kind {p}-kind-none">' + bubble(18, 44, 5.4, f'{p}-drop-a') + bubble(34, 47, 3.8, f'{p}-drop-b') +
@@ -297,7 +293,7 @@ HEADER = {
     'material-save': 'Krackle material save: shaded swatch (idle), charge ring around a small swatch (saving), starburst, cracked ring and splat.',
     'krackle-glyph': 'Krackle micro glyphs for notifications: charge ring, ink drop (info), starburst, cracked ring and splat.',
     'viewport-loader': 'Krackle viewport loader: twelve-dot charge ring around a boiling ball, resting bubbles (empty) and a knocked-out splat (error).',
-    'folder-flap': 'Krackle folder: energy panels with punched bubbles. The front panel tips open on hover/focus and three bubbles rise out.',
+    'folder-flap': 'Krackle folder: energy panels with one composed mass of bubbles. The front panel tips open on hover/focus.',
     'empty-assets': 'Krackle empty tray: a tray of energy holding a few loose bubbles, with a drop of ink waiting above it.',
     'empty-state': 'Krackle grid empty states: a tray with two bubbles (empty folder), three loose bubbles (no matches) and a splat (failed to load).',
 }

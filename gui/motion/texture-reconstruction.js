@@ -1,4 +1,7 @@
 // Reassemble updated texture previews. Image loading and project writes stay with the app.
+// Krackle: the new pixels arrive through a 45° halftone screen, each dot swelling from
+// nothing until the dots overlap into the finished image (ink spreading from the centre).
+// A wipe swap sends the same swelling dots across the old preview from left to right.
 (() => {
   'use strict';
   const records = new WeakMap(), live = new Set();
@@ -57,18 +60,21 @@
     host.classList.add('texture-reconstructing');
     host.appendChild(canvas);
 
-    const columns = width >= 90 ? 8 : 4, rows = columns;
-    const blockWidth = canvas.width / columns, blockHeight = canvas.height / rows;
     const duration = record.mode === 'wipe' ? 320 : width >= 90 ? 460 : 330;
     const spread = record.mode === 'wipe' ? 0 : width >= 90 ? 180 : 100;
     canvas.dataset.swapMode = record.mode;
-    const blocks = Array.from({length: columns * rows}, (_, index) => ({
-      x: (index % columns) * blockWidth, y: Math.floor(index / columns) * blockHeight,
-      delay: ((index * 37) % (columns * rows)) / (columns * rows) * spread,
-      dx: Math.sin(index * 12.9898 + 1) * canvas.width * .22,
-      dy: Math.cos(index * 7.233 + 2) * canvas.height * .22,
-      rotation: Math.sin(index * 3.17) * .22,
-    }));
+    // Comic-sized screen: about 14 dots across a tile, 8 in the compact sidebar.
+    const pitch = canvas.width / (width >= 90 ? 14 : 8), reach = pitch * 0.76;
+    const cx = canvas.width / 2, cy = canvas.height / 2, far = Math.hypot(cx, cy) || 1;
+    const dots = [];
+    const c = Math.SQRT1_2, span = Math.ceil(Math.hypot(canvas.width, canvas.height) / pitch) + 2;
+    for (let i = -span; i <= span; i++) for (let j = -span; j <= span; j++) {
+      const x = cx + (i - j) * pitch * c, y = cy + (i + j) * pitch * c;
+      if (x < -reach || y < -reach || x > canvas.width + reach || y > canvas.height + reach) continue;
+      // Delay grows outward from the centre with a little jitter, like ink soaking in.
+      const jitter = (Math.sin(i * 12.9898 + j * 78.233) * 43758.5453) % 1;
+      dots.push({x, y, delay: (Math.hypot(x - cx, y - cy) / far * 0.8 + Math.abs(jitter) * 0.2) * spread});
+    }
     const started = performance.now();
     const draw = now => {
       record.frame = null;
@@ -78,27 +84,27 @@
       }
       try {
         context.clearRect(0, 0, canvas.width, canvas.height);
-        if (record.mode === 'wipe') {
-          const progress = Math.min(1, (now-started)/duration), eased = 1-Math.pow(1-progress,3);
-          if (record.previous) context.drawImage(record.previous,0,0,canvas.width,canvas.height);
-          context.save(); context.beginPath(); context.rect(0,0,canvas.width*eased,canvas.height); context.clip();
-          context.clearRect(0,0,canvas.width,canvas.height); context.drawImage(source,0,0); context.restore();
-          record.frame=requestAnimationFrame(draw); return;
+        const elapsed = now - started;
+        if (record.mode === 'wipe' && record.previous) context.drawImage(record.previous, 0, 0, canvas.width, canvas.height);
+        const front = (1 - Math.pow(1 - Math.min(1, elapsed / duration), 3)) * canvas.width * 1.35;
+        context.save();
+        context.beginPath();
+        for (const dot of dots) {
+          let grow;
+          if (record.mode === 'wipe') grow = Math.max(0, Math.min(1, (front - dot.x) / (canvas.width * 0.35)));
+          else {
+            const progress = Math.max(0, Math.min(1, (elapsed - dot.delay) / duration));
+            grow = 1 - Math.pow(1 - progress, 3);
+          }
+          if (grow <= 0) continue;
+          const r = reach * grow;
+          context.moveTo(dot.x + r, dot.y);
+          context.arc(dot.x, dot.y, r, 0, Math.PI * 2);
         }
-        for (const block of blocks) {
-          const progress = Math.max(0, Math.min(1, (now - started - block.delay) / duration));
-          if (!progress) continue;
-          const eased = 1 - Math.pow(1 - progress, 3), remaining = 1 - eased;
-          context.save();
-          context.globalAlpha = Math.min(1, progress * 3);
-          context.translate(block.x + blockWidth / 2 + block.dx * remaining,
-            block.y + blockHeight / 2 + block.dy * remaining);
-          context.rotate(block.rotation * remaining);
-          context.scale(.55 + eased * .45, .55 + eased * .45);
-          context.drawImage(source, block.x, block.y, blockWidth, blockHeight,
-            -blockWidth / 2, -blockHeight / 2, blockWidth + .5, blockHeight + .5);
-          context.restore();
-        }
+        context.clip();
+        if (record.mode === 'wipe') context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(source, 0, 0);
+        context.restore();
         record.frame = requestAnimationFrame(draw);
       } catch (_) { dispose(record); }
     };

@@ -197,8 +197,8 @@
     var state = STATES.has(opts.state) ? opts.state : 'idle';
     var reducedPref = opts.reducedMotion === 'reduce' ? 'reduce' : 'system';
     var mql = null;
-    try { mql = window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
-    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.reducedMotion === 'reduce'; }
+    try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
+    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.motion === 'reduce'; }
 
     // ── dot pool ──
     var rndSeed = 12345 + uid * 101, results = 0;
@@ -206,8 +206,8 @@
     var POOL = Math.max.apply(null, sample.map(function (f) { return f.length; })) + 60;
     function F() { return new Float32Array(POOL); }
     var X = F(), Y = F(), VX = F(), VY = F(), R = F(), TX = F(), TY = F(), TR = F(), PA = F(), PR = F(), BASE = F(), DELAY = F();
-    var AL = F(), TAL = F(), M = F(), TM = F(), COLT = F(), WAVE = F(), KICK = F(), DX = F(), DY = F(), SF = F();
-    var KFROM = new Uint8Array(POOL), KTO = new Uint8Array(POOL), ROLE = new Uint8Array(POOL), SPECK = new Uint8Array(POOL);
+    var AL = F(), TAL = F(), M = F(), TM = F(), COLT = F(), WAVE = F(), KICK = F(), DX = F(), DY = F(), SF = F(), SH = F();
+    var KFROM = new Uint8Array(POOL), KTO = new Uint8Array(POOL), ROLE = new Uint8Array(POOL), SPECK = new Uint8Array(POOL), DEPTH = new Uint8Array(POOL);
     var kr = mulberry32(rndSeed);
     for (var i0 = 0; i0 < POOL; i0++) { SF[i0] = 0.55 + 1.55 * Math.pow(kr(), 2.2); SPECK[i0] = kr() < 0.32 ? 1 : 0; M[i0] = 1; COLT[i0] = 1; }
 
@@ -257,8 +257,19 @@
       if (name === 'drop') { enterDrop(rnd); return; }
       var shape = name === 'busy' ? fRing(P) : name === 'success' ? fBurst(P, rnd) : name === 'warning' ? fCracked(P, rnd) : fSplat(P, rnd);
       if (shape.length > POOL - 4) { shape.sort(function (a, b) { return b.r - a.r; }); shape.length = POOL - 4; }
-      var targets = shape.map(function (t) { return {x: t.x, y: t.y, r: t.r, k: t.k, m: t.m, role: t.role || R_SHAPE, dx: t.dx || 0, dy: t.dy || 0, al: 1}; });
-      var visible = name === 'busy' ? 14 : name === 'success' ? 10 : 0, n = 0, dizzy = 0;
+      var solid = {}, Q = Math.SQRT1_2 / P;
+      function cell(t) { return [Math.round((t.x + t.y) * Q), Math.round((t.y - t.x) * Q)]; }
+      shape.forEach(function (t) { if (t.r > P * 0.15) { var c = cell(t); solid[c[0] + ',' + c[1]] = 1; } });
+      // Lattice steps to the nearest gap: bubbles may only sit this far inside the silhouette.
+      function depthOf(t) {
+        var c = cell(t);
+        for (var d = 1; d <= 3; d++) for (var a = -d; a <= d; a++) for (var b = -d; b <= d; b++) {
+          if (Math.abs(a) + Math.abs(b) === d && !solid[(c[0] + a) + ',' + (c[1] + b)]) return d - 1;
+        }
+        return 3;
+      }
+      var targets = shape.map(function (t) { return {x: t.x, y: t.y, r: t.r, k: t.k, m: t.m, role: t.role || R_SHAPE, dx: t.dx || 0, dy: t.dy || 0, al: 1, depth: depthOf(t)}; });
+      var visible = name === 'busy' || name === 'success' ? 6 : 0, n = 0, dizzy = 0;
       for (var i = shape.length; i < POOL; i++, n++) {
         if (name === 'error' && dizzy < 3) {
           targets.push({x: DIZZY_C[0], y: DIZZY_C[1], r: P * 0.8, k: K_FAULT, m: 0, role: R_DIZZY, dz: dizzy++, al: 1});
@@ -281,7 +292,7 @@
         if (t.role === R_SHAPE || t.role === R_CHUNK) { t.x += (jit() - 0.5) * 2 * J; t.y += (jit() - 0.5) * 2 * J; }
         TX[i] = t.x; TY[i] = t.y; TR[i] = t.r; BASE[i] = t.r;
         PA[i] = t.role === R_DIZZY ? t.dz * TAU / 3 : Math.atan2(t.y, t.x); PR[i] = Math.hypot(t.x, t.y);
-        ROLE[i] = t.role; DX[i] = t.dx || 0; DY[i] = t.dy || 0; TAL[i] = t.al; TM[i] = t.m; KICK[i] = 0.7 + rnd() * 0.6;
+        ROLE[i] = t.role; DX[i] = t.dx || 0; DY[i] = t.dy || 0; TAL[i] = t.al; TM[i] = t.m; KICK[i] = 0.7 + rnd() * 0.6; DEPTH[i] = t.depth || 0;
         KFROM[i] = COLT[i] >= 0.5 ? KTO[i] : KFROM[i]; KTO[i] = t.k; COLT[i] = 0;
         var dist = Math.hypot(t.x, t.y);
         if (name === 'busy' && fromInk) DELAY[i] = 0.04 + (1 - clamp01(Math.hypot(X[i], Y[i]) / PUDDLE)) * 0.34;
@@ -289,7 +300,44 @@
         else if (name === 'success') DELAY[i] = 0.18 + rnd() * 0.05 + dist / 400 * 0.06;
         else if (name === 'warning') DELAY[i] = t.role === R_CHUNK ? 0.1 : 0.08 + clamp01((t.y + 200) / 600) * 0.12;
         else DELAY[i] = t.role === R_DIZZY ? 0.5 : rnd() * 0.04;
-        if (rm) { X[i] = t.x + (t.role === R_CHUNK ? 0 : 0); Y[i] = t.y; R[i] = t.r; VX[i] = VY[i] = 0; AL[i] = t.al; M[i] = t.m; COLT[i] = 1; }
+        if (rm) { X[i] = t.x; Y[i] = t.y; R[i] = t.r; VX[i] = VY[i] = 0; AL[i] = t.al; M[i] = t.m; COLT[i] = 1; }
+      });
+      compose(name, rnd);
+    }
+
+    // Graphic hierarchy: energy defines the silhouette, bubbles only texture it. Each
+    // result places a few deliberate dark masses deep inside the shape on the shadow
+    // side (overlapping bubbles that merge), scatters a sparse fringe of single bubbles,
+    // and leaves the rest as clean energy. Only dots at least one lattice step inside
+    // the shape (DEPTH) may carry a bubble, so edges never perforate. SH is per dot:
+    // 0 none, (0, 0.75) a single bubble, >= 0.75 part of a mass.
+    var MASSES = {busy: [], success: [1.3], warning: [1.5], error: [2.7, 1.7]};
+    var SPARSE = {busy: 0.3, success: 0.05, warning: 0.1, error: 0.12};
+    function compose(name, rnd) {
+      var extent = name === 'error' ? 250 : name === 'success' ? 205 : 248;
+      var maxBase = 0, i, j, cand = [];
+      for (i = 0; i < POOL; i++) if (ROLE[i] === R_SHAPE || ROLE[i] === R_CHUNK) maxBase = Math.max(maxBase, BASE[i]);
+      for (i = 0; i < POOL; i++) {
+        SH[i] = 0;
+        if ((ROLE[i] === R_SHAPE || ROLE[i] === R_CHUNK) && BASE[i] >= maxBase * 0.5 && DEPTH[i] >= 1) cand.push(i);
+      }
+      function shadow(i) { return (TX[i] * 0.6 + TY[i] * 0.8) / extent + (ROLE[i] === R_CHUNK && name === 'warning' ? 2 : 0); }
+      var centres = [];
+      (MASSES[name] || []).forEach(function (mr, n) {
+        var best = -1, score = -1e9;
+        cand.forEach(function (c) {
+          if (DEPTH[c] < (mr > 2 ? 2 : 1)) return;
+          var sc = shadow(c) + (rnd() - 0.5) * 0.35;
+          for (var q = 0; q < centres.length; q++) if (Math.hypot(TX[c] - centres[q].x, TY[c] - centres[q].y) < (centres[q].r + mr * P) * 1.1) sc -= 9;
+          if (sc > score) { score = sc; best = c; }
+        });
+        if (best >= 0) centres.push({x: TX[best], y: TY[best], r: mr * P});
+      });
+      cand.forEach(function (c) {
+        var m = 0;
+        for (j = 0; j < centres.length; j++) m = Math.max(m, 1 - Math.hypot(TX[c] - centres[j].x, TY[c] - centres[j].y) / centres[j].r);
+        if (m > 0) SH[c] = 0.75 + 0.25 * m;
+        else if (shadow(c) > -0.1 && rnd() < (SPARSE[name] || 0)) SH[c] = 0.3 + 0.4 * rnd();
       });
     }
 
@@ -367,7 +415,7 @@
     }
 
     function inkOf(i) {
-      var a = inks[KFROM[i]], b = inks[KTO[i]], t = COLT[i], w = WAVE[i] * 0.35;
+      var a = inks[KFROM[i]], b = inks[KTO[i]], t = COLT[i], w = 0;
       var r = a[0] + (b[0] - a[0]) * t, g = a[1] + (b[1] - a[1]) * t, bl = a[2] + (b[2] - a[2]) * t;
       if (w > 0) { r += (glint[0] - r) * w; g += (glint[1] - g) * w; bl += (glint[2] - bl) * w; }
       return ((r | 0) & ~3) + ',' + ((g | 0) & ~3) + ',' + ((bl | 0) & ~3);
@@ -388,7 +436,7 @@
       function bubble(x, y, r, i) {
         if (r < 1.6 / scale) return;
         black.moveTo(x + r, y); black.arc(x, y, r, 0, TAU);
-        if (SPECK[i] && r > P * 0.36) { var sr = Math.max(1 / scale, r * 0.22); specks.moveTo(x - r * 0.36 + sr, y - r * 0.38); specks.arc(x - r * 0.36, y - r * 0.38, sr, 0, TAU); }
+        if (SPECK[i] && r > P * 0.55) { var sr = Math.max(1 / scale, r * 0.22); specks.moveTo(x - r * 0.36 + sr, y - r * 0.38); specks.arc(x - r * 0.36, y - r * 0.38, sr, 0, TAU); }
       }
       function minB(i) { return Math.max(P * 0.2 * SF[i], 2.4 / scale); }
       for (var i = 0; i < POOL; i++) {
@@ -401,14 +449,15 @@
         } else if (form === 'drop') {
           addCircle(energy, key, X[i], Y[i], R[i] + halo * 0.65); anyEnergy = true;
           if (i % 9 === 0) bubble(X[i], Y[i], P * 0.34 * SF[i], i);
-        } else if (M[i] >= 0.5) {
-          addCircle(energy, key, X[i], Y[i], R[i] + halo * 0.65); anyEnergy = true;
-          if (kk === K_FAULT && SF[i] < 0.85 && form === 'error') continue;
-          bubble(X[i], Y[i], Math.max(rb * 0.62, minB(i)), i);
         } else {
-          addCircle(energy, key, X[i], Y[i], rb + halo * 0.8); anyEnergy = true;
-          if (kk === K_SUCCESS && SF[i] < 1.1) continue;
-          bubble(X[i], Y[i], Math.max(rb * 0.8 * (kk === K_WARN ? 1.12 : kk === K_SUCCESS ? 0.8 : 1), minB(i)), i);
+          addCircle(energy, key, X[i], Y[i], (M[i] >= 0.5 ? R[i] + halo * 0.65 : rb + halo * 0.8)); anyEnergy = true;
+          // The charge crest swells and catches crisp Paper highlights, never an airbrushed glow.
+          if (WAVE[i] > 0.6 && i % 3 === 0) { var hr = Math.max(1.4 / scale, R[i] * 0.38); specks.moveTo(X[i] - R[i] * 0.35 + hr, Y[i] - R[i] * 0.4); specks.arc(X[i] - R[i] * 0.35, Y[i] - R[i] * 0.4, hr, 0, TAU); }
+          if (!SH[i]) continue;
+          // Bubbles grow in with their dot; a mass's bubbles overlap past the dot spacing.
+          var grow = Math.min(1.1, Math.max(0.5, R[i] / Math.max(1e-3, BASE[i])));
+          var rb2 = SH[i] >= 0.75 ? P * (0.62 + 2 * (SH[i] - 0.75)) : P * (0.34 + 0.18 * SH[i] + 0.08 * SF[i]);
+          bubble(X[i], Y[i], Math.min(P * (0.55 + 0.85 * (DEPTH[i] - 1)), rb2 * grow), i);
         }
       }
       if (form === 'drop' && !reduced() && tau < DROP_T + 0.3) {
@@ -474,7 +523,7 @@
       update(dt);
       render();
       frames++;
-      if (settled(clock - formStart) || document.hidden) { sleep(); return; }
+      if (settled(clock - formStart) || document.hidden || !onScreen) { sleep(); return; }
       raf = requestAnimationFrame(frame);
     }
 
@@ -496,13 +545,15 @@
         sleep();
         return;
       }
-      if (!raf && !document.hidden) raf = requestAnimationFrame(frame);
+      if (!raf && !document.hidden && onScreen) raf = requestAnimationFrame(frame);
     }
 
     function apply(next) {
       readInks();
       if (next === 'idle') { form = 'idle'; render(); sleep(); return; }
-      if (next === 'busy') enterForm(form === 'busy' ? 'busy' : 'drop');
+      // Busy after busy (a quick check running straight into a build) keeps the
+      // current performance; only a fresh start drops new ink.
+      if (next === 'busy') { if (form !== 'busy' && form !== 'drop') enterForm('drop'); }
       else { results++; enterForm(next); }
       wake();
     }
@@ -516,6 +567,15 @@
     }
     if (mql && typeof mql.addEventListener === 'function') mql.addEventListener('change', onEnvironment);
     document.addEventListener('visibilitychange', onEnvironment);
+    // A stage in a hidden dialog never draws; showing the dialog resumes it.
+    var onScreen = true, io = null;
+    if (typeof IntersectionObserver === 'function') {
+      io = new IntersectionObserver(function (entries) {
+        onScreen = entries[entries.length - 1].isIntersecting;
+        if (onScreen) onEnvironment(); else sleep();
+      });
+      io.observe(host);
+    }
 
     host.setAttribute('data-atelier-motion', 'krackle-stage');
     host.setAttribute('data-am-state', state);
@@ -540,6 +600,7 @@
         if (destroyed) return;
         destroyed = true;
         sleep();
+        if (io) io.disconnect();
         if (mql && typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onEnvironment);
         document.removeEventListener('visibilitychange', onEnvironment);
         if (canvas.parentNode === host) host.removeChild(canvas);
