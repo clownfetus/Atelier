@@ -42,6 +42,25 @@ The app, installers and update checker identify each release by its full number,
 - Spinners are a charge ring. Outcomes are named in text, such as **Mod exported
   with warnings** and **Succeeded with warnings** in Activity.
 
+### Packaging and verification
+
+- Passed 25 backend suites and 10 focused browser checks on Windows.
+- Passed clean install, running upgrade from the 0.4.0 installer, reinstall and
+  uninstall on Windows 2022 and 2025, checking all 511 payload files.
+- Built and checked native AppImage startup on Ubuntu 24.04. Separately, the
+  released AppImages upgraded from 0.4.0 to 0.4.1 with tools re-staged and an
+  existing project kept, and the packaged 0.4.1 app passed the custom-texture
+  and Model Studio error checks.
+- Verified the Blender import fix with Blender 5.1.2's own importer.
+- A release build starts by pushing the release commit to
+  `release/<version>-candidate`; build inputs come from
+  `tests/fixtures/installer/release-<version>-inputs.json`.
+
+Custom textures in game and Wine-dependent Linux asset workflows still need the
+checks described in [the release notes](docs/release-0.4.1.md).
+
+[Verification workflow](https://github.com/clownfetus/Atelier/actions/runs/38955861759)
+
 ## 0.4.0 — 16 October 2026
 
 ### Model Studio
