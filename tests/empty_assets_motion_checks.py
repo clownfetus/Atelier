@@ -94,7 +94,9 @@ def run_empty_assets_motion_checks(page, context, url, report, checks):
           emptyHost.style.cssText='position:fixed;left:20px;top:160px;z-index:9999'; document.body.append(emptyHost);
           window.emptyHandle=originalEmptyMount(emptyHost,{state:'entering'});
           window.emptyEffects=emptyHost.getAnimations({subtree:true});
-          if(emptyEffects.length!==5) throw Error('Expected five finite entrance effects');
+          // Krackle entrance: the tray stamps, guides fade and each loose bubble drops in, all finite.
+          if(emptyEffects.length<5 || emptyEffects.some(effect=>effect.effect.getTiming().iterations===Infinity))
+            throw Error('Expected finite entrance effects for the tray, guides and bubbles');
           emptyHandle.setState('entering');
           if(!emptyEffects.every(effect=>emptyHost.getAnimations({subtree:true}).includes(effect))) throw Error('Repeated entrance restarted');
           emptyHandle.setState('settled');

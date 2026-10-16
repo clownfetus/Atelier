@@ -1,0 +1,18 @@
+/*
+ * Atelier — Krackle stage host (export review and other real work)
+ * The canvas draws itself; this only sizes the stage and hides it while idle.
+ */
+[data-atelier-motion="krackle-stage"] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  line-height: 0;
+  pointer-events: none;
+  user-select: none;
+}
+[data-atelier-motion="krackle-stage"][data-am-state="idle"] { display: none; }
+[data-atelier-motion="krackle-stage"] .am-krackle-stage-canvas { display: block; }
+[data-atelier-motion="krackle-stage"] .am-krackle-stage-filter { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.export-review-stage { position: relative; margin: -4px auto 0; }
+.export-review-stage:empty, .export-review-stage[hidden] { display: none; }

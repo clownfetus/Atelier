@@ -1,23 +1,25 @@
 /*
- * Atelier — Scoped 3D Viewport Loader Styles
+ * Atelier — Scoped 3D Viewport Loader Styles (Krackle)
  * Scope prefix: am-viewport-loader- / [data-atelier-motion="viewport-loader"]
  * Designed for the fixed dark #viewport-loading preview surface in both UI themes.
+ * Loading: twelve dots charge around a ball whose bubbles boil. Empty: the ball is
+ * gone and three bubbles rest on the floor. Error: a knocked-out splat, dazed bubbles.
  */
 
 [data-atelier-motion="viewport-loader"] {
   --am-viewport-loader-size: 72px;
   --am-viewport-loader-fg: var(--studio-preview-on-surface, #e5e2e4);
   --am-viewport-loader-accent: var(--skin-loader-accent, #accbff);
+  --am-viewport-loader-rift: #c3b3f2;
   --am-viewport-loader-empty: #9aa8be;
   --am-viewport-loader-error: #ffb4ab;
   --am-viewport-loader-badge-bg: #14161b;
-
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--am-viewport-loader-size);
   height: var(--am-viewport-loader-size);
-  color: var(--am-viewport-loader-fg);
+  color: var(--am-viewport-loader-accent);
   vertical-align: middle;
   flex-shrink: 0;
   line-height: 0;
@@ -30,146 +32,88 @@
   height: 100%;
   display: block;
   overflow: visible;
-  fill: none;
+  fill: currentColor;
 }
 
-/* Transform origins in the 48x48 coordinate space */
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-brackets,
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-cube-group,
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-rear-group,
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-front-group,
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-orbit-ring,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-energy { fill: currentColor; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-hole { fill: var(--am-viewport-loader-badge-bg); }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-glint { fill: #fbf6ea; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-rift { fill: var(--am-viewport-loader-rift); }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-hull { fill: var(--am-viewport-loader-fg); }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-drip-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.67;
+  stroke-linecap: round;
+}
+
+/* Individual dots and bubbles scale about themselves; groups about the 48x48 centre. */
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-dot,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-dot-hole,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-boil,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-loose,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-rest,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-sat {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-loading,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-ring,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-sphere,
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome {
+  transform-box: view-box;
   transform-origin: 24px 24px;
 }
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome > circle {
-  fill: var(--am-viewport-loader-badge-bg);
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-splat {
+  transform-box: view-box;
+  transform-origin: 24px 27.5px;
 }
-
-/* Wireframe stroke defaults */
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-hull {
-  stroke: currentColor;
-  stroke-width: 2.15;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-drip {
+  transform-box: fill-box;
+  transform-origin: center top;
 }
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-front-ribs {
-  stroke: currentColor;
-  stroke-width: 2.15;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-}
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-rear-ribs {
-  stroke: var(--am-viewport-loader-accent);
-  stroke-width: 1.75;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  opacity: 0.34;
-}
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-top-face {
-  fill: var(--am-viewport-loader-accent);
-  opacity: 0.08;
-}
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-orbit-ring {
-  stroke: var(--am-viewport-loader-accent);
-  stroke-width: 1.85;
-  stroke-linecap: round;
-  stroke-dasharray: 0.28 0.72;
-  stroke-dashoffset: 0;
-  opacity: 0;
-}
-
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-vertex-core {
-  fill: var(--am-viewport-loader-accent);
-  opacity: 0.9;
-}
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-dot-hole { transform: scale(0); }
 
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-outcome {
   opacity: 0;
   pointer-events: none;
 }
 
-/* State: idle & ready (static assembled resting frame) */
+/* State: idle & ready (the assembled ball, still) */
 [data-atelier-motion="viewport-loader"][data-am-state="idle"],
-[data-atelier-motion="viewport-loader"][data-am-state="ready"] {
-  color: var(--am-viewport-loader-fg);
-}
-
-/* State: loading */
+[data-atelier-motion="viewport-loader"][data-am-state="ready"],
 [data-atelier-motion="viewport-loader"][data-am-state="loading"] {
-  color: var(--am-viewport-loader-fg);
+  color: var(--am-viewport-loader-accent);
 }
 
-[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-orbit-ring {
-  opacity: 0.78;
-}
+/* Reduced-motion loading pose: the crest frozen at the top of the ring. */
+[data-atelier-motion="viewport-loader"][data-am-state="loading"][data-am-reduced="true"] .am-viewport-loader-dot:nth-of-type(1) { transform: scale(1.75); }
+[data-atelier-motion="viewport-loader"][data-am-state="loading"][data-am-reduced="true"] .am-viewport-loader-dot:nth-of-type(12) { transform: scale(1.35); }
+[data-atelier-motion="viewport-loader"][data-am-state="loading"][data-am-reduced="true"] .am-viewport-loader-dot-hole:nth-of-type(13) { transform: scale(1); }
 
-[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-brackets {
-  stroke: var(--am-viewport-loader-accent);
-  opacity: 0.55;
-}
-
-/* State: empty (distinct static blueprint pose when no meshes exist) */
+/* State: empty — the ball drained away, three bubbles on the floor */
 [data-atelier-motion="viewport-loader"][data-am-state="empty"] {
   color: var(--am-viewport-loader-empty);
 }
-
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-hull {
-  stroke-dasharray: 0.09 0.075;
-  opacity: 0.72;
-}
-
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-front-ribs,
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-rear-ribs {
-  opacity: 0.24;
-}
-
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-top-face,
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-orbit-ring,
-[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-vertex-core {
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-sphere,
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-loose {
   opacity: 0;
 }
-
+[data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-ring {
+  opacity: 0.42;
+  transform: scale(0.82);
+}
 [data-atelier-motion="viewport-loader"][data-am-state="empty"] .am-viewport-loader-outcome-empty {
   opacity: 1;
 }
 
-/* State: error (distinct static error pose legible on dark viewport surface) */
+/* State: error — a knocked-out splat with three dazed bubbles */
 [data-atelier-motion="viewport-loader"][data-am-state="error"] {
   color: var(--am-viewport-loader-error);
 }
-
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-hull {
-  opacity: 0.88;
-}
-
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-front-ribs,
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-rear-ribs {
-  stroke: currentColor;
-  opacity: 0.25;
-}
-
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-top-face {
-  fill: currentColor;
-  opacity: 0.1;
-}
-
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-orbit-ring,
-[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-vertex-core {
+[data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-loading {
   opacity: 0;
 }
-
 [data-atelier-motion="viewport-loader"][data-am-state="error"] .am-viewport-loader-outcome-error {
   opacity: 1;
 }

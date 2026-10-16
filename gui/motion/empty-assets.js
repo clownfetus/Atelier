@@ -3,9 +3,9 @@
  * Classic-script IIFE attaching window.AtelierMotion.emptyAssets.
  * Preserves existing window.AtelierMotion members.
  *
- * Portions of the sharp package slot motif reference Material Design Icons
- * (https://github.com/google/material-design-icons, commit 49d4db35df873165d6bd6ba09b063c7dafbac2f4),
- * licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+ * Krackle artwork (scripts/krackle_art.py, also empty-assets.svg): a tray of energy
+ * holding a few loose bubbles, with a drop of ink waiting above it. The entrance
+ * drops the bubbles in with a bounce; afterwards the illustration is still.
  */
 (function (global) {
   'use strict';
@@ -48,6 +48,10 @@
     return el;
   }
 
+  // krackle-art:empty-assets:begin
+  var SVG_INNER = '<g class="am-empty-assets-plane am-empty-assets-plane--guides"><circle class="am-empty-assets-svg__guide-dot" cx="14" cy="18" r="2.1" /><circle class="am-empty-assets-svg__guide-dot" cx="19.5" cy="18" r="1.4" /><circle class="am-empty-assets-svg__guide-dot" cx="24" cy="18" r="0.8" /><circle class="am-empty-assets-svg__guide-dot" cx="14" cy="23.5" r="1.4" /><circle class="am-empty-assets-svg__guide-dot" cx="14" cy="28" r="0.8" /><circle class="am-empty-assets-svg__guide-dot" cx="98" cy="18" r="2.1" /><circle class="am-empty-assets-svg__guide-dot" cx="92.5" cy="18" r="1.4" /><circle class="am-empty-assets-svg__guide-dot" cx="88" cy="18" r="0.8" /><circle class="am-empty-assets-svg__guide-dot" cx="98" cy="23.5" r="1.4" /><circle class="am-empty-assets-svg__guide-dot" cx="98" cy="28" r="0.8" /></g><g class="am-empty-assets-plane am-empty-assets-plane--deck"><g class="am-empty-assets-svg__drop-group"><path class="am-empty-assets-svg__drop" d="M56 14.5 C58.69 22.27 62.4 29.03 62.4 33 A6.4 6.4 0 1 1 49.6 33 C49.6 29.03 53.31 22.27 56 14.5 Z" /><circle class="am-empty-assets-svg__hole" cx="57.9" cy="34.6" r="2.1" /></g><g class="am-empty-assets-svg__bubble"><circle class="am-empty-assets-svg__charge" cx="40.5" cy="60.5" r="5.2" /><circle class="am-empty-assets-svg__hole" cx="41.8" cy="61.54" r="2.29" /></g><g class="am-empty-assets-svg__bubble"><circle class="am-empty-assets-svg__charge" cx="55" cy="57.5" r="6.6" /><circle class="am-empty-assets-svg__hole" cx="56.65" cy="58.82" r="2.9" /></g><g class="am-empty-assets-svg__bubble"><circle class="am-empty-assets-svg__charge" cx="69.5" cy="61.5" r="4.4" /><circle class="am-empty-assets-svg__hole" cx="70.6" cy="62.38" r="1.94" /></g><g class="am-empty-assets-svg__bubble"><circle class="am-empty-assets-svg__charge" cx="79" cy="64.5" r="2.6" /><circle class="am-empty-assets-svg__hole" cx="79.65" cy="65.02" r="1.14" /></g></g><g class="am-empty-assets-plane am-empty-assets-plane--tray"><path class="am-empty-assets-svg__well" d="M17 56 H95 L104 68 H8 Z" /><path class="am-empty-assets-svg__face" d="M8 68 H104 L97.5 93.5 Q97 96 94.5 96 H17.5 Q15 96 14.5 93.5 Z" /><circle class="am-empty-assets-svg__face" cx="12.5" cy="68.4" r="3" /><circle class="am-empty-assets-svg__face" cx="22" cy="68.4" r="2.4" /><circle class="am-empty-assets-svg__face" cx="32" cy="68.4" r="3.2" /><circle class="am-empty-assets-svg__face" cx="43" cy="68.4" r="2.3" /><circle class="am-empty-assets-svg__face" cx="54" cy="68.4" r="3.1" /><circle class="am-empty-assets-svg__face" cx="65" cy="68.4" r="2.4" /><circle class="am-empty-assets-svg__face" cx="76" cy="68.4" r="3.3" /><circle class="am-empty-assets-svg__face" cx="87" cy="68.4" r="2.4" /><circle class="am-empty-assets-svg__face" cx="98.5" cy="68.4" r="2.9" /><circle class="am-empty-assets-svg__hole" cx="80" cy="85.5" r="4.6" /><circle class="am-empty-assets-svg__hole" cx="67.5" cy="89" r="2.8" /><circle class="am-empty-assets-svg__hole" cx="90.5" cy="78.5" r="2.4" /><circle class="am-empty-assets-svg__hole" cx="58.5" cy="81" r="2" /><circle class="am-empty-assets-svg__hole" cx="45" cy="88" r="2.3" /><circle class="am-empty-assets-svg__hole" cx="32" cy="82" r="1.5" /><circle class="am-empty-assets-svg__hole" cx="23.5" cy="89" r="1.3" /><circle class="am-empty-assets-svg__hole" cx="71.5" cy="76.5" r="1.6" /><circle class="am-empty-assets-svg__hole" cx="40" cy="76" r="1.1" /><circle class="am-empty-assets-svg__speck" cx="78.6" cy="84.2" r="1.1" /><circle class="am-empty-assets-svg__speck" cx="66.6" cy="88" r="0.7" /></g>';
+  // krackle-art:empty-assets:end
+
   function buildTraySvg() {
     var svg = createSvgNode('svg', {
       'class': 'am-empty-assets-svg',
@@ -58,109 +62,16 @@
       'aria-hidden': 'true',
       'focusable': 'false'
     });
-
-    // Layer 1: Upper technical registration & datum frame guides
-    var gGuides = createSvgNode('g', {
-      'class': 'am-empty-assets-plane am-empty-assets-plane--guides'
-    });
-    var pathGuideStroke = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__guide-stroke',
-      'd': 'M 14 32 V 20 L 18 16 H 30 M 82 16 H 94 L 98 20 V 32',
-      'stroke': 'currentColor',
-      'stroke-width': '1.75',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter',
-      'opacity': '0.72'
-    });
-    var pathGuideDatum = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__guide-datum',
-      'd': 'M 44 16 H 68 M 56 12 V 20 M 22 23 H 34 M 78 23 H 90',
-      'stroke': 'currentColor',
-      'stroke-width': '1.5',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter',
-      'opacity': '0.58'
-    });
-    gGuides.appendChild(pathGuideStroke);
-    gGuides.appendChild(pathGuideDatum);
-
-    // Layer 2: Recessed staging deck & single subtle tonal plane
-    var gDeck = createSvgNode('g', {
-      'class': 'am-empty-assets-plane am-empty-assets-plane--deck'
-    });
-    var pathTonal = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__tonal',
-      'd': 'M 24 30 H 88 L 94 36 V 64 H 76 L 70 70 H 42 L 36 64 H 18 V 36 Z',
-      'fill': 'var(--acc, #37639d)',
-      'fill-opacity': '0.1'
-    });
-    var pathAccentStroke = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__accent-stroke',
-      'pathLength': '100',
-      'd': 'M 18 64 V 36 L 24 30 H 88 L 94 36 V 64',
-      'stroke': 'var(--acc, #37639d)',
-      'stroke-width': '2',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter'
-    });
-    var pathAccentSlot = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__accent-slot',
-      'd': 'M 42 43 H 70 V 51 H 42 Z M 28 39 H 36 M 76 39 H 84 M 30 57 H 82',
-      'stroke': 'var(--acc, #37639d)',
-      'stroke-width': '1.75',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter',
-      'opacity': '0.88'
-    });
-    gDeck.appendChild(pathTonal);
-    gDeck.appendChild(pathAccentStroke);
-    gDeck.appendChild(pathAccentSlot);
-
-    // Layer 3: Primary structural asset tray chassis (96px painted width: x=8..104)
-    var gTray = createSvgNode('g', {
-      'class': 'am-empty-assets-plane am-empty-assets-plane--tray'
-    });
-    var pathChassis = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__chassis',
-      'pathLength': '100',
-      'd': 'M 18 44 H 14 L 8 50 V 88 L 16 96 H 96 L 104 88 V 50 L 98 44 H 94',
-      'stroke': 'currentColor',
-      'stroke-width': '2.25',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter'
-    });
-    var pathLip = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__lip',
-      'd': 'M 8 64 H 36 L 42 70 H 70 L 76 64 H 104',
-      'stroke': 'currentColor',
-      'stroke-width': '2.25',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter'
-    });
-    var pathBed = createSvgNode('path', {
-      'class': 'am-empty-assets-svg__bed',
-      'd': 'M 16 73 V 84 L 20 88 H 92 L 96 84 V 73 M 36 88 V 83 M 56 88 V 81 M 76 88 V 83',
-      'stroke': 'currentColor',
-      'stroke-width': '1.75',
-      'stroke-linecap': 'square',
-      'stroke-linejoin': 'miter',
-      'opacity': '0.85'
-    });
-    gTray.appendChild(pathChassis);
-    gTray.appendChild(pathLip);
-    gTray.appendChild(pathBed);
-
-    svg.appendChild(gGuides);
-    svg.appendChild(gDeck);
-    svg.appendChild(gTray);
-
+    // Bundled, trusted artwork; no caller data is ever inserted here.
+    svg.innerHTML = SVG_INNER;
+    function q(selector) { return svg.querySelector(selector); }
     return {
       svg: svg,
-      gGuides: gGuides,
-      gDeck: gDeck,
-      gTray: gTray,
-      pathChassis: pathChassis,
-      pathAccentStroke: pathAccentStroke
+      gGuides: q('.am-empty-assets-plane--guides'),
+      gDeck: q('.am-empty-assets-plane--deck'),
+      gTray: q('.am-empty-assets-plane--tray'),
+      drop: q('.am-empty-assets-svg__drop-group'),
+      bubbles: Array.prototype.slice.call(svg.querySelectorAll('.am-empty-assets-svg__bubble'))
     };
   }
 
@@ -252,15 +163,12 @@
     }
 
     function clearInlineAnimationStyles() {
-      var planes = [nodes.gGuides, nodes.gDeck, nodes.gTray];
+      var planes = [nodes.gGuides, nodes.gDeck, nodes.gTray, nodes.drop].concat(nodes.bubbles);
       for (var i = 0; i < planes.length; i++) {
+        if (!planes[i]) continue;
         planes[i].style.transform = '';
         planes[i].style.opacity = '';
       }
-      nodes.pathChassis.style.strokeDasharray = '';
-      nodes.pathChassis.style.strokeDashoffset = '';
-      nodes.pathAccentStroke.style.strokeDasharray = '';
-      nodes.pathAccentStroke.style.strokeDashoffset = '';
     }
 
     function cancelActiveAnimations() {
@@ -313,55 +221,45 @@
       var started = [];
 
       try {
-        // Layer 3: Tray structural chassis (2.5px vertical alignment + subtle stroke reveal over 300ms)
-        nodes.pathChassis.style.strokeDasharray = '100';
-        var animTrayPlane = nodes.gTray.animate(
+        var fall = 'cubic-bezier(0.55, 0, 1, 0.45)';
+        var rise = 'cubic-bezier(0, 0.55, 0.45, 1)';
+        // The tray stamps up into place.
+        started.push(nodes.gTray.animate(
           [
-            { transform: 'translate3d(0, 2.5px, 0)', opacity: 0.35 },
-            { transform: 'translate3d(0, 0, 0)', opacity: 1 }
-          ],
-          { duration: 290, easing: easing, fill: 'both' }
-        );
-        started.push(animTrayPlane);
-
-        var animChassisStroke = nodes.pathChassis.animate(
-          [
-            { strokeDashoffset: 28 },
-            { strokeDashoffset: 0 }
+            { transform: 'translateY(4px) scale(0.96)', opacity: 0.35 },
+            { transform: 'translateY(-1px) scale(1.01)', opacity: 1, offset: 0.6 },
+            { transform: 'translateY(0) scale(1)', opacity: 1 }
           ],
           { duration: 300, easing: easing, fill: 'both' }
-        );
-        started.push(animChassisStroke);
-
-        // Layer 2: Recessed staging deck (-3px alignment + stroke reveal over 320ms)
-        nodes.pathAccentStroke.style.strokeDasharray = '100';
-        var animDeckPlane = nodes.gDeck.animate(
+        ));
+        // The registration dots fade in like a print plate.
+        started.push(nodes.gGuides.animate(
+          [{ opacity: 0 }, { opacity: 1 }],
+          { duration: 260, easing: easing, fill: 'both' }
+        ));
+        // Loose bubbles drop into the tray one after another and bounce.
+        for (var b = 0; b < nodes.bubbles.length; b++) {
+          started.push(nodes.bubbles[b].animate(
+            [
+              { transform: 'translateY(-26px)', opacity: 0, offset: 0, easing: fall },
+              { transform: 'translateY(0)', opacity: 1, offset: 0.5, easing: rise },
+              { transform: 'translateY(-5px)', offset: 0.7, easing: fall },
+              { transform: 'translateY(0)', offset: 0.86, easing: rise },
+              { transform: 'translateY(-1.2px)', offset: 0.93, easing: fall },
+              { transform: 'translateY(0)', opacity: 1, offset: 1 }
+            ],
+            { duration: 420, delay: 40 + b * 55, easing: 'linear', fill: 'both' }
+          ));
+        }
+        // The drop swings in on its thread and hangs, waiting for the first edit.
+        started.push(nodes.drop.animate(
           [
-            { transform: 'translate3d(0, -3px, 0)', opacity: 0 },
-            { transform: 'translate3d(0, 0, 0)', opacity: 1 }
+            { transform: 'translateY(-10px) scaleY(1.25)', opacity: 0 },
+            { transform: 'translateY(1.5px) scaleY(0.92)', opacity: 1, offset: 0.6 },
+            { transform: 'translateY(0) scaleY(1)', opacity: 1 }
           ],
-          { duration: 320, easing: easing, fill: 'both' }
-        );
-        started.push(animDeckPlane);
-
-        var animAccentStroke = nodes.pathAccentStroke.animate(
-          [
-            { strokeDashoffset: 36 },
-            { strokeDashoffset: 0 }
-          ],
-          { duration: 320, easing: easing, fill: 'both' }
-        );
-        started.push(animAccentStroke);
-
-        // Layer 1: Upper technical frame guides (-2px alignment over 340ms)
-        var animGuidesPlane = nodes.gGuides.animate(
-          [
-            { transform: 'translate3d(0, -2px, 0)', opacity: 0 },
-            { transform: 'translate3d(0, 0, 0)', opacity: 1 }
-          ],
-          { duration: 340, easing: easing, fill: 'both' }
-        );
-        started.push(animGuidesPlane);
+          { duration: 360, delay: 120, easing: easing, fill: 'both' }
+        ));
 
         activeAnimations = started;
 

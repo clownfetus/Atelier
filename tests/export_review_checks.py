@@ -134,6 +134,11 @@ def run_export_review_checks(page, context, url, report, checks):
         assert 'Included changes · 1' in overlay.inner_text()
         review.locator('#export-review-confirm').click()
         review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'busy' && document.querySelector('progress')")
+        # The build request leaves in the same task as the busy render; allow its interception to arrive.
+        for _ in range(50):
+            if pending:
+                break
+            review.wait_for_timeout(20)
         assert len(pending) == 1
         assert review.locator('#install-btn').is_disabled()
         assert overlay.locator('progress').get_attribute('value') is None

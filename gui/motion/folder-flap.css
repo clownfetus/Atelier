@@ -1,9 +1,10 @@
 /*
- * Atelier — Scoped Folder Hover & Keyboard Focus Styles (CSS-Only)
+ * Atelier — Scoped Folder Hover & Keyboard Focus Styles (CSS-Only, Krackle)
  * Scope prefix: .am-folder-flap / .card[data-atelier-motion="folder-flap"]
  * Preserves existing 156px .card, 134px .card-thumb, and 76% (~102px) .card-icon slot.
- * Official Material Symbols Sharp closed/open folders, weight 300, optical size 48.
- * Outline paths retain their source geometry; only the enclosing fit transform changes.
+ * Krackle folder (scripts/krackle_art.py): energy panels in the folder colour with
+ * bubbles punched through to the tile. On hover or keyboard focus the front panel tips
+ * open and three accent bubbles rise out; leaving lets them sink back.
  */
 
 .card[data-atelier-motion="folder-flap"] .am-folder-flap {
@@ -14,51 +15,71 @@
   pointer-events: none;
 }
 
-/* Crossfade the outlined closed/open states; retain the existing motion hooks. */
-.card[data-atelier-motion="folder-flap"] .am-folder-flap-back {
-  fill: currentColor;
-  opacity: 1;
-  transform-box: view-box;
-  transform-origin: 48px 82px;
-  transition:
-    transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1)),
-    opacity 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
-}
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-energy { fill: currentColor; }
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-back .am-folder-flap-panel { opacity: 0.62; }
+/* Bubbles show the tile behind the folder; the tile darkens on hover, so they follow it. */
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-hole { fill: var(--bg3, #e4e7eb); }
+:root[data-theme="dark"] .card[data-atelier-motion="folder-flap"] .am-folder-flap-hole { fill: #121216; }
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-speck { fill: var(--krackle-glint, #fbf6ea); opacity: 0.9; }
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-pop-energy { fill: var(--krackle-charge, var(--acc, #37639d)); }
 
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-back,
 .card[data-atelier-motion="folder-flap"] .am-folder-flap-front {
-  fill: currentColor;
-  opacity: 0;
+  opacity: 1;
   transform-box: view-box;
-  transform-origin: 48px 82px;
+  transform-origin: 48px 80px;
+  transition: transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+
+/* Pop bubbles wait inside the folder, shrunk and hidden behind the front panel. */
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-pop { opacity: 1; }
+.card[data-atelier-motion="folder-flap"] .am-folder-flap-pop-bubble {
+  opacity: 0;
+  transform: translateY(9px) scale(0.35);
+  transform-box: fill-box;
+  transform-origin: center bottom;
   transition:
     transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1)),
-    opacity 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+    opacity 120ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
 }
 
-/* Keyboard :focus-visible open state (180ms smooth deceleration, no bounce/overshoot) */
-.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
-  opacity: 0;
-  transition-duration: 180ms;
-}
-
+/* Open pose, shared by keyboard focus and fine-pointer hover. */
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-front {
+  transform: skewX(-9deg) scaleY(0.86);
+  transition: transform 220ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
   transform: translateY(-1px);
-  opacity: 1;
   transition-duration: 180ms;
 }
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-pop-bubble {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 260ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    opacity 120ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+}
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-pop-1 { transition-delay: 40ms; }
+.card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-pop-2 { transition-delay: 80ms; }
 
-/* Pointer :hover open state gated by fine hover-capable pointer */
 @media (hover: hover) and (pointer: fine) {
-  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
-    opacity: 0;
-    transition-duration: 180ms;
-  }
-
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-front {
+    transform: skewX(-9deg) scaleY(0.86);
+    transition: transform 220ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+  }
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
     transform: translateY(-1px);
-    opacity: 1;
     transition-duration: 180ms;
   }
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-pop-bubble {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      transform 260ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1)),
+      opacity 120ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+  }
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-pop-1 { transition-delay: 40ms; }
+  .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-pop-2 { transition-delay: 80ms; }
 }
 
 /* Reduced motion: disable movement transitions immediately while keeping distinct static open/closed states */

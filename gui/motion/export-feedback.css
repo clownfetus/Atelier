@@ -1,6 +1,8 @@
 /*
- * Atelier — Scoped Export Feedback Styles
+ * Atelier — Scoped Export Feedback Styles (Krackle)
  * Scope prefix: am-export-feedback- / [data-atelier-motion="export-feedback"]
+ * Energy is currentColor; bubbles are --krackle-hole (the surface behind the icon).
+ * Each state's resting pose lives here, so the icon reads correctly without motion.
  */
 
 [data-atelier-motion="export-feedback"] {
@@ -32,124 +34,89 @@
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="busy"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="busy"] {
-  color: var(--acc, #335d9f);
+  color: var(--krackle-charge, var(--acc, #335d9f));
 }
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="success"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="success"] {
-  color: var(--studio-success, #216642);
+  color: var(--krackle-success, var(--studio-success, #216642));
 }
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="warning"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="warning"] {
-  color: var(--studio-warning, #785300);
+  color: var(--krackle-warn, var(--studio-warning, #785300));
 }
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="error"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="error"] {
-  color: var(--md-sys-color-error, #ba1a1a);
+  color: var(--krackle-fault, var(--md-sys-color-error, #ba1a1a));
 }
 
-[data-atelier-motion="export-feedback"] .am-export-feedback-tray-group {
-  transform-origin: 12px 17.5px;
+[data-atelier-motion="export-feedback"] .am-export-feedback-energy { fill: currentColor; }
+[data-atelier-motion="export-feedback"] .am-export-feedback-hole { fill: var(--krackle-hole, #121216); }
+[data-atelier-motion="export-feedback"] .am-export-feedback-arc,
+[data-atelier-motion="export-feedback"] .am-export-feedback-drip-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+[data-atelier-motion="export-feedback"] .am-export-feedback-arc { stroke-width: 4.1; }
+[data-atelier-motion="export-feedback"] .am-export-feedback-drip-line { stroke-width: 2.16; }
+
+/* Dots, bubbles and flecks scale about their own centres; whole glyphs about the icon centre. */
+[data-atelier-motion="export-feedback"] .am-export-feedback-dot,
+[data-atelier-motion="export-feedback"] .am-export-feedback-dot-hole,
+[data-atelier-motion="export-feedback"] .am-export-feedback-burst-hole,
+[data-atelier-motion="export-feedback"] .am-export-feedback-fleck,
+[data-atelier-motion="export-feedback"] .am-export-feedback-sat {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+[data-atelier-motion="export-feedback"] .am-export-feedback-idle,
+[data-atelier-motion="export-feedback"] .am-export-feedback-busy,
+[data-atelier-motion="export-feedback"] .am-export-feedback-burst,
+[data-atelier-motion="export-feedback"] .am-export-feedback-splat {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+[data-atelier-motion="export-feedback"] .am-export-feedback-ring {
+  transform-box: view-box;
+  transform-origin: 12px 10.8px;
+}
+[data-atelier-motion="export-feedback"] .am-export-feedback-drip {
+  transform-box: fill-box;
+  transform-origin: center top;
 }
 
-[data-atelier-motion="export-feedback"] .am-export-feedback-arrow-group {
-  transform-origin: 12px 10px;
-}
+[data-atelier-motion="export-feedback"] .am-export-feedback-dot-hole { transform: scale(0); }
 
-[data-atelier-motion="export-feedback"] .am-export-feedback-well {
-  opacity: 0.12;
-  transition: opacity 180ms var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
-}
-
-[data-atelier-motion="export-feedback"] .am-export-feedback-payload {
-  opacity: 0;
-  transform-origin: 12px 16.25px;
-}
-
+[data-atelier-motion="export-feedback"] .am-export-feedback-idle,
+[data-atelier-motion="export-feedback"] .am-export-feedback-busy,
 [data-atelier-motion="export-feedback"] .am-export-feedback-outcome {
   opacity: 0;
   pointer-events: none;
-  transform-origin: 12px 10px;
 }
 
-[data-atelier-motion="export-feedback"] .am-export-feedback-check-path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.35;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+[data-atelier-motion="export-feedback"] .am-export-feedback-well {
+  transition: opacity 180ms var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
 }
 
-[data-atelier-motion="export-feedback"] .am-export-feedback-error-stroke {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.25;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-}
+/* State: idle — a drop waiting above the tray */
+[data-atelier-motion="export-feedback"][data-am-state="idle"] .am-export-feedback-idle { opacity: 1; }
 
-/* State: idle */
-[data-atelier-motion="export-feedback"][data-am-state="idle"] .am-export-feedback-arrow-group {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
+/* State: busy — the charge ring. Reduced motion freezes the crest at the top. */
+[data-atelier-motion="export-feedback"][data-am-state="busy"] .am-export-feedback-busy { opacity: 1; }
+[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-dot-0 { transform: scale(1.62); }
+[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-dot-5 { transform: scale(1.25); }
+[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-dot-hole-0 { transform: scale(1); }
 
-/* State: busy (static reduced-motion pose) */
-[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-arrow-group {
-  opacity: 1;
-  transform: translateY(1.1px);
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="busy"][data-am-reduced="true"] .am-export-feedback-payload {
-  opacity: 0.42;
-}
-
-/* State: success */
-[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-arrow-group {
-  opacity: 0;
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-outcome-success {
-  opacity: 1;
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-check-path {
-  stroke-dashoffset: 0;
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-payload {
-  opacity: 0.36;
-}
-
-/* State: warning */
-[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-arrow-group {
-  opacity: 0;
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-outcome-warning {
-  opacity: 1;
-}
-
-[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-well {
-  opacity: 0.22;
-}
-
-/* State: error */
-[data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-arrow-group {
-  opacity: 0;
-}
-
+/* Results: a starburst, a cracked ring with its chunk on the floor, or a splat */
+[data-atelier-motion="export-feedback"][data-am-state="success"] .am-export-feedback-outcome-success,
+[data-atelier-motion="export-feedback"][data-am-state="warning"] .am-export-feedback-outcome-warning,
 [data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-outcome-error {
   opacity: 1;
 }
-
-[data-atelier-motion="export-feedback"][data-am-state="error"] .am-export-feedback-well {
-  opacity: 0.22;
-}
+[data-atelier-motion="export-feedback"] .am-export-feedback-fleck { opacity: 0; }
 
 /* Static fallback sibling helper */
 .am-export-feedback-slot {

@@ -1,4 +1,6 @@
 /* Adapted from the supplied Gemini logo entrance. Original PNG remains caller-owned.
+ * Krackle: as the mark rises into place, a ring of six charge bubbles pops out from
+ * behind it and fades at the edge of the 32px slot. The mark itself is never redrawn.
  * Image readiness covers both the SVG image and its cache probe; failures never own
  * the fallback. Caller must handle ready and destroy before removing its host. */
 (function (global) {
@@ -101,6 +103,25 @@
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
 
+    // Krackle splash: six bubbles behind the mark, hidden unless the entrance plays.
+    var splash = document.createElementNS(SVG_NS, 'g');
+    splash.setAttribute('class', 'am-logo-entrance-splash');
+    var bubbles = [];
+    for (var b = 0; b < 6; b++) {
+      var bubble = document.createElementNS(SVG_NS, 'g');
+      bubble.setAttribute('class', 'am-logo-entrance-bubble');
+      var energy = document.createElementNS(SVG_NS, 'circle');
+      energy.setAttribute('class', 'am-logo-entrance-energy');
+      energy.setAttribute('cx', '16'); energy.setAttribute('cy', '16'); energy.setAttribute('r', b % 2 ? '1.8' : '2.4');
+      var hole = document.createElementNS(SVG_NS, 'circle');
+      hole.setAttribute('class', 'am-logo-entrance-hole');
+      hole.setAttribute('cx', '16.4'); hole.setAttribute('cy', '16.3'); hole.setAttribute('r', b % 2 ? '0.75' : '1');
+      bubble.appendChild(energy); bubble.appendChild(hole);
+      splash.appendChild(bubble);
+      bubbles.push(bubble);
+    }
+    svg.appendChild(splash);
+
     var stage = document.createElementNS(SVG_NS, 'g');
     stage.setAttribute('class', 'am-logo-entrance-stage');
 
@@ -119,7 +140,8 @@
     return {
       svg: svg,
       stage: stage,
-      image: image
+      image: image,
+      bubbles: bubbles
     };
   }
 
@@ -186,6 +208,7 @@
     var reducedMotionMode = initialReducedMotion;
     var isOffscreen = false;
     var activeAnimation = null;
+    var splashAnimations = [];
     var finishTimer = null;
     var animationGeneration = 0;
     var probeImg = null;
@@ -248,9 +271,43 @@
           anim.cancel();
         } catch (_ignore) {}
       }
+      while (splashAnimations.length) {
+        var splashAnim = splashAnimations.pop();
+        splashAnim.onfinish = null;
+        try {
+          splashAnim.cancel();
+        } catch (_ignoreSplash) {}
+      }
       if (stageEl) {
         stageEl.style.opacity = '';
         stageEl.style.transform = '';
+      }
+    }
+
+    function playSplash(gen) {
+      // Never touches Animation.finished; any failure settles the whole entrance.
+      for (var i = 0; i < nodes.bubbles.length; i++) {
+        if (gen !== animationGeneration) return;
+        var angle = -Math.PI / 2 + i * Math.PI / 3 + 0.35;
+        var near = 9.5, far = 14.5;
+        var splashAnim = nodes.bubbles[i].animate(
+          [
+            { transform: 'translate(0px, 0px) scale(0.3)', opacity: 0 },
+            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45 },
+            { transform: 'translate(' + (Math.cos(angle) * far).toFixed(2) + 'px, ' + (Math.sin(angle) * far).toFixed(2) + 'px) scale(0)', opacity: 0 }
+          ],
+          { duration: ENTRANCE_DURATION_MS - 40, delay: i * 6, easing: ENTRANCE_EASING, fill: 'none' }
+        );
+        if (!splashAnim || typeof splashAnim.cancel !== 'function') throw new Error('Splash unavailable');
+        splashAnimations.push(splashAnim);
+        splashAnim.onfinish = (function (finished) {
+          return function () {
+            var idx = splashAnimations.indexOf(finished);
+            if (idx !== -1) splashAnimations.splice(idx, 1);
+            finished.onfinish = null;
+            try { finished.cancel(); } catch (_ignoreFinish) {}
+          };
+        })(splashAnim);
       }
     }
 
@@ -328,6 +385,8 @@
         }
 
         activeAnimation = anim;
+
+        playSplash(gen);
 
         if (anim.finished && typeof anim.finished.catch === 'function') {
           anim.finished.catch(function () {});
