@@ -1500,9 +1500,27 @@ function closeMaterialEditor(force = false) {
   return true;
 }
 
+// The curve, VFX, level and text editors share the material editor's rule: closing never silently
+// drops a draft. Editors without per-field dirty flags compare their edits with the state last
+// loaded, saved or reset.
+const _editSnapshot = state => JSON.stringify(state);
+const _vfxSnapshot = v => _editSnapshot({ groups: v.groups, scalars: v.scalars, vectors: v.vectors });
+function _discardUnsaved(dirty, what) { return !dirty || confirm(`Discard unsaved ${what}?`); }
+function _curveDirty() { return !!curveEditor && Object.values(curveEditor.dirty || {}).some(Boolean); }
+function _vfxDirty() { return !!vfxEditor && _vfxSnapshot(vfxEditor) !== vfxEditor.baseline; }
+function _worldDirty() { return !!worldEditor && _editSnapshot(worldEditor.edits) !== worldEditor.baseline; }
+function _textDirty() { return !!textEditor && _editSnapshot(textEditor.edits) !== textEditor.baseline; }
+function _otherEditorsDirty() {
+  const open = id => document.getElementById(id)?.classList.contains("active");
+  return (open("curve-overlay") && _curveDirty()) || (open("vfx-overlay") && _vfxDirty())
+      || (open("world-overlay") && _worldDirty()) || (open("text-overlay") && _textDirty());
+}
+
 window.addEventListener("beforeunload", event => {
   if (materialDirtyCount() || (matEditor && _materialSaving.has(matEditor))) {
     event.preventDefault(); event.returnValue = "Material parameters have unsaved changes.";
+  } else if (_otherEditorsDirty()) {
+    event.preventDefault(); event.returnValue = "An editor has unsaved changes.";
   }
 });
 window.addEventListener("keydown", event => {
@@ -1638,13 +1656,14 @@ async function saveCurve() {
   try {
     const res = await api("/api/curve_save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: c.game_rel, edits }) });
-    if (res.ok) { toast(`Saved: ${c.name}`, "success"); loadSidebar(); closeCurveEditor(); }
+    if (res.ok) { toast(`Saved: ${c.name}`, "success"); loadSidebar(); closeCurveEditor(true); }
     else document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed");
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
 }
 
 async function resetCurve() {
   const c = curveEditor; if (!c) return;
+  if (!confirm("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.")) return;
   document.getElementById("curve-status").textContent = "Resetting…";
   try {
     const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1655,12 +1674,14 @@ async function resetCurve() {
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
 }
 
-function closeCurveEditor() {
+function closeCurveEditor(force = false) {
+  if (force !== true && !_discardUnsaved(_curveDirty(), "curve edits")) return false;
   const overlay = document.getElementById('curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   curveEditor = null;
   _syncBulkEditorAction();
+  return true;
 }
 
 document.getElementById("curve-save").addEventListener("click", saveCurve);
@@ -1715,6 +1736,7 @@ async function openVfxEditor(item) {
                 vectors: (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) })),
                 groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) })) };
   renderVfxEditor();
+  vfxEditor.baseline = _vfxSnapshot(vfxEditor);
   _syncBulkEditorAction('vfx');
   loadSidebar();
 }
@@ -1907,12 +1929,13 @@ async function saveVfx() {
   try {
     const res = await api("/api/vfx_save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors, inten }) });
-    if (res.ok) { toast(`Saved: ${v.name}`, "success"); _warnIntenLost(res, inten); loadSidebar(); closeVfxEditor(); }
+    if (res.ok) { toast(`Saved: ${v.name}`, "success"); _warnIntenLost(res, inten); loadSidebar(); closeVfxEditor(true); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
 async function resetVfx() {
   const v = vfxEditor; if (!v) return;
+  if (!confirm("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.")) return;
   document.getElementById("vfx-status").textContent = "Resetting…";
   try {
     const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1920,17 +1943,19 @@ async function resetVfx() {
     if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) }));
                   v.scalars = (res.scalars || []).map(x => ({ ...x }));
                   v.vectors = (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) }));
-                  renderVfxEditor(); _syncBulkEditorAction('vfx');
+                  renderVfxEditor(); v.baseline = _vfxSnapshot(v); _syncBulkEditorAction('vfx');
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
-function closeVfxEditor() {
+function closeVfxEditor(force = false) {
+  if (force !== true && !_discardUnsaved(_vfxDirty(), "VFX edits")) return false;
   const overlay = document.getElementById('vfx-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   vfxEditor = null;
   _syncBulkEditorAction();
+  return true;
 }
 
 document.getElementById("vfx-save").addEventListener("click", saveVfx);
@@ -3383,6 +3408,7 @@ _ctxFileInput.addEventListener("change", async () => {
 });
 
 async function revertImported(item) {
+  if (!confirm(`Revert ${item.name || item.game_rel} to the game original? This replaces your edited content for this asset.`)) return;
   const project = _activeProjectName;
   const progress = toastSpinner('Restoring original…');
   try {
@@ -4520,6 +4546,7 @@ async function openWorldEditor(item) {
   const e = res.edits || {};
   worldEditor = { game_rel: item.game_rel, name: item.name, model: res,
                   edits: { lights: e.lights || {}, fog: e.fog || {}, grade: e.grade || {}, visibility: e.visibility || {} } };
+  worldEditor.baseline = _editSnapshot(worldEditor.edits);
   renderWorldEditor();
 }
 
@@ -4615,8 +4642,12 @@ function _wireWorldInputs() {
   }));
 }
 
-document.getElementById("world-close").addEventListener("click", () =>
-  document.getElementById("world-overlay").classList.remove("active"));
+function closeWorldEditor(force = false) {
+  if (force !== true && !_discardUnsaved(_worldDirty(), "level edits")) return false;
+  document.getElementById("world-overlay").classList.remove("active");
+  return true;
+}
+document.getElementById("world-close").addEventListener("click", closeWorldEditor);
 
 document.getElementById("world-save").addEventListener("click", async () => {
   if (!worldEditor) return;
@@ -4625,6 +4656,7 @@ document.getElementById("world-save").addEventListener("click", async () => {
     const res = await api("/api/world_save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: worldEditor.game_rel, edits: worldEditor.edits }) });
     if (!res.ok) { st.textContent = res.error || "save failed"; return; }
+    worldEditor.baseline = _editSnapshot(worldEditor.edits);
     st.textContent = "Saved — included at export.";
     toast("Saved " + worldEditor.name, "success");
     refreshSidebarEntry(worldEditor.game_rel, worldEditor.name, "");
@@ -4634,12 +4666,14 @@ document.getElementById("world-save").addEventListener("click", async () => {
 
 document.getElementById("world-reset").addEventListener("click", async () => {
   if (!worldEditor) return;
+  if (!confirm("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.")) return;
   const st = document.getElementById("world-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/world_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: worldEditor.game_rel }) });
     if (!res.ok) { st.textContent = res.error || "reset failed"; return; }
     worldEditor.edits = { lights: {}, fog: {}, grade: {}, visibility: {} };
+    worldEditor.baseline = _editSnapshot(worldEditor.edits);
     worldEditor.model = res;
     renderWorldEditor();
     st.textContent = "Reset to vanilla.";
@@ -4667,6 +4701,7 @@ async function openTextEditor(item) {
   catch (e) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">Error: ' + e.message + '</div>'; return; }
   if (!res.ok) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">' + (res.error || "failed to read StringTable") + '</div>'; return; }
   textEditor = { game_rel: item.game_rel, name: item.name, entries: res.entries || [], edits: Object.assign({}, res.edits || {}) };
+  textEditor.baseline = _editSnapshot(textEditor.edits);
   renderTextEditor("");
 }
 
@@ -4696,8 +4731,12 @@ function renderTextEditor(filter) {
 
 document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
 
-document.getElementById("text-close").addEventListener("click", () =>
-  document.getElementById("text-overlay").classList.remove("active"));
+function closeTextEditor(force = false) {
+  if (force !== true && !_discardUnsaved(_textDirty(), "text edits")) return false;
+  document.getElementById("text-overlay").classList.remove("active");
+  return true;
+}
+document.getElementById("text-close").addEventListener("click", closeTextEditor);
 
 document.getElementById("text-save").addEventListener("click", async () => {
   if (!textEditor) return;
@@ -4706,6 +4745,7 @@ document.getElementById("text-save").addEventListener("click", async () => {
     const res = await api("/api/text_save", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: textEditor.game_rel, edits: textEditor.edits }) });
     if (!res.ok) { st.textContent = res.error || "save failed"; return; }
+    textEditor.baseline = _editSnapshot(textEditor.edits);
     const n = Object.keys(textEditor.edits).length;
     st.textContent = n ? (n + " string(s) edited — included at export.") : "No changes.";
     toast("Saved " + textEditor.name, "success");
@@ -4716,12 +4756,13 @@ document.getElementById("text-save").addEventListener("click", async () => {
 
 document.getElementById("text-reset").addEventListener("click", async () => {
   if (!textEditor) return;
+  if (!confirm("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.")) return;
   const st = document.getElementById("text-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/text_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: textEditor.game_rel }) });
     if (!res.ok) { st.textContent = res.error || "reset failed"; return; }
-    textEditor.entries = res.entries || []; textEditor.edits = {};
+    textEditor.entries = res.entries || []; textEditor.edits = {}; textEditor.baseline = _editSnapshot(textEditor.edits);
     renderTextEditor(document.getElementById("text-search").value);
     st.textContent = "Reset to vanilla.";
     toast("Reset " + textEditor.name, "success");
