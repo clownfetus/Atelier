@@ -1,4 +1,4 @@
-# Atelier 0.3.6 release preparation
+# Atelier 0.4 release preparation (0.4.0)
 
 This update includes the contextual Model Studio, original/edited texture loading,
 looping idle playback, mesh replacement import with default-on skeleton, weight
@@ -18,6 +18,6 @@ and 2025 runners and cover installation, running upgrade, reinstall and uninstal
 The Linux job builds an AppImage and checks its native startup with isolated data.
 Linux's Wine-dependent modding tools still require the dependencies in LINUX.md.
 
-The 0.3.6 release remains a draft during preparation. Build artifacts and workflow
+The 0.4.0 release remains a draft during preparation. Build artifacts and workflow
 results must pass before updating main. Publishing the draft to the stable update
 channel is a separate action; this workflow does not publish releases or move main.

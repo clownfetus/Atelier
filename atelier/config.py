@@ -343,7 +343,7 @@ def validate_game_rel(game_rel):
 @contextmanager
 def project_context(root):
     """Pin a request/worker to the project it started with, independent of UI navigation."""
-    token = _operation_root.set(root)
+    token = _operation_root.set(os.path.realpath(root))
     try:
         yield
     finally:

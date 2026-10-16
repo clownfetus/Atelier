@@ -18,6 +18,14 @@ from atelier.web import browse
 
 
 class Recovery(unittest.TestCase):
+    def test_project_context_resolves_alias_before_deriving_relative_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            alias=os.path.join(folder,'..',os.path.basename(folder))
+            with C.project_context(alias):
+                self.assertEqual(C.get_import_root(),os.path.realpath(folder))
+                relative=os.path.relpath(C.project_base('Characters/T_Test'),C.get_import_root())
+                self.assertEqual(relative.replace('\\','/'),'Characters/T_Test')
+
     def setUp(self):
         self.folder=tempfile.TemporaryDirectory();self.addCleanup(self.folder.cleanup)
         self.root=Path(self.folder.name)

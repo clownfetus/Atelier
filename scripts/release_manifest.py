@@ -9,7 +9,7 @@ shutil.copy2(ROOT/'LICENSE',bundle/'LICENSE')
 (bundle/'licenses').mkdir(exist_ok=True)
 collect_licenses(bundle/'licenses')
 if '--manifest' in sys.argv:
-    inputs=json.loads((ROOT/'tests/fixtures/installer/release-0.3.6-inputs.json').read_text())
+    inputs=json.loads((ROOT/'tests/fixtures/installer/release-0.4.0-inputs.json').read_text())
     def sha(path):
         with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()

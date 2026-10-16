@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from packaging.requirements import Requirement
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,9 @@ def collect_licenses(destination):
     for line in (ROOT / 'requirements.txt').read_text(encoding='utf-8').splitlines():
         match = re.match(r'([A-Za-z0-9_-]+)==', line)
         if match:
+            requirement = Requirement(line)
+            if requirement.marker and not requirement.marker.evaluate():
+                continue
             packages.add(match[1])
     # Included by PyInstaller's runtime hooks, rather than imported directly by Atelier.
     packages.update(('setuptools', 'pyinstaller'))
@@ -65,9 +69,15 @@ def collect_licenses(destination):
         records.append({'name': package, 'version': dist.version,
                         'license': dist.metadata.get('License-Expression') or dist.metadata.get('License', ''),
                         'files': copied})
-    python_license = Path(sys.base_prefix) / 'LICENSE.txt'
-    if not python_license.is_file():
-        raise RuntimeError(f'Python license missing: {python_license}')
+    python_version = f'python{sys.version_info.major}.{sys.version_info.minor}'
+    python_license = next((path for path in (
+        Path(sys.base_prefix) / 'LICENSE.txt',
+        Path(sys.base_prefix) / 'lib' / python_version / 'LICENSE.txt',
+        Path('/usr/share/doc') / python_version / 'copyright',
+        Path('/usr/share/doc/python3/copyright'),
+    ) if path.is_file()), None)
+    if python_license is None:
+        raise RuntimeError('Python license missing from this build environment')
     shutil.copy2(python_license, destination / 'PYTHON-LICENSE.txt')
     (destination / 'runtime-packages.json').write_text(json.dumps(records, indent=2), encoding='utf-8')
     missing = [record['name'] for record in records if not record['files']]

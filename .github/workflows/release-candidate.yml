@@ -1,7 +1,7 @@
 name: Build and verify release candidate
 on:
   push:
-    branches: [codex/release-0.3.6]
+    branches: [codex/release-0.4.0]
   workflow_dispatch:
 permissions:
   contents: read
@@ -95,7 +95,7 @@ jobs:
       - name: Install native Linux GUI build dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb
       - run: python3 -m venv --system-site-packages .venv
-      - run: .venv/bin/python -m pip install -r requirements.txt pyinstaller==6.22.3 setuptools
+      - run: .venv/bin/python -m pip install --upgrade -r requirements.txt pyinstaller==6.22.3 setuptools
       - run: .venv/bin/python tests/run_checks.py --suite test_morphs.py --suite test_packaging.py --report-dir reports/linux
       - run: .venv/bin/python scripts/release_inputs.py
       - run: bash linux/build_appimage.sh
@@ -105,7 +105,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/appimage-smoke"
           cd "$RUNNER_TEMP/appimage-smoke"
-          "$GITHUB_WORKSPACE/dist/Atelier-0.3.6-x86_64.AppImage" --appimage-extract > /dev/null
+          "$GITHUB_WORKSPACE/dist/Atelier-0.4.0-x86_64.AppImage" --appimage-extract > /dev/null
           export ATELIER_DATA_DIR="$RUNNER_TEMP/atelier-smoke-data"
           export ATELIER_PORT=8897
           xvfb-run -a ./squashfs-root/usr/Atelier/Atelier --help > startup.log 2>&1 &
