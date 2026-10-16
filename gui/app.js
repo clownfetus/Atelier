@@ -443,6 +443,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
 
   filtered.forEach(card => {
     const el = document.createElement("button");
+    el._libraryCard = card;
     el.className = "card" + (card.imported ? " imported" : "");
     el.type = "button";
     el.title = `${card.label}\n${card.game_rel || card.rel_path || ''}`;
@@ -519,6 +520,40 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
   _gridThumbs?.start(retryThumbs);
+}
+
+function updateImportedCard(gameRel, record) {
+  const item = allItems.find(row => row.game_rel === gameRel);
+  if (!item || !record) return;
+  Object.assign(item, {imported:true, token:record.token});
+  const area = document.getElementById('grid-area'), grid = area.querySelector('.grid');
+  if (!grid) return;
+  const button = [...grid.querySelectorAll('.card')].find(node => node._libraryCard?.game_rel === gameRel);
+  if (button) {
+    Object.assign(button._libraryCard, {imported:true, token:record.token});
+    button.classList.add('imported');
+    if (!button.querySelector('.card-editing-badge')) {
+      const badge=document.createElement('span');badge.className='card-editing-badge';badge.textContent='Editing';
+      button.querySelector('.card-thumb').append(badge);button.title+='\nIn your edit list';
+    }
+    const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
+  }
+  const q=document.getElementById('search-input').value.trim().toLowerCase();
+  const cards=AtelierLibraryTools.sort(AtelierLibraryTools.filter(allItems.map(_makeCard),q));
+  if (!cards.length) {buildGrid(allItems.map(_makeCard));return;}
+  const key=card=>card.rel_path||card.game_rel||card.label;
+  const roots=new Map([...grid.querySelectorAll('.card')].map(node=>{
+    let root=node;while(root.parentElement!==grid)root=root.parentElement;
+    return [node.dataset.libraryPath,root];
+  }));
+  const wanted=new Set(cards.map(key));
+  for(const [path,root] of roots)if(!wanted.has(path))root.remove();
+  const scroll=area.scrollTop, focused=document.activeElement;
+  cards.forEach((card,index)=>{const root=roots.get(key(card));if(root&&grid.children[index]!==root)grid.insertBefore(root,grid.children[index]||null);});
+  if(focused?.isConnected&&document.activeElement!==focused)focused.focus({preventScroll:true});
+  area.scrollTop=scroll;
+  const narrowed=!!q||AtelierLibraryTools.hasFilters();
+  document.getElementById('library-count').textContent=`${cards.length} ${cards.length===1?'item':'items'}${narrowed?' of '+allItems.length:''}`;
 }
 
 function renderCardIcon(card, cardEl) {
@@ -716,6 +751,7 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
   document.getElementById("confirm-overlay").classList.remove("active");
   if (!pendingImport) return;
   const item = pendingImport; pendingImport = null;
+  const project = _activeProjectName;
   suppressedImportGameRels.add(item.game_rel);
   const loadingToast = toastSpinner(`Loading ${item.name}…`);
   setStatus(`Loading ${item.name}…`);
@@ -744,15 +780,15 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
       });
     }
     if (res.ok) {
+      suppressedImportGameRels.delete(item.game_rel);
+      if(project!==_activeProjectName)return;
       suppressChangeToastUntil = Date.now() + 1500;
       suppressedImportGameRels.delete(item.game_rel);
       loadingToast.resolve(`Loaded: ${item.name}`, "success");
       setStatus("");
-      refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
-      const gridArea   = document.getElementById("grid-area");
-      const savedScroll = gridArea.scrollTop;
-      await renderGrid();
-      gridArea.scrollTop = savedScroll;
+      const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
+      if(project!==_activeProjectName)return;
+      updateImportedCard(item.game_rel, imported);
       if (_openAfterImport) {
         const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
         handleImportedFileAction(importedItem);
@@ -2164,8 +2200,9 @@ async function loadSidebar() {
 function refreshSidebarEntry(game_rel, name, skin_id) {
   const project = _activeProjectName, requestId = ++_sidebarRequest;
   window.AtelierEmptyAssetsUI?.begin();
-  api("/api/imported").then(data => {
-    if (project !== _activeProjectName || requestId !== _sidebarRequest) return;
+  return api("/api/imported").then(data => {
+    if (project !== _activeProjectName) return;
+    if (requestId !== _sidebarRequest) return data.find(item=>item.game_rel===game_rel);
     data.forEach(item => {
       if (!sidebarData[item.token]) sidebarData[item.token] = { ...item };
       else {
@@ -2176,6 +2213,7 @@ function refreshSidebarEntry(game_rel, name, skin_id) {
     window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
     renderSidebar();
     window.AtelierPolish?.fly(game_rel);
+    return data.find(item=>item.game_rel===game_rel);
   });
 }
 
@@ -2254,9 +2292,15 @@ async function performClearMany(items) {
 
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
+  const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
+  const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
   const previousRows = window.AtelierPolish?.sidebarBefore(list);
   // Observe this synchronous render's final state, including empty/search branches.
-  if (window.AtelierPolish) Promise.resolve().then(() => window.AtelierPolish.sidebarAfter(previousRows, list));
+  Promise.resolve().then(() => {
+    list.scrollTop=scroll;
+    if(focused?.isConnected&&document.activeElement===document.body)focused.focus({preventScroll:true});
+    window.AtelierPolish?.sidebarAfter(previousRows, list);
+  });
   window.AtelierEmptyAssetsUI?.dispose();
   window.AtelierTextureReconstruction?.disposeWithin(list);
   list.innerHTML = "";
@@ -2286,7 +2330,11 @@ function renderSidebar() {
     list.appendChild(bar);
   }
   items.forEach(item => {
+    const signature=JSON.stringify([_activeProjectName,item,_sbMarked.has(item.token)]);
+    const previous=existing.get(item.token);
+    if(previous?._sidebarSignature===signature){list.appendChild(previous);return;}
     const el = document.createElement("div");
+    el._sidebarSignature=signature;
     el.className = "sb-item" + (item.selected ? " selected" : "") + (_sbMarked.has(item.token) ? " marked" : "");
     el.dataset.token = item.token;
     el.dataset.gameRel = item.game_rel;

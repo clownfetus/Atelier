@@ -75,7 +75,7 @@ def mpc():
 class Cases(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="atelier-job-case-")
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.project = self.root / "projects" / "A"
         self.project.mkdir(parents=True)
         self.manager = J.JobManager(self.root / "jobs")

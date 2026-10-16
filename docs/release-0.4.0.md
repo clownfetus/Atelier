@@ -3,6 +3,8 @@
 This update includes the contextual Model Studio, original/edited texture loading,
 looping idle playback, mesh replacement import with default-on skeleton, weight
 and morph preservation, texture mip repair and the requested library polish.
+Individual texture imports retain the existing library and edit-list thumbnails,
+updating the imported asset in place to prevent the repeated screen flash.
 
 Local verification: 22 backend suites; final focused mesh/morph/packaging checks;
 packaged WebView2 import controls; native preservation enabled and disabled;

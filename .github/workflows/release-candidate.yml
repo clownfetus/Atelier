@@ -23,6 +23,8 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.3 playwright==1.64.0 setuptools
       - run: python tests/run_checks.py --report-dir reports/backend
+      - run: python -m playwright install chromium
+      - run: python tests/browser_smoke.py --viewer-followups-only --report-dir reports/viewer
       - run: python scripts/release_inputs.py
       - run: python -m PyInstaller --noconfirm --clean Atelier.spec
       - run: python scripts/stage_tools.py --platform windows

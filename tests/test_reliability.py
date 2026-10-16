@@ -58,7 +58,7 @@ def triple(base, value=b"new"):
 class Reliability(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="atelier-case-")
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.projects = self.root / "projects"
         for name in ("A", "B"):
             (self.projects / name).mkdir(parents=True)

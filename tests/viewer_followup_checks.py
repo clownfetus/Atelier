@@ -54,6 +54,30 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         assert b'"keep_morphs":false' in replaced[0] and b'"keep_skeleton":true' in replaced[0] and b'"keep_weights":true' in replaced[0]
         tab.screenshot(path=str(report/'model-replacement-dialog.png'))
         tab.get_by_role('button',name='Close',exact=True).last.click()
+        imported=[];browse_requests=[]
+        textures=[{'type':'asset','file_type':'texture','name':name,'game_rel':'Fixture/'+name,'imported':False} for name in ('T_One','T_Two')]
+        tab.unroute('**/api/browse?*')
+        tab.route('**/api/browse?*',lambda route:(browse_requests.append(route.request.url),route.fulfill(json=textures))[-1])
+        tab.route('**/api/imported',lambda route:route.fulfill(json=imported))
+        tab.route('**/api/thumb?*',lambda route:route.fulfill(body=art.getvalue(),content_type='image/png'))
+        tab.route('**/api/preview?*',lambda route:route.fulfill(body=art.getvalue(),content_type='image/png'))
+        tab.route('**/api/prefetch_thumbs',lambda route:route.fulfill(json={'ok':True,'cached':[row['game_rel'] for row in textures]}))
+        def import_texture(route):
+            gr=route.request.post_data_json['game_rel']
+            imported.append({'game_rel':gr,'name':gr.split('/')[-1],'file_type':'texture','token':gr.split('/')[-1],'selected':True})
+            route.fulfill(json={'ok':True})
+        tab.route('**/api/import_texture',import_texture)
+        tab.evaluate("async()=>{_openAfterImport=false;await renderGrid();window.__steadyGrid=document.querySelector('#grid-area .grid');window.__steadyImages=[...__steadyGrid.querySelectorAll('img')];window.__steadyBanner=document.getElementById('library-hero').firstChild;}")
+        for index,name in enumerate(('T_One','T_Two')):
+            tab.locator(f'.card[data-library-path="Fixture/{name}"]').click()
+            tab.locator('#confirm-ok').click()
+            tab.wait_for_function('count=>document.querySelectorAll("#grid-area .card.imported").length===count',arg=index+1)
+            if index==0:tab.evaluate("window.__steadySidebarRow=document.querySelector('.sb-item');window.__steadySidebarImage=__steadySidebarRow.querySelector('img')")
+        assert len(browse_requests)==1,browse_requests
+        assert tab.evaluate("document.querySelector('#grid-area .grid')===__steadyGrid && __steadyImages.every((img,i)=>img===__steadyGrid.querySelectorAll('img')[i]) && document.getElementById('library-hero').firstChild===__steadyBanner")
+        assert tab.evaluate("document.querySelector('.sb-item')===__steadySidebarRow && __steadySidebarRow.querySelector('img')===__steadySidebarImage")
+        tab.screenshot(path=str(report/'texture-import-stable-grid.png'))
+        checks.append('Consecutive texture imports preserve grid, thumbnail, banner and existing sidebar nodes without reloading the library')
         for kind in ('texture','mesh','material','curve','vfx','world','text'):
             labels=tab.evaluate("kind=>_ctxItemsCard({type:'asset',file_type:kind,imported:true,token:'kept',game_rel:'Fixture/T_Painted'}).filter(x=>typeof x==='object').map(x=>x.label)",kind)
             assert 'Revert to original' in labels,kind
