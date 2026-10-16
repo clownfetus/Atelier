@@ -1,10 +1,12 @@
 # Running Atelier on Linux
 
-For 0.4 (0.4.0), the AppImage was built and its native startup checked on Ubuntu
-24.04 in the [release workflow](https://github.com/clownfetus/Atelier/actions/runs/38870854575).
+For 0.4.1, the AppImage was built and its native startup checked on Ubuntu 24.04
+in the [release workflow](https://github.com/clownfetus/Atelier/actions/runs/38955861759).
+Upgrading from the 0.4.0 AppImage re-staged the bundled tools and kept existing
+projects, and the packaged app's custom-texture and Model Studio checks passed.
 Wine-dependent 3D and model-replacement paths still require separate runtime
 verification. Both `AtelierMesh.exe` and `AtelierAnimation.exe` use Wine; the latter
-provides standing-idle decoding. See [the release notes](docs/release-0.4.0.md).
+provides standing-idle decoding. See [the release notes](docs/release-0.4.1.md).
 
 Atelier started as a Windows app; this document covers both running it from source on Linux for
 development, and building a packaged Linux copy with `linux/build_appimage.sh` (the Linux

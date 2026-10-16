@@ -14,10 +14,11 @@ Screenshots show the current source interface with example data. The published
 installer can contain an earlier interface until a new release is published.
 See [screenshot details](images/README.md).
 
-**Atelier 0.4 (0.4.0)** adds the redesigned Model Studio, model replacement with
-default-on skeleton/weight/morph preservation, automatic texture-resolution
-recovery, and texture imports that keep the screen stable. See the
-[release notes](docs/release-0.4.0.md) for details and verification.
+**Atelier 0.4.1** lets a material use your own images in its texture slots
+(experimental), fixes mesh editing in Blender, explains Model Studio load failures
+and brings the Krackle design language to Atelier's feedback. It builds on 0.4's
+redesigned Model Studio and model replacement. See the
+[release notes](docs/release-0.4.1.md) for details and verification.
 
 ## Features
 
