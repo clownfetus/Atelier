@@ -34,6 +34,29 @@ body {
   flex-shrink: 0;
   margin-right: 10px;
 }
+.project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  min-width: 0;
+  max-width: 260px;
+  padding: 0 14px 0 10px;
+  margin-right: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-full);
+  color: var(--text);
+  font: var(--studio-type-label);
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.project-chip[hidden] { display: none; }
+.project-chip:hover { border-color: var(--acc); }
+.project-chip svg { width: 16px; height: 16px; color: var(--acc); flex-shrink: 0; }
+#project-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-chip-count { color: var(--muted); font-weight: 400; white-space: nowrap; }
+.project-chip-count:empty { display: none; }
 .nav-btn {
   width: 36px; height: 36px;
   background: transparent;
@@ -519,19 +542,30 @@ body {
 
 /* â”€â”€ progress overlay â”€â”€ */
 #prog-overlay { pointer-events: all; }
-#usmap-update-overlay { pointer-events: all; }
-#usmap-update-box {
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: 14px;
-  padding: 28px 32px 26px;
-  max-width: 420px;
-  width: calc(100% - 40px);
+/* Non-blocking notices sit under the top bar and below every overlay, so they never cover a dialog. */
+.notice-banner {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 190;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  gap: 12px;
+  max-width: min(620px, calc(100vw - 32px));
+  padding: 10px 12px 10px 16px;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--border2);
+  border-radius: var(--studio-shape-medium);
+  box-shadow: var(--studio-shadow);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
 }
-#usmap-update-box h2 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.notice-banner[hidden] { display: none; }
+.notice-banner > svg { color: var(--acc); flex-shrink: 0; }
+.notice-banner .btn { flex-shrink: 0; }
+#usmap-update-name { color: var(--muted); }
 #prog-box {
   background: var(--bg2);
   border: 1px solid var(--border2);
@@ -565,7 +599,9 @@ body {
 #toast-area {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  /* Body padding (12px) + resize handle (12px) + gap: the bottom-right corner of the library, clear of the tray. */
+  right: calc(var(--sidebar-w, 300px) + 36px);
+  transition: bottom var(--studio-motion-fast) var(--studio-easing);
   z-index: 300;
   display: flex;
   flex-direction: column;
@@ -1032,6 +1068,7 @@ body {
   z-index: 150; display: none;
 }
 #view3d-fab.show { display: inline-flex; }
+body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 
 /* â”€â”€ 3D viewport â”€â”€ */
 #viewport-box {
@@ -1064,6 +1101,8 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   background: rgba(12,12,14,.72); color: var(--studio-preview-on-surface); font-size: 13px; text-align: center; padding: 20px;
 }
+/* Load errors can carry the decoder's own lines and a suggested next step. */
+#viewport-loading-msg { white-space: pre-line; max-width: min(640px, 100%); overflow-wrap: anywhere; }
 
 /* materials sidebar */
 #viewport-materials {
@@ -1413,7 +1452,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 @media (max-width: 1100px) {
   #topbar { padding-inline: 12px; }
   .studio-brand { margin-right: 12px; }
-  .studio-brand span, #searchbar kbd { display: none; }
+  .studio-brand span, #searchbar kbd, .project-chip-count { display: none; }
+  .project-chip { max-width: 180px; }
   #search-input { width: 140px; }
   #sidebar { width: 260px; }
 }

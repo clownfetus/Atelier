@@ -398,8 +398,16 @@ def _model_glb(game_rel):
     if elsewhere:
         return elsewhere
     detail = "\n".join(l for l in ((r.stderr or "") + (r.stdout or "")).splitlines() if l.strip())[-600:]
-    raise RuntimeError(f"AtelierMesh could not decode {name} (exit code {r.returncode})"
-                       + (f":\n{detail}" if detail else ", and it gave no reason."))
+    message = (f"AtelierMesh could not decode {name} (exit code {r.returncode})"
+               + (f":\n{detail}" if detail else ", and it gave no reason."))
+    # The decoder's own reason is often just "export failed". When it could also see installed
+    # mods, a mod that overrides this mesh is the likeliest cause, and the user can test that.
+    mods_note = getattr(r, "mods_note", None)
+    if mods_note:
+        message += (f"\n\nInstalled mods may be the cause: {mods_note}. If one of them changes "
+                    f"{name}, move it out of the mods folder for now and reopen this model.")
+    print(f"[model_gltf] {message}", file=sys.stderr, flush=True)
+    raise RuntimeError(message)
 
 @app.get("/api/model_gltf")
 def api_model_gltf():
@@ -2727,6 +2735,66 @@ def _install_mod_payload(body):
         return resp
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+@app.get("/api/skin_swapper/status")
+def api_skin_swapper_status():
+    """Whether Project Galacta Skin Swapper export is available (template installed, not revoked)."""
+    from atelier import skin_swapper
+    skin_swapper.refresh_flag_async()
+    response.content_type = "application/json"
+    return json.dumps(skin_swapper.status())
+
+
+@app.post("/api/skin_swapper/plan")
+def api_skin_swapper_plan():
+    """Validate a Skin Swapper export without building it: IDs, package names and every problem."""
+    from atelier import skin_swapper
+    body = request.json or {}
+    response.content_type = "application/json"
+    result = skin_swapper.plan(_mod_stem(body.get("mod_name")), body.get("meshes") or [],
+                               body.get("skin_name"), body.get("author"))
+    return json.dumps({"ok": True, **result, "status": skin_swapper.status()})
+
+
+@app.post("/api/skin_swapper/build")
+def api_skin_swapper_build():
+    """Build a Skin Swapper mod: the edited meshes and their Galacta configs in one container."""
+    body = request.json or {}
+    if body.get("background"):
+        return _submit_job("export", "Skin Swapper export " + _mod_stem(body.get("mod_name")),
+                           lambda job: _skin_swapper_payload(body))
+    response.content_type = "application/json"
+    return json.dumps(_skin_swapper_payload(body))
+
+
+def _skin_swapper_payload(body):
+    from atelier import skin_swapper
+    mod_name = _mod_stem(body.get("mod_name"))
+    copy_to_mods = bool(body.get("copy_to_mods"))
+    password = (body.get("password") or "").strip() or None
+    if copy_to_mods and not get_mods_folder():
+        return {"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
+                "need_mods_folder": True}
+    out_dir = ASSETS_MODS
+    os.makedirs(out_dir, exist_ok=True)
+    try:
+        result = skin_swapper.build(mod_name, body.get("meshes") or [], body.get("skin_name"),
+                                    body.get("author"), out_dir, password)
+        if not result.get("ok"):
+            return {"ok": False, "error": result.get("error", "build failed"),
+                    "problems": result.get("problems") or []}
+        pak = result.get("pak")
+        resp = {"ok": True, "pak_path": pak.replace("\\", "/"), "applied": result.get("applied") or [],
+                "skipped": [], "artifacts": result.get("artifacts") or [], "galacta_folder": result.get("folder")}
+        if copy_to_mods:
+            ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
+            if not ok:
+                return {**resp, "ok": False, "built": True, "error": err}
+            resp["installed_dir"] = dest.replace("\\", "/")
+        return resp
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 
 @app.post("/api/pick_mod_file")
 def api_pick_mod_file():

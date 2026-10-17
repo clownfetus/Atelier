@@ -220,6 +220,9 @@ __marimo__/
 
 # Custom for this project
 Tools/
+# Project Galacta's Skin Swapper template may not be redistributed outside Atelier: never commit it,
+# wherever it is copied (atelier/skin_swapper.py reads it from Tools/Galacta/).
+GAL_ConfigTemplate.*
 tools-src/**/bin/
 tools-src/**/obj/
 extracted/

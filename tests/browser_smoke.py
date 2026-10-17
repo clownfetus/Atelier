@@ -268,6 +268,8 @@ def main():
                 run_material_workflow_checks(page, context, url, report, checks)
                 from export_review_checks import run_export_review_checks
                 run_export_review_checks(page, context, url, report, checks)
+                from skin_swapper_review_checks import run_skin_swapper_review_checks
+                run_skin_swapper_review_checks(page, context, url, report, checks)
                 from empty_assets_motion_checks import run_empty_assets_motion_checks
                 run_empty_assets_motion_checks(page, context, url, report, checks)
                 from logo_motion_checks import run_logo_motion_checks

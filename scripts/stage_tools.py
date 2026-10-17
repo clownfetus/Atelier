@@ -43,6 +43,8 @@ MANIFEST = {
         ("shaders/dxcompiler.dll", True),            # dxc_ir
         ("shaders/dxil.dll", True),                  # dxc_ir validator
         ("MarvelRivalsCharacterIDs.md", True),       # seed; the app rewrites it (installer: onlyifdoesntexist)
+        ("Galacta/GAL_ConfigTemplate.uasset", False),  # skin_swapper: Galacta's template, never in git
+        ("Galacta/GAL_ConfigTemplate.uexp", False),
     ],
     # Native builds where they exist (hostos.native_tool prefers them over Wine); AtelierMesh runs
     # under Wine. UAssetGUI and DXC are omitted: hostos.unsupported() refuses those features here.
@@ -58,8 +60,15 @@ MANIFEST = {
         ("AtelierAnimation/oo2core_9_win64.dll", True),
         ("shaders/liboo2corelinux64.so.9", True),
         ("MarvelRivalsCharacterIDs.md", True),
+        ("Galacta/GAL_ConfigTemplate.uasset", False),
+        ("Galacta/GAL_ConfigTemplate.uexp", False),
     ],
 }
+# Project Galacta's Skin Swapper template (atelier/skin_swapper.py). Galacta allows it inside Atelier
+# but not elsewhere, and this repository is public, so it is never committed: release builds stage it
+# from a private Tools/Galacta/ or from CI secrets. It is optional, but the pair ships whole or not at
+# all, and these two files are the only cooked packages the dist audit accepts.
+GALACTA_TEMPLATE = ("Galacta/GAL_ConfigTemplate.uasset", "Galacta/GAL_ConfigTemplate.uexp")
 EXECUTABLES = {"linux": ["UAssetTool", "shaders/retoc-rivals-cli"], "windows": []}
 DIRECTORIES = {"AtelierMesh"}
 # Retain the Windows helper API used by verification scripts and older callers.
@@ -101,6 +110,10 @@ def validate_tools(root, platform="windows"):
     if missing:
         label = "Windows" if platform == "windows" else "Linux"
         raise RuntimeError(f"Required {label} tools missing or empty: " + ", ".join(missing))
+    present = [rel for rel in GALACTA_TEMPLATE if (root / rel).is_file() and (root / rel).stat().st_size > 0]
+    if len(present) == 1:
+        raise RuntimeError("Incomplete Skin Swapper template: Tools/" + present[0] + " has no matching "
+                           + ("uexp" if present[0].endswith(".uasset") else "uasset"))
 
 
 def stage_tools(source, destination, platform="windows"):
@@ -126,6 +139,8 @@ def stage_tools(source, destination, platform="windows"):
                 shutil.copy2(src, target)
             elif not required:
                 print(f"  [optional] not found, skipped: Tools/{rel}")
+                if rel == GALACTA_TEMPLATE[0]:
+                    print("  [notice] No Skin Swapper template: this build cannot export Project Galacta mods.")
         validate_tools(destination, platform)
         for rel in EXECUTABLES[platform]:
             os.chmod(destination / rel, 0o755)
@@ -147,9 +162,12 @@ def audit(platform, dist):
     problems = [f"unexpected top-level entry: {p.name}" for p in dist.iterdir()
                 if p.name not in allowed_top]
     problems += [f"missing: {name}" for name in allowed_top if not (dist / name).exists()]
+    template = {"Tools/" + rel for rel in GALACTA_TEMPLATE}
     for path in dist.rglob("*"):
         rel = path.relative_to(dist)
         name = path.name.lower()
+        if rel.as_posix() in template:
+            continue
         if (path.is_file() and (name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_EXTS)) \
                 or (path.is_dir() and name in FORBIDDEN_DIRS and rel.parts[0] != "_internal"):
             problems.append(f"dev/run data in dist: {rel.as_posix()}")

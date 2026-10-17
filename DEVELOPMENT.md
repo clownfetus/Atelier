@@ -183,6 +183,28 @@ The existing spec packages the GUI, vendor libraries and Blender scripts. Native
 
 For Phase 2 use `D:\AtelierDev\phase-2\build\dist` and `D:\AtelierDev\phase-2\build\work`. The GUI directory is included recursively, so the local font, symbol paths, theme modules, logo and catalogue seed need no additional packaging rule. Downloaded portraits remain external cache files. A local Phase 2 executable was built successfully; this is separate from testing the installed application or an installer upgrade.
 
+### Project Galacta Skin Swapper template
+
+Skin Swapper export (`atelier/skin_swapper.py`) needs Galacta's cooked config template,
+`GAL_ConfigTemplate.uasset` and `.uexp`. Galacta allows it inside Atelier but not
+elsewhere, and this repository is public, so it is never committed (`.gitignore`
+blocks `GAL_ConfigTemplate.*` everywhere).
+
+- **Local and release builds:** put both files in `Tools/Galacta/`. `stage_tools.py`
+  stages the pair when present (a lone half fails the build), the dist audit accepts
+  exactly those two cooked files, and `Atelier.iss` installs them only if staged.
+  Without them the build succeeds, prints a notice, and the export reports itself
+  unavailable.
+- **CI release candidates:** store each file base64-encoded in the repository
+  secrets `GALACTA_TEMPLATE_UASSET_B64` and `GALACTA_TEMPLATE_UEXP_B64`, for example
+  with `[Convert]::ToBase64String([IO.File]::ReadAllBytes('GAL_ConfigTemplate.uasset'))`.
+  Both workflow jobs write them to `Tools/Galacta/` before staging.
+- **Switching generation off (rule 5):** set `skin_swapper.enabled` to `false` in
+  `integrations.json` on `main`, with a short `message`. Atelier re-reads it from
+  GitHub when an export review offers the format (at most every six hours) and always
+  before a Skin Swapper build; the review shows the message. Offline installs keep
+  the last value they read.
+
 ## Phase 2 evidence
 
 - 178 regression checks passed; two native-tool cases explicitly skipped in the isolated runner.
