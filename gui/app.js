@@ -21,7 +21,6 @@ let   histIdx     = 0;
 let   allItems    = [];      // current grid items (raw from server)
 let   sidebarData = {};      // token -> {name, game_rel, skin_id, char_name, skin_name, selected}
 let   importing   = false;
-let   pendingImport = null;
 let   pendingClear  = null;
 let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
@@ -276,6 +275,8 @@ function renderBreadcrumbs() {
   }
 
   lucide.createIcons({ nodes: [bc] });
+  // The skin-level Model Studio entry belongs to skin folders only.
+  document.getElementById("view3d-fab").classList.toggle("show", !!skinIdFromPath(nav.path));
 }
 
 // ── grid rendering ────────────────────────────────────────────────────────────
@@ -749,29 +750,20 @@ function handleAssetClick(item) {
     handleImportedFileAction(item);
     return;
   }
-  const ft   = item.file_type || "other";
-  const kind = ft.charAt(0).toUpperCase() + ft.slice(1);
-  const sid  = skinIdFromPath(nav.path);
-  document.getElementById("confirm-title").textContent = `Edit ${kind}?`;
-  document.getElementById("confirm-msg").textContent =
-    `Edit ${ft} "${item.name}"${sid ? ` from skin ${sid}` : ""}?`;
-  pendingImport = { skin_id: sid, rel_path: item.rel_path, game_rel: item.game_rel, name: item.name, file_type: ft };
-  document.getElementById("confirm-overlay").classList.add("active");
+  // Bringing an asset into the project is non-destructive (Delete edits takes it out again),
+  // so a click starts editing at once instead of asking first.
+  editAsset({ skin_id: skinIdFromPath(nav.path), rel_path: item.rel_path, game_rel: item.game_rel,
+    name: item.name, file_type: item.file_type || "other" });
 }
 
-document.getElementById("confirm-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-overlay").classList.remove("active");
-  pendingImport = null;
-});
-
-document.getElementById("confirm-ok").addEventListener("click", async () => {
-  document.getElementById("confirm-overlay").classList.remove("active");
-  if (!pendingImport) return;
-  const item = pendingImport; pendingImport = null;
+const _editsInFlight = new Set();   // a second click on the same asset while it loads does nothing
+async function editAsset(item) {
+  if (_editsInFlight.has(item.game_rel)) return;
+  _editsInFlight.add(item.game_rel);
   const project = _activeProjectName;
   suppressedImportGameRels.add(item.game_rel);
-  const loadingToast = toastSpinner(`Loading ${item.name}…`);
-  setStatus(`Loading ${item.name}…`);
+  const loadingToast = toastSpinner(`Preparing ${item.name} for editing…`);
+  setStatus(`Preparing ${item.name} for editing…`);
   try {
     let res;
     if (item.file_type === "material") {
@@ -798,10 +790,9 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
     }
     if (res.ok) {
       suppressedImportGameRels.delete(item.game_rel);
-      if(project!==_activeProjectName)return;
+      if (project !== _activeProjectName) { loadingToast.remove(); setStatus(""); return; }
       suppressChangeToastUntil = Date.now() + 1500;
-      suppressedImportGameRels.delete(item.game_rel);
-      loadingToast.resolve(`Loaded: ${item.name}`, "success");
+      loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
       setStatus("");
       const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
       if(project!==_activeProjectName)return;
@@ -819,8 +810,10 @@ document.getElementById("confirm-ok").addEventListener("click", async () => {
     suppressedImportGameRels.delete(item.game_rel);
     loadingToast.resolve(`Error: ${e.message}`, "error");
     setStatus("");
+  } finally {
+    _editsInFlight.delete(item.game_rel);
   }
-});
+}
 
 // ── material parameter editor ──────────────────────────────────────────────────
 let matEditor = null;
@@ -2140,7 +2133,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
 });
 
 function showProgress(current, total) {
-  const label = `Importing ${current} / ${total} assets…`;
+  const label = `Preparing ${current} / ${total} assets for editing…`;
   if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('prog-counter'), label);
   else document.getElementById('prog-counter').textContent = label;
 }
@@ -2270,10 +2263,11 @@ function refreshEditedTexture(gameRel, tok, animate = true) {
 function handleSSE(d) {
   window.AtelierPolish?.importProgress(d);
   if (d.usmap_updated) {
-    const ov = document.getElementById("usmap-update-overlay");
-    document.getElementById("usmap-update-name").textContent = d.name || "";
-    ov.classList.add("active");
-    lucide.createIcons({ nodes: [ov] });
+    // A notice, not a dialog: the mapping applies at next launch, so nothing here may block open work.
+    const banner = document.getElementById("usmap-update-banner");
+    document.getElementById("usmap-update-name").textContent = d.name ? `(${d.name})` : "";
+    banner.hidden = false;
+    lucide.createIcons({ nodes: [banner] });
     return;
   }
   if (d.toast) {
@@ -2298,7 +2292,7 @@ function handleSSE(d) {
     refreshEditedTexture(d.game_rel, d.token, !importing && !suppressedImportGameRels.has(d.game_rel));
     if (!importing && !suppressedImportGameRels.has(d.game_rel)) window.AtelierPolish?.fly(d.game_rel);
     if (!importing && !suppressedImportGameRels.has(d.game_rel) && Date.now() >= suppressChangeToastUntil) {
-      toast("Asset edited", "warning", 4000);
+      toast("Edit saved", "success", 4000);
     }
     return;
   }
@@ -2311,9 +2305,9 @@ function handleSSE(d) {
     suppressChangeToastUntil = Date.now() + 2500;
     document.getElementById("prog-overlay").classList.remove("active");
     if (d.error) {
-      toast(`Load failed: ${d.error}`, "warning", 8000);
+      toast(`Edit All failed: ${d.error}`, "warning", 8000);
     } else {
-      toast(`Loaded ${d.current} texture${d.current !== 1 ? "s" : ""}`, "success");
+      toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
     }
     setStatus("");
     loadSidebar();
@@ -2324,6 +2318,9 @@ function handleSSE(d) {
 }
 
 connectSSE();
+document.getElementById("usmap-update-dismiss").addEventListener("click", () => {
+  document.getElementById("usmap-update-banner").hidden = true;
+});
 
 // ── sidebar / export ──────────────────────────────────────────────────────────
 let _sidebarRequest = 0;
@@ -2414,7 +2411,7 @@ function sbDeleteMarked() {
   pendingClearMany = items;
   document.getElementById("confirm-clear-title").textContent = `Delete ${items.length} assets?`;
   document.getElementById("confirm-clear-msg").textContent =
-    `Delete these ${items.length} edited assets from local assets? The imported files will be removed.`;
+    `Delete your edits to these ${items.length} assets? Their edited files are removed from this project.`;
   document.getElementById("confirm-clear-overlay").classList.add("active");
 }
 
@@ -2431,7 +2428,7 @@ async function performClearMany(items) {
       _sbLastTok = null;
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "warning", 3500);
+      toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "info", 3500);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2590,6 +2587,8 @@ function updateInstallBtn() {
   const badge = document.getElementById("sel-count");
   if (window.AtelierPolish) window.AtelierPolish.count(badge, sel); else badge.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
+  const edited = Object.keys(sidebarData).length;
+  document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
 
   const copyRow = document.getElementById("toggle-copy-row");
@@ -2853,7 +2852,7 @@ function clearImported(token, skipConfirm) {
   const kind = ft.charAt(0).toUpperCase() + ft.slice(1);
   document.getElementById("confirm-clear-title").textContent = `Delete ${kind}?`;
   document.getElementById("confirm-clear-msg").textContent =
-    `Delete "${item.name}" from local assets? This will remove the imported file.`;
+    `Delete your edits to "${item.name}"? Its edited files are removed from this project.`;
   document.getElementById("confirm-clear-overlay").classList.add("active");
 }
 
@@ -2870,7 +2869,7 @@ async function performClearImported(item) {
       delete sidebarData[item.token];
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted: ${item.name}`, "warning", 3000);
+      toast(`Deleted: ${item.name}`, "info", 3000);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2923,7 +2922,7 @@ document.getElementById("confirm-clear-all-ok").addEventListener("click", async 
       sidebarData = {};
       window.AtelierEmptyAssetsUI?.confirmed(project, 0);
       renderSidebar();
-      toast(`Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`, "warning", 4000);
+      toast(`Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`, "info", 4000);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -3398,6 +3397,11 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const sidebar = document.getElementById("sidebar");
   let dragging = false, startX = 0, startW = 0;
 
+  // Toasts sit just left of the tray (see #toast-area), so they never cover its export controls.
+  const syncTrayWidth = () => document.documentElement.style.setProperty("--sidebar-w", sidebar.offsetWidth + "px");
+  if (window.ResizeObserver) new ResizeObserver(syncTrayWidth).observe(sidebar);
+  syncTrayWidth();
+
   handle.addEventListener("mousedown", e => {
     dragging = true;
     startX   = e.clientX;
@@ -3741,21 +3745,20 @@ function _fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 function _showUpdatePanel(id) {
-  ["update-checking", "update-confirm", "update-downloading", "update-error"].forEach(p => {
+  ["update-confirm", "update-downloading", "update-error"].forEach(p => {
     document.getElementById(p).style.display = p === id ? "flex" : "none";
   });
 }
 
 async function checkUpdate() {
   const overlay = document.getElementById("update-overlay");
-  overlay.classList.add("active");
-  _showUpdatePanel("update-checking");
-
+  // The startup splash covers the check; the dialog only appears when there is an update to offer.
   let info;
   try { info = await api("/api/update_check"); }
-  catch { overlay.classList.remove("active"); return false; }
+  catch { return false; }
 
-  if (!info.available) { overlay.classList.remove("active"); return false; }
+  if (!info.available) return false;
+  overlay.classList.add("active");
 
   document.getElementById("update-tag").textContent = info.tag;
   // Non-Windows builds can't update in place: same prompt, but the button opens the release page.
@@ -3770,11 +3773,6 @@ async function checkUpdate() {
   return new Promise(resolve => {
     const dismiss = () => { overlay.classList.remove("active"); resolve(false); };
     document.getElementById("update-later").onclick = dismiss;
-    const skipVerBtn = document.getElementById("update-skip-ver");
-    if (skipVerBtn) skipVerBtn.onclick = async () => {
-      try { await api("/api/update_skip", { method: "POST" }); } catch {}
-      dismiss();
-    };
     if (info.manual) {
       document.getElementById("update-now").onclick = async () => {
         try { await api("/api/update_open_release", { method: "POST" }); } catch {}
@@ -3792,7 +3790,12 @@ async function checkUpdate() {
         let s, p;
         try {
           [s, p] = await Promise.all([api("/api/update_status"), api("/api/update_progress")]);
-        } catch { clearInterval(poll); return; }
+        } catch {
+          // Losing the status stream must not leave "Downloading…" up with no way out.
+          clearInterval(poll);
+          _showUpdatePanel("update-error");
+          return;
+        }
         if (p.total > 0) {
           fill.style.width = p.pct + "%";
           label.textContent = `${_fmtMB(p.bytes)} / ${_fmtMB(p.total)}  (${p.pct}%)`;
@@ -4140,7 +4143,18 @@ function _applyActiveProject(name) {
   const modInput = document.getElementById("mod-name-input");
   modInput.value       = name;
   modInput.placeholder = name || "ModFilename";
+  const chip = document.getElementById("project-chip");
+  document.getElementById("project-chip-name").textContent = name || "";
+  chip.setAttribute("aria-label", name ? `Project: ${name}. Switch project` : "Switch project");
+  chip.hidden = !name;
 }
+
+async function openProjectPicker() {
+  const res = await api("/api/projects");
+  _renderProjectPicker(res.projects || []);
+  document.getElementById("project-overlay").classList.add("active");
+}
+document.getElementById("project-chip").addEventListener("click", openProjectPicker);
 
 async function _selectProject(name) {
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
@@ -4241,7 +4255,7 @@ document.getElementById("proj-delete-ok").addEventListener("click", async () => 
     else _projSel.delete(name);
   }
   const done = names.length - failed.length;
-  if (done) toast(done === 1 ? `Deleted project "${names[0]}"` : `Deleted ${done} projects`, "warning");
+  if (done) toast(done === 1 ? `Deleted project "${names[0]}"` : `Deleted ${done} projects`, "info");
   if (failed.length) toast(`Delete failed: ${failed.join("; ")}`, "warning", 6000);
   const res = await _projRefresh();
   if (!res.active || !(res.projects || []).find(p => p.name === res.active)) {
@@ -4266,11 +4280,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
   _ctxShow(
     { preventDefault: () => {}, stopPropagation: () => e.stopPropagation(), clientX: rect.left, clientY: rect.bottom + 4 },
     [
-      { icon: "folder-open", label: "Back to Projects", action: async () => {
-        const res = await api("/api/projects");
-        _renderProjectPicker(res.projects || []);
-        document.getElementById("project-overlay").classList.add("active");
-      }},
+      { icon: "folder-open", label: "Back to Projects", action: openProjectPicker },
       { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
       { icon: "package-open", label: "Open Export Folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
@@ -4518,7 +4528,6 @@ async function selectShader(el) {
   _shSelectTab("props");
 }
 
-function _esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
 function _shSelectTab(tab) {
   document.querySelectorAll(".sh-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));

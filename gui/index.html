@@ -44,6 +44,7 @@
 <!-- ── top bar ── -->
 <div id="topbar">
   <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
+  <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
   <div id="nav-btns">
     <button class="nav-btn" id="btn-back"    title="Back"    disabled><i data-lucide="arrow-left"  size="15"></i></button>
     <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
@@ -130,18 +131,6 @@
   </aside>
 </div>
 
-<!-- ── confirm: single import ── -->
-<div class="overlay" id="confirm-overlay">
-  <div class="modal">
-    <h2><i data-lucide="download" size="18" style="color:var(--acc)"></i> <span id="confirm-title">Edit Asset?</span></h2>
-    <p id="confirm-msg">Edit this asset in your local assets folder?</p>
-    <div class="modal-row">
-      <button class="btn" id="confirm-cancel">Cancel</button>
-      <button class="btn primary" id="confirm-ok">Edit</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── confirm: import all ── -->
 <div class="overlay" id="confirm-all-overlay">
   <div class="modal">
@@ -149,7 +138,7 @@
     <p id="confirm-all-msg">This will extract and decode all listed textures.</p>
     <div class="warning">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>This may take a while. Do not close the browser tab while editing.</span>
+      <span>This may take a while. Keep Atelier open until it finishes.</span>
     </div>
     <div class="modal-row">
       <button class="btn" id="confirm-all-cancel">Cancel</button>
@@ -211,7 +200,7 @@
 <div class="overlay" id="prog-overlay">
   <div id="prog-box">
     <h2><div class="spinner"></div> Editing Assets…</h2>
-    <div id="prog-counter" style="font-size:13px;color:var(--muted)">Downloading 0 / 0 assets…</div>
+    <div id="prog-counter" style="font-size:13px;color:var(--muted)">Preparing 0 / 0 assets for editing…</div>
     <div id="import-segments" aria-label="Import results"></div>
     <div class="warning" style="margin-top:4px">
       <i data-lucide="shield-alert" size="14" style="flex-shrink:0;margin-top:2px"></i>
@@ -398,16 +387,11 @@
 <!-- ── update check / download ── -->
 <div class="overlay" id="update-overlay">
   <div class="modal" id="update-modal">
-    <div id="update-checking" style="display:flex;align-items:center;gap:10px">
-      <div class="spinner" style="flex-shrink:0"></div>
-      <span style="font-size:13px;color:var(--muted)">Checking for updates&hellip;</span>
-    </div>
     <div id="update-confirm" style="display:none;flex-direction:column;gap:14px">
       <h2><i data-lucide="arrow-up-circle" size="18" style="color:var(--acc)"></i> Update Available</h2>
       <p>Atelier <strong id="update-tag" style="color:var(--text)"></strong> is ready to install.</p>
       <div class="modal-row">
         <button class="btn" id="update-later">Later</button>
-        <!---<button class="btn" id="update-skip-ver">Skip Version</button>--->
         <button class="btn primary" id="update-now">
           <i data-lucide="download" size="14"></i>
           Update Now
@@ -585,16 +569,11 @@
   </div>
 </div>
 
-<!-- ── USMAP update (un-closable) ── -->
-<div class="overlay" id="usmap-update-overlay">
-  <div id="usmap-update-box">
-    <h2><i data-lucide="refresh-cw" size="18" style="color:var(--acc)"></i> USMAP Updated</h2>
-    <div id="usmap-update-name" style="font-size:13px;color:var(--muted);margin:6px 0 4px"></div>
-    <div class="warning" style="margin-top:4px">
-      <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>A new mapping file was downloaded. Please restart Atelier to apply it.</span>
-    </div>
-  </div>
+<!-- ── USMAP update notice: non-blocking, the new mapping applies at next launch ── -->
+<div class="notice-banner" id="usmap-update-banner" role="status" hidden>
+  <i data-lucide="refresh-cw" size="16"></i>
+  <span><strong>New USMAP mapping downloaded</strong> <span id="usmap-update-name"></span><br>Restart Atelier when you're ready to use it. Your open work is not affected.</span>
+  <button class="btn" id="usmap-update-dismiss" type="button">Got it</button>
 </div>
 
 <!-- ── project picker ── -->

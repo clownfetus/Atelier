@@ -69,8 +69,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         tab.route('**/api/import_texture',import_texture)
         tab.evaluate("async()=>{_openAfterImport=false;await renderGrid();window.__steadyGrid=document.querySelector('#grid-area .grid');window.__steadyImages=[...__steadyGrid.querySelectorAll('img')];window.__steadyBanner=document.getElementById('library-hero').firstChild;}")
         for index,name in enumerate(('T_One','T_Two')):
-            tab.locator(f'.card[data-library-path="Fixture/{name}"]').click()
-            tab.locator('#confirm-ok').click()
+            tab.locator(f'.card[data-library-path="Fixture/{name}"]').click()   # one click edits; no confirmation
             tab.wait_for_function('count=>document.querySelectorAll("#grid-area .card.imported").length===count',arg=index+1)
             if index==0:tab.evaluate("window.__steadySidebarRow=document.querySelector('.sb-item');window.__steadySidebarImage=__steadySidebarRow.querySelector('img')")
         assert len(browse_requests)==1,browse_requests

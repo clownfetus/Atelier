@@ -128,7 +128,8 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Basic workflow
 
-1. Create or open a project using the project control at the bottom right.
+1. Create or open a project. The project button beside the Atelier logo shows
+   the open project and its edit count; click it to switch projects.
 2. Browse to the assets you want to change. Edit material parameters or
    right-click a texture to replace it with an external image.
 3. Select the assets to include under **Edited Assets** and enter a mod filename.
