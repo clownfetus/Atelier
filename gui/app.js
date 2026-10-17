@@ -2620,7 +2620,9 @@ document.getElementById("toggle-password-row").addEventListener("click", e => {
 document.getElementById("toggle-copy").addEventListener("change", () => _syncToggleRow("toggle-copy"));
 document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
-async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName, review = null) {
+// `extra` swaps the build endpoint and adds its fields, e.g. a Skin Swapper build; every guard,
+// review state and result path stays the same as a standard export.
+async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName, review = null, extra = null) {
   _exportRunningCount++;
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
@@ -2628,7 +2630,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
   const finishFeedback = beginExportFeedback(project);
   const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy");
   try {
-    const res = await (window.AtelierJobs?.run || api)("/api/install_mod", {
+    const res = await (window.AtelierJobs?.run || api)(extra?.endpoint || "/api/install_mod", {
       project,
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2636,6 +2638,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         items: exportable.map(i => i.game_rel),
         password,
         copy_to_mods: copyToMods,
+        ...(extra?.body || {}),
       }),
     });
     t?.remove();
@@ -2738,7 +2741,7 @@ function _blockExportForDrafts(snapshot = null) {
   return true;
 }
 
-async function _confirmExportReview(snapshot, password) {
+async function _confirmExportReview(snapshot, password, extra = null) {
   if (_exportReviewChecking || _exportRunningCount) return;
   if (_blockExportForDrafts(snapshot)) return;
   if (!_exportReviewCurrent(snapshot, password)) {
@@ -2758,7 +2761,7 @@ async function _confirmExportReview(snapshot, password) {
     }
     _exportReviewChecking = false;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, password, snapshot.project, snapshot);
+      snapshot.copyToMods, password, snapshot.project, snapshot, extra);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -2794,6 +2797,23 @@ async function _confirmExportReview(snapshot, password) {
   }
 }
 
+// Project Galacta Skin Swapper is offered when the reviewed edits include a character skin mesh.
+// Hero and skin come from that mesh's path, never from input; the server re-derives and checks them.
+async function _skinSwapperOffer(snapshot) {
+  const meshes = snapshot.included.filter(item => item.file_type === "mesh"
+    && /^Characters\/\d{4}\/\d{7}\//.test(item.game_rel || ""));
+  if (!meshes.length) return null;
+  let status;
+  try { status = await api("/api/skin_swapper/status", { project: snapshot.project }); } catch (_) { return null; }
+  if (typeof status?.available !== "boolean") return null;
+  const [, hero, skin] = meshes[0].game_rel.match(/^Characters\/(\d{4})\/(\d{7})\//);
+  const skinLabel = _pathLabels[`Characters/${hero}/${skin}`] || "";
+  let author = "";
+  try { author = localStorage.getItem("atelier.skinSwapper.author") || ""; } catch (_) {}
+  return { status, meshes, hero, skin, heroLabel: _pathLabels[`Characters/${hero}`] || "", skinLabel,
+           defaults: { skinName: skinLabel || snapshot.modName, author } };
+}
+
 async function doInstallMod() {
   if (_exportRunningCount || _exportReviewChecking) return;
   if (_blockExportForDrafts()) return;
@@ -2810,8 +2830,20 @@ async function doInstallMod() {
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
   const password = snapshot.protected ? _protectionPassword : "";
   if (!window.AtelierExportReview) { await _confirmExportReview(snapshot, password); return; }
+  const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
     confirm: () => _confirmExportReview(snapshot, password), refresh: doInstallMod, settings: openPaths,
+    skinSwapper: swapper && {
+      ...swapper,
+      plan: options => api("/api/skin_swapper/plan", {
+        project: snapshot.project, method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mod_name: snapshot.modName, ...options }),
+      }),
+      build: options => {
+        try { localStorage.setItem("atelier.skinSwapper.author", options.author || ""); } catch (_) {}
+        return _confirmExportReview(snapshot, password, { endpoint: "/api/skin_swapper/build", body: options });
+      },
+    },
     reveal: async () => {
       try {
         const result = await api("/api/open_export_folder", {project: snapshot.project});

@@ -42,6 +42,8 @@ redesigned Model Studio and model replacement. See the
   resize with Bicubic, and apply Color blending at 100% inside Atelier.
 - **Choose your appearance:** Light, Dark or System mode, Atelier/Darcula/Repak X
   palettes, and saved custom palettes with separate light and dark colors.
+- **Build Skin Swapper mods:** export an edited character mesh in Project Galacta's
+  Skin Swapper format, for its Companion App to load. See [Skin Swapper mods](#skin-swapper-mods).
 
 <details>
 <summary>View the light theme</summary>
@@ -145,6 +147,27 @@ Use **Bulk VFX / curves** to preview a multiplier or RGB replacement across
 supported assets in the selection or current folder. RGB edits preserve alpha.
 Global material parameter collections are labelled because changes can affect
 every referencing material. Save the reviewed batch, then export separately.
+
+## Skin Swapper mods
+
+Atelier can export an edited character mesh as a mod for Project Galacta's
+Skin Swapper, which its Companion App then loads.
+
+1. Edit a skin's mesh in Blender or replace it with **Replace model…** using your
+   own BLEND, FBX, GLB or PSK file, then select it under **Edited Assets**.
+2. Set the mod filename. It becomes the Galacta folder name, so use letters,
+   digits and underscores only.
+3. Click **Export Mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
+   and skin come from the mesh and cannot be changed. Enter the skin name and
+   author, and pick a form for multi-form heroes (Form 0 is the default).
+4. Click **Build Skin Swapper mod**, then add the mod in the Companion App.
+
+The mod holds only your mesh and a Galacta config for it, under
+`/Game/Marvel/ProjectGalacta/Meshes/{HeroID}/{SkinID}/{ModFolder}/`. Atelier
+never ships game assets in these mods: unedited meshes and models imported from
+cooked game files are refused. It never creates or edits `skins.txt`; the
+Companion App manages that. Project Galacta can switch this export off, and the
+review then says why.
 
 ## Help
 

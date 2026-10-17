@@ -36,7 +36,8 @@ def main():
             for name in ("atelier", "gui", "tests", "scripts"):
                 shutil.copytree(ROOT / name, checkout / name,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            for name in ("io_lib.py", "main.py", "version", "BUILD.bat", "Atelier.iss"):
+            for name in ("io_lib.py", "main.py", "version", "BUILD.bat", "Atelier.iss",
+                         "integrations.json", ".gitignore"):
                 shutil.copy2(ROOT / name, checkout / name)
             env = dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1")
             env.pop("MR_TOOLS", None)
