@@ -29,26 +29,34 @@ def _aes_hex():
 
 _VANILLA_PAKS = os.path.join(_CACHE, "vanilla_paks")
 
-def _vanilla_paks_dir():
-    """Hardlink mirror of PAKS's TOP-LEVEL files only. AtelierMesh's CUE4Parse provider scans
-    the directory it's given recursively, so pointing it at PAKS directly also picks up whatever
-    lives in PAKS/~mods (or any other subfolder the "Copy to mods folder" setting points at) --
-    installed mods then win pack-stacking and the 3D viewport shows modded content, unlike the file
-    browser and the Blender export path, which both resolve assets through index.ensure_index()'s
-    non-recursive `glob(PAKS + "/*.utoc")` and so only ever see vanilla containers. Mirroring PAKS's
-    top level with hardlinks (instant, no extra disk use, same-volume only) keeps the viewport in
-    sync with everything else without needing to touch AtelierMesh itself. Falls back to the real
-    PAKS dir (mods included) if hardlinking isn't possible, e.g. PAKS is on another volume."""
+def _drive(path):
+    return os.path.splitdrive(os.path.abspath(path))[0].upper()
+
+def vanilla_paks():
+    """(folder, problem): a hardlink mirror of PAKS's TOP-LEVEL files only, or PAKS itself and why.
+
+    AtelierMesh's CUE4Parse provider scans the directory it's given recursively, so pointing it at
+    PAKS directly also picks up whatever lives in PAKS/~mods (or any other subfolder the "Copy to
+    mods folder" setting points at) -- installed mods then win pack-stacking and the 3D viewport
+    shows modded content, unlike the file browser and the Blender export path, which both resolve
+    assets through index.ensure_index()'s non-recursive `glob(PAKS + "/*.utoc")` and so only ever
+    see vanilla containers. Mirroring PAKS's top level with hardlinks (instant, no extra disk use,
+    same-volume only) keeps the viewport in sync with everything else without needing to touch
+    AtelierMesh itself.
+
+    When hardlinking isn't possible -- most often because Atelier's data folder and the game are on
+    different drives -- this falls back to the real PAKS dir, mods included, and `problem` says why
+    in words a user can act on. It is None when the mirror is in use."""
     try:
         wanted = {f: os.path.join(PAKS, f) for f in os.listdir(PAKS)
                   if os.path.isfile(os.path.join(PAKS, f))}
-    except OSError:
-        return PAKS
-    os.makedirs(_VANILLA_PAKS, exist_ok=True)
+    except OSError as e:
+        return PAKS, f"Atelier could not read the game's Paks folder ({e.strerror or e})"
     try:
+        os.makedirs(_VANILLA_PAKS, exist_ok=True)
         have = set(os.listdir(_VANILLA_PAKS))
-    except OSError:
-        return PAKS
+    except OSError as e:
+        return PAKS, f"Atelier could not use its cache folder ({e.strerror or e})"
     for stale in have - wanted.keys():
         try: os.remove(os.path.join(_VANILLA_PAKS, stale))
         except OSError: pass
@@ -61,16 +69,49 @@ def _vanilla_paks_dir():
                     continue
                 os.remove(link)
             os.link(src, link)
-        except OSError:
-            return PAKS  # cross-volume, no permission, etc. -- better vanilla-or-mods than a broken mirror
-    return _VANILLA_PAKS
+        except OSError as e:
+            # Cross-volume, no permission, etc. -- better vanilla-or-mods than a broken mirror.
+            cache, game = _drive(_VANILLA_PAKS), _drive(PAKS)
+            if cache and game and cache != game:
+                return PAKS, f"Atelier's data folder is on {cache} and the game is on {game}"
+            return PAKS, f"Atelier could not link the game's files into its cache ({e.strerror or e})"
+    return _VANILLA_PAKS, None
+
+def _vanilla_paks_dir():
+    return vanilla_paks()[0]
+
+def _mod_folders(paks):
+    """Subfolders of the game's Paks folder (relative names) that hold mod containers."""
+    found = []
+    for dirpath, _dirs, files in os.walk(paks):
+        if dirpath != paks and any(f.lower().endswith((".utoc", ".pak")) for f in files):
+            found.append(os.path.relpath(dirpath, paks).replace("\\", "/"))
+    return sorted(found)
 
 def atelier_mesh(asset, out_dir):
-    """Decode an MR mesh (content-mount path, no ext) to glTF (.glb) under out_dir."""
-    return hostos.run_exe(
-        [ATELIER_MESH, "--paks", os.path.abspath(_vanilla_paks_dir()), "--aes", _aes_hex(),
+    """Decode an MR mesh (content-mount path, no ext) to glTF (.glb) under out_dir.
+
+    The result also carries `paks`, the folder the decoder read, and `mods_note`: None when it saw
+    only the game's own containers, otherwise a sentence saying why installed mods were visible to
+    it -- a mod that overrides the mesh is then a likely reason for a failed decode."""
+    paks, problem = vanilla_paks()
+    mods = _mod_folders(PAKS) if problem else []
+    note = None
+    if mods:
+        shown = ", ".join(mods[:3]) + (f" and {len(mods) - 3} more" if len(mods) > 3 else "")
+        note = f"{problem}, so Atelier could not keep installed mods out of this decode and also read {shown}"
+    print(f"[atelier_mesh] {asset}: paks={paks} "
+          + (f"(installed mods visible: {note})" if note else "(game files only)"),
+          file=sys.stderr, flush=True)
+    r = hostos.run_exe(
+        [ATELIER_MESH, "--paks", os.path.abspath(paks), "--aes", _aes_hex(),
          "--usmap", USMAP, "--asset", asset, "--out", os.path.abspath(out_dir)],
         capture_output=True, text=True, cwd=ROOT)
+    try:
+        r.paks, r.mods_note = paks, note
+    except AttributeError:
+        pass
+    return r
 
 # A UAssetTool call that is still running after this long is wedged, not slow: the measured
 # worst case is ~15s for a single-asset extract fallback. Overridable for very large batches.

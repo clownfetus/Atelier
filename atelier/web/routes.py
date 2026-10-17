@@ -398,8 +398,16 @@ def _model_glb(game_rel):
     if elsewhere:
         return elsewhere
     detail = "\n".join(l for l in ((r.stderr or "") + (r.stdout or "")).splitlines() if l.strip())[-600:]
-    raise RuntimeError(f"AtelierMesh could not decode {name} (exit code {r.returncode})"
-                       + (f":\n{detail}" if detail else ", and it gave no reason."))
+    message = (f"AtelierMesh could not decode {name} (exit code {r.returncode})"
+               + (f":\n{detail}" if detail else ", and it gave no reason."))
+    # The decoder's own reason is often just "export failed". When it could also see installed
+    # mods, a mod that overrides this mesh is the likeliest cause, and the user can test that.
+    mods_note = getattr(r, "mods_note", None)
+    if mods_note:
+        message += (f"\n\nInstalled mods may be the cause: {mods_note}. If one of them changes "
+                    f"{name}, move it out of the mods folder for now and reopen this model.")
+    print(f"[model_gltf] {message}", file=sys.stderr, flush=True)
+    raise RuntimeError(message)
 
 @app.get("/api/model_gltf")
 def api_model_gltf():

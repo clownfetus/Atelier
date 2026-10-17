@@ -1101,6 +1101,8 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   background: rgba(12,12,14,.72); color: var(--studio-preview-on-surface); font-size: 13px; text-align: center; padding: 20px;
 }
+/* Load errors can carry the decoder's own lines and a suggested next step. */
+#viewport-loading-msg { white-space: pre-line; max-width: min(640px, 100%); overflow-wrap: anywhere; }
 
 /* materials sidebar */
 #viewport-materials {
