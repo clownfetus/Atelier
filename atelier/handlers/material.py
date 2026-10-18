@@ -170,6 +170,14 @@ def _original_document(game_rel):
     from atelier.handlers.texture import ensure_work_base, missing_reason
     from atelier.tools import tex_semaphore
 
+    from atelier.added_assets import source_base
+    added = source_base(game_rel)
+    if added:
+        # Added packages may share a path in different projects; their originals are project-owned.
+        from atelier.added_assets import _read_package
+        with tempfile.TemporaryDirectory(prefix='atelier-added-material-') as temporary:
+            return _read_package(added, temporary)
+
     jp = project_base(game_rel, CACHE_3DVIEW) + ".json"
 
     def read(path):

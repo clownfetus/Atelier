@@ -137,7 +137,20 @@ def revert(game_rel):
 def preview(game_rel):
     from atelier.handlers import meshedit,mesh
     base=target_base(game_rel);blend=Path(base+'.blend');target=Path(base+'.mesh.glb')
-    if not blend.is_file():return None
+    if not blend.is_file():
+        from atelier.added_assets import source_base
+        original = source_base(game_rel)
+        if not original:
+            return None
+        if not target.is_file():
+            descriptor, temporary = tempfile.mkstemp(suffix='.glb', prefix='.added-mesh-preview-', dir=target.parent)
+            os.close(descriptor)
+            try:
+                mesh.export_glb(mesh.Mesh(original), 0, temporary)
+                os.replace(temporary, target)
+            finally:
+                Path(temporary).unlink(missing_ok=True)
+        return str(target)
     if not target.is_file() or target.stat().st_mtime_ns<blend.stat().st_mtime_ns:
         descriptor,temporary=tempfile.mkstemp(suffix='.glb',prefix='.mesh-preview-',dir=target.parent);os.close(descriptor)
         try:

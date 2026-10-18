@@ -84,6 +84,22 @@ clearly labelled catalogue artwork when a capture is unavailable.
 
 ## Material editing
 
+### Add an asset at a custom path
+
+Click **Add asset** beside **Process S maps** in the Mod tray. Choose Texture,
+Mesh or Material, give it a name, and browse to a destination folder or type a
+new one. The dialog shows the final `/Game/Marvel/…` asset path before saving.
+
+Upload an image with a game texture as its format template, upload a cooked
+`.uasset` with its matching companion files, or choose **Copy a game asset**.
+For FBX, GLB or Blender meshes, copy a compatible game mesh first, then use
+**Replace model**. Material uploads must be material instances (`MI_`).
+
+Added assets appear in the library and Mod tray and use the normal editors and
+Build mod action. Existing assets at the destination are protected. Original
+source packages travel with the project and are included in Delete/Undo.
+Use the new package path when referencing the asset from a material or mesh.
+
 ### Process S maps
 
 Click **Process S maps** under **Mod tray** to process every imported texture

@@ -76,6 +76,30 @@ For a fresh directory, use Atelier's Setup/Settings to select the game Paks fold
 
 ## Automated checks
 
+### Named asset additions
+
+`atelier/added_assets.py` prepares and verifies new texture, material-instance
+and mesh packages before one recoverable project publication. Each addition has
+an `<asset>.asset.json` record pointing to its project-owned original under
+`.atelier/added-assets/<id>/`. The regular extraction resolver reads these sources
+before consulting game caches. Library browsing includes their project folders;
+project trash moves the source package and editor files together.
+
+Texture templates are renamed before the image is injected: a JSON round trip
+after injection can discard inline mip data. Native verification compares decoded
+pixels from the original and renamed templates after encoding the same image.
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_added_assets.py --suite test_project_trash.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --add-assets-only --report-dir 'D:\AtelierDev\add-assets\browser'
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_added_assets.py --report-dir 'D:\AtelierDev\add-assets\native-new'
+```
+
+The opt-in native check uses a new report project and builds a mod containing all
+three added types without installing it. It also checks the renamed mesh's
+skeleton, materials and LOD count. In-game loading remains a separate check.
+
 ### Material replacement
 
 `_atelier_material_source` inside a saved material JSON records its donor. Export

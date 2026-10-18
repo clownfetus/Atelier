@@ -412,7 +412,7 @@ def _model_glb(game_rel):
     """Decode (cached) a mesh game_rel to a .glb and return its path, or raise saying why there is
     no model. The decoder's failure used to be dropped and the route answered a bare 404, which
     the viewer could only show as 'fetch ... responded with 404: Not Found'."""
-    if os.path.isfile(project_base(game_rel)+'.blend'):
+    if os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json'):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
     asset   = pak_game_path(game_rel)                        # Marvel/Content/Marvel/.../SK_...
@@ -1630,6 +1630,54 @@ def api_search():
     from atelier.search import search
     response.content_type = 'application/json'
     return json.dumps(search(request.query.getunicode('q', ''), request.query.get('limit', '50')))
+
+@app.get('/api/assets/browse')
+def api_assets_browse():
+    from atelier import added_assets
+    return added_assets.browse(request.query.get('path', ''), request.query.get('file_type') or None)
+
+
+@app.post('/api/assets/add')
+def api_assets_add():
+    from atelier import added_assets
+    if request.content_type.startswith('application/json'):
+        body = request.json or {}
+        files = []
+        upload = None
+    else:
+        body = dict(request.forms)
+        upload = tempfile.TemporaryDirectory(prefix='atelier-asset-upload-')
+        files, seen, total = [], set(), 0
+        try:
+            for entry in request.files.getall('files'):
+                name = os.path.basename(entry.filename.replace('\\', '/'))
+                extension = os.path.splitext(name)[1].lower()
+                if (extension not in set(added_assets.PACKAGE_EXTS) | added_assets.IMAGE_EXTS or
+                        name.casefold() in seen):
+                    raise ValueError('Choose an image or cooked Unreal asset files with unique filenames.')
+                seen.add(name.casefold())
+                target = os.path.join(upload.name, name)
+                with open(target, 'wb') as output:
+                    while chunk := entry.file.read(1024 * 1024):
+                        total += len(chunk)
+                        if total > 2 * 1024**3:
+                            raise ValueError('Asset files exceed 2 GB.')
+                        output.write(chunk)
+                files.append(target)
+        except BaseException:
+            upload.cleanup()
+            raise
+    def work(job):
+        return added_assets.add(body.get('file_type'), body.get('folder', ''), body.get('name', ''),
+                                body.get('source', ''), files)
+    try:
+        return _submit_job('asset-add', 'Add ' + str(body.get('name') or 'asset'), work,
+                           upload.cleanup if upload else None)
+    except BaseException:
+        if upload:
+            upload.cleanup()
+        raise
+
 
 # ── single import (texture) ────────────────────────────────────────────────────
 

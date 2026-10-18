@@ -2364,6 +2364,23 @@ window.addEventListener('atelier-bulk-saved', event => {
     else if (_bulkEditorKind === 'vfx' && vfxEditor) openVfxEditor(vfxEditor);
   }
 });
+document.getElementById('add-asset-open').addEventListener('click', () => {
+  if (matEditor || curveEditor || vfxEditor || worldEditor || textEditor || window.AtelierViewport?.hasPendingEdits?.()) {
+    toast('Close the asset editor and resolve its drafts before adding an asset.', 'warning'); return;
+  }
+  window.AtelierAddAsset.open(nav.path || '');
+});
+window.addEventListener('atelier-asset-added', async event => {
+  const result = event.detail;
+  if (result.project !== _activeProjectName) return;
+  try {
+    await loadSidebar();
+    if (result.project !== _activeProjectName) return;
+    await renderGrid();
+    if (result.project !== _activeProjectName) return;
+    toast(`Added ${result.name} to ${result.game_rel.split('/').slice(0, -1).join('/') || '/Game/Marvel'}.`, 'success', 6000);
+  } catch (error) { toast('Asset added; could not refresh the library: ' + error.message, 'warning', 8000); }
+});
 document.getElementById('process-s-maps').addEventListener('click', () => {
   if (matEditor || curveEditor || vfxEditor || window.AtelierViewport?.hasPendingEdits?.()) {
     toast('Close the asset editor and resolve its drafts before processing S maps.', 'warning'); return;
@@ -4411,7 +4428,7 @@ document.getElementById("project-chip").addEventListener("click", openProjectPic
 
 async function _selectProject(name) {
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
-                     "text-overlay", "texopt-overlay", "viewport-overlay"];
+                     "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay"];
   if (editorIds.some(id => document.getElementById(id)?.classList.contains("active"))) {
     toast("Close the active editor before switching projects.", "info");
     return;

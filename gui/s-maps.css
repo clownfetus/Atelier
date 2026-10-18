@@ -1,4 +1,6 @@
-#process-s-maps { margin: 0 12px 8px; }
+.mod-tray-actions { display: flex; gap: 8px; margin: 0 12px 8px; }
+.mod-tray-actions > * { flex: 1; min-width: 0; }
+.mod-tray-actions .btn { padding-inline: 8px; white-space: nowrap; }
 .modal.s-maps-modal { width: min(780px, calc(100vw - 40px)); max-width: 780px; padding: 24px; }
 .s-maps-modal p { margin: 12px 0; line-height: 1.5; }
 .s-maps-pairings { display: grid; gap: 16px; margin: 20px 0; }

@@ -30,6 +30,7 @@
 <link rel="stylesheet" href="/static/export-review.css">
 <link rel="stylesheet" href="/static/job-tools.css">
 <link rel="stylesheet" href="/static/s-maps.css">
+<link rel="stylesheet" href="/static/add-asset.css">
 <link rel="stylesheet" href="/static/motion/krackle.css">
 <link rel="stylesheet" href="/static/motion/surfaces.css">
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
@@ -111,7 +112,10 @@
       <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
     <button class="btn" id="bulk-edit-open" type="button" hidden>Bulk VFX / curves</button>
-    <button class="btn" id="process-s-maps" type="button" disabled title="Process all edited _D textures with same-folder S maps. Bicubic resize, Color blend at 100%; S dimensions and alpha are preserved.">Process S maps</button>
+    <div class="mod-tray-actions">
+      <button class="btn" id="add-asset-open" type="button" title="Add a texture, mesh or material with your own name and game folder">Add asset</button>
+      <button class="btn" id="process-s-maps" type="button" disabled title="Process all edited _D textures with same-folder S maps. Bicubic resize, Color blend at 100%; S dimensions and alpha are preserved.">Process S maps</button>
+    </div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
@@ -852,6 +856,7 @@
 <link rel="stylesheet" href="/static/mesh-edit.css">
 <script src="/static/mesh-edit.js"></script>
 <script src="/static/s-maps.js"></script>
+<script src="/static/add-asset.js"></script>
 <script src="/static/tooltips.js"></script>
 <script src="/static/polish.js"></script>
 <script src="/static/roster.js"></script>

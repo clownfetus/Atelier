@@ -1,0 +1,25 @@
+.modal.add-asset-modal { width: min(680px, calc(100vw - 32px)); max-width: 680px; max-height: calc(100vh - 48px); overflow-y: auto; padding: 24px; gap: 12px; }
+.add-asset-modal h2 { margin: 0; }
+.add-asset-modal > .add-asset-help { margin: 0; }
+.add-asset-help, .add-asset-status { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.add-asset-form { display: grid; gap: 12px; }
+.add-asset-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+.add-asset-field { display: flex; flex-direction: column; gap: 7px; font-size: 13px; min-width: 0; }
+.add-asset-field input, .add-asset-field select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg2); color: var(--text); font: inherit; padding: 8px 10px; }
+.add-asset-field input:focus-visible, .add-asset-field select:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.add-asset-inline { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.add-asset-inline input { flex: 1; }
+.add-asset-inline .btn { flex-shrink: 0; }
+.add-asset-files { overflow-wrap: anywhere; font-size: 13px; color: var(--muted); }
+.add-asset-destination { display: grid; gap: 6px; padding: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; }
+.add-asset-destination code, .add-asset-browser-path { overflow-wrap: anywhere; color: var(--text); }
+.add-asset-browser { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg2); }
+.add-asset-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 12px; }
+.add-asset-browser-path { flex: 1; min-width: 0; }
+.add-asset-browser-items { display: grid; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 10px; }
+.add-asset-browser-items button { width: 100%; justify-content: flex-start; text-align: left; overflow-wrap: anywhere; white-space: normal; }
+.add-asset-status { margin: 0; min-height: 20px; }
+.add-asset-status.is-error { color: var(--md-sys-color-error); }
+.add-asset-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.add-asset-modal [hidden] { display: none !important; }
+@media (max-width: 560px) { .add-asset-columns { grid-template-columns: 1fr; } }

@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
+    parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
     parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
@@ -290,6 +291,15 @@ def main():
                     browser.close()
                     return
 
+                if args.add_assets_only:
+                    from added_assets_browser_checks import run_added_asset_checks
+                    run_added_asset_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+
                 if args.s_maps_only:
                     from s_maps_browser_checks import run_s_maps_checks
                     run_s_maps_checks(page, context, url, report, checks)
@@ -363,6 +373,8 @@ def main():
                 run_texture_reconstruction_checks(page, context, url, report, checks)
                 from s_maps_browser_checks import run_s_maps_checks
                 run_s_maps_checks(page, context, url, report, checks)
+                from added_assets_browser_checks import run_added_asset_checks
+                run_added_asset_checks(page, context, url, report, checks)
                 from category_icon_checks import run_category_icon_checks
                 run_category_icon_checks(page, context, url, report, checks)
                 from library_workflow_checks import run_library_workflow_checks

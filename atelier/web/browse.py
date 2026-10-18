@@ -131,7 +131,7 @@ def game_rel_from_token(tok):
         for fname in files:
             if not fname.endswith(".png"): continue
             gr = project_game_rel(os.path.join(dirpath, fname), import_root)
-            if "/" not in gr:                       # legacy flat file: resolve via asset_cache
+            if "/" not in gr and not os.path.isfile(project_base(gr, import_root) + '.asset.json'):
                 gr = _ac.by_name(gr) or gr
             if token(gr) == tok:
                 return gr
@@ -356,7 +356,7 @@ def _browse_text(path):
                     "token": token(gr) if imported else None})
     return out
 
-def browse_dispatch(path):
+def _browse_game_dispatch(path):
     """Unified browse entry point. path is relative to Marvel/Content/Marvel/."""
     path = (path or "").strip("/")
     if not path:                         # root: pin synthetic "Maps" + "Text" sections (not indexed)
@@ -385,6 +385,15 @@ def browse_dispatch(path):
                     item["rel_path"] = f"{skin_pfx}/{item['rel_path']}"
             return items
     return _browse_pak_level(path)
+
+
+def browse_dispatch(path):
+    from atelier.added_assets import library_items
+    path = (path or '').strip('/')
+    items = _browse_game_dispatch(path)
+    existing = {item.get('rel_path', item.get('game_rel', '')).casefold() for item in items}
+    items.extend(item for item in library_items(path) if item['rel_path'].casefold() not in existing)
+    return items
 
 # ── kept for backwards compat (CLI / any callers) ────────────────────────────
 
@@ -428,6 +437,8 @@ def all_imported():
         _dirs[:] = [d for d in _dirs if d not in ('.atelier', '.atelier-trash')]
         for fname in sorted(files):
             fpath = os.path.join(dirpath, fname)
+            if fname.endswith('.asset.json'):
+                continue
             if fname.endswith('.mesh.json'):
                 gr=project_game_rel(fpath[:-len('.mesh.json')]+'.blend',import_root)
                 ext='.blend'
@@ -444,7 +455,7 @@ def all_imported():
             else:
                 continue
             if not fname.endswith('.mesh.json'):gr = project_game_rel(fpath, import_root)
-            if "/" not in gr:                           # legacy flat file: resolve via asset_cache
+            if "/" not in gr and not os.path.isfile(project_base(gr, import_root) + '.asset.json'):
                 gr = _ac.by_name(gr) or gr
             name = os.path.basename(gr)
             if ext == ".png":

@@ -18,7 +18,7 @@ from atelier import asset_cache, config, project_meta
 from atelier.storage import atomic_json
 
 DIRECTORY = '.atelier-trash'
-EDIT_EXTS = ('.png', '.json', '.blend', '.blend.mat.json', '.blend1', '.mesh.json', '.mesh.glb')
+EDIT_EXTS = ('.png', '.json', '.blend', '.blend.mat.json', '.blend1', '.mesh.json', '.mesh.glb', '.asset.json')
 MAX_AGE = 7 * 24 * 3600
 MAX_ENTRIES = 20
 
@@ -41,9 +41,14 @@ def _entry(root, entry):
 
 
 def _files(root, game_rel):
+    from atelier.added_assets import source_files
+    try:
+        originals = source_files(game_rel, root)
+    except (ValueError, OSError):
+        originals = []  # A damaged source record must still be removable/recoverable as an edit.
     return sorted({Path(base + ext) for base in
                    (config.project_base(game_rel, root), config.project_base_legacy(game_rel, root))
-                   for ext in EDIT_EXTS if Path(base + ext).is_file()})
+                   for ext in EDIT_EXTS if Path(base + ext).is_file()} | set(originals))
 
 
 def remove(root, game_rels):

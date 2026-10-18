@@ -585,6 +585,10 @@ def _note_mip_attempt(game_rel, base):
 def ensure_work_base(game_rel):
     """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
     Returns None if the asset isn't in the game at all."""
+    from atelier.added_assets import source_base
+    added = source_base(game_rel)
+    if added:
+        return added
     import atelier.asset_cache as _ac
     cached = _ac.get(game_rel)
     if cached:
