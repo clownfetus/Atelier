@@ -74,6 +74,7 @@ def main():
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
+    parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -155,6 +156,14 @@ def main():
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
                 from startup_update_checks import run_startup_update_checks
                 run_startup_update_checks(context, url, report, checks)
+
+                if args.surfaces_only:
+                    from surfaces_checks import run_surfaces_checks
+                    run_surfaces_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
 
                 if args.inks_dial_only:
                     from inks_dial_checks import run_inks_dial_checks
@@ -279,6 +288,8 @@ def main():
                     return
 
                 from design_checks import run_design_checks
+                from surfaces_checks import run_surfaces_checks
+                run_surfaces_checks(page,context,url,report,checks)
                 from inks_dial_checks import run_inks_dial_checks
                 run_inks_dial_checks(page,context,url,report,checks)
                 from find_checks import run_find_checks
