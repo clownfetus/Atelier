@@ -27,3 +27,6 @@
 #sel-count::before {content:'';width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 28%,#eee5cf 0 1px,transparent 1.2px),radial-gradient(circle at 65% 68%,#121216 0 2px,transparent 2.2px),var(--krackle-charge);}
 .k-update-drop {position:fixed;top:0;right:70px;width:40px;height:40px;border:0;background:var(--bg2);color:var(--krackle-charge);border-radius:0 0 6px 6px;z-index:210;cursor:pointer;display:grid;place-items:center;}
 .k-update-drop+ .k-update-drop {right:116px;}
+.k-startup-stage {margin:auto;}
+.k-index-failure {flex-shrink:0;}
+.toast:has(.k-index-failure) {max-width:520px;flex-wrap:wrap;}

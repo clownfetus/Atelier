@@ -3022,8 +3022,10 @@ async function checkIndexWarnings() {
     if (!res.failed || !res.failed.length) return;
     _indexWarnShown = true;
     const names = res.failed.map(f => f.container).join(", ");
-    toast(`${res.failed.length} pak container(s) could not be read: ${names}. ` +
+    const notice=toast(`${res.failed.length} pak container(s) could not be read: ${names}. ` +
           `Assets inside them are missing — check the AES key in Settings.`, "warning", 14000);
+    const settings=document.createElement('button');settings.className='btn toast-undo';settings.textContent='Settings';settings.addEventListener('click',event=>{event.stopPropagation();notice.remove();openPaths();});notice.append(settings);
+    window.AtelierSurfaces?.indexFailure(notice);
   } catch (e) {}
 }
 

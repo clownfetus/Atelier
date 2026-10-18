@@ -2,6 +2,18 @@
 (() => {
   'use strict';
   const api=window.AtelierSurfaces||={};
+  let startupStage=null,startupHost=null;
+  api.startupProgress=data=>{
+    const splash=document.getElementById('startup-splash');if(!splash||!Number(data.total)||!AtelierMotionPolicy.allows(2))return;
+    if(!startupHost){startupHost=document.createElement('div');startupHost.className='k-startup-stage';splash.prepend(startupHost);try{startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:156,kind:'index-load'});}catch(_){startupHost.remove();startupHost=null;}}
+    if(startupHost)startupHost.setAttribute('aria-label',`Container ${data.current} of ${data.total}`);
+  };
+  api.startupDone=()=>{startupStage?.destroy();startupStage=null;startupHost?.remove();startupHost=null;};
+  api.indexFailure=notice=>{
+    const host=document.createElement('div');host.className='k-index-failure';notice.prepend(host);
+    let stage;try{stage=AtelierMotion.krackleStage.mount(host,{state:'error',size:112,kind:'index-load'});}catch(_){host.remove();}
+    const remove=notice.remove.bind(notice);notice.remove=()=>{stage?.destroy();remove();};
+  };
   const drops=new Map();
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();

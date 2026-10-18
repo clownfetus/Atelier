@@ -206,10 +206,11 @@
       const label=document.getElementById('startup-label'), progress=document.getElementById('startup-progress');
       if (label) label.textContent=data.total ? `Reading container ${data.current} / ${data.total}` : data.stage==='ready'?'Library ready':'Opening your library…';
       if (progress) { if(data.total) {progress.max=data.total;progress.value=data.current;} else progress.removeAttribute('value'); }
+      window.AtelierSurfaces?.startupProgress(data);
     } catch (_) { /* Startup errors remain visible in the normal library error state. */ }
     if (!startupEnded) startupTimer=setTimeout(startup,300);
   }
-  function startupDone() { startupEnded=true; clearTimeout(startupTimer); document.getElementById('startup-splash')?.remove(); }
+  function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
   window.AtelierPolish=Object.freeze({count,sample,samplePalette,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play});
 })();
