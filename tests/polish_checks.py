@@ -76,7 +76,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.evaluate("openMaterialEditor({name:'Fixture material',game_rel:'Fixture/MI_Fixture'})")
         tab.wait_for_selector('#matsw0'); tab.wait_for_timeout(250)
         assert tab.locator('.library-heading h1,#material-overlay h2').evaluate_all("(nodes)=>nodes.every(node=>getComputedStyle(node).fontVariationSettings.includes('80') && getComputedStyle(node).fontWeight==='650')")
-        assert tab.locator('#matsw0').evaluate("el=>el.style.boxShadow.includes('px') && el.style.opacity==='0.5'")
+        assert tab.locator('#matsw0').evaluate("el=>el.style.boxShadow==='none' && el.style.opacity==='0.5' && el.parentElement.querySelector('.hdr-ring i')")
         tab.evaluate('matCompare("original"); matRestoreParameter("colors",0)')
         tab.wait_for_timeout(180)
         tab.evaluate('closeMaterialEditor(true)'); tab.wait_for_timeout(250)

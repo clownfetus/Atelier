@@ -160,7 +160,14 @@
       const parent=node.parentElement;
       if (value) {
         parent.style.setProperty('--swatch-color',node.value); parent.style.setProperty('--swatch-alpha',value.rgba[3] ?? 1);
-        node.style.boxShadow = `0 0 ${Math.min(14,Math.log2((value.inten||1)+1)*3)}px ${value.inten>1?node.value:'transparent'}`;
+        node.style.boxShadow='none';
+        parent.querySelector('.hdr-ring')?.remove();
+        if(value.inten>1){
+          const ring=document.createElement('span');ring.className='hdr-ring';ring.setAttribute('aria-hidden','true');
+          parent.style.setProperty('--hdr-radius',Math.min(7,2+Math.log2(value.inten)*1.5)+'px');
+          const count=Math.min(5,Math.ceil(Math.log2(value.inten))+1);
+          for(let i=0;i<count;i++){const bubble=document.createElement('i'),angle=(i/count)*Math.PI*2; bubble.style.left=(50+50*Math.cos(angle))+'%';bubble.style.top=(50+50*Math.sin(angle))+'%';ring.append(bubble);}parent.append(ring);
+        }
         node.style.opacity = String(Math.max(0, Math.min(1,value.rgba[3] ?? 1)));
         node.title=`${value.name} · intensity ${+(value.inten||1).toFixed(2)} · alpha ${+(value.rgba[3]??1).toFixed(2)}`;
       }
