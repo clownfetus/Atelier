@@ -1,4 +1,6 @@
 """Logo startup/ownership checks. Uses original local PNG; never writes project data."""
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +21,11 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 def run_logo_motion_checks(page, context, url, report, checks):
+    mark = subprocess.run([sys.executable, str(ROOT / 'scripts/brand_mark.py'), '--check'],
+                          capture_output=True, text=True)
+    assert mark.returncode == 0, mark.stdout + mark.stderr
+    checks.append('The A mark vector, interface PNG and application icons match scripts/brand_mark.py')
+
     tab = context.new_page()
     errors, pending_config, delayed = [], [], []
     tab.on('pageerror', lambda error: errors.append(str(error)))
