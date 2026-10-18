@@ -12,14 +12,14 @@
 
   var VALID_STATES = new Set(['idle', 'loading', 'ready', 'empty', 'error']);
 
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_TURN = 'cubic-bezier(0.42, 0, 0.58, 1)';
-  var EASE_POP = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_TURN = window.AtelierMotion.ease.turn;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
+  var SHOW_DELAY_MS = 150;
   var ASSEMBLY_DURATION_MS = 220;
-  var LOOP_DURATION_MS = 1200;
+  var LOOP_DURATION_MS = window.AtelierMotion.beatMs;
   var SETTLE_DURATION_MS = 180;
   var EMPTY_DURATION_MS = 520;
   var SPLAT_DURATION_MS = 560;
@@ -210,7 +210,7 @@
           { transform: 'scale(1)' },
           { transform: 'scale(' + (b % 2 ? 0.45 : 1.3) + ')', offset: 0.5 },
           { transform: 'scale(1)' }
-        ], { duration: LOOP_DURATION_MS * (0.75 + b * 0.18), delay: -b * 170, iterations: Infinity, easing: EASE_TURN });
+        ], { duration: LOOP_DURATION_MS * (0.75 + b * 0.18), delay: -b * LOOP_DURATION_MS / 6, iterations: Infinity, easing: EASE_TURN });
       }
 
       // Loose bubbles drift around the edge of the stage.
@@ -219,7 +219,7 @@
           { transform: 'translate(0px, 0px) scale(1)' },
           { transform: 'translate(' + (l % 2 ? -0.8 : 0.8) + 'px, -1.4px) scale(1.15)', offset: 0.5 },
           { transform: 'translate(0px, 0px) scale(1)' }
-        ], { duration: LOOP_DURATION_MS * 2, delay: -l * 400, iterations: Infinity, easing: EASE_TURN });
+        ], { duration: LOOP_DURATION_MS * 2, delay: -l * LOOP_DURATION_MS / 3, iterations: Infinity, easing: EASE_TURN });
       }
     }
 
@@ -239,6 +239,9 @@
         return;
       }
 
+      // Hide the whole loading artwork, including loose bubbles, until the show-delay ends.
+      // Mounting stays immediate so the caller never flashes its static fallback.
+      runAnimation(loadingGroup, [{ opacity: 0 }, { opacity: 0 }], { duration: SHOW_DELAY_MS });
       // 220ms coalesce: the ring's dots gather out of the centre, then the ball swells in.
       var last = null;
       for (var k = 0; k < dots.length; k++) {
@@ -247,13 +250,13 @@
         last = runAnimation(dots[k], [
           { transform: from, opacity: 0 },
           { transform: 'translate(0px, 0px) scale(1)', opacity: 1 }
-        ], { duration: ASSEMBLY_DURATION_MS, delay: k * 6, fill: 'backwards', easing: EASE_STANDARD });
+        ], { duration: ASSEMBLY_DURATION_MS, delay: SHOW_DELAY_MS + k * 6, fill: 'backwards', easing: EASE_STANDARD });
       }
       runAnimation(sphereGroup, [
         { transform: 'scale(0.4)', opacity: 0, easing: EASE_STANDARD },
         { transform: 'scale(1.08)', opacity: 1, offset: 0.7, easing: EASE_SWAY },
         { transform: 'scale(1)', opacity: 1 }
-      ], { duration: ASSEMBLY_DURATION_MS + 66, easing: 'linear' },
+      ], { duration: ASSEMBLY_DURATION_MS + 66, delay: SHOW_DELAY_MS, fill: 'backwards', easing: 'linear' },
         function () {
           if (destroyed || generation !== myGen || currentState !== 'loading') return;
           startSteadyLoadingLoop(myGen);

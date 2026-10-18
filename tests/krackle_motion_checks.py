@@ -24,12 +24,13 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         spinner = tab.evaluate("""() => {
           const s = document.createElement('div'); s.className = 'spinner'; document.body.append(s);
           const after = getComputedStyle(s, '::after'), before = getComputedStyle(s, '::before');
-          const result = {name: after.animationName, timing: after.animationTimingFunction,
+          const result = {name: after.animationName, timing: after.animationTimingFunction, duration: after.animationDuration,
             mask: (after.maskImage || after.webkitMaskImage || '').startsWith('url('),
             ring: (before.maskImage || before.webkitMaskImage || '').startsWith('url('), border: getComputedStyle(s).borderTopWidth};
           s.remove(); return result;
         }""")
         assert spinner['name'] == 'krackle-charge' and 'steps' in spinner['timing'], spinner
+        assert spinner['duration'] == '1.04s', spinner
         assert spinner['mask'] and spinner['ring'] and spinner['border'] == '0px', spinner
         tab.emulate_media(reduced_motion='reduce')
         assert tab.evaluate("""() => { const s = document.createElement('div'); s.className = 'spinner'; document.body.append(s);
@@ -70,6 +71,30 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           toastEl.remove();
         }""")
         checks.append('Caption notifications use micro formations; job results settle after one pop and controller failures keep the original icon')
+
+        tab.evaluate(r"""() => {
+          const host = document.createElement('span'); document.body.append(host);
+          const glyph = AtelierMotion.krackleGlyph.mount(host, {state:'busy'});
+          try {
+            for (const state of ['success','warning','error']) {
+              glyph.setState('busy');
+              const loops = host.getAnimations({subtree:true});
+              glyph.setState(state);
+              const ring = host.querySelector('.am-krackle-glyph-busy');
+              const fade = ring.getAnimations()[0];
+              if (!fade || fade.effect.getTiming().duration !== 140 || !loops.every(a=>a.playState==='idle'))
+                throw Error('Busy glyph hard-cut or retained its old loop');
+              fade.pause(); fade.currentTime = 70;
+              const opacity = Number(getComputedStyle(ring).opacity);
+              if (!(opacity > 0 && opacity < 1)) throw Error('Ring fade is not visible');
+              glyph.setState('busy');
+              if (fade.playState !== 'idle') throw Error('New work retained a stale result fade');
+            }
+            glyph.setReducedMotion('reduce'); glyph.setState('success');
+            if (host.getAnimations({subtree:true}).length) throw Error('Reduced glyph faded');
+          } finally { glyph.destroy(); host.remove(); }
+        }""")
+        checks.append('Activity glyph rings fade into real results for 140ms, cancel on new work, and stay still under reduced motion')
 
         # Grid empty states keep their text; the art is decorative and settles.
         tab.evaluate("buildGrid([])")

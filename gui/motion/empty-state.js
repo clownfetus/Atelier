@@ -10,10 +10,10 @@
   'use strict';
 
   var KINDS = new Set(['empty', 'none', 'error']);
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
   var mounted = typeof WeakMap === 'function' ? new WeakMap() : null;
 
   // krackle-art:empty-state:begin

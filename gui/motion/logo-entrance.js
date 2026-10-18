@@ -1,5 +1,5 @@
 /* Adapted from the supplied Gemini logo entrance. Original PNG remains caller-owned.
- * Krackle: as the mark rises into place, a ring of six charge bubbles pops out from
+ * Krackle: as the mark stamps into place, a ring of six charge bubbles pops out from
  * behind it and fades at the edge of the 32px slot. The mark itself is never redrawn.
  * Image readiness covers both the SVG image and its cache probe; failures never own
  * the fallback. Caller must handle ready and destroy before removing its host. */
@@ -11,9 +11,7 @@
   var VALID_STATES = new Set(['settled', 'entering']);
   var VALID_REDUCED_MOTION = new Set(['system', 'reduce']);
   var ENTRANCE_DURATION_MS = 320;
-  var ENTRANCE_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
-  var ENTRANCE_START_OPACITY = 0.58;
-  var ENTRANCE_START_Y_PX = 2;
+  var ENTRANCE_EASING = global.AtelierMotion.ease.standard;
 
   var mountedHosts = typeof WeakMap === 'function' ? new WeakMap() : null;
   var fallbackHostList = [];
@@ -293,7 +291,7 @@
         var splashAnim = nodes.bubbles[i].animate(
           [
             { transform: 'translate(0px, 0px) scale(0.3)', opacity: 0, easing: ENTRANCE_EASING },
-            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45, easing: 'cubic-bezier(0.55, 0, 1, 0.45)' },
+            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45, easing: global.AtelierMotion.ease.fall },
             { transform: 'translate(' + (Math.cos(angle) * far).toFixed(2) + 'px, ' + (Math.sin(angle) * far).toFixed(2) + 'px) scale(0)', opacity: 0 }
           ],
           { duration: ENTRANCE_DURATION_MS - 80, delay: i * 16, easing: 'linear', fill: 'none' }
@@ -364,17 +362,24 @@
         var anim = stageEl.animate(
           [
             {
-              opacity: ENTRANCE_START_OPACITY,
-              transform: 'translateY(' + ENTRANCE_START_Y_PX + 'px)'
+              opacity: 1,
+              transform: 'translateY(1px) scale(1.04, 0.94)',
+              easing: ENTRANCE_EASING
             },
             {
               opacity: 1,
-              transform: 'translateY(0px)'
+              transform: 'scale(0.98, 1.02)',
+              offset: 0.45,
+              easing: global.AtelierMotion.ease.sway
+            },
+            {
+              opacity: 1,
+              transform: 'none'
             }
           ],
           {
             duration: ENTRANCE_DURATION_MS,
-            easing: ENTRANCE_EASING,
+            easing: 'linear',
             fill: 'none'
           }
         );

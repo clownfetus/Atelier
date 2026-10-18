@@ -217,13 +217,13 @@
       currentState = 'entering';
       emptyHost.setAttribute(STATE_ATTR, 'entering');
 
-      var easing = 'cubic-bezier(0.2, 0, 0, 1)';
+      var easing = window.AtelierMotion.ease.standard;
       var started = [];
 
       try {
-        var fall = 'cubic-bezier(0.55, 0, 1, 0.45)';
-        var rise = 'cubic-bezier(0, 0.55, 0.45, 1)';
-        var sway = 'cubic-bezier(0.45, 0, 0.55, 1)';
+        var fall = window.AtelierMotion.ease.fall;
+        var rise = window.AtelierMotion.ease.rise;
+        var sway = window.AtelierMotion.ease.sway;
         // The tray stamps up into place.
         started.push(nodes.gTray.animate(
           [

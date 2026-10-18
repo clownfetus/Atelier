@@ -13,11 +13,11 @@
   var VALID_STATES = new Set(['idle', 'saving', 'success', 'warning', 'error']);
   var TERMINAL_STATES = new Set(['success', 'warning', 'error']);
 
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
-  var SAVING_LOOP_MS = 960;
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
+  var SAVING_LOOP_MS = window.AtelierMotion.beatMs;
   var POP_DURATION_MS = 380;
   var CRACK_DURATION_MS = 620;
   var SPLAT_DURATION_MS = 560;

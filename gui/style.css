@@ -177,7 +177,6 @@ body {
   border-radius: var(--studio-shape-large);
   padding: 10px;
   cursor: pointer;
-  transition: border-color .15s, background .15s;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -593,7 +592,7 @@ body {
   height: 100%;
   background: var(--acc);
   border-radius: 4px;
-  transition: width .3s ease;
+  transition: width 200ms linear;
   width: 0%;
 }
 #prog-counter { font-size: 13px; color: var(--muted); }
@@ -1188,7 +1187,7 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 }
 #shader-build-title { font-size: 15px; font-weight: 600; text-align: center; }
 .shader-bar { height: 8px; background: var(--bg3); border-radius: 5px; overflow: hidden; }
-#shader-bar-fill { height: 100%; width: 5%; background: var(--acc); transition: width .3s ease; }
+#shader-bar-fill { height: 100%; width: 5%; background: var(--acc); transition: width 200ms linear; }
 
 #shader-browser { flex: 1; display: none; flex-direction: column; min-height: 0; }
 .shader-toolbar {
@@ -1424,7 +1423,7 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .overlay.active > :first-child { animation: dialogIn var(--studio-motion-standard) var(--studio-easing); }
 @keyframes dialogIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .btn, .nav-btn, .card, .menu-btn, .ctx-item, .proj-card {
-  transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing);
+  transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing), box-shadow var(--studio-motion-fast) var(--studio-easing);
 }
 .btn:not(:disabled):active, .menu-btn:active { box-shadow: inset 0 0 0 1px currentColor; }
 .btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }

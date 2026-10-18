@@ -272,7 +272,7 @@
       successHole = parseColour(ctx, cs.getPropertyValue('--krackle-success-hole'), '#121216');
     }
 
-    function headAngle(tau) { return carryHead + tau * 0.7 * TAU; }
+    function headAngle(tau) { return carryHead + tau * (1000 / (window.AtelierMotion.beatMs * 2)) * TAU; }
     function waveAt(a, head) {
       var dlt = (((head - a) % TAU) + TAU) % TAU, tr = 0.45 * TAU;
       if (dlt < tr) return Math.pow(1 - dlt / tr, 1.6);

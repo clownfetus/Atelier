@@ -73,6 +73,11 @@ def run_viewport_motion_checks(page, context, url, report, checks):
           window.viewportTestMotion = AtelierMotion.viewportLoader.mount(viewportTestHost, {state:'loading'});
           window.viewportOldAnimations = viewportTestHost.getAnimations({subtree:true});
           if (!viewportOldAnimations.length) throw Error('Loading assembly did not animate');
+          const loading = viewportTestHost.querySelector('.am-viewport-loader-loading');
+          if (getComputedStyle(loading).opacity !== '0') throw Error('Fast load flashed loose bubbles');
+          const assembly = viewportOldAnimations.filter(a=>a.effect.target.matches('.am-viewport-loader-dot, .am-viewport-loader-sphere'));
+          if (!assembly.length || assembly.some(a=>a.effect.getTiming().delay < 150 || a.effect.getTiming().fill !== 'backwards'))
+            throw Error('Fast load did not defer assembly');
           viewportTestMotion.setState('loading');
           if (!viewportOldAnimations.every(a => viewportTestHost.getAnimations({subtree:true}).includes(a)))
             throw Error('Repeated loading restarted assembly');
@@ -82,6 +87,9 @@ def run_viewport_motion_checks(page, context, url, report, checks):
           viewportTestMotion.replay();
           if (viewportTestHost.getAnimations({subtree:true}).length) throw Error('Ready replay started motion');
           viewportTestMotion.setState('empty');
+          const rest = viewportTestHost.querySelector('.am-viewport-loader-rest').getAnimations()[0];
+          if (rest.effect.getTiming().delay !== 0 || getComputedStyle(loading).opacity !== '1')
+            throw Error('Show-delay leaked into the empty result');
         }""")
         motion_page.wait_for_function('!viewportTestHost.getAnimations({subtree:true}).length')
         assert motion_page.evaluate("getComputedStyle(viewportTestHost.querySelector('.am-viewport-loader-outcome-empty')).opacity") == '1'
@@ -98,12 +106,15 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         motion_page.wait_for_function("viewportTestHost.getAnimations({subtree:true}).some(a=>a.effect.getTiming().iterations===Infinity)")
         motion_page.evaluate(r"""() => {
           const before = viewportTestHost.getAnimations({subtree:true});
+          const ring = before.filter(a=>a.effect.target.matches('.am-viewport-loader-dot'));
+          if (!ring.length || ring.some(a=>a.effect.getTiming().duration !== AtelierMotion.beatMs) || AtelierMotion.beatMs !== 1040)
+            throw Error('Viewport ring lost the shared busy beat');
           viewportTestMotion.setState('loading');
           const after = viewportTestHost.getAnimations({subtree:true});
           if (after.length !== before.length || !before.every(a=>after.includes(a)))
             throw Error('Repeated loading duplicated steady loops');
         }""")
-        checks.append('Viewport SVG settles ready/empty/error, cancels interrupted assembly, and avoids duplicate loops/remounts')
+        checks.append('Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts')
 
         motion_page.emulate_media(reduced_motion='reduce')
         motion_page.wait_for_function("viewportTestHost.dataset.amReduced === 'true' && !viewportTestHost.getAnimations({subtree:true}).length")

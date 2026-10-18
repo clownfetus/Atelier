@@ -11,11 +11,11 @@
   'use strict';
 
   var VALID_STATES = new Set(['busy', 'info', 'success', 'warning', 'error']);
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
-  var BUSY_DURATION_MS = 1040;
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
+  var BUSY_DURATION_MS = window.AtelierMotion.beatMs;
   var CHUNK_FROM = [-1.54, -4.02];
   var DIZZY_ORBIT = {cx: 12, cy: 3, rx: 4.4, ry: 1, rest: [7.6, 3.3], turns: 1.5};
   var mounted = typeof WeakMap === 'function' ? new WeakMap() : null;
@@ -99,10 +99,16 @@
 
     function centre(el) { return [Number(el.getAttribute('cx')) - 12, Number(el.getAttribute('cy')) - 12]; }
 
-    function play() {
+    function play(previousState) {
       cancel();
       host.setAttribute('data-am-reduced', String(reduced()));
       if (destroyed || reduced() || hidden()) return;
+      if (previousState === 'busy' && state !== 'busy') {
+        run(parts.busy, [
+          { opacity: 1, transform: 'scale(1)' },
+          { opacity: 0, transform: 'scale(0.7)' }
+        ], { duration: 140, easing: EASE_STANDARD, fill: 'forwards' });
+      }
       if (state === 'busy') {
         for (var k = 0; k < parts.dots.length; k++) {
           var timing = {duration: BUSY_DURATION_MS, delay: (k * BUSY_DURATION_MS) / parts.dots.length, iterations: Infinity, easing: 'linear'};
@@ -201,9 +207,10 @@
     var handle = {
       setState: function (next) {
         if (destroyed || !VALID_STATES.has(next) || next === state) return;
+        var previousState = state;
         state = next;
         host.setAttribute('data-am-state', state);
-        play();
+        play(previousState);
       },
       replay: function () { if (!destroyed && state !== 'busy') play(); },
       setReducedMotion: function (mode) {

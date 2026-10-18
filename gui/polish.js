@@ -3,7 +3,7 @@
   'use strict';
   const reduced = () => (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)')).matches;
   const mounts = new Map();
-  function mount(host, {frames = [], duration = 160, state = 'idle'} = {}) {
+  function mount(host, {frames = [], duration = 160, state = 'idle', easing = window.AtelierMotion.ease.standard} = {}) {
     mounts.get(host)?.destroy(); let animation = null, destroyed = false;
     const instance = {
       get finished() { return animation?.finished || Promise.resolve(); },
@@ -11,7 +11,7 @@
         if (destroyed) return;
         state = value; host.dataset.polishState = value; animation?.cancel();
         if (frames.length && !reduced()) {
-          try { animation = host.animate(frames, {duration, easing:'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+          try { animation = host.animate(frames, {duration, easing}); } catch (_) {}
         }
       },
       destroy() { if (destroyed) return; destroyed = true; animation?.cancel(); mounts.delete(host); delete host.dataset.polishState; },
@@ -26,8 +26,8 @@
     for (const container of emptyKeys.keys()) if (!container.isConnected || !container.querySelector(':scope > .polish-empty')) emptyKeys.delete(container);
   });
   removals.observe(document.documentElement, {childList:true, subtree:true});
-  const play = (host, frames, duration = 160) => {
-    const instance = mount(host, {frames,duration,state:'playing'});
+  const play = (host, frames, duration = 160, easing = window.AtelierMotion.ease.standard) => {
+    const instance = mount(host, {frames,duration,easing,state:'playing'});
     setTimeout(() => instance.destroy(), duration + 20); return instance;
   };
   window.AtelierMotion ||= {}; window.AtelierMotion.polish = Object.freeze({mount});
@@ -122,12 +122,12 @@
         }
         Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden'});
         document.body.append(copy);
-        play(copy,[{opacity:1,clipPath:'inset(0 0 0 0)'},{opacity:0,clipPath:'inset(0 0 100% 0)'}],300);
+        play(copy,[{opacity:1,clipPath:'inset(0 0 0 0)'},{opacity:0,clipPath:'inset(100% 0 0 0)'}],300,AtelierMotion.ease.fall);
         const bubbles=document.createElement('span'); bubbles.className='trash-drain'; bubbles.setAttribute('aria-hidden','true'); bubbles.inert=true;
         Object.assign(bubbles.style,{left:(entry.rect.x+8)+'px',top:(entry.rect.y+2)+'px'});
         for(let i=0;i<6;i++) {
           const dot=document.createElement('i'); dot.style.left=(6+i%3*13)+'px'; dot.style.top=(3+Math.floor(i/3)*14)+'px'; bubbles.append(dot);
-          play(dot,[{transform:'translateY(0) scale(1)',opacity:1},{transform:`translateY(${12+i*2}px) scale(.6)`,opacity:0}],300);
+          play(dot,[{transform:'translateY(0) scale(1)',opacity:1},{transform:`translateY(${12+i*2}px) scale(.6)`,opacity:0}],300,AtelierMotion.ease.fall);
         }
         document.body.append(bubbles);
         setTimeout(()=>{copy.remove();bubbles.remove();},320);
@@ -206,8 +206,8 @@
       Object.assign(el.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',margin:'0',animation:'none',pointerEvents:'none'});
       layer.append(el);
       el.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(4px)'}],
-        {duration:120,easing:'cubic-bezier(.3,0,1,1)',fill:'forwards'}).finished.then(finish,finish);
-      setTimeout(finish,200);
+        {duration:AtelierMotion.exitMs,easing:AtelierMotion.ease.exit,fill:'forwards'}).finished.then(finish,finish);
+      setTimeout(finish,AtelierMotion.exitMs+80);
     } catch (_) { finish(); }
   }
   function swatchesBefore() { return new Map([...document.querySelectorAll('#mat-body input[type=color]')].map(node=>[node.id,node.value])); }

@@ -68,7 +68,7 @@
   background: radial-gradient(circle at 50% 15.8%, var(--krackle-hole) 0 5.9%, var(--krackle-charge) 6.3%);
   -webkit-mask-image: var(--krackle-crest-mask);
   mask-image: var(--krackle-crest-mask);
-  animation: krackle-charge 1.04s steps(6, end) infinite;
+  animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
 }
 @keyframes krackle-charge { to { transform: rotate(360deg); } }
 
@@ -123,7 +123,7 @@ progress:not([value]) {
   background-size: 48px 10px, 48px 10px, 8px 10px;
   background-position: 0 0, 14px 0, 0 0;
   background-repeat: repeat-x;
-  animation: krackle-indeterminate 1.04s steps(12, end) infinite;
+  animation: krackle-indeterminate var(--krackle-beat) steps(12, end) infinite;
 }
 progress:not([value])::-webkit-progress-bar { background: transparent; }
 progress:not([value])::-moz-progress-bar { background: transparent; }
@@ -158,7 +158,7 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   background: var(--krackle-charge);
   -webkit-mask-image: var(--krackle-crest-mask);
   mask-image: var(--krackle-crest-mask);
-  animation: krackle-charge 1.04s steps(6, end) infinite;
+  animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
 }
 
 /* ── Grid empty states and notification glyph hosts ────────────────────────── */
@@ -214,6 +214,7 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-burst-hole,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-fleck,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-sat { transform-box: fill-box; transform-origin: center; }
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-busy,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-burst,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-splat { transform-box: view-box; transform-origin: 12px 12px; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-ring { transform-box: view-box; transform-origin: 12px 10.8px; }

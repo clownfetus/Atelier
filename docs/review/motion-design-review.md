@@ -5,11 +5,15 @@ Scope: `gui/motion/` and the motion tokens in `gui/tokens.css` / `gui/style.css`
 the neighbouring motion each animation plays next to (`polish.js`, `continuity.css`,
 `preferences.js`, `surface-adapters.js`, `app.js` call sites).
 
-**Status: proposals 1–5 are implemented on this branch. Proposals 6–10 remain proposals.** Each
+**Status: proposals 1–10 are implemented on this branch.** Each
 implemented item ends with an "Implemented" note that records any deviation from the proposal.
-The four required browser smoke modes (`--surfaces-only`, `--inks-dial-only`, `--polish-only`,
-`--texture-reconstruction-only`) pass in Edge, and `polish_checks.py` now also asserts the toast exit
-and the settled empty state.
+All five required runs pass in installed Edge with isolated fixtures: `--surfaces-only`
+12 PASS, `--inks-dial-only` 9 PASS, `--polish-only` 13 PASS,
+`--texture-reconstruction-only` 11 PASS, and the full suite 160 PASS (156 baseline,
+plus the generated-logo check and three new motion regression groups). All report
+zero page errors. The full run measures 0.50ms median particle CPU across 240 samples,
+below the 8ms budget. JavaScript/Python syntax and LF endings are checked.
+Native WebView2, real-game compatibility and optional real-mesh runs were not performed.
 
 ## Method
 
@@ -278,6 +282,12 @@ sweep is the real entrance.
 that the model reveals; that is unaffected. This suite is outside the four required
 modes but should stay green.
 
+**Implemented.** Assembly delays include 150ms with backwards fill. A cancellable
+150ms hold on the loading group also hides loose bubbles, which the proposed
+dot/sphere delays alone would leave visible. Mounting and fallback replacement
+stay immediate; ready, empty/error, teardown and policy changes cancel the hold
+through the existing animation generation. Calm/Off stills remain immediate.
+
 ### 7. One busy tempo (rhythm)
 
 **Problem.** Busy loops run at 960 ms (`material-save.js:19`), 1040 ms (spinner,
@@ -297,6 +307,12 @@ dialog the stage and the progress bar beat against each other at an 11:8 ratio.
 This item is lower once 1c lands, because the progress bar then hides behind a drawing
 stage. CPU cost is unchanged (only the head speed changes).
 
+**Implemented.** `timing.js` reads `--krackle-beat` once after the styles load and
+exposes `AtelierMotion.beatMs`. CSS rings/progress and all JS busy rings use this
+source; the stage completes a revolution in two beats (2080ms). The loader's bob,
+boil and drift durations and phase offsets derive from the same beat, preserving
+their relative rhythms. No particle geometry, ink or frame-loop work was added.
+
 ### 8. Logo entrance: no dip, and one brand moment at startup (staging)
 
 **Problem.** The static mark is fully visible. `logo-entrance-ui.js:43` swaps it, in
@@ -312,6 +328,15 @@ brand moments compete.
 | `logo-entrance-ui.js:63-65` | Plays at document start | When the launch formation is drawing, hold and play on `AtelierSurfaces.startupDone()`. The splash leaves and the topbar mark "receives" the ink. |
 | `logo-entrance.css:75-84` | Unused `am-logo-entrance-reveal` keyframes | Remove. |
 
+**Implemented.** The 320ms stamp stays fully opaque, uses linear effect timing
+and per-keyframe standard/sway easing. The unused CSS keyframes were removed.
+`startupProgress()` holds the topbar only when a Full launch formation owns the
+large stage; `startupDone()` releases it once, after removing the stage. If progress
+arrives after the topbar has started, that entrance settles immediately and one
+stamp is queued. Hidden startup work is discarded, and explicit Calm replay is
+preserved. The latest logo from `feat/krackle-mark` (`dc1583f`) is included, with
+its original generated SVG, interface PNG and application icons.
+
 ### 9. Exits accelerate and point where gravity points (craft)
 
 | Where | Before | After |
@@ -320,6 +345,14 @@ brand moments compete.
 | Export button revert `export-feedback-ui.js:47` | After 1800 ms the glyph is destroyed and the download icon snaps back | 120 ms opacity crossfade before `destroy`. |
 | Glyph busy → result `krackle-glyph.js:99-124` | The ring hard-cuts to the result (CSS state selectors) | Reuse export feedback's 140 ms fade plus scale .7 (`export-feedback.js:296-301`) so Activity rows hand over the same way. |
 | Determinate width `style.css:596`, `:1191` | `width .3s ease`, which restarts a slow-start curve on every update | `width 200ms linear`: steady between updates, no stutter. |
+
+**Implemented.** The snapshot clips downward and both it and its bubbles use the
+fall curve, with the existing 300ms lifetime. The export button crossfades both
+icons in the same 20px slot for 120ms before destroying the glyph; new operations,
+reduced motion, hiding and teardown cancel it, and stale project results reset
+immediately. Glyph busy-to-result handoffs fade/scale the old ring over 140ms,
+cancel on interruption and remain immediate under Off. Both determinate widths
+use 200ms linear timing.
 
 ### 10. Token and housekeeping cleanup (system)
 
@@ -343,6 +376,17 @@ brand moments compete.
   (`polish.css:28-30`). For 320 ms the transparent areas go flat, then snap back.
   Use `background: inherit`.
 
+**Implemented.** Removed the dead card transition and unused reduced-motion
+selectors, added box-shadow to the 120ms transition list, and inherited the texture
+preview background. Real exits use the new exit tokens, including the existing
+toast exit helper. Toast entrances were already tokenized by proposal 5; rolling
+digits retain their 160ms entrance with the standard curve, and overlays use
+standard entry/accelerating exit curves. `AtelierMotion.ease` in `timing.js` now
+supplies the seven artwork controllers' shared curves. The inventory README
+records the 625ms empty-assets entrance and the new loader, save and logo timings.
+The folder smoke now selects the real Off preference instead of setting the
+unused `data-reduced-motion` attribute.
+
 ### Lower-priority craft notes
 
 - **Bounce timing.** The bounce keyframes (`empty-state.js:24-29`,
@@ -353,6 +397,9 @@ brand moments compete.
   Rolling down for decreasing counts would encode direction. It is low value.
 
 ## Animation inventory
+
+This inventory records the original review baseline. The Implemented notes above
+describe the final timings and behavior.
 
 Tiers: **F**ull / **C**alm / **O**ff. OS reduced motion forces Off
 (`preferences.js:9`). Off stops every CSS animation and transition through

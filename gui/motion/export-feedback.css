@@ -134,6 +134,12 @@
   display: none !important;
 }
 
+.am-export-feedback-slot[data-am-resetting="true"] { display: inline-grid; place-items: center; }
+.am-export-feedback-slot[data-am-resetting="true"] > * { grid-area: 1 / 1; }
+.am-export-feedback-slot[data-am-mounted="true"][data-am-resetting="true"] > .am-export-feedback-fallback {
+  display: inline-flex !important;
+}
+
 .toast .am-export-feedback-slot { width: 24px; height: 24px; }
 .toast.am-export-feedback-toast > .am-export-feedback-message { white-space: pre-line; overflow-wrap: anywhere; }
 .toast.am-export-feedback-toast.error { border-color: var(--md-sys-color-error); cursor: pointer; }

@@ -9,7 +9,7 @@
   display: block;
   pointer-events: none;
   border-radius: inherit;
-  background: var(--bg3);
+  background: inherit;
 }
 @media (prefers-reduced-motion: reduce) {
   .texture-reconstruction { display: none; }

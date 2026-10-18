@@ -40,7 +40,7 @@
 @keyframes toast-timer { to {transform:scaleX(0);} }
 .rolling-count, #prog-counter, .job-row, .vp-param, input[type=number], #status-msg, .mat-nums, .sb-bulk { font-variant-numeric:tabular-nums; }
 .rolling-digit { display:inline-block; position:relative; }
-.rolling-change { animation:digit-in 160ms ease both; }
+.rolling-change { animation:digit-in 160ms var(--studio-easing) both; }
 .rolling-change::before { content:attr(data-previous); position:absolute; left:0; top:-1.15em; opacity:.4; }
 @keyframes digit-in { from {transform:translateY(70%);opacity:.15;} to {transform:none;opacity:1;} }
 .rolling-count { overflow:hidden; }

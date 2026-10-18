@@ -38,8 +38,10 @@ def run_logo_motion_checks(page, context, url, report, checks):
         tab.wait_for_function('logoEntrances===1')
         tab.wait_for_function('document.querySelector("[data-atelier-motion=logo-entrance]").dataset.amState==="settled"')
         assert tab.evaluate('logoAnimationOptions[0].options.duration') == 320
-        assert tab.evaluate('logoAnimationOptions[0].frames[0].opacity') >= .5
-        assert tab.evaluate('logoAnimationOptions[0].frames[0].transform') == 'translateY(2px)'
+        assert tab.evaluate('logoAnimationOptions[0].frames.every(frame=>frame.opacity===1)')
+        assert tab.evaluate('logoAnimationOptions[0].frames[0].transform') == 'translateY(1px) scale(1.04, 0.94)'
+        assert tab.evaluate('logoAnimationOptions[0].frames[1].offset') == .45
+        assert tab.evaluate('logoAnimationOptions[0].options.easing') == 'linear'
         assert tab.locator('.studio-brand > img').evaluate('el=>el.naturalWidth>0 && el.hidden')
         assert tab.locator('.studio-brand [data-atelier-motion=logo-entrance]').evaluate('el=>el.getBoundingClientRect().width===32 && el.getBoundingClientRect().height===32 && !el.getAnimations({subtree:true}).length')
         assert tab.evaluate('document.querySelector(".studio-brand > span:not([data-atelier-motion])").getBoundingClientRect().x === logoInitialLabel')
@@ -52,6 +54,39 @@ def run_logo_motion_checks(page, context, url, report, checks):
         tab.wait_for_timeout(250)
         tab.screenshot(path=str(report / 'logo-startup-dark.png'))
         checks.append('Logo entrance runs once independently of pending startup configuration, preserves the original 32px PNG and wordmark position, then releases its effects')
+
+        tab.evaluate(r"""async () => {
+          await document.querySelector('.studio-brand > img').decode();
+          document.querySelector('.studio-brand').click();
+          window.beforeLaunchEntrances = logoEntrances;
+          const splash = document.createElement('div'); splash.id = 'startup-splash';
+          splash.style = 'position:fixed;top:80px;left:300px';
+          splash.innerHTML = '<progress max="10" value="2"></progress>'; document.body.append(splash);
+          AtelierSurfaces.startupProgress({total:10,current:2});
+          const logo = document.querySelector('.studio-brand [data-atelier-motion=logo-entrance]');
+          if (splash.dataset.launch !== 'true' || splash.querySelector('.k-startup-stage')?.dataset.amMicro === 'true')
+            throw Error('Launch did not own the stage');
+          if (logo.dataset.amState !== 'settled' || logo.getAnimations({subtree:true}).length)
+            throw Error('Launch did not hold the topbar entrance');
+          document.querySelector('.studio-brand').click();
+          if (logoEntrances !== beforeLaunchEntrances) throw Error('Replay competed with launch');
+          AtelierSurfaces.startupDone(); splash.remove();
+          if (logoEntrances !== beforeLaunchEntrances + 1 || logo.dataset.amState !== 'entering')
+            throw Error('Launch did not hand over to the topbar');
+          AtelierSurfaces.startupDone();
+          if (logoEntrances !== beforeLaunchEntrances + 1) throw Error('Startup completion replayed twice');
+        }""")
+        tab.wait_for_function('document.querySelector(".studio-brand [data-atelier-motion=logo-entrance]").dataset.amState === "settled"')
+        tab.evaluate(r"""() => {
+          const before = logoEntrances;
+          AtelierLogoEntranceUI.holdStartup();
+          Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+          document.dispatchEvent(new Event('visibilitychange'));
+          delete document.hidden; document.dispatchEvent(new Event('visibilitychange'));
+          AtelierSurfaces.startupDone();
+          if (logoEntrances !== before) throw Error('Hidden launch queued a later entrance');
+        }""")
+        checks.append('The latest logo stays fully opaque, yields to the Full launch formation, enters once at completion, and discards hidden startup replays')
 
         tab.evaluate(r"""() => {
           window.logoHost=document.createElement('div');

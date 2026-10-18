@@ -91,7 +91,10 @@
   --studio-shape-full: 999px;
   --studio-motion-fast: 120ms;
   --studio-motion-standard: 200ms;
+  --studio-motion-exit: 120ms;
   --studio-easing: cubic-bezier(.2, 0, 0, 1);
+  --studio-easing-exit: cubic-bezier(.3, 0, 1, 1);
+  --krackle-beat: 1040ms;
   --studio-control-height: 36px;
   --studio-icon-size: 18px;
 

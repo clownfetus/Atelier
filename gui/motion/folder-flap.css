@@ -60,8 +60,6 @@
   }
 }
 
-[data-reduced-motion="reduce"] .card[data-atelier-motion="folder-flap"] .am-folder-flap,
-[data-reduced-motion="reduce"] .card[data-atelier-motion="folder-flap"] .am-folder-flap *,
 .card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap,
 .card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap * {
   animation: none !important;

@@ -17,13 +17,16 @@
           const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,128,128);mask=ctx.getImageData(0,0,128,128);
         }
         startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:mask?224:156,kind:mask?'launch':'index-load',tier:mask?3:2,mask});
-        if(mask&&startupHost.dataset.amMicro!=='true')splash.dataset.launch='true';
+        if(mask&&startupHost.dataset.amMicro!=='true') {
+          splash.dataset.launch='true';
+          if(AtelierMotionPolicy.allows(3)&&!document.hidden)window.AtelierLogoEntranceUI?.holdStartup();
+        }
       }catch(_){startupHost.remove();startupHost=null;}
     }
     if(startupHost)startupHost.setAttribute('aria-label',`Container ${data.current} of ${data.total}`);
     startupStage?.setProgress(Number(data.current)/Number(data.total));
   };
-  api.startupDone=()=>{startupStage?.destroy();startupStage=null;startupHost?.remove();startupHost=null;};
+  api.startupDone=()=>{startupStage?.destroy();startupStage=null;startupHost?.remove();startupHost=null;window.AtelierLogoEntranceUI?.startupDone();};
   api.indexFailure=notice=>{
     const host=document.createElement('div');host.className='k-index-failure';notice.prepend(host);
     let stage;try{stage=AtelierMotion.krackleStage.mount(host,{state:'error',size:112,kind:'index-load'});}catch(_){host.remove();}

@@ -18,6 +18,8 @@ def run_export_motion_checks(page, context, url, report, checks):
           window.motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'busy'});
           window.motionAnimations = motionHost.getAnimations({subtree:true});
           if (!motionAnimations.length) throw Error('Busy state did not animate');
+          if (motionAnimations.some(a=>a.effect.getTiming().iterations === Infinity && a.effect.getTiming().duration !== AtelierMotion.beatMs))
+            throw Error('Export ring lost the shared busy beat');
           motionInstance.setState('busy');
           const repeated = motionHost.getAnimations({subtree:true});
           if (!motionAnimations.every(a => repeated.includes(a))) throw Error('Repeated busy restarted motion');
@@ -215,6 +217,35 @@ def run_export_motion_checks(page, context, url, report, checks):
         assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') != 'success'
         motion_page.evaluate('_activeProjectName = originalMotionProject; updateInstallBtn()')
         checks.append('Overlapping exports keep independent feedback; old operations/projects cannot overwrite current button results')
+
+        motion_page.evaluate(r"""() => {
+          window.fadeButton = document.getElementById('install-btn');
+          window.fadeSlot = fadeButton.querySelector('.am-export-feedback-slot');
+          window.fadeDone = AtelierExportFeedback.begin(fadeButton); fadeDone('success');
+        }""")
+        motion_page.wait_for_function('fadeSlot.dataset.amResetting === "true"', polling=5, timeout=4000)
+        motion_page.evaluate(r"""() => {
+          const host = fadeSlot.lastElementChild, fallback = fadeSlot.firstElementChild;
+          const fades = fadeSlot.getAnimations({subtree:true});
+          if (!host.querySelector('svg') || fades.length !== 2 || fades.some(a=>a.effect.getTiming().duration!==120))
+            throw Error('Button result did not crossfade before disposal');
+          for (const animation of fades) { animation.pause(); animation.currentTime = 60; }
+          if (![host,fallback].every(node=>{const opacity=Number(getComputedStyle(node).opacity);return opacity>0 && opacity<1;}))
+            throw Error('Both button icons did not participate in the crossfade');
+          if (fadeSlot.getBoundingClientRect().width !== 20) throw Error('Crossfade changed the icon slot');
+          window.interruptedFades = fades;
+          fadeDone = AtelierExportFeedback.begin(fadeButton);
+          if (fadeSlot.dataset.amResetting || !interruptedFades.every(a=>a.playState==='idle'))
+            throw Error('New operation retained the old reset fade');
+        }""")
+        motion_page.wait_for_timeout(250)
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') == 'busy'
+        motion_page.evaluate("fadeDone('warning')")
+        motion_page.wait_for_function('fadeSlot.dataset.amResetting === "true"', polling=5, timeout=4000)
+        motion_page.emulate_media(reduced_motion='reduce')
+        motion_page.wait_for_function('AtelierMotionPolicy.query().matches && !fadeSlot.dataset.amResetting && !fadeSlot.querySelector("[data-atelier-motion]") && !fadeSlot.getAnimations({subtree:true}).length')
+        motion_page.emulate_media(reduced_motion='no-preference')
+        checks.append('Export results crossfade back to the static icon in a fixed 20px slot; new operations and reduced motion cancel the reset safely')
 
         motion_page.evaluate("""() => {
           document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove());
