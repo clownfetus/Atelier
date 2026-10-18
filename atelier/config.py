@@ -424,8 +424,10 @@ def _prereq_issues(need_tool=True):
         issues.append(("error", f"No pak files found at: {PAKS}"))
     if not os.path.exists(AES_KEY_FILE):
         issues.append(("error", f"AES_KEY.txt not found at: {AES_KEY_FILE}"))
-    if need_tool and not os.path.exists(os.path.join(TOOLS, "UAssetTool.exe")):
-        issues.append(("error", f"UAssetTool.exe not found at: {os.path.join(TOOLS, 'UAssetTool.exe')}"))
+    tool = os.path.join(TOOLS, "UAssetTool.exe")
+    if need_tool and not (os.path.isfile(tool) or _hostos.native_tool(tool)):
+        expected = tool if _hostos.IS_WINDOWS else f"{tool[:-4]} (native) or {tool} (Wine)"
+        issues.append(("error", f"UAssetTool not found at: {expected}"))
     if need_tool:
         level, msg = _hostos.tools_ready()
         if level != "ok":

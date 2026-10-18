@@ -138,6 +138,10 @@ def main():
                     raise RuntimeError('Smoke fixture unexpectedly configured a real game')
                 title = 'Initial Configuration' if launch == 'previous-launch' else 'Find the game'
                 wait_for(lambda: any(title in name for name in accessible_names()), process)
+                if launch != 'previous-launch':
+                    prereqs = json.load(urllib.request.urlopen(base + '/api/prereqs', timeout=10))
+                    if any(item['level'] == 'error' and ('UAssetTool' in item['message'] or 'Wine not found' in item['message']) for item in prereqs['issues']):
+                        raise RuntimeError('Packaged Linux native core tool failed prerequisite recognition')
                 names = accessible_names()
                 (report / f'{launch}-accessibility.json').write_text(json.dumps(names, indent=2))
                 if not any(title in name for name in names):
@@ -176,6 +180,7 @@ def main():
                     raise RuntimeError('AppRun replaced user data during refresh')
                 if json.loads((data / 'mr_config.json').read_text()).get('release_upgrade_canary') != 'preserve existing settings':
                     raise RuntimeError('Upgrade lost existing configuration fields')
+        result['checks'].append({'name': 'packaged native UAssetTool satisfies asset-operation prerequisites without its Windows executable'})
         result['checks'].append({'name': 'actual previous-version upgrade and relaunch preserve user tools, projects and configuration'})
         result['ok'] = True
         print(json.dumps(result, indent=2))

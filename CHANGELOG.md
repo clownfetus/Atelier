@@ -15,6 +15,8 @@ The app, installers and update checker identify each release by its full number,
 - Inspect / Showcase rendering, posters, turntables and client-created Mod cards.
 - Material replacement and restoration use the same themed confirmations as
   other editors; confirmations cannot apply to a subsequently opened material.
+- Linux prerequisite checks accept its native UAssetTool without requiring a
+  Windows executable; packaged checks cover this after an actual 0.4.1 upgrade.
 - Pinned Windows compiler/build dependencies, complete candidate checks, native
   WebKit AppImage checks and upgrade preservation from 0.4.1.
 

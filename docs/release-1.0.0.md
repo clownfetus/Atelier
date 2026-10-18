@@ -48,6 +48,8 @@ version/date, Copy image and Save PNG.
   immediately; deleted files are retained for up to seven days and twenty batches.
 - Activity tracks imports, builds and repatches. Bulk VFX / curves previews
   changes before saving; S map processing stays inside Atelier.
+- Linux recognizes its native UAssetTool during asset validation, so native
+  extraction and builds do not require a Windows executable.
 - Update checks run alongside startup, so a slow or offline release service
   does not hold up the library or setup.
 
