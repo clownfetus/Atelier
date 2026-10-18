@@ -477,7 +477,9 @@ guard reserves outcome inks, nudges the smallest colour distance within 45°,
 then tries other sampled colours and a full hue turn. Pink moves toward magenta;
 gold/amber toward orange. Manual colours can retain a CLASH warning. SHIFTED
 explains automatic changes in Settings. Primary buttons and the dark model
-loader fit against their own surfaces.
+loader fit against their own surfaces. Card thumbs paint the raised `--bg3`,
+not the card's `--bg2`, so theme.js also fits (or guards) `--krackle-charge-raised`
+against `--bg3` and `.card-thumb` reads it as its `--krackle-charge`.
 
 `AtelierMotionPolicy.tier()` returns 3/1/0 for Full/Calm/Off; `allows(tier)` is
 the shared gate. Legacy system/reduce values migrate to full/off. OS reduced
@@ -516,7 +518,9 @@ HTML and both-theme PNG sheets live in `docs/review/wave-4b`. The hidden local
 `atelier.experimentalKrackleEmblems=1` flag is for review only and defaults off.
 With it on, `icons.js` inlines the generated markup from `category-emblems.js`
 (an `<image>` SVG cannot see page variables), so emblems take the measured
-`--krackle-charge`/`--krackle-hole`, and each copy gets its own clip id.
+`--krackle-charge`/`--krackle-hole`, and each copy gets its own clip id. On a
+card that charge is the thumb's raised ink. The review sheet draws the candidates on
+Studio card and thumb surfaces with that fitted ink, so its PNGs match the app.
 Control glyphs keep Material Sharp. D4 remains a user decision.
 
 Particle rendering uses preallocated circle command buffers, linked per integer

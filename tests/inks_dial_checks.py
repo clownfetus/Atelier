@@ -1,4 +1,5 @@
 """Measured outcome inks, presentation-policy migration and one large moment."""
+import json
 
 
 def run_inks_dial_checks(page,context,url,report,checks):
@@ -6,6 +7,20 @@ def run_inks_dial_checks(page,context,url,report,checks):
     stored=None
     def motion(value):
         tab.evaluate("value=>{const control=document.getElementById('settings-motion');control.value=value;control.dispatchEvent(new Event('change'));}",value)
+    def thumb_ink(guard=None):
+        # A real .card-thumb in the live cascade: its charge must be the raised ink fitted (or guarded) to --bg3.
+        return tab.evaluate("""guard => {
+          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),bg3=cs.getPropertyValue('--bg3').trim();
+          const thumb=document.createElement('div'),probe=document.createElement('i');thumb.className='card-thumb';thumb.append(probe);document.body.append(thumb);
+          const color=value=>{probe.style.color=value;return getComputedStyle(probe).color;};
+          try{
+            const ink=color('var(--krackle-charge)'),surface=getComputedStyle(thumb).backgroundColor;
+            const expected=color(guard?K.guard(guard[0],guard[1],bg3,{candidates:[]}).charge:K.fit(K.defaults(bg3).charge,bg3));
+            return {ink,expected,surface,raised:color(cs.getPropertyValue('--krackle-charge-raised').trim()),
+              bg3:color(bg3),contrast:K.contrast(ink,surface)};
+          }finally{thumb.remove();}
+        }""",guard)
+    raised={}
     try:
         tab.goto(url);tab.wait_for_selector('#grid-area .card')
         stored=tab.evaluate("Object.fromEntries(['motion','adaptiveAccent','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
@@ -24,6 +39,8 @@ def run_inks_dial_checks(page,context,url,report,checks):
                     ok:['success','warn','fault','success-hole'].every(key=>cs.getPropertyValue('--krackle-'+key).trim()===expected[key==='success-hole'?'successHole':key])};
                 }""")
                 assert result['ok'] and result['surface']==result['expected'],(mode,preset,result)
+                thumb=thumb_ink();raised[f'{mode}/{preset}']=round(thumb['contrast'],2)
+                assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['surface']==thumb['bg3'] and thumb['contrast']>=3,(mode,preset,thumb)
             tab.evaluate("""mode=>{
               document.querySelector('[data-theme-preset=custom]').click();
               for(const [key,value] of Object.entries({background:mode==='dark'?'#101021':'#fef2eb',surface:mode==='dark'?'#252545':'#f2dddd'})){
@@ -31,7 +48,11 @@ def run_inks_dial_checks(page,context,url,report,checks):
               }
             }""",mode)
             assert tab.locator('html').get_attribute('data-krackle-surface')==mode
-        checks.append('Fixed outcome inks follow measured surfaces on all six presets in both themes and custom dark/light palettes')
+            thumb=thumb_ink();raised[f'{mode}/custom']=round(thumb['contrast'],2)
+            assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['surface']==thumb['bg3'] and thumb['contrast']>=3,(mode,'custom',thumb)
+        (report/'krackle-raised-inks.json').write_text(json.dumps(raised,indent=2))
+        print('Raised charge on card thumbs (--bg3): '+', '.join(f'{key} {value}:1' for key,value in raised.items()),flush=True)
+        checks.append('Fixed outcome inks follow measured surfaces on all six presets in both themes and custom dark/light palettes; card thumbs take a charge fitted to --bg3 (3:1) on every one')
         tab.evaluate("""() => {
           document.querySelector('[data-theme-preset=studio]').click();
           const hero=document.getElementById('library-hero');hero.hidden=false;
@@ -43,10 +64,13 @@ def run_inks_dial_checks(page,context,url,report,checks):
           const host=document.getElementById('viewport-loading-motion-host'),cs=getComputedStyle(host);
           return host.dataset.krackleSurface==='dark'&&AtelierKrackleInks.contrast(cs.getPropertyValue('--krackle-charge'),'#14161b')>=3;
         }""")
+        thumb=thumb_ink(['#ff5c9a','#2a9fd6'])
+        assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['contrast']>=3,('guarded thumb',thumb)
         tab.evaluate("document.getElementById('library-hero').hidden=true;window.dispatchEvent(new Event('atelier:preferences'))")
         assert tab.locator('#krackle-accent-status').get_attribute('hidden') is not None
         assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--krackle-charge').trim()")=='#2693c6'
-        checks.append('Adaptive inks are guarded only in hero/skin context; SHIFTED is visible and the dark model-loader surface keeps readable inks')
+        thumb=thumb_ink();assert thumb['ink']==thumb['expected']=='rgb(37, 141, 191)',('studio light thumb',thumb)
+        checks.append('Adaptive inks are guarded only in hero/skin context, on card thumbs too; SHIFTED is visible and the dark model-loader surface keeps readable inks')
         motion('full')
         result=tab.evaluate("""() => {
           const arbiter=AtelierMotion.moment,a=arbiter.claim('fixture',2),b=arbiter.claim('fixture-second',2);

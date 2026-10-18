@@ -9,6 +9,8 @@
  */
 :root {
   --krackle-charge: #2a9fd6;
+  /* Charge for raised surfaces (--bg3); theme.js measures it, this is the unmeasured default. */
+  --krackle-charge-raised: var(--krackle-charge);
   --krackle-rift: #8a6cff;
   --krackle-success: #eee5cf;
   --krackle-warn: #f5c02e;
@@ -30,6 +32,8 @@
 
 [data-krackle-surface='dark'] { --krackle-charge:#2a9fd6; --krackle-rift:#8a6cff; --krackle-success:#eee5cf; --krackle-warn:#f5c02e; --krackle-fault:#e0407a; --krackle-hole:#121216; --krackle-success-hole:#121216; }
 [data-krackle-surface='light'] { --krackle-charge:#2693c6; --krackle-rift:#8a6cff; --krackle-success:#121216; --krackle-warn:#9a6b00; --krackle-fault:#c8336a; --krackle-hole:#121216; --krackle-success-hole:#eee5cf; }
+/* Thumbs paint --bg3. No var(--krackle-charge) fallback here: a self-reference is a cycle and voids the property. */
+.card-thumb { --krackle-charge: var(--krackle-charge-raised); }
 .am-stage-micro { display:inline-flex; width:48px; height:48px; }
 #krackle-accent-status { font-size:10px; letter-spacing:.08em; padding:2px 5px; border:1px solid var(--border); }
 #krackle-accent-status[hidden] { display:none; }

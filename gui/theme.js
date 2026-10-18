@@ -147,6 +147,7 @@
       set('--studio-brand-filter', blackMark ? 'brightness(0)' : 'brightness(0) invert(1)');
     }
     const surface=getComputedStyle(root).getPropertyValue('--bg2').trim()||p.surface;
+    const raised=getComputedStyle(root).getPropertyValue('--bg3').trim()||p.surface;
     const K=window.AtelierKrackleInks;
     root.dataset.krackleSurface=K?K.surfaceKind(surface):(luminance(p.surface)<.179?'dark':'light');
     let guarded=null;
@@ -155,6 +156,10 @@
       if(window.AtelierPreferences?.adaptive()&&artworkAccent&&document.querySelector('#library-hero:not([hidden])'))
         guarded=K.guard(artworkAccent,artworkColors[1]||defaults.rift,surface,{candidates:artworkColors.slice(2)});
       set('--krackle-charge',guarded?.charge||defaults.charge);set('--krackle-rift',guarded?.rift||defaults.rift);
+      // Card thumbs paint --bg3, not the card's --bg2; .card-thumb reads this charge (krackle.css).
+      const lifted=K.defaults(raised),thumbInks=guarded&&K.guard(artworkAccent,artworkColors[1]||lifted.rift,raised,{candidates:artworkColors.slice(2)});
+      set('--krackle-charge-raised',thumbInks?.charge||K.fit(lifted.charge,raised));
+      if(thumbInks?.shifted)guarded.shifted=true;if(thumbInks?.clash)guarded.clash=true;
       for(const button of document.querySelectorAll('.btn.primary,#viewport-loading-motion-host')) {
         const background=button.id==='viewport-loading-motion-host'?'#14161b':getComputedStyle(button).backgroundColor;
         try {

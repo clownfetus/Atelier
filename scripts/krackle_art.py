@@ -353,7 +353,15 @@ def category_emblems():
             "  markup:(cls,scale)=>marks[cls][scale].replaceAll('{clip}','k-category-emblem-clip-'+(++next))});\n})();\n")
     out[MOTION/'category-emblems.js']=('whole',source)
     cells=''.join(f'<article><strong>{label}</strong><div>{previews[cls,24]}{previews[cls,102]}</div></article>' for cls,label,*_ in definitions)
-    sheet='<!doctype html><html lang="en"><meta charset="utf-8"><title>D4 category emblem review</title><style>body{--krackle-charge:#2693c6;background:#eee5cf;color:#121216;font:13px Arial;margin:20px}body.dark{--krackle-charge:#2a9fd6;background:#121216;color:#eee5cf}main{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}article{border:1px solid #888;padding:10px}article div{display:flex;align-items:center;gap:20px;margin-top:10px}h1{font-size:22px}</style><h1>D4 review candidates · 24 px and 102 px · Material Sharp remains active</h1><main>'+cells+'</main></html>\n'
+    # Studio card (--bg2), thumb (--bg3) and the charge theme.js fits to the thumb, per theme.
+    # surfaces_checks.py asserts these match the app, so the review PNGs show what cards show.
+    theme=lambda card,thumb,charge:f'--card:{card};--thumb:{thumb};--krackle-charge:{charge}'
+    sheet=('<!doctype html><html lang="en"><meta charset="utf-8"><title>D4 category emblem review</title><style>'
+           'body{'+theme('#eef0f3','#e4e7eb','#258dbf')+';background:#eee5cf;color:#121216;font:13px Arial;margin:20px}'
+           'body.dark{'+theme('#1e2126','#2b2f35','#2a9fd6')+';background:#121216;color:#eee5cf}'
+           'main{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}article{background:var(--card);border:1px solid #888;padding:10px}'
+           'article div{display:flex;align-items:center;gap:20px;margin-top:10px;padding:8px;border-radius:4px;background:var(--thumb)}h1{font-size:22px}'
+           '</style><h1>D4 review candidates · 24 px and 102 px on Studio card thumbs · Material Sharp remains active</h1><main>'+cells+'</main></html>\n')
     out[ROOT/'docs/review/wave-4b/category-emblems.html']=('whole',sheet)
     return out
 
