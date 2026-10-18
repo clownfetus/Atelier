@@ -490,9 +490,11 @@ guard reserves outcome inks, nudges the smallest colour distance within 45°,
 then tries other sampled colours and a full hue turn. Pink moves toward magenta;
 gold/amber toward orange. Manual colours can retain a CLASH warning. SHIFTED
 explains automatic changes in Settings. Primary buttons and the dark model
-loader fit against their own surfaces. Card thumbs paint the raised `--bg3`,
-not the card's `--bg2`, so theme.js also fits (or guards) `--krackle-charge-raised`
-against `--bg3` and `.card-thumb` reads it as its `--krackle-charge`.
+loader fit against their own surfaces. The root `--krackle-charge` is fitted (or
+guarded) against the card body's `--bg2`. Card thumbs, and hovered card bodies,
+paint the raised `--bg3`, so theme.js also fits (or guards) `--krackle-charge-raised`
+against `--bg3`, and `.card-thumb` and `.card:hover` read it as their
+`--krackle-charge`. The edited corner therefore keeps 3:1 when a card is hovered.
 
 `AtelierMotionPolicy.tier()` returns 3/1/0 for Full/Calm/Off; `allows(tier)` is
 the shared gate. Legacy system/reduce values migrate to full/off. OS reduced

@@ -20,7 +20,40 @@ def run_inks_dial_checks(page,context,url,report,checks):
               bg3:color(bg3),contrast:K.contrast(ink,surface)};
           }finally{thumb.remove();}
         }""",guard)
-    raised={}
+    def card_ink():
+        # A real .card.imported: its edited corner is the root charge on the resting --bg2 body and the
+        # raised charge on the hovered --bg3 body. The raised ink must also pass on --bg2, because it
+        # switches at once while the body's background is still easing between the two.
+        tab.evaluate("""() => {
+          const card=document.createElement('div');card.id='ink-card-fixture';card.className='card imported';
+          card.style='position:fixed;top:80px;left:320px;z-index:1000;transition:none';document.body.append(card);
+        }""")
+        measure="""() => {
+          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),card=document.getElementById('ink-card-fixture');
+          const probe=document.createElement('i');card.append(probe);
+          const color=value=>{probe.style.color=value;return getComputedStyle(probe).color;};
+          try{
+            const ink=getComputedStyle(card,'::after').backgroundColor,surface=getComputedStyle(card).backgroundColor;
+            const bg2=color(cs.getPropertyValue('--bg2').trim()),bg3=color(cs.getPropertyValue('--bg3').trim());
+            return {ink,surface,bg2,bg3,hover:card.matches(':hover'),charge:color(cs.getPropertyValue('--krackle-charge').trim()),
+              raised:color(cs.getPropertyValue('--krackle-charge-raised').trim()),contrast:K.contrast(ink,surface),onBg2:K.contrast(ink,bg2)};
+          }finally{probe.remove();}
+        }"""
+        try:
+            tab.mouse.move(0,0);rest=tab.evaluate(measure)
+            tab.hover('#ink-card-fixture');hovered=tab.evaluate(measure)
+            tab.mouse.move(0,0)
+        finally:tab.evaluate("document.getElementById('ink-card-fixture').remove()")
+        assert not rest['hover'] and rest['surface']==rest['bg2'] and rest['ink']==rest['charge'] and rest['contrast']>=3,('resting card',rest)
+        assert hovered['hover'] and hovered['surface']==hovered['bg3'] and hovered['ink']==hovered['raised'] and hovered['contrast']>=3 and hovered['onBg2']>=3,('hovered card',hovered)
+        return rest,hovered
+    def root_ink():
+        # Unguarded, the root charge is the resting card body's ink, fitted to --bg2.
+        return tab.evaluate("""() => {
+          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),bg2=cs.getPropertyValue('--bg2').trim(),charge=cs.getPropertyValue('--krackle-charge').trim();
+          return {charge,bg2,expected:K.fit(K.defaults(bg2).charge,bg2),contrast:K.contrast(charge,bg2)};
+        }""")
+    raised={};cards={}
     try:
         tab.goto(url);tab.wait_for_selector('#grid-area .card')
         stored=tab.evaluate("Object.fromEntries(['motion','adaptiveAccent','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
@@ -39,6 +72,8 @@ def run_inks_dial_checks(page,context,url,report,checks):
                     ok:['success','warn','fault','success-hole'].every(key=>cs.getPropertyValue('--krackle-'+key).trim()===expected[key==='success-hole'?'successHole':key])};
                 }""")
                 assert result['ok'] and result['surface']==result['expected'],(mode,preset,result)
+                ink=root_ink();assert ink['charge']==ink['expected'] and ink['contrast']>=3,(mode,preset,ink)
+                rest,hovered=card_ink();cards[f'{mode}/{preset}']={'rest':round(rest['contrast'],2),'hover':round(hovered['contrast'],2)}
                 thumb=thumb_ink();raised[f'{mode}/{preset}']=round(thumb['contrast'],2)
                 assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['surface']==thumb['bg3'] and thumb['contrast']>=3,(mode,preset,thumb)
             tab.evaluate("""mode=>{
@@ -48,11 +83,16 @@ def run_inks_dial_checks(page,context,url,report,checks):
               }
             }""",mode)
             assert tab.locator('html').get_attribute('data-krackle-surface')==mode
+            ink=root_ink();assert ink['charge']==ink['expected'] and ink['contrast']>=3,(mode,'custom',ink)
+            rest,hovered=card_ink();cards[f'{mode}/custom']={'rest':round(rest['contrast'],2),'hover':round(hovered['contrast'],2)}
             thumb=thumb_ink();raised[f'{mode}/custom']=round(thumb['contrast'],2)
             assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['surface']==thumb['bg3'] and thumb['contrast']>=3,(mode,'custom',thumb)
         (report/'krackle-raised-inks.json').write_text(json.dumps(raised,indent=2))
+        (report/'krackle-card-inks.json').write_text(json.dumps(cards,indent=2))
         print('Raised charge on card thumbs (--bg3): '+', '.join(f'{key} {value}:1' for key,value in raised.items()),flush=True)
+        print('Edited corner on card bodies (rest --bg2 / hover --bg3): '+', '.join(f"{key} {value['rest']}/{value['hover']}:1" for key,value in cards.items()),flush=True)
         checks.append('Fixed outcome inks follow measured surfaces on all six presets in both themes and custom dark/light palettes; card thumbs take a charge fitted to --bg3 (3:1) on every one')
+        checks.append('The root charge is fitted to the resting card body (--bg2), and a hovered card body (--bg3) switches its edited corner to the raised charge: 3:1 resting and hovered on every preset and custom palette in both themes')
         tab.evaluate("""() => {
           document.querySelector('[data-theme-preset=studio]').click();
           const hero=document.getElementById('library-hero');hero.hidden=false;
@@ -66,6 +106,7 @@ def run_inks_dial_checks(page,context,url,report,checks):
         }""")
         thumb=thumb_ink(['#ff5c9a','#2a9fd6'])
         assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['contrast']>=3,('guarded thumb',thumb)
+        card_ink()
         tab.evaluate("document.getElementById('library-hero').hidden=true;window.dispatchEvent(new Event('atelier:preferences'))")
         assert tab.locator('#krackle-accent-status').get_attribute('hidden') is not None
         assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--krackle-charge').trim()")=='#2693c6'
