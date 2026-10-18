@@ -84,6 +84,13 @@
       return dens < 0.04 ? null : {x: x, y: y, r: P * 0.5 * Math.sqrt(dens) * 0.92, k: K_CHARGE, m: 0};
     });
   }
+  function fMask(P,mask) {
+    return lattice(-240,-240,240,240,P,function(x,y){
+      var px=Math.min(mask.width-1,Math.max(0,Math.round((x+240)/480*(mask.width-1))));
+      var py=Math.min(mask.height-1,Math.max(0,Math.round((y+240)/480*(mask.height-1))));
+      return mask.data[(py*mask.width+px)*4+3]>128?{x:x,y:y,r:P*.5,k:K_CHARGE,m:0}:null;
+    });
+  }
   function fBurst(P, rnd) {
     var S = 205, n = 10 + Math.floor(rnd() * 3), ph = rnd() * TAU, pts = [];
     for (var k = 0; k < n * 2; k++) {
@@ -204,7 +211,7 @@
     function clearMicro() {micro?.destroy();micro=null;microHost?.remove();microHost=null;microMode=false;canvas.style.display='';host.removeAttribute('data-am-micro');}
     function ownership() {
       if(reducedPref==='reduce'||window.AtelierMotionPolicy?.allows(2)===false){release();clearMicro();return;}
-      if(!releaseMoment)releaseMoment=window.AtelierMotion.moment?.claim(opts.kind||'formation',2)||null;
+      if(!releaseMoment)releaseMoment=window.AtelierMotion.moment?.claim(opts.kind||'formation',opts.tier||2)||null;
       if(releaseMoment){clearMicro();return;}
       microMode=true;canvas.style.display='none';host.setAttribute('data-am-micro','true');
       if(!microHost){microHost=document.createElement('span');microHost.className='am-stage-micro';host.append(microHost);try{micro=window.AtelierMotion.krackleGlyph.mount(microHost,{state:state==='idle'?'info':state});}catch(_){}}
@@ -214,6 +221,7 @@
     // ── dot pool ──
     var rndSeed = 12345 + uid * 101, results = 0;
     var sample = [fRing(P), fBurst(P, mulberry32(1)), fCracked(P, mulberry32(2)), fSplat(P, mulberry32(3))];
+    if(opts.mask)sample.push(fMask(P,opts.mask));
     var POOL = Math.max.apply(null, sample.map(function (f) { return f.length; })) + 60;
     function F() { return new Float32Array(POOL); }
     var X = F(), Y = F(), VX = F(), VY = F(), R = F(), TX = F(), TY = F(), TR = F(), PA = F(), PR = F(), BASE = F(), DELAY = F();
@@ -223,6 +231,7 @@
     for (var i0 = 0; i0 < POOL; i0++) { SF[i0] = 0.55 + 1.55 * Math.pow(kr(), 2.2); SPECK[i0] = kr() < 0.32 ? 1 : 0; M[i0] = 1; COLT[i0] = 1; }
 
     var form = 'idle', formStart = 0, clock = 0, carryHead = 0, kicked = false, fromInk = false;
+    var progress=0;
     var inks = [], hole = [18, 18, 22], successHole=[18,18,22], glint = [238,229,207];
     var raf = 0, last = 0, sleeping = true, destroyed = false, frames = 0;
 
@@ -267,7 +276,7 @@
       form = name; formStart = clock; kicked = false;
       var rnd = mulberry32(rndSeed + CODE[name] + 1 + results * 977);
       if (name === 'drop') { enterDrop(rnd); return; }
-      var shape = name === 'busy' ? fRing(P) : name === 'success' ? fBurst(P, rnd) : name === 'warning' ? fCracked(P, rnd) : fSplat(P, rnd);
+      var shape = name === 'busy' ? (opts.mask?fMask(P,opts.mask):fRing(P)) : name === 'success' ? fBurst(P, rnd) : name === 'warning' ? fCracked(P, rnd) : fSplat(P, rnd);
       if (shape.length > POOL - 4) { shape.sort(function (a, b) { return b.r - a.r; }); shape.length = POOL - 4; }
       var solid = {}, Q = Math.SQRT1_2 / P;
       function cell(t) { return [Math.round((t.x + t.y) * Q), Math.round((t.y - t.x) * Q)]; }
@@ -427,6 +436,7 @@
     }
 
     function inkOf(i) {
+      if(opts.mask&&form==='busy'&&TY[i]<240-480*progress)return '68,72,80';
       var a = inks[KFROM[i]], b = inks[KTO[i]], t = COLT[i], w = 0;
       var r = a[0] + (b[0] - a[0]) * t, g = a[1] + (b[1] - a[1]) * t, bl = a[2] + (b[2] - a[2]) * t;
       if (w > 0) { r += (glint[0] - r) * w; g += (glint[1] - g) * w; bl += (glint[2] - bl) * w; }
@@ -602,6 +612,7 @@
     host.setAttribute('data-am-sleeping', 'true');
 
     var handle = {
+      setProgress: function(value) {progress=clamp01(Number(value)||0);if(form==='busy'&&sleeping)render();},
       setState: function (next) {
         if (destroyed || !STATES.has(next) || next === state) return;
         state = next;

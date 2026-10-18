@@ -28,5 +28,10 @@
 .k-update-drop {position:fixed;top:0;right:70px;width:40px;height:40px;border:0;background:var(--bg2);color:var(--krackle-charge);border-radius:0 0 6px 6px;z-index:210;cursor:pointer;display:grid;place-items:center;}
 .k-update-drop+ .k-update-drop {right:116px;}
 .k-startup-stage {margin:auto;}
+#startup-splash[data-launch=true] > img {display:none;}
+#startup-splash[data-launch=true] > progress {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+:root:not([data-krackle=full]) #startup-splash[data-launch=true] > progress {position:static;clip-path:none;width:180px;height:3px;}
+:root:not([data-krackle=full]) #startup-splash[data-launch=true] > img {display:block;}
+:root:not([data-krackle=full]) .k-startup-stage {display:none;}
 .k-index-failure {flex-shrink:0;}
 .toast:has(.k-index-failure) {max-width:520px;flex-wrap:wrap;}
