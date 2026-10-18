@@ -2321,6 +2321,7 @@ function handleSSE(d) {
     const banner = document.getElementById("usmap-update-banner");
     document.getElementById("usmap-update-name").textContent = d.name ? `(${d.name})` : "";
     banner.hidden = false;
+    window.AtelierSurfaces?.updateDrop('usmap',()=>{banner.scrollIntoView({block:'nearest'});document.getElementById('usmap-update-dismiss')?.focus();});
     lucide.createIcons({ nodes: [banner] });
     return;
   }
@@ -3862,7 +3863,7 @@ async function checkUpdate(pending = api("/api/update_check")) {
   lucide.createIcons();
 
   return new Promise(resolve => {
-    const dismiss = () => { overlay.classList.remove("active"); resolve(false); };
+    const dismiss = () => { overlay.classList.remove("active");window.AtelierSurfaces?.updateDrop('app',()=>overlay.classList.add('active')); resolve(false); };
     document.getElementById("update-later").onclick = dismiss;
     if (info.manual) {
       document.getElementById("update-now").onclick = async () => {
