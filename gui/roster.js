@@ -143,7 +143,9 @@
       const label=document.createElement('strong');label.className='roster-hero-name';label.textContent=hero.name;
       const costumes=hero.skins?.length||0;
       const counts=document.createElement('span');counts.className='roster-counts';counts.textContent=`${costumes} costume${costumes===1?'':'s'} · ${count} edit${count===1?'':'s'}`;button.append(label,counts);
-      button.addEventListener('click',()=>choose(hero,button,true)); heroes.append(button);
+      button.addEventListener('click',()=>choose(hero,button,true));
+      button.addEventListener('dblclick',()=>navigate?.(hero.path));
+      heroes.append(button);
     }
     heroes.classList.add('k-screen');
     heroes.addEventListener('keydown',event=>{
