@@ -52,6 +52,9 @@ def main():
         checks[f'installer_{os_name}']=data
     data=load(one(art/'linux-reports','appimage-smoke/results.json'))
     if not data.get('ok') or data['appimage_sha256']!=sha(linux):raise RuntimeError('Linux desktop gate failed')
+    inputs=load(ROOT/'tests/fixtures/installer'/f'release-{version}-inputs.json')
+    if data.get('previous_appimage_sha256')!=inputs['linux_seed_sha256']:
+        raise RuntimeError('Linux upgrade gate did not use the pinned previous release')
     checks['linux_appimage']=data
     out.mkdir(parents=True)
     for path in [installer,linux]:shutil.copy2(path,out/path.name)

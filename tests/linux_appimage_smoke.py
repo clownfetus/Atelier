@@ -56,6 +56,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--appimage', type=Path, required=True)
     parser.add_argument('--source', type=Path, required=True)
+    parser.add_argument('--previous-appimage', type=Path, required=True)
     parser.add_argument('--report-dir', type=Path, required=True)
     args = parser.parse_args()
     if sys.platform != 'linux' or not os.environ.get('DISPLAY'):
@@ -64,7 +65,11 @@ def main():
     if report.exists():
         parser.error('Use a fresh report directory')
     report.mkdir(parents=True)
-    result = {'appimage_sha256': sha256(appimage), 'checks': [], 'platform': sys.platform}
+    previous = args.previous_appimage.resolve(strict=True)
+    inputs = json.loads((source / 'tests/fixtures/installer' / f'release-{(source / "version").read_text().strip()}-inputs.json').read_text())
+    if sha256(previous) != inputs['linux_seed_sha256']:
+        parser.error('Previous AppImage does not match the pinned upgrade baseline')
+    result = {'appimage_sha256': sha256(appimage), 'previous_appimage_sha256': sha256(previous), 'checks': [], 'platform': sys.platform}
     version = (source / 'version').read_text().strip()
     process = None
     try:
@@ -106,6 +111,13 @@ def main():
             if completed.returncode or '--game-paks-dir' not in completed.stdout + completed.stderr:
                 raise RuntimeError(f'Native retoc lacks the Rivals {command} interface')
         result['checks'].append({'name': 'native UAssetTool and Rivals retoc launch'})
+        previous_extract = report / 'previous-extracted'
+        previous_extract.mkdir()
+        subprocess.run([str(previous), '--appimage-extract'], cwd=previous_extract, check=True,
+                       stdout=subprocess.DEVNULL, timeout=120)
+        previous_payload = previous_extract / 'squashfs-root/usr/Atelier'
+        previous_version = (previous_payload / '_internal/version').read_text().strip()
+        result['previous_version'] = previous_version
         data = report / 'user-data'
         with socket.socket() as port_probe:
             port_probe.bind(('127.0.0.1', 0))
@@ -114,20 +126,24 @@ def main():
         env = dict(os.environ, ATELIER_HOME=str(data), ATELIER_DATA_DIR=str(data),
                    ATELIER_PORT=str(port), WEBKIT_DISABLE_DMABUF_RENDERER='1',
                    LIBGL_ALWAYS_SOFTWARE='1', NO_AT_BRIDGE='0')
-        for launch in ('first-launch', 'refresh-and-preservation'):
+        for launch, image, expected_payload, expected_version in (
+                ('previous-launch', previous, previous_payload, previous_version),
+                ('upgrade-and-preservation', appimage, payload, version),
+                ('same-version-relaunch', appimage, payload, version)):
             with (report / f'{launch}.log').open('w') as log:
-                process = subprocess.Popen([str(appimage), '--appimage-extract-and-run'], env=env,
+                process = subprocess.Popen([str(image), '--appimage-extract-and-run'], env=env,
                                            stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
                 setup = wait_for(lambda: json.load(urllib.request.urlopen(base + '/api/setup_status', timeout=2)), process)
                 if setup['configured']:
                     raise RuntimeError('Smoke fixture unexpectedly configured a real game')
-                wait_for(lambda: any('Find the game' in name for name in accessible_names()), process)
+                title = 'Initial Configuration' if launch == 'previous-launch' else 'Find the game'
+                wait_for(lambda: any(title in name for name in accessible_names()), process)
                 names = accessible_names()
                 (report / f'{launch}-accessibility.json').write_text(json.dumps(names, indent=2))
-                if not any('Find the game' in name for name in names):
+                if not any(title in name for name in names):
                     raise RuntimeError('WebKit setup form did not initialize')
                 with urllib.request.urlopen(base + '/static/app.js', timeout=5) as response:
-                    if hashlib.sha256(response.read()).hexdigest() != sha256(source / 'gui/app.js'):
+                    if hashlib.sha256(response.read()).hexdigest() != sha256(expected_payload / '_internal/gui/app.js'):
                         raise RuntimeError('Frozen backend served different frontend code')
                 subprocess.run(['scrot', str(report / f'{launch}.png')], check=True)
                 window = subprocess.check_output(['xdotool', 'search', '--onlyvisible', '--name', '^Atelier$'], text=True).splitlines()[-1]
@@ -136,22 +152,31 @@ def main():
                 process = None
                 if code:
                     raise RuntimeError(f'Frozen app did not close cleanly: {code}')
-            if (data / '.staged').read_text().strip() != version:
+            if (data / '.staged').read_text().strip() != expected_version:
                 raise RuntimeError('AppRun did not stage the release version')
-            if sha256(data / 'Atelier') != sha256(payload / 'Atelier'):
+            if sha256(data / 'Atelier') != sha256(expected_payload / 'Atelier'):
                 raise RuntimeError('AppRun staged the wrong executable')
+            if sha256(data / 'Tools/UAssetTool') != sha256(expected_payload / 'Tools/UAssetTool'):
+                raise RuntimeError('AppRun did not refresh the native tool')
             result['checks'].append({'name': launch + ': real GTK/WebKit setup, frontend, graceful close'})
-            if launch == 'first-launch':
+            if launch == 'previous-launch':
                 (data / 'Tools/user-note.txt').write_text('preserve this user file')
                 fixture = data / 'assets/projects/SmokeProject/readme.txt'
                 fixture.parent.mkdir(parents=True)
                 fixture.write_text('preserve this project')
-                # Exercise the older-version refresh branch without importing game data.
-                (data / '.staged').write_text('0.4.1')
+                config = data / 'mr_config.json'
+                saved = json.loads(config.read_text()) if config.exists() else {}
+                saved['release_upgrade_canary'] = 'preserve existing settings'
+                config.write_text(json.dumps(saved))
+                # The actual old AppImage populated this directory and WebKit profile.
+                # Corrupt a bundled tool to prove the upgrade really refreshes it.
+                (data / 'Tools/UAssetTool').write_bytes(b'obsolete runtime tool')
             else:
                 if (data / 'Tools/user-note.txt').read_text() != 'preserve this user file' or fixture.read_text() != 'preserve this project':
                     raise RuntimeError('AppRun replaced user data during refresh')
-        result['checks'].append({'name': 'version refresh preserves user tool files and projects'})
+                if json.loads((data / 'mr_config.json').read_text()).get('release_upgrade_canary') != 'preserve existing settings':
+                    raise RuntimeError('Upgrade lost existing configuration fields')
+        result['checks'].append({'name': 'actual previous-version upgrade and relaunch preserve user tools, projects and configuration'})
         result['ok'] = True
         print(json.dumps(result, indent=2))
         return 0

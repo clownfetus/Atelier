@@ -33,6 +33,8 @@ def main():
         if sys.platform=='linux':
             image=work/'previous.AppImage';download(inputs['linux_seed_url'],image,inputs['linux_seed_sha256'])
             image.chmod(0o755)
+            if os.environ.get('RUNNER_TEMP'):
+                shutil.copy2(image, Path(os.environ['RUNNER_TEMP'])/'atelier-previous.AppImage')
             subprocess.run([str(image),'--appimage-extract'],cwd=work,check=True,stdout=subprocess.DEVNULL)
             tools=next((work/'squashfs-root').rglob('Tools/UAssetTool')).parent
             for name in ('UAssetTool','liboo2corelinux64.so.9','libooz.so','shaders/retoc-rivals-cli','shaders/liboo2corelinux64.so.9'):

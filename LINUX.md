@@ -2,8 +2,9 @@
 
 The 1.0.0 candidate builds on Ubuntu 24.04. Its release workflow verifies native
 UAssetTool and Rivals retoc commands, the actual GTK/WebKit setup window, served
-frontend hashes, graceful close, and bundled-tool refresh while preserving user
-files and projects. Exact results and artifact hashes are recorded in the
+frontend hashes, graceful close, and upgrade from the actual 0.4.1 AppImage. The checks verify
+bundled-tool refresh, existing configuration fields, user files and projects,
+then relaunch the upgraded app. Exact results and artifact hashes are recorded in the
 release's `VERIFICATION.json`.
 
 Wine-dependent 3D and model-replacement paths require separate runtime

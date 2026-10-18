@@ -73,7 +73,8 @@ and stay silent in Calm, Off or a hidden window.
 Release checks cover the combined backend and browser workflows, packaged
 Windows WebView2, clean installation, running upgrade from **0.4.1**, reinstall
 and uninstall on two disposable Windows runners, and real Linux GTK/WebKit
-startup plus version-refresh preservation. Exact outcomes, build commit and
+startup, upgrade from the actual **0.4.1 AppImage**, and relaunch with preserved
+configuration and projects. Exact outcomes, build commit and
 artifact hashes are recorded in `VERIFICATION.json`; a failed gate prevents
 creation of the final release bundle.
 

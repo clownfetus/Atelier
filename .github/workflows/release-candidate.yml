@@ -151,7 +151,7 @@ jobs:
           xvfb-run -a dbus-run-session -- bash -c '
             openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
             export GTK_MODULES=gail:atk-bridge NO_AT_BRIDGE=0
-            .venv/bin/python tests/linux_appimage_smoke.py --appimage "dist/Atelier-'"$version"'-x86_64.AppImage" --source "$PWD" --report-dir "$RUNNER_TEMP/appimage-smoke"
+            .venv/bin/python tests/linux_appimage_smoke.py --appimage "dist/Atelier-'"$version"'-x86_64.AppImage" --source "$PWD" --previous-appimage "$RUNNER_TEMP/atelier-previous.AppImage" --report-dir "$RUNNER_TEMP/appimage-smoke"
           '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

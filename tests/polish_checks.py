@@ -11,7 +11,20 @@ def run_polish_checks(page, context, url, report, checks):
     tab.on('pageerror', lambda error: errors.append(str(error)))
     viewport = (Path(__file__).resolve().parents[1] / 'gui/viewport.js').read_text(encoding='utf-8')
     viewport += """
-window.__polishViewport={reveal:()=>inspection.materialize(),state:()=>({filmic:renderer.toneMapping===THREE.ACESFilmicToneMapping,
+window.__polishViewport={
+  revealFrames(){
+    const original=performance.now,base=performance.now();
+    try {
+      // Capture real renders at fixed reveal positions; screenshot scheduling on
+      // a software GPU can otherwise miss the entire 420ms transition.
+      performance.now=()=>base;inspection.materialize();
+      performance.now=()=>base+84;inspection.render();
+      const wire=renderer.domElement.toDataURL('image/png');
+      performance.now=()=>base+600;inspection.render();
+      return {wire,shaded:renderer.domElement.toDataURL('image/png')};
+    } finally {performance.now=original;}
+  },
+  state:()=>({filmic:renderer.toneMapping===THREE.ACESFilmicToneMapping,
   environment:!!scene.environment?.isTexture,materials:Object.values(matsByName).flat().map(m=>({opacity:m.opacity,wireframe:m.wireframe,color:m.color.toArray()}))})};
 loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshStandardMaterial({color:0x85aedd});material.name='MI_Fixture';
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),material);mesh.position.y=1;root.add(mesh);
@@ -51,7 +64,9 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
     tab.route('**/api/imported', lambda route: route.fulfill(json=[]))
     tab.route('**/api/jobs', lambda route: route.fulfill(json={'jobs':[]}))
     try:
+        tab.emulate_media(reduced_motion='no-preference')
         tab.goto(url); tab.wait_for_selector('#grid-area .card'); tab.wait_for_function('window.AtelierPolish && window.AtelierContinuity')
+        tab.bring_to_front()
         stored=tab.evaluate("Object.fromEntries(['motion','density','adaptiveAccent','theme','appearance','firstExportCelebrated'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
         assert not tab.locator('#startup-splash').count()
         tab.wait_for_selector('.roster-portrait'); tab.locator('.roster-portrait').click()
@@ -83,16 +98,15 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert not tab.locator('#material-overlay').evaluate("el=>el.classList.contains('active')")
         assert not tab.locator('.polish-ghost').count()
         checks.append('Folder direction, portrait/banner and breadcrumb transitions clean up; editors return to their card; HDR/alpha swatches keep real values')
+        tab.locator('#settings-motion').select_option('full',force=True)
         tab.evaluate("AtelierViewport.openMesh('Fixture/Body','Synthetic sphere')")
         tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none' && document.getElementById('viewport-animation').options.length===2")
         tab.wait_for_timeout(600)
         state=tab.evaluate('__polishViewport.state()'); assert state['filmic'] and state['environment'],state
         tab.wait_for_function("document.getElementById('viewport-animation').value!=='' && document.getElementById('viewport-play').getAttribute('aria-pressed')==='true'")
-        tab.evaluate('__polishViewport.reveal()'); tab.wait_for_timeout(80)
-        wire=tab.locator('#viewport-canvas').screenshot()
-        tab.wait_for_timeout(550)
-        shaded=tab.locator('#viewport-canvas').screenshot()
-        assert wire!=shaded
+        frames=tab.evaluate('__polishViewport.revealFrames()')
+        assert frames['wire'].startswith('data:image/png;base64,')
+        assert frames['wire']!=frames['shaded']
         assert tab.evaluate('__polishViewport.state().materials')==state['materials']
         tab.evaluate('AtelierViewport.close()')
         checks.append('Filmic studio environment and wireframe-to-shaded reveal render real Three.js geometry without changing editable materials; discovered idle starts automatically')

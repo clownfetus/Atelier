@@ -51,7 +51,8 @@ cancellation, failure drafts, stale replies and a closed editor's confirmation.
 
 The release bundle is produced only after full backend and browser checks,
 frozen WebView2 checks, clean/running-upgrade/reinstall/uninstall checks on
-Windows 2022 and 2025, and real Ubuntu 24.04 GTK/WebKit AppImage checks pass.
+Windows 2022 and 2025, and real Ubuntu 24.04 GTK/WebKit AppImage checks pass, including an actual
+0.4.1 AppImage upgrade, native-tool refresh and same-version relaunch.
 The upgrade baseline is the published **0.4.1**, pinned by size and SHA-256.
 Encrypted repository inputs stage the complete Galacta template pair into each
 application package; the pair is excluded from Git and the source archive.
