@@ -17,6 +17,7 @@
   var EASE_POP = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
   var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
   var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
+  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
   var ASSEMBLY_DURATION_MS = 220;
   var LOOP_DURATION_MS = 1200;
   var SETTLE_DURATION_MS = 180;
@@ -249,10 +250,10 @@
         ], { duration: ASSEMBLY_DURATION_MS, delay: k * 6, fill: 'backwards', easing: EASE_STANDARD });
       }
       runAnimation(sphereGroup, [
-        { transform: 'scale(0.4)', opacity: 0 },
-        { transform: 'scale(1.08)', opacity: 1, offset: 0.7 },
+        { transform: 'scale(0.4)', opacity: 0, easing: EASE_STANDARD },
+        { transform: 'scale(1.08)', opacity: 1, offset: 0.7, easing: EASE_SWAY },
         { transform: 'scale(1)', opacity: 1 }
-      ], { duration: ASSEMBLY_DURATION_MS + 66, easing: EASE_STANDARD },
+      ], { duration: ASSEMBLY_DURATION_MS + 66, easing: 'linear' },
         function () {
           if (destroyed || generation !== myGen || currentState !== 'loading') return;
           startSteadyLoadingLoop(myGen);
@@ -294,28 +295,28 @@
 
       // Error: squeeze to a point, burst into a splat that drips, then three dazed bubbles circle.
       runAnimation(splatGroup, [
-        { transform: 'scale(0.5)', opacity: 0, offset: 0 },
-        { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-        { transform: 'scale(1.18)', opacity: 1, offset: 0.52 },
-        { transform: 'scale(0.96)', opacity: 1, offset: 0.74 },
+        { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY },
+        { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+        { transform: 'scale(1.18)', opacity: 1, offset: 0.48, easing: EASE_SWAY },
+        { transform: 'scale(0.96)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
         { transform: 'scale(1)', opacity: 1, offset: 1 }
-      ], { duration: SPLAT_DURATION_MS - 40, easing: EASE_STANDARD });
+      ], { duration: SPLAT_DURATION_MS - 40, easing: 'linear' });
       for (var s2 = 0; s2 < sats.length; s2++) {
         var sc = centreOf(sats[s2]);
         var start = 'translate(' + px(24 - sc[0]) + ', ' + px(27.5 - sc[1]) + ') scale(0.3)';
         runAnimation(sats[s2], [
           { transform: start, opacity: 0, offset: 0 },
-          { transform: start, opacity: 0, offset: 0.24 },
-          { transform: 'translate(0px, 0px) scale(1.2)', opacity: 1, offset: 0.62 },
+          { transform: start, opacity: 0, offset: 0.26, easing: EASE_STANDARD },
+          { transform: 'translate(0px, 0px) scale(1.2)', opacity: 1, offset: 0.55, easing: EASE_SWAY },
           { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
-        ], { duration: SPLAT_DURATION_MS, easing: EASE_STANDARD });
+        ], { duration: SPLAT_DURATION_MS, easing: 'linear' });
       }
       runAnimation(dripGroup, [
         { transform: 'scaleY(0)', offset: 0 },
-        { transform: 'scaleY(0)', offset: 0.45 },
-        { transform: 'scaleY(1.15)', offset: 0.82 },
+        { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+        { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD },
         { transform: 'scaleY(1)', offset: 1 }
-      ], { duration: 680, easing: EASE_STANDARD });
+      ], { duration: 680, easing: 'linear' });
       for (var d = 0; d < dizzies.length; d++) {
         var dc = centreOf(dizzies[d]);
         var rest = Math.atan2((dc[1] - DIZZY_ORBIT.cy) / DIZZY_ORBIT.ry, (dc[0] - DIZZY_ORBIT.cx) / DIZZY_ORBIT.rx);

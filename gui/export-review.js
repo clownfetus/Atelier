@@ -50,12 +50,18 @@
       }
     });
   }
+  // Export feedback elsewhere (toast, button) holds still while this dialog's stage carries the job.
+  const announce = () => document.dispatchEvent(new Event('atelier:export-review'));
   function show() {
-    if (!overlay.classList.contains('active')) opener = document.activeElement;
+    const opening = !overlay.classList.contains('active');
+    if (opening) opener = document.activeElement;
     overlay.classList.add('active'); panel.focus();
+    if (opening) announce();
   }
   function hide() {
+    const closing = overlay.classList.contains('active');
     overlay.classList.remove('active');
+    if (closing) announce();
     if (opener?.isConnected && !opener.disabled) opener.focus();
     else if (!lastButton.hidden && !lastButton.disabled) lastButton.focus();
     else document.getElementById('install-btn').focus();
@@ -291,6 +297,13 @@
       lastButton.hidden = false; lastButton.disabled = false;
       lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();
+    },
+    // True when the large stage will draw `state` for the current job: busy only while the dialog
+    // is open (it can be hidden mid-build), results always (finish() reopens the dialog).
+    staging(state) {
+      if (!stage || !stageHost?.isConnected || stageHost.dataset.amMicro === 'true') return false;
+      if (!window.AtelierMotionPolicy?.allows(2)) return false;
+      return state !== 'busy' || overlay.classList.contains('active');
     },
     notice(message) {
       if (!current) return;

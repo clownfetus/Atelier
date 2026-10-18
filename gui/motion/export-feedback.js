@@ -14,8 +14,9 @@
   var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
   var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
   var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
+  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
   var BUSY_DURATION_MS = 1040;
-  var POP_DURATION_MS = 420;
+  var POP_DURATION_MS = 380;
   var CRACK_DURATION_MS = 620;
   var SPLAT_DURATION_MS = 560;
   var DIZZY_DURATION_MS = 1100;
@@ -99,6 +100,8 @@
       return motionUnavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches);
     }
 
+    // Decorative follow-through (flecks, the dazed orbit) is Full only; Calm keeps the state change.
+    function decorative() { return !window.AtelierMotionPolicy || window.AtelierMotionPolicy.allows(2); }
     function isDocumentHidden() {
       return Boolean(typeof document !== 'undefined' && document.hidden);
     }
@@ -207,44 +210,44 @@
 
     function playSuccess() {
       trackAnimation(burst, [
-        { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0 },
-        { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.52 },
-        { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.76 },
+        { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
+        { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+        { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
         { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
-      ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
+      ], { duration: POP_DURATION_MS, easing: 'linear' });
       trackAnimation(burstHole, [
         { transform: 'scale(0)', offset: 0 },
-        { transform: 'scale(0)', offset: 0.42 },
-        { transform: 'scale(1.35)', offset: 0.72 },
+        { transform: 'scale(0)', offset: 0.36, easing: EASE_STANDARD },
+        { transform: 'scale(1.35)', offset: 0.64, easing: EASE_SWAY },
         { transform: 'scale(1)', offset: 1 }
-      ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
-      for (var i = 0; i < flecks.length; i++) {
+      ], { duration: POP_DURATION_MS, easing: 'linear' });
+      for (var i = 0; decorative() && i < flecks.length; i++) {
         var d = centreOffset(flecks[i], 12, 12);
         trackAnimation(flecks[i], [
-          { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0 },
+          { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0, easing: EASE_STANDARD },
           { opacity: 1, offset: 0.25 },
-          { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.6 },
+          { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.55, easing: EASE_FALL },
           { transform: 'translate(' + px(d[0] * 0.25) + ', ' + px(d[1] * 0.25) + ') scale(0)', opacity: 0, offset: 1 }
-        ], { duration: POP_DURATION_MS + 40, easing: EASE_STANDARD });
+        ], { duration: POP_DURATION_MS + 40, easing: 'linear' });
       }
     }
 
     function playWarning() {
       // The ring stamps down, then the broken-off chunk drops out and bounces twice.
       trackAnimation(ring, [
-        { transform: 'scale(1.3)', opacity: 0, offset: 0 },
-        { transform: 'scale(0.93)', opacity: 1, offset: 0.42 },
-        { transform: 'scale(1.03)', opacity: 1, offset: 0.7 },
+        { transform: 'scale(1.3)', opacity: 0, offset: 0, easing: EASE_FALL },
+        { transform: 'scale(0.93)', opacity: 1, offset: 0.3, easing: EASE_STANDARD },
+        { transform: 'scale(1.03)', opacity: 1, offset: 0.6, easing: EASE_SWAY },
         { transform: 'scale(1)', opacity: 1, offset: 1 }
-      ], { duration: 380, easing: EASE_STANDARD });
+      ], { duration: 380, easing: 'linear' });
       var from = 'translate(' + px(CHUNK_FROM[0]) + ', ' + px(CHUNK_FROM[1]) + ')';
       trackAnimation(chunk, [
         { transform: from, offset: 0 },
-        { transform: from, offset: 0.3, easing: EASE_FALL },
-        { transform: 'translate(0px, 0px)', offset: 0.62, easing: EASE_RISE },
-        { transform: 'translate(0px, -1.6px)', offset: 0.74, easing: EASE_FALL },
-        { transform: 'translate(0px, 0px)', offset: 0.86, easing: EASE_RISE },
-        { transform: 'translate(0px, -0.5px)', offset: 0.93, easing: EASE_FALL },
+        { transform: from, offset: 0.18, easing: EASE_FALL },
+        { transform: 'translate(0px, 0px)', offset: 0.56, easing: EASE_RISE },
+        { transform: 'translate(0px, -1.6px)', offset: 0.7, easing: EASE_FALL },
+        { transform: 'translate(0px, 0px)', offset: 0.84, easing: EASE_RISE },
+        { transform: 'translate(0px, -0.5px)', offset: 0.92, easing: EASE_FALL },
         { transform: 'translate(0px, 0px)', offset: 1 }
       ], { duration: CRACK_DURATION_MS, easing: 'linear' });
     }
@@ -252,29 +255,29 @@
     function playError() {
       // Squeezed to a point, then flung out into a splat that drips; one bubble is left dazed.
       trackAnimation(splat, [
-        { transform: 'scale(0.5)', opacity: 0, offset: 0 },
-        { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-        { transform: 'scale(1.2)', opacity: 1, offset: 0.52 },
-        { transform: 'scale(0.95)', opacity: 1, offset: 0.74 },
+        { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY },
+        { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+        { transform: 'scale(1.2)', opacity: 1, offset: 0.48, easing: EASE_SWAY },
+        { transform: 'scale(0.95)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
         { transform: 'scale(1)', opacity: 1, offset: 1 }
-      ], { duration: SPLAT_DURATION_MS - 40, easing: EASE_STANDARD });
+      ], { duration: SPLAT_DURATION_MS - 40, easing: 'linear' });
       for (var i = 0; i < sats.length; i++) {
         var d = centreOffset(sats[i], 12, 12);
         var start = 'translate(' + px(-d[0]) + ', ' + px(-d[1]) + ') scale(0.3)';
         trackAnimation(sats[i], [
           { transform: start, opacity: 0, offset: 0 },
-          { transform: start, opacity: 0, offset: 0.24 },
-          { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.6 },
+          { transform: start, opacity: 0, offset: 0.26, easing: EASE_STANDARD },
+          { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.55, easing: EASE_SWAY },
           { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
-        ], { duration: SPLAT_DURATION_MS, easing: EASE_STANDARD });
+        ], { duration: SPLAT_DURATION_MS, easing: 'linear' });
       }
       trackAnimation(drip, [
         { transform: 'scaleY(0)', offset: 0 },
-        { transform: 'scaleY(0)', offset: 0.45 },
-        { transform: 'scaleY(1.15)', offset: 0.82 },
+        { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+        { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD },
         { transform: 'scaleY(1)', offset: 1 }
-      ], { duration: 640, easing: EASE_STANDARD });
-      trackAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
+      ], { duration: 640, easing: 'linear' });
+      if (decorative()) trackAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
         duration: DIZZY_DURATION_MS,
         delay: 260,
         fill: 'backwards',

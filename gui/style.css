@@ -623,7 +623,7 @@ body {
   align-items: center;
   gap: 8px;
   box-shadow: var(--studio-shadow);
-  animation: toastIn .2s ease;
+  animation: toastIn var(--studio-motion-standard) var(--studio-easing);
   max-width: 300px;
   pointer-events: all;
 }

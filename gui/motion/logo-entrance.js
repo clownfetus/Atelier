@@ -292,11 +292,11 @@
         var near = 9.5, far = 14.5;
         var splashAnim = nodes.bubbles[i].animate(
           [
-            { transform: 'translate(0px, 0px) scale(0.3)', opacity: 0 },
-            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45 },
+            { transform: 'translate(0px, 0px) scale(0.3)', opacity: 0, easing: ENTRANCE_EASING },
+            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45, easing: 'cubic-bezier(0.55, 0, 1, 0.45)' },
             { transform: 'translate(' + (Math.cos(angle) * far).toFixed(2) + 'px, ' + (Math.sin(angle) * far).toFixed(2) + 'px) scale(0)', opacity: 0 }
           ],
-          { duration: ENTRANCE_DURATION_MS - 40, delay: i * 6, easing: ENTRANCE_EASING, fill: 'none' }
+          { duration: ENTRANCE_DURATION_MS - 80, delay: i * 16, easing: 'linear', fill: 'none' }
         );
         if (!splashAnim || typeof splashAnim.cancel !== 'function') throw new Error('Splash unavailable');
         splashAnimations.push(splashAnim);

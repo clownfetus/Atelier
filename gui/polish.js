@@ -18,7 +18,13 @@
     };
     mounts.set(host, instance); instance.setState(state); return instance;
   }
-  const removals = new MutationObserver(() => { for (const [host, instance] of mounts) if (!host.isConnected) instance.destroy(); });
+  // Container -> the empty state it shows. Typing that keeps a view empty rebuilds it with the same key,
+  // so the art stays settled; any other content in between (cards, a loading pose) forgets the key.
+  const emptyKeys = new Map();
+  const removals = new MutationObserver(() => {
+    for (const [host, instance] of mounts) if (!host.isConnected) instance.destroy();
+    for (const container of emptyKeys.keys()) if (!container.isConnected || !container.querySelector(':scope > .polish-empty')) emptyKeys.delete(container);
+  });
   removals.observe(document.documentElement, {childList:true, subtree:true});
   const play = (host, frames, duration = 160) => {
     const instance = mount(host, {frames,duration,state:'playing'});
@@ -139,13 +145,35 @@
       setTimeout(()=>copy.remove(),320);
     });
   }
+  let burstQueued=false;
   function exported() {
     if(!window.AtelierMotionPolicy?.allows(3)||document.hidden)return;
     try { if (localStorage.getItem('atelier.firstExportCelebrated')) return; } catch (_) {}
     const colors = [...new Set([...document.querySelectorAll('.sb-item.selected img')].map(sample).concat(
       [...document.querySelectorAll('.sb-item.selected [data-swatch-color]')].map(node=>node.dataset.swatchColor)).filter(Boolean))].slice(0,6);
     if (!colors.length) return;
-    const release=window.AtelierMotion?.moment?.claim('first-export',3);if(!release)return;
+    // The export review's stage owns the moment while the dialog is open, so the burst waits for it to
+    // close and leaves the then-visible button. The overlay's 120 ms exit and the stage's release follow.
+    const overlay=document.getElementById('export-review-overlay');
+    if (overlay?.classList.contains('active')) {
+      if (burstQueued) return;
+      burstQueued=true;
+      const closed=()=>{
+        if (overlay.classList.contains('active')) return;
+        document.removeEventListener('atelier:export-review',closed); burstQueued=false;
+        let tries=0; const attempt=()=>{ if(!burst(colors)&&++tries<5) setTimeout(attempt,150); };
+        setTimeout(attempt,140);
+      };
+      document.addEventListener('atelier:export-review',closed);
+      return;
+    }
+    burst(colors);
+  }
+  // Returns false only when the moment was refused, so a deferred burst can retry.
+  function burst(colors) {
+    if(!window.AtelierMotionPolicy?.allows(3)||document.hidden)return true;
+    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return true; } catch (_) {}
+    const release=window.AtelierMotion?.moment?.claim('first-export',3);if(!release)return false;
     try{localStorage.setItem('atelier.firstExportCelebrated','1');}catch(_){}
     const button=document.getElementById('install-btn'), rect=button.getBoundingClientRect();
     colors.forEach((color,index)=>{
@@ -156,6 +184,31 @@
       setTimeout(()=>dot.remove(),reduced()?1800:480);
     });
     setTimeout(release,500);
+    return true;
+  }
+  // A dismissed toast leaves its slot at once, so the live region, collation and the stack stay truthful,
+  // while the same element fades 4 px down for 120 ms (accelerating) in an inert layer. Off removes it outright.
+  function leave(el, done) {
+    if (!el?.isConnected || reduced() || document.hidden || typeof el.animate !== 'function') { done(); return; }
+    if (el.parentElement?.id==='toast-exit-layer') return; // Already leaving; the first exit removes it.
+    let finished=false; const finish=()=>{ if (finished) return; finished=true; done(); };
+    try {
+      const rect=el.getBoundingClientRect(), area=document.getElementById('toast-area');
+      let layer=document.getElementById('toast-exit-layer');
+      if (!layer) {
+        layer=document.createElement('div'); layer.id='toast-exit-layer'; layer.setAttribute('aria-hidden','true'); layer.inert=true;
+        layer.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:300';
+        if (area) area.before(layer); else document.body.append(layer);
+      }
+      // Keep the caption ink while dropping the hooks that identify a live toast.
+      el.style.borderLeftColor=getComputedStyle(el).borderLeftColor;
+      el.classList.remove('toast-timed'); el.removeAttribute('role'); el.removeAttribute('aria-live'); delete el.dataset.operationState;
+      Object.assign(el.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',margin:'0',animation:'none',pointerEvents:'none'});
+      layer.append(el);
+      el.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(4px)'}],
+        {duration:120,easing:'cubic-bezier(.3,0,1,1)',fill:'forwards'}).finished.then(finish,finish);
+      setTimeout(finish,200);
+    } catch (_) { finish(); }
   }
   function swatchesBefore() { return new Map([...document.querySelectorAll('#mat-body input[type=color]')].map(node=>[node.id,node.value])); }
   function swatchesAfter(previous, colors=[]) {
@@ -189,8 +242,10 @@
     host.replaceChildren(art,text,detail);
     // Krackle art replaces the outline drawing when available; the outline stays as the fallback.
     if (!window.AtelierMotion?.emptyState) return;
+    const container=host.parentElement, key=kind+'|'+title, settled=!!container&&emptyKeys.get(container)===key;
+    if (container) emptyKeys.set(container,key);
     const krackle=document.createElement('span'); krackle.className='am-empty-state-host k-screen';
-    try { host.prepend(krackle); window.AtelierMotion.emptyState.mount(krackle,{kind}); art.remove(); }
+    try { host.prepend(krackle); window.AtelierMotion.emptyState.mount(krackle,{kind,reducedMotion:settled?'reduce':'system'}); art.remove(); }
     catch (_) { krackle.remove(); }
   }
   function importStart(items) {
@@ -223,5 +278,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,samplePalette,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

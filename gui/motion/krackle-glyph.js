@@ -14,6 +14,7 @@
   var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
   var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
   var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
+  var EASE_SWAY = 'cubic-bezier(0.45, 0, 0.55, 1)';
   var BUSY_DURATION_MS = 1040;
   var CHUNK_FROM = [-1.54, -4.02];
   var DIZZY_ORBIT = {cx: 12, cy: 3, rx: 4.4, ry: 1, rest: [7.6, 3.3], turns: 1.5};
@@ -44,6 +45,8 @@
     try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
 
     function reduced() { return unavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches); }
+    // Decorative follow-through (flecks, the dazed orbit) is Full only; Calm keeps the state change.
+    function decorative() { return !window.AtelierMotionPolicy || window.AtelierMotionPolicy.allows(2); }
     function hidden() { return Boolean(document.hidden); }
 
     host.setAttribute('data-atelier-motion', 'krackle-glyph');
@@ -122,56 +125,56 @@
         ], { duration: 420, easing: 'linear' });
       } else if (state === 'success') {
         run(parts.burst, [
-          { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0 },
-          { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.52 },
-          { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.76 },
+          { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
+          { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+          { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
           { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
-        ], { duration: 420, easing: EASE_STANDARD });
+        ], { duration: 380, easing: 'linear' });
         run(parts.burstHole, [
-          { transform: 'scale(0)', offset: 0 }, { transform: 'scale(0)', offset: 0.42 },
-          { transform: 'scale(1.35)', offset: 0.72 }, { transform: 'scale(1)', offset: 1 }
-        ], { duration: 420, easing: EASE_STANDARD });
-        parts.flecks.forEach(function (fleck) {
+          { transform: 'scale(0)', offset: 0 }, { transform: 'scale(0)', offset: 0.36, easing: EASE_STANDARD },
+          { transform: 'scale(1.35)', offset: 0.64, easing: EASE_SWAY }, { transform: 'scale(1)', offset: 1 }
+        ], { duration: 380, easing: 'linear' });
+        if (decorative()) parts.flecks.forEach(function (fleck) {
           var d = centre(fleck);
           run(fleck, [
-            { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0 },
+            { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0, easing: EASE_STANDARD },
             { opacity: 1, offset: 0.25 },
-            { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.6 },
+            { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.55, easing: EASE_FALL },
             { transform: 'translate(' + px(d[0] * 0.25) + ', ' + px(d[1] * 0.25) + ') scale(0)', opacity: 0, offset: 1 }
-          ], { duration: 460, easing: EASE_STANDARD });
+          ], { duration: 420, easing: 'linear' });
         });
       } else if (state === 'warning') {
         run(parts.ring, [
-          { transform: 'scale(1.3)', opacity: 0, offset: 0 }, { transform: 'scale(0.93)', opacity: 1, offset: 0.42 },
-          { transform: 'scale(1.03)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)', opacity: 1, offset: 1 }
-        ], { duration: 380, easing: EASE_STANDARD });
+          { transform: 'scale(1.3)', opacity: 0, offset: 0, easing: EASE_FALL }, { transform: 'scale(0.93)', opacity: 1, offset: 0.3, easing: EASE_STANDARD },
+          { transform: 'scale(1.03)', opacity: 1, offset: 0.6, easing: EASE_SWAY }, { transform: 'scale(1)', opacity: 1, offset: 1 }
+        ], { duration: 380, easing: 'linear' });
         var from = 'translate(' + px(CHUNK_FROM[0]) + ', ' + px(CHUNK_FROM[1]) + ')';
         run(parts.chunk, [
-          { transform: from, offset: 0 }, { transform: from, offset: 0.3, easing: EASE_FALL },
-          { transform: 'translate(0px, 0px)', offset: 0.62, easing: EASE_RISE },
-          { transform: 'translate(0px, -1.6px)', offset: 0.74, easing: EASE_FALL },
-          { transform: 'translate(0px, 0px)', offset: 0.86, easing: EASE_RISE },
-          { transform: 'translate(0px, -0.5px)', offset: 0.93, easing: EASE_FALL },
+          { transform: from, offset: 0 }, { transform: from, offset: 0.18, easing: EASE_FALL },
+          { transform: 'translate(0px, 0px)', offset: 0.56, easing: EASE_RISE },
+          { transform: 'translate(0px, -1.6px)', offset: 0.7, easing: EASE_FALL },
+          { transform: 'translate(0px, 0px)', offset: 0.84, easing: EASE_RISE },
+          { transform: 'translate(0px, -0.5px)', offset: 0.92, easing: EASE_FALL },
           { transform: 'translate(0px, 0px)', offset: 1 }
         ], { duration: 620, easing: 'linear' });
       } else if (state === 'error') {
         run(parts.splat, [
-          { transform: 'scale(0.5)', opacity: 0, offset: 0 }, { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-          { transform: 'scale(1.2)', opacity: 1, offset: 0.52 }, { transform: 'scale(0.95)', opacity: 1, offset: 0.74 },
+          { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY }, { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+          { transform: 'scale(1.2)', opacity: 1, offset: 0.48, easing: EASE_SWAY }, { transform: 'scale(0.95)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
           { transform: 'scale(1)', opacity: 1, offset: 1 }
-        ], { duration: 520, easing: EASE_STANDARD });
+        ], { duration: 520, easing: 'linear' });
         parts.sats.forEach(function (sat) {
           var d = centre(sat), start = 'translate(' + px(-d[0]) + ', ' + px(-d[1]) + ') scale(0.3)';
           run(sat, [
-            { transform: start, opacity: 0, offset: 0 }, { transform: start, opacity: 0, offset: 0.24 },
-            { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.6 },
+            { transform: start, opacity: 0, offset: 0 }, { transform: start, opacity: 0, offset: 0.26, easing: EASE_STANDARD },
+            { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.55, easing: EASE_SWAY },
             { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
-          ], { duration: 560, easing: EASE_STANDARD });
+          ], { duration: 560, easing: 'linear' });
         });
         run(parts.drip, [
-          { transform: 'scaleY(0)', offset: 0 }, { transform: 'scaleY(0)', offset: 0.45 },
-          { transform: 'scaleY(1.15)', offset: 0.82 }, { transform: 'scaleY(1)', offset: 1 }
-        ], { duration: 640, easing: EASE_STANDARD });
+          { transform: 'scaleY(0)', offset: 0 }, { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+          { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD }, { transform: 'scaleY(1)', offset: 1 }
+        ], { duration: 640, easing: 'linear' });
         var frames = [];
         var rest = Math.atan2((DIZZY_ORBIT.rest[1] - DIZZY_ORBIT.cy) / DIZZY_ORBIT.ry, (DIZZY_ORBIT.rest[0] - DIZZY_ORBIT.cx) / DIZZY_ORBIT.rx);
         for (var i = 0; i <= 16; i++) {
@@ -182,7 +185,7 @@
             opacity: t < 0.08 ? t / 0.08 : 1, offset: t
           });
         }
-        run(parts.dizzy, frames, { duration: 1100, delay: 260, fill: 'backwards', easing: 'linear' });
+        if (decorative()) run(parts.dizzy, frames, { duration: 1100, delay: 260, fill: 'backwards', easing: 'linear' });
       }
     }
 

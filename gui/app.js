@@ -108,6 +108,12 @@ async function revealInExplorer(gameRel) {
   }
 }
 
+// Toasts fade out through AtelierPolish.leave when it is available; otherwise they go at once.
+function leaveToast(el, remove) {
+  try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, remove); return; } } catch (_) { /* Fall through. */ }
+  remove();
+}
+
 function toastSpinner(msg) {
   try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy'); }
   catch (_) { /* Static operation feedback remains available. */ }
@@ -121,7 +127,7 @@ function toastSpinner(msg) {
     const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
     el.prepend(icon); lucide.createIcons({nodes:[el]});
     try { window.AtelierKrackleGlyph?.toastIcon(el, state === 'error' ? 'error' : state); } catch (_) {}
-    setTimeout(() => el.remove(), duration);
+    setTimeout(() => leaveToast(el, () => el.remove()), duration);
   };
   document.getElementById("toast-area").appendChild(el);
   return el;
@@ -143,7 +149,7 @@ function toast(msg, type = "info", duration = 3200, instance = '') {
   el.setAttribute('role','status'); el.setAttribute('aria-atomic','true');
   let remaining = duration, start = Date.now(), t, repeats = 1, hovered = false;
   const remove = el.remove.bind(el);
-  el.remove = () => { clearTimeout(t); if (_collatedToasts.get(key)?.el === el) _collatedToasts.delete(key); remove(); };
+  el.remove = () => { clearTimeout(t); if (_collatedToasts.get(key)?.el === el) _collatedToasts.delete(key); leaveToast(el, remove); };
   const reset = () => {
     clearTimeout(t); remaining = duration; start = Date.now();
     el.classList.remove('toast-timed'); el.style.setProperty('--toast-duration', duration+'ms'); void el.offsetWidth; el.classList.add('toast-timed');
@@ -168,19 +174,19 @@ function setStatus(msg) {
   document.getElementById("status-msg").textContent = msg;
 }
 
-function toastExportFeedback(msg, type, duration, state) {
+function toastExportFeedback(msg, type, duration, state, options) {
   try {
-    if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state);
+    if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state, options);
   } catch (error) { console.warn("Export animation unavailable", error); }
   // Export still works when the optional animation scripts fail to load.
   if (state === "busy") return toastSpinner(msg);
   toast(msg, type === "error" ? "warning" : type, duration);
 }
 
-function beginExportFeedback(project) {
+function beginExportFeedback(project, options) {
   window.AtelierPolish?.packing();
   let finish;
-  try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project); }
+  try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project, options); }
   catch (error) { console.warn("Export animation unavailable", error); }
   return state => {
     try { finish?.(state); }
@@ -2682,8 +2688,16 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
   if (review) window.AtelierExportReview?.start(review);
-  const finishFeedback = beginExportFeedback(project);
-  const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy");
+  // While the review dialog's stage draws this job it is the one hero; the toast and button hold still.
+  const quiet = review ? state => !!window.AtelierExportReview?.staging?.(state) : null;
+  const finishFeedback = beginExportFeedback(project, {quiet});
+  const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy", {quiet});
+  // The busy toast resolves in place, so its charge hands over to the result instead of a new toast.
+  const settle = (message, outcome, duration) => {
+    if (t?.resolve && t.isConnected) { t.resolve(message, outcome, duration); return; }
+    t?.remove();
+    toastExportFeedback(message, outcome, duration, outcome, {quiet});
+  };
   try {
     const res = await (window.AtelierJobs?.run || api)(extra?.endpoint || "/api/install_mod", {
       project,
@@ -2696,12 +2710,11 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         ...(extra?.body || {}),
       }),
     });
-    t?.remove();
     if (res.ok) {
       const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
       if (outcome === 'success') window.AtelierPolish?.exported();
       finishFeedback(outcome);
-      toastExportFeedback(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000, outcome);
+      settle(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000);
       if (project === _activeProjectName) setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
       // A mod can build fine and still be missing a piece — one asset that would not stage. Saying
       // "Installed" and nothing else makes that look identical to the game ignoring the edit.
@@ -2709,30 +2722,29 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         toastExportFeedback(`${res.skipped.length} item(s) did NOT go into the mod:\n• ` +
               res.skipped.slice(0, 4).join("\n• ") +
               (res.skipped.length > 4 ? `\n• +${res.skipped.length - 4} more` : ""),
-              "warning", 16000, "warning");
+              "warning", 16000, "warning", {quiet});
       }
       console.log("[export] staged:", res.applied, "\n[export] skipped:", res.skipped);
     } else if (res.cancelled) {
       finishFeedback('warning');
-      toastExportFeedback('Export cancelled. Project edits are preserved.', 'warning', 4500, 'warning');
+      settle('Export cancelled. Project edits are preserved.', 'warning', 4500);
       if (project === _activeProjectName) setStatus('Export cancelled');
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
       finishFeedback("warning");
-      toastExportFeedback("No mods folder set — opening Settings…", "warning", 3200, "warning");
+      settle("No mods folder set — opening Settings…", "warning", 3200);
       openPaths();
     } else {
       const outcome = res.built ? "warning" : "error";
       finishFeedback(outcome);
-      toastExportFeedback(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, outcome, 10000, outcome);
+      settle(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, outcome, 10000);
       if (project === _activeProjectName) setStatus(res.built ? `Exported → ${res.pak_path || ""}` : "");
     }
     if (review) window.AtelierExportReview?.finish(review, res);
     return res;
   } catch (e) {
-    t?.remove();
     finishFeedback("error");
-    toastExportFeedback(`Error: ${e.message}`, "error", 3200, "error");
+    settle(`Error: ${e.message}`, "error", 3200);
     if (project === _activeProjectName) setStatus("");
     const res = {ok: false, error: e.message};
     if (review) window.AtelierExportReview?.finish(review, res);

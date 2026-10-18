@@ -111,8 +111,34 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('.toast-repeat').count() == 1
         assert tab.locator('.toast-repeat').evaluate("el=>getComputedStyle(el.parentElement,'::after').animationPlayState==='paused'")
         tab.mouse.move(0,0); tab.wait_for_timeout(1050)
-        assert not tab.locator('.toast-repeat').count()
+        # The toast leaves its slot on time; its 120 ms exit fade then removes the faded copy.
+        assert not tab.locator('#toast-area .toast-repeat').count()
+        tab.wait_for_function("!document.querySelector('.toast-repeat')", timeout=1000)
         checks.append('Operation resolves on the same mount with literal text; repeats merge, bump and reset their paused countdown line')
+
+        full = tab.evaluate('!AtelierMotionPolicy.query().matches && !document.hidden')
+        tab.evaluate("""() => { document.getElementById('toast-area').replaceChildren();
+          window.leavingToast=toast('Exit fixture','info',5000); leavingToast.remove(); }""")
+        assert not tab.locator('#toast-area .toast').count()
+        if full:
+            assert tab.evaluate("(layer=>layer.inert && layer.contains(leavingToast) && !leavingToast.hasAttribute('role'))(document.getElementById('toast-exit-layer'))")
+        tab.wait_for_function('!leavingToast.isConnected', timeout=1000)
+        # Typing that keeps a folder empty rebuilds the empty state without replaying its entrance.
+        tab.locator('#search-scope').click()
+        assert tab.evaluate('AtelierSearch.scope()') == 'folder'
+
+        def empty_effects(text):
+            tab.locator('#search-input').fill(text)
+            tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=none]')
+            return tab.evaluate("document.querySelector('#empty-state [data-atelier-motion=empty-state]').getAnimations({subtree:true}).length")
+        first, repeat = empty_effects('zzqx'), empty_effects('zzqxy')
+        tab.locator('#search-input').fill('')
+        tab.wait_for_function("!document.querySelector('#empty-state [data-am-kind=none]')")
+        again = empty_effects('zzqx')
+        assert repeat == 0 and (not full or (first > 0 and again > 0)), (first, repeat, again)
+        tab.locator('#search-input').fill('')
+        tab.locator('#search-scope').click()
+        checks.append('A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance')
 
         tab.evaluate("""() => {
           sidebarData={m:{token:'m',game_rel:'Fixture/MI_Fixture',name:'Material fixture',file_type:'material',selected:true,ui_preview:{colors:[[.8,.1,.2,1],[.2,.4,.7,1]]}},

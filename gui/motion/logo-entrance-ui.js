@@ -5,6 +5,8 @@
   let started = false, destroyed = false, instance, host, fallback;
   const hidden = () => document.hidden || document.visibilityState === 'hidden';
   const reduced = () => (window.AtelierMotionPolicy?.query() || window.matchMedia?.('(prefers-reduced-motion: reduce)')).matches;
+  // The startup entrance is a showcase moment, so it plays only in Full; an explicit replay still plays in Calm.
+  const showcase = () => !reduced() && window.AtelierMotionPolicy?.allows(2) !== false;
 
   function restore() {
     if (fallback) { fallback.hidden = false; fallback.classList.remove('am-logo-entrance-fallback'); }
@@ -60,7 +62,7 @@
       brand.addEventListener('click', replay);
       brand.addEventListener('keydown', event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();replay();}});
     }
-    if (!fallback || hidden() || reduced() || !window.AtelierMotion?.logoEntrance) return;
+    if (!fallback || hidden() || !showcase() || !window.AtelierMotion?.logoEntrance) return;
     if (fallback.complete) { if (fallback.naturalWidth) mount(); }
     else { fallback.addEventListener('load', mount, { once: true }); fallback.addEventListener('error', restore, { once: true }); }
   }

@@ -5,7 +5,11 @@ Scope: `gui/motion/` and the motion tokens in `gui/tokens.css` / `gui/style.css`
 the neighbouring motion each animation plays next to (`polish.js`, `continuity.css`,
 `preferences.js`, `surface-adapters.js`, `app.js` call sites).
 
-**Status: proposals only. No code has changed.** Each item needs a go-ahead before editing.
+**Status: proposals 1–5 are implemented on this branch. Proposals 6–10 remain proposals.** Each
+implemented item ends with an "Implemented" note that records any deviation from the proposal.
+The four required browser smoke modes (`--surfaces-only`, `--inks-dial-only`, `--polish-only`,
+`--texture-reconstruction-only`) pass in Edge, and `polish_checks.py` now also asserts the toast exit
+and the settled empty state.
 
 ## Method
 
@@ -89,6 +93,16 @@ unchanged. **Tests:** `export_motion_checks.py:180-182` expects one `.toast.succ
 containing `Exported: <name>`, which still holds after (a). `polish_checks.py` operation
 toasts already use `resolve` in place.
 
+**Implemented.** (a) as proposed, through a `settle()` helper in `_runInstall`. (b) is a
+`quiet(state)` predicate rather than a fixed flag, because the user can hide the dialog
+mid-build. `AtelierExportReview.staging(state)` is true when the stage is mounted, not in
+micro mode, and the tier is Full; for `busy` it also requires the dialog to be open.
+`export-review.js` dispatches `atelier:export-review` when the dialog opens or closes, and
+`export-feedback-ui.js` re-reads the predicate, so a hidden dialog lets the toast ring move
+again. Calm keeps the micro pops, because its stage is still. (c) as proposed. (d) waits for
+`atelier:export-review` to report the close, then retries the claim up to five times at
+150 ms, because the stage releases the moment only after its hidden-dialog observer fires.
+
 ### 2. The "No matches" empty state replays on every keystroke (frequency)
 
 **Problem.** In folder scope, typing in the search box runs `applyLibraryView` on each
@@ -110,6 +124,12 @@ settled (the rule `empty-assets-ui.js` already follows).
 
 **Tests:** `krackle_motion_checks.py:76-90` checks kinds and fallbacks, not replay,
 so they still hold.
+
+**Implemented.** The key (`kind|title`) is kept per container in `polish.js`. Its existing
+MutationObserver forgets the key as soon as the container shows anything else (cards, the
+loading pose), so navigating to another empty folder still enters. `polish_checks.py` types
+into folder-scope search: the first zero-result keystroke has 3 entrance effects, the next
+has 0, and after results return and vanish again it has 3.
 
 ### 3. Overshoot keyframes are eased twice (easing, anticipation)
 
@@ -172,6 +192,12 @@ A shared `outcomeFrames()` helper would make this one change instead of three.
 **Constraints.** Durations stay the same or get shorter, the poses don't change, and
 there are no particles. Off is unchanged.
 
+**Implemented** in all seven files listed above, with the values in the table. One
+deviation: the logo splash is 240 ms with a 16 ms stagger, not 280 ms with 24 ms. The
+entrance cancels the splash when its 320 ms ends, and a 24 ms stagger would have cut the
+last bubble short. The material-save swatch pulse (`material-save.js:208-212`) is a
+symmetric loop, not an overshoot, and was left as it is.
+
 ### 4. Calm should keep the state change and drop the decoration (tiers)
 
 **Problem.** Calm means tier 1, and `data-motion` stays `full` (`preferences.js:14`).
@@ -197,6 +223,11 @@ reads "Calm keeps small responses and still formations".
 **Tests:** `inks_dial_checks.py:87-92` and `surfaces_checks.py:51-111` check stage sleep
 and Calm drop behaviour. Neither asserts the logo or glyph tails in Calm.
 
+**Implemented** with one change to the proposal: only the automatic startup entrance is
+Full-only (`showcase()` in `logo-entrance-ui.js`). Clicking the mark still replays in Calm,
+because that is an explicit request. Flecks and the dazed orbit run only when
+`allows(2)`, in all three outcome controllers.
+
 ### 5. Toasts need an exit (asymmetry)
 
 **Problem.** Toasts enter over 200 ms with a 10 px rise using the generic `ease`
@@ -217,6 +248,19 @@ waits 1050 ms after `mouseleave` for a 1000 ms toast and asserts it is gone. Wit
 120 ms exit, removal lands at ~1070-1120 ms, so that wait needs about +150 ms. Raising
 the wait is the safer fix; shortening the exit below ~50 ms would leave the hard cut
 mostly in place. Flagged for the user's call.
+
+**Implemented** as `AtelierPolish.leave(el, done)`, used by all four removal paths. The toast
+leaves `#toast-area` at once, so the live region, collation, the stack and every `#toast-area`
+selector stay truthful. The same element then fades for 120 ms in an inert,
+`aria-hidden` layer just before `#toast-area`. It drops `role`, `toast-timed` and
+`data-operation-state`, and keeps its caption ink inline. Export and material-save glyphs stop
+their effects at dismissal and hold their still pose until the fade ends; they are not
+swapped for the fallback icon. Instead of a longer wait, `polish_checks.py:113-116` now checks
+that the toast has left `#toast-area` at 1050 ms, then waits for the faded copy to go.
+For the same reason, the Undo locators in `trust_checks.py` are scoped to
+`#toast-area .toast-undo`. A copy that is still fading is inert and `aria-hidden`, but a global
+CSS selector still matches it, which tripped Playwright's strict mode. Off removes toasts
+outright.
 
 ### 6. Hold the viewport loader for fast loads (timing)
 

@@ -23,18 +23,18 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         tab.goto(url);tab.wait_for_function("atelierProject()==='Smoke A' && document.querySelectorAll('.sb-item').length===2")
         tab.locator('.sb-item .sb-clear').first.click()
         tab.locator('#atelier-confirm-ok').click()
-        undo=tab.locator('.toast-undo');undo.wait_for()
+        undo=tab.locator('#toast-area .toast-undo');undo.wait_for()
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===1")
         undo.click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
         assert [p.read_bytes() for p in files]==originals
         tab.evaluate("() => {_sbMarked=new Set(Object.keys(sidebarData));window.batch=sbDeleteMarked();}")
         tab.locator('#atelier-confirm-ok').click();tab.evaluate('batch')
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===0")
-        tab.locator('.toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
+        tab.locator('#toast-area .toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
         checks.append('Deleting an edit offers Undo and restores the byte-identical file through the real project routes')
         tab.locator('#clear-all-btn').click();tab.locator('#atelier-confirm-ok').click()
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===0")
-        undo=tab.locator('.toast-undo');undo.wait_for();undo.hover()
+        undo=tab.locator('#toast-area .toast-undo');undo.wait_for();undo.hover()
         assert undo.locator('..').evaluate("el=>el.style.getPropertyValue('--toast-duration')")=='10000ms'
         tab.wait_for_timeout(400)
         assert undo.is_visible()
@@ -44,7 +44,7 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         tab.locator('.sb-item .sb-clear').first.click(modifiers=['Shift'])
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===1")
         assert tab.locator('.trash-drain').count()==0
-        tab.locator('.toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
+        tab.locator('#toast-area .toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
         checks.append('Clear All uses one Undo batch, hover pauses its ten-second toast and reduced motion omits the row dissolve')
 
         tab.locator('#menu-btn').focus()
