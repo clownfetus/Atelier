@@ -69,6 +69,7 @@ def main():
     parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
+    parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -148,6 +149,17 @@ def main():
                     page.screenshot(path=str(report / f'current-{width}x{height}.png'))
                 checks.append('UI loads at three desktop sizes without uncaught JavaScript errors')
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
+                from startup_update_checks import run_startup_update_checks
+                run_startup_update_checks(context, url, report, checks)
+
+                if args.review_followups_only:
+                    from review_followup_checks import run_review_followup_checks
+                    run_review_followup_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
 
                 if args.viewer_followups_only:
                     from viewer_followup_checks import run_viewer_followup_checks
@@ -270,6 +282,8 @@ def main():
                 run_export_review_checks(page, context, url, report, checks)
                 from skin_swapper_review_checks import run_skin_swapper_review_checks
                 run_skin_swapper_review_checks(page, context, url, report, checks)
+                from review_followup_checks import run_review_followup_checks
+                run_review_followup_checks(context, url, report, checks)
                 from empty_assets_motion_checks import run_empty_assets_motion_checks
                 run_empty_assets_motion_checks(page, context, url, report, checks)
                 from logo_motion_checks import run_logo_motion_checks

@@ -110,6 +110,7 @@
       input.type = 'radio'; input.name = 'export-format'; input.value = value; input.disabled = !!disabled;
       input.checked = current.format === value;
       input.addEventListener('change', () => {
+        current.retry = null;
         current.format = preferredFormat = value; renderReview();
         body.querySelector('input[name="export-format"]:checked')?.focus();
       });
@@ -205,7 +206,10 @@
     }
     button('Cancel', hide);
     button('Refresh review', callbacks.refresh).id = 'export-review-refresh';
-    button('Export ' + countLabel, () => callbacks.confirm(), true).id = 'export-review-confirm';
+    button('Export ' + countLabel, () => {
+      current.retry = callbacks.confirm;
+      callbacks.confirm();
+    }, true).id = 'export-review-confirm';
   }
   function renderResult() {
     const { snapshot, result, callbacks } = current;

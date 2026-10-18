@@ -503,6 +503,8 @@ body {
   justify-content: center;
 }
 .overlay.active { display: flex; }
+/* The update offer can arrive while setup or the project picker is open; it shows above them. */
+#update-overlay { z-index: 250; }
 .modal {
   background: var(--md-sys-color-surface-container);
   border: 1px solid var(--border);

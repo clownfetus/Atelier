@@ -200,7 +200,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         motion_page.wait_for_function(f'__viewportMotion.state().modelRequests === {before + 1}')
         motion_page.evaluate(f'__viewportMotion.model({before}, true); viewportOpen')
         assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'error'
-        assert motion_page.locator('#viewport-loading-msg').inner_text() == 'Failed to load meshes.'
+        assert motion_page.locator('#viewport-loading-msg').inner_text() == 'Failed to load meshes. Fixture mesh: Fixture decode failure'
         close_preview()
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Failed mesh fixture')

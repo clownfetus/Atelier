@@ -16,6 +16,9 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+import threading
+import shutil
+import time
 from unittest.mock import patch
 from urllib.parse import quote
 from wsgiref.util import setup_testing_defaults
@@ -178,6 +181,64 @@ class EditedMeshesOnly(unittest.TestCase):
         self.assertIsNone(S._edit_problem(MESH))
 
 
+class GeometryGate(unittest.TestCase):
+    def model(self, positions, triangles):
+        import numpy as np
+        points = np.asarray(positions, dtype="f4")
+        indices = np.asarray(triangles, dtype="<u2").reshape(-1).tobytes()
+        lod = {"sections": [{"num_tris": len(triangles)}], "idx_off": 0, "idx_stride": 2}
+        return SimpleNamespace(lods=[lod], positions=lambda _: points, _blob=lambda _: indices)
+
+    def test_exporter_vertex_splits_and_reordering_are_not_edits(self):
+        original = self.model([[0, 0, 0], [1, 0, 0], [0, 1, 0]], [[0, 1, 2]])
+        rebuilt = self.model([[0, 1, 0], [0, 0, 0], [1.000001, 0, 0], [0, 0, 0]], [[3, 0, 2]])
+        self.assertTrue(S._same_geometry(original, rebuilt))
+
+    def test_moved_vertices_and_changed_triangle_multiplicity_are_edits(self):
+        original = self.model([[0, 0, 0], [1, 0, 0], [0, 1, 0]], [[0, 1, 2]])
+        moved = self.model([[0, 0, .1], [1, 0, 0], [0, 1, 0]], [[0, 1, 2]])
+        duplicate = self.model([[0, 0, 0], [1, 0, 0], [0, 1, 0]], [[0, 1, 2], [0, 1, 2]])
+        self.assertFalse(S._same_geometry(original, moved))
+        self.assertFalse(S._same_geometry(original, duplicate))
+
+    def test_round_trip_precision_at_nearly_coincident_seams_is_not_an_edit(self):
+        original = self.model([[0, 0, 0], [.0004, 0, 0], [1, 0, 0], [0, 1, 0]],
+                              [[0, 2, 3], [1, 2, 3]])
+        rebuilt = self.model([[.00039, 0, 0], [1, 0, 0], [0, 1, 0]], [[0, 1, 2], [0, 1, 2]])
+        self.assertTrue(S._same_geometry(original, rebuilt))
+
+    def test_unchanged_surface_with_different_cooked_bytes_never_reaches_relocation(self):
+        from atelier.handlers import meshedit, mesh
+        original = self.model([[0, 0, 0], [1, 0, 0], [0, 1, 0]], [[0, 1, 2]])
+        with patch.object(S, "_edit_problem", return_value=None), \
+             patch.object(meshedit, "stage_mesh", return_value={"uasset": "rebuilt.uasset"}), \
+             patch.object(meshedit, "_resolve_base", return_value="vanilla"), \
+             patch.object(S, "_same_file", return_value=False), \
+             patch.object(mesh, "Mesh", return_value=original), patch.object(S, "_relocate") as relocate:
+            with self.assertRaisesRegex(RuntimeError, "no geometry edits"):
+                S._stage_mesh(entry(), "scratch", "stage")
+        relocate.assert_not_called()
+
+    def test_blender_extraction_records_original_before_any_user_edits(self):
+        from atelier.handlers import meshedit
+        with tempfile.TemporaryDirectory() as tmp:
+            base = str(Path(tmp) / "SK_Original")
+            def blender(script, args, label):
+                Path(args[1]).write_bytes(b"untouched blend")
+                return "BLEND_OK"
+            model = SimpleNamespace(lods=[{}])
+            with patch.object(meshedit, "project_base", return_value=base), \
+                 patch.object(meshedit._mesh, "Mesh", return_value=model), \
+                 patch.object(meshedit._mesh, "export_glb"), \
+                 patch.object(meshedit._survey, "probe", return_value={"status": "ok", "warnings": []}), \
+                 patch.object(meshedit._survey, "verdict_text", return_value="ok"), \
+                 patch.object(meshedit, "_run_blender", side_effect=blender), \
+                 patch.object(MR, "target_base", return_value=base):
+                meshedit.extract_blend(MESH, base_path="vanilla", with_materials=False)
+                self.assertTrue(MR.is_original(MESH))
+                self.assertIn("has no edits", S._edit_problem(MESH))
+
+
 class ConfigPatch(unittest.TestCase):
     def test_the_template_becomes_this_meshs_config(self):
         e = entry(sculpt=1)
@@ -262,6 +323,8 @@ class OffSwitch(unittest.TestCase):
     """Rule 5: Galacta can switch generation off for every install, from its own published flag."""
     def setUp(self):
         Path(S._flag_path()).unlink(missing_ok=True)
+        for name in ("skinswapper-flag.json", "integrations-flag.json"):
+            Path(C.DATA_ROOT, "_cache", name).unlink(missing_ok=True)
 
     def response(self, payload):
         body = json.dumps(payload).encode()
@@ -298,6 +361,96 @@ class OffSwitch(unittest.TestCase):
         self.assertEqual(S.FLAG_URL, "https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json")
         # The shape Galacta publishes there (17 Oct 2026).
         self.assertEqual(S.parse_flag({"enabled": True, "message": ""}), {"enabled": True, "message": ""})
+
+    def test_revocation_survives_cache_cleanup_and_data_reset(self):
+        with patch.object(S.urllib.request, "urlopen", return_value=self.response({"enabled": False})):
+            S.refresh_flag()
+        cache = Path(C.DATA_ROOT, "_cache").resolve()
+        self.assertTrue(cache.is_relative_to(Path(C.DATA_ROOT).resolve()))
+        if cache.exists():
+            shutil.rmtree(cache)
+        with patch.object(S.urllib.request, "urlopen", side_effect=OSError("offline")):
+            self.assertFalse(S.refresh_flag())
+        self.assertFalse(S.flag_state()[0])
+        # Exercise the real reset path in the already disposable application data.
+        R.api_reset_data()
+        self.assertFalse(S.flag_state()[0])
+
+    def test_previous_cache_is_migrated_before_cleanup(self):
+        old = Path(C.DATA_ROOT, "_cache", "skinswapper-flag.json")
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_text(json.dumps({"enabled": False, "message": "Migrated", "checked_at": 0}))
+        self.assertEqual(S.flag_state(), (False, "Migrated"))
+        old.unlink()
+        self.assertEqual(S.flag_state(), (False, "Migrated"))
+
+    def test_old_fetch_cannot_publish_after_a_newer_fetch(self):
+        entered, release, second_entered = threading.Event(), threading.Event(), threading.Event()
+        def fetch(*args, **kwargs):
+            if threading.current_thread().name == "old-flag":
+                entered.set()
+                if not release.wait(3):
+                    raise OSError("test deadline")
+                return self.response({"enabled": True})
+            second_entered.set()
+            return self.response({"enabled": False})
+        old = threading.Thread(target=S.refresh_flag, name="old-flag")
+        new = threading.Thread(target=S.refresh_flag, name="new-flag")
+        with patch.object(S.urllib.request, "urlopen", side_effect=fetch):
+            try:
+                old.start()
+                self.assertTrue(entered.wait(2))
+                new.start()
+                self.assertFalse(second_entered.wait(.1))
+            finally:
+                release.set()
+                old.join(3)
+                if new.ident is not None:
+                    new.join(3)
+        self.assertTrue(second_entered.is_set())
+        self.assertFalse(S.flag_state()[0])
+
+    def test_future_timestamp_does_not_suppress_refresh(self):
+        Path(S._flag_path()).parent.mkdir(parents=True, exist_ok=True)
+        Path(S._flag_path()).write_text(json.dumps({"enabled": False, "checked_at": 9999999999}))
+        done = threading.Event()
+        with patch.object(S, "refresh_flag", side_effect=lambda: done.set()):
+            S.refresh_flag_async()
+            self.assertTrue(done.wait(2))
+            deadline = time.monotonic() + 2
+            while S._refreshing.is_set() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertFalse(S._refreshing.is_set())
+        self.assertEqual(S._read_flag()["checked_at"], 0)
+
+    def test_concurrent_status_requests_share_one_background_refresh(self):
+        entered, release = threading.Event(), threading.Event()
+        def refresh():
+            entered.set()
+            release.wait(3)
+        with patch.object(S, "refresh_flag", side_effect=refresh) as fetch:
+            try:
+                S.refresh_flag_async()
+                self.assertTrue(entered.wait(2))
+                callers = [threading.Thread(target=S.refresh_flag_async) for _ in range(8)]
+                for caller in callers:
+                    caller.start()
+                for caller in callers:
+                    caller.join(2)
+                self.assertEqual(fetch.call_count, 1)
+            finally:
+                release.set()
+                deadline = time.monotonic() + 2
+                while S._refreshing.is_set() and time.monotonic() < deadline:
+                    time.sleep(.01)
+        self.assertFalse(S._refreshing.is_set())
+
+    def test_oversized_flag_preserves_revocation(self):
+        with patch.object(S.urllib.request, "urlopen", return_value=self.response({"enabled": False})):
+            S.refresh_flag()
+        with patch.object(S.urllib.request, "urlopen", return_value=self.response({"enabled": True, "padding": "x" * 65536})):
+            self.assertFalse(S.refresh_flag())
+        self.assertFalse(S.flag_state()[0])
 
 
 class StageAudit(unittest.TestCase):
@@ -399,6 +552,15 @@ class Routes(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual((body["hero_id"], body["skin_id"]), ("1024", "1024503"))
         self.assertIn("Author is required.", body["problems"])
+
+    def test_invalid_mod_names_are_rejected_without_sanitizing(self):
+        for name in ("Foo.Bar", "../Foo", "Foo\\Bar", "Foo\n", "", None):
+            with self.subTest(name=name), patch.object(S, "_edit_problem", return_value=None):
+                status, result = self.call("POST", "/api/skin_swapper/plan", {
+                    "mod_name": name, "skin_name": "Skin", "author": "Review", "meshes": [{"game_rel": MESH}]})
+            self.assertEqual(status, 200)
+            self.assertTrue(result["problems"])
+            self.assertEqual(result["entries"], [])
 
     def test_a_failed_build_returns_its_problems(self):
         with patch.object(S, "build", return_value={"ok": False, "error": "not built", "problems": ["p1"]}):

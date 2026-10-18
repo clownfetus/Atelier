@@ -133,6 +133,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
               "(CLI: --force 1) to extract it for inspection anyway -- but a build will "
               "fail or produce a broken package.")
     m = _mesh.Mesh(base)
+    project_extract = blend_path is None
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     os.makedirs(os.path.dirname(blend_path), exist_ok=True)
 
@@ -158,6 +159,13 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
         if os.path.exists(glb):
             os.remove(glb)
     info = next((l for l in out.splitlines() if l.startswith("BLEND_OK")), "")
+    if project_extract:
+        from atelier.handlers.meshreplace import digest
+        from atelier.storage import atomic_json
+        atomic_json(project_base(game_rel) + ".mesh.json", {
+            "version": 1, "game_rel": game_rel, "state": "original",
+            "original_blend_sha256": digest(blend_path),
+        })
     textures = sorted(t for t, r in (manifest or {}).get("textures", {}).items() if r.get("path"))
     return {"blend": blend_path, "info": info.strip(), "lods": len(m.lods),
             "warnings": report["warnings"] + ((manifest or {}).get("warnings") or []),

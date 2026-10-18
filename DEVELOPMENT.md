@@ -203,7 +203,8 @@ blocks `GAL_ConfigTemplate.*` everywhere).
   `https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json` as
   `{"enabled": true, "message": ""}`; nothing in this repository controls it. Atelier
   re-reads it when an export review offers the format (at most every six hours) and
-  always before a Skin Swapper build, and caches it in `_cache/skinswapper-flag.json`.
+  always before a Skin Swapper build, and saves it in `_state/skinswapper-flag.json`.
+  This state survives cache cleanup and Reset Local Data; older `_cache` flag files are migrated.
   When it is off the review shows Galacta's message and builds are refused. When it
   can't be fetched, the last value Atelier got is used.
 

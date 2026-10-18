@@ -124,16 +124,8 @@ Write-Host "Tools: $tools"
 Step 'Skin Swapper template'
 $templateDir = [IO.Path]::GetFullPath($Template)
 $galacta = Join-Path $tools 'Galacta'
-New-Item -ItemType Directory -Force -Path $galacta | Out-Null
-foreach ($ext in '.uasset', '.uexp') {
-    $file = Join-Path $templateDir ('GAL_ConfigTemplate' + $ext)
-    if (!(Test-Path -LiteralPath $file) -or (Get-Item -LiteralPath $file).Length -eq 0) {
-        throw "Missing or empty $file. The template is the .uasset and .uexp pair."
-    }
-    Copy-Item -LiteralPath $file -Destination $galacta -Force
-    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower()
-    Write-Host ("  GAL_ConfigTemplate{0,-7} sha256 {1}" -f $ext, $hash)
-}
+& $python (Join-Path $root 'scripts\stage_galacta_template.py') --source $templateDir --destination $galacta
+if ($LASTEXITCODE -ne 0) { throw 'Installing the template pair failed. See the error above for recovery details.' }
 
 Step 'Asking Atelier whether Skin Swapper export is available'
 $env:ATELIER_DATA_DIR = $DataDir

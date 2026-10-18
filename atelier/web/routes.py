@@ -1108,15 +1108,6 @@ def api_update_check():
         print(f"[update] up to date ({current} >= {remote})")
         return json.dumps({"available": False})
 
-    try:
-        with open(_c.CONFIG_FILE, encoding="utf-8") as f:
-            _cfg_skip = json.load(f)
-        if _cfg_skip.get("skipped_update") == tag:
-            print(f"[update] {tag} was skipped by user")
-            return json.dumps({"available": False})
-    except Exception:
-        pass
-
     release_url = data.get("html_url") or f"https://github.com/clownfetus/Atelier/releases/tag/{tag}"
 
     # Only Windows updates in place (Inno Setup installer). Elsewhere the same prompt sends the
@@ -1148,17 +1139,6 @@ def api_update_open_release():
     try: hostos.open_path(_update_cache["release_url"])
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
-    return json.dumps({"ok": True})
-
-
-@app.post("/api/update_skip")
-def api_update_skip():
-    response.content_type = "application/json"
-    if not _update_cache:
-        return json.dumps({"ok": False})
-    tag = _update_cache["tag"]
-    _c._save_config(skipped_update=tag)
-    print(f"[update] skipped version {tag}")
     return json.dumps({"ok": True})
 
 
@@ -1301,14 +1281,9 @@ def api_usmap_update_check():
             mappings_dir = os.path.join(_c.TOOLS, "Mappings")
             dest_path    = os.path.join(mappings_dir, latest_name)
             _download_usmap_file(latest["download_url"], dest_path)
-            # Remove old file if it matches the pattern
-            if current_name and _USMAP_PATTERN.match(current_name):
-                old_path = os.path.join(mappings_dir, current_name)
-                if os.path.exists(old_path) and os.path.abspath(old_path) != os.path.abspath(dest_path):
-                    try: os.remove(old_path)
-                    except Exception: pass
+            # Consumers imported USMAP at startup. Keep that file and active value until restart;
+            # only pin the downloaded mapping for the next launch, as the non-blocking notice says.
             _c.save_usmap_config(dest_path)
-            _c.USMAP = dest_path
             _push_sse({"usmap_updated": True, "name": latest_name})
         except Exception:
             pass  # silent fail — will retry on next launch
@@ -2751,7 +2726,7 @@ def api_skin_swapper_plan():
     from atelier import skin_swapper
     body = request.json or {}
     response.content_type = "application/json"
-    result = skin_swapper.plan(_mod_stem(body.get("mod_name")), body.get("meshes") or [],
+    result = skin_swapper.plan(body.get("mod_name"), body.get("meshes") or [],
                                body.get("skin_name"), body.get("author"))
     return json.dumps({"ok": True, **result, "status": skin_swapper.status()})
 
@@ -2761,7 +2736,7 @@ def api_skin_swapper_build():
     """Build a Skin Swapper mod: the edited meshes and their Galacta configs in one container."""
     body = request.json or {}
     if body.get("background"):
-        return _submit_job("export", "Skin Swapper export " + _mod_stem(body.get("mod_name")),
+        return _submit_job("export", "Skin Swapper export " + str(body.get("mod_name") or ""),
                            lambda job: _skin_swapper_payload(body))
     response.content_type = "application/json"
     return json.dumps(_skin_swapper_payload(body))
@@ -2769,7 +2744,7 @@ def api_skin_swapper_build():
 
 def _skin_swapper_payload(body):
     from atelier import skin_swapper
-    mod_name = _mod_stem(body.get("mod_name"))
+    mod_name = body.get("mod_name")
     copy_to_mods = bool(body.get("copy_to_mods"))
     password = (body.get("password") or "").strip() or None
     if copy_to_mods and not get_mods_folder():

@@ -177,14 +177,15 @@ To see the switched-off state without changing your published flag, work offline
 keeps its last known value:
 
 1. Disconnect from the network, or block `0xsaturno.github.io`.
-2. Write `<DataDir>\_cache\skinswapper-flag.json`:
+2. Write `<DataDir>\_state\skinswapper-flag.json` (persistent state, preserved by cache cleanup and data reset):
    ```json
-   { "enabled": false, "message": "Paused for testing", "checked_at": 9999999999 }
+   { "enabled": false, "message": "Paused for testing", "checked_at": 0 }
    ```
 3. Open the export review again. The Skin Swapper option is disabled and shows your message,
    and a build is refused.
 
 Once you're back online, the next build or review reads your published flag again.
+Earlier `_cache` flag files are migrated into `_state` when first read.
 
 ## Questions for you
 

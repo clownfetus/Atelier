@@ -757,11 +757,13 @@ function handleAssetClick(item) {
 }
 
 const _editsInFlight = new Set();   // a second click on the same asset while it loads does nothing
+const _assetOperationKey = (gameRel, project = _activeProjectName) => JSON.stringify([project, gameRel]);
 async function editAsset(item) {
-  if (_editsInFlight.has(item.game_rel)) return;
-  _editsInFlight.add(item.game_rel);
   const project = _activeProjectName;
-  suppressedImportGameRels.add(item.game_rel);
+  const key = _assetOperationKey(item.game_rel, project);
+  if (_editsInFlight.has(key)) return;
+  _editsInFlight.add(key);
+  suppressedImportGameRels.add(key);
   const loadingToast = toastSpinner(`Preparing ${item.name} for editing…`);
   setStatus(`Preparing ${item.name} for editing…`);
   try {
@@ -788,9 +790,9 @@ async function editAsset(item) {
         body: JSON.stringify({ skin_id: item.skin_id, rel_path: item.rel_path, game_rel: item.game_rel }),
       });
     }
+    if (project !== _activeProjectName) { loadingToast.remove(); return; }
     if (res.ok) {
-      suppressedImportGameRels.delete(item.game_rel);
-      if (project !== _activeProjectName) { loadingToast.remove(); setStatus(""); return; }
+      suppressedImportGameRels.delete(key);
       suppressChangeToastUntil = Date.now() + 1500;
       loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
       setStatus("");
@@ -802,16 +804,18 @@ async function editAsset(item) {
         handleImportedFileAction(importedItem);
       }
     } else {
-      suppressedImportGameRels.delete(item.game_rel);
+      suppressedImportGameRels.delete(key);
       loadingToast.resolve(`Edit failed: ${res.error}`, "error");
       setStatus("");
     }
   } catch (e) {
-    suppressedImportGameRels.delete(item.game_rel);
+    suppressedImportGameRels.delete(key);
+    if (project !== _activeProjectName) { loadingToast.remove(); return; }
     loadingToast.resolve(`Error: ${e.message}`, "error");
     setStatus("");
   } finally {
-    _editsInFlight.delete(item.game_rel);
+    suppressedImportGameRels.delete(key);
+    _editsInFlight.delete(key);
   }
 }
 
@@ -2289,9 +2293,10 @@ function handleSSE(d) {
     return;
   }
   if (d.file_changed) {
-    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressedImportGameRels.has(d.game_rel));
-    if (!importing && !suppressedImportGameRels.has(d.game_rel)) window.AtelierPolish?.fly(d.game_rel);
-    if (!importing && !suppressedImportGameRels.has(d.game_rel) && Date.now() >= suppressChangeToastUntil) {
+    const suppressed = suppressedImportGameRels.has(_assetOperationKey(d.game_rel));
+    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressed);
+    if (!importing && !suppressed) window.AtelierPolish?.fly(d.game_rel);
+    if (!importing && !suppressed && Date.now() >= suppressChangeToastUntil) {
       toast("Edit saved", "success", 4000);
     }
     return;
@@ -3531,23 +3536,23 @@ _ctxFileInput.addEventListener("change", async () => {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("game_rel", game_rel);
-  suppressedImportGameRels.add(game_rel);
+  suppressedImportGameRels.add(_assetOperationKey(game_rel, project));
   const t = toastSpinner("Replacing…");
   try {
     const res  = await projectFetch("/api/replace_texture", { method: "POST", body: fd }, project);
     const data = await res.json();
-    if (project !== _activeProjectName) { t.remove(); suppressedImportGameRels.delete(game_rel); return; }
+    if (project !== _activeProjectName) { t.remove(); suppressedImportGameRels.delete(_assetOperationKey(game_rel, project)); return; }
     if (data.ok) {
       suppressChangeToastUntil = Date.now() + 1500;
-      suppressedImportGameRels.delete(game_rel);
+      suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
       t.resolve("Texture replaced", "success");
       refreshEditedTexture(game_rel, data.token);
     } else {
-      suppressedImportGameRels.delete(game_rel);
+      suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
       t.resolve(`Replace failed: ${data.error}`, "error");
     }
   } catch (err) {
-    suppressedImportGameRels.delete(game_rel);
+    suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
     t.resolve(`Error: ${err.message}`, "error");
   }
 });
@@ -3782,14 +3787,15 @@ function _showUpdatePanel(id) {
   });
 }
 
-async function checkUpdate() {
+// `pending` is the release check init() started alongside startup; the dialog only appears when
+// there is an update to offer.
+async function checkUpdate(pending = api("/api/update_check")) {
   const overlay = document.getElementById("update-overlay");
-  // The startup splash covers the check; the dialog only appears when there is an update to offer.
   let info;
-  try { info = await api("/api/update_check"); }
+  try { info = await pending; }
   catch { return false; }
 
-  if (!info.available) return false;
+  if (!info?.available) return false;
   overlay.classList.add("active");
 
   document.getElementById("update-tag").textContent = info.tag;
@@ -3862,17 +3868,19 @@ function _enforceSafeName(input) {
 _enforceSafeName(document.getElementById("proj-name-input"));
 _enforceSafeName(document.getElementById("mod-name-input"));
 
-async function checkProject() {
+async function checkProject(onReady = () => {}) {
   const res = await api("/api/projects");
   if (res.active && res.projects.find(p => p.name === res.active)) {
     _applyActiveProject(res.active);
     toast(`Project: ${res.active}`, "success");
+    onReady();
     return;
   }
   return new Promise(resolve => {
     _projPickerResolve = resolve;
     _renderProjectPicker(res.projects || []);
     document.getElementById("project-overlay").classList.add("active");
+    onReady();
   });
 }
 
@@ -4398,9 +4406,15 @@ async function init() {
   window.AtelierPolish?.startup();
   console.log("[init] starting");
   renderBreadcrumbs();
-  if (await checkUpdate()) { console.log("[init] update in progress"); return; }
-  if (await checkSetup()) { window.AtelierPolish?.startupDone(); console.log("[init] halted for setup"); return; }
-  await checkProject();
+  // The release check runs alongside startup instead of before it, so a slow or offline GitHub
+  // never delays setup or the library. Its dialog appears once one of them is on screen.
+  const update = api("/api/update_check").catch(() => null);
+  if (await checkSetup()) {
+    window.AtelierPolish?.startupDone(); console.log("[init] halted for setup");
+    checkUpdate(update);
+    return;
+  }
+  await checkProject(() => checkUpdate(update));
   await checkPrereqs();
   await renderGrid();
   await loadSidebar();

@@ -38,6 +38,7 @@ the result unless the .uexp comes back byte-identical. Measured on SK_1035_10355
 """
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -65,7 +66,8 @@ TEXT_LIMIT = 64
 _SKIN_PATH_RE = re.compile(r"^Characters/(\d{4})/(\d{7})/")
 _STAGE_ROOT = ("Marvel", "Content", "Marvel")   # /Game/Marvel/<x> stages at Marvel/Content/Marvel/<x>
 
-_flag_lock = threading.Lock()
+_flag_lock = threading.RLock()
+_fetch_lock = threading.Lock()
 _refreshing = threading.Event()
 
 
@@ -77,7 +79,8 @@ def template_files():
 
 
 def _flag_path():
-    return os.path.join(config.DATA_ROOT, "_cache", "skinswapper-flag.json")
+    # Revocation is persistent integration state, not disposable decode/build cache.
+    return os.path.join(config.DATA_ROOT, "_state", "skinswapper-flag.json")
 
 
 def parse_flag(payload):
@@ -88,48 +91,80 @@ def parse_flag(payload):
     return {"enabled": payload["enabled"], "message": message.strip()[:300]}
 
 
-def _read_flag():
+def _load_flag(path):
     try:
-        with open(_flag_path(), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        flag = parse_flag(data)
+        if flag is None:
+            return {}
+        checked = data.get("checked_at", 0)
+        flag["checked_at"] = checked if (type(checked) in (int, float) and 0 <= checked <= time.time()
+                                         and math.isfinite(checked)) else 0
+        return flag
     except (OSError, ValueError):
+        return {}
+
+
+def _save_flag(flag):
+    from atelier.storage import atomic_json
+    atomic_json(_flag_path(), flag)
+
+
+def _read_flag():
+    with _flag_lock:
+        flag = _load_flag(_flag_path())
+        if flag:
+            return flag
+        # Preserve the last known decision when upgrading from either earlier cache name.
+        for name in ("skinswapper-flag.json", "integrations-flag.json"):
+            flag = _load_flag(os.path.join(config.DATA_ROOT, "_cache", name))
+            if flag:
+                _save_flag(flag)
+                return flag
         return {}
 
 
 def refresh_flag(timeout=5):
     """Fetch Galacta's switch and cache it. Unreachable or unpublished keeps the last known value."""
-    try:
-        req = urllib.request.Request(FLAG_URL, headers={"User-Agent": "Atelier"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            flag = parse_flag(json.loads(r.read(64 * 1024).decode("utf-8")))
-    except (OSError, ValueError):
-        return False
-    if flag is None:
-        return False
-    flag["checked_at"] = time.time()
-    path = _flag_path()
-    with _flag_lock:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(flag, f)
-        os.replace(tmp, path)
-    return True
+    # Serialize the fetch as well as publication: an older response must never undo a newer one.
+    with _fetch_lock:
+        try:
+            req = urllib.request.Request(FLAG_URL, headers={"User-Agent": "Atelier"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read(64 * 1024 + 1)
+                if len(raw) > 64 * 1024:
+                    return False
+                flag = parse_flag(json.loads(raw.decode("utf-8")))
+        except (OSError, ValueError):
+            return False
+        if flag is None:
+            return False
+        flag["checked_at"] = time.time()
+        with _flag_lock:
+            _save_flag(flag)
+        return True
 
 
 def refresh_flag_async():
     """Refresh a stale switch without making the caller wait for the network."""
-    if time.time() - (_read_flag().get("checked_at") or 0) < FLAG_MAX_AGE or _refreshing.is_set():
-        return
-    _refreshing.set()
+    with _flag_lock:
+        if time.time() - (_read_flag().get("checked_at") or 0) < FLAG_MAX_AGE or _refreshing.is_set():
+            return
+        _refreshing.set()
 
     def run():
         try:
             refresh_flag()
         finally:
+            with _flag_lock:
+                _refreshing.clear()
+    try:
+        threading.Thread(target=run, name="galacta-flag", daemon=True).start()
+    except BaseException:
+        with _flag_lock:
             _refreshing.clear()
-    threading.Thread(target=run, name="galacta-flag", daemon=True).start()
+        raise
 
 
 def flag_state():
@@ -201,7 +236,7 @@ def _text_problem(label, value):
 def plan(mod_folder, meshes, skin_name, author, check_edits=True):
     """Validate a request and lay out every package. Returns {entries, problems, hero_id, skin_id}."""
     problems = []
-    folder_ok = isinstance(mod_folder, str) and bool(MOD_FOLDER_RE.match(mod_folder))
+    folder_ok = isinstance(mod_folder, str) and bool(MOD_FOLDER_RE.fullmatch(mod_folder))
     if not folder_ok:
         problems.append("The mod name becomes the Galacta folder name, so it may only use letters, "
                         "digits and underscores (up to 48).")
@@ -382,6 +417,56 @@ def _same_file(a, b):
     return digest(a) == digest(b)
 
 
+def _same_geometry(original, rebuilt, tolerance=1e-3):
+    """Compare LOD0 surfaces in game centimetres, ignoring exporter vertex/face ordering.
+
+    Blender splits vertices at UV/normal seams and cooking regenerates lower LODs and metadata.
+    None of that is a model edit. Match positions within float round-trip precision, then compare
+    triangle multiplicities using the original positions as stable IDs. Lower LODs cannot make an
+    untouched top LOD eligible for Skin Swapper export.
+    """
+    import numpy as np
+    from scipy.spatial import cKDTree
+
+    source_lod, target_lod = original.lods[0], rebuilt.lods[0]
+    source = np.asarray(original.positions(source_lod), dtype="f8")
+    target = np.asarray(rebuilt.positions(target_lod), dtype="f8")
+    if not len(source) or not len(target) or not np.isfinite(source).all() or not np.isfinite(target).all():
+        raise ValueError("The mesh has empty or non-finite geometry; it was not exported.")
+    # The metre/centimetre and coordinate transforms introduce several float32 ULPs. At seams,
+    # even two original positions can differ by less than that noise; give them the same ID so
+    # a round trip choosing the neighbouring position cannot look like a topology edit.
+    tolerance = max(tolerance, float(np.max(np.abs(source))) * np.finfo("f4").eps * 8)
+    points, source_ids = np.unique(source, axis=0, return_inverse=True)
+    tree = cKDTree(points)
+    distance, target_ids = tree.query(target)
+    if np.any(distance > tolerance):
+        return False
+    parent = np.arange(len(points))
+
+    def representative(index):
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    for a, b in tree.query_pairs(tolerance, output_type="ndarray"):
+        a, b = representative(a), representative(b)
+        parent[max(a, b)] = min(a, b)
+    labels = np.array([representative(i) for i in range(len(points))])
+    source_ids, target_ids = labels[source_ids], labels[target_ids]
+
+    def triangles(model, lod, ids):
+        count = sum(section["num_tris"] for section in lod["sections"]) * 3
+        indices = np.frombuffer(model._blob(lod), dtype=f"<u{lod['idx_stride']}",
+                                count=count, offset=lod["idx_off"])
+        faces = np.sort(ids[indices].reshape(-1, 3), axis=1)
+        return faces[np.lexsort((faces[:, 2], faces[:, 1], faces[:, 0]))]
+
+    return np.array_equal(triangles(original, source_lod, source_ids),
+                          triangles(rebuilt, target_lod, target_ids))
+
+
 def _uat_error(result, fallback):
     return (((getattr(result, "stderr", "") or "") + (getattr(result, "stdout", "") or "")).strip()[-300:]
             or fallback)
@@ -439,6 +524,10 @@ def _stage_mesh(entry, scratch, stage):
     if all(_same_file(src + ext, base + ext) for ext in (".uexp", ".ubulk")):
         raise RuntimeError(f"{entry['mesh_name']} cooks to exactly the game's mesh. Game assets may not "
                            f"ship in a Skin Swapper mod.")
+    from atelier.handlers.mesh import Mesh
+    if _same_geometry(Mesh(base), Mesh(src)):
+        raise RuntimeError(f"{entry['mesh_name']} has no geometry edits. Re-saving or recooking the "
+                           "game's model does not make it an edited mesh for Skin Swapper export.")
     _relocate(src, _stage_path(stage, entry["mesh_game_rel"]), GAME_PREFIX + entry["mesh_game_rel"], scratch)
     return f"mesh {entry['mesh_name']} -> {GAME_PREFIX}{entry['folder']}/"
 
