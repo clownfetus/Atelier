@@ -168,13 +168,21 @@ def run_surfaces_checks(page,context,url,report,checks):
                 assert ink['clipped']==f"url(#{ink['clip']})",ink
             energy[theme]=inks[0]['energy'];thumbs[theme]=round(inks[0]['thumbContrast'],2);surfaces[theme]=[inks[0]['card'],inks[0]['thumb']]
             tab.locator('#grid-area .grid').screenshot(path=str(report/f'category-emblems-app-{theme}.png'),animations='disabled')
+            # Hovered, the body paints --bg3, so its edited corner takes the raised charge; the emblem keeps its ink.
+            card=tab.locator('#grid-area .card').first;card.evaluate("node=>node.classList.add('imported')");card.hover()
+            settled="surface=>{const card=document.querySelector('#grid-area .card'),probe=document.createElement('i');probe.style.color='var('+surface+')';card.append(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(card).backgroundColor===color;}"
+            tab.wait_for_function(settled,arg='--bg3')
+            hovered=tab.evaluate("""() => {const card=document.querySelector('#grid-area .card'),corner=getComputedStyle(card,'::after').backgroundColor;
+              return {corner,contrast:AtelierKrackleInks.contrast(corner,getComputedStyle(card).backgroundColor),energy:getComputedStyle(card.querySelector('.k-category-emblem-energy > *')).fill};}""")
+            card.evaluate("node=>node.classList.remove('imported')");tab.mouse.move(0,0);tab.wait_for_function(settled,arg='--bg2')
+            assert hovered['corner']==hovered['energy']==inks[0]['raised'] and hovered['contrast']>=3,(theme,hovered)
         assert energy['light']!=energy['dark'],energy
         (report/'category-emblem-inks.json').write_text(json.dumps({'energy':energy,'thumbContrast':thumbs},indent=2))
         print(f"D4 emblem energy on card thumbs: light {thumbs['light']}:1, dark {thumbs['dark']}:1",flush=True)
         tab.evaluate("document.getElementById('grid-area').style.setProperty('--krackle-charge-raised','#7a4cd9')")
         assert all(ink['energy']=='rgb(122, 76, 217)' for ink in emblem_inks())
         tab.evaluate("document.getElementById('grid-area').style.removeProperty('--krackle-charge-raised');localStorage.removeItem('atelier.experimentalKrackleEmblems')")
-        checks.append('With the D4 flag on, card emblems are inlined with unique clip ids; their energy follows the thumb\'s raised --krackle-charge (3:1 on light and dark thumbs and cards, local overrides) and bubbles follow --krackle-hole; all 36 silhouettes stay inside the 24-unit box')
+        checks.append('With the D4 flag on, card emblems are inlined with unique clip ids; their energy follows the thumb\'s raised --krackle-charge (3:1 on light and dark thumbs and cards, local overrides), a hovered card\'s edited corner takes that raised ink at 3:1 on --bg3, and bubbles follow --krackle-hole; all 36 silhouettes stay inside the 24-unit box')
         review=context.new_page()
         try:
             review.set_viewport_size({'width':1320,'height':1100});review.set_content((Path(__file__).resolve().parents[1]/'docs/review/wave-4b/category-emblems.html').read_text(encoding='utf-8'))

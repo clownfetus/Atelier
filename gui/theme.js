@@ -155,7 +155,7 @@
       const defaults=K.defaults(surface);
       if(window.AtelierPreferences?.adaptive()&&artworkAccent&&document.querySelector('#library-hero:not([hidden])'))
         guarded=K.guard(artworkAccent,artworkColors[1]||defaults.rift,surface,{candidates:artworkColors.slice(2)});
-      set('--krackle-charge',guarded?.charge||defaults.charge);set('--krackle-rift',guarded?.rift||defaults.rift);
+      set('--krackle-charge',guarded?.charge||K.fit(defaults.charge,surface));set('--krackle-rift',guarded?.rift||defaults.rift);
       // Card thumbs paint --bg3, not the card's --bg2; .card-thumb reads this charge (krackle.css).
       const lifted=K.defaults(raised),thumbInks=guarded&&K.guard(artworkAccent,artworkColors[1]||lifted.rift,raised,{candidates:artworkColors.slice(2)});
       set('--krackle-charge-raised',thumbInks?.charge||K.fit(lifted.charge,raised));
