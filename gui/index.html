@@ -52,8 +52,10 @@
   <nav id="breadcrumbs" aria-label="Asset location"></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
-    <input id="search-input" type="search" aria-label="Search assets by name, ID or path" placeholder="Search names, IDs, paths…" aria-keyshortcuts="Control+f Meta+f">
+    <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets, IDs…" aria-keyshortcuts="Control+f Meta+f">
+    <button id="search-scope" class="search-scope" type="button" aria-label="Search scope: Everywhere">Everywhere</button>
     <kbd>Ctrl F</kbd>
+    <div id="search-results" role="listbox" aria-label="Search results" hidden></div>
   </div>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
 </div>
@@ -66,6 +68,7 @@
     <div id="startup-splash" role="status"><img src="/static/brand/atelier-mark.png" alt=""><span id="startup-label">Opening your library…</span><progress id="startup-progress" aria-label="Container indexing"></progress></div>
     <div class="library-heading"><h1>Asset library</h1><span id="library-count" aria-live="polite"></span><span id="library-category-line" class="card-icon folder-icon" aria-hidden="true"></span></div>
     <section id="library-hero" aria-label="Current character" hidden></section>
+    <section id="continue-ribbon" aria-label="Continue editing" hidden></section>
     <div class="library-controls" role="group" aria-label="Library view controls">
       <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
       <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
@@ -812,6 +815,7 @@
 <script src="/static/library-pins.js"></script>
 <script src="/static/thumbnails.js"></script>
 <script src="/static/library-tools.js"></script>
+<script src="/static/search.js"></script>
 <script src="/static/export-review.js"></script>
 <script src="/static/job-tools.js"></script>
 <script src="/static/bulk-edit.js"></script>

@@ -1065,6 +1065,7 @@ async function saveEdits() {
         body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
       }, project).then(r => r.json());
       if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
+      window.AtelierRoster?.rememberEditor(d.game_rel,'studio',project);
       ok++; d.colors = r.colors || d.colors.map(col => ({ ...col, rgba: submitted[name][col.name]?.slice() || col.rgba }));
       if (gen === generation && edited === draft) {
         for (const [param, rgba] of Object.entries(submitted[name])) {

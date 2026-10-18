@@ -462,3 +462,9 @@ Viewport `canLeave` and `close` now return promises. Every dependent action awai
 them before clearing geometry or changing skin. A cancelled answer retains the
 draft, loaded geometry and loader; export's public pending-edit guard still
 focuses Save without offering to discard anything.
+
+Search typing remains plain. A completed empty global result may show three
+decorative bubbles, with no per-keystroke effect. A new query aborts the old
+request; Escape and navigation dispose its popover. Roster filtering, card focus
+and Continue do not wait for animation. Portrait accents stay behind artwork,
+and costume opening follows the actual mesh lookup with a folder fallback.

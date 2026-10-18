@@ -195,7 +195,8 @@ def main():
                   const name = document.createElement('div'); name.className = 'card-name';
                   name.textContent = item.label;
                   card.append(thumb, name);
-                  document.querySelector('#grid-area .grid').appendChild(card);
+                  const fullSize = document.createElement('div'); fullSize.className='grid'; fullSize.style.setProperty('--card-w','156px');
+                  fullSize.append(card); document.body.append(fullSize);
                   try {
                     const svg = card.querySelector('.am-folder-flap');
                     const front = svg.querySelector('.am-folder-flap-front');
@@ -206,7 +207,7 @@ def main():
                       transition:getComputedStyle(front).transitionDuration,
                       animations:svg.getAnimations({subtree:true}).length};
                   } finally {
-                    card.remove();
+                    fullSize.remove();
                   }
                 })()""")
                 assert 101 <= folder_motion['width'] <= 103, folder_motion

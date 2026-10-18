@@ -71,6 +71,8 @@ def main():
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
+    parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
+    parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -179,6 +181,26 @@ def main():
                     browser.close()
                     return
 
+                if args.find_only:
+                    from find_checks import run_find_checks
+                    run_find_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.library_only:
+                    from find_checks import run_find_checks
+                    from library_pins_checks import run_library_pins_checks
+                    from library_workflow_checks import run_library_workflow_checks
+                    for check in (run_find_checks,run_library_pins_checks,run_library_workflow_checks):check(page,context,url,report,checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.polish_only:
                     from polish_checks import run_polish_checks
                     run_polish_checks(page, context, url, report, checks)
@@ -248,6 +270,8 @@ def main():
                     return
 
                 from design_checks import run_design_checks
+                from find_checks import run_find_checks
+                run_find_checks(page, context, url, report, checks)
                 from trust_checks import run_trust_checks
                 run_trust_checks(page, context, url, report, checks)
                 run_design_checks(page, context, url, report, checks)

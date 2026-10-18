@@ -77,6 +77,7 @@ function projectFetch(path, opts = {}, project = _activeProjectName) {
 }
 window.atelierProject = () => _activeProjectName;
 window.atelierFetch = projectFetch;
+const _libraryQuery = () => window.AtelierSearch?.query() ?? document.getElementById('search-input').value.trim();
 async function api(path, opts = {}) {
   const { project = _activeProjectName, ...requestOpts } = opts;
   const res = await projectFetch(path, requestOpts, project);
@@ -201,6 +202,17 @@ function skinIdFromPath(path) {
 }
 
 // ── navigation ────────────────────────────────────────────────────────────────
+async function openRosterSkin(skin) {
+  const project=_activeProjectName, skinId=skin.path?.split('/').at(-1);
+  if(!/^\d{7}$/.test(skinId||''))return;
+  try {
+    const meshes=await api('/api/skin_meshes?skin_id='+encodeURIComponent(skinId),{project});
+    if(project!==_activeProjectName)return;
+    if(Array.isArray(meshes)&&meshes.length)await window.AtelierViewport?.open(skinId,skin.name);
+    else {await pushNav({path:skin.path});toast('No meshes were found for this costume. Its folder is open.','info');}
+  } catch(error) {if(project===_activeProjectName){await pushNav({path:skin.path});toast('Could not load this costume’s meshes: '+error.message,'warning');}}
+}
+
 function pushNav(newNav, {focusPath = '__first__'} = {}) {
   const direction = nav.path && (!newNav.path || nav.path.startsWith(newNav.path + '/')) ? 'back' : 'forward';
   AtelierLibraryTools.closePreview();
@@ -211,8 +223,9 @@ function pushNav(newNav, {focusPath = '__first__'} = {}) {
   nav = { ...newNav };
   updateNavBtns();
   document.getElementById("search-input").value = "";
-  renderGrid(focusPath, direction);
+  const rendered = renderGrid(focusPath, direction);
   renderSidebar();
+  return rendered;
 }
 
 function updateNavBtns() {
@@ -326,6 +339,7 @@ let _gridThumbs = null;
 let _gridStatus = 'ready';
 let _gridRenderedPath = '';
 async function renderGrid(focusPath = null, direction = 'forward') {
+  window.AtelierSearch?.reset();
   const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
   allItems = [];
@@ -366,7 +380,10 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       const bannerReady = window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
       const category = path.split('/').reverse().map(part=>folderIconCls(part)).find(cls=>cls!=='folder-icon') || 'folder-icon';
       document.getElementById('library-category-line').className = 'card-icon ' + category;
-      window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}));
+      window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}), {
+        openSkin: openRosterSkin,
+        continue:(item,kind)=>kind==='studio'&&item.skin_id?window.AtelierViewport?.open(item.skin_id,item.skin_name):handleImportedFileAction({...item,file_type:kind==='studio'?item.file_type:kind}),
+      });
       buildGrid(data.map(_makeCard), false, focusElsewhere ? null : focusPath);
       _gridStatus = 'ready';
       renderBreadcrumbs();
@@ -413,17 +430,19 @@ function _mountEmptyArt(container, kind) {
 function renderHomePins() {
   window.AtelierLibraryPins?.render(document.getElementById("home-pins"), {
     isHome: !nav.path, onNavigate: path => pushNav({path}),
-    filter: document.getElementById("search-input").value.trim(),
+    filter: _libraryQuery(),
   });
 }
 
+let _homeCategoriesExpanded=false;
 function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs?.destroy();
   _gridThumbs = null;
   renderHomePins();
   const area = document.getElementById("grid-area");
+  area.classList.toggle('home-categories',!nav.path);
   window.AtelierTextureReconstruction?.disposeWithin(area);
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
   let filtered = AtelierLibraryTools.filter(cards, q);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
@@ -436,6 +455,9 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
   }
   filtered = AtelierLibraryTools.sort(filtered);
+  const moreCategories=!nav.path&&!q&&!AtelierLibraryTools.hasFilters()&&filtered.length>8;
+  const categoryCount=filtered.length;
+  if(moreCategories&&!_homeCategoriesExpanded)filtered=filtered.slice(0,8);
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -537,11 +559,17 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
     }
     const wrapper = window.AtelierLibraryPins?.decorate(card, el) || el;
+    el.classList.toggle('category-chip',!nav.path&&card.type==='folder');
+    wrapper.classList.toggle('home-category-wrap',!nav.path&&card.type==='folder');
     grid.appendChild(AtelierLibraryTools.decorate(card, el, wrapper));
   });
 
   area.innerHTML = "";
   area.appendChild(grid);
+  if(moreCategories) {
+    const more=document.createElement('button');more.className='btn home-category-more';more.textContent=_homeCategoriesExpanded?'Fewer folders':`+${categoryCount-8} more folders`;more.setAttribute('aria-expanded',String(_homeCategoriesExpanded));
+    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});area.append(more);
+  }
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
   _gridThumbs?.start(retryThumbs);
@@ -563,7 +591,7 @@ function updateImportedCard(gameRel, record) {
     }
     const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
   }
-  const q=document.getElementById('search-input').value.trim().toLowerCase();
+  const q=_libraryQuery().toLowerCase();
   const cards=AtelierLibraryTools.sort(AtelierLibraryTools.filter(allItems.map(_makeCard),q));
   if (!cards.length) {buildGrid(allItems.map(_makeCard));return;}
   const key=card=>card.rel_path||card.game_rel||card.label;
@@ -621,6 +649,7 @@ function libraryParent() {
   if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});
 }
 function applyLibraryView() {
+  window.AtelierSearch?.reset();
   if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard));
   else if (_gridStatus === 'loading') {
     const area=document.getElementById('grid-area');
@@ -638,7 +667,15 @@ AtelierLibraryTools.init({
     _ctxShow({preventDefault() {}, stopPropagation() {}, currentTarget: button, clientX: bounds.left + 12, clientY: bounds.top + 12}, _ctxItemsCard(card));
   },
 });
-document.getElementById("search-input").addEventListener("input", applyLibraryView);
+window.AtelierSearch?.init({changed:applyLibraryView, open:async (group,item)=>{
+  if(group==='assets') {
+    await pushNav({path:item.parent},{focusPath:item.game_rel});
+    [...document.querySelectorAll('#grid-area .card')].find(card=>card.dataset.libraryPath===item.game_rel)?.focus();
+  } else await pushNav({path:item.path});
+}});
+document.getElementById("search-input").addEventListener("input", () => {
+  if(!window.AtelierSearch || AtelierSearch.scope()==='folder')applyLibraryView();
+});
 
 document.addEventListener("keydown", e => {
   if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
@@ -657,6 +694,7 @@ document.addEventListener("keydown", e => {
 
 // ── asset click / single import ───────────────────────────────────────────────
 function handleImportedFileAction(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,item.file_type,_activeProjectName);
   const ft = item.file_type || "texture";
   switch (ft) {
     case "material":
@@ -1016,6 +1054,7 @@ function _seedScalars(arr) {
 }
 
 async function openMaterialEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'material',_activeProjectName);
   if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
@@ -1685,6 +1724,7 @@ function _resampleStops(channels) {
 }
 
 async function openCurveEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'curve',_activeProjectName);
   _syncBulkEditorAction();
   const ov = document.getElementById("curve-overlay");
   document.getElementById("curve-title").textContent = item.name;
@@ -1832,6 +1872,7 @@ function _vfxGradCss(g) {
 }
 
 async function openVfxEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'vfx',_activeProjectName);
   _syncBulkEditorAction();
   const ov = document.getElementById("vfx-overlay");
   document.getElementById("vfx-title").textContent = item.name;
@@ -2080,7 +2121,7 @@ document.getElementById("vfx-overlay").addEventListener("click", e => {
 
 // ── import all ────────────────────────────────────────────────────────────────
 function _shownTextures() {
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   const paths = new Set(AtelierLibraryTools.filter(allItems.map(_makeCard), q)
     .filter(i => i.type === 'asset' && i.file_type === 'texture').map(i => i.game_rel));
   return allItems.filter(i => i.type === 'asset' && i.file_type === 'texture' && paths.has(i.game_rel));
@@ -2096,7 +2137,7 @@ document.getElementById("view3d-fab").addEventListener("click", () => {
 document.getElementById("import-all-btn").addEventListener("click", () => {
   const shown   = _shownTextures();
   const pending = shown.filter(i => !i.imported);
-  const q       = document.getElementById("search-input").value.trim();
+  const q       = _libraryQuery();
   if (!pending.length) { toast(q ? "All shown textures already edited" : "All textures already edited", "success"); return; }
   const sid = skinIdFromPath(nav.path);
   pendingImportAll = pending;
@@ -2190,7 +2231,7 @@ document.getElementById('bulk-edit-open').addEventListener('click', () => {
     toast('Save or reset this file’s changes before bulk editing.', 'warning'); return;
   }
   const eligible = item => ['curve','vfx'].includes(item.file_type) && item.game_rel;
-  const query = document.getElementById('search-input').value.trim().toLowerCase();
+  const query = _libraryQuery().toLowerCase();
   const folder = AtelierLibraryTools.filter(allItems.map(_makeCard), query).filter(eligible);
   const current = _bulkEditorKind === 'curve' ? curveEditor : vfxEditor;
   const edited = Object.values(sidebarData).filter(i => i.selected && eligible(i) && i.game_rel !== current.game_rel);
@@ -2395,7 +2436,7 @@ let _sbLastTok  = null;          // anchor for shift-click ranges
 
 function _sbVisible() {
   const all = Object.values(sidebarData);
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   return q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
 }
 
@@ -2448,6 +2489,7 @@ async function performClearMany(items) {
 }
 
 function renderSidebar() {
+  window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
   const list = document.getElementById("sidebar-list");
   document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
@@ -2471,7 +2513,7 @@ function renderSidebar() {
     updateInstallBtn();
     return;
   }
-  const q     = document.getElementById("search-input").value.trim().toLowerCase();
+  const q     = _libraryQuery().toLowerCase();
   const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
   if (!items.length) {
     list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets match the search.</div>';
@@ -4705,6 +4747,7 @@ function _rgb01Hex(c) { c = c || [1, 1, 1]; return "#" + _wHx(c[0] * 255) + _wHx
 function _hex01(h) { return [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; }
 
 async function openWorldEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'world',_activeProjectName);
   const ov = document.getElementById("world-overlay");
   document.getElementById("world-title").textContent = item.name;
   document.getElementById("world-sub").textContent = item.game_rel || "";
@@ -4861,6 +4904,7 @@ let textEditor = null;
 function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 async function openTextEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'text',_activeProjectName);
   const ov = document.getElementById("text-overlay");
   document.getElementById("text-title").textContent = item.name;
   document.getElementById("text-sub").textContent = item.game_rel || "";
