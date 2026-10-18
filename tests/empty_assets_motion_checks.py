@@ -47,7 +47,7 @@ def run_empty_assets_motion_checks(page, context, url, report, checks):
         assert empty_page.locator('#sidebar-list [data-atelier-motion="empty-assets"]').count() == 0
         empty_page.locator('#search-scope').click()
         empty_page.locator('#search-input').fill('unmatched-asset')
-        assert 'No edited assets match the search.' in empty_page.locator('#sidebar-list').inner_text()
+        assert 'No Mod tray assets match the search.' in empty_page.locator('#sidebar-list').inner_text()
         assert empty_page.locator('#sidebar-list .am-empty-assets-svg').count() == 0
         empty_page.locator('#search-input').fill('')
         fixture['data'] = []

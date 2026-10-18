@@ -3880,8 +3880,8 @@ async function checkUpdate(pending = api("/api/update_check")) {
   lucide.createIcons();
 
   return new Promise(resolve => {
-    const dismiss = () => { overlay.classList.remove("active");window.AtelierSurfaces?.updateDrop('app',()=>overlay.classList.add('active')); resolve(false); };
-    document.getElementById("update-later").onclick = dismiss;
+    const dismiss = (remind=false) => { overlay.classList.remove("active");if(remind)window.AtelierSurfaces?.updateDrop('app',()=>overlay.classList.add('active')); resolve(false); };
+    document.getElementById("update-later").onclick = ()=>dismiss(true);
     if (info.manual) {
       document.getElementById("update-now").onclick = async () => {
         try { await api("/api/update_open_release", { method: "POST" }); } catch {}
