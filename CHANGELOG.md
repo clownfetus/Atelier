@@ -1,9 +1,23 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**0.4.1**.
+**1.0.0**.
 
-## Unreleased
+## 1.0.0 — 18 October 2026
+
+- Consolidates the unmerged UI waves, motion review and latest Krackle A mark.
+- Hero-led Home, Everywhere search, costume entry points and Continue editing.
+- Recoverable project trash, Undo, themed confirmations and guided setup.
+- Mod tray / Build mod workflow, guarded image drops, readable caption results,
+  updated surfaces and palettes, and measured Krackle inks.
+- Full / Calm / Off motion with system reduced-motion precedence, shared timing
+  and once-per-launch presentation. Optional formation sounds are off by default.
+- Inspect / Showcase rendering, posters, turntables and client-created Mod cards.
+- Material replacement and restoration use the same themed confirmations as
+  other editors; confirmations cannot apply to a subsequently opened material.
+- Pinned Windows compiler/build dependencies, complete candidate checks, native
+  WebKit AppImage checks and upgrade preservation from 0.4.1.
+
 
 - **Replace material** in the material editor searches installed materials by
   character, skin, name or path and applies one to the target, preserving the

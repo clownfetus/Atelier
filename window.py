@@ -7,7 +7,6 @@ import os
 import datetime
 if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
     os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
-import webview
 
 from atelier import hostos
 from atelier.window_theme import WindowTheme
@@ -80,6 +79,15 @@ def _run_server():
 
 
 def main():
+    from atelier.windows_runtime import launch_issue
+    issue = launch_issue()
+    if issue:
+        print(issue, file=sys.stderr)
+        if os.name == 'nt':
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, issue, 'Atelier requirements', 0x10)
+        return 1
+    import webview
     webview.settings['ALLOW_DOWNLOADS'] = True  # Viewer captures use the native Save As dialog.
     _setup_logging()
 
@@ -133,4 +141,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

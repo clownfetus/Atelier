@@ -148,6 +148,8 @@ def main():
                 exportReview: typeof AtelierExportReview === 'object',
                 originalComparison: typeof materialDirtyCount === 'function',
                 motions: Object.keys(AtelierMotion).sort(),
+                beatMs: AtelierMotion.beatMs, exitMs: AtelierMotion.exitMs,
+                modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley && window.AtelierModCards),
                 folderMotion: !!document.querySelector('link[href$="folder-flap.css"]'),
                 font: document.fonts.check('14px Roboto'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
@@ -156,10 +158,11 @@ def main():
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info
-            assert info['motions'] == ['emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader'], info
+            assert {'emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader', 'krackleGlyph', 'krackleStage'}.issubset(info['motions']), info
+            assert info['beatMs'] == 1040 and info['exitMs'] == 120 and info['modernFeedback'], info
             assert info['logo'] > 0 and info['emptyTray'] == 112 and info['singleMark'] == 1, info
             result['interface'] = info
-            result['checks'].append('All workflow modules, six motion sets, local font and logo load from the frozen bundle')
+            result['checks'].append('All workflow modules, shared timing, Krackle controllers, local font and latest logo load from the frozen bundle')
             for theme in ('light', 'dark'):
                 page.locator('#settings-theme').select_option(theme, force=True)
                 assert page.evaluate('document.documentElement.dataset.theme') == theme

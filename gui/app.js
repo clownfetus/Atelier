@@ -1568,12 +1568,13 @@ function matChooseSource(path) {
 
 async function replaceMaterialFromSource() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
+  const editor = matEditor, project = _activeProjectName;
   const source = document.getElementById("mat-source-path").value.trim();
   const status = document.getElementById("mat-status");
   if (!source) { status.textContent = "Choose or paste a source material path."; return; }
-  if (!confirm(`Replace ${matEditor.name} with ${source}? This saves immediately and replaces its parameters and custom texture assignments.`
-    + (materialDirtyCount() ? " Unsaved parameter changes will be discarded." : ""))) return;
-  const editor = matEditor, project = _activeProjectName;
+  if (!(await _confirmAction(`Replace ${editor.name} with ${source}? This saves immediately and replaces its parameters and custom texture assignments.`
+    + (materialDirtyCount() ? " Unsaved parameter changes will be discarded." : ""), 'Replace material?', 'Replace'))) return;
+  if (matEditor !== editor || project !== _activeProjectName || _materialSaving.has(editor)) return;
   const current = () => matEditor === editor && project === _activeProjectName;
   _materialSaving.add(editor); _matRefreshDirty();
   document.getElementById("mat-body").inert = true;
@@ -1716,10 +1717,11 @@ async function saveMaterial() {
 
 async function resetMaterial() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
+  const editor = matEditor, project = _activeProjectName;
   const ownTextures = Object.keys(matEditor.custom || {}).length;
   if (!(await _confirmAction("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
                + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""), 'Restore game values?', 'Restore'))) return;
-  const editor = matEditor, project = _activeProjectName;
+  if (matEditor !== editor || project !== _activeProjectName || _materialSaving.has(editor)) return;
   const structural = !!editor.materialSource;
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;

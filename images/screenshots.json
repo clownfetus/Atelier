@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "viewport": [
+    1400,
+    900
+  ],
+  "data": "Isolated configured game data; no edits saved and no mods installed",
+  "page_errors": [],
+  "files": [
+    {
+      "path": "studio-dark.png",
+      "sha256": "c63e688b7fe07872eb2c0eca583a07e2f6d6dbf17e189f5639a0940f9d6de4d2"
+    },
+    {
+      "path": "studio-light.png",
+      "sha256": "82087a1c9c61dabf231295427b19f1267194e88db916087c00c2775735014d9f"
+    },
+    {
+      "path": "material-editor.png",
+      "sha256": "47c1b80feb547533c1db9bbffaa10a17a9114a0cf3a4fe7c06a0cd568863f9c9"
+    },
+    {
+      "path": "material-replacement.png",
+      "sha256": "d05bb615c4024ee8fb7aeaa0b03ec1edb10123ebd069003f627c9e14cfa91e75"
+    },
+    {
+      "path": "model-studio.png",
+      "sha256": "c8525ae439bd7cb8617499d207c32bf5fe2bb49befc50237918767c68ff4be18"
+    },
+    {
+      "path": "showcase.png",
+      "sha256": "839520c1e199b8af4d21f2cf0e3e6a3f3e0c618fb52c682f68612d8017fca16d"
+    },
+    {
+      "path": "appearance-settings.png",
+      "sha256": "79827ef52c7d48fb96111aa3ecfb75f2acc57a018c3908dcc560b1c4f7f957d3"
+    }
+  ]
+}

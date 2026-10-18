@@ -1,47 +1,44 @@
 # Atelier: Modding Studio
 
-Settings and first-run setup offer a Full / Calm / Off Motion dial. Calm keeps
-small responses and still formations; Off uses stills. Your operating system's
-reduced-motion preference always takes precedence. Hero/skin artwork accents
-keep outcome colours distinct, with a SHIFTED label when adjustment is needed.
-
-Your **Mod tray** collects edits for **Build mod**. Drop an image onto an edited
-texture card to use the same replacement flow as Replace with Image; Atelier asks
-before overwriting the edit. Paper caption
-notifications keep results readable in either theme; exact colour swatches show
-HDR intensity around their edges.
-
-Model Studio offers **Inspect** and **Showcase**. Showcase uses cel lighting and
-a skin-colour dot backdrop for presentation; returning to Inspect restores the
-editable materials. Successful and warning builds can offer a **Mod card** with
-completed asset counts, version/date and Copy image / Save PNG actions. It uses a
-matching loaded Showcase capture or clearly labelled catalogue artwork. Formation
-sounds are optional, off by default, and silent in Calm, Off or a hidden window.
-
-Atelier is a desktop modding studio for Marvel Rivals. Browse game assets, edit
-textures and material parameters, preview models, and build mods from one interface.
+**Atelier 1.0** brings the Marvel Rivals modding workflow together: find heroes
+and assets, edit materials and textures, inspect models, and review your mod
+before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
+· [What's new in 1.0](docs/release-1.0.0.md)
 · [Development guide](DEVELOPMENT.md)
-· [Changelog](CHANGELOG.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier asset library in dark mode, with category folders, search, filters and edited assets](images/studio-dark.png)
+![Atelier 1.0 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-Screenshots show the current source interface with example data. The published
-installer can contain an earlier interface until a new release is published.
-See [screenshot details](images/README.md).
+## What's new in 1.0
 
-**Atelier 0.4.1** lets a material use your own images in its texture slots
-(experimental), fixes mesh editing in Blender, explains Model Studio load failures
-and brings the Krackle design language to Atelier's feedback. It builds on 0.4's
-redesigned Model Studio and model replacement. See the
-[release notes](docs/release-0.4.1.md) for details and verification.
+- **Find your next edit faster.** Home opens with hero portraits and costume
+  lists. Search Everywhere across heroes, skins, folders and assets, or narrow
+  the search to This folder. Continue editing reopens your latest project edit.
+- **Swap a whole material.** Search installed materials by character, skin, name
+  or path, use one on another asset, and restore the target's game defaults.
+- **Present your work.** Model Studio's Inspect and Showcase views offer
+  editable previews and cel-lit presentation. Create posters and turntables;
+  completed builds can produce a shareable Mod card.
+- **Recover deleted edits.** Project trash keeps deleted edits and export
+  options together. Undo is available immediately, with seven days of recovery.
+- **Make Atelier yours.** The latest Krackle A logo, comic-inspired surfaces,
+  readable result captions, new palettes and a Full / Calm / Off motion dial.
+  Optional formation sounds start off; system reduced-motion settings take
+  precedence.
+- **Start and build with clearer guidance.** Three-step setup, progress tied to
+  actual work, a Mod tray for edits, and a review before Build mod. A slow update
+  service no longer holds up launch.
+
+The app and download files use **1.0.0**. See the [release notes](docs/release-1.0.0.md)
+for verification and platform limits. Screenshots show the actual interface with
+an isolated, configured game installation; [capture details](images/README.md).
 
 ## Features
 
 - **Find assets:** character and skin names, current-folder search by name, ID or
-  path, type/status filters, sorting, adjustable tile sizes and pinned folders.
+  path, Everywhere search, type/status filters, sorting, adjustable tile sizes and pinned folders.
 - **Edit materials:** grouped color, dye-region and scalar parameters, explicit
   unsaved changes, comparison with saved values or the original game material,
   and individual value restoration.
@@ -69,6 +66,21 @@ redesigned Model Studio and model replacement. See the
 ![Atelier asset library in light mode with the same example project](images/studio-light.png)
 
 </details>
+
+## Model Studio and Showcase
+
+Inspect a model with material picking, lighting controls, original/edited
+comparison, and a before/after wipe. Switch to **Showcase** for cel lighting and
+a skin-colour dot backdrop. Returning to **Inspect** restores the editable
+materials; presentation does not save material changes.
+
+![Model Studio inspecting Magik from an isolated game installation](images/model-studio.png)
+
+![The same model in Showcase presentation](images/showcase.png)
+
+A completed build's **Mod card** records its actual asset counts and version/date.
+Copy the image or save a PNG. Cards use a matching loaded Showcase capture, or
+clearly labelled catalogue artwork when a capture is unavailable.
 
 ## Material editing
 
@@ -107,7 +119,7 @@ Open the target material and expand **Replace material**. Search by character,
 skin, asset name or path, select a result (or paste its `/Game/Marvel/…` path),
 then click **Use this material**. Character and skin names use the installed
 reference table. The replacement saves immediately; export the target material
-through Edited Assets as usual.
+through the Mod tray as usual.
 
 The donor's parent, textures, static switches and cooked shader data are kept,
 while the target keeps its package path and name. Donor project edits are not
@@ -128,7 +140,7 @@ Open **Menu → Settings → Appearance** to choose a mode and palette. Use **Cu
 to change the background, foreground, surface and accent, then name and save the
 palette to reuse it. Appearance is also available during first-run configuration.
 
-![Appearance settings showing dark mode, palette presets and editable custom colors](images/appearance-settings.png)
+![Appearance settings with palette presets and the Full, Calm and Off motion dial](images/appearance-settings.png)
 
 ## Installation
 
@@ -137,8 +149,9 @@ palette to reuse it. Appearance is also available during first-run configuration
 1. Download **AtelierSetup.exe** from the
    [latest official release](https://github.com/clownfetus/Atelier/releases/latest).
 2. Run the installer, then launch Atelier.
-3. In **Initial Configuration**, select your Marvel Rivals installation folder
-   and provide the current USMAP mapping and AES key when requested. The
+3. Follow **Find the game → Unlock the paks → Make it yours**. Select your
+   Marvel Rivals folder and provide a current USMAP mapping and AES key if
+   automatic retrieval is unavailable. The
    [Help section](#help) has links if automatic retrieval is unavailable.
 4. In **Menu → Settings**, choose your mods folder to enable **Copy to ~mods/**.
 

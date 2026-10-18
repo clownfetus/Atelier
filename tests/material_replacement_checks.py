@@ -63,11 +63,11 @@ def run_material_replacement_checks(page, context, url, report, checks):
         tab.wait_for_selector("#mat-source-results option")
         tab.locator("#mat-source-results").select_option(SOURCE)
         assert tab.locator("#mat-source-path").input_value() == SOURCE
-        tab.once("dialog", lambda dialog: dialog.dismiss())
         tab.locator("#mat-use-source").click()
+        tab.locator("#atelier-confirm-cancel").click()
         assert not writes
-        tab.once("dialog", lambda dialog: dialog.accept())
         tab.locator("#mat-use-source").click()
+        tab.locator("#atelier-confirm-ok").click()
         tab.wait_for_function("matEditor?.materialSource?.includes('MI_Galaxy')")
         assert tab.evaluate("matEditor.colors[0].name") == "GalaxyGlow"
         assert tab.evaluate("matEditor.scalars[0].name") == "StarSpeed"
@@ -83,18 +83,33 @@ def run_material_replacement_checks(page, context, url, report, checks):
             tab.screenshot(path=str(report / ("material-replacement-" + theme + ".png")))
         checks.append("Material search/select, cancellation and immediate replacement retain donor controls and project identity")
 
-        tab.once("dialog", lambda dialog: dialog.accept())
         tab.locator("#mat-reset").click()
+        tab.locator("#atelier-confirm-ok").click()
         tab.wait_for_function("!matEditor?.materialSource && matEditor?.colors?.[0]?.name === 'Tint'")
         assert tab.evaluate("materialDirtyCount()") == 0
         checks.append("Restore game defaults returns the original parameter schema after replacement")
+
+        before = len(writes)
+        for action in ("replaceMaterialFromSource", "resetMaterial"):
+            tab.locator("#mat-source-path").fill(SOURCE)
+            tab.evaluate("action => { window.confirmation = window[action](); }", action)
+            tab.wait_for_selector("#atelier-confirm-ok")
+            tab.evaluate("closeMaterialEditor(true)")
+            tab.evaluate("openMaterialEditor({name:'Other material',game_rel:'Fixture/MI_ConfirmOther'})")
+            tab.locator("#atelier-confirm-ok").click()
+            tab.wait_for_timeout(80)
+            assert tab.evaluate("matEditor.game_rel") == "Fixture/MI_ConfirmOther"
+            assert len(writes) == before
+            tab.evaluate("closeMaterialEditor(true)")
+            open_editor()
+        checks.append("A confirmation for a closed material cannot replace or reset a subsequently opened editor")
 
         state["replace"] = "fail"
         tab.locator("#msn0").fill(".8")
         tab.locator("#msn0").dispatch_event("input")
         tab.locator("#mat-source-path").fill(SOURCE)
-        tab.once("dialog", lambda dialog: dialog.accept())
         tab.locator("#mat-use-source").click()
+        tab.locator("#atelier-confirm-ok").click()
         tab.wait_for_function("document.getElementById('mat-status').textContent.includes('donor unavailable')")
         assert tab.locator("#msn0").input_value() == ".8"
         assert tab.evaluate("materialDirtyCount()") == 1
@@ -110,8 +125,8 @@ def run_material_replacement_checks(page, context, url, report, checks):
         assert tab.locator("#mat-source-results option").all_text_contents() == [SOURCE]
 
         state["replace"] = "delay"
-        tab.once("dialog", lambda dialog: dialog.accept())
         tab.locator("#mat-use-source").click()
+        tab.locator("#atelier-confirm-ok").click()
         old_write = pending(pending_writes)
         assert tab.locator("#mat-body").evaluate("el=>el.inert")
         tab.evaluate("closeMaterialEditor(true)")
