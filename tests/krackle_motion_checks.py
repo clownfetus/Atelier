@@ -53,7 +53,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           try { const t = toastSpinner('Working glyph'); t.resolve('Finished glyph', 'warning', 60000); }
           finally { window.AtelierExportFeedback = feedback; }
         }""")
-        assert tab.locator('#toast-area [data-atelier-motion=krackle-glyph][data-am-state=warning]').count() == 1
+        assert tab.locator('#toast-area .toast',has_text='Finished glyph').locator('[data-atelier-motion=krackle-glyph][data-am-state=warning]').count() == 1
         tab.wait_for_function("!document.querySelector('#toast-area').getAnimations({subtree:true}).some(a=>a.effect?.target?.closest?.('[data-atelier-motion]'))", timeout=8000)
         assert tab.evaluate("[...document.querySelectorAll('#toast-area .toast')].map(t=>t.innerText.trim())") == [
             'Plain warning', 'Finished success', 'Finished warning', 'Finished error', 'Finished glyph']
@@ -69,7 +69,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           if (!toastEl.querySelector('svg.lucide') || toastEl.querySelector('[data-atelier-motion]')) throw Error('Glyph failure lost the static icon');
           toastEl.remove();
         }""")
-        checks.append('Job toasts resolve into Krackle results that settle after one pop; plain notifications keep Material icons; failures keep the original icon')
+        checks.append('Caption notifications use micro formations; job results settle after one pop and controller failures keep the original icon')
 
         # Grid empty states keep their text; the art is decorative and settles.
         tab.evaluate("buildGrid([])")
