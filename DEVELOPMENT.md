@@ -25,6 +25,12 @@ Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
 storage, so an old cached page cannot mix with the new scripts and styles.
 `tests/test_frontend_cache.py` checks the HTML, conditional responses and CSS.
+The post-update “What’s new” popup reads the bundled `CHANGELOG.md` offline and
+records `changelog_version` in app settings when dismissed. Fresh setup establishes
+the initial version without a popup. Keep the numbered release section in the
+changelog in sync with `version`; `Unreleased` entries never appear in the popup.
+Run `tests/browser_smoke.py --changelog-only --report-dir <folder>` and
+`tests/run_checks.py --suite test_changelog.py` for the upgrade and dismissal checks.
 The frozen smoke checks the first native navigation before reloading, and accepts
 `--profile-source <old-_webview-directory>` to test an existing profile. Add
 `--expected-theme dark` to verify the saved theme, and

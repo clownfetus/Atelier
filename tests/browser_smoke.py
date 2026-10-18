@@ -77,6 +77,7 @@ def main():
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
+    parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -158,6 +159,16 @@ def main():
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
                 from startup_update_checks import run_startup_update_checks
                 run_startup_update_checks(context, url, report, checks)
+
+                from changelog_checks import run_changelog_checks
+                run_changelog_checks(context, url, report, checks)
+                if args.changelog_only:
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
 
                 if args.showcase_only:
                     from showcase_checks import run_showcase_checks

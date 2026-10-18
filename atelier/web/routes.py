@@ -7,6 +7,7 @@ from atelier import hostos
 from atelier import operations
 from atelier import jobs
 from atelier import preview
+from atelier import changelog
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
@@ -114,7 +115,8 @@ class _ProjectScopePlugin:
                     root = _c.project_dir(body.get("name", ""), PROJECTS_ROOT)
                     with operations.project_use(root):
                         return callback(*args, **kwargs)
-                if route.rule in ("/api/projects", "/api/project/export"):
+                if route.rule in ("/api/projects", "/api/project/export",
+                                  "/api/changelog", "/api/changelog/acknowledge"):
                     return callback(*args, **kwargs)
                 header = request.get_header("X-Atelier-Project")
                 name = (unquote(header) if header is not None else
@@ -153,6 +155,16 @@ def api_app_info():
     except OSError:
         version='development'
     return {'version':version}
+
+
+@app.get('/api/changelog')
+def api_changelog():
+    return changelog.status(VERSION_FILE)
+
+
+@app.post('/api/changelog/acknowledge')
+def api_changelog_acknowledge():
+    return changelog.acknowledge(VERSION_FILE, (request.json or {}).get('version'))
 
 
 @app.get("/api/jobs")

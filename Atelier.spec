@@ -10,6 +10,7 @@ from stage_tools import UNUSED_PACKAGES
 datas = [
     ('gui', 'gui'),
     ('version', '.'),
+    ('CHANGELOG.md', '.'),
     # Blender runs these as standalone --python scripts, so they must exist as real .py files on
     # disk — being importable from the PYZ is not enough. meshedit._SCRIPTS resolves them next to
     # the package, which is <_MEIPASS>/atelier/blender when frozen. Without this the whole .blend

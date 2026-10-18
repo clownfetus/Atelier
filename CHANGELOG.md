@@ -3,6 +3,11 @@
 The app, installers and update checker identify each release by its full number, such as
 **1.0.0**.
 
+## Unreleased
+
+- A “What’s new” popup shows the bundled changelog once after an update, including
+  skipped releases. Reopen it from the app menu at any time.
+
 ## 1.0.0 — 18 October 2026
 
 - Consolidates the unmerged UI waves, motion review and latest Krackle A mark.

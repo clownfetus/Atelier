@@ -3597,6 +3597,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
         await loadSidebar();
         updateInstallBtn();
       }
+      window.AtelierChangelog?.ready();
     } else {
       toast(`Error: ${res.error}`, "warning");
       _resetSaveBtn();
@@ -4006,6 +4007,7 @@ async function checkUpdate(pending = api("/api/update_check")) {
   catch { return false; }
 
   if (!info?.available) return false;
+  await window.AtelierChangelog?.whenClosed();
   overlay.classList.add("active");
 
   document.getElementById("update-tag").textContent = info.tag;
@@ -4540,6 +4542,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
+      { icon: "sparkles", label: "What’s new…", action: () => window.AtelierChangelog?.show() },
       { icon: "circle-help", label: "Help / Info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
       { icon: "trash-2", label: "Reset Data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },
@@ -4618,6 +4621,7 @@ async function init() {
   window.AtelierPolish?.startup();
   console.log("[init] starting");
   renderBreadcrumbs();
+  window.AtelierChangelog?.start();
   // The release check runs alongside startup instead of before it, so a slow or offline GitHub
   // never delays setup or the library. Its dialog appears once one of them is on screen.
   const update = api("/api/update_check").catch(() => null);
@@ -4631,6 +4635,7 @@ async function init() {
   await renderGrid();
   await loadSidebar();
   checkUsmapUpdate();
+  window.AtelierChangelog?.ready();
 }
 
 init();
