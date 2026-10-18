@@ -857,6 +857,7 @@ function _matRefreshDirty() {
   save.disabled = busy;
   save.textContent = busy ? "Saving…" : n ? `Save changes (${n})` : "Save";
   document.getElementById("mat-reset").disabled = busy;
+  bodyMaterialBusy(busy);
   const revert = document.getElementById("mat-revert");
   if (revert) revert.disabled = busy || !n;
   ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
@@ -1015,6 +1016,7 @@ async function openMaterialEditor(item) {
   matEditor = null;
   clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
+  document.getElementById("mat-body").inert = false;
   document.getElementById("mat-title").textContent = item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
@@ -1029,14 +1031,18 @@ async function openMaterialEditor(item) {
   matEditor = { game_rel: item.game_rel, name: item.name,
                 colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved",
                 textures: res.textures || {}, textureClasses: res.texture_classes || {},
-                custom: res.custom_textures || {} };
+                custom: res.custom_textures || {}, materialSource: res.material_source || "" };
   _matRemember(matEditor, res.original);
   renderMatEditor();
   loadSidebar();
+  await loadMaterialDye(item, current, project);
+}
+
+async function loadMaterialDye(item, current, project) {
   // Dyeing materials (chromas) recolour through the ColorID mask, so the "Region N" pickers below
   // do nothing visible on their own — attach a live composite so the user can see what they're doing.
   try {
-    const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`);
+    const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`, { project });
     if (di && di.dyeable && current() && matEditor) {
       const editor = matEditor;
       matEditor.dyeable = true;
@@ -1044,7 +1050,7 @@ async function openMaterialEditor(item) {
       matEditor.dyeView = "preview";
       matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
       try {
-        const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`);
+        const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`, { project });
         if (!current() || matEditor !== editor) return;
         matEditor.dyeOff = !!(ao && ao.opts && ao.opts.dye_off);
         matEditor.dyeMask = (ao && ao.mask) || "";
@@ -1360,6 +1366,7 @@ function renderMatEditor() {
     </div>
     <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
   </div><p class="mat-reference-note">${m.compareMode === "original" ? "Game original values are shown below each parameter. Changes apply only when you save." : "Saved values are from this project's last save. Compare Game original to inspect the unmodified material."}</p>`;
+  h += materialReplacementHtml(m, expanded);
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
     const reg  = m.dyeView === "regions";
@@ -1447,6 +1454,98 @@ function renderMatEditor() {
   reset.textContent = "Restore game defaults";
   reset.title = "Replace the project's saved material with original game values";
   _matRefreshDirty();
+}
+
+function bodyMaterialBusy(busy) {
+  document.querySelectorAll("#mat-replacement input, #mat-replacement button, #mat-replacement select")
+    .forEach(el => { el.disabled = busy; });
+}
+
+function materialReplacementHtml(m, expanded) {
+  return `<details id="mat-replacement" class="mat-parameter-group" data-mat-group="Replacement" ${expanded.get("Replacement") ? "open" : ""}>
+    <summary>Replace material<span>${m.materialSource ? "Using another material" : "Game material"}</span></summary>
+    <div class="mat-replacement-body">
+      <p>${m.materialSource ? `Source: <code>${_matEscape(m.materialSource)}</code>` : "This asset uses its original game material."}</p>
+      <p>Use a material from any character, including its parent, textures and shader settings. This is saved immediately and included in export.</p>
+      <label for="mat-source-search">Find a material by character, skin, name or path</label>
+      <div class="mat-source-search"><input id="mat-source-search" type="search" placeholder="e.g. galaxy, 1031, MI_Body" oninput="matSearchSources(this.value)">
+        <button type="button" class="btn" onclick="matSearchSources(document.getElementById('mat-source-search').value, true)">Search</button></div>
+      <p id="mat-source-status" role="status" aria-live="polite"></p>
+      <select id="mat-source-results" size="5" aria-label="Matching materials" hidden onchange="matChooseSource(this.value)"></select>
+      <label for="mat-source-path">Source material path</label>
+      <input id="mat-source-path" type="text" placeholder="Characters/…/Materials/MI_…" value="${_matEscape(m.sourceDraft || m.materialSource || "")}" oninput="matEditor.sourceDraft=this.value">
+      <p>UVs, vertex colors and character-specific shader inputs can affect the result. Animated game shaders are not fully represented in the 3D preview.</p>
+      <button type="button" id="mat-use-source" class="btn" onclick="replaceMaterialFromSource()">Use this material</button>
+    </div></details>`;
+}
+
+let _matSourceTimer = null, _matSourceRevision = 0;
+async function matSearchSources(query, immediate = false) {
+  clearTimeout(_matSourceTimer);
+  const revision = ++_matSourceRevision, editor = matEditor, project = _activeProjectName;
+  const current = () => matEditor === editor && project === _activeProjectName && revision === _matSourceRevision;
+  const status = document.getElementById("mat-source-status"), results = document.getElementById("mat-source-results");
+  if (!status || !results) return;
+  results.hidden = true;
+  if (query.trim().length < 2) { status.textContent = "Enter at least two characters."; return; }
+  const search = async () => {
+    if (!current()) return;
+    status.textContent = "Finding materials…";
+    try {
+      const res = await api(`/api/material_sources?q=${encodeURIComponent(query)}`, { project });
+      if (!current() || !status.isConnected) return;
+      if (!res.ok) throw new Error(res.error || "Search failed");
+      results.replaceChildren(...(res.materials || []).filter(path => path !== editor.game_rel)
+        .map(path => new Option(res.labels?.[path] ? `${res.labels[path]} — ${path}` : path, path)));
+      results.selectedIndex = -1;
+      results.hidden = !results.options.length;
+      status.textContent = `${results.options.length} matching materials${res.more ? " shown. Refine your search for more." : "."}`;
+    } catch (error) { if (current() && status.isConnected) status.textContent = error.message; }
+  };
+  if (immediate) await search();
+  else _matSourceTimer = setTimeout(search, 250);
+}
+
+function matChooseSource(path) {
+  if (!matEditor) return;
+  matEditor.sourceDraft = path;
+  document.getElementById("mat-source-path").value = path;
+}
+
+async function replaceMaterialFromSource() {
+  if (!matEditor || _materialSaving.has(matEditor)) return;
+  const source = document.getElementById("mat-source-path").value.trim();
+  const status = document.getElementById("mat-status");
+  if (!source) { status.textContent = "Choose or paste a source material path."; return; }
+  if (!confirm(`Replace ${matEditor.name} with ${source}? This saves immediately and replaces its parameters and custom texture assignments.`
+    + (materialDirtyCount() ? " Unsaved parameter changes will be discarded." : ""))) return;
+  const editor = matEditor, project = _activeProjectName;
+  const current = () => matEditor === editor && project === _activeProjectName;
+  _materialSaving.add(editor); _matRefreshDirty();
+  document.getElementById("mat-body").inert = true;
+  status.textContent = "Replacing material…";
+  try {
+    const res = await api("/api/material_replace", { project, method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: editor.game_rel, source_game_rel: source }) });
+    if (!res.ok) throw new Error(res.error || "Replacement failed");
+    if (project === _activeProjectName) loadSidebar();
+    if (!current()) { toast(`${project}: Replaced ${editor.name}`, "success"); return; }
+    const revision = ++_materialOpenRevision;
+    editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars);
+    editor.textures = res.textures || {}; editor.textureClasses = res.texture_classes || {};
+    editor.custom = res.custom_textures || {}; editor.materialSource = res.material_source || "";
+    editor.sourceDraft = editor.materialSource; editor.compareMode = "saved";
+    editor.dyeable = false; editor.dyeOff = false;
+    _matRemember(editor);
+    renderMatEditor();
+    document.getElementById("mat-status").textContent = "Replacement saved. Export this material to apply it in game.";
+    loadMaterialDye({ game_rel: editor.game_rel }, () => current() && revision === _materialOpenRevision, project);
+  } catch (error) { if (current()) status.textContent = "Error: " + error.message; }
+  finally {
+    _materialSaving.delete(editor);
+    if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
+  }
 }
 
 // Writes one colour row's inputs back from state. `except` is the id of the element the user is
@@ -1567,9 +1666,11 @@ async function resetMaterial() {
   if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
                + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""))) return;
   const editor = matEditor, project = _activeProjectName;
+  const structural = !!editor.materialSource;
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;
   _materialSaving.add(editor); _matRefreshDirty();
+  if (structural) document.getElementById("mat-body").inert = true;
   document.getElementById("mat-status").textContent = "Resetting…";
   try {
     const res = await api("/api/material_reset", {
@@ -1579,19 +1680,26 @@ async function resetMaterial() {
     });
     if (!current()) return;
     if (res.ok) {
-      const newer = JSON.stringify(materialSaveSnapshot(editor)) !== submitted;
+      const newer = !structural && JSON.stringify(materialSaveSnapshot(editor)) !== submitted;
       if (!newer) { editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars); }
       const original = { colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
       _materialReferences.set(editor, { saved: original, original });
       editor.custom = res.custom_textures || {};
+      editor.materialSource = "";
+      editor.dyeable = false; editor.dyeOff = false;
       if (res.textures) { editor.textures = res.textures; editor.textureClasses = res.texture_classes || {}; }
       renderMatEditor();
       dyeRefresh(0); loadSidebar();
       document.getElementById("mat-status").textContent = newer ? "Game defaults restored; newer edits remain unsaved." : "Restored original game values.";
       toast(`Reset: ${matEditor.name}`, "info");
+      const revision = ++_materialOpenRevision;
+      loadMaterialDye({ game_rel: editor.game_rel }, () => current() && revision === _materialOpenRevision, project);
     } else { document.getElementById("mat-status").textContent = "Error: " + (res.error || "reset failed"); }
   } catch (e) { if (current()) document.getElementById("mat-status").textContent = "Error: " + e.message; }
-  finally { _materialSaving.delete(editor); if (current()) _matRefreshDirty(); }
+  finally {
+    _materialSaving.delete(editor);
+    if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
+  }
 }
 
 function closeMaterialEditor(force = false) {

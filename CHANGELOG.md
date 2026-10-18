@@ -3,6 +3,18 @@
 The app, installers and update checker identify each release by its full number, such as
 **0.4.1**.
 
+## Unreleased
+
+- **Replace material** in the material editor searches installed materials by
+  character, skin, name or path and applies one to the target, preserving the
+  donor's parent, textures, static switches and cooked shader data through export.
+  The target retains its identity; its replacement parameters remain editable.
+- **Restore game defaults** returns the original target material after a swap.
+  Material replacement/default restoration and removal of incompatible texture,
+  dye and intensity options publish together with rollback on failure.
+- Circular donor parent chains are refused. Cross-character native container
+  build/readback and browser checks pass; appearance has not been tested in game.
+
 ## 0.4.1 — 16 October 2026
 
 ### Your own images in material texture slots (experimental)

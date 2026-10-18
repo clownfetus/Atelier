@@ -49,6 +49,31 @@ For a fresh directory, use Atelier's Setup/Settings to select the game Paks fold
 
 ## Automated checks
 
+### Material replacement
+
+`_atelier_material_source` inside a saved material JSON records its donor. Export
+decodes the current vanilla donor, retains its complete import graph and cooked
+payload, renames its package/export identity to the target, then applies saved
+parameters and custom textures. The marker never enters the compiled package.
+Donor project edits are not read. Parent chains are checked for recursion before
+save and export. Default restoration reads pristine data before publication;
+the material and cleared texture/dye/intensity options share one recoverable
+project transaction.
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_material_replacement.py --suite test_material_original.py --suite test_custom_textures.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --material-replacement-only --report-dir 'D:\AtelierDev\material-replacement\browser'
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_material_replacement.py --report-dir 'D:\AtelierDev\material-replacement\native'
+```
+
+The native check writes only a new report/project/export directory and application
+caches; it never installs a mod. A real cross-character build/readback verified
+target identity, donor parent/package references, textures, parameters, static
+switches and the opaque cooked shader payload. Readback without base-game
+containers labels external imports `Export_N/Object`; their package identities
+and reference indices remain verifiable. In-game appearance is not established.
+
 ### Interface polish and continuity
 
 ```powershell

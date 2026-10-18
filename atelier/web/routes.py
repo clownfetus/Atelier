@@ -1846,14 +1846,59 @@ def api_material_reset():
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
         p = reset_material(gr)
-        _put_inten(gr, {})
-        custom = _custom_tex.clear(gr)        # "game defaults" includes the game's own textures
+        try:
+            _custom_tex.prune()
+        except OSError:
+            pass  # Unreferenced images can be collected at the next assignment.
+        custom = _custom_tex.public(gr)
         response.content_type = "application/json"
         return json.dumps({"ok": True, "game_rel": gr, "token": token(gr), "inten": {},
                            "custom_textures": custom, **p})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
+
+
+@app.get("/api/material_sources")
+def api_material_sources():
+    """Search installed MI paths without importing any materials into the project."""
+    from atelier.index import ensure_index
+    from atelier.handlers.skinnames import char_name, skin_name
+    response.content_type = "application/json"
+    query = (request.query.getunicode("q") or "").strip().casefold()
+    if len(query) < 2:
+        return {"ok": True, "materials": [], "more": False}
+    words = query.split()
+    matches = {}
+    for path, _container, mount in ensure_index():
+        if mount.rstrip("/") != "Marvel/Content/Marvel" or not path.lower().endswith(".uasset") or not is_material(path):
+            continue
+        parts = path.split("/")
+        label = ""
+        if len(parts) > 3 and parts[0] == "Characters":
+            label = " · ".join(n for n in (char_name(parts[1]), skin_name(parts[2])) if n)
+        if all(word in (path + " " + label).casefold() for word in words):
+            matches[path[:-7]] = label
+    paths = sorted(matches, key=str.casefold)
+    return {"ok": True, "materials": paths[:80], "labels": {p: matches[p] for p in paths[:80]}, "more": len(paths) > 80}
+
+
+@app.post("/api/material_replace")
+def api_material_replace():
+    response.content_type = "application/json"
+    body = request.json or {}
+    try:
+        gr = body.get("game_rel", "")
+        p = _material_mod.replace_material(gr, body.get("source_game_rel", ""))
+        try:
+            _custom_tex.prune()
+        except OSError:
+            pass
+        custom = _custom_tex.public(gr)
+        return {"ok": True, "game_rel": gr, "token": token(gr), "inten": {},
+                "custom_textures": custom, **p}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 # ── custom textures: the user's own image as a NEW texture for one material slot ─────────────
 # See handlers/custom_texture.py. Assigned on upload, like dye-off: it is an export option on the
