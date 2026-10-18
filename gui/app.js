@@ -152,13 +152,15 @@ function toast(msg, type = "info", duration = 3200, instance = '') {
   _collatedToasts.set(key,{el,repeat:() => {
     let badge = el.querySelector('.toast-repeat');
     if (!badge) { badge = document.createElement('span'); badge.className = 'toast-repeat'; el.append(badge); }
-    badge.textContent = '×' + (++repeats); reset();
+    badge.textContent = '×' + (++repeats);badge.setAttribute('aria-label',repeats+' repeats');
+    badge.style.setProperty('--repeat-count',Math.min(5,repeats));badge.classList.toggle('toast-repeat-number',repeats>5); reset();
     window.AtelierPolish?.play(badge,[{transform:'scale(.85)'},{transform:'scale(1)'}],120);
   }});
   reset();
   el.addEventListener("mouseenter", () => { hovered = true; clearTimeout(t); remaining = Math.max(0, remaining-(Date.now()-start)); });
   el.addEventListener("mouseleave", () => { hovered = false; start = Date.now(); t = setTimeout(() => el.remove(), remaining); });
   el.addEventListener("click", () => el.remove());
+  try {window.AtelierKrackleGlyph?.toastIcon(el,type);}catch(_){}
   return el;
 }
 
