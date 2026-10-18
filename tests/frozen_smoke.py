@@ -50,6 +50,14 @@ def main():
     if os.name != 'nt':
         raise SystemExit('The frozen desktop smoke requires Windows.')
     exe = args.exe.resolve(strict=True)
+    import pefile
+    with pefile.PE(str(exe)) as pe:
+        stamps = {key.decode(): value.decode() for group in pe.FileInfo
+                  for item in group if hasattr(item, 'StringTable')
+                  for table in item.StringTable for key, value in table.entries.items()}
+    expected_version = (Path(__file__).resolve().parents[1] / 'version').read_text().strip()
+    assert stamps.get('FileVersion') == stamps.get('ProductVersion') == expected_version, stamps
+    assert stamps.get('ProductName') == 'Atelier', stamps
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
     data = report / 'isolated-data'
@@ -91,7 +99,7 @@ def main():
     hider = threading.Thread(target=hide_loop, daemon=True)
     hider.start()
     result = {'exe_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
-              'checks': [], 'page_errors': [], 'fixture_scope': 'Game browsing and remote checks only'}
+              'checks': [], 'page_errors': [], 'fixture_scope': 'Game browsing and remote checks only', 'windows_file_properties': stamps}
     try:
         wait_port(args.app_port, process)
         wait_port(args.debug_port, process)

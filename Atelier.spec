@@ -72,6 +72,32 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# Keep Windows file properties in sync with the UI and installer version.
+windows_version = None
+if sys.platform == 'win32':
+    from PyInstaller.utils.win32.versioninfo import (
+        VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable,
+        StringStruct, VarFileInfo, VarStruct,
+    )
+    application_version = Path('version').read_text(encoding='utf-8').strip()
+    numbers = tuple(int(part) for part in application_version.split('.'))
+    if len(numbers) != 3 or any(not 0 <= number <= 99 for number in numbers):
+        raise ValueError('Application version must be N.N.N with 1-2 digit numbers')
+    windows_version = VSVersionInfo(
+        ffi=FixedFileInfo(filevers=(*numbers, 0), prodvers=(*numbers, 0),
+                          mask=0x3f, flags=0, OS=0x40004, fileType=1,
+                          subtype=0, date=(0, 0)),
+        kids=[StringFileInfo([StringTable('040904B0', [
+            StringStruct('CompanyName', 'Atelier'),
+            StringStruct('FileDescription', 'Atelier Modding Studio'),
+            StringStruct('FileVersion', application_version),
+            StringStruct('InternalName', 'Atelier'),
+            StringStruct('OriginalFilename', 'Atelier.exe'),
+            StringStruct('ProductName', 'Atelier'),
+            StringStruct('ProductVersion', application_version),
+        ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])],
+    )
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -91,6 +117,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='icon.ico',
+    version=windows_version,
 )
 
 coll = COLLECT(

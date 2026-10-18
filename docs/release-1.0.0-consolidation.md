@@ -28,7 +28,7 @@ outside the checkout under `D:/AtelierDev/release-1.0-audit`.
 | `codex/readme-refresh` | Included; documentation refreshed again for 1.0.0. |
 | `krakle`, old phase 0/1 and phase 2 branches | Their reliability, material, catalogue and original UI work is represented in current upstream and later waves. Older implementations are superseded by the current interface. |
 | `codex/linux-appimage-release` (`c4c61b4`) | Current Linux builder retained; native WebKit/accessibility/tool/preservation verification from `b165e8b` restored and generalized to 1.0.0. The old workflow that publishes directly to 0.3.5 is obsolete and is not re-enabled. |
-| `fork/feature/windows-packaging` (`b731d97`) | Retained pinned build dependencies/compiler bootstrap and native runtime prerequisite checks. Its older standalone orchestration, installer test namespace and forced process exit are superseded by the current disposable-runner release pipeline, stable installer identity and graceful job shutdown. Exact portable/source hash checks and final artifact gating are included in the 1.0 workflow. |
+| `fork/feature/windows-packaging` (`b731d97`) | Retained pinned build dependencies/compiler bootstrap, Windows file-version metadata, installer branding and native runtime prerequisite checks. Its older standalone orchestration, installer test namespace and forced process exit are superseded by the current disposable-runner release pipeline, stable installer identity and graceful job shutdown. Exact portable/source hash checks and final artifact gating are included in the 1.0 workflow. |
 
 ## Uncommitted files
 

@@ -71,4 +71,4 @@ if ($LASTEXITCODE -ne 0 -and $InstallWebView2) {
 if ($LASTEXITCODE -ne 0) { throw 'Resolve the desktop runtime message above; use -InstallWebView2 to provision the signed Evergreen bootstrapper.' }
 Write-Host "Build environment ready. In this shell run:"
 Write-Host "`$env:ISCC = '$env:ISCC'"
-Write-Host 'python -m PyInstaller --noconfirm --clean Atelier.spec'
+Write-Host '.\.venv-build\Scripts\python.exe -m PyInstaller --noconfirm --clean Atelier.spec'
