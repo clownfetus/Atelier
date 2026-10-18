@@ -8,6 +8,15 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/static/vendor/bricolage-grotesque/BricolageGrotesque-Latin.woff2') format('woff2');
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --md-sys-color-primary: #37639d;
@@ -62,6 +71,7 @@
   --studio-shadow: 0 12px 36px rgb(20 24 30 / 14%);
 
   --studio-font: 'Roboto', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --studio-display: 'Bricolage Grotesque', var(--studio-font);
   --studio-mono: 'Cascadia Code', ui-monospace, monospace;
   --studio-type-title: 600 20px/1.4 var(--studio-font);
   --studio-type-body: 400 14px/1.5 var(--studio-font);
