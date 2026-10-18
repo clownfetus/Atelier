@@ -156,10 +156,27 @@ def set_asset_opts(project_dir, game_rel, opts):
         return cur
 
 
-def forget_asset(project_dir, game_rel):
+def forget_asset(project_dir, game_rel, selection=False):
     """Drop an asset's options — called when the asset itself is deleted from the project, so a
     re-import doesn't silently inherit settings from an edit the user threw away."""
     with _lock:
         d = load(project_dir)
-        if d["asset_opts"].pop(game_rel, None) is not None:
+        changed = d["asset_opts"].pop(game_rel, None) is not None or (selection and game_rel in d['deselected'])
+        if selection:
+            d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
+        if changed:
             _write(project_dir, d)
+
+
+def restore_asset(project_dir, game_rel, saved):
+    """Restore only this edit's options and selection, preserving unrelated project changes."""
+    with _lock:
+        d = load(project_dir)
+        if saved.get('opts'):
+            d['asset_opts'][game_rel] = saved['opts']
+        else:
+            d['asset_opts'].pop(game_rel, None)
+        d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
+        if saved.get('deselected'):
+            d['deselected'].append(game_rel)
+        _write(project_dir, d)

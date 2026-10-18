@@ -127,6 +127,7 @@ def game_rel_from_token(tok):
     import_root = get_import_root()
     if not os.path.isdir(import_root): return None
     for dirpath, _dirs, files in os.walk(import_root):
+        _dirs[:] = [d for d in _dirs if d not in ('.atelier', '.atelier-trash')]
         for fname in files:
             if not fname.endswith(".png"): continue
             gr = project_game_rel(os.path.join(dirpath, fname), import_root)
@@ -424,7 +425,7 @@ def all_imported():
     for dirpath, _dirs, files in os.walk(import_root):
         # Atelier's own per-project bookkeeping, not user edits. Pruned by name rather than left
         # to _classify_file, which rejects "manifest"/"project" only by accident of prefix.
-        _dirs[:] = [d for d in _dirs if d != ".atelier"]
+        _dirs[:] = [d for d in _dirs if d not in ('.atelier', '.atelier-trash')]
         for fname in sorted(files):
             fpath = os.path.join(dirpath, fname)
             if fname.endswith('.mesh.json'):

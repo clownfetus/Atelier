@@ -143,6 +143,12 @@ Open **Activity** to review job progress and results or cancel work before file
 publication. Interrupted work is recorded after reopening and does not restart
 automatically.
 
+Deleting edits moves their files and export options into that project's trash.
+Choose **Undo** within 10 seconds to restore the batch; hovering pauses the toast.
+Shift-click Delete skips the prompt and keeps Undo available. Trash is kept for
+7 days, up to 20 batches, and is excluded from mods and project archives.
+Deleting an entire project remains permanent and asks for confirmation.
+
 Use **Bulk VFX / curves** to preview a multiplier or RGB replacement across
 supported assets in the selection or current folder. RGB edits preserve alpha.
 Global material parameter collections are labelled because changes can affect

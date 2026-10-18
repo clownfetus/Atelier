@@ -69,6 +69,7 @@ from atelier.handlers.text import is_text
 from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.project_meta as _project_meta
+from atelier import project_trash
 import atelier.web.browse as _browse_mod
 
 
@@ -2075,6 +2076,8 @@ class _PNGHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith(".png"):
+            if project_trash.DIRECTORY in event.src_path.replace('\\', '/').split('/'):
+                return
             import_root = get_import_root().replace("\\", "/")
             evt_path    = event.src_path.replace("\\", "/")
             if not evt_path.startswith(import_root + "/"):
@@ -2098,6 +2101,8 @@ class _PNGHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         p = event.src_path
+        if project_trash.DIRECTORY in p.replace('\\', '/').split('/'):
+            return
         if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
             return
         import_root = get_import_root().replace("\\", "/")
@@ -2147,6 +2152,7 @@ def _list_projects():
         try:
             # Project files are subfolder-mirrored by game_rel, so walk (not just listdir).
             for dirpath, _dirs, files in os.walk(path):
+                _dirs[:] = [d for d in _dirs if d not in ('.atelier', project_trash.DIRECTORY)]
                 for fname in files:
                     fp = os.path.join(dirpath, fname)
                     mt = os.path.getmtime(fp)
@@ -2166,6 +2172,11 @@ def _list_projects():
 @app.get("/api/projects")
 def api_projects():
     response.content_type = "application/json"
+    active = get_active_project()
+    if active:
+        root = _c.project_dir(active, PROJECTS_ROOT)
+        with operations.project_use(root, write=True):
+            project_trash.purge(root)
     return json.dumps({"ok": True, "projects": _list_projects(), "active": get_active_project()})
 
 @app.post("/api/project/select")
@@ -2179,6 +2190,8 @@ def api_project_select():
     if not os.path.isdir(project_dir):
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "project not found"})
+    with operations.project_use(project_dir, write=True):
+        project_trash.purge(project_dir)
     set_active_project(name)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
@@ -2321,6 +2334,7 @@ def _build_project_zip_reserved(names):
         for name, d in dirs:
             prefix = "" if len(dirs) == 1 else name + "/"
             for root, _subdirs, files in os.walk(d):
+                _subdirs[:] = [part for part in _subdirs if part != project_trash.DIRECTORY]
                 rel_root = os.path.relpath(root, d)
                 if not files and rel_root != ".":
                     z.writestr(prefix + rel_root.replace(os.sep, "/") + "/", b"")
@@ -2855,28 +2869,11 @@ def api_open_export_folder():
 # Every on-disk form a project edit can take. A mesh's edit is a .blend (plus Blender's .blend1
 # backup and the texture manifest beside it), so deleting one has to clear those too -- otherwise
 # the asset returns on the next sidebar refresh and "Delete" looks like it did nothing.
-_EDIT_EXTS = (".png", ".json", ".blend", ".blend.mat.json", ".blend1", ".mesh.json", ".mesh.glb")
+_EDIT_EXTS = project_trash.EDIT_EXTS
 
 def _delete_one_imported(gr):
-    """Remove every on-disk trace of one edited asset (both project layouts + the work copy)."""
-    work_base = _cache_import_base(gr)
-    for base in (project_base(gr), project_base_legacy(gr)):   # clean both layouts
-        for ext in _EDIT_EXTS:
-            p = base + ext
-            if os.path.exists(p):
-                try: os.remove(p)
-                except Exception: pass
-    if work_base:
-        for ext in (".uasset", ".uexp", ".ubulk"):
-            p = work_base + ext
-            if os.path.exists(p):
-                try: os.remove(p)
-                except Exception: pass
-    _asset_cache.remove(gr)
-    # ...and its export options, so a re-import doesn't silently inherit settings from an edit
-    # the user has just thrown away.
-    try: _project_meta.forget_asset(get_import_root(), gr)
-    except Exception: pass
+    """Compatibility entry point; a batch request uses one shared trash entry instead."""
+    return project_trash.remove(get_import_root(), [gr])
 
 @app.post("/api/delete_imported")
 def api_delete_imported():
@@ -2888,17 +2885,19 @@ def api_delete_imported():
     response.content_type = "application/json"
     if not grs:
         return json.dumps({"ok": False, "error": "missing game_rel"})
-    for gr in grs:
-        _delete_one_imported(gr)
-    return json.dumps({"ok": True, "deleted": len(grs)})
+    return json.dumps(project_trash.remove(get_import_root(), grs))
 
 @app.post("/api/delete_all_imported")
 def api_delete_all_imported():
     items = all_imported()
-    for item in items:
-        _delete_one_imported(item["game_rel"])
     response.content_type = "application/json"
-    return json.dumps({"ok": True, "deleted": len(items)})
+    return json.dumps(project_trash.remove(get_import_root(), [item['game_rel'] for item in items]))
+
+
+@app.post('/api/restore_imported')
+def api_restore_imported():
+    response.content_type = 'application/json'
+    return json.dumps(project_trash.restore(get_import_root(), (request.json or {}).get('entry')))
 
 @app.get("/api/asset_info")
 def api_asset_info():
