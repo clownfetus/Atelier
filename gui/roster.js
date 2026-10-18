@@ -3,6 +3,14 @@
   'use strict';
   let data = null, pending = null, navigate, requested = false, selected = '';
   let carouselCleanups = [];
+  let edits=[],project='',filter='all',options={},signature='',recent=[];
+  const storageKey=()=> 'atelier.roster.'+project+'.v1';
+  const read=()=>{try{return JSON.parse(localStorage.getItem(storageKey()))||{};}catch(_){return {};}};
+  const write=value=>{try{localStorage.setItem(storageKey(),JSON.stringify(value));}catch(_){}};
+  function rememberEditor(gameRel,kind,inProject=project) {
+    try {const key='atelier.editors.'+inProject+'.v1',saved=JSON.parse(localStorage.getItem(key)||'{}');saved[gameRel]=kind;localStorage.setItem(key,JSON.stringify(saved));}catch(_){}
+  }
+  function editorFor(item) {try{return JSON.parse(localStorage.getItem('atelier.editors.'+project+'.v1')||'{}')[item.game_rel]||item.file_type;}catch(_){return item.file_type;}}
   const colourCache = new Map();
   const host = () => document.getElementById('hero-roster');
   const reduced = () => (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)')).matches;
@@ -61,56 +69,97 @@
   themeObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-palette','style']});
   window.addEventListener('pagehide',()=>{cleanup();themeObserver.disconnect();});
   function image(item) {
-    const img = document.createElement('img'); img.alt=''; img.loading='lazy'; img.decoding='async'; img.src=item.avatar;
+    const img = document.createElement('img'); img.alt=''; img.loading='lazy'; img.decoding='async'; img.src=item.avatar||item.thumbnail||'';
+    img.addEventListener('load',()=>{const colour=window.AtelierPolish?.sample(img);if(colour)img.parentElement?.style.setProperty('--roster-accent',colour);});
     img.addEventListener('error',()=>{img.hidden=true;}); return img;
   }
   function render() {
     const root=host(); if (!root || !requested || !data) return;
+    renderContinue();
     cleanup();root.replaceChildren(); root.hidden=false;
     if (!data.heroes?.length) { window.AtelierPolish?.empty(root,'Catalogue unavailable','Browse the library folders below. Saved artwork will return when available.'); return; }
     const details=document.createElement('details'); details.open=true;
-    const summary=document.createElement('summary'); summary.textContent='Character roster'; details.append(summary);
+    const summary=document.createElement('summary'); summary.textContent='Heroes'; details.append(summary);
+    const filters=document.createElement('div');filters.className='roster-filters';filters.setAttribute('role','group');filters.setAttribute('aria-label','Filter heroes');
+    for(const [value,label] of [['all','All'],['edited','Edited'],['recent','Recently opened']]) {
+      const button=document.createElement('button');button.className='btn';button.textContent=label;button.setAttribute('aria-pressed',String(value===filter));button.addEventListener('click',()=>{filter=value;render();});filters.append(button);
+    }
+    details.append(filters);
     const heroes=document.createElement('div'); heroes.className='roster-strip'; heroes.setAttribute('role','group'); heroes.setAttribute('aria-label','Heroes');
     const skins=document.createElement('div'); skins.className='roster-skins'; skins.setAttribute('role','group'); skins.setAttribute('aria-label','Selected hero costumes');
-    const heroCarousel=carousel(heroes,'heroes'),skinCarousel=carousel(skins,'skins');
-    function choose(hero, button) {
+    const skinCarousel=carousel(skins,'skins');
+    function choose(hero, button,record=false) {
       selected = hero.path;
+      if(record){recent=[hero.path,...recent.filter(path=>path!==hero.path)].slice(0,30);write({recent});}
       heroes.querySelectorAll('button').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));
       skins.replaceChildren();
       const open=document.createElement('button'); open.className='roster-open'; open.textContent='Open '+hero.name; open.addEventListener('click',()=>navigate?.(hero.path)); skins.append(open);
       for (const skin of hero.skins || []) {
         const tile=document.createElement('button'); tile.className='roster-skin'; tile.title=skin.name; tile.setAttribute('aria-label',skin.name);
         const label=document.createElement('span'); label.textContent=skin.name; tile.append(label);
-        tile.addEventListener('click',()=>navigate?.(skin.path)); skins.append(tile);
+        tile.addEventListener('click',()=>options.openSkin?options.openSkin(skin):navigate?.(skin.path)); skins.append(tile);
         tintSkin(tile,skin);
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
     }
-    for (const hero of data.heroes) {
+    const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;
+    const shown=data.heroes.filter(hero=>filter==='all'||(filter==='edited'?editCount(hero)>0:recent.includes(hero.path)));
+    if(filter==='recent')shown.sort((a,b)=>recent.indexOf(a.path)-recent.indexOf(b.path));
+    for (const hero of shown) {
       const button=document.createElement('button'); button.className='roster-portrait'; button.setAttribute('aria-pressed','false');
-      button.title=hero.name; button.append(image(hero)); const label=document.createElement('span'); label.textContent=hero.name; button.append(label);
-      button.addEventListener('click',()=>choose(hero,button)); heroes.append(button);
+      const count=editCount(hero);button.classList.toggle('has-edits',count>0);
+      button.title=hero.name;button.setAttribute('aria-label',hero.name);
+      const artwork=document.createElement('div');artwork.className='roster-art';artwork.append(image(hero));button.append(artwork);
+      const label=document.createElement('strong');label.textContent=hero.name;
+      const costumes=hero.skins?.length||0;
+      const counts=document.createElement('span');counts.className='roster-counts';counts.textContent=`${costumes} costume${costumes===1?'':'s'} · ${count} edit${count===1?'':'s'}`;button.append(label,counts);
+      button.addEventListener('click',()=>choose(hero,button,true)); heroes.append(button);
     }
-    details.append(heroCarousel.wrap,skinCarousel.wrap); root.append(details);
-    const index = Math.max(0,data.heroes.findIndex(hero=>hero.path===selected));
-    choose(data.heroes[index],heroes.children[index]);
-    heroes.children[index]?.scrollIntoView({block:'nearest',inline:'nearest'});requestAnimationFrame(heroCarousel.update);
+    heroes.addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
+      const buttons=[...heroes.children],index=buttons.indexOf(document.activeElement);if(index<0)return;
+      const columns=Math.max(1,Math.round(heroes.clientWidth/buttons[0].offsetWidth));
+      const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-columns,ArrowDown:columns};
+      const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:Math.min(buttons.length-1,Math.max(0,index+delta[event.key]));event.preventDefault();buttons[next].focus();
+    });
+    details.append(heroes,skinCarousel.wrap);root.append(details);
+    if(shown.length){const index=Math.max(0,shown.findIndex(hero=>hero.path===selected));choose(shown[index],heroes.children[index]);}
+    else {const empty=document.createElement('p');empty.className='roster-filter-empty';empty.textContent=filter==='edited'?'No heroes have edits in this project.':'Open a hero to see it here.';heroes.append(empty);}
+    renderContinue();
   }
   window.addEventListener('atelier:catalogue-updated', () => {
     if (pending) return;
     pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
       .then(result=>{data=result;host()?.replaceChildren();render();}).catch(()=>{}).finally(()=>{pending=null;});
   });
-  function show(home, onNavigate) {
-    requested=home; navigate=onNavigate; const root=host(); if (!root) return;
+  function show(home, onNavigate,opts={}) {
+    requested=home; navigate=onNavigate;options=opts;const root=host(); if (!root) return;
+    renderContinue();
     if (!home) {root.hidden=true;return;}
     if (data) {if(!root.childNodes.length) render();else root.hidden=false;return;}
     if (!pending) pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
       .then(result=>{data=result;render();}).catch(()=>{data={heroes:[]};render();}).finally(()=>{pending=null;});
   }
+  function update(items,inProject) {
+    const next=JSON.stringify([inProject,items.map(item=>[item.game_rel,item.modified||item.mtime,item.file_type])]);
+    if(next===signature)return;signature=next;edits=items;
+    if(project!==inProject){project=inProject;filter='all';const stored=read();recent=Array.isArray(stored.recent)?stored.recent.filter(path=>typeof path==='string'):[];}
+    render();
+  }
+  function renderContinue() {
+    const root=document.getElementById('continue-ribbon');if(!root)return;
+    const item=[...edits].sort((a,b)=>(b.modified||b.mtime||0)-(a.modified||a.mtime||0))[0];root.replaceChildren();root.hidden=!requested||!item;
+    if(!item)return;
+    if(item.file_type==='texture'||item.skin_id){const img=document.createElement('img');img.alt='';img.src=item.file_type==='texture'?`/api/preview?game_rel=${encodeURIComponent(item.game_rel)}&_project=${encodeURIComponent(project)}`:'/api/catalogue/thumbnail/'+item.skin_id;img.onerror=()=>img.remove();root.append(img);}
+    const copy=document.createElement('div'),title=document.createElement('strong');title.textContent='Pick up where you left off';
+    const detail=document.createElement('p'),seconds=Math.max(0,Date.now()/1000-(item.modified||item.mtime||0));
+    const ago=seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+' min ago':seconds<86400?Math.floor(seconds/3600)+' h ago':Math.floor(seconds/86400)+' d ago';
+    detail.textContent=[item.char_name,item.skin_name,item.name].filter(Boolean).join(' · ')+', edited '+ago;copy.append(title,detail);root.append(copy);
+    const button=document.createElement('button');button.className='btn primary';button.textContent='Continue editing';button.addEventListener('click',()=>options.continue?.(item,editorFor(item)));root.append(button);
+  }
   function describe(path) {
     const parts=path.split('/'), hero=data?.heroes?.find(item=>item.path==='Characters/'+parts[1]);
     return hero ? {hero,skin:hero.skins?.find(item=>item.path==='Characters/'+parts[1]+'/'+parts[2])} : null;
   }
-  window.AtelierRoster=Object.freeze({show,describe});
+  window.AtelierRoster=Object.freeze({show,describe,update,rememberEditor});
 })();

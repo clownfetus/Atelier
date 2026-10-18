@@ -331,3 +331,15 @@ Settings restores the complete form. Automatic retrieval runs behind the first
 panel and never replaces manually entered values. A 24 px success formation
 marks validated steps. Presets and the motion dial lead the final panel; advanced
 appearance controls are available under More appearance options.
+
+Home leads with a keyboard-accessible roster wall. Portraits have a quiet sampled
+accent behind the image; names and counts keep a plain panel surface. Edited
+heroes carry a charge corner. Project-local recent history does not imply an
+edit. Category folders become compact chips with a More folders control, while
+folders deeper in the library retain their full preview slots. Pins stay separate.
+
+The header scope explicitly distinguishes Everywhere from This folder. Global
+results group heroes, costumes, folders and assets, use one active keyboard row,
+and never alter the tray or current-folder selection while typing. Stale requests
+are aborted and cannot replace a newer result. Continue uses server file mtimes;
+editor preferences are local and never change exported content.

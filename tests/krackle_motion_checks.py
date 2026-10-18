@@ -77,6 +77,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         assert tab.locator('#empty-state').inner_text().strip().startswith('Empty folder')
         assert tab.locator('#empty-state svg.lucide').count() == 0
         tab.wait_for_function("!document.querySelector('#grid-area').getAnimations({subtree:true}).length")
+        tab.locator('#search-scope').click()
         tab.locator('#search-input').fill('no such asset anywhere')
         tab.evaluate("buildGrid([_makeCard({type:'folder', name:'Characters', rel_path:'Characters'})])")
         tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=none]')

@@ -101,6 +101,7 @@ def run_library_pins_checks(page, context, url, report, checks):
         assert pins_page.locator('.library-pins').is_hidden()
         assert folder('Body').count() == 1
         home()
+        pins_page.locator('#search-scope').click()
         pins_page.locator('#search-input').fill('Magik')
         assert pins_page.locator('.library-pin-open').count() == 1
         assert 'Magik materials' in pins_page.locator('.library-pin-open').inner_text()
@@ -190,13 +191,13 @@ def run_library_pins_checks(page, context, url, report, checks):
                 pins_page.locator('#settings-theme').select_option(theme, force=True)
                 assert pins_page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 assert pins_page.locator('.library-pin-open').count() == 3
-                assert folder('Maps').bounding_box()['width'] == 156
-                assert folder('Maps').locator('.card-icon').bounding_box()['width'] > 90
+                assert 60 <= folder('Maps').bounding_box()['width'] < 156
+                assert folder('Maps').locator('.card-icon').bounding_box()['width'] == 20
                 assert pins_page.locator('#install-btn').is_visible()
                 pins_page.screenshot(path=str(report / f'library-pins-{theme}-{width}.png'), animations='disabled')
         assert not errors, errors
         assert not writes, writes
-        checks.append('Pinned home links fit both themes and desktop sizes without shrinking asset tiles, blocking export or issuing backend writes')
+        checks.append('Pinned home links and category chips fit both themes and desktop sizes without blocking export or issuing backend writes')
     finally:
         if not pins_page.is_closed():
             pins_page.evaluate('(args)=>args.raw===null ? localStorage.removeItem(args.key) : localStorage.setItem(args.key,args.raw)', {'key': KEY, 'raw': prior})

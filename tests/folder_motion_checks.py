@@ -22,6 +22,7 @@ FIXTURES = r"""() => {
     {type:'asset', name:'Failed original texture', file_type:'texture', game_rel:'Fixture/Original', imported:false}
   ];
   window.renderFolderMotionFixture = () => {
+    nav={path:'Folder motion fixtures'};
     document.getElementById('search-input').value = '';
     allItems = folderMotionItems;
     buildGrid(folderMotionItems.map(item => {

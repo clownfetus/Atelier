@@ -153,6 +153,13 @@ Shift-click Delete skips the prompt and keeps Undo available. Trash is kept for
 7 days, up to 20 batches, and is excluded from mods and project archives.
 Deleting an entire project remains permanent and asks for confirmation.
 
+Home leads with hero portraits, costume/edit counts and All / Edited / Recently
+opened filters. Costume buttons open Model Studio, or their folder when no mesh
+is available. **Continue editing** reopens the latest project edit in its editor.
+The search field defaults to **Everywhere**, grouping heroes, costumes, folders
+and assets. Switch to **This folder** for local filtering; arrow keys and Enter
+navigate global results, and Escape closes them.
+
 Use **Bulk VFX / curves** to preview a multiplier or RGB replacement across
 supported assets in the selection or current folder. RGB edits preserve alpha.
 Global material parameter collections are labelled because changes can affect

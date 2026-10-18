@@ -798,3 +798,13 @@ disposable-file Undo, themed confirmation paths and the three-panel setup.
 These checks also run in the full browser suite. `tests/dom_checks.js` awaits
 editor leave promises; it still rejects server calls after a declined answer.
 Fixtures use a synthetic key, and no setup payloads or keys are logged.
+
+`tests/test_search.py` covers HTTP UTF-8 decoding, accent-insensitive grouping,
+caps/counts, index and catalogue replacement, and an active index builder. Its
+550,000-row benchmark measures cached 3–4 character queries against a 100 ms
+median budget. Search builds its own compact table without holding the index
+builder's lock, and rebuilds it when either immutable generation changes.
+
+`python tests/browser_smoke.py --find-only --report-dir <folder>` checks global
+search keyboard/stale-response behavior, explicit folder scope, roster filters,
+Continue and costume fallbacks. It is also included in the full browser suite.

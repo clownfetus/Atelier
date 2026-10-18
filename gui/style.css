@@ -1461,6 +1461,16 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .trash-drain i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--krackle-charge, var(--acc)); }
 
 /* Kept last: editors previously suppressed native outlines. */
+#searchbar { position: relative; min-width: 0; }
+.search-scope { border: 1px solid var(--border); border-radius: 12px; padding: 3px 8px; color: var(--text); background: var(--bg3); white-space: nowrap; font: inherit; font-size: 11px; cursor: pointer; }
+#search-results { position: absolute; right: 0; top: calc(100% + 8px); width: min(620px, 85vw); max-height: 65vh; overflow-y: auto; z-index: 270; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg2); color: var(--text); box-shadow: var(--studio-shadow-dialog); }
+#search-results[hidden] { display: none; }
+.search-group { margin: 10px 6px 4px; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.search-result { display: flex; flex-direction: column; width: 100%; padding: 8px; gap: 3px; text-align: left; border: 0; border-radius: 4px; color: var(--text); background: transparent; font: inherit; cursor: pointer; }
+.search-result span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.search-result:hover, .search-active { background: var(--bg3); outline: 1px solid var(--acc); }
+.search-no-results { display: block; margin: 8px; color: var(--krackle-charge); }
+:root[data-motion=reduce] .search-no-results { display: none; }
 :focus-visible { outline: 2px solid var(--acc) !important; outline-offset: 3px; }
 .seg-btn:focus-visible { outline-offset: -3px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 1px; }
