@@ -82,6 +82,7 @@
   --studio-space-3: 12px;
   --studio-space-4: 16px;
   --studio-space-6: 24px;
+  --screen-dot:rgb(18 18 22 / 12%);
   --studio-shape-small: 6px;
   --studio-shape-medium: 8px;
   --studio-shape-large: 10px;
@@ -120,6 +121,7 @@
 }
 
 :root[data-theme='dark'] {
+  --screen-dot:rgb(238 229 207 / 13%);
   color-scheme: dark;
   --md-sys-color-primary: #98b7e2;
   --md-sys-color-on-primary: #173252;

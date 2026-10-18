@@ -1,0 +1,8 @@
+/* Two offset square grids form one 45-degree lattice. Keep text/art on solid surfaces. */
+.k-screen {
+  background-image:radial-gradient(circle,var(--screen-dot) 1px,transparent 1.1px),radial-gradient(circle,var(--screen-dot) 1px,transparent 1.1px);
+  background-size:12px 12px;
+  background-position:0 0,6px 6px;
+}
+.roster-strip.k-screen { background-color:var(--bg2); }
+.roster-portrait strong,.roster-portrait .roster-counts { width:100%; background:var(--bg2); }

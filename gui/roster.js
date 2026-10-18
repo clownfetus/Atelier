@@ -110,11 +110,12 @@
       const count=editCount(hero);button.classList.toggle('has-edits',count>0);
       button.title=hero.name;button.setAttribute('aria-label',hero.name);
       const artwork=document.createElement('div');artwork.className='roster-art';artwork.append(image(hero));button.append(artwork);
-      const label=document.createElement('strong');label.textContent=hero.name;
+      const label=document.createElement('strong');label.className='roster-hero-name';label.textContent=hero.name;
       const costumes=hero.skins?.length||0;
       const counts=document.createElement('span');counts.className='roster-counts';counts.textContent=`${costumes} costume${costumes===1?'':'s'} · ${count} edit${count===1?'':'s'}`;button.append(label,counts);
       button.addEventListener('click',()=>choose(hero,button,true)); heroes.append(button);
     }
+    heroes.classList.add('k-screen');
     heroes.addEventListener('keydown',event=>{
       if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
       const buttons=[...heroes.children],index=buttons.indexOf(document.activeElement);if(index<0)return;
