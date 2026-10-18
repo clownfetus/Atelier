@@ -10,6 +10,13 @@ card to use the same replacement flow as Replace with Image. Paper caption
 notifications keep results readable in either theme; exact colour swatches show
 HDR intensity around their edges.
 
+Model Studio offers **Inspect** and **Showcase**. Showcase uses cel lighting and
+a skin-colour dot backdrop for presentation; returning to Inspect restores the
+editable materials. Successful and warning builds can offer a **Mod card** with
+completed asset counts, version/date and Copy image / Save PNG actions. It uses a
+matching loaded Showcase capture or clearly labelled catalogue artwork. Formation
+sounds are optional, off by default, and silent in Calm, Off or a hidden window.
+
 Atelier is a desktop modding studio for Marvel Rivals. Browse game assets, edit
 textures and material parameters, preview models, and build mods from one interface.
 

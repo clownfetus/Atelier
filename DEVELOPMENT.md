@@ -14,6 +14,13 @@ and originating project header. Review candidates remain behind the disabled
 `atelier.experimentalKrackleEmblems` flag; both-scale sheets are generated with
 the artwork, not maintained separately. Run the full browser suite before a PR.
 
+Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
+WebAudio context (no test sounds reach the speakers). It checks disposable toon
+materials while rendering, exact source identity/JSON after Inspect, camera
+restoration on successful/failed captures, clipboard/download/folder actions,
+warning/failure cards and Full/Calm/Off/OS/hidden audio gates. The pure Node card
+data harness runs under `test_mod_cards.py`; HTTP tests verify `/api/app_info`.
+
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
 storage, so an old cached page cannot mix with the new scripts and styles.

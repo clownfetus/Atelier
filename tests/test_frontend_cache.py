@@ -40,6 +40,13 @@ def get(path, modified_since=None):
 
 
 class FrontendCache(unittest.TestCase):
+    def test_local_build_identity_needs_no_release_check(self):
+        import json
+        status,headers,body=get('/api/app_info')
+        self.assertEqual(status,200)
+        expected=Path(R.VERSION_FILE).read_text(encoding='utf-8').strip()
+        self.assertEqual(json.loads(body),{'version':expected})
+
     def test_legacy_and_versioned_page_prevent_storage(self):
         for path in ('/', '/?ui=upgraded'):
             with self.subTest(path=path):

@@ -17,15 +17,35 @@ export function createViewportInspection(api) {
   const reducedMotion = (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)'));
   const effects = createViewportEffects({renderer,scene,camera,modelRoot,grid,reduced:reducedMotion});
   let cameraMove = null, revealBounds = null;
+  let showcaseMode=false,showcaseColors=null,showcaseBackdrop=null;
+  const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
+  toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
+  function showcaseInks(){return window.AtelierShowcaseArt.palette(showcaseColors||palette());}
+  function drawShowcase(){
+    if(!showcaseMode)return;
+    if(!showcaseBackdrop){showcaseBackdrop=document.createElement('canvas');showcaseBackdrop.className='vp-showcase-backdrop';showcaseBackdrop.setAttribute('aria-hidden','true');$('viewport-stage').prepend(showcaseBackdrop);}
+    const width=Math.max(1,$('viewport-stage').clientWidth),height=Math.max(1,$('viewport-stage').clientHeight-58);
+    showcaseBackdrop.width=width;showcaseBackdrop.height=height;
+    const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height,showcaseInks());
+  }
+  function setShowcase(value){
+    showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));$('viewport-inspect').setAttribute('aria-pressed',String(!showcaseMode));
+    $('viewport-stage').classList.toggle('vp-showcase',showcaseMode);showcaseBackdrop?.remove();showcaseBackdrop=null;
+    if(showcaseMode){
+      clearHover();drawShowcase();const skin=api.context?.().skin,stamp=revision;
+      if(skin){const image=new Image();image.src='/api/catalogue/thumbnail/'+encodeURIComponent(skin);image.decode().then(()=>{if(stamp!==revision||!showcaseMode)return;showcaseColors=window.AtelierPolish?.samplePalette(image)||null;drawShowcase();}).catch(()=>{});}
+    }
+  }
+  $('viewport-showcase').addEventListener('click',()=>setShowcase(true));$('viewport-inspect').addEventListener('click',()=>setShowcase(false));
   const shadedPlane = new THREE.Plane(new THREE.Vector3(0,-1,0));
   const wirePlane = new THREE.Plane(new THREE.Vector3(0,1,0));
   renderer.localClippingEnabled = true;
   let revealStart = null, reveal = 1;
   const revealWire = new THREE.MeshBasicMaterial({color:0xaccbff, wireframe:true,
     transparent:true, depthWrite:false, toneMapped:false});
-  function materialize() { revealBounds = bounds(); revealStart = reducedMotion.matches ? null : performance.now(); }
+  function materialize() { revealBounds = bounds(); revealStart = reducedMotion.matches ? null : performance.now();if(showcaseMode){showcaseColors=null;setShowcase(true);} }
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { revealStart = null; reveal = 1; finishCamera(); } });
-  window.addEventListener('pagehide', () => revealWire.dispose(), {once:true});
+  window.addEventListener('pagehide', () => {revealWire.dispose();toonGradient.dispose();}, {once:true});
 
   function worldBoxes() {
     const boxes = [];
@@ -217,14 +237,23 @@ export function createViewportInspection(api) {
     $('viewport-region-legend').hidden = !regions;
   }
 
-  function displayMaterial(source, original, showcase) {
+  function displayMaterial(source, original, showcase,comic=false) {
     if (!source.visible) return source;
     const base = original ? originals.get(source) || source : source;
     const overlay = !showcase && regions && overlays.get(source.name);
     const flat = lighting === 'flat' || lighting === 'emissive' || !!overlay;
     let pair = variants.get(base);
     if (!pair) {
-      pair = {standard:base.clone(), flat:new THREE.MeshBasicMaterial()}; variants.set(base, pair);
+      pair = {standard:base.clone(), flat:new THREE.MeshBasicMaterial(),toon:new THREE.MeshToonMaterial({gradientMap:toonGradient})}; variants.set(base, pair);
+    }
+    if(comic){
+      const toon=pair.toon,oldMap=toon.map,oldAlpha=toon.alphaTest,oldSide=toon.side;
+      toon.color.copy(base.color||new THREE.Color(0xffffff));toon.emissive.copy(base.emissive||new THREE.Color(0));
+      for(const key of ['map','alphaMap','emissiveMap','normalMap','bumpMap','aoMap','displacementMap'])toon[key]=base[key]||null;
+      for(const key of ['side','transparent','opacity','alphaTest','depthWrite','depthTest','blending','emissiveIntensity','normalMapType','bumpScale','aoMapIntensity','displacementScale','displacementBias'])if(base[key]!==undefined)toon[key]=base[key];
+      if(base.normalScale)toon.normalScale.copy(base.normalScale);toon.wireframe=false;toon.clippingPlanes=null;
+      if(oldMap!==toon.map||oldAlpha!==toon.alphaTest||oldSide!==toon.side)toon.needsUpdate=true;
+      return toon;
     }
     const material = flat ? pair.flat : pair.standard;
     const oldMap = material.map, oldWireframe = material.wireframe, oldToneMapped = material.toneMapped;
@@ -246,23 +275,27 @@ export function createViewportInspection(api) {
     return material;
   }
 
-  function renderPass(original = false, showcase = false, wireOnly = false) {
+  function renderPass(original = false, showcase = false, wireOnly = false,comic=false) {
     const restore = [];
+    const gridVisible=grid.visible;
+    try {
+    if(comic)grid.visible=false;
     modelRoot.traverse(mesh => {
       if (!mesh.isMesh) return;
       restore.push([mesh, mesh.material]);
-      const shown = m => !m.visible ? m : wireOnly ? revealWire : displayMaterial(m, original, showcase);
+      const shown = m => !m.visible ? m : wireOnly ? revealWire : displayMaterial(m, original, showcase,comic);
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(shown) : shown(mesh.material);
     });
-    try {
       renderer.render(scene, camera);
-      if (!wireOnly && lighting !== 'flat' && !regions) effects.drawBloom();
+      if (!comic&&!wireOnly && lighting !== 'flat' && !regions) effects.drawBloom();
     }
-    finally { for (const [mesh, material] of restore) mesh.material = material; }
+    finally { for (const [mesh, material] of restore) mesh.material = material;grid.visible=gridVisible; }
   }
 
-  function render(showcase = false) {
-    if (!showcase) { updateCamera(); updateAxes(); }
+  function render(showcase = false,comic=showcaseMode) {
+    const captured=showcase;
+    showcase ||= comic;
+    if (!captured) { updateCamera(); updateAxes(); }
     reveal = revealStart === null || showcase ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
     if (reveal === 1) revealStart = null;
     if (reveal < 1 && revealBounds && !revealBounds.isEmpty()) {
@@ -270,7 +303,7 @@ export function createViewportInspection(api) {
       shadedPlane.constant = height; wirePlane.constant = -height; revealWire.clippingPlanes = [wirePlane];
     }
     if (comparison !== 'wipe' || showcase) {
-      renderPass(!showcase && comparison === 'original', showcase);
+      renderPass(!showcase && comparison === 'original', showcase,false,comic);
       if (reveal < 1) {
         const clear = renderer.autoClear, visible = grid.visible;
         revealWire.opacity = (1 - reveal) * .8;
@@ -379,12 +412,13 @@ export function createViewportInspection(api) {
     return [...new Set(Object.entries(api.materials().data).flatMap(([name,d]) => (d.colors || []).filter(c => !/emiss|glow/i.test(c.name)).map(c => api.hex(api.materials().edited[name]?.[c.name] || c.rgba))))].slice(0,8);
   }
 
-  function posterCanvas(size, footer = 96) {
+  function posterCanvas(size, footer = 96,comic=showcaseMode) {
     const output = document.createElement('canvas'); output.width = size; output.height = size + footer;
     const context = output.getContext('2d');
     context.fillStyle = '#101217'; context.fillRect(0,size,size,footer);
     const mode = $('viewport-backdrop').value;
-    if (mode !== 'checker') {
+    if(comic)window.AtelierShowcaseArt.draw(context,size,size,showcaseInks());
+    else if (mode !== 'checker') {
       const style = getComputedStyle($('viewport-stage'));
       const gradient = context.createLinearGradient(0,0,size,size);
       gradient.addColorStop(0,style.getPropertyValue('--viewport-gradient-top').trim() || '#253142');
@@ -393,6 +427,7 @@ export function createViewportInspection(api) {
       context.fillRect(0,0,size,size);
     }
     context.drawImage(renderer.domElement, 0,0,size,size);
+    if(footer<=0)return output;
     context.fillStyle = '#e5e2e4'; context.font = `500 ${Math.round(size*.025)}px Roboto, sans-serif`;
     context.fillText(($('viewport-capture-name').value.trim() || $('viewport-title').textContent).slice(0,100), size*.035, size+footer*.38, size*.85);
     palette().forEach((color,i) => { context.fillStyle = color; context.fillRect(size*.035 + i*size*.045, size+footer*.6, size*.032, footer*.18); });
@@ -400,6 +435,15 @@ export function createViewportInspection(api) {
   }
 
   const toBlob = (canvas, type) => new Promise((resolve,reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(Error('Image encoding failed')), type, .88));
+  function cardPoster(size=1000) {
+    if(capture||bounds().isEmpty()||!api.ready())return null;
+    finishCamera();
+    const dimensions=renderer.getSize(new THREE.Vector2()),ratio=renderer.getPixelRatio();
+    const saved={position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),aspect:camera.aspect,near:camera.near,far:camera.far,min:controls.minDistance,max:controls.maxDistance,fit:fitOnResize,damping:controls.enableDamping};
+    const animationState=api.pauseAnimation?.();
+    try{renderer.setPixelRatio(1);renderer.setSize(size,size,false);camera.aspect=1;camera.updateProjectionMatrix();frame(true);render(true,true);return posterCanvas(size,0,true);}
+    finally{controls.enableDamping=false;camera.position.copy(saved.position);camera.up.copy(saved.up);controls.target.copy(saved.target);camera.aspect=saved.aspect;camera.near=saved.near;camera.far=saved.far;controls.minDistance=saved.min;controls.maxDistance=saved.max;controls.update();controls.enableDamping=saved.damping;fitOnResize=saved.fit;camera.updateProjectionMatrix();renderer.setPixelRatio(ratio);renderer.setSize(dimensions.x,dimensions.y,false);api.resumeAnimation?.(animationState);api.resize();}
+  }
   function download(blob, extension) {
     const url = URL.createObjectURL(blob), anchor = document.createElement('a');
     anchor.href = url; anchor.download = ($('viewport-capture-name').value.trim() || $('viewport-title').textContent).replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').slice(0,100) + extension;
@@ -475,13 +519,14 @@ export function createViewportInspection(api) {
   function clearMaterials() {
     effects.clear(); finishCamera(false);
     revision++; requestedMode++;
-    for (const pair of variants.values()) { pair.standard.dispose(); pair.flat.dispose(); }
+    for (const pair of variants.values()) { pair.standard.dispose(); pair.flat.dispose();pair.toon.dispose(); }
     for (const material of originals.values()) material.dispose();
     for (const texture of textures) texture.dispose();
     variants.clear(); originals.clear(); overlays.clear(); textures.clear(); originalTextures.clear();
     originalPromise = regionPromise = null; regions = false; updateRegions(); setComparison('edited'); clearHover();
   }
   function reset() {
+    setShowcase(false);showcaseColors=null;
     setLoading(false);
     revealStart = null; reveal = 1;
     capture?.abort(); clearMaterials(); view = 'perspective'; $('viewport-view').value = view;
@@ -514,7 +559,7 @@ export function createViewportInspection(api) {
     renderer.domElement.setAttribute('aria-busy',String(assetsLoading));
     $('viewport-stage').classList.toggle('vp-assets-loading',assetsLoading);
   }
-  return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,
-    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading}),
-    resized:() => { if (fitOnResize && !capture && !cameraMove) frame(true); }, capturing:() => !!capture};
+  return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,cardPoster,
+    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading,showcase:showcaseMode}),
+    resized:() => { if (fitOnResize && !capture && !cameraMove) frame(true);drawShowcase(); }, capturing:() => !!capture};
 }

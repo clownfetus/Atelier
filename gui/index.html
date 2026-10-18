@@ -223,6 +223,7 @@
     <div id="viewport-body">
       <div id="viewport-stage">
         <div id="viewport-inspect-tools">
+          <div class="vp-segment" role="group" aria-label="Presentation mode"><button id="viewport-inspect" aria-pressed="true">Inspect</button><button id="viewport-showcase" aria-pressed="false">Showcase</button></div>
           <div class="vp-segment" role="group" aria-label="Texture comparison">
             <button id="viewport-edited" aria-pressed="true">Edited</button>
             <button id="viewport-original" aria-pressed="false">Original</button>
@@ -499,6 +500,7 @@
       <div class="setup-section">Behavior</div>
       <div class="setup-field"><label class="setup-label" for="settings-density">Density</label><select id="settings-density" class="setup-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
       <div class="setup-field"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="full">Full</option><option value="calm">Calm</option><option value="off">Off</option></select></div>
+      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-foley"><span class="switch-track"></span></span>Formation sounds</label><p class="setup-note">Optional drop, pop and splat sounds. Full motion only.</p></div>
       <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-adaptive-accent"><span class="switch-track"></span></span>Use character artwork for the library accent <span id="krackle-accent-status" hidden></span></label><p class="setup-note">Optional. Fits Charge and Rift to the current surface and keeps them distinct from outcomes. Artwork and project colours stay unchanged.</p></div>
       <div class="setup-field">
         <label class="toggle-row" id="toggle-import-open-row">
@@ -833,6 +835,10 @@
 <script src="/static/dialog.js"></script>
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>
+<script src="/static/motion/showcase-art.js"></script>
+<script src="/static/motion/foley.js"></script>
+<script src="/static/mod-card-data.js"></script>
+<script src="/static/mod-cards.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

@@ -60,7 +60,9 @@
     else if (!lastButton.hidden && !lastButton.disabled) lastButton.focus();
     else document.getElementById('install-btn').focus();
   }
+  let disposeCard=null;
   function reset(heading, state) {
+    disposeCard?.();disposeCard=null;
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
     showStage(state === 'review' ? 'idle' : state);
@@ -237,6 +239,7 @@
     if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
+    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt});
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
     if (!result.ok) button('Retry export', current.retry || callbacks.confirm, true).id = 'export-review-retry';
@@ -287,7 +290,7 @@
     },
     finish(snapshot, result) {
       if (current?.snapshot !== snapshot) return;
-      busy = false; current.result = result; lastResult = current;
+      busy = false; current.result = result;current.builtAt=new Date().toISOString(); lastResult = current;
       lastButton.hidden = false; lastButton.disabled = false;
       lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();

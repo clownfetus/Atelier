@@ -48,8 +48,13 @@
 #viewport-stage[data-backdrop=solid] { background:var(--viewport-backdrop,#14161b); }
 #viewport-stage[data-backdrop=checker] { background-color:#b7bdc5; background-image:conic-gradient(#e0e3e8 25%,transparent 0 50%,#e0e3e8 0 75%,transparent 0); background-size:24px 24px; }
 #viewport-canvas { position:absolute; inset:58px 0 0; width:100%; height:calc(100% - 58px); display:block; background:transparent; outline-offset:-4px; touch-action:none; }
+.vp-showcase-backdrop {position:absolute;inset:58px 0 0;width:100%;height:calc(100% - 58px);pointer-events:none;}
+#viewport-stage.vp-showcase {background:#14161b;}
 #viewport-inspect-tools, #viewport-tools { position:absolute; z-index:5; top:20px; display:flex; align-items:center; gap:12px; padding:0; background:transparent; border:0; }
 #viewport-inspect-tools { left:22px; }
+#viewport-inspect-tools {max-width:270px;flex-wrap:wrap;gap:6px;}
+#viewport-inspect-tools .vp-segment {background:var(--bg2);}
+#viewport-stage.vp-showcase #viewport-inspect-tools > button {background:var(--bg2);}
 #viewport-tools { right:22px; }
 #viewport-inspect-tools > button { border-color:transparent; background:transparent; }
 .vp-segment { display:flex; border:1px solid var(--border2); border-radius:6px; background:var(--bg2); overflow:hidden; }
