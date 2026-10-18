@@ -26,7 +26,7 @@
 .roster-strip::-webkit-scrollbar { display:block; }
 /* Reserve a complete portrait row, captions and controls. Folder cards can yield space;
    short windows scroll the Home pane instead of letting sections paint over one another. */
-#hero-roster:not([hidden]) { flex:1 1 0; min-height:calc(var(--card-w,156px) * .64 + 196px); display:flex; flex-direction:column; }
+#hero-roster:not([hidden]) { flex:1 1 0; min-height:calc(var(--card-w,156px) * .64 + 212px); display:flex; flex-direction:column; }
 .roster-section { display:flex; flex-direction:column; flex:1; min-height:0; }
 .roster-content { display:grid; grid-template-rows:auto minmax(0,1fr) auto; flex:1; min-height:0; }
 .roster-content[hidden] { display:none; }

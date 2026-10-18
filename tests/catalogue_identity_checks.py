@@ -1,5 +1,6 @@
 """Identity artwork, HiDPI fallbacks, theme ownership and custom package location UI."""
 from io import BytesIO
+from urllib.parse import quote
 import time
 from PIL import Image
 
@@ -61,6 +62,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
     stored = None
     try:
         tab.goto(url); tab.wait_for_function('window.AtelierCatalogueArt && window.atelierProject?.()')
+        project_header = quote(tab.evaluate('atelierProject()'), safe='')
         pixel_ratio = tab.evaluate('devicePixelRatio')
         sharp = '?sharp=1'
         stored = tab.evaluate("Object.fromEntries(['homePins.v1','motion'].map(k=>['atelier.'+k,localStorage.getItem('atelier.'+k)]))")
@@ -135,7 +137,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
         assert tab.locator('#mattex-path-0').inner_text() == '/Game/Marvel/MyMod/Textures/T_Chosen'
         tab.locator('.mat-texture-location .btn').click()
         tab.wait_for_function("matEditor.custom.BaseColor.game_rel==='MyMod/Textures/T_Chosen'")
-        assert all(header == 'Smoke%20A' for _,header in writes)
+        assert all(header == project_header for _,header in writes)
         tab.locator('.mat-texture-location summary').click()
         tab.screenshot(path=str(report/'custom-texture-location.png'), animations='disabled')
         tab.locator('#mattex-name-0').fill('Delayed')
@@ -185,7 +187,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
                 Math.abs(image.bottom-box.bottom)<1 && getComputedStyle(host).marginBottom==='0px';
             }""")
             box = tab.locator('#library-hero').bounding_box()
-            screenshot = Image.open(BytesIO(tab.screenshot(scale='css'))).convert('RGB')
+            screenshot = Image.open(BytesIO(tab.screenshot(scale='css', animations='disabled'))).convert('RGB')
             pixel = screenshot.getpixel((round(box['x']+box['width']*.8), round(box['y']+box['height']*.5)))
             assert all(abs(a-b)<=3 for a,b in zip(pixel,(182,64,80))), pixel
             tab.screenshot(path=str(report/(kind+'-upscaled-edge-to-edge.png')), animations='disabled')
