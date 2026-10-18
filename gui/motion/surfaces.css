@@ -40,3 +40,5 @@
 .k-project-drop {width:48px;height:48px;display:grid;place-items:center;border:0;background:var(--bg2);color:var(--krackle-charge);cursor:pointer;}
 .k-project-drop [data-atelier-motion] {width:48px;height:48px;}
 .k-project-fall {position:fixed;z-index:290;pointer-events:none;}
+.hdr-ring {position:absolute;inset:calc(-1 * var(--hdr-radius,4px));border:2px solid var(--swatch-color);border-radius:8px;pointer-events:none;}
+.hdr-ring i {position:absolute;width:4px;height:4px;margin:-2px;background:#121216;border-radius:50%;}
