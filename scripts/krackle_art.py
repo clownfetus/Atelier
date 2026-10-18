@@ -14,6 +14,7 @@ a solid silhouette in currentColor; bubbles are holes punched into it, painted w
 success is a starburst, warning a cracked ring with its fallen chunk, error a splat.
 """
 import argparse
+import json
 import math
 import re
 import sys
@@ -289,6 +290,64 @@ def spinner_masks():
 
 
 # ── writing ───────────────────────────────────────────────────────────────────
+def category_emblems():
+    """Review candidates: broad energy silhouettes, with scale-specific bubbles."""
+    definitions=[
+      ('char-icon','Characters','<circle cx="12" cy="6" r="4"/><path d="M3 23V19Q3 11 12 11Q21 11 21 19V23Z"/>',12,17),
+      ('ui-folder-icon','UI','<path d="M2 2H11V11H2ZM13 2H22V11H13ZM2 13H11V22H2ZM13 13H22V22H13Z"/>',6,7),
+      ('texture-folder-icon','Textures','<path d="M1 22L8 7L13 14L17 10L23 22Z"/><circle cx="18" cy="5" r="3"/>',8,17),
+      ('material-folder-icon','Materials',path(teardrop(12,14,9,1),'energy'),15,17),
+      ('vfx-folder-icon','VFX',path(starburst(12,12,12,5.5,10,.2),'energy'),12,13),
+      ('mesh-folder-icon','Meshes','<path d="M12 1L23 7V18L12 24L1 18V7Z"/>',15,16),
+      ('text-folder-icon','Text','<path d="M2 2H22V8H15V23H9V8H2Z"/>',12,14),
+      ('nameplate-folder-icon','Nameplates','<path d="M1 3H23V21H1Z"/><circle cx="7" cy="9" r="3"/>',8,14),
+      ('plugin-folder-icon','Plugins','<path d="M2 4H9V2Q12 -1 15 2V4H22V11H24V17H22V23H2V16H0V10H2Z"/>',11,15),
+      ('weapon-folder-icon','Weapons','<path d="M1 0L8 3L13 10L23 21L20 24L10 13L3 8ZM24 0L21 8L14 13L4 24L0 20L11 10L16 3Z"/>',12,12),
+      ('animation-folder-icon','Animation','<path d="M4 1H20V23H4Z"/><path d="M0 4H24V8H0ZM0 16H24V20H0Z"/>',12,13),
+      ('audio-folder-icon','Audio','<path d="M1 8H7L16 1V23L7 16H1Z"/><circle cx="20" cy="9" r="3"/><circle cx="21" cy="16" r="2"/>',12,13),
+      ('map-folder-icon','Maps','<path d="M1 4L8 1L16 5L23 2V20L16 23L8 19L1 22Z"/>',10,13),
+      ('light-folder-icon','Lights','<circle cx="12" cy="9" r="9"/><path d="M7 14H17V23H7Z"/>',15,11),
+      ('blueprint-folder-icon','Blueprints','<path d="M1 8L12 0L23 8V23H1Z"/>',14,15),
+      ('ai-folder-icon','AI','<circle cx="8" cy="9" r="7"/><circle cx="16" cy="9" r="7"/><circle cx="8" cy="15" r="7"/><circle cx="16" cy="15" r="7"/>',10,14),
+      ('ability-folder-icon','Abilities','<path d="M13 0L1 14H10L7 24L23 8H14L18 0Z"/>',13,11),
+      ('physics-folder-icon','Physics','<circle cx="12" cy="6" r="6"/><circle cx="6" cy="17" r="6"/><circle cx="18" cy="17" r="6"/>',6,17),
+      ('controls-folder-icon','Controls','<path d="M4 5H20L24 22H18L14 17H10L6 22H0Z"/>',8,11),
+      ('data-folder-icon','Data','<path d="M2 4Q12 -3 22 4V20Q12 27 2 20Z"/>',13,16),
+      ('tools-folder-icon','Tools','<path d="M3 0L10 4V9L23 19L19 24L6 11H2L0 4Z"/>',8,8),
+      ('environment-folder-icon','Environment','<path d="M12 0L22 13H18L24 20H15V24H9V20H0L6 13H2Z"/>',12,16),
+      ('font-folder-icon','Fonts','<path d="M4 1H23V7H11V11H20V17H11V24H4Z"/>',8,6),
+      ('movie-folder-icon','Movies','<path d="M1 1H23V7H1ZM1 9H23V23H1Z"/>',12,16),
+      ('language-folder-icon','Languages','<circle cx="12" cy="12" r="12"/>',10,15),
+      ('code-folder-icon','Functions','<path d="M8 1L0 12L8 23L12 19L7 12L12 5ZM16 1L24 12L16 23L12 19L17 12L12 5Z"/>',6,12),
+      ('statistics-folder-icon','Statistics','<path d="M1 13H7V24H1ZM9 7H15V24H9ZM17 0H23V24H17Z"/>',12,16),
+      ('pipeline-folder-icon','Pipelines','<path d="M0 0H8V8H24V16H16V24H8V16H0Z"/>',11,12),
+      ('resources-folder-icon','Resources','<path d="M12 0L24 6L12 12L0 6ZM0 9L12 15L24 9V15L12 21L0 15ZM0 18L12 24L24 18V24H0Z"/>',11,17),
+      ('security-folder-icon','Security','<path d="M12 0L23 5V12Q22 21 12 24Q2 21 1 12V5Z"/>',13,14),
+      ('mobile-folder-icon','Mobile','<path d="M5 0H19V24H5Z"/>',12,18),
+      ('vr-folder-icon','VR','<path d="M2 4H22L24 20H16L12 15L8 20H0Z"/>',6,12),
+      ('shapes-folder-icon','Shapes','<path d="M6 0L13 14H0Z"/><circle cx="17" cy="17" r="7"/>',17,18),
+      ('sky-folder-icon','Sky','<circle cx="18" cy="6" r="6"/><circle cx="8" cy="14" r="7"/><circle cx="16" cy="16" r="7"/><path d="M1 14H23V23H1Z"/>',11,18),
+      ('deformer-folder-icon','Deformers','<path d="M2 2Q12 -3 22 2Q15 12 22 22Q12 27 2 22Q10 12 2 2Z"/>',12,13),
+      ('prototype-folder-icon','Prototypes','<path d="M12 0Q24 8 18 19H6Q0 8 12 0ZM6 12L0 23L8 20ZM18 12L24 23L16 20ZM9 21H15L12 25Z"/>',12,10),
+    ]
+    out={};mapping={};previews={}
+    for cls,label,body,x,y in definitions:
+        mapping[cls]=cls
+        for size in [24,102]:
+            holes=[(x,y,1.7)] if size==24 else [(x,y,2.1),(x-2.7,y+2,1.4),(x+1.8,y+3,1.1),(x-3,y-1.8,.8)]
+            cut=''.join(circle(a,b,r,'bubble',extra=' fill="var(--krackle-hole,#121216)"') for a,b,r in holes)
+            clip=f'energy-{cls}-{size}'
+            mark=f'<defs><clipPath id="{clip}">{body}</clipPath></defs><g fill="currentColor">{body}</g><g clip-path="url(#{clip})">{cut}</g>'
+            markup=svg('k-category-emblem',24,mark,size=size,extra=' style="color:var(--krackle-charge,#2a9fd6)"')
+            previews[cls,size]=markup
+            out[MOTION/'category-emblems'/f'{cls}-{size}.svg']=('whole',markup+'\n')
+    source='// Generated by scripts/krackle_art.py. D4 review candidates; Sharp remains the default.\n'+"window.AtelierCategoryEmblems=Object.freeze({enabled:()=>{try{return localStorage.getItem('atelier.experimentalKrackleEmblems')==='1';}catch(_){return false;}},names:"+json.dumps(mapping)+"});\n"
+    out[MOTION/'category-emblems.js']=('whole',source)
+    cells=''.join(f'<article><strong>{label}</strong><div>{previews[cls,24]}{previews[cls,102]}</div></article>' for cls,label,*_ in definitions)
+    sheet='<!doctype html><html lang="en"><meta charset="utf-8"><title>D4 category emblem review</title><style>body{--krackle-charge:#2693c6;background:#eee5cf;color:#121216;font:13px Arial;margin:20px}body.dark{--krackle-charge:#2a9fd6;background:#121216;color:#eee5cf}main{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}article{border:1px solid #888;padding:10px}article div{display:flex;align-items:center;gap:20px;margin-top:10px}h1{font-size:22px}</style><h1>D4 review candidates · 24 px and 102 px · Material Sharp remains active</h1><main>'+cells+'</main></html>\n'
+    out[ROOT/'docs/review/wave-4b/category-emblems.html']=('whole',sheet)
+    return out
+
 HEADER = {
     'export-feedback': 'Krackle export feedback: drop and tray (idle), six-dot charge ring (busy), starburst, cracked ring and splat.',
     'material-save': 'Krackle material save: shaded swatch (idle), charge ring around a small swatch (saving), starburst, cracked ring and splat.',
@@ -323,7 +382,7 @@ def replace_region(text, name, payload, kind):
 
 
 def targets():
-    out = {}
+    out = category_emblems()
     for name, fn in ART.items():
         markup = fn()
         out[MOTION / f'{name}.svg'] = ('whole', standalone(name, markup))
@@ -365,6 +424,7 @@ def main():
         if wanted != current:
             stale.append(file.relative_to(ROOT))
             if not args.check:
+                file.parent.mkdir(parents=True,exist_ok=True)
                 file.write_text(wanted, encoding='utf-8')
     if args.check and stale:
         print('Out of date: ' + ', '.join(map(str, stale)))
