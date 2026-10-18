@@ -169,6 +169,8 @@ cooked game files are refused. It never creates or edits `skins.txt`; the
 Companion App manages that. Project Galacta can switch this export off, and the
 review then says why.
 
+To test the integration from source, see [Testing Skin Swapper export](docs/skin-swapper-testing.md).
+
 ## Help
 
 <a id="get-marvelrivals-path"></a>
