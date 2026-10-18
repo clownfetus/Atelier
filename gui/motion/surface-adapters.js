@@ -2,11 +2,24 @@
 (() => {
   'use strict';
   const api=window.AtelierSurfaces||={};
-  let startupStage=null,startupHost=null;
+  let startupStage=null,startupHost=null,launchAttempted=false;
   api.startupProgress=data=>{
     const splash=document.getElementById('startup-splash');if(!splash||!Number(data.total)||!AtelierMotionPolicy.allows(2))return;
-    if(!startupHost){startupHost=document.createElement('div');startupHost.className='k-startup-stage';splash.prepend(startupHost);try{startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:156,kind:'index-load'});}catch(_){startupHost.remove();startupHost=null;}}
+    if(!startupHost){
+      startupHost=document.createElement('div');startupHost.className='k-startup-stage';splash.prepend(startupHost);
+      try{
+        let mask=null;
+        const image=document.querySelector('.studio-brand > img');
+        if(!launchAttempted&&image?.complete&&image.naturalWidth){
+          launchAttempted=true;const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
+          const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,128,128);mask=ctx.getImageData(0,0,128,128);
+        }
+        startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:mask?224:156,kind:mask?'launch':'index-load',tier:mask?3:2,mask});
+        if(mask&&startupHost.dataset.amMicro!=='true')splash.dataset.launch='true';
+      }catch(_){startupHost.remove();startupHost=null;}
+    }
     if(startupHost)startupHost.setAttribute('aria-label',`Container ${data.current} of ${data.total}`);
+    startupStage?.setProgress(Number(data.current)/Number(data.total));
   };
   api.startupDone=()=>{startupStage?.destroy();startupStage=null;startupHost?.remove();startupHost=null;};
   api.indexFailure=notice=>{
