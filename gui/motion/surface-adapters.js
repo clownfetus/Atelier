@@ -44,6 +44,16 @@
     setTimeout(dispose,460);
   };
   const drops=new Map();
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('.btn.primary:not(:disabled)');if(!button||!AtelierMotionPolicy.allows(2)||document.hidden)return;
+    const rect=button.getBoundingClientRect(),x=event.detail?event.clientX:rect.x+rect.width/2,y=event.detail?event.clientY:rect.y+rect.height/2;
+    for(let i=0;i<8;i++){
+      const dot=document.createElement('i');dot.className='k-button-pop';dot.setAttribute('aria-hidden','true');dot.style.left=x+'px';dot.style.top=y+'px';document.body.append(dot);
+      const angle=i/8*Math.PI*2;
+      try{const a=dot.animate([{transform:'scale(.3)',opacity:1},{transform:`translate(${Math.cos(angle)*28}px,${Math.sin(angle)*22}px) scale(1)`,opacity:0}],{duration:200,easing:'cubic-bezier(.2,0,0,1)'});a.finished.then(()=>dot.remove(),()=>dot.remove());}catch(_){dot.remove();}
+      setTimeout(()=>dot.remove(),220);
+    }
+  },true);
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
     const button=document.createElement('button');button.className='k-update-drop';button.type='button';button.title=kind==='usmap'?'Mapping update available':'Atelier update available';button.setAttribute('aria-label',button.title);
