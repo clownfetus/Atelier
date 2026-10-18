@@ -9,7 +9,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 import time
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from PIL import Image, ImageDraw
 from playwright.sync_api import sync_playwright
@@ -135,6 +135,9 @@ def boot(browser, url, errors, mode='dark', custom=False, fixture=None):
     page.route('**/api/usmap_update_check', lambda route: route.fulfill(json={'ok': True}))
     page.route('**/api/catalogue/status', lambda route: route.fulfill(json={'updating': False, 'portraits': 803}))
     if fixture:
+        page.route('**/api/setup_status', lambda route: route.fulfill(json={'configured': True}))
+        page.route('**/api/prereqs', lambda route: route.fulfill(json={'issues': []}))
+        page.route('**/api/changelog', lambda route: route.fulfill(json={'available': False, 'releases': []}))
         page.route('**/api/catalogue/**', fixture)
         page.route('**/colour-grey', fixture)
         page.route('**/api/imported', lambda route: route.fulfill(json=[]))
@@ -232,7 +235,9 @@ def synthetic(browser, args, report, results, errors, mode, custom):
         nav(page, 'Characters/1046/1046102')
         wait_decoration(page, 'banner', red)
         page.wait_for_selector('#library-hero.has-nameplate.has-art')
-        assert page.locator('.library-hero-art').get_attribute('src').endswith('/banner/1046102')
+        nameplate = urlparse(page.locator('.library-hero-art').get_attribute('src'))
+        assert nameplate.path == '/api/catalogue/banner/1046102'
+        assert parse_qs(nameplate.query).get('sharp') == ['1']
         assert controls(page)['roles'] == before['roles']
         page.screenshot(path=str(report / f'fixture-nameplate-{label}.png'), animations='disabled')
         for sid, expected in [('1046103', BLUE), ('1046104', GREEN), ('1046105', BLUE), ('1046106', PURPLE)]:

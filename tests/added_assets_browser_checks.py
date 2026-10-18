@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from added_asset_fixtures import AssetTool, decode_png, image_bytes, package
+from added_asset_fixtures import AssetTool, decode_png, image_bytes, package, mesh_probe
 
 
 def run_added_asset_checks(page, context, url, report, checks):
@@ -26,6 +26,7 @@ def run_added_asset_checks(page, context, url, report, checks):
             for module in (A, CT, T, M): stack.enter_context(patch.object(module, 'uat', tool))
             for module in (A, B): stack.enter_context(patch.object(module, 'ensure_index', return_value=entries))
             stack.enter_context(patch.object(T, 'decode_to_png', side_effect=decode_png))
+            stack.enter_context(patch('atelier.handlers.meshsurvey.probe', side_effect=mesh_probe))
             stack.enter_context(patch.object(T, 'ensure_work_base', side_effect=lambda gr: by_path.get(gr) or ensure(gr)))
             tab.route('**/api/browse?*', lambda route: route.continue_())
             tab.route('**/api/thumb?*', lambda route: route.fulfill(body=image_bytes(), content_type='image/png'))

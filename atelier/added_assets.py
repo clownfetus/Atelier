@@ -175,6 +175,21 @@ def _export(doc, name, file_type):
     return tops[0]
 
 
+def _mesh_lods(base):
+    """Reject incomplete cooked skeletal packages before publishing a new asset."""
+    from atelier.handlers.meshsurvey import probe
+    report = probe(base, read_tails=False, include_layout=True)
+    layout = report.get('_layout', [])
+    if report['status'] == 'error' or not layout or any(lod['blob'] == 'missing' for lod in layout):
+        raise ValueError('The skeletal mesh is missing geometry. Include every companion file and streamed LOD.')
+    # Renaming can move the serialized properties without changing the geometry.
+    # Compare section meaning, excluding parser byte-offset bookkeeping.
+    return [{'num_verts': lod['num_verts'], 'n_indices': lod['n_indices'],
+             'sections': [{key: value for key, value in section.items()
+                           if key not in ('off', 'bm', 'after') and not key.endswith('_off')}
+                          for section in lod['sections']]} for lod in layout]
+
+
 def _retarget(doc, old_name, target, file_type, source_path=None):
     doc = copy.deepcopy(doc)
     original_names = list(doc.get('NameMap', []))
@@ -244,7 +259,18 @@ def add(file_type, folder, name, source='', files=()):
     with tempfile.TemporaryDirectory(prefix='atelier-add-asset-') as temporary:
         work = Path(temporary)
         doc = _read_package(original, str(work / 'source-json'))
-        _export(doc, os.path.basename(original), file_type)
+        export = _export(doc, os.path.basename(original), file_type)
+        skeletal = file_type == 'mesh' and doc['Imports'][-export['ClassIndex'] - 1]['ObjectName'] == 'SkeletalMesh'
+        original_lods = None
+        if skeletal:
+            if source_gr:
+                # Patch packages may store their streamed geometry in a base container.
+                # Complete that source before making the independent project copy.
+                from atelier.handlers.meshstudio import complete_mesh_source
+                original = complete_mesh_source(source_gr)
+                doc = _read_package(original, str(work / 'source-json'))
+                _export(doc, os.path.basename(original), file_type)
+            original_lods = _mesh_lods(original)
         image = None
         if images:
             png, _size = custom_texture._normalized_png(images[0].read_bytes())
@@ -280,6 +306,8 @@ def add(file_type, folder, name, source='', files=()):
             compiled = encoded
         verified = _read_package(str(compiled.with_suffix('')), str(work / 'readback'))
         _export(verified, compiled.stem, file_type)
+        if skeletal and _mesh_lods(str(compiled.with_suffix(''))) != original_lods:
+            raise ValueError('The renamed skeletal mesh did not retain every original LOD and section.')
         if file_type == 'texture':
             editor_file = image; editor_ext = '.png'
         elif file_type == 'material':

@@ -80,6 +80,8 @@ def main():
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
+    parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
+    parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -168,6 +170,26 @@ def main():
                 from changelog_checks import run_changelog_checks
                 run_changelog_checks(context, url, report, checks)
                 if args.changelog_only:
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.identity_only:
+                    from release_interface_checks import run_release_interface_checks
+                    run_release_interface_checks(page, context, browser, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.model_export_only:
+                    from model_studio_export_browser_checks import run_model_studio_export_browser_checks
+                    run_model_studio_export_browser_checks(page, context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks:
@@ -363,6 +385,13 @@ def main():
                 run_polish_checks(page, context, url, report, checks)
                 from viewport_inspection_checks import run_viewport_inspection_checks
                 run_viewport_inspection_checks(page, context, url, report, checks, args.mesh, args.idle)
+                from viewport_loading_checks import run_viewport_loading_checks, run_hero_artwork_checks
+                run_viewport_loading_checks(page, context, url, report, checks)
+                run_hero_artwork_checks(page, context, url, report, checks)
+                from viewer_followup_checks import run_viewer_followup_checks
+                run_viewer_followup_checks(page, context, url, report, checks)
+                from model_studio_export_browser_checks import run_model_studio_export_browser_checks
+                run_model_studio_export_browser_checks(page, context, url, report, checks)
                 from export_motion_checks import run_export_motion_checks
                 run_export_motion_checks(page, context, url, report, checks)
                 from viewport_motion_checks import run_viewport_motion_checks
@@ -405,6 +434,9 @@ def main():
                 run_logo_motion_checks(page, context, url, report, checks)
                 from krackle_motion_checks import run_krackle_motion_checks
                 run_krackle_motion_checks(page, context, url, report, checks)
+
+                from release_interface_checks import run_release_interface_checks
+                run_release_interface_checks(page, context, browser, url, report, checks)
 
                 # Real backend CRUD, with encoded project header rather than a mock bridge.
                 result = page.evaluate("""async () => {

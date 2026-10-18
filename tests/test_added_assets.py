@@ -18,7 +18,7 @@ atexit.register(_data.cleanup)
 from atelier import added_assets as A, config as C, project_trash, storage
 from atelier.handlers import custom_texture as CT, material as M, texture as T, meshreplace
 from atelier.web import browse as B
-from added_asset_fixtures import AssetTool, decode_png, image_bytes, package
+from added_asset_fixtures import AssetTool, decode_png, image_bytes, package, mesh_probe
 
 
 class AddedAssets(unittest.TestCase):
@@ -33,6 +33,7 @@ class AddedAssets(unittest.TestCase):
         self.tool = AssetTool()
         for module in (A, CT, T, M): self.stack.enter_context(patch.object(module, 'uat', self.tool))
         self.stack.enter_context(patch.object(T, 'decode_to_png', side_effect=decode_png))
+        self.stack.enter_context(patch('atelier.handlers.meshsurvey.probe', side_effect=mesh_probe))
         for module in (T, M): self.stack.enter_context(patch.object(module, 'pak_game_path', side_effect=lambda gr: 'Marvel/Content/Marvel/' + gr))
         self.stack.enter_context(patch.object(M, 'CACHE_3DVIEW', str(self.root / 'cache')))
         self.stack.enter_context(patch.object(M, '_CACHE', str(self.root / 'cache')))
@@ -124,6 +125,37 @@ class AddedAssets(unittest.TestCase):
             self.assertEqual(Path(path).read_bytes(), b'glTF fixture')
             self.assertEqual(meshreplace.preview(gr), path)
             parse.assert_called_once()
+
+    def test_game_mesh_completes_streamed_source_before_copying(self):
+        source = self.source('mesh')
+        complete = self.root / 'complete' / source.name
+        complete.parent.mkdir(); shutil.copy2(source, complete)
+        complete.with_suffix('.uexp').write_bytes(b'opaque payload')
+        complete.with_suffix('.ubulk').write_bytes(b'streamed high detail geometry')
+        with patch.object(T, 'ensure_work_base', return_value=str(source.with_suffix(''))), \
+             patch('atelier.handlers.meshstudio.complete_mesh_source', return_value=str(complete.with_suffix(''))) as resolve:
+            result = A.add('mesh', 'Custom', 'Complete', source='Fixtures/SK_Source')
+        resolve.assert_called_once_with('Fixtures/SK_Source')
+        self.assertEqual(Path(A.source_base(result['game_rel']) + '.ubulk').read_bytes(), b'streamed high detail geometry')
+
+    def test_incomplete_uploaded_mesh_and_lost_lods_publish_nothing(self):
+        incomplete = {'status': 'ok', '_layout': [{'blob': 'missing'}]}
+        with patch('atelier.handlers.meshsurvey.probe', return_value=incomplete), \
+             self.assertRaisesRegex(ValueError, 'missing geometry'):
+            self.add('mesh')
+        self.assertFalse(list(self.project.rglob('*')))
+        changed = mesh_probe(); changed['_layout'][0]['num_verts'] = 2
+        with patch('atelier.handlers.meshsurvey.probe', side_effect=[mesh_probe(), changed]), \
+             self.assertRaisesRegex(ValueError, 'every original LOD'):
+            self.add('mesh')
+        self.assertFalse(list(self.project.rglob('*')))
+
+    def test_mesh_rename_may_move_serialized_section_offsets(self):
+        original, renamed = mesh_probe(), mesh_probe()
+        original['_layout'][0]['sections'][0].update(off=100, bm=120, after=180, bonemap_off=124)
+        renamed['_layout'][0]['sections'][0].update(off=110, bm=130, after=190, bonemap_off=134)
+        with patch('atelier.handlers.meshsurvey.probe', side_effect=[original, renamed]):
+            self.assertTrue(self.add('mesh')['ok'])
 
     def test_folder_browser_includes_project_folders_and_filters_source_types(self):
         self.add('material', folder='Custom/Materials'); self.add('texture', folder='Custom/Textures')

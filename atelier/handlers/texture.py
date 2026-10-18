@@ -1028,7 +1028,8 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
             from atelier.handlers.meshedit import stage_mesh
             info = stage_mesh(gr, stage)
             lods = len(info.get('visibility') or info['applied'])
-            applied.append(f"mesh {os.path.basename(gr)} ({lods} LODs" + ('; hidden sections' if info.get('visibility') else '') + ')')
+            detail = 'unchanged' if info.get('unchanged') and not info.get('visibility') else f'{lods} LODs'
+            applied.append(f"mesh {os.path.basename(gr)} ({detail}" + ('; hidden sections' if info.get('visibility') else '') + ')')
         except Exception as e:
             # A failed mesh must not leave a partial or unhidden package to be
             # packed alongside successful edits after being reported as skipped.

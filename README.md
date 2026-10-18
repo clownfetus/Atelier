@@ -1,17 +1,30 @@
 # Atelier: Modding Studio
 
-**Atelier 1.0** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.0](docs/release-1.0.0.md)
+· [What's new in 1.1](docs/release-1.1.0.md)
 · [Development guide](DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
 ![Atelier 1.0 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.0
+## What's new in 1.1
+
+- **Create assets at your own paths.** Add named textures, material instances and
+  meshes, then edit, build, delete or recover them through the normal project workflow.
+- **Take Model Studio into Blender.** Export a portable scene with the visible
+  body, held weapons, connected materials, packed textures and deformation bones.
+- **Replace and refine models.** Choose a body or weapon destination, import
+  model/texture bundles, and save individual section visibility into your mod.
+- **Browse a clearer library.** Hero and costume nameplates, sharper banners,
+  distinct category emblems, saved card sizes and a remembered Heroes startup view.
+- **See what changed.** Read the bundled changelog after an update or reopen it
+  from the menu, including releases you skipped.
+
+## Included from 1.0
 
 - **Find your next edit faster.** Home opens with hero portraits and costume
   lists. Search Everywhere across heroes, skins, folders and assets, or narrow
@@ -31,7 +44,7 @@ before building it. Available for Windows and Linux.
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-The app and download files use **1.0.0**. See the [release notes](docs/release-1.0.0.md)
+The app and download files use **1.1.0**. See the [release notes](docs/release-1.1.0.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -73,6 +86,17 @@ Inspect a model with material picking, lighting controls, original/edited
 comparison, and a before/after wipe. Switch to **Showcase** for cel lighting and
 a skin-colour dot backdrop. Returning to **Inspect** restores the editable
 materials; presentation does not save material changes.
+
+**Export to Blender** saves the selected body and visible held weapons together
+in a portable `.blend`, with connected materials, packed images and deformation
+bones. Blender must be configured in Settings. Game physics and animation controls
+are not recreated. The per-mesh **Edit in Blender** action remains available for
+replacement round trips.
+
+The section eye controls save which parts are hidden in the exported mesh.
+Use **Replace model** to choose the body or a separate weapon, then import a
+supported model, a model ZIP, or companion files together. Existing game rigs and
+physics assets are retained; a different shape may need weight adjustments.
 
 ![Model Studio inspecting Magik from an isolated game installation](images/model-studio.png)
 

@@ -195,6 +195,14 @@ def main():
                 raise AssertionError('Invalid material path was not rejected with HTTP 400')
             assert rejected.get('ok') is False and rejected.get('error'), rejected
             result['checks'].append('Frozen Python backend includes original-material comparison and rejects traversal')
+            source_notes = Path(__file__).resolve().parents[1] / 'CHANGELOG.md'
+            assert source_notes.read_bytes() == (exe.parent / '_internal/CHANGELOG.md').read_bytes()
+            with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/changelog', timeout=10) as reply:
+                notes = json.load(reply)
+            assert notes['version'] == expected_version and not notes['available'], notes
+            assert notes['releases'][0]['version'] == expected_version, notes
+            assert any(block['type'] == 'list' for block in notes['releases'][0]['blocks']), notes
+            result['checks'].append('Frozen backend serves the exact bundled release notes for its application version')
             assert not result['page_errors'], result['page_errors']
             for path in ('/', '/?ui=upgrade-check', '/static/tokens.css'):
                 with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}{path}',timeout=10) as reply:

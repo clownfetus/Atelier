@@ -11,6 +11,50 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which('node'),'Node is unavailable')
 class Frontend(unittest.TestCase):
+    def test_blender_export_requires_one_visible_body_and_uses_visible_weapons(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('async function editInBlender()');
+const end=source.indexOf('// Sidebar shows',start);
+assert.ok(start>=0 && end>start);
+const objects=[
+ {kind:'body',root:{visible:false}},
+ {kind:'body',root:{visible:false}},
+ {kind:'weapon',root:{visible:true},hand:'both'},
+ {kind:'weapon',root:{visible:false},hand:'left'},
+];
+const meshMeta=['HiddenBody','SelectedBody','VisibleWeapon','HiddenWeapon'].map(name=>({game_rel:'Fixture/'+name}));
+const requests=[],notes=[];
+const environment={objects,meshMeta,generation:1,viewportProject:'Originating project',
+ canLeave:async()=>true,note:(message)=>notes.push(message),refreshBlenderBtn:()=>{},$:()=>({disabled:false}),
+ window:{AtelierJobs:{run:async(path,request)=>{
+  requests.push({path,project:request.project,payload:JSON.parse(request.body)});
+  return {ok:false,error:'Fixture stops before any native export'};
+ }}}};
+vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+(async()=>{
+ await environment.editInBlender();
+ assert.equal(requests.length,0,'A weapon-only or empty view must not export an invisible body');
+ assert.ok(notes.at(-1).includes('Show one body form'));
+ objects[0].root.visible=objects[1].root.visible=true;
+ await environment.editInBlender();
+ assert.equal(requests.length,0,'Multiple body forms must be resolved before export');
+ assert.ok(notes.at(-1).includes('Choose one body form'));
+ objects[0].root.visible=false;
+ await environment.editInBlender();
+ assert.deepEqual(requests,[{path:'/api/model_blender_export',project:'Originating project',payload:{
+  game_rel:'Fixture/SelectedBody',weapons:[{game_rel:'Fixture/VisibleWeapon',hand:'both'}]}}]);
+ environment.canLeave=async()=>false;
+ await environment.editInBlender();
+ assert.equal(requests.length,1,'Declining the pending-edits confirmation must not export');
+ console.log('PASS Blender export selection, visible held weapons and pending-edit cancellation');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],
+                              capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
     def test_physical_sockets_shared_bones_dual_clones_and_surface_modes(self):
         with tempfile.TemporaryDirectory(prefix='atelier-studio-three-') as folder:
             folder=Path(folder)

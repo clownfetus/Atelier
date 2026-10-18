@@ -1,17 +1,42 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.0.0**.
+**1.1.0**.
 
 ## Unreleased
 
+## 1.1.0 — 19 October 2026
+
+### Create and edit assets
+
+- **Add asset** creates named textures, material instances and meshes at a chosen
+  `/Game/Marvel/` path. Copy a game asset, upload cooked files, or upload an image
+  with a game texture as its format template. New assets use the normal editors,
+  Mod tray and Build mod flow, with collision protection and Delete/Undo support.
+- Copied skeletal meshes retain streamed detail levels and their bulk data.
+  Incomplete uploaded meshes are rejected before changing the project.
+- Model replacement accepts model ZIPs or companion files together, with
+  texture-bundle controls and a separate body/weapon destination picker. It keeps
+  the game rig, checks all detail levels and can retain untouched sections.
+- Model Studio's section eye controls save visibility into the exported mesh;
+  hidden sections can be restored without hiding other sections that share a material.
+- Model Studio recovers available texture maps, shows custom texture assignments,
+  groups material controls and previews held weapons with hand selection.
+- Model and Blender exports report their actual preparation/build stages and
+  offer cancellation. Preview settings and Showcase effects remain separate from edits.
+
+### Model Studio and library
+
 - Home keeps complete character cards, costume controls and category cards in
   separate rows at every card size. Shorter windows scroll without overlapping.
-
+- Double-click a Home portrait to open the character folder. The **Heroes**
+  startup preference and selected card size are remembered.
 - Model Studio's **Export to Blender** saves the visible body and held weapons
   in one portable `.blend`, with connected materials, packed textures and
   working deformation bones. The resting surface is checked before saving.
   Game physics and animation controls are not recreated.
+- Blender export requires one visible body, so hiding every body cannot silently
+  export a hidden one. The completed export's **Open in Blender** action stays usable.
 - Character strips use each hero's verified nameplate, with a costume's matching
   nameplate when available. A hero's named Immortal plate fills in when its plain
   plate is unpublished. The artwork keeps its contrast and uses a gentler crop.

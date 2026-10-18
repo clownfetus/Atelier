@@ -68,3 +68,9 @@ def decode_png(base, source):
     Path(base).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source + '.ubulk', base + '.png')
     return base + '.png'
+
+
+def mesh_probe(*_args, **_kwargs):
+    """Labelled layout for these JSON packages, which contain no native geometry."""
+    return {'status': 'ok', '_layout': [{'blob': 'uexp', 'num_verts': 3, 'n_indices': 3,
+                                       'sections': [{'mat': 0, 'num_tris': 1}]}]}

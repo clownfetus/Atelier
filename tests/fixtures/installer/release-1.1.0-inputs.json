@@ -1,0 +1,11 @@
+{
+  "version": "1.1.0",
+  "tools_seed_sha256": "c5c00386c037aa9ff632e7e383082ae4441fb45c77f712b53ba256ed5165a2ca",
+  "tools_seed_asset": "windows-tools.zip",
+  "previous_windows_url": "https://github.com/clownfetus/Atelier/releases/download/1.0.0/AtelierSetup.exe",
+  "previous_windows_sha256": "2836a7e2cccd998616cb74689c6f5d62b50183afc97783859ede44f737723dc1",
+  "previous_windows_bytes": 149455325,
+  "linux_seed_url": "https://github.com/clownfetus/Atelier/releases/download/1.0.0/Atelier-1.0.0-x86_64.AppImage",
+  "linux_seed_sha256": "ed9ff97a8f997f09435f5361dd4418895b763d88234403acd7a507c5615d1e48",
+  "tools_seed_api_url": "https://api.github.com/repos/clownfetus/Atelier/releases/assets/646582462"
+}

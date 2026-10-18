@@ -46,6 +46,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
         'textures': {'BaseColor': 'Characters/1029/1029100/Textures/T_Game'},
         'texture_classes': {'BaseColor': 'Texture2D'}, 'custom_textures': custom}))
     tab.route('**/api/dye_info?*', lambda r: r.fulfill(json={'dyeable': False}))
+    tab.route('**/api/material_custom_texture/preview?*', lambda r: r.fulfill(body=image, content_type='image/png'))
     def location(route):
         body = route.request.post_data_json
         writes.append((body, route.request.headers.get('x-atelier-project')))
@@ -139,6 +140,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
         tab.wait_for_function("matEditor.custom.BaseColor.game_rel==='MyMod/Textures/T_Chosen'")
         assert all(header == project_header for _,header in writes)
         tab.locator('.mat-texture-location summary').click()
+        tab.wait_for_function("document.querySelector('img[src*=\"material_custom_texture/preview\"]')?.naturalWidth>0")
         tab.screenshot(path=str(report/'custom-texture-location.png'), animations='disabled')
         tab.locator('#mattex-name-0').fill('Delayed')
         tab.locator('.mat-texture-location .btn').click()

@@ -85,7 +85,7 @@ def main():
         if (payload / '_internal/version').read_text().strip() != version:
             raise RuntimeError('Wrong packaged version')
         matches = {}
-        for folder in ('gui', 'atelier/blender'):
+        for folder in ('gui', 'atelier/blender', 'atelier/models'):
             for original in sorted((source / folder).rglob('*')):
                 if not original.is_file() or '__pycache__' in original.parts or original.suffix == '.pyc':
                     continue
@@ -136,7 +136,8 @@ def main():
                 setup = wait_for(lambda: json.load(urllib.request.urlopen(base + '/api/setup_status', timeout=2)), process)
                 if setup['configured']:
                     raise RuntimeError('Smoke fixture unexpectedly configured a real game')
-                title = 'Initial Configuration' if launch == 'previous-launch' else 'Find the game'
+                title = ('Find the game' if tuple(map(int, expected_version.split('.'))) >= (1, 0, 0)
+                         else 'Initial Configuration')
                 wait_for(lambda: any(title in name for name in accessible_names()), process)
                 if launch != 'previous-launch':
                     prereqs = json.load(urllib.request.urlopen(base + '/api/prereqs', timeout=10))

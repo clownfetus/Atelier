@@ -167,6 +167,9 @@
 #viewport-navigation { color:var(--muted); font-size:11px; white-space:nowrap; }
 #viewport-navigation span { padding:0 5px; }
 #viewport-status { color:var(--muted); font-size:12px; flex:0 1 auto; min-width:0; max-width:32%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+#viewport-foot:has(#viewport-status > button) { flex-wrap:wrap; }
+#viewport-status:has(> button) { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:1 1 100%; max-width:100%; overflow:visible; white-space:normal; }
+#viewport-status > button { flex:none; }
 #viewport-status[data-kind=success] { color:var(--vp-success); }
 #viewport-status[data-kind=warning] { color:var(--acc); }
 #viewport-status:has(.vp-load-status) { color:var(--acc); }

@@ -416,8 +416,9 @@ function refreshBlenderBtn() {
   if (btn) btn.disabled = !meshMeta.length;
 }
 async function editInBlender() {
-  if(objects.filter(object=>object.root.visible && object.kind!=='weapon').length>1){note('Choose one body form from Model before exporting to Blender.','info');return;}
-  const target = meshMeta[objects.findIndex(object => object.root.visible && object.kind !== 'weapon')] || meshMeta[0];
+  const bodies=objects.filter(object=>object.root.visible && object.kind!=='weapon');
+  if(bodies.length!==1){note(bodies.length?'Choose one body form from Model before exporting to Blender.':'Show one body form from Model before exporting to Blender.','info');return;}
+  const target = meshMeta[objects.indexOf(bodies[0])];
   if (!target) return;
   if (!(await canLeave())) return;
   const weapons=objects.flatMap((object,index)=>object.kind==='weapon' && object.root.visible ? [{game_rel:meshMeta[index].game_rel,hand:object.hand || 'auto'}] : []);

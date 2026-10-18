@@ -1,7 +1,7 @@
 name: Build and verify release candidate
 on:
   push:
-    branches: ['codex/release-1.0.0', 'release/*-candidate']
+    branches: ['codex/release-*', 'release/*-candidate']
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,7 @@ jobs:
           "$PWD/.venv-build/Scripts" >> $env:GITHUB_PATH
           & ./.venv-build/Scripts/python.exe -m pip install -r requirements-dev.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "ATELIER_VERSION=$((Get-Content version -Raw).Trim())" >> $env:GITHUB_ENV
       - run: python tests/run_checks.py --report-dir reports/backend
       - run: python -m playwright install chromium
       - run: python tests/browser_smoke.py --report-dir reports/browser
@@ -56,17 +57,17 @@ jobs:
           python scripts/release_manifest.py --manifest
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify the frozen WebView2 application
-        run: python tests/frozen_smoke.py --exe dist/Atelier/Atelier.exe --report-dir reports/frozen --viewer-checks --viewer-followups
+        run: python tests/frozen_smoke.py --exe dist/Atelier/Atelier.exe --report-dir reports/frozen --viewer-checks --viewer-followups --roster-checks
       - name: Archive the verified portable payload
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/Atelier -DestinationPath dist/Atelier-Windows-1.0.0.zip
-          python scripts/verify_portable.py --archive dist/Atelier-Windows-1.0.0.zip --manifest dist/installer-manifest.json
+          Compress-Archive -Path dist/Atelier -DestinationPath "dist/Atelier-Windows-$env:ATELIER_VERSION.zip"
+          python scripts/verify_portable.py --archive "dist/Atelier-Windows-$env:ATELIER_VERSION.zip" --manifest dist/installer-manifest.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-portable
-          path: dist/Atelier-Windows-1.0.0.zip
+          path: dist/Atelier-Windows-${{ env.ATELIER_VERSION }}.zip
           compression-level: 0
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -186,9 +187,11 @@ jobs:
           path: ${{ runner.temp }}/candidate-artifacts
       - name: Assemble verified Windows, Linux and matching source assets
         run: python scripts/release_bundle.py --artifacts "$RUNNER_TEMP/candidate-artifacts" --output "$RUNNER_TEMP/release"
+      - name: Read release version
+        run: echo "ATELIER_VERSION=$(tr -d '[:space:]' < version)" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Atelier-1.0.0-release
+          name: Atelier-${{ env.ATELIER_VERSION }}-release
           path: ${{ runner.temp }}/release
           compression-level: 0
           if-no-files-found: error

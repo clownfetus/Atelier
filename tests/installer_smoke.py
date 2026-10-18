@@ -483,6 +483,22 @@ ConvertTo-Json -InputObject $items -Compress
             context.route('https://**', lambda route: route.fulfill(json={}))
             page.reload()
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 4 && document.documentElement.dataset.theme === 'dark'")
+            # Historical manifests can still exercise installers from before this feature.
+            has_changelog = (upgrade / '_internal/gui/changelog.js').is_file()
+            if has_changelog:
+                expected_version = (upgrade / '_internal/version').read_text().strip()
+                page.wait_for_selector('#changelog-overlay.active')
+                assert page.locator('#changelog-version').inner_text() == 'Atelier ' + expected_version
+                assert page.locator('.changelog-release h3').first.inner_text() == expected_version
+                page.screenshot(path=str(report / 'upgrade-changelog.png'))
+                with page.expect_response('**/api/changelog/acknowledge') as acknowledged:
+                    page.locator('#changelog-done').click()
+                assert acknowledged.value.ok
+                page.wait_for_selector('#changelog-overlay.active', state='hidden')
+                saved_config = json.loads((upgrade / 'mr_config.json').read_text())
+                assert saved_config == dict(config, changelog_version=expected_version), saved_config
+                protected['mr_config.json'] = (upgrade / 'mr_config.json').read_bytes()
+                result['checks'].append('Installed upgrade shows bundled release notes and acknowledgement preserves every existing setting')
             page.screenshot(path=str(report / 'upgraded-interface.png'))
             assert not result['page_errors'], result['page_errors']
             result['checks'].append('Running-app upgrade detects its previous directory, replaces all payload, removes stale owned files and preserves user files/preferences')
@@ -506,6 +522,11 @@ ConvertTo-Json -InputObject $items -Compress
                 canary: localStorage.getItem('atelier.upgrade-canary'), tokens: !!document.querySelector('link[href="/static/tokens.css"]')})""")
             assert '?ui=' in repeated['url'] and repeated['tokens'] and repeated['theme'] == 'dark' and repeated['canary'] == 'preserve-me', repeated
             result['reinstall_first_launch'] = repeated
+            if has_changelog:
+                with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/changelog', timeout=10) as response:
+                    notes = json.load(response)
+                assert not notes['available'] and notes['version'] == expected_version, notes
+                result['checks'].append('Reinstall retains the acknowledged changelog version without another update popup')
             journal('same-version-first-launch-verified', **repeated)
             page.screenshot(path=str(report / 'reinstalled-first-launch.png'))
             assert not result['page_errors'], result['page_errors']
