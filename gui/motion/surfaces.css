@@ -35,3 +35,5 @@
 :root:not([data-krackle=full]) .k-startup-stage {display:none;}
 .k-index-failure {flex-shrink:0;}
 .toast:has(.k-index-failure) {max-width:520px;flex-wrap:wrap;}
+.card.k-texture-pool {outline:3px solid var(--krackle-charge);outline-offset:-4px;}
+.card.k-texture-pool::before {content:'';position:absolute;inset:4px;pointer-events:none;border-radius:3px;background:radial-gradient(circle at 0 25%,var(--krackle-charge) 0 6px,transparent 6.5px),radial-gradient(circle at 100% 65%,var(--krackle-charge) 0 7px,transparent 7.5px),radial-gradient(circle at 50% 0,var(--krackle-rift) 0 6px,transparent 6.5px);}

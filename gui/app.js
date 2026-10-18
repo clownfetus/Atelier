@@ -3587,8 +3587,13 @@ _ctxFileInput.addEventListener("change", async () => {
   _ctxFileInput.value = "";
   if (!file || !_ctxFileTarget) return;
   const game_rel = _ctxFileTarget;
-  const project = _activeProjectName;
   _ctxFileTarget = null;
+  await replaceTextureFromFile(file,game_rel);
+});
+
+async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) {
+  if(!file||!game_rel)return;
+  if(!/^image\//i.test(file.type)&&! /\.(png|jpe?g|tga|bmp|dds|webp|tiff?)$/i.test(file.name||'')){toast('Drop an image file to replace this texture.','warning');return;}
   const fd = new FormData();
   fd.append("file", file);
   fd.append("game_rel", game_rel);
@@ -3611,6 +3616,16 @@ _ctxFileInput.addEventListener("change", async () => {
     suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
     t.resolve(`Error: ${err.message}`, "error");
   }
+}
+
+// File bytes, never native file paths: WebView2 exposes ordinary File objects.
+for(const name of ['dragenter','dragover','dragleave','drop'])document.getElementById('grid-area').addEventListener(name,event=>{
+  const target=event.target.closest('.card'),item=target?._libraryCard;
+  if(item?.file_type!=='texture'||!event.dataTransfer?.types.includes('Files'))return;
+  event.preventDefault();
+  if(name==='dragenter'||name==='dragover'){target.classList.add('k-texture-pool');event.dataTransfer.dropEffect='copy';}
+  else if(name==='dragleave'){if(!target.contains(event.relatedTarget))target.classList.remove('k-texture-pool');}
+  else {target.classList.remove('k-texture-pool');const file=event.dataTransfer.files[0];if(file)replaceTextureFromFile(file,item.game_rel);}
 });
 
 async function revertImported(item) {
