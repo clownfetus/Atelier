@@ -178,7 +178,7 @@
     host.replaceChildren(art,text,detail);
     // Krackle art replaces the outline drawing when available; the outline stays as the fallback.
     if (!window.AtelierMotion?.emptyState) return;
-    const krackle=document.createElement('span'); krackle.className='am-empty-state-host';
+    const krackle=document.createElement('span'); krackle.className='am-empty-state-host k-screen';
     try { host.prepend(krackle); window.AtelierMotion.emptyState.mount(krackle,{kind}); art.remove(); }
     catch (_) { krackle.remove(); }
   }
