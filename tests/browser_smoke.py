@@ -68,6 +68,7 @@ def main():
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
     parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
+    parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
@@ -179,6 +180,18 @@ def main():
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.material_replacement_only:
+                    from material_replacement_checks import run_material_replacement_checks
+                    from material_workflow_checks import run_material_workflow_checks
+                    run_material_replacement_checks(page, context, url, report, checks)
+                    run_material_workflow_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
                     browser.close()
                     return
 
@@ -336,6 +349,8 @@ def main():
                 run_pin_label_checks(page, context, url, report, checks)
                 from material_workflow_checks import run_material_workflow_checks
                 run_material_workflow_checks(page, context, url, report, checks)
+                from material_replacement_checks import run_material_replacement_checks
+                run_material_replacement_checks(page, context, url, report, checks)
                 from export_review_checks import run_export_review_checks
                 run_export_review_checks(page, context, url, report, checks)
                 from skin_swapper_review_checks import run_skin_swapper_review_checks

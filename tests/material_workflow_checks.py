@@ -74,7 +74,7 @@ def run_material_workflow_checks(page, context, url, report, checks):
         tab.goto(url)
         tab.wait_for_function('window.atelierProject?.() && window.__materialWorkflowViewport')
         open_editor()
-        assert tab.locator('.mat-parameter-group summary').all_text_contents() == ['Surface colors1', 'Dye region 22', 'Scalar parameters1']
+        assert tab.locator('.mat-parameter-group:not(#mat-replacement) summary').all_text_contents() == ['Surface colors1', 'Dye region 22', 'Scalar parameters1']
         assert tab.evaluate('materialDirtyCount()') == 0
         assert 'Saved:' in tab.locator('#matrow0 .mat-reference').inner_text()
         tab.locator('#msn0').fill('.6')

@@ -94,6 +94,27 @@ save when ready. New edits made during a save remain marked as unsaved.
 
 ![Material editor showing color and dye-region groups, scalar parameters and saved-value comparisons](images/material-editor.png)
 
+### Replace a material
+
+Open the target material and expand **Replace material**. Search by character,
+skin, asset name or path, select a result (or paste its `/Game/Marvel/…` path),
+then click **Use this material**. Character and skin names use the installed
+reference table. The replacement saves immediately; export the target material
+through Edited Assets as usual.
+
+The donor's parent, textures, static switches and cooked shader data are kept,
+while the target keeps its package path and name. Donor project edits are not
+copied. You can edit the replacement's exposed parameters and texture slots.
+**Restore game defaults** restores the target's original material and removes
+custom texture assignments. Failed reads or publication preserve saved edits.
+
+This supports installed `MI_` material instances in the main game content, rather
+than arbitrary uploaded JSON. A source that inherits from the target is refused
+to prevent a circular parent chain. UVs, vertex colors and character-specific
+shader inputs can change the appearance on another model; animated shaders are
+not fully represented in the preview. Native container readback is verified;
+in-game appearance still needs checking.
+
 ## Appearance
 
 Open **Menu → Settings → Appearance** to choose a mode and palette. Use **Custom**
