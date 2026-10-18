@@ -51,7 +51,7 @@ def document(gr, red=.2, parent=PARENT, parent_class="Material"):
 class ReplacementTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="atelier-replacement-case-")
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.projects = self.root / "projects"
         for name in ("A", "B"):
             (self.projects / name).mkdir(parents=True)
