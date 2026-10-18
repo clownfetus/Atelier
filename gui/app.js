@@ -2509,7 +2509,7 @@ function renderSidebar() {
   const all = Object.values(sidebarData);
   window.AtelierSMapsUI?.update(all);
   if (!all.length) {
-    list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>No edited assets yet</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
+    list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>Your Mod tray is empty</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
     lucide.createIcons({ nodes: [list] });
     window.AtelierEmptyAssetsUI?.mount(_activeProjectName, list.querySelector('.sidebar-empty'));
     updateInstallBtn();
@@ -2518,7 +2518,7 @@ function renderSidebar() {
   const q     = _libraryQuery().toLowerCase();
   const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
   if (!items.length) {
-    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets match the search.</div>';
+    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
     updateInstallBtn();
     return;
   }

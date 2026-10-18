@@ -23,6 +23,9 @@
   --krackle-ring-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='3.8' r='2.15'/%3E%3Ccircle cx='19.1' cy='7.9' r='2.15'/%3E%3Ccircle cx='19.1' cy='16.1' r='2.15'/%3E%3Ccircle cx='12' cy='20.2' r='2.15'/%3E%3Ccircle cx='4.9' cy='16.1' r='2.15'/%3E%3Ccircle cx='4.9' cy='7.9' r='2.15'/%3E%3C/svg%3E");
   --krackle-crest-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='3.8' r='3.6'/%3E%3Ccircle cx='4.9' cy='7.9' r='2.75'/%3E%3C/svg%3E");
   /* krackle-art:spinner:end */
+  /* krackle-art:edited-corner:begin */
+  --krackle-edited-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M0 0H24V24ZM11.3 3a1.3 1.3 0 1 0 -2.6 0a1.3 1.3 0 1 0 2.6 0ZM19 4a2 2 0 1 0 -4 0a2 2 0 1 0 4 0ZM21.6 10a1.6 1.6 0 1 0 -3.2 0a1.6 1.6 0 1 0 3.2 0Z'/%3E%3C/svg%3E");
+  /* krackle-art:edited-corner:end */
 }
 
 [data-krackle-surface='dark'] { --krackle-charge:#2a9fd6; --krackle-rift:#8a6cff; --krackle-success:#eee5cf; --krackle-warn:#f5c02e; --krackle-fault:#e0407a; --krackle-hole:#121216; --krackle-success-hole:#121216; }
@@ -257,8 +260,9 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 /* The startup splash's progress is a run of dots, tall enough to read as Krackle. */
 #startup-progress:not([value]) { height: 10px; }
 /* Edited sidebar rows: the corner of energy carries a bubble. */
-.sb-item::after {
-  background: radial-gradient(circle at 72% 28%, var(--krackle-hole) 0 1.3px, transparent 1.6px), var(--krackle-charge);
+.sb-item::after,.card.imported::after,.roster-portrait.has-edits::after {
+  content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
+  background:var(--krackle-charge);clip-path:none;mask:var(--krackle-edited-mask) center/contain no-repeat;
 }
 /* First export: the skin's colours burst out of the button as Krackle bubbles. */
 .export-color-moment {
