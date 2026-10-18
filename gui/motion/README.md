@@ -514,6 +514,9 @@ transient button/project bubbles release on hiding, policy changes and teardown.
 Category candidates are generated at 24 and 102 px by `krackle_art.py`; review
 HTML and both-theme PNG sheets live in `docs/review/wave-4b`. The hidden local
 `atelier.experimentalKrackleEmblems=1` flag is for review only and defaults off.
+With it on, `icons.js` inlines the generated markup from `category-emblems.js`
+(an `<image>` SVG cannot see page variables), so emblems take the measured
+`--krackle-charge`/`--krackle-hole`, and each copy gets its own clip id.
 Control glyphs keep Material Sharp. D4 remains a user decision.
 
 Particle rendering uses preallocated circle command buffers, linked per integer

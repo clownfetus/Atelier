@@ -25,8 +25,9 @@
         svg.setAttribute('focusable', 'false');
         // Trusted, vendored SVG path data only; never insert asset names or API data here.
         svg.innerHTML = artwork.body;
+        // D4 candidates: generated emblem markup is inlined (not an <image>) so the theme's Krackle inks reach it.
         const emblems=window.AtelierCategoryEmblems,category=Object.keys(emblems?.names||{}).find(cls=>node.classList.contains(cls));
-        if(category&&emblems.enabled())svg.innerHTML=`<image href="/static/motion/category-emblems/${category}-${size>=32?102:24}.svg" width="24" height="24"/>`,svg.setAttribute('viewBox','0 0 24 24');
+        if(category&&emblems.enabled())svg.innerHTML=emblems.markup(category,size>=32?102:24),svg.setAttribute('viewBox','0 0 24 24');
         node.replaceWith(svg);
       }
     }

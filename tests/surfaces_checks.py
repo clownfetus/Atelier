@@ -13,7 +13,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         tab.evaluate("value=>{const c=document.getElementById('settings-motion');c.value=value;c.dispatchEvent(new Event('change'));}",value)
     try:
         tab.goto(url);tab.wait_for_selector('#grid-area .card')
-        stored=tab.evaluate("Object.fromEntries(['motion','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
+        stored=tab.evaluate("Object.fromEntries(['motion','theme','appearance','experimentalKrackleEmblems'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
         assert tab.evaluate("document.fonts.load('650 24px \"Bricolage Grotesque\"').then(f=>f.length>0)")
         assert tab.locator('#explorer').evaluate('el=>getComputedStyle(el).borderRadius')=='6px'
         assert 'Mod tray' in tab.locator('#sidebar-header').inner_text()
@@ -130,6 +130,47 @@ def run_surfaces_checks(page,context,url,report,checks):
         checks.append('Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles')
         assert tab.evaluate("!AtelierCategoryEmblems.enabled()&&Object.keys(AtelierCategoryEmblems.names).length===36")
         checks.append('Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; the 36 category candidates remain disabled pending D4 review')
+        escaped=tab.evaluate("""() => {
+          const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),out=[];svg.setAttribute('viewBox','0 0 24 24');document.body.append(svg);
+          try{for(const cls of Object.keys(AtelierCategoryEmblems.names))for(const scale of [24,102]){
+            svg.innerHTML=AtelierCategoryEmblems.markup(cls,scale);
+            for(const shape of svg.querySelectorAll('.k-category-emblem-energy > *')){
+              const length=shape.getTotalLength();
+              for(let i=0;i<=400;i++){const p=shape.getPointAtLength(length*i/400);if(Math.min(p.x,p.y)<-.01||Math.max(p.x,p.y)>24.01){out.push([cls,scale,p.x,p.y]);break;}}
+            }
+          }}finally{svg.remove();}
+          return out;
+        }""")
+        assert not escaped,escaped
+        tab.evaluate("localStorage.setItem('atelier.experimentalKrackleEmblems','1');nav={path:'Emblem fixture'};buildGrid(['Characters','Weapons'].map(name=>_makeCard({type:'folder',name,rel_path:'Emblem fixture/'+name})))")
+        def emblem_inks():
+            return tab.evaluate("""() => [...document.querySelectorAll('#grid-area .card svg.card-icon')].map(svg=>{
+              const energy=getComputedStyle(svg.querySelector('.k-category-emblem-energy > *')).fill,probe=document.createElement('i');
+              svg.after(probe);probe.style.color='var(--krackle-charge)';const charge=getComputedStyle(probe).color;
+              probe.style.color='var(--krackle-hole)';const hole=getComputedStyle(probe).color;probe.remove();
+              const against=node=>AtelierKrackleInks.contrast(energy,getComputedStyle(node).backgroundColor);
+              // fit() measures the card (--bg2); the thumb behind the emblem is --bg3 and is recorded, not floored.
+              return {energy,charge,hole,bubble:getComputedStyle(svg.querySelector('.k-category-emblem-bubbles > circle')).fill,
+                contrast:against(svg.closest('.card')),thumbContrast:against(svg.closest('.card-thumb')),
+                clip:svg.querySelector('clipPath').id,clipped:svg.querySelector('[clip-path]').getAttribute('clip-path')};
+            })""")
+        energy={};thumbs={}
+        for theme in ['light','dark']:
+            tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
+            inks=emblem_inks()
+            assert len(inks)==2 and len({ink['clip'] for ink in inks})==2,inks
+            for ink in inks:
+                assert ink['energy']==ink['charge'] and ink['bubble']==ink['hole'] and ink['contrast']>=3,(theme,ink)
+                assert ink['clipped']==f"url(#{ink['clip']})",ink
+            energy[theme]=inks[0]['energy'];thumbs[theme]=round(inks[0]['thumbContrast'],2)
+            tab.locator('#grid-area .grid').screenshot(path=str(report/f'category-emblems-app-{theme}.png'),animations='disabled')
+        assert energy['light']!=energy['dark'],energy
+        (report/'category-emblem-inks.json').write_text(json.dumps({'energy':energy,'thumbContrast':thumbs},indent=2))
+        print(f"D4 emblem energy on card thumbs: light {thumbs['light']}:1, dark {thumbs['dark']}:1",flush=True)
+        tab.evaluate("document.getElementById('grid-area').style.setProperty('--krackle-charge','#7a4cd9')")
+        assert all(ink['energy']=='rgb(122, 76, 217)' for ink in emblem_inks())
+        tab.evaluate("document.getElementById('grid-area').style.removeProperty('--krackle-charge');localStorage.removeItem('atelier.experimentalKrackleEmblems')")
+        checks.append('With the D4 flag on, card emblems are inlined with unique clip ids; their energy follows --krackle-charge (3:1 on light and dark cards, local hero inks; thumb contrast recorded) and bubbles follow --krackle-hole; all 36 silhouettes stay inside the 24-unit box')
         review=context.new_page()
         try:
             review.set_viewport_size({'width':1320,'height':1100});review.set_content((Path(__file__).resolve().parents[1]/'docs/review/wave-4b/category-emblems.html').read_text(encoding='utf-8'))
