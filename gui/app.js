@@ -4098,6 +4098,7 @@ function _renderProjectPicker(projects, keepQuery) {
       : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
     lucide.createIcons({ nodes: [grid] });
     window.AtelierPolish?.empty(grid.firstElementChild, q ? 'No project matches your search' : 'No projects yet', q ? 'Try another project name.' : 'Create one to get started.');
+    if(!q)window.AtelierSurfaces?.emptyProjects(grid.firstElementChild);
     return;
   }
   projects.forEach(proj => {
@@ -4317,6 +4318,7 @@ function _showProjNameModal(ctx) {
 }
 
 document.getElementById("proj-new-btn").addEventListener("click", () => {
+  window.AtelierSurfaces?.newProjectMoment();
   _showProjNameModal({
     title: "New Project", value: "", okLabel: "Create",
     action: async name => {

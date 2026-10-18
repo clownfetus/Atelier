@@ -27,6 +27,22 @@
     let stage;try{stage=AtelierMotion.krackleStage.mount(host,{state:'error',size:112,kind:'index-load'});}catch(_){host.remove();}
     const remove=notice.remove.bind(notice);notice.remove=()=>{stage?.destroy();remove();};
   };
+  api.emptyProjects=host=>{
+    const old=host.querySelector('.am-empty-state-host');old?.remove();
+    const button=document.createElement('button');button.type='button';button.className='k-project-drop';button.title='New Project';button.setAttribute('aria-label','New Project');
+    const glyphHost=document.createElement('span');button.append(glyphHost);host.prepend(button);
+    try{AtelierMotion.krackleGlyph.mount(glyphHost,{state:'info',reducedMotion:'reduce'});}catch(_){button.textContent='New Project';}
+    button.addEventListener('click',()=>document.getElementById('proj-new-btn').click());
+  };
+  api.newProjectMoment=()=>{
+    const drop=document.querySelector('.k-project-drop');if(!drop||!AtelierMotionPolicy.allows(2)||document.hidden)return;
+    const release=AtelierMotion.moment.claim('new-project',2);if(!release)return;
+    const rect=drop.getBoundingClientRect(),copy=drop.cloneNode(true);copy.removeAttribute('title');copy.removeAttribute('aria-label');copy.setAttribute('aria-hidden','true');copy.inert=true;
+    copy.classList.add('k-project-fall');copy.style.left=rect.x+'px';copy.style.top=rect.y+'px';document.body.append(copy);
+    let animation;const dispose=()=>{animation?.cancel();copy.remove();release();};
+    try{animation=copy.animate([{transform:'translateY(0)'},{transform:'translateY(100px) scale(1.2,.6)',opacity:0}],{duration:420,easing:'cubic-bezier(.55,0,1,.45)'});animation.finished.then(dispose,dispose);}catch(_){dispose();}
+    setTimeout(dispose,460);
+  };
   const drops=new Map();
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
