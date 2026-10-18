@@ -85,8 +85,9 @@
   --screen-dot:rgb(18 18 22 / 12%);
   --studio-shape-small: 6px;
   --studio-shape-medium: 8px;
-  --studio-shape-large: 10px;
-  --studio-shape-dialog: 12px;
+  --studio-shape-large: 6px;
+  --studio-shape-dialog: 6px;
+  --studio-workspace-gutter:var(--bg);
   --studio-shape-full: 999px;
   --studio-motion-fast: 120ms;
   --studio-motion-standard: 200ms;
@@ -121,6 +122,7 @@
 }
 
 :root[data-theme='dark'] {
+  --studio-workspace-gutter:#121216;
   --screen-dot:rgb(238 229 207 / 13%);
   color-scheme: dark;
   --md-sys-color-primary: #98b7e2;

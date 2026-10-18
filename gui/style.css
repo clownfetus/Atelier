@@ -138,6 +138,7 @@ body {
 
 /* â”€â”€ body layout â”€â”€ */
 #body {
+  background:var(--studio-workspace-gutter);
   display: flex;
   flex: 1;
   min-height: 0;
