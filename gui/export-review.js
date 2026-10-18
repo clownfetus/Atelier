@@ -70,7 +70,7 @@
   function showStage(state) {
     try {
       if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
-        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156});
+        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156, kind:'export-review'});
       }
       stage?.setState(state);
     } catch (_) {

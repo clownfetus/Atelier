@@ -455,8 +455,7 @@ existing hover-paused toast timer.
 
 First-run validation uses `krackleGlyph` at 24 px beside the step heading. A
 validation change destroys the previous mount; it does not decorate input fields
-or delay Next. The first-run Full/Calm/Off control maps Full to the existing system
-policy and Calm/Off to reduced motion until the Wave 4 policy lands.
+or delay Next. The first-run and Settings dials share Full/Calm/Off preferences.
 
 Viewport `canLeave` and `close` now return promises. Every dependent action awaits
 them before clearing geometry or changing skin. A cancelled answer retains the
@@ -468,3 +467,28 @@ decorative bubbles, with no per-keystroke effect. A new query aborts the old
 request; Escape and navigation dispose its popover. Roster filtering, card focus
 and Continue do not wait for animation. Portrait accents stay behind artwork,
 and costume opening follows the actual mesh lookup with a folder fallback.
+
+Wave 4a fixes outcome inks by measured surface luminance, independently of the
+palette's semantic UI colours. Success uses Paper on dark surfaces and Ink with
+Paper holes on light ones. Charge/Rift alone can follow sampled hero/skin art.
+`krackle-inks.js` is pure sRGB: fitting guarantees 3:1 contrast; CIE76 distances
+use CIELAB with a consistent D65 reference white (not CSS's D50 `lab()`). The
+guard reserves outcome inks, nudges the smallest colour distance within 45°,
+then tries other sampled colours and a full hue turn. Pink moves toward magenta;
+gold/amber toward orange. Manual colours can retain a CLASH warning. SHIFTED
+explains automatic changes in Settings. Primary buttons and the dark model
+loader fit against their own surfaces.
+
+`AtelierMotionPolicy.tier()` returns 3/1/0 for Full/Calm/Off; `allows(tier)` is
+the shared gate. Legacy system/reduce values migrate to full/off. OS reduced
+motion always forces Off. `query()` and `data-motion` retain their old contract;
+`data-krackle` exposes the effective dial. Calm keeps micro responses but stops
+particle frames on a still formation. Off keeps static feedback.
+
+`AtelierMotion.moment.claim(kind,tier)` returns an idempotent release or null.
+Only one Tier 2/3 formation owns the screen; refused stages render a hand-drawn
+48 px glyph. Export review, edit import and the model loader release ownership
+on completion, hiding or disposal. A Tier 3 kind can claim only once per page
+session. Result states interrupt work immediately. Theme changes repaint still
+formations without replaying a result. Tests cover the colour guard, every
+palette, migration, OS overrides, stopped frames and competing stage ownership.

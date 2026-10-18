@@ -157,7 +157,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
             assert tab.locator('html').get_attribute('data-palette') == preset
             assert all(pair['ratio']>=4.5 for pair in measure_contrast(tab)),preset
         tab.evaluate("""() => {
-          const picker=document.getElementById('settings-motion');picker.value='reduce';picker.dispatchEvent(new Event('change'));
+          const picker=document.getElementById('settings-motion');picker.value='off';picker.dispatchEvent(new Event('change'));
           AtelierPolish.play(document.getElementById('library-count'),[{opacity:0},{opacity:1}],160);
         }""")
         assert tab.evaluate("AtelierMotionPolicy.query().matches && document.getElementById('library-count').getAnimations().length===0")

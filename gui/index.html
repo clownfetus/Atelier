@@ -6,6 +6,7 @@
 <title>Atelier</title>
 <link rel="icon" type="image/png" href="/static/brand/atelier-mark.png">
 <script src="/static/preferences.js"></script>
+<script src="/static/motion/krackle-inks.js"></script>
 <script src="/static/theme.js"></script>
 <script src="/static/catalogue.js" defer></script>
 <script src="/static/vendor/material-symbols/symbols.js"></script>
@@ -279,7 +280,7 @@
         <div id="viewport-loading">
           <div class="am-viewport-loader-slot" id="viewport-loading-slot" aria-hidden="true">
             <span class="am-viewport-loader-fallback"><i data-lucide="box" size="72"></i></span>
-            <span id="viewport-loading-motion-host"></span>
+            <span id="viewport-loading-motion-host" data-krackle-surface="dark"></span>
           </div>
           <span id="viewport-loading-msg">Decoding model…</span>
         </div>
@@ -496,8 +497,8 @@
       </div>
       <div class="setup-section">Behavior</div>
       <div class="setup-field"><label class="setup-label" for="settings-density">Density</label><select id="settings-density" class="setup-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
-      <div class="setup-field"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="system">Follow system</option><option value="reduce">Reduce motion</option></select></div>
-      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-adaptive-accent"><span class="switch-track"></span></span>Use character artwork for the library accent</label><p class="setup-note">Optional. Applies a readable accent while browsing a character; artwork and project colors stay unchanged.</p></div>
+      <div class="setup-field"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="full">Full</option><option value="calm">Calm</option><option value="off">Off</option></select></div>
+      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-adaptive-accent"><span class="switch-track"></span></span>Use character artwork for the library accent <span id="krackle-accent-status" hidden></span></label><p class="setup-note">Optional. Fits Charge and Rift to the current surface and keeps them distinct from outcomes. Artwork and project colours stay unchanged.</p></div>
       <div class="setup-field">
         <label class="toggle-row" id="toggle-import-open-row">
           <span class="switch"><input type="checkbox" id="toggle-import-open" checked><span class="switch-track"></span></span>
@@ -797,6 +798,7 @@
 <!-- krackle-art:folder-flap:end -->
 </template>
 
+<script src="/static/motion/moment.js"></script>
 <script src="/static/motion/export-feedback.js"></script>
 <script src="/static/motion/export-feedback-ui.js"></script>
 <script src="/static/motion/viewport-loader.js"></script>

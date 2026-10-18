@@ -30,13 +30,15 @@
     const label=document.createElement('label');label.className='setup-label';label.textContent='Motion';label.htmlFor='setup-motion-dial';
     dial=document.createElement('select');dial.id='setup-motion-dial';dial.className='setup-input';
     for(const [value,text] of [['full','Full'],['calm','Calm'],['off','Off']]) {const option=document.createElement('option');option.value=value;option.textContent=text;dial.append(option);}
-    dial.value=$('settings-motion').value==='reduce'?'off':'full';
+    const value=$('settings-motion').value;
+    dial.value=['full','calm','off'].includes(value)?value:value==='reduce'?'off':'full';
     dial.addEventListener('change',()=>{
       const control=$('settings-motion');
       control.value=[...control.options].some(o=>o.value==='full')?dial.value:(dial.value==='full'?'system':'reduce');
       control.dispatchEvent(new Event('change',{bubbles:true}));
     });
     const field=document.createElement('div');field.className='setup-field';field.append(label,dial);pages[2].page.append(field);
+    const note=document.createElement('p');note.className='setup-note';note.dataset.motionNote='';note.textContent=document.querySelector('[data-motion-note]')?.textContent||'Full motion follows real work.';field.append(note);
     advanced=document.createElement('details');advanced.className='setup-advanced';
     const summary=document.createElement('summary');summary.textContent='More appearance options';advanced.append(summary);pages[2].page.append(advanced);
     document.querySelector('[data-theme-preset="custom"]').addEventListener('click',()=>{if(!settings)advanced.open=true;},true);
@@ -58,7 +60,7 @@
         else node.hidden=true;
       }
       $('settings-motion').closest('.setup-field').hidden=true;
-      // Keep the Full/Calm/Off dial beside the presets; Wave 4 replaces the legacy mapping.
+      // Keep the shared Full/Calm/Off dial beside the presets.
       pages[2].page.append(dial.closest('.setup-field'));
       pages[2].page.append(advanced);
     } else {
