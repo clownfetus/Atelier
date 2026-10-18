@@ -3591,9 +3591,11 @@ _ctxFileInput.addEventListener("change", async () => {
   await replaceTextureFromFile(file,game_rel);
 });
 
+const _isImageFile=file=>/^image\//i.test(file.type)||/\.(png|jpe?g|tga|bmp|dds|webp|tiff?)$/i.test(file.name||'');
+
 async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) {
   if(!file||!game_rel)return;
-  if(!/^image\//i.test(file.type)&&! /\.(png|jpe?g|tga|bmp|dds|webp|tiff?)$/i.test(file.name||'')){toast('Drop an image file to replace this texture.','warning');return;}
+  if(!_isImageFile(file)){toast('Drop an image file to replace this texture.','warning');return;}
   const fd = new FormData();
   fd.append("file", file);
   fd.append("game_rel", game_rel);
@@ -3618,14 +3620,28 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
   }
 }
 
-// File bytes, never native file paths: WebView2 exposes ordinary File objects.
-for(const name of ['dragenter','dragover','dragleave','drop'])document.getElementById('grid-area').addEventListener(name,event=>{
+// File bytes, never native file paths: WebView2 exposes ordinary File objects. Like Replace with
+// Image, a drop only replaces an edited texture; it overwrites that edit in place, and a stray drop
+// is easy to make, so it asks first.
+for(const name of ['dragenter','dragover','dragleave','drop'])document.getElementById('grid-area').addEventListener(name,async event=>{
   const target=event.target.closest('.card'),item=target?._libraryCard;
   if(item?.file_type!=='texture'||!event.dataTransfer?.types.includes('Files'))return;
   event.preventDefault();
+  if(!item.imported){
+    event.dataTransfer.dropEffect='none';
+    if(name==='drop')toast('Edit this texture first, then drop an image to replace it.','info');
+    return;
+  }
   if(name==='dragenter'||name==='dragover'){target.classList.add('k-texture-pool');event.dataTransfer.dropEffect='copy';}
   else if(name==='dragleave'){if(!target.contains(event.relatedTarget))target.classList.remove('k-texture-pool');}
-  else {target.classList.remove('k-texture-pool');const file=event.dataTransfer.files[0];if(file)replaceTextureFromFile(file,item.game_rel);}
+  else {
+    target.classList.remove('k-texture-pool');
+    const file=event.dataTransfer.files[0];  // Read before awaiting: the drop's data expires with the event.
+    if(!file)return;
+    if(!_isImageFile(file)){toast('Drop an image file to replace this texture.','warning');return;}
+    if(await _confirmAction(`Replace your edit to "${item.label}" with ${file.name}? The current edit is overwritten and cannot be undone.`,'Replace texture?','Replace'))
+      await replaceTextureFromFile(file,item.game_rel);
+  }
 });
 
 async function revertImported(item) {

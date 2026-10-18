@@ -502,7 +502,10 @@ A sampled from the original PNG. Calm/Off retain the plain launch splash. Index
 failures show the KO result beside the original explanation and Settings action.
 
 Texture drops upload `File` bytes through `replaceTextureFromFile`, the same
-project-scoped FormData path as Replace with Image. Success uses the existing
+project-scoped FormData path as Replace with Image. As with that menu item, only
+edited textures accept a drop; unedited cards show no pool and refuse it. The
+replacement overwrites the edit in place, so a drop asks for confirmation before
+any request is sent. Success uses the existing
 texture refresh/reconstruction. Calm/Off keep the final preview without particles.
 Cancelled Activity glyphs drain once; replaced rows dispose their controllers.
 The empty-project drop starts the original creation dialog immediately. All

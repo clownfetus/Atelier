@@ -5,8 +5,9 @@ small responses and still formations; Off uses stills. Your operating system's
 reduced-motion preference always takes precedence. Hero/skin artwork accents
 keep outcome colours distinct, with a SHIFTED label when adjustment is needed.
 
-Your **Mod tray** collects edits for **Build mod**. Drop an image onto a texture
-card to use the same replacement flow as Replace with Image. Paper caption
+Your **Mod tray** collects edits for **Build mod**. Drop an image onto an edited
+texture card to use the same replacement flow as Replace with Image; Atelier asks
+before overwriting the edit. Paper caption
 notifications keep results readable in either theme; exact colour swatches show
 HDR intensity around their edges.
 

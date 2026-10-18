@@ -28,29 +28,39 @@ def run_surfaces_checks(page,context,url,report,checks):
             assert tab.locator('.toast').evaluate("n=>[getComputedStyle(n).backgroundColor,getComputedStyle(n).color]")==['rgb(238, 229, 207)','rgb(18, 18, 22)']
             tab.screenshot(path=str(report/f'surfaces-caption-{theme}.png'),animations='disabled')
         checks.append('Local Latin display lettering loads; panels use 6px roles; Mod tray captions keep Ink text on Paper and repeats use five bubbles then a number')
-        tab.evaluate("document.getElementById('toast-area').replaceChildren();window.replaced=[];window.oldRefresh=refreshEditedTexture;refreshEditedTexture=(...args)=>replaced.push(args);nav={path:'Texture fixture'};buildGrid([_makeCard({type:'asset',name:'T_Fixture',file_type:'texture',game_rel:'Fixture/T_Fixture'})]);")
+        tab.evaluate("document.getElementById('toast-area').replaceChildren();window.replaced=[];window.oldRefresh=refreshEditedTexture;refreshEditedTexture=(...args)=>replaced.push(args);nav={path:'Texture fixture'};buildGrid([_makeCard({type:'asset',name:'T_Fixture',file_type:'texture',game_rel:'Fixture/T_Fixture',imported:true}),_makeCard({type:'asset',name:'T_Plain',file_type:'texture',game_rel:'Fixture/T_Plain'})]);")
         def replace(route):
             uploads.append((route.request.headers.get('x-atelier-project'),route.request.post_data_buffer))
             route.fulfill(json={'ok':True,'token':'fixture-token'})
         tab.route('**/api/replace_texture',replace)
-        def drop(name,mime,bytes_):
-            tab.evaluate("""([name,mime,bytes])=>{
-              const card=document.querySelector('#grid-area .card'),transfer=new DataTransfer();
+        def drop(name,mime,bytes_,label='T_Fixture'):
+            tab.evaluate("""([name,mime,bytes,label])=>{
+              const card=[...document.querySelectorAll('#grid-area .card')].find(node=>node._libraryCard.label===label),transfer=new DataTransfer();
               transfer.items.add(new File([new Uint8Array(bytes)],name,{type:mime}));
-              card.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));
+              const over=new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer});card.dispatchEvent(over);
               window.poolRect=card.getBoundingClientRect().toJSON();window.hadPool=card.classList.contains('k-texture-pool');
+              window.overPrevented=over.defaultPrevented;window.overEffect=transfer.dropEffect;
               card.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
-            }""",[name,mime,list(bytes_)])
+            }""",[name,mime,list(bytes_),label])
+        drop('replacement.png','image/png',png,'T_Plain');tab.wait_for_timeout(80)
+        assert tab.evaluate('overPrevented') and tab.evaluate('overEffect')=='none' and not tab.evaluate('hadPool')
+        assert not uploads and not tab.locator('#atelier-confirm').count()
+        assert 'Edit this texture first' in tab.locator('.toast').last.inner_text()
+        drop('replacement.png','image/png',png);tab.locator('#atelier-confirm-cancel').click();tab.wait_for_timeout(80)
+        assert not uploads and tab.evaluate('replaced.length')==0
         for index,value in enumerate(['full','calm','off']):
             mode(value);drop('replacement.png','image/png',png)
+            assert 'T_Fixture' in tab.locator('#atelier-confirm-body').inner_text()
+            tab.locator('#atelier-confirm-ok').click()
             tab.wait_for_function('expected=>replaced.length===expected',arg=index+1)
             assert tab.evaluate('hadPool') and not tab.locator('.k-texture-pool').count()
         assert len(uploads)==3 and all(header=='Smoke%20A' and png in body for header,body in uploads)
         assert tab.evaluate('replaced.length')==3
         drop('unsafe.txt','text/plain',b'not an image');tab.wait_for_timeout(80)
-        assert len(uploads)==3 and 'image file' in tab.locator('.toast.warning').last.inner_text()
+        assert len(uploads)==3 and not tab.locator('#atelier-confirm').count()
+        assert 'image file' in tab.locator('.toast.warning').last.inner_text()
         tab.evaluate('refreshEditedTexture=oldRefresh')
-        checks.append('Image drops in Full/Calm/Off upload File bytes with the originating project header and use the existing refresh; non-images send no request')
+        checks.append('Unedited textures refuse image drops; an edited texture asks before replacing, Cancel keeps it, and confirmed drops in Full/Calm/Off upload File bytes with the originating project header and the existing refresh; non-images send no request')
         tab.evaluate("_renderProjectPicker([],false);document.getElementById('project-overlay').classList.add('active')")
         for value in ['full','calm','off']:
             mode(value);tab.locator('.k-project-drop:not(.k-project-fall)').click();tab.wait_for_selector('#proj-name-overlay.active')
