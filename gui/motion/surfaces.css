@@ -6,3 +6,20 @@
 }
 .roster-strip.k-screen { background-color:var(--bg2); }
 .roster-portrait strong,.roster-portrait .roster-counts { width:100%; background:var(--bg2); }
+
+/* Captions always sit on Paper, including in a dark workspace. */
+.toast {
+  --krackle-charge:#2693c6;--krackle-rift:#8a6cff;--krackle-success:#121216;
+  --krackle-warn:#9a6b00;--krackle-fault:#c8336a;--krackle-hole:#121216;--krackle-success-hole:#eee5cf;
+  --caption-ink:var(--krackle-charge);
+  color:#121216;background:#eee5cf;border:1px solid #121216;border-radius:4px;
+  border-left:4px solid var(--caption-ink);box-shadow:2px 3px 8px #12121628;
+}
+:root[data-theme=dark] .toast { box-shadow:4px 4px 0 #121216; }
+.toast.success {--caption-ink:var(--krackle-success);border-color:#121216;border-left-color:var(--caption-ink);}
+.toast.warning {--caption-ink:var(--krackle-warn);border-color:#121216;border-left-color:var(--caption-ink);}
+.toast[data-operation-state=error],.toast.error {--caption-ink:var(--krackle-fault);border-left-color:var(--caption-ink);}
+.toast-timed::after { background:var(--caption-ink); }
+.toast-repeat {font-size:0;padding:0;width:calc(var(--repeat-count,1)*8px);height:8px;background:radial-gradient(circle,#121216 2px,transparent 2.2px) 0 0/8px 8px repeat-x;}
+.toast-repeat-number {font-size:12px;width:auto;height:auto;background:none;}
+.toast .toast-undo {background:#eee5cf;color:#121216;border-color:#121216;}

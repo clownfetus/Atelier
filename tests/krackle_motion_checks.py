@@ -42,7 +42,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         # Ordinary informational and warning toasts keep their Material icons.
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
         tab.evaluate("toast('Plain warning', 'warning', 60000)")
-        assert tab.locator('#toast-area .toast.warning [data-atelier-motion]').count() == 0
+        assert tab.locator('#toast-area .toast.warning [data-atelier-motion=krackle-glyph]').count() == 1
         assert tab.locator('#toast-area .toast.warning svg.lucide').count() == 1
         for state in ('success', 'warning', 'error'):
             tab.evaluate("state => { const t = toastSpinner('Working ' + state); t.resolve('Finished ' + state, state, 60000); }", state)
