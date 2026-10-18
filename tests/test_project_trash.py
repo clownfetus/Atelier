@@ -84,6 +84,13 @@ class Trash(unittest.TestCase):
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(browse.all_imported()[0]['game_rel'], self.tex)
 
+    def test_imported_reports_real_file_modification_time(self):
+        path = self.seed(self.tex)
+        os.utime(path, (1700000000,1700000000))
+        item = call('/api/imported',method='GET')[0]
+        self.assertEqual(item['modified'],1700000000)
+        self.assertEqual(item['modified'],item['mtime'])
+
     def test_restore_preserves_reimport_and_restores_nonconflicting_assets(self):
         texture = self.seed(self.tex); material = self.seed(self.mat, '.json')
         deleted = T.remove(str(self.root), [self.tex,self.mat])
