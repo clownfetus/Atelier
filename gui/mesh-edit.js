@@ -42,7 +42,7 @@
     panel=el('section',undefined,'modal mesh-edit-modal');panel.tabIndex=-1;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','mesh-edit-title');
     title=el('h2','Model replacement');title.id='mesh-edit-title';
     description=el('p');description.className='mesh-edit-path';
-    const help=el('p','Choose a model ZIP, Blender, FBX, GLB, PSK or cooked Unreal mesh. A ZIP can contain the model, material JSON and PNG textures, or you can select those files together. Existing game material slots are preserved.');
+    const help=el('p','Choose a model ZIP, Blender, FBX, GLB, PSK or cooked Unreal mesh. A ZIP can contain the model, material JSON and PNG textures, or you can select those files together. Existing game material slots are preserved. PSK files contain no texture images; assign those in the material editor.');
     targets=el('div',undefined,'mesh-edit-targets');
     const bodySection=el('section'),bodyHeading=el('h3','Body parts');bodyHeading.id='mesh-edit-body-heading';bodyList=el('div',undefined,'mesh-edit-target-list');bodyList.setAttribute('role','group');bodyList.setAttribute('aria-labelledby',bodyHeading.id);bodySection.append(bodyHeading,bodyList);
     const weaponSection=el('section'),weaponHeading=el('h3','Weapons');weaponHeading.id='mesh-edit-weapons-heading';weaponList=el('div',undefined,'mesh-edit-target-list');weaponList.id='mesh-edit-weapons';weaponList.setAttribute('role','group');weaponList.setAttribute('aria-labelledby',weaponHeading.id);

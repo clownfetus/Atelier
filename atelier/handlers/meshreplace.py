@@ -88,9 +88,8 @@ def prepare(game_rel,source,options=None,companions=()):
             imported=work/'source.glb';mesh.export_glb(donor,0,str(imported))
         else:imported=source
         template=work/'template.blend'
-        # Blender's glTF reference armature is deliberately unbound: its imported
-        # rest rotations are unsuitable for measuring the game skeleton. ActorX
-        # unit detection must use the cooked parent-local translations instead.
+        # Measure ActorX units against cooked parent-local translations directly,
+        # independently of Blender's object transforms and editing armature.
         reference=work/'reference-bones.json'
         bones=mesh.Mesh(original).bones if source.suffix.lower() in ('.psk','.pskx') else []
         atomic_json(str(reference),{bone['name']:(bones[bone['parent']]['name'],

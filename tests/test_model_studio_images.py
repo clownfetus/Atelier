@@ -65,5 +65,9 @@ class TextureRecovery(unittest.TestCase):
         document,_=self.cube();document['Exports'][0]['PlatformData']['PixelFormat']='PF_BC5'
         self.assertIsNone(meshimages.inline_hdr_blocks(document,str(self.source)))
 
+    def test_partial_cube_blocks_are_not_silently_merged_between_faces(self):
+        document,_=self.cube();document['Exports'][0]['PlatformData']['Mips'][0]['SizeY']=2
+        with self.assertRaisesRegex(ValueError,'padding'):meshimages.inline_hdr_blocks(document,str(self.source))
+
 
 if __name__=='__main__':unittest.main()

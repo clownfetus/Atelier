@@ -29,6 +29,8 @@ def inline_hdr_blocks(document, source):
     cube=any(row.get('ObjectName')=='TextureCube' and row.get('ClassName')=='Class'
              for row in document.get('Imports',[]))
     faces=6 if cube else 1
+    if faces==6 and height%4:
+        raise ValueError('This HDR cube needs per-face padding support before it can be ported')
     header=(mip.get('BulkData') or {}).get('Header') or {}
     offset,size=header.get('OffsetInFile'),header.get('SizeOnDisk')
     expected=((width+3)//4)*((height+3)//4)*16*faces

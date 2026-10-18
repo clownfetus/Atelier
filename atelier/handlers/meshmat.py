@@ -160,6 +160,7 @@ def resolve_mesh_textures(slots):
             continue
         if mi not in cache:
             try:
+                jobs.progress('Reading model material · '+os.path.basename(mi))
                 cache[mi] = material_snapshot(mi)
             except jobs.Cancelled:
                 raise
@@ -324,6 +325,7 @@ def extract_textures_to_project(tex_game_rels, root=None):
         from atelier.tools import tex_semaphore
         try:
             with jobs.cancellable_lock(tex_semaphore):
+                jobs.progress('Preparing model texture · '+os.path.basename(gr))
                 return _one(gr)
         except jobs.Cancelled:
             raise

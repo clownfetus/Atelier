@@ -150,6 +150,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
     manifest_path, manifest = blend_path + ".mat.json", None
     if with_materials:
         try:
+            jobs.progress('Preparing Blender materials · '+os.path.basename(game_rel))
             manifest = _meshmat.build_manifest(game_rel, m, work_base=base,root=texture_root)
             for index in presentation_hidden:
                 slot=manifest['slots'].get(m.materials[index]['slot_name'])
@@ -164,6 +165,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
     _mesh.export_glb(m, 0, glb)
     try:
         args = [glb, blend_path] + ([manifest_path] if manifest else [])
+        jobs.progress('Writing Blender scene · '+os.path.basename(game_rel))
         out = _run_blender("glb_to_blend.py", args, "BLEND")
     finally:
         if os.path.exists(glb):
