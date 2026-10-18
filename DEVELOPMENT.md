@@ -785,3 +785,16 @@ The AppImage SHA-256 is
 `76717d20eebd47b6e25006e80e7928c314f32b5fd370a510af0263ad947aee9e`.
 Release documentation changes after that build do not alter the tested payload.
 The release assets include source, SHA256SUMS.txt and VERIFICATION.json.
+
+## Trust workflow checks
+
+`tests/test_project_trash.py` verifies byte-identical restoration, both project
+layouts, metadata/selection, conflicts, interrupted deletion, retention and archive
+exclusion. Trash lives inside `<project>/.atelier-trash`; remove/restore routes
+use the existing project reservation and write lock.
+
+Run `python tests/browser_smoke.py --trust-only --report-dir <folder>` for real
+disposable-file Undo, themed confirmation paths and the three-panel setup.
+These checks also run in the full browser suite. `tests/dom_checks.js` awaits
+editor leave promises; it still rejects server calls after a declined answer.
+Fixtures use a synthetic key, and no setup payloads or keys are logged.

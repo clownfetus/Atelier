@@ -169,7 +169,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
             }""", {'name': name, 'immediate': immediate})
 
         def close_preview():
-            motion_page.evaluate("__viewportMotion.guard(''); AtelierViewport.close(); __viewportMotion.settleMaterials()")
+            motion_page.evaluate("async () => {__viewportMotion.guard(''); await AtelierViewport.close(); __viewportMotion.settleMaterials();}")
             assert not motion_page.evaluate("document.getElementById('viewport-overlay').classList.contains('active')")
             assert not motion_page.evaluate('__viewportMotion.state().animating')
             assert motion_page.locator('#viewport-loading-motion-host svg').count() == 0
@@ -258,18 +258,18 @@ def run_viewport_motion_checks(page, context, url, report, checks):
 
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Protected fixture')
-        motion_page.evaluate("window.protectedLoader=document.querySelector('#viewport-loading-motion-host svg'); window.savedConfirm=window.confirm; window.confirm=()=>false")
+        motion_page.evaluate("window.protectedLoader=document.querySelector('#viewport-loading-motion-host svg'); window.savedConfirm=AtelierDialog; window.AtelierDialog={confirm:async()=>false}")
         try:
             for guard in ('saving', 'edited'):
                 motion_page.evaluate("""guard => {
                   __viewportMotion.guard(guard);
                   if (!AtelierViewport.hasPendingEdits()) throw Error('Missing public pending-edit guard');
-                  const priorConfirm = window.confirm;
-                  window.confirm = () => { throw Error('Export guard prompted to discard'); };
+                  const priorConfirm = window.AtelierDialog;
+                  window.AtelierDialog = {confirm:() => { throw Error('Export guard prompted to discard'); }};
                   document.getElementById('viewport-materials').classList.remove('empty');
                   document.getElementById('viewport-mat-section').style.display = 'flex';
                   try { AtelierViewport.focusPendingEdits(); }
-                  finally { window.confirm = priorConfirm; }
+                  finally { window.AtelierDialog = priorConfirm; }
                   const expectedFocus = guard === 'saving' ? 'viewport-status' : 'viewport-mat-save';
                   if (document.activeElement.id !== expectedFocus) throw Error('Pending-edit focus: expected ' + expectedFocus + ', got ' + document.activeElement.id);
                   if (!AtelierViewport.hasPendingEdits()) throw Error('Pending-edit focus discarded the draft');
@@ -281,7 +281,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                 assert motion_page.evaluate('__viewportMotion.state().modelRequests') == before + 1
                 assert motion_page.evaluate("document.getElementById('viewport-overlay').classList.contains('active')")
         finally:
-            motion_page.evaluate("window.confirm=savedConfirm; __viewportMotion.guard('')")
+            motion_page.evaluate("window.AtelierDialog=savedConfirm; __viewportMotion.guard('')")
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         close_preview()
         assert not motion_page.evaluate('AtelierViewport.hasPendingEdits()')

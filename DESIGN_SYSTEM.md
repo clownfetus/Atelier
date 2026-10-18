@@ -312,3 +312,22 @@ See `DEVELOPMENT.md` for reproducible commands. Automated coverage includes colo
 These workflow additions retain the existing information architecture and native
 pipeline. Full game-version compatibility and end-to-end manual editor coverage
 remain release checks; visual/browser tests do not replace them.
+
+Asset deletion is recoverable: a ten-second Undo toast restores one request's
+batch from project trash. Its timer pauses on hover. Shift-delete keeps the fast
+path with the same Undo. Removed rows use inert snapshots and a 300 ms drain of
+loose bubbles; reduced motion removes them immediately. The request and list
+refresh never wait for the snapshot.
+
+`AtelierDialog.confirm` owns asset-delete and editor confirmations. It inserts
+titles and body text literally, traps focus above editor/update overlays, treats
+Escape/backdrop as Cancel, and initially focuses Cancel for destructive actions.
+Async leave guards retain drafts until an affirmative answer. Project-management
+and export-review dialogs retain their dedicated layouts.
+
+First-run setup validates Find the game, Unlock the paks and Make it yours in
+order. Existing controls are reparented, retaining their IDs and save contract;
+Settings restores the complete form. Automatic retrieval runs behind the first
+panel and never replaces manually entered values. A 24 px success formation
+marks validated steps. Presets and the motion dial lead the final panel; advanced
+appearance controls are available under More appearance options.

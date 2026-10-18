@@ -445,3 +445,20 @@ showcase mode, separate from inspection.
 job toast glyphs and fallbacks, empty states, the stage's sleep, hidden-dialog and
 cleanup behaviour and the Activity ring, and fails if the generated artwork is
 stale.
+
+Wave 2 adds a 300 ms deletion drain to the existing inert sidebar snapshots.
+Snapshots contain no live asset identifiers, are noninteractive and never delay
+the delete request or rendering. Loose bubbles stay within a 48 px micro host;
+OS/Atelier reduced motion skips the drain. Detached snapshots and their effects
+are disposed after completion. Undo itself is ordinary focusable UI, with the
+existing hover-paused toast timer.
+
+First-run validation uses `krackleGlyph` at 24 px beside the step heading. A
+validation change destroys the previous mount; it does not decorate input fields
+or delay Next. The first-run Full/Calm/Off control maps Full to the existing system
+policy and Calm/Off to reduced motion until the Wave 4 policy lands.
+
+Viewport `canLeave` and `close` now return promises. Every dependent action awaits
+them before clearing geometry or changing skin. A cancelled answer retains the
+draft, loaded geometry and loader; export's public pending-edit guard still
+focuses Save without offering to discard anything.

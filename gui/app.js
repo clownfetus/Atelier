@@ -21,7 +21,6 @@ let   histIdx     = 0;
 let   allItems    = [];      // current grid items (raw from server)
 let   sidebarData = {};      // token -> {name, game_rel, skin_id, char_name, skin_name, selected}
 let   importing   = false;
-let   pendingClear  = null;
 let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
@@ -88,6 +87,14 @@ async function api(path, opts = {}) {
   }
 }
 
+async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Continue', tone = 'danger') {
+  const project = _activeProjectName;
+  const editors = [matEditor, curveEditor, vfxEditor, worldEditor, textEditor];
+  const accepted = await AtelierDialog.confirm({title, body, confirmLabel, tone});
+  return accepted && project === _activeProjectName &&
+    editors.every((editor, i) => editor === [matEditor, curveEditor, vfxEditor, worldEditor, textEditor][i]);
+}
+
 // Reveal in the file manager. The endpoint reports why it could not, so surface that instead of
 // firing and forgetting — a silent no-op here was reported as "Open in Explorer does nothing".
 async function revealInExplorer(gameRel) {
@@ -120,15 +127,16 @@ function toastSpinner(msg) {
 }
 
 const _collatedToasts = new Map();
-function toast(msg, type = "info", duration = 3200) {
-  const key = type + '\n' + msg, existing = _collatedToasts.get(key);
+function toast(msg, type = "info", duration = 3200, instance = '') {
+  const key = type + '\n' + msg + '\n' + instance, existing = _collatedToasts.get(key);
   if (existing?.el.isConnected) { existing.repeat(); return existing.el; }
   const el = document.createElement("div");
   el.className = `toast ${type}`;
   const icon = type === "success" ? "check-circle"
              : type === "warning" ? "alert-triangle"
              : "info";
-  el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span>${msg}</span>`;
+  el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span></span>`;
+  el.querySelector('span').textContent = msg;
   document.getElementById("toast-area").appendChild(el);
   lucide.createIcons({ nodes: [el] });
   el.setAttribute('role','status'); el.setAttribute('aria-atomic','true');
@@ -162,9 +170,8 @@ function toastExportFeedback(msg, type, duration, state) {
     if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state);
   } catch (error) { console.warn("Export animation unavailable", error); }
   // Export still works when the optional animation scripts fail to load.
-  const text = _esc(msg);
-  if (state === "busy") return toastSpinner(text);
-  toast(text, type === "error" ? "warning" : type, duration);
+  if (state === "busy") return toastSpinner(msg);
+  toast(msg, type === "error" ? "warning" : type, duration);
 }
 
 function beginExportFeedback(project) {
@@ -183,7 +190,7 @@ function toastMaterialSave(msg, state = "success", duration = 4000) {
   try {
     if (window.AtelierMaterialSaveFeedback) return window.AtelierMaterialSaveFeedback.toast(msg, state, duration);
   } catch (error) { console.warn("Material save feedback unavailable", error); }
-  try { toast(_esc(msg), state === "error" ? "warning" : state, duration); }
+  try { toast(msg, state === "error" ? "warning" : state, duration); }
   catch (error) { console.warn("Material save notification unavailable", error); }
   return null;
 }
@@ -694,7 +701,7 @@ async function _checkBlenderReady() {
 
 async function meshBlendExtract(game_rel, name, force = false) {
   if (!(await _checkBlenderReady())) return;
-  if (!confirm(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`))
+  if (!force && !(await _confirmAction(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`, 'Edit in Blender?', 'Extract', 'default')))
     return;
   const t = toastSpinner(`Preparing ${name} for Blender…`);
   setStatus(`Preparing ${name} for Blender…`);
@@ -710,7 +717,7 @@ async function meshBlendExtract(game_rel, name, force = false) {
         // The preflight refuses formats the rebuilder can't pack. Extracting anyway is useful for
         // INSPECTING such a mesh, so offer it -- but say plainly that a build will not work.
         t.resolve(res.error || 'Extraction needs confirmation', 'warning', 8000);
-        if (confirm(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`))
+        if (await _confirmAction(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`, 'Extract for inspection?', 'Extract'))
           return meshBlendExtract(game_rel, name, true);
         return;
       }
@@ -1009,7 +1016,7 @@ function _seedScalars(arr) {
 }
 
 async function openMaterialEditor(item) {
-  if (materialDirtyCount() && !confirm("Discard unsaved material parameters and open another material?")) return;
+  if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
   matEditor = null;
@@ -1279,7 +1286,7 @@ async function matCustomTextureClear(i) {
   const editor = matEditor, project = _activeProjectName, slot = _matTextureSlots(editor)[i];
   const own = slot && (editor.custom || {})[slot];
   if (!own) return;
-  if (!confirm(`Use the game texture in ${slot} again? Your image ${own.source || own.name} is removed from this material.`)) return;
+  if (!(await _confirmAction(`Use the game texture in ${slot} again? Your image ${own.source || own.name} is removed from this material.`, 'Remove custom texture?', 'Remove'))) return;
   const st = document.getElementById("mat-status");
   let res;
   try {
@@ -1564,8 +1571,8 @@ async function saveMaterial() {
 async function resetMaterial() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
   const ownTextures = Object.keys(matEditor.custom || {}).length;
-  if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
-               + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""))) return;
+  if (!(await _confirmAction("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
+               + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""), 'Restore game values?', 'Restore'))) return;
   const editor = matEditor, project = _activeProjectName;
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;
@@ -1594,8 +1601,8 @@ async function resetMaterial() {
   finally { _materialSaving.delete(editor); if (current()) _matRefreshDirty(); }
 }
 
-function closeMaterialEditor(force = false) {
-  if (force !== true && materialDirtyCount() && !confirm("Discard unsaved material parameters?")) return false;
+async function closeMaterialEditor(force = false) {
+  if (force !== true && materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters?"))) return false;
   ++_materialOpenRevision; ++_dyePreviewRevision; clearTimeout(_dyeTimer);
   const img = document.getElementById("dye-prev");
   if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
@@ -1611,7 +1618,7 @@ function closeMaterialEditor(force = false) {
 // loaded, saved or reset.
 const _editSnapshot = state => JSON.stringify(state);
 const _vfxSnapshot = v => _editSnapshot({ groups: v.groups, scalars: v.scalars, vectors: v.vectors });
-function _discardUnsaved(dirty, what) { return !dirty || confirm(`Discard unsaved ${what}?`); }
+async function _discardUnsaved(dirty, what) { return !dirty || await _confirmAction(`Discard unsaved ${what}?`); }
 function _curveDirty() { return !!curveEditor && Object.values(curveEditor.dirty || {}).some(Boolean); }
 function _vfxDirty() { return !!vfxEditor && _vfxSnapshot(vfxEditor) !== vfxEditor.baseline; }
 function _worldDirty() { return !!worldEditor && _editSnapshot(worldEditor.edits) !== worldEditor.baseline; }
@@ -1769,7 +1776,7 @@ async function saveCurve() {
 
 async function resetCurve() {
   const c = curveEditor; if (!c) return;
-  if (!confirm("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.", 'Restore curve?', 'Restore'))) return;
   document.getElementById("curve-status").textContent = "Resetting…";
   try {
     const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1780,8 +1787,8 @@ async function resetCurve() {
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
 }
 
-function closeCurveEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_curveDirty(), "curve edits")) return false;
+async function closeCurveEditor(force = false) {
+  if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
   const overlay = document.getElementById('curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -2041,7 +2048,7 @@ async function saveVfx() {
 }
 async function resetVfx() {
   const v = vfxEditor; if (!v) return;
-  if (!confirm("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.", 'Restore effect?', 'Restore'))) return;
   document.getElementById("vfx-status").textContent = "Resetting…";
   try {
     const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -2054,8 +2061,8 @@ async function resetVfx() {
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
-function closeVfxEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_vfxDirty(), "VFX edits")) return false;
+async function closeVfxEditor(force = false) {
+  if (force !== true && _vfxDirty() && !(await _discardUnsaved(true, "VFX edits"))) return false;
   const overlay = document.getElementById('vfx-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -2410,14 +2417,11 @@ function _sbMarkClick(item, e) {
   renderSidebar();
 }
 
-function sbDeleteMarked() {
+async function sbDeleteMarked() {
   const items = [...(_sbMarked || [])].map(t => sidebarData[t]).filter(Boolean);
   if (!items.length) return;
-  pendingClearMany = items;
-  document.getElementById("confirm-clear-title").textContent = `Delete ${items.length} assets?`;
-  document.getElementById("confirm-clear-msg").textContent =
-    `Delete your edits to these ${items.length} assets? Their edited files are removed from this project.`;
-  document.getElementById("confirm-clear-overlay").classList.add("active");
+  if (await _confirmAction(`Move your edits to these ${items.length} assets to the project trash for 7 days?`, `Delete ${items.length} assets?`, 'Delete'))
+    await performClearMany(items);
 }
 
 async function performClearMany(items) {
@@ -2433,7 +2437,7 @@ async function performClearMany(items) {
       _sbLastTok = null;
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "info", 3500);
+      _trashUndo(res, project, `Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2445,6 +2449,7 @@ async function performClearMany(items) {
 
 function renderSidebar() {
   const list = document.getElementById("sidebar-list");
+  document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
   const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
   const previousRows = window.AtelierPolish?.sidebarBefore(list);
@@ -2874,23 +2879,42 @@ document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
-let pendingClearMany = null;     // several marked assets awaiting the one confirm dialog
 
-function clearImported(token, skipConfirm) {
+function _trashUndo(result, project, message) {
+  const notice = toast(message, 'info', 10000, result.entry || '');
+  if (!result.entry) return;
+  const undo = document.createElement('button');
+  undo.className = 'btn toast-undo'; undo.textContent = 'Undo';
+  undo.addEventListener('click', async event => {
+    event.stopPropagation();
+    if (undo.disabled) return;
+    undo.disabled = true;
+    try {
+      const restored = await api('/api/restore_imported', {
+        project, method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({entry:result.entry}),
+      });
+      if (project === _activeProjectName && restored.game_rels?.length) {
+        await loadSidebar(); await renderGrid();
+      }
+      if (restored.ok) { notice.remove(); toast('Edits restored', 'success'); }
+      else { undo.disabled = false; toast(restored.error || 'Could not restore edits', 'warning', 6000); }
+    } catch (error) { undo.disabled = false; toast(error.message, 'warning'); }
+  });
+  notice.append(undo);
+}
+
+async function clearImported(token, skipConfirm) {
   const item = sidebarData[token];
   if (!item) return;
-  pendingClearMany = null;
   if (skipConfirm) {
-    performClearImported(item);
+    await performClearImported(item);
     return;
   }
-  pendingClear = item;
   const ft   = item.file_type || "asset";
   const kind = ft.charAt(0).toUpperCase() + ft.slice(1);
-  document.getElementById("confirm-clear-title").textContent = `Delete ${kind}?`;
-  document.getElementById("confirm-clear-msg").textContent =
-    `Delete your edits to "${item.name}"? Its edited files are removed from this project.`;
-  document.getElementById("confirm-clear-overlay").classList.add("active");
+  if (await _confirmAction(`Move your edits to "${item.name}" to the project trash for 7 days?`, `Delete ${kind}?`, 'Delete'))
+    await performClearImported(item);
 }
 
 async function performClearImported(item) {
@@ -2906,7 +2930,7 @@ async function performClearImported(item) {
       delete sidebarData[item.token];
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted: ${item.name}`, "info", 3000);
+      _trashUndo(res, project, `Deleted: ${item.name}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2916,38 +2940,11 @@ async function performClearImported(item) {
   }
 }
 
-document.getElementById("confirm-clear-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  pendingClear = null; pendingClearMany = null;
-});
-
-document.getElementById("confirm-clear-ok").addEventListener("click", async () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  if (pendingClearMany) {
-    const items = pendingClearMany; pendingClearMany = null;
-    await performClearMany(items);
-    return;
-  }
-  if (!pendingClear) return;
-  const item = pendingClear; pendingClear = null;
-  await performClearImported(item);
-});
-
-document.getElementById("clear-all-btn").addEventListener("click", () => {
+document.getElementById("clear-all-btn").addEventListener("click", async () => {
   const count = Object.keys(sidebarData).length;
   if (!count) { toast("No edited assets to clear", "info"); return; }
-  document.getElementById("confirm-clear-all-msg").textContent =
-    `All ${count} edited asset${count !== 1 ? "s" : ""} will be permanently deleted from local assets.`;
-  document.getElementById("confirm-clear-all-overlay").classList.add("active");
-});
-
-document.getElementById("confirm-clear-all-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-clear-all-overlay").classList.remove("active");
-});
-
-document.getElementById("confirm-clear-all-ok").addEventListener("click", async () => {
+  if (!(await _confirmAction(`All ${count} edited asset${count !== 1 ? "s" : ""} will be moved to the project trash for 7 days. The project keeps at most 20 trash entries.`, 'Delete all edits?', 'Delete all'))) return;
   const project = _activeProjectName;
-  document.getElementById("confirm-clear-all-overlay").classList.remove("active");
   try {
     const res = await api("/api/delete_all_imported", {
       method: "POST",
@@ -2959,7 +2956,7 @@ document.getElementById("confirm-clear-all-ok").addEventListener("click", async 
       sidebarData = {};
       window.AtelierEmptyAssetsUI?.confirmed(project, 0);
       renderSidebar();
-      toast(`Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`, "info", 4000);
+      _trashUndo(res, project, `Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -3061,13 +3058,23 @@ async function checkSetup() {
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
-    const [aes, usmapPath] = await Promise.all([_fetchAesKeyValue(), _fetchUsmapPath()]);
     _pathsMode = false;
     _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
-    document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
-    document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
+    document.getElementById("setup-aes").value   = statusRes.aes_prefill || "";
+    document.getElementById("setup-usmap").value = statusRes.usmap_prefill || "";
+    window.AtelierSetup?.detected(statusRes.paks_prefill || '');
     _setSetupLoading(false);
+    for (const [kind, fetchValue] of [['aes', _fetchAesKeyValue], ['usmap', _fetchUsmapPath]]) {
+      const field = document.getElementById('setup-' + kind), initial = field.value;
+      window.AtelierSetup?.retrieval(kind, 'pending');
+      fetchValue().then(value => {
+        if (_pathsMode || !document.getElementById('setup-overlay').classList.contains('active')) return;
+        if (value && field.value === initial) field.value = value;
+        window.AtelierSetup?.retrieval(kind, value ? 'ready' : 'failed');
+        validateSetup();
+      });
+    }
     await validateSetup();
     return true;
   } catch (e) {
@@ -3088,6 +3095,7 @@ function _applySetupMode() {
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
+  window.AtelierSetup?.mode(paths);
 }
 
 async function openPaths() {
@@ -3270,6 +3278,7 @@ async function validateSetup() {
     blenderEl.classList.toggle("setup-valid",   blenderOk);
     blenderEl.classList.toggle("setup-invalid", blenderBad);
   }
+  window.AtelierSetup?.validation({pakOk, usmapOk, keyOk});
 }
 
 document.getElementById("setup-path").addEventListener("input", validateSetup);
@@ -3362,7 +3371,7 @@ document.getElementById("setup-blender-browse").addEventListener("click", async 
 
 function _resetSaveBtn() {
   const btn = document.getElementById("setup-save");
-  const label = _pathsMode ? "Save" : "Save & Continue";
+  const label = _pathsMode ? "Save" : "Open Atelier";
   btn.disabled = false;
   btn.innerHTML = `<i data-lucide="check" size="14"></i> <span id="setup-save-label">${label}</span>`;
   lucide.createIcons({ nodes: [btn] });
@@ -3558,7 +3567,7 @@ _ctxFileInput.addEventListener("change", async () => {
 });
 
 async function revertImported(item) {
-  if (!confirm(`Revert ${item.name || item.game_rel} to the game original? This replaces your edited content for this asset.`)) return;
+  if (!(await _confirmAction(`Revert ${item.name || item.game_rel} to the game original? This replaces your edited content for this asset.`, 'Revert asset?', 'Revert'))) return;
   const project = _activeProjectName;
   const progress = toastSpinner('Restoring original…');
   try {
@@ -4806,8 +4815,8 @@ function _wireWorldInputs() {
   }));
 }
 
-function closeWorldEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_worldDirty(), "level edits")) return false;
+async function closeWorldEditor(force = false) {
+  if (force !== true && _worldDirty() && !(await _discardUnsaved(true, "level edits"))) return false;
   document.getElementById("world-overlay").classList.remove("active");
   return true;
 }
@@ -4830,7 +4839,7 @@ document.getElementById("world-save").addEventListener("click", async () => {
 
 document.getElementById("world-reset").addEventListener("click", async () => {
   if (!worldEditor) return;
-  if (!confirm("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.", 'Restore level?', 'Restore'))) return;
   const st = document.getElementById("world-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/world_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -4895,8 +4904,8 @@ function renderTextEditor(filter) {
 
 document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
 
-function closeTextEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_textDirty(), "text edits")) return false;
+async function closeTextEditor(force = false) {
+  if (force !== true && _textDirty() && !(await _discardUnsaved(true, "text edits"))) return false;
   document.getElementById("text-overlay").classList.remove("active");
   return true;
 }
@@ -4920,7 +4929,7 @@ document.getElementById("text-save").addEventListener("click", async () => {
 
 document.getElementById("text-reset").addEventListener("click", async () => {
   if (!textEditor) return;
-  if (!confirm("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.", 'Restore text?', 'Restore'))) return;
   const st = document.getElementById("text-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/text_reset", { method: "POST", headers: { "Content-Type": "application/json" },

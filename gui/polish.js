@@ -114,8 +114,16 @@
           for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
         }
         Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden'});
-        document.body.append(copy); play(copy,[{opacity:1,transformOrigin:'top',transform:'scaleY(1)'},{opacity:0,transformOrigin:'top',transform:'scaleY(0)'}],120);
-        setTimeout(()=>copy.remove(),140);
+        document.body.append(copy);
+        play(copy,[{opacity:1,clipPath:'inset(0 0 0 0)'},{opacity:0,clipPath:'inset(0 0 100% 0)'}],300);
+        const bubbles=document.createElement('span'); bubbles.className='trash-drain'; bubbles.setAttribute('aria-hidden','true'); bubbles.inert=true;
+        Object.assign(bubbles.style,{left:(entry.rect.x+8)+'px',top:(entry.rect.y+2)+'px'});
+        for(let i=0;i<6;i++) {
+          const dot=document.createElement('i'); dot.style.left=(6+i%3*13)+'px'; dot.style.top=(3+Math.floor(i/3)*14)+'px'; bubbles.append(dot);
+          play(dot,[{transform:'translateY(0) scale(1)',opacity:1},{transform:`translateY(${12+i*2}px) scale(.6)`,opacity:0}],300);
+        }
+        document.body.append(bubbles);
+        setTimeout(()=>{copy.remove();bubbles.remove();},320);
       }
     }
   }

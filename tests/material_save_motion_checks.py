@@ -206,7 +206,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
             open_editor('MI_Origin')
             old = start_save()
             if stale_case in ('closed', 'reopened'):
-                material_page.evaluate('closeMaterialEditor()')
+                material_page.evaluate('closeMaterialEditor(true)')
             if stale_case == 'reopened':
                 open_editor('MI_Newer')
                 material_page.locator('#mat-status').evaluate("el=>el.textContent='New draft status'")
@@ -222,7 +222,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
                 assert material_page.locator('#mat-status').inner_text() == 'New draft status'
             else:
                 assert material_page.locator('#mat-status').inner_text() == 'Other project status'
-            material_page.evaluate("closeMaterialEditor(); _activeProjectName='Save Ω'")
+            material_page.evaluate("closeMaterialEditor(true); _activeProjectName='Save Ω'")
         checks.append('In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project')
 
         clear_toasts()
@@ -292,7 +292,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
             assert message in material_page.locator('#toast-area').inner_text()
             assert material_page.locator('#toast-area img').count() == 0
             assert not material_page.evaluate('materialInjected')
-            material_page.evaluate('closeMaterialEditor()')
+            material_page.evaluate('closeMaterialEditor(true)')
             response['payload'] = {'ok': True, 'inten_saved': True}
         material_page.evaluate('window.AtelierMaterialSaveFeedback=originalMaterialPresentation')
         clear_toasts()

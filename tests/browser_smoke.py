@@ -70,6 +70,7 @@ def main():
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
+    parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -169,6 +170,15 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
+                if args.trust_only:
+                    from trust_checks import run_trust_checks
+                    run_trust_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.polish_only:
                     from polish_checks import run_polish_checks
                     run_polish_checks(page, context, url, report, checks)
@@ -238,6 +248,8 @@ def main():
                     return
 
                 from design_checks import run_design_checks
+                from trust_checks import run_trust_checks
+                run_trust_checks(page, context, url, report, checks)
                 run_design_checks(page, context, url, report, checks)
                 from appearance_checks import run_appearance_checks
                 run_appearance_checks(page, context, url, report, checks)

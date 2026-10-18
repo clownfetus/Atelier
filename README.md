@@ -130,6 +130,10 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Basic workflow
 
+On first run, Find the game and Unlock the paks validate your installation before
+Make it yours offers palettes and motion. Key/mapping retrieval has manual
+fallbacks. Menu → Settings keeps the full configuration form.
+
 1. Create or open a project. The project button beside the Atelier logo shows
    the open project and its edit count; click it to switch projects.
 2. Browse to the assets you want to change. Edit material parameters or

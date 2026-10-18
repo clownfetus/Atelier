@@ -1445,6 +1445,21 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 #viewport-chroma { width: 100%; margin-top: 6px; padding: 6px; border: 1px solid var(--border2); border-radius: var(--studio-shape-small); background: var(--bg3); color: var(--text); }
 #viewport-mat-foot button { min-height: var(--studio-control-height); border-radius: var(--studio-shape-small); font-family: inherit; }
 
+.toast-undo { flex-shrink: 0; min-height: 28px; padding: 3px 9px; }
+#atelier-confirm { z-index: 300; }
+#atelier-confirm-body { white-space: pre-line; overflow-wrap: anywhere; }
+.setup-step[hidden], .setup-step-nav[hidden] { display: none; }
+#setup-overlay .setup-body [hidden], #setup-save[hidden], #setup-next[hidden], #setup-back[hidden] { display: none !important; }
+.setup-advanced { margin-top: 16px; }
+.setup-advanced summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+.setup-step h3 { display: flex; align-items: center; gap: 10px; font-size: 24px; margin: 6px 0 12px; }
+.setup-step-count { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
+.setup-step-status { color: var(--text); font-size: 13px; }
+.setup-step-glyph { display: inline-flex; width: 24px; height: 24px; }
+.setup-step-nav { display: inline-flex; gap: 8px; }
+.trash-drain { position: fixed; width: 48px; height: 48px; pointer-events: none; z-index: 230; }
+.trash-drain i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--krackle-charge, var(--acc)); }
+
 /* Kept last: editors previously suppressed native outlines. */
 :focus-visible { outline: 2px solid var(--acc) !important; outline-offset: 3px; }
 .seg-btn:focus-visible { outline-offset: -3px; }

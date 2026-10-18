@@ -150,37 +150,6 @@
   </div>
 </div>
 
-<!-- ── confirm: clear one ── -->
-<div class="overlay" id="confirm-clear-overlay">
-  <div class="modal">
-    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i> <span id="confirm-clear-title">Delete Asset?</span></h2>
-    <p id="confirm-clear-msg">Delete this edited asset from local assets?</p>
-    <div class="modal-row">
-      <button class="btn" id="confirm-clear-cancel">Cancel</button>
-      <button class="btn primary danger" id="confirm-clear-ok">Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── confirm: clear all ── -->
-<div class="overlay" id="confirm-clear-all-overlay">
-  <div class="modal">
-    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i> Delete All Edited?</h2>
-    <p id="confirm-clear-all-msg">All edited assets will be permanently deleted from local assets.</p>
-    <div class="warning">
-      <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>This cannot be undone. You will need to re-edit assets to use them again.</span>
-    </div>
-    <div class="modal-row">
-      <button class="btn" id="confirm-clear-all-cancel">Cancel</button>
-      <button class="btn primary danger" id="confirm-clear-all-ok">
-        <i data-lucide="trash-2" size="14"></i>
-        Delete All
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- ── confirm: overwrite existing mod on install ── -->
 <div class="overlay" id="confirm-overwrite-overlay">
   <div class="modal">
@@ -853,6 +822,8 @@
 <script src="/static/polish.js"></script>
 <script src="/static/roster.js"></script>
 <script src="/static/continuity.js"></script>
+<script src="/static/dialog.js"></script>
+<script src="/static/setup-wizard.js"></script>
 <script src="/static/app.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>
