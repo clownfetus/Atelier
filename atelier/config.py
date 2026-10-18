@@ -363,6 +363,8 @@ def project_base(game_rel, root=None):
     never collide — the old flat basename layout silently overwrote them. Legacy flat files are still
     read via project_base_legacy() for back-compat."""
     parts = validate_game_rel(game_rel)
+    if parts[0].lower() == '.atelier-trash':
+        raise ValueError('Project bookkeeping cannot be used as a game asset.')
     root = os.path.realpath(root or get_import_root())
     path = os.path.join(root, *parts)
     root_key = _path_comparison_key(root)

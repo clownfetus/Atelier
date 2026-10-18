@@ -149,6 +149,7 @@ class Trash(unittest.TestCase):
     def test_invalid_entry_and_symlink_paths_cannot_escape_project(self):
         with self.assertRaises(ValueError): T.restore(str(self.root), '../elsewhere')
         with self.assertRaises(ValueError): T._inside(self.root, '../T_Test.png')
+        with self.assertRaises(ValueError): C.project_base('.atelier-trash/entry/files/Fixture/T_Test')
 
     def test_interrupted_delete_recovers_on_open(self):
         path = self.seed(self.tex)
