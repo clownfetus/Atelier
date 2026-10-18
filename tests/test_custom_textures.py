@@ -160,6 +160,7 @@ class CustomTextureTests(unittest.TestCase):
     def test_names_are_ue_safe_and_keep_the_users_words(self):
         self.assertEqual(CT.texture_name("my paint v3.png"), "T_my_paint_v3")
         self.assertEqual(CT.texture_name("T_Hood_D.tga"), "T_Hood_D")
+        self.assertEqual(CT.texture_name("t_Hood_D.tga"), "T_Hood_D")
         self.assertEqual(CT.texture_name("C:\\art\\é.png"), "T_Custom")
         self.assertEqual(CT.texture_name("..//../x y--z.PNG"), "T_x_y_z")
         a = CT.package_game_rel(MI, "BaseColor", "T_x")
@@ -205,6 +206,67 @@ class CustomTextureTests(unittest.TestCase):
             "Normal": {"name": "bad name", "file": "0123456789abcdef0123.png"}}})
         self.assertEqual(CT.assignments(MI, str(self.project)), {})
         self.assertIsNone(CT.image_path(MI, "BaseColor", str(self.project)))
+
+    def test_chosen_location_survives_image_changes_and_rewires_export(self):
+        self.assign()
+        with patch('atelier.added_assets.ensure_index', return_value=[]):
+            custom = CT.set_location(MI, 'BaseColor', 'Hood_Paint', '/Game/Marvel/MyMod/Textures', str(self.project))
+            self.assertEqual(custom['BaseColor']['game_rel'], 'MyMod/Textures/T_Hood_Paint')
+            self.assign(filename='different.png', data=png(color=(30,40,50,255)))
+            self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['game_rel'], 'MyMod/Textures/T_Hood_Paint')
+            with patch.object(CT, 'get_import_root', return_value=str(self.project)):
+                M.stage_material(str(self.stage), MI, {}, {})
+        self.assertTrue((self.stage/'Marvel/Content/Marvel/MyMod/Textures/T_Hood_Paint.uasset').is_file())
+        self.assertEqual(self.uat.compiled['T_Hood_Paint']['FolderName'], '/Game/Marvel/MyMod/Textures/T_Hood_Paint')
+        self.assertIn('/Game/Marvel/MyMod/Textures/T_Hood_Paint', self.uat.compiled['MI_Body']['NameMap'])
+
+    def test_location_validation_and_collisions_leave_assignment_unchanged(self):
+        before = self.assign()
+        stored = self.stored()
+        for folder in ('../escape', 'C:/outside', '/Other/Textures', 'X//Y', 'X/%2e%2e',
+                       'X/CON', 'Plugins/Foo', 'Marvel_LQ/Foo', 'X/'+'a'*65):
+            with self.subTest(folder=folder), self.assertRaises(ValueError):
+                CT.set_location(MI, 'BaseColor', 'T_Paint', folder, str(self.project))
+        for name in ('T_../Bad', 'T_bad.name', 'T_bad name', 'T_', 'T_'+'x'*61):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                CT.set_location(MI, 'BaseColor', name, 'MyMod/Textures', str(self.project))
+        with patch('atelier.added_assets.ensure_index', return_value=[('mymod/textures/t_paint.uasset',)]):
+            with self.assertRaisesRegex(ValueError, 'already exists in the game'):
+                CT.set_location(MI, 'BaseColor', 'T_Paint', 'MyMod/Textures', str(self.project))
+        self.assertEqual(CT.public(MI, str(self.project)), before)
+        self.assertEqual(self.stored(), stored)
+        with patch('atelier.added_assets.ensure_index', return_value=[]):
+            self.assign(slot='Normal')
+            CT.set_location(MI, 'BaseColor', 'T_Paint', 'MyMod/Textures', str(self.project))
+            with self.assertRaisesRegex(ValueError, 'Another material texture slot'):
+                CT.set_location(MI, 'Normal', 'T_paint', 'mymod/textures', str(self.project))
+            other = self.project/'MyMod/Textures/T_Other.png'
+            other.parent.mkdir(parents=True, exist_ok=True); other.write_bytes(png())
+            with self.assertRaisesRegex(ValueError, 'already exists in this project'):
+                CT.set_location(MI, 'Normal', 'T_Other', 'MyMod/Textures', str(self.project))
+        with patch('atelier.added_assets.ensure_index', return_value=[('MyMod/Textures/T_Paint.uasset',)]), \
+             patch.object(CT, 'get_import_root', return_value=str(self.project)):
+            with self.assertRaisesRegex(ValueError, 'already exists in the game'):
+                M.stage_material(str(self.stage), MI, {}, {})
+        self.assertFalse(list(self.stage.rglob('*.uasset')))
+
+    def test_invalid_saved_folder_is_never_exported(self):
+        self.assign()
+        rec = CT.assignments(MI, str(self.project))['BaseColor']
+        project_meta.set_asset_opts(str(self.project), MI, {'custom_textures': {'BaseColor': {**rec, 'folder': '../../escape'}}})
+        self.assertEqual(CT.assignments(MI, str(self.project)), {})
+
+    def test_location_api_uses_the_originating_project_and_validates_the_slot(self):
+        self.assign()
+        body = {'game_rel': MI, 'slot': 'BaseColor', 'name': 'Chosen', 'folder': 'MyMod/Textures'}
+        with patch('atelier.added_assets.ensure_index', return_value=[]):
+            result = json.loads(self.call('POST', '/api/material_custom_texture/location', body=body)[1])
+            self.assertTrue(result['ok'], result)
+            self.assertEqual(result['custom_textures']['BaseColor']['game_rel'], 'MyMod/Textures/T_Chosen')
+            for changes in ({'folder': '../escape'}, {'slot': 'Nope'}, {'game_rel': '../MI_Body'}, {'name': None}):
+                result = json.loads(self.call('POST', '/api/material_custom_texture/location', body={**body, **changes})[1])
+                self.assertFalse(result['ok'], result)
+        self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['name'], 'T_Chosen')
 
     # ── export ───────────────────────────────────────────────────────────────────
 

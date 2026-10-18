@@ -6,6 +6,9 @@ import sys
 # One list, shared with the dist audit in scripts/stage_tools.py.
 sys.path.insert(0, str(Path(SPECPATH) / 'scripts'))
 from stage_tools import UNUSED_PACKAGES
+from update_catalogue_seed import validate_seed
+
+validate_seed(Path(SPECPATH) / 'gui' / 'catalogue.json')
 
 datas = [
     ('gui', 'gui'),
@@ -18,6 +21,8 @@ datas = [
 ]
 # Do not collect developer __pycache__ files beside the standalone scripts.
 datas += [(str(script), 'atelier/blender') for script in Path('atelier/blender').glob('*.py')]
+# upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
+datas += [(str(item), 'atelier/models') for item in Path('atelier/models').iterdir() if item.is_file()]
 binaries = []
 hiddenimports = [
     'io_lib',

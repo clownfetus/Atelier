@@ -103,6 +103,15 @@ class CatalogueTests(unittest.TestCase):
         wrong_folder = f'<a data-type="nameplate"><img src="{IMAGE}" alt="Amethyst Armor"></a>'
         self.assertEqual(parse_cards(wrong_folder, kind='nameplate'), [])
 
+    def test_new_artwork_paths_are_narrowly_allowlisted(self):
+        prefix = 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/'
+        for path in ('lord-icons/item_herohead_21029020.png', 'lord-icons/Magik%20Deluxe%20Avatar.png',
+                     'kill-icons/item_kill_2102912.webp', 'kill-icons/Magik%20Deluxe%20KO%20Prompt%201.png'):
+            self.assertTrue(allowed_url(prefix + path), path)
+        for path in ('lord-icons/../../evil.png', 'lord-icons/%2fetc.png', 'lord-icons/unknown.png',
+                     'kill-icons/item_kill_21.svg', 'lord-icons/sub/item_herohead_21.png'):
+            self.assertFalse(allowed_url(prefix + path), path)
+
     def test_nameplate_matches_only_a_unique_same_named_costume(self):
         chars = {'1029': {'name': 'Magik', 'skins': {'1029100': 'Amethyst Armor', '1029101': 'Unknown'}}}
         roster = [{'name': 'Magik', 'image': IMAGE, 'page': HERO}]
@@ -111,8 +120,9 @@ class CatalogueTests(unittest.TestCase):
                                  lambda pages: [{'ids': ['1029100'], 'image': IMAGE} for _ in pages])
         entries = build(CARDS + nameplate('AMETHYST ARMOR') + nameplate('Immortal Magik', 'immortal-magik'))
         self.assertEqual(entries['1029100']['banner'], PLATES + 'img_amethyst-armor.webp')
+        self.assertEqual(entries['1029100']['badge'], PLATES + 'img_icon_amethyst-armor.webp')
         self.assertNotIn('banner', entries['1029101'])  # Hero-portrait fallbacks never get one.
-        self.assertNotIn('banner', entries['1029'])
+        self.assertEqual(entries['1029']['banner'], PLATES + 'img_immortal-magik.webp')
         for page in (CARDS,  # No nameplate in the bundle.
                      CARDS + nameplate('Amethyst Armour'),  # Close is not the same name.
                      CARDS + nameplate('AMETHYST ARMOR') + nameplate('Amethyst Armor', 'amethyst-armor-2'),
@@ -136,6 +146,28 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(self.catalogue.describe('Characters/1029/1029100')['banner'], '/api/catalogue/banner/1029100')
             for path in ('Characters/1029', 'Characters/1029/1029101', 'Characters/1029/1029102', 'Characters/1029/1029999'):
                 self.assertIsNone(self.catalogue.describe(path)['banner'])
+
+    def test_hero_nameplate_uses_the_exact_name_on_its_own_page(self):
+        chars = {'1067': {'name': 'Gorr', 'skins': {}}}
+        roster = [{'name': 'Gorr The God Butcher', 'image': IMAGE,
+                   'page': 'https://rivalskins.com/hero/gorr-the-god-butcher/'}]
+        def build(extra):
+            return build_entries(chars, roster, lambda _: CARDS + extra,
+                                 lambda pages: [{'ids': [], 'image': IMAGE} for _ in pages])
+        plate = nameplate('GORR THE GOD BUTCHER', 'gorr-the-god-butcher')
+        entries = build(plate + nameplate('Immortal Gorr the God Butcher', 'immortal-gorr'))
+        self.assertEqual(entries['1067']['banner'], PLATES + 'img_gorr-the-god-butcher.webp')
+        self.catalogue.data['entries'].update(entries)
+        self.assertEqual(self.catalogue.describe('Characters/1067')['banner'], '/api/catalogue/banner/1067')
+        data = io.BytesIO(); Image.new('RGBA', (8,4)).save(data, 'WEBP')
+        with patch('atelier.catalogue.fetch', return_value=(data.getvalue(), {})):
+            self.assertTrue(self.catalogue.banner('1067').is_file())
+        for extra in (plate + plate, nameplate('Gorr', 'gorr'), nameplate('Divine Destroyer', 'divine-destroyer')):
+            self.assertNotIn('banner', build(extra)['1067'])
+        rank_plate = build(nameplate('Immortal Gorr the God Butcher', 'immortal-gorr'))['1067']
+        self.assertEqual(rank_plate['banner'], PLATES+'img_immortal-gorr.webp')
+        self.assertEqual(rank_plate['banner_style'], 'immortal')
+        self.assertEqual(entries['1067']['banner_style'], 'default')
 
     def test_npcs_are_not_playable_heroes(self):
         entries = build_entries({'4057': {'name': 'Deadpool', 'skins': {}}},
@@ -167,11 +199,62 @@ class CatalogueTests(unittest.TestCase):
         self.assertFalse(self.catalogue.status()['updating'])
         self.assertEqual(self.catalogue.status()['error'], 'offline')
 
+    def test_hidpi_banner_returns_original_while_one_worker_sharpens_it(self):
+        data = io.BytesIO()
+        Image.new('RGBA', (8, 4), (10, 30, 180, 120)).save(data, 'WEBP', lossless=True)
+        self.catalogue.data['entries']['1029100'].update(banner=PLATES+'img_amethyst-armor.webp',
+                                                       badge=PLATES+'img_icon_amethyst-armor.webp')
+        with patch('atelier.catalogue.fetch', return_value=(data.getvalue(), {})), \
+             patch('atelier.catalogue.threading.Thread') as thread:
+            path = self.catalogue.banner('1029100', sharp=True)
+            self.assertTrue(path.is_file())
+            self.assertEqual(self.catalogue.banner('1029100', sharp=True), path)
+            self.assertEqual(len(self.catalogue.sharp_pending), 1)
+            thread.assert_called_once()
+            self.assertIsNotNone(self.catalogue.badge('1029100'))
+        with patch('atelier.upscale.upscale', side_effect=lambda im: im.resize((32,16))):
+            self.catalogue._sharpen_banners()
+        sharp = self.catalogue.banner('1029100', sharp=True)
+        self.assertTrue(sharp.name.endswith('-x4.webp'))
+        with Image.open(sharp) as image:
+            self.assertEqual(image.size, (32,16))
+        sharp.unlink()
+        with patch('atelier.catalogue.threading.Thread'), patch('atelier.upscale.upscale', side_effect=MemoryError):
+            self.catalogue.banner('1029100', sharp=True)
+            self.catalogue._sharpen_banners()
+            self.assertEqual(self.catalogue.banner('1029100', sharp=True), path)
+            self.assertFalse(self.catalogue.sharp_pending)
+
     def test_malformed_cache_uses_seed(self):
         self.catalogue.root.mkdir()
         (self.catalogue.root / 'catalogue.json').write_text('{broken')
         loaded = Catalogue(self.catalogue.root, self.seed)
         self.assertEqual(loaded.describe('Characters/1029')['name'], 'Magik')
+
+    def test_updated_seed_replaces_older_matching_metadata_without_waiting_for_network(self):
+        self.catalogue.root.mkdir()
+        cache = self.catalogue.root / 'catalogue.json'
+        old = {**self.catalogue.data, 'parser_version': PARSER_VERSION - 1}
+        cache.write_text(json.dumps(old), encoding='utf-8')
+        current = json.loads(self.seed.read_text())
+        current['parser_version'] = PARSER_VERSION
+        current['entries']['1029'].update(banner=PLATES + 'img_magik.webp',
+                                          badge=PLATES + 'img_icon_magik.webp')
+        self.seed.write_text(json.dumps(current), encoding='utf-8')
+        with patch('atelier.catalogue.fetch', side_effect=TimeoutError('offline')) as get:
+            loaded = Catalogue(self.catalogue.root, self.seed)
+            self.assertEqual(loaded.describe('Characters/1029')['banner'], '/api/catalogue/banner/1029')
+            get.assert_not_called()
+            loaded.update()
+            self.assertEqual(loaded.describe('Characters/1029')['banner'], '/api/catalogue/banner/1029')
+        self.assertEqual(json.loads(cache.read_text()), old)
+        current['entries']['1029']['name'] = 'Refreshed Magik'
+        cache.write_text(json.dumps(current), encoding='utf-8')
+        self.assertEqual(Catalogue(self.catalogue.root, self.seed).describe('Characters/1029')['name'],
+                         'Refreshed Magik')
+        self.seed.unlink()
+        cache.write_text(json.dumps(old), encoding='utf-8')
+        self.assertEqual(Catalogue(self.catalogue.root, self.seed).describe('Characters/1029')['name'], 'Magik')
 
     def test_image_cache_survives_offline_and_rejects_non_image(self):
         data = io.BytesIO()
@@ -195,6 +278,27 @@ class CatalogueTests(unittest.TestCase):
             self.catalogue.start_update()
             worker.assert_called_once()
             worker.return_value.start.assert_called_once()
+
+    def test_release_seed_requires_current_parser_and_paired_nameplates(self):
+        from scripts.update_catalogue_seed import validate_seed
+        seed = Path(__file__).resolve().parents[1] / 'gui' / 'catalogue.json'
+        data, count = validate_seed(seed)
+        self.assertGreater(count, 0)
+        for sid, entry in data['entries'].items():
+            if entry.get('banner'):
+                self.assertFalse(entry.get('hero_fallback'))
+                if len(sid) == 4:
+                    self.assertEqual(entry['kind'], 'hero')
+                    self.assertTrue(entry['source'].startswith('https://rivalskins.com/hero/'))
+                else:
+                    self.assertEqual(entry['kind'], 'skin')
+                    self.assertTrue(sid.startswith(entry['hero']))
+                self.assertEqual(nameplate_url(entry['badge']), entry['banner'])
+        invalid = self.root / 'invalid-seed.json'
+        for content in ({**data, 'parser_version': 0}, {'schema': 1, 'parser_version': PARSER_VERSION, 'entries': {}}):
+            invalid.write_text(json.dumps(content), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                validate_seed(invalid)
 
     def test_unchanged_catalogue_skips_full_crawl(self):
         import hashlib

@@ -150,6 +150,7 @@ def run_appearance_checks(page, context, url, report, checks):
             tab.wait_for_function("document.documentElement.dataset.palette==='repak'")
             tab.evaluate("Promise.allSettled(document.getAnimations().filter(animation=>animation.effect?.pseudoElement).map(animation=>animation.finished))")
             help_button = tab.locator('.setup-help-btn')
+            tab.keyboard.press('Tab')
             help_button.focus()
             tab.wait_for_selector('#atelier-tooltip:visible')
             assert help_button.get_attribute('aria-describedby') == 'atelier-tooltip'

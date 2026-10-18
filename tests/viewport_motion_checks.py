@@ -175,8 +175,10 @@ def run_viewport_motion_checks(page, context, url, report, checks):
 
         def start_mesh(name='Fixture', immediate=False):
             motion_page.evaluate("""args => {
-              __viewportMotion.configure({immediate:args.immediate});
-              window.viewportOpen = AtelierViewport.openMesh('Characters/1029/1029001/Meshes/' + args.name, args.name, '1029001');
+              const game_rel = 'Characters/1029/1029001/Meshes/' + args.name;
+              __viewportMotion.configure({immediate:args.immediate,
+                skinList:[{name:args.name,game_rel,kind:'body'}]});
+              window.viewportOpen = AtelierViewport.openMesh(game_rel, args.name, '1029001');
             }""", {'name': name, 'immediate': immediate})
 
         def close_preview():

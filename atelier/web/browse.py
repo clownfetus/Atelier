@@ -1,4 +1,4 @@
-import os, re, hashlib, threading, urllib.request
+import os, re, json, hashlib, threading, urllib.request
 from atelier.catalogue import catalogue
 from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel
 from atelier.index import ensure_index
@@ -9,6 +9,28 @@ def _imported_exists(game_rel, ext):
     """A project copy exists at the unique subfolder path, or at the legacy flat path (back-compat)."""
     return (ext == '.blend' and os.path.exists(project_base(game_rel)+'.mesh.json')) or (os.path.exists(project_base(game_rel) + ext)
             or os.path.exists(project_base_legacy(game_rel) + ext))
+
+def _edited_swatches(game_rel, limit=6):
+    """An edited material's colours for its card, as the editor shows them: each stored value
+    divided by its HDR intensity, max(rgb, 1). Distinct colours only, in parameter order."""
+    from atelier.handlers.material import _mat_params
+    for base in (project_base(game_rel), project_base_legacy(game_rel)):
+        try:
+            with open(base + '.json', encoding='utf-8-sig') as f:
+                colors, _ = _mat_params(json.load(f))
+        except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+            continue
+        out = []
+        for color in colors:
+            r, g, b = color['rgba'][:3]
+            scale = max(r, g, b, 1)
+            value = '#' + ''.join(f'{round(min(1, max(0, v / scale)) * 255):02x}' for v in (r, g, b))
+            if value not in out:
+                out.append(value)
+            if len(out) == limit:
+                break
+        return out
+    return []
 
 _REMOTE_MD_URL   = "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/refs/heads/main/MarvelRivalsCharacterIDs.md"
 _update_callback = None   # set by routes.py to _push_sse after it's defined
@@ -227,6 +249,8 @@ def _browse_pak_level(rel_path):
                 label_id = fname[-3:] if len(fname) == 7 else fname
                 item['label'] = f"{label_id} — {portrait['name']}"
             item.update(thumbnail=portrait['thumbnail'], hero_fallback=portrait['hero_fallback'])
+            if portrait['banner']:
+                item['banner'] = portrait['banner']
         result.append(item)
     if not rel_path:
         pinned = [r for r in result if r["name"].lower() in ROOT_PINNED]
@@ -249,6 +273,7 @@ def _browse_pak_level(rel_path):
             "game_rel":  gr,
             "imported":  imported,
             "token":     token(gr) if imported else None,
+            **({"swatches": _edited_swatches(gr)} if is_mat and imported else {}),
         })
     return result
 
@@ -296,6 +321,7 @@ def _browse_skin(skin_id, subpath):
             "game_rel":  td["game_rel"],
             "imported":  imported,
             "token":     tok,
+            **({"swatches": _edited_swatches(td["game_rel"])} if is_mat and imported else {}),
         })
     return result
 

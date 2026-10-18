@@ -6,6 +6,8 @@ from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, US
 from atelier.tools import uat, uat_json
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
+_model_extract_lock=threading.Lock()
+
 # ── DDS passthrough ────────────────────────────────────────────────────────────
 # Some textures MUST keep their exact block data, not be re-encoded from PNG. The dyeing/recolour
 # masks (T_*_ColorID, slot "DyeingTexture" on M_Common_* masters) pack a REGION INDEX into alpha as
@@ -65,22 +67,19 @@ def decode_dds(import_base, uasset_base):
     bpb = _BPB.get(fmt)
     if not bpb or not w:
         return None
-    blocks = lambda d: max(1, d // 4) * max(1, d // 4)
     for src in (".uptnl", ".ubulk"):
         p = uasset_base + src
         if not os.path.exists(p):
             continue
         data = open(p, "rb").read()
-        for p2 in range(14, 1, -1):
-            d = 1 << p2
-            if d > w:
-                continue
-            size = blocks(d) * bpb
+        for level in range(max(w, h).bit_length()):
+            mw, mh = max(1, w >> level), max(1, h >> level)
+            size = max(1, (mw + 3) // 4) * max(1, (mh + 3) // 4) * bpb
             # .uptnl is exactly the top mip; .ubulk is a chain whose head is ~3/4 of the whole
             if size == len(data) or (src == ".ubulk" and size <= len(data) and size > len(data) * 0.6):
                 out = import_base + ".dds"
                 os.makedirs(os.path.dirname(out), exist_ok=True)
-                open(out, "wb").write(_dds_header(d, d, fmt, size) + data[:size])
+                open(out, "wb").write(_dds_header(mw, mh, fmt, size) + data[:size])
                 return out
     return None
 
@@ -582,9 +581,11 @@ def _note_mip_attempt(game_rel, base):
           file=sys.stderr, flush=True)
 
 
-def ensure_work_base(game_rel):
+def ensure_work_base(game_rel,prefer_exact=False):
     """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
-    Returns None if the asset isn't in the game at all."""
+    Returns None if the asset isn't in the game at all. Model Studio requests
+    exact container/path extraction first to avoid repeated full-game scans and
+    basename collisions; a required legacy fallback runs one at a time."""
     from atelier.added_assets import source_base
     added = source_base(game_rel)
     if added:
@@ -623,7 +624,7 @@ def ensure_work_base(game_rel):
     _purge_ambiguous(game_rel)
     # Full-path extract first wherever it applies: on Linux (UAssetTool cannot read containers
     # without Oodle) and for plugin assets anywhere (a basename cannot tell them from their twins).
-    if prefers_retoc() or is_plugin_asset(game_rel):
+    if prefer_exact or prefers_retoc() or is_plugin_asset(game_rel):
         hit = extract_via_retoc([game_rel]).get(game_rel)
         if hit:
             rb, pak, pfx = hit
@@ -635,8 +636,11 @@ def ensure_work_base(game_rel):
         # includes the most recently changed assets. On Windows UAssetTool covers those; on Linux it
         # reports the missing-Oodle reason, which is the honest answer rather than "not found".
     os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
-    r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)]
-            + uat_filter([game_rel]))
+    arguments=["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)]+uat_filter([game_rel])
+    if prefer_exact:
+        from atelier import jobs
+        with jobs.cancellable_lock(_model_extract_lock):r=uat(arguments)
+    else:r=uat(arguments)
     # A tool crash, a file lock, or a MOTW-tainted DLL all leave the asset unextracted, and the
     # caller can only report "not found in the game paks" — indistinguishable from an asset the
     # game genuinely doesn't have. Log the failure so a transient one is diagnosable from _logs.
@@ -840,11 +844,12 @@ def stage_inject(stage, game_rel, opts=None):
 
     opts (from project_meta.get_asset_opts) may carry:
       blank      - ship a fully transparent texture instead of the edited PNG (#22)
-      no_mips    - single inline mip instead of the full chain (#20)
+      no_mips    - single inline mip instead of the full chain (#20); on unless stored False
       lod_group  - retarget the texture's LODGroup (#20)
       lq_twin    - also stage the Marvel_LQ copy, when this install has that mount (#21)
     """
-    opts = opts or {}
+    from atelier.project_meta import effective_asset_opts
+    opts = effective_asset_opts(opts)
     # Prefer the unique subfolder path; fall back to a legacy flat png if that's where it already lives.
     import_base = project_base(game_rel)
     if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):
@@ -1003,6 +1008,16 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
     stage = stage_dir
     os.makedirs(stage)
     applied, skipped = [], []
+    # A model uploaded with its material bundle must keep those dependencies even
+    # when a caller builds only the mesh row. The material builder includes each
+    # content-addressed custom texture beside the edited material package.
+    from atelier.handlers.meshtextures import dependencies
+    mat_items=list(mat_items)
+    selected_materials={row['game_rel'] for row in mat_items}
+    for mesh_rel in mesh_items or []:
+        for material_rel in dependencies(mesh_rel):
+            if material_rel not in selected_materials:
+                mat_items.append({'game_rel':material_rel});selected_materials.add(material_rel)
     # MESH FIRST, before any texture is injected. Staging a mesh runs Blender, which flushes any
     # still-modified image datablock onto the project PNGs stage_inject then reads. Injecting
     # first would ship the pre-flush version -- one build behind, looking exactly like "my
@@ -1012,8 +1027,16 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
         try:
             from atelier.handlers.meshedit import stage_mesh
             info = stage_mesh(gr, stage)
-            applied.append(f"mesh {os.path.basename(gr)} ({len(info['applied'])} LODs)")
-        except Exception as e: skipped.append(f"{os.path.basename(gr)}: {e}")
+            lods = len(info.get('visibility') or info['applied'])
+            applied.append(f"mesh {os.path.basename(gr)} ({lods} LODs" + ('; hidden sections' if info.get('visibility') else '') + ')')
+        except Exception as e:
+            # A failed mesh must not leave a partial or unhidden package to be
+            # packed alongside successful edits after being reported as skipped.
+            failed_base = os.path.join(stage, *pak_game_path(gr).split('/'))
+            for extension in ('.uasset', '.uexp', '.ubulk'):
+                try: os.remove(failed_base + extension)
+                except FileNotFoundError: pass
+            skipped.append(f"{os.path.basename(gr)}: {e}")
     for game_rel in tex_items:
         jobs.progress("Encoding texture " + os.path.basename(game_rel))
         try: applied.append("tex " + stage_inject(stage, game_rel, asset_opts.get(game_rel)))

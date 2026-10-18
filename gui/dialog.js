@@ -6,6 +6,10 @@
     if (active) return Promise.resolve(false);
     const opener = document.activeElement;
     const overlay = document.createElement('div'); overlay.id='atelier-confirm'; overlay.className='overlay active';
+    // Confirmations may originate inside Model Studio (z-index 2200) or another
+    // raised editor. Keep this modal above the currently open overlay.
+    const layers=[...document.querySelectorAll('.overlay.active')].map(node=>Number.parseInt(getComputedStyle(node).zIndex,10)||0);
+    overlay.style.zIndex=String(Math.max(300,...layers)+1);
     const panel = document.createElement('section'); panel.className='modal'; panel.tabIndex=-1;
     panel.setAttribute('role','alertdialog'); panel.setAttribute('aria-modal','true');
     panel.setAttribute('aria-labelledby','atelier-confirm-title'); panel.setAttribute('aria-describedby','atelier-confirm-body');

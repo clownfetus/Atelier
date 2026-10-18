@@ -10,9 +10,8 @@ checks, real-progress launch presentation, policy gates and a recorded particle
 CPU median (`krackle-frame-perf.json`). It also simulates 8 ms refresh intervals
 followed by 40 ms intervals to test merge-filter fallback. Native WebView2 smoke
 uploads a pathless File to a disposable fixture endpoint and verifies its bytes
-and originating project header. Review candidates remain behind the disabled
-`atelier.experimentalKrackleEmblems` flag; both-scale sheets are generated with
-the artwork, not maintained separately. Run the full browser suite before a PR.
+and originating project header. Category emblems are on by default; both-scale
+review sheets are generated with the artwork, not maintained separately. Run the full browser suite before a PR.
 
 Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
 WebAudio context (no test sounds reach the speakers). It checks disposable toon
@@ -884,3 +883,40 @@ builder's lock, and rebuilds it when either immutable generation changes.
 `python tests/browser_smoke.py --find-only --report-dir <folder>` checks global
 search keyboard/stale-response behavior, explicit folder scope, roster filters,
 Continue and costume fallbacks. It is also included in the full browser suite.
+
+## Custom texture native export verification (18 October 2026)
+
+`tests/native_custom_textures.py` exercises the real UAssetTool, installed game
+templates and current mapping, without substituting native calls or source data.
+The 83.09-second Windows run passed all six check groups. Evidence, native tool
+hashes, compiled/readback JSON, decoded images and the three built containers are
+under `D:/AtelierDev/custom-texture-export-20261018/report`; `verification.txt`
+summarizes the run and `results.json` records the exact material import links.
+
+The source material was
+`Characters/1015/1015502/Materials/MI_1015502_Equip_01`. Two 64×64 custom images
+used its BaseColor (DXT1) and Normal (BC5) templates. After choosing a folder and
+name, each image was replaced again to verify that its package location remained
+saved. Both textures were then staged with the material, built through the
+production `build_mod` path and unpacked using the native IoStore reader.
+
+The chosen folder `/Game/Marvel/Atelier/NativeCustomCheck/UserChosen/Textures`
+survived readback exactly. BaseColor still pointed to `T_ChosenPaint_D` and Normal
+to `T_ChosenPaint_D_Normal`, both as Texture2D imports with the correct package
+outer. Their parameter indices stayed -21 and -23 respectively. All other texture
+parameters and material colours/scalars were retained. Both decoded textures kept
+their dimensions, native formats and pixel hashes. Authored project hashes and
+game container size/timestamp snapshots remained unchanged.
+
+Rerun with configured isolated application data and a fresh report directory:
+
+```powershell
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\custom-texture-export-20261018\appdata'
+.\.venv\Scripts\python.exe tests/native_custom_textures.py --report-dir 'D:\AtelierDev\custom-texture-native-new-report'
+```
+
+`--material`, `--slots`, `--folder` and `--name` select another case. The check
+rejects an existing report directory and outputs inside the game's Paks folder.
+It publishes only into the report, copies global script containers for readback,
+and never installs into the game. This verifies native build/readback; it does
+not constitute an in-game rendering test or coverage of other texture formats.

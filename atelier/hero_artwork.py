@@ -1,4 +1,6 @@
-"""Hero avatars and emblems, checked once per launch and cached independently of costumes."""
+"""Hero avatars and emblems, checked once per launch and cached independently of costumes.
+
+Story banners are published at 344x120 but drawn far wider, so visible stories are upscaled 4x."""
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 import hashlib
@@ -6,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import re
+import sys
 import threading
 import time
 from urllib.parse import unquote, urlsplit
@@ -17,14 +20,17 @@ from atelier.storage import atomic_json
 
 PAGES = {'avatar': 'https://rivalskins.com/assets/hero-icons-avatars/',
          'logo': 'https://rivalskins.com/assets/hero-logos/',
-         'story': 'https://rivalskins.com/assets/hero-story-images/'}
+         'story': 'https://rivalskins.com/assets/hero-story-images/',
+         'lord': 'https://rivalskins.com/assets/lord-icons/',
+         'kill': 'https://rivalskins.com/assets/kill-icons/'}
 PREFIX = 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/'
 # The Hood's published 0010 image is a blank silhouette; 0011 is the usable portrait.
 PREFERRED_AVATARS = {'img_squarehead_10660011_avatar': '1066'}
 
 
 def asset_url(url, kind):
-    folder = {'avatar':'hero-icons-avatars/', 'logo':'hero-logos/', 'story':'hero-story-images/'}.get(kind)
+    folder = {'avatar':'hero-icons-avatars/', 'logo':'hero-logos/', 'story':'hero-story-images/',
+              'lord':'lord-icons/', 'kill':'kill-icons/'}.get(kind)
     return bool(folder) and isinstance(url, str) and url.startswith(PREFIX + folder) and allowed_url(url)
 
 
@@ -32,6 +38,7 @@ class Assets(HTMLParser):
     def __init__(self, kind, names):
         super().__init__(convert_charrefs=True)
         self.kind, self.names, self.entries, self.ranks = kind, names, {}, {}
+        self.candidates = {}
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
@@ -39,6 +46,17 @@ class Assets(HTMLParser):
         if tag not in ('img', 'a') or not asset_url(url, self.kind):
             return
         name = Path(unquote(urlsplit(url).path)).stem
+        if self.kind in ('lord', 'kill'):
+            # Only the page's explicit, exact hero labels establish ownership. Numeric-only
+            # item_herohead/item_kill filenames do not prove a hero or costume association.
+            if tag != 'img':
+                return
+            suffix = r'(.+) Deluxe Avatar' if self.kind == 'lord' else r'(.+) Deluxe KO Prompt 1'
+            label = re.fullmatch(suffix, attrs.get('alt', ''), re.I)
+            cid = self.names.get(normalized(label[1])) if label else None
+            if cid:
+                self.candidates.setdefault(cid, set()).add(url)
+            return
         if self.kind == 'story':
             numeric = re.fullmatch(r'img_herostory_(\d{4})(\d{2})_hover', name, re.I)
             if numeric:
@@ -61,6 +79,8 @@ class Assets(HTMLParser):
 def parse_assets(html, kind, names):
     parser = Assets(kind, names)
     parser.feed(html)
+    if kind in ('lord', 'kill'):
+        return {cid: next(iter(urls)) for cid, urls in parser.candidates.items() if len(urls) == 1}
     return parser.entries
 
 
@@ -68,6 +88,7 @@ class HeroArtwork:
     def __init__(self, root):
         self.root = Path(root)
         self.lock, self.slots = threading.Lock(), threading.BoundedSemaphore(3)
+        self.sharp_pending, self.sharp_failed, self.sharp_running = [], {}, False
         self.started = False
         self.state = {'updating': False, 'error': None, 'checked_at': None}
         try:
@@ -89,15 +110,24 @@ class HeroArtwork:
                 return
             self.started = True
             self.state.update(updating=True, error=None)
-        names = {}
+        matches = {}
         for cid, entry in entries.items():
             if re.fullmatch(r'\d{4}', cid):
                 key = normalized(entry.get('name', ''))
-                names[ALIASES.get(key, key)] = cid
+                if cid.startswith('10'):
+                    matches.setdefault(ALIASES.get(key, key), []).append(cid)
+        names = {key: ids[0] for key, ids in matches.items() if len(ids) == 1}
         threading.Thread(target=self.update, args=(names,), name='atelier-hero-artwork', daemon=True).start()
 
+    def _path(self, url):
+        return self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp')
+
+    @staticmethod
+    def _sharp_path(path):
+        return path.with_name(path.stem + '-x4.webp')
+
     def _image(self, url):
-        path = self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp')
+        path = self._path(url)
         if path.is_file():
             return path
         with self.slots:
@@ -158,13 +188,52 @@ class HeroArtwork:
             with self.lock:
                 self.state['updating'] = False
 
+    def _start_sharpening(self):
+        threading.Thread(target=self._sharpen_banners, name='hero-banner', daemon=True).start()
+
+    def _sharpen_banners(self):
+        """Sharpen requested banners only; a visible hero never waits behind the whole roster."""
+        while True:
+            with self.lock:
+                if not self.sharp_pending:
+                    self.sharp_running = False
+                    return
+                path = self.sharp_pending[0]
+            target = self._sharp_path(path)
+            staged = target.with_suffix(f'.{threading.get_ident()}.tmp')
+            try:
+                if not target.is_file():
+                    from atelier.upscale import upscale
+                    with Image.open(path) as image:
+                        sharp = upscale(image)
+                    sharp.save(staged, format='WEBP', quality=95, method=6)
+                    staged.replace(target)
+            except Exception as exc:
+                with self.lock:
+                    self.sharp_failed[path] = time.time()
+                print(f'[hero-artwork] keeping {path.name} at its original size: {exc}', file=sys.stderr, flush=True)
+            finally:
+                staged.unlink(missing_ok=True)
+                with self.lock:
+                    self.sharp_pending.remove(path)
+
     def image(self, cid, kind):
         if not re.fullmatch(r'\d{4}', cid) or kind not in PAGES:
             return None
         with self.lock:
             url = self.entries.get(cid, {}).get(kind)
         # UI reads are local: a slow or offline artwork source never blocks navigation.
-        path = self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp') if url else None
+        path = self._path(url) if url else None
+        if path and kind == 'story' and path.is_file():
+            target = self._sharp_path(path)
+            if target.is_file():
+                return target
+            with self.lock:
+                if path not in self.sharp_pending and time.time() - self.sharp_failed.get(path, 0) >= 300:
+                    self.sharp_pending.append(path)
+                if self.sharp_pending and not self.sharp_running:
+                    self.sharp_running = True
+                    self._start_sharpening()
         return path if path and path.is_file() else None
 
 

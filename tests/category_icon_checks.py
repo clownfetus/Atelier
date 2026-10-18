@@ -1,4 +1,6 @@
 """Real card/category artwork and shared home-shortcut colors in both themes."""
+from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 def run_category_icon_checks(page, context, url, report, checks):
@@ -56,8 +58,9 @@ def run_category_icon_checks(page, context, url, report, checks):
         assert icon_page.evaluate("ICON_CLS_TO_LUCIDE['weapon-folder-icon']") == 'swords'
         weapon = icon_page.locator('#grid-area .card .weapon-folder-icon')
         assert weapon.get_attribute('data-lucide') == 'swords'
-        assert weapon.evaluate("""el=>el.querySelector('path').getAttribute('d') ===
-          AtelierSymbolPaths.swords.large.body.match(/d="([^"]+)"/)[1]""")
+        artwork = ET.parse(Path(__file__).resolve().parents[1] / 'gui/motion/category-emblems/weapon-folder-icon-102.svg')
+        expected = artwork.find(".//{*}g[@class='k-category-emblem-energy']/{*}path").attrib['d']
+        assert weapon.locator('.k-category-emblem-energy path').get_attribute('d') == expected
         assert weapon.get_attribute('aria-hidden') == 'true'
         assert weapon.get_attribute('focusable') == 'false'
         assert weapon.locator('path').count() > 0
@@ -78,19 +81,22 @@ def run_category_icon_checks(page, context, url, report, checks):
                 .map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4)
                 .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
               return [...document.querySelectorAll('#grid-area .card .card-icon')].map(el=>{
-                const color=getComputedStyle(el).color, bg=getComputedStyle(el.closest('.card-thumb')).backgroundColor;
+                const energy=el.querySelector('.k-category-emblem-energy > *');
+                const color=energy?getComputedStyle(energy).fill:getComputedStyle(el).color;
+                const bg=getComputedStyle(el.closest('.card-thumb')).backgroundColor;
                 const a=lum(color), b=lum(bg), cls=Object.keys(ICON_CLS_TO_LUCIDE).find(c=>el.classList.contains(c));
                 const chip=document.querySelector(`#category-icon-chips [data-category="${cls}"] svg`);
-                return {cls,color,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),
-                  chipColor:getComputedStyle(chip).color, chipSize:chip.getBoundingClientRect().width,
+                const chipEnergy=chip.querySelector('.k-category-emblem-energy > *');
+                return {cls,color,emblem:!!energy,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),
+                  chipColor:chipEnergy?getComputedStyle(chipEnergy).fill:getComputedStyle(chip).color, chipSize:chip.getBoundingClientRect().width,
                   slot:el.getBoundingClientRect().width,
                   cardWidth:el.closest('.card').getBoundingClientRect().width,
                   thumbWidth:el.closest('.card-thumb').getBoundingClientRect().width};
               });
             }""")
             assert len(measurements) == 39, measurements
-            assert len({m['color'] for m in measurements}) == 22, measurements
-            assert all(m['ratio'] >= 4.5 for m in measurements), (theme, measurements)
+            assert len({m['color'] for m in measurements}) >= 36, measurements
+            assert all(m['ratio'] >= (3 if m['emblem'] else 4.5) for m in measurements), (theme, measurements)
             assert all(100 <= m['slot'] <= 104 and m['cardWidth'] == 156 and m['thumbWidth'] == 134
                        for m in measurements), measurements
             assert all(m['color'] == m['chipColor'] and m['chipSize'] == 18 for m in measurements), measurements
@@ -105,6 +111,6 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert all(a == b for a, b in aliases), aliases
             icon_page.screenshot(path=str(report / f'category-icons-{theme}.png'), animations='disabled')
         assert not errors, errors
-        checks.append('All 39 icon types retain large preview slots across 22 light/dark color families above 4.5:1; asset/folder aliases and 18px home chips share category colors')
+        checks.append('All 39 icon types retain large preview slots; the 36 category emblems reach 3:1 in both themes, and 18px home chips share category colors')
     finally:
         icon_page.close()

@@ -96,22 +96,20 @@ def run_inks_dial_checks(page,context,url,report,checks):
         tab.evaluate("""() => {
           document.querySelector('[data-theme-preset=studio]').click();
           const hero=document.getElementById('library-hero');hero.hidden=false;
-          const control=document.getElementById('settings-adaptive-accent');control.checked=true;control.dispatchEvent(new Event('change'));
+          window.dispatchEvent(new StorageEvent('storage',{key:'atelier.adaptiveAccent',newValue:'1'}));
           window.dispatchEvent(new CustomEvent('atelier:artwork',{detail:{accent:'#ff5c9a',colors:['#ff5c9a','#2a9fd6']}}));
         }""")
-        assert tab.locator('#krackle-accent-status').inner_text()=='SHIFTED'
         assert tab.evaluate("""() => {
           const host=document.getElementById('viewport-loading-motion-host'),cs=getComputedStyle(host);
           return host.dataset.krackleSurface==='dark'&&AtelierKrackleInks.contrast(cs.getPropertyValue('--krackle-charge'),'#14161b')>=3;
         }""")
-        thumb=thumb_ink(['#ff5c9a','#2a9fd6'])
+        thumb=thumb_ink()
         assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['contrast']>=3,('guarded thumb',thumb)
         card_ink()
         tab.evaluate("document.getElementById('library-hero').hidden=true;window.dispatchEvent(new Event('atelier:preferences'))")
-        assert tab.locator('#krackle-accent-status').get_attribute('hidden') is not None
         assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--krackle-charge').trim()")=='#2693c6'
         thumb=thumb_ink();assert thumb['ink']==thumb['expected']=='rgb(37, 141, 191)',('studio light thumb',thumb)
-        checks.append('Adaptive inks are guarded only in hero/skin context, on card thumbs too; SHIFTED is visible and the dark model-loader surface keeps readable inks')
+        checks.append('Hero artwork and legacy adaptive settings preserve theme inks on cards, selection markers and the readable model loader')
         motion('full')
         result=tab.evaluate("""() => {
           const arbiter=AtelierMotion.moment,a=arbiter.claim('fixture',2),b=arbiter.claim('fixture-second',2);

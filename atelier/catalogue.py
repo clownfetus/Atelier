@@ -25,7 +25,7 @@ from atelier.storage import atomic_json
 IDS_URL = 'https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md'
 HEROES_URL = 'https://rivalskins.com/heroes/'
 DAY = 86400
-PARSER_VERSION = 3
+PARSER_VERSION = 5
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -82,12 +82,18 @@ def allowed_url(url):
     if parsed.scheme != 'https' or parsed.username or parsed.password or port:
         return False
     return (parsed.netloc == 'rivalskins.com' and (
-        parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/')
+        parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/',
+                        '/assets/lord-icons/', '/assets/kill-icons/')
         or parsed.path.startswith(('/hero/', '/item/', '/wp-content/uploads/marvel-assets/items/costume/',
                                    '/wp-content/uploads/marvel-assets/items/nameplate/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-logos/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-icons-avatars/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-story-images/'))
+        or bool(re.fullmatch(r'/wp-content/uploads/marvel-assets/assets/(?:'
+                             r'lord-icons/(?:item_herohead_\d+|img_squarehead_\d+_avatar|'
+                             r'(?:[A-Za-z0-9_&-]|%20|%27)+%20Deluxe%20Avatar(?:%20\d+)?)|'
+                             r'kill-icons/(?:item_kill_\d+|(?:[A-Za-z0-9_&-]|%20|%27)+'
+                             r'%20Deluxe%20KO%20Prompt%20[12]))\.(?:png|webp)', parsed.path))
     )) or url == IDS_URL
 
 
@@ -191,7 +197,19 @@ def build_entries(chars, roster, load_page, load_items):
             raise ValueError(f'No costume cards found for {char["name"]}; retaining previous catalogue')
         plates = {}
         for plate in parse_cards(page, kind='nameplate'):
-            plates.setdefault(normalized(plate['name']), []).append(nameplate_url(plate['image']))
+            plates.setdefault(normalized(plate['name']), []).append(plate)
+        if hero:
+            # A hero's named progression plate is safe when no plain plate is published.
+            # A costume's unrelated plate is never borrowed for the hero header.
+            for plate_name, style in ((hero['name'], 'default'), ('Immortal '+hero['name'], 'immortal')):
+                hero_plates = plates.get(normalized(plate_name), [])
+                if not hero_plates:
+                    continue
+                if len(hero_plates) == 1:
+                    banner = nameplate_url(hero_plates[0]['image'])
+                    if banner:
+                        entry.update(banner=banner, badge=hero_plates[0]['image'], banner_style=style)
+                break
         for sid, name in char['skins'].items():
             entries[sid] = {'name': name, 'kind': 'skin', 'hero': cid,
                             'image': entry['image'], 'source': entry['source'], 'hero_fallback': True}
@@ -205,15 +223,17 @@ def build_entries(chars, roster, load_page, load_items):
                 matches = [sid for sid, skin in char['skins'].items() if normalized(skin) == name]
                 skin_ids = matches if len(matches) == len(same_name) == 1 else []
             # A bundle's nameplate shares its costume's name on the same hero page. Pair them only
-            # when that name is unique on both sides; anything else keeps the hero's story banner.
+            # when that name is unique on both sides; anything else uses the hero's banner fallback.
             plate = plates.get(name, []) if name else []
-            banner = plate[0] if len(plate) == len(same_name) == 1 else None
+            matched = plate[0] if len(plate) == len(same_name) == 1 else None
+            banner = nameplate_url(matched['image']) if matched else None
             for sid in skin_ids:
                 if not sid.startswith(cid):
                     continue  # Never cross hero boundaries, including transformation/NPC IDs.
                 entries[sid] = {'name': char['skins'].get(sid, costume['name']), 'kind': 'skin', 'hero': cid,
                                 'image': artwork['image'], 'source': costume['page'], 'hero_fallback': False,
-                                'match': 'id' if artwork['ids'] else 'name', **({'banner': banner} if banner else {})}
+                                'match': 'id' if artwork['ids'] else 'name',
+                                **({'banner': banner, 'badge': matched['image']} if banner else {})}
     return entries
 
 
@@ -223,7 +243,14 @@ class Catalogue:
         self.lock, self.download_slots = threading.Lock(), threading.BoundedSemaphore(3)
         self.started = False
         self.failed_images = {}
-        self.data = self._read(self.root / 'catalogue.json') or self._read(self.seed) or {'entries': {}}
+        self.sharp_pending, self.sharp_failed, self.sharp_running = [], {}, False
+        cached, bundled = self._read(self.root / 'catalogue.json'), self._read(self.seed)
+        # Updated matching rules ship with verified metadata; use it immediately even offline.
+        if (bundled and bundled.get('parser_version') == PARSER_VERSION
+                and (not cached or cached.get('parser_version') != PARSER_VERSION)):
+            self.data = bundled
+        else:
+            self.data = cached or bundled or {'entries': {}}
         self.state = {'updating': False, 'error': None, 'checked_at': self.data.get('checked_at')}
 
     @staticmethod
@@ -236,6 +263,7 @@ class Catalogue:
                        and isinstance(entry.get('name'), str)
                        and (entry.get('image') is None or allowed_url(entry['image']))
                        and (entry.get('banner') is None or allowed_url(entry['banner']))
+                       and (entry.get('badge') is None or allowed_url(entry['badge']))
                        for key, entry in data['entries'].items()):
                 return None
             return data
@@ -265,7 +293,8 @@ class Catalogue:
             return None
         return {'name': entry.get('name'), 'thumbnail': f'/api/catalogue/thumbnail/{key}' if entry.get('image') else None,
                 'hero_fallback': entry.get('hero_fallback', False),
-                'banner': f'/api/catalogue/banner/{key}' if sid and entry.get('banner') and not entry.get('hero_fallback') else None}
+                'banner': f'/api/catalogue/banner/{key}' if entry.get('banner') and not entry.get('hero_fallback') else None,
+                'badge': f'/api/catalogue/badge/{key}' if sid and entry.get('badge') and not entry.get('hero_fallback') else None}
 
     def start_update(self):
         with self.lock:
@@ -340,15 +369,66 @@ class Catalogue:
         entry = self.data.get('entries', {}).get(key, {})
         return None if entry.get('hero_fallback') else self._cached(icon_url(entry.get('image')))
 
-    def banner(self, key):
-        """The 848x192 nameplate published with a skin's bundle, or None when it has no matched one."""
+    def badge(self, key):
+        """The square icon of the uniquely matched same-hero nameplate, never a guessed skin."""
         if not re.fullmatch(r'\d{7}', key):
+            return None
+        entry = self.data.get('entries', {}).get(key, {})
+        url = entry.get('badge')
+        if entry.get('hero_fallback') or not isinstance(url, str) or not nameplate_url(url):
+            return None
+        return self._cached(url)
+
+    @staticmethod
+    def _sharp_path(path):
+        return path.with_name(path.stem + '-x4.webp')
+
+    def banner(self, key, sharp=False):
+        """The hero or costume's published nameplate, or None when no plate is verified."""
+        if not re.fullmatch(r'\d{4}(?:\d{3})?', key):
             return None
         entry = self.data.get('entries', {}).get(key, {})
         url = entry.get('banner')
         if entry.get('hero_fallback') or not isinstance(url, str) or '/items/nameplate/' not in url:
             return None
-        return self._cached(url)
+        path = self._cached(url)
+        if path:
+            target = self._sharp_path(path)
+            if target.is_file():
+                return target
+            if sharp:
+                with self.lock:
+                    if path not in self.sharp_pending and time.time() - self.sharp_failed.get(path, 0) >= 300:
+                        self.sharp_pending.append(path)
+                    if self.sharp_pending and not self.sharp_running:
+                        self.sharp_running = True
+                        threading.Thread(target=self._sharpen_banners, name='catalogue-banners', daemon=True).start()
+        return path
+
+    def _sharpen_banners(self):
+        """One background worker; HTTP reads keep returning originals while CPU work runs."""
+        while True:
+            with self.lock:
+                if not self.sharp_pending:
+                    self.sharp_running = False
+                    return
+                path = self.sharp_pending[0]
+            target = self._sharp_path(path)
+            staged = target.with_suffix(f'.{threading.get_ident()}.tmp')
+            try:
+                if not target.is_file():
+                    from atelier.upscale import upscale
+                    with Image.open(path) as image:
+                        image = upscale(image)
+                    image.save(staged, format='WEBP', quality=95, method=6)
+                    staged.replace(target)
+            except Exception:
+                with self.lock:
+                    self.sharp_failed[path] = time.time()
+            finally:
+                staged.unlink(missing_ok=True)
+                with self.lock:
+                    self.sharp_pending.remove(path)
 
     def _cached(self, url):
         if not url or not allowed_url(url):

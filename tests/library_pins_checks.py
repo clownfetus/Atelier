@@ -51,8 +51,11 @@ def run_library_pins_checks(page, context, url, report, checks):
         assert glyph.get_attribute('data-lucide') == 'folder-map'
         assert 'map-folder-icon' in glyph.get_attribute('class')
         assert glyph.bounding_box()['width'] == 18
-        assert glyph.evaluate("""el=>el.querySelector('path').getAttribute('d') ===
-          AtelierSymbolPaths['folder-map'].body.match(/d="([^"]+)"/)[1]""")
+        # Category emblems replace the Sharp glyph by default; pins draw the same Krackle mark.
+        assert glyph.evaluate("""el=>{const expected=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          expected.innerHTML=AtelierCategoryEmblems.markup('map-folder-icon',24);
+          return el.querySelector('.k-category-emblem-energy path')?.getAttribute('d') ===
+            expected.querySelector('.k-category-emblem-energy path').getAttribute('d');}""")
         assert pins_page.evaluate('AtelierLibraryPins.list().find(pin=>pin.path==="Maps").iconCls') == 'map-folder-icon'
 
     try:
@@ -134,7 +137,9 @@ def run_library_pins_checks(page, context, url, report, checks):
         # Existing v1 shortcuts acquire current category artwork without a storage migration.
         assert_map_pin()
         assert pins_page.evaluate('key=>JSON.parse(localStorage.getItem(key)).version', KEY) == 1
-        assert pins_page.locator('.library-pins img').count() == 0
+        assert pins_page.locator('.library-pins img:not(.hero-chip-art), .library-pins img[onerror]').count() == 0
+        assert pins_page.locator('.library-pins .hero-chip-art').evaluate_all(
+            "images=>images.every(img=>/^\\/api\\/catalogue\\/(hero\\/1029\\/(lord|avatar)|thumbnail\\/1029)$/.test(img.getAttribute('src')))")
         assert pins_page.locator('.library-pin-open').first.inner_text().startswith('<img src=x')
         assert not pins_page.evaluate('Boolean(window.pinInjected)')
         assert not pins_page.evaluate("AtelierLibraryPins.toggle({type:'asset',rel_path:'Fixture/Asset'})")

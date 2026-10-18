@@ -188,6 +188,7 @@
       open.title = pin.path;
       open.setAttribute('aria-label', `Open ${pin.label} (${pin.path})`);
       open.append(glyph(iconNames[pin.iconCls] || 'folder', `card-icon ${pin.iconCls}`));
+      const hero = window.AtelierCatalogueArt?.heroChip(pin.path); if (hero) open.prepend(hero);
       const text = document.createElement('span');
       text.textContent = pin.label;
       open.append(text);
@@ -218,5 +219,6 @@
     pins = next;
     publish(false);
   });
+  window.addEventListener('atelier:catalogue-updated', () => publish(false));
   window.AtelierLibraryPins = Object.freeze({decorate, render, list, isPinned, toggle, remove, makePinLabel, updateLabels});
 })();

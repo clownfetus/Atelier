@@ -158,7 +158,8 @@ For isolated testing in PowerShell:
 Use a separate test-mods destination; this package does not install any mods.
 
 Atelier is licensed under the included LICENSE. GUI third-party licenses and
-provenance are under _internal/gui/vendor; Python runtime/package licenses are
+provenance are under _internal/gui/vendor; the banner upscaling model's licence and
+provenance are under _internal/atelier/models; Python runtime/package licenses are
 under licenses. The matching complete project source archive is {source_name}.
 Native export round trips and in-game checks remain separate from UI smoke tests.
 

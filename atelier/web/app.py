@@ -27,6 +27,9 @@ def frontend_url(gui_dir):
 
 class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
     daemon_threads = True
+    # Chromium requests many local assets at startup and on reload. The default
+    # backlog of five causes long connection retries on Windows.
+    request_queue_size = 128
 
 class _ThreadedServer(ServerAdapter):
     def run(self, handler):

@@ -82,6 +82,30 @@ def _mat_textures(d):
     """{slot: game_rel} for the MI's texture params — see texture_slots."""
     return {slot: s["game_rel"] for slot, s in texture_slots(d).items()}
 
+
+def _mat_surface(d):
+    """Display metadata only; never rewrite the game's cooked shader or its parameters.
+
+    Rivals serializes the instance's base property values alongside its overrides.
+    Keep its blend mode, mask threshold and sidedness instead of treating every
+    glTF material as an opaque surface. Shader-specific effects remain an approximation.
+    """
+    props = _ex_props(d["Exports"][0])
+    overrides = _gn(props, "BasePropertyOverrides") or {}
+    values = {p.get("Name"): p.get("Value") for p in overrides.get("Value", [])}
+    scalar = {p["name"].lower(): p["value"] for p in _mat_params(d)[1]}
+    parent = _gn(props, "Parent") or {}
+    idx = parent.get("Value")
+    imports = d.get("Imports", [])
+    parent_name = imports[-idx-1].get("ObjectName", "") if isinstance(idx, int) and -len(imports) <= idx < 0 else ""
+    blend = str(values.get("BlendMode") or "")
+    if not blend:
+        blend = "BLEND_Translucent" if "translucent" in parent_name.lower() else "BLEND_Opaque"
+    return {"blend_mode": blend, "two_sided": bool(values.get("TwoSided", False)),
+            "opacity": max(0.0, min(1.0, float(scalar.get("opacitymultiplier", scalar.get("opacity", 1.0))))),
+            "mask_clip": max(0.0, min(1.0, _f(values.get("OpacityMaskClipValue", .3333)))),
+            "parent": parent_name}
+
 def _mat_texture_classes(d):
     """{slot: UE class name} ('Texture2D', 'TextureCube', …) — only Texture2D slots can take a
     custom texture, and the editor says so instead of offering a button that would fail."""
@@ -108,7 +132,7 @@ def _apply_mat_edits(d, colors, scalars):
                 mark_changed(e, pv)
                 pv["Value"] = float(scalars[nm])
 
-def mat_json(game_rel, out_dir=None):
+def mat_json(game_rel, out_dir=None, prefer_exact=False):
     """Extract the MI + convert to JSON as <basename>.json. Returns the json path.
     The active project dir always takes priority (edits/explicit imports live there); if no
     project copy exists, the JSON is produced in out_dir (defaults to the project dir — the
@@ -134,7 +158,7 @@ def mat_json(game_rel, out_dir=None):
             return jp
     # One extractor for every handler: it picks retoc or UAssetTool per host and records the
     # asset cache itself (texture.ensure_work_base).
-    work_base = ensure_work_base(game_rel)
+    work_base = ensure_work_base(game_rel,**({'prefer_exact':True} if prefer_exact else {}))
     if not work_base or not os.path.exists(work_base + ".uasset"):
         from atelier.handlers.texture import missing_reason as TX_missing_reason
         raise RuntimeError(TX_missing_reason(game_rel, "material"))
@@ -154,9 +178,10 @@ def read_material(game_rel, cache_only=False):
     """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance.
     cache_only=True routes any freshly-extracted JSON into CACHE_3DVIEW instead of the project
     folder — used by the 3D viewport's automatic per-mesh material reads."""
-    d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None), encoding="utf-8-sig"))
+    d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None,
+        **({'prefer_exact':True} if cache_only else {})), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
-    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d),
+    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d),
             "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, "")}
 
 def _original_document(game_rel):
@@ -218,7 +243,7 @@ def read_material_original(game_rel):
     """Original comparison bypasses saved edits, including a replacement's donor snapshot."""
     d = _original_document(game_rel)
     colors, scalars = _mat_params(d)
-    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
+    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d)}
 
 
 def _material_path(game_rel):

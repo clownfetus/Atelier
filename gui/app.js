@@ -133,6 +133,18 @@ function toastSpinner(msg) {
   return el;
 }
 
+function renderTrayProgress() {
+  for (const row of document.getElementById('tray-progress').children)
+    row.hidden = row.dataset.project !== _activeProjectName;
+}
+function trayProgress(message, project = _activeProjectName) {
+  const row = toastSpinner(message);
+  row.dataset.project = project;
+  document.getElementById('tray-progress').append(row);
+  renderTrayProgress();
+  return row;
+}
+
 const _collatedToasts = new Map();
 function toast(msg, type = "info", duration = 3200, instance = '') {
   const key = type + '\n' + msg + '\n' + instance, existing = _collatedToasts.get(key);
@@ -272,7 +284,12 @@ function renderBreadcrumbs() {
   const crumb = (label, navState) => {
     const el = document.createElement(navState === null ? "span" : "button");
     el.className = "crumb" + (navState === null ? " active" : "");
-    el.textContent = label;
+    // The label is its own box so a narrow bar ellipsizes it instead of clipping the whole trail.
+    const text = document.createElement("span");
+    text.className = "crumb-label";
+    text.textContent = label;
+    el.title = label;
+    el.append(text);
     if (navState !== null) el.addEventListener("click", () => pushNav(navState));
     return el;
   };
@@ -285,7 +302,7 @@ function renderBreadcrumbs() {
 
   const parts = nav.path ? nav.path.split("/") : [];
   const homeCrumb = document.createElement(parts.length ? "button" : "span");
-  homeCrumb.className = "crumb" + (parts.length === 0 ? " active" : "");
+  homeCrumb.className = "crumb crumb-home" + (parts.length === 0 ? " active" : "");
   homeCrumb.title = "Asset library";
   homeCrumb.setAttribute("aria-label", "Asset library");
   homeCrumb.innerHTML = '<i data-lucide="house" size="18"></i>';
@@ -297,12 +314,21 @@ function renderBreadcrumbs() {
     const part = parts[i];
     accumulated = accumulated ? `${accumulated}/${part}` : part;
     const isLast = i === parts.length - 1;
-    const label  = _pathLabels[accumulated] || part;
+    const identity = window.AtelierRoster?.describe(accumulated);
+    const named = i === 1 && parts[0] === 'Characters' ? identity?.hero?.name :
+      i === 2 && parts[0] === 'Characters' ? identity?.skin?.name : null;
+    const label = named || (_pathLabels[accumulated] || part).replace(/^\d+\s*[—–-]\s*/, '');
     bc.appendChild(sep());
-    bc.appendChild(crumb(label, isLast ? null : { path: accumulated }));
+    const node = crumb(label, isLast ? null : { path: accumulated });
+    node.title = label + '\n' + accumulated;
+    if (i === 1 && parts[0].toLowerCase() === 'characters') {
+      const art = window.AtelierCatalogueArt?.heroChip(accumulated); if (art) node.prepend(art);
+    }
+    bc.appendChild(node);
   }
 
   lucide.createIcons({ nodes: [bc] });
+  requestAnimationFrame(() => { bc.scrollLeft = bc.scrollWidth; });
   // The skin-level Model Studio entry belongs to skin folders only.
   document.getElementById("view3d-fab").classList.toggle("show", !!skinIdFromPath(nav.path));
 }
@@ -336,6 +362,7 @@ function _makeCard(item) {
     iconCls:   assetIconCls(ft),
     imported:  item.imported,
     token:     item.token,
+    swatches:  item.swatches,
     game_rel:  item.game_rel,
     rel_path:  item.rel_path,
     onClick:   () => handleAssetClick(item),
@@ -510,6 +537,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     thumb.className = "card-thumb";
 
     if (card.type === "folder" && card.thumbnail) {
+      el.classList.add('artwork-card');
       const img = document.createElement("img");
       img.alt = ""; // The button's visible label already names this hero/skin.
       img.className = "hero-portrait";
@@ -539,6 +567,8 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
         img.src = `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(project)}`;
       }
       thumb.appendChild(img);
+    } else if (card.imported && card.swatches?.length) {
+      thumb.appendChild(_editedDots(card.swatches));
     } else {
       thumb.appendChild(renderCardIcon(card, el));
     }
@@ -584,6 +614,41 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs?.start(retryThumbs);
 }
 
+// An edited material has no preview, so its saved colours fill the thumb as the Krackle 45° lattice,
+// in diagonal bands. Textures and glyphs being edited keep their own colours through the same
+// lattice as a mask (polish.css).
+function _editedDots(colors) {
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 96 96"); svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+  svg.setAttribute("class", "card-edited-dots"); svg.setAttribute("aria-hidden", "true");
+  const band = 192 / colors.length;
+  for (let y = 3, row = 0; y < 96; y += 6, row++) for (let x = row % 2 ? 9 : 3; x < 96; x += 12) {
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", 4);
+    dot.setAttribute("fill", colors[Math.min(colors.length - 1, Math.floor((x + y) / band))]);
+    dot.style.setProperty("--d", ((x + y) / 192).toFixed(3));
+    svg.append(dot);
+  }
+  return svg;
+}
+
+// The dissolve plays once, when an asset joins the edit list; cards already being edited are still.
+function _playEditDissolve(card) {
+  card.classList.remove("just-edited"); void card.offsetWidth; card.classList.add("just-edited");
+  setTimeout(() => card.classList.remove("just-edited"), 1400);
+}
+
+function _refreshEditedSwatches(gameRel, colors) {
+  const swatches = [...new Set(colors.map(([r, g, b]) => _rgbHex(r, g, b, Math.max(r, g, b, 1))))].slice(0, 6);
+  const item = allItems.find(row => row.game_rel === gameRel);
+  if (item) item.swatches = swatches;
+  const card = [...document.querySelectorAll('#grid-area .card')].find(node => node._libraryCard?.game_rel === gameRel);
+  if (!card || !swatches.length) return;
+  card._libraryCard.swatches = swatches;
+  const thumb = card.querySelector('.card-thumb'), current = thumb.querySelector('.card-edited-dots, .card-icon');
+  if (current) current.replaceWith(_editedDots(swatches));
+}
+
 function updateImportedCard(gameRel, record) {
   const item = allItems.find(row => row.game_rel === gameRel);
   if (!item || !record) return;
@@ -593,6 +658,7 @@ function updateImportedCard(gameRel, record) {
   const button = [...grid.querySelectorAll('.card')].find(node => node._libraryCard?.game_rel === gameRel);
   if (button) {
     Object.assign(button._libraryCard, {imported:true, token:record.token});
+    if (!button.classList.contains('imported')) _playEditDissolve(button);
     button.classList.add('imported');
     if (!button.querySelector('.card-editing-badge')) {
       const badge=document.createElement('span');badge.className='card-editing-badge';badge.textContent='Editing';
@@ -818,7 +884,7 @@ async function editAsset(item) {
   if (_editsInFlight.has(key)) return;
   _editsInFlight.add(key);
   suppressedImportGameRels.add(key);
-  const loadingToast = toastSpinner(`Preparing ${item.name} for editing…`);
+  const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project);
   setStatus(`Preparing ${item.name} for editing…`);
   try {
     let res;
@@ -1293,9 +1359,38 @@ function _matTexturesHtml(m, expanded) {
       ${is2d ? `<button type="button" class="btn" onclick="matCustomTexturePick(${i})"><i data-lucide="image-plus" size="13"></i> ${own ? "Change image…" : "Use my own image…"}</button>`
              : `<span class="mat-tag">Only 2D textures can use your own image</span>`}
       ${own ? `<button type="button" class="btn" onclick="matCustomTextureClear(${i})"><i data-lucide="rotate-ccw" size="13"></i> Use game texture</button>` : ""}
-    </div></div>`;
+    </div>${own ? `<details class="mat-texture-location"><summary>Package location</summary>
+      <label for="mattex-name-${i}">Texture name</label><input id="mattex-name-${i}" value="${_matEscape(own.name)}" maxlength="62" spellcheck="false" oninput="matCustomTexturePath(${i})">
+      <label for="mattex-folder-${i}">Game folder</label><input id="mattex-folder-${i}" value="${_matEscape(own.folder ?? own.game_rel.slice(0,own.game_rel.lastIndexOf('/')))}" maxlength="173" spellcheck="false" oninput="matCustomTexturePath(${i})">
+      <p class="mat-texture-help">Use folders within /Game/Marvel/. Letters, numbers and underscores only. Existing assets cannot be overwritten.</p>
+      <p id="mattex-path-${i}" class="mat-subpath">/Game/Marvel/${_matEscape(own.game_rel)}</p>
+      <button type="button" class="btn" onclick="matCustomTextureLocation(${i},this)">Save location</button>
+    </details>` : ''}</div>`;
   });
   return h + `</details>`;
+}
+
+function matCustomTexturePath(i) {
+  const folder=document.getElementById(`mattex-folder-${i}`).value.trim().replaceAll('\\','/').replace(/^\/Game\/Marvel(?:\/|$)/,'').replace(/\/+$/,'');
+  let name=document.getElementById(`mattex-name-${i}`).value.trim();name=/^T_/i.test(name)?'T_'+name.slice(2):'T_'+name;
+  document.getElementById(`mattex-path-${i}`).textContent='/Game/Marvel/'+[folder,name].filter(Boolean).join('/');
+}
+
+async function matCustomTextureLocation(i, button) {
+  if(!matEditor)return;
+  const editor=matEditor,project=_activeProjectName,slot=_matTextureSlots(editor)[i];
+  if(!editor.custom?.[slot])return;
+  const name=document.getElementById(`mattex-name-${i}`).value,folder=document.getElementById(`mattex-folder-${i}`).value;
+  const status=document.getElementById('mat-status');button.disabled=true;
+  let result;
+  try{result=await api('/api/material_custom_texture/location',{project,method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({game_rel:editor.game_rel,slot,name,folder})});}
+  catch(error){result={ok:false,error:error.message};}
+  if(editor!==matEditor||project!==_activeProjectName)return;
+  button.disabled=false;
+  if(!result.ok){status.textContent='Error: '+(result.error||'Could not save the package location.');return;}
+  editor.custom=result.custom_textures||{};renderMatEditor();
+  status.textContent='Texture will ship as /Game/Marvel/'+editor.custom[slot].game_rel;loadSidebar();
 }
 
 function matCustomTexturePick(i) {
@@ -1698,7 +1793,7 @@ async function saveMaterial() {
       if (intenLost) message += `\nColour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
         `will reopen with the intensity folded in (same colour in game, different numbers).`;
       notify(message, intenLost || newerEdits ? "warning" : "success", intenLost || newerEdits ? 8000 : 3200);
-      if (project === _activeProjectName) loadSidebar();
+      if (project === _activeProjectName) { loadSidebar(); _refreshEditedSwatches(submitted.game_rel, Object.values(submitted.colors)); }
       if (isCurrent()) {
         const refs = _materialReferences.get(editor);
         if (refs) refs.saved = {
@@ -2642,6 +2737,7 @@ function renderSidebar() {
   window.AtelierTextureReconstruction?.disposeWithin(list);
   list.innerHTML = "";
   const all = Object.values(sidebarData);
+  window.AtelierCatalogueArt?.tray(all);
   window.AtelierSMapsUI?.update(all);
   if (!all.length) {
     list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>Your Mod tray is empty</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
@@ -3875,12 +3971,13 @@ function _ctxItemsSidebar(item) {
 // group, #21 duplicate into Marvel_LQ, #22 remove a texture) plus the dye-off toggle live on the
 // ASSET, not on the app: two projects can ship the same texture differently, so these are stored
 // per project (see project_meta.asset_opts) and shown wherever the asset is.
-const TEXOPT_LABELS = { blank: "blank", no_mips: "no mips", lod_group: "group", dye_off: "no dye",
+// Sidebar opts are stored differences from the defaults: no_mips is on unless stored false.
+const TEXOPT_LABELS = { blank: "blank", no_mips: "keeps mips", lod_group: "group", dye_off: "no dye",
                         lq_twin: "LQ", custom_textures: "own textures" };
 
 function _sbOptBadge(item) {
   const o = item.opts || {};
-  const on = Object.keys(TEXOPT_LABELS).filter(k => o[k]);
+  const on = Object.keys(TEXOPT_LABELS).filter(k => k === "no_mips" ? o[k] === false : o[k]);
   if (!on.length) return "";
   const label = on.map(k => k === "lod_group"
     ? String(o.lod_group).replace("TEXTUREGROUP_", "")
@@ -3971,8 +4068,8 @@ async function saveTexOpts() {
   if (!texOpts) return;
   const st = document.getElementById("texopt-status");
   st.textContent = "Saving…";
-  // Every key is sent, including the ones now off — the server treats false as "remove", which is
-  // how an option that was switched back off stops being an option at all.
+  // Every key is sent, including the ones now off — the server removes any value equal to its
+  // default, which is how an option switched back to its default stops being stored at all.
   const opts = { blank: false, no_mips: false, lq_twin: false, lod_group: "" };
   Object.assign(opts, texOpts.opts);
   try {
@@ -4410,6 +4507,7 @@ async function _projExportRun(names) {
 function _applyActiveProject(name) {
   window.AtelierEmptyAssetsUI?.begin();
   _activeProjectName = name;
+  renderTrayProgress();
   const modInput = document.getElementById("mod-name-input");
   modInput.value       = name;
   modInput.placeholder = name || "ModFilename";

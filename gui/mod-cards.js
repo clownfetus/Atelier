@@ -4,7 +4,7 @@
   const blob=canvas=>new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Image encoding unavailable')),'image/png'));
   function mount(parent,snapshot,result,{reveal,builtAt=new Date().toISOString()}={}) {
     const context=window.AtelierModCardData.context(snapshot);if(!(result.ok||result.built)||!context)return ()=>{};
-    let disposed=false,image=null,objectUrl=null;
+    let disposed=false,image=null,stamp=null,objectUrl=null;
     const controller=new AbortController();
     (async()=>{
       let picture=window.AtelierViewport?.captureModPoster(context),source='Showcase capture';
@@ -20,6 +20,11 @@
       AtelierShowcaseArt.draw(ctx,1000,1000,AtelierShowcaseArt.palette(colors));
       const w=picture.naturalWidth||picture.width,h=picture.naturalHeight||picture.height,scale=Math.min(1000/w,1000/h);
       ctx.drawImage(picture,(1000-w*scale)/2,(1000-h*scale)/2,w*scale,h*scale);
+      const heroes=new Set((snapshot.included||[]).map(item=>window.AtelierCatalogueArt?.heroId(item)).filter(Boolean));
+      if(heroes.size===1&&heroes.has(context.hero)){
+        stamp=new Image();stamp.src='/api/catalogue/hero/'+context.hero+'/kill';
+        try{await stamp.decode();if(disposed)return;ctx.drawImage(stamp,876,20,104,104);canvas.dataset.heroBadge=context.hero;}catch(_){}
+      }
       ctx.fillStyle='#eee5cf';ctx.fillRect(0,1000,1000,240);ctx.fillStyle='#121216';ctx.font='650 58px "Bricolage Grotesque",Roboto,sans-serif';ctx.fillText(snapshot.modName,34,1070,930);
       const singular={textures:'texture',materials:'material',meshes:'mesh',curves:'curve',texts:'text',levels:'level',collections:'collection',configs:'config'};
       const count=AtelierModCardData.counts(result.applied),details=Object.entries(count.types).map(([type,n])=>`${n} ${n===1?singular[type]||type:type}`);
@@ -41,7 +46,7 @@
       button('Save PNG',async()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(await blob(canvas));const anchor=document.createElement('a');anchor.href=objectUrl;anchor.download=snapshot.modName.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')+'-Atelier.png';anchor.click();});
       button('Open export folder',()=>reveal?.());card.append(actions);parent.append(card);
     })().catch(()=>{/* A missing capture/artwork skips the optional card. Export remains complete. */});
-    return ()=>{disposed=true;controller.abort();if(image)image.src='';if(objectUrl)URL.revokeObjectURL(objectUrl);};
+    return ()=>{disposed=true;controller.abort();if(image)image.src='';if(stamp)stamp.src='';if(objectUrl)URL.revokeObjectURL(objectUrl);};
   }
   window.AtelierModCards=Object.freeze({mount});
 })();

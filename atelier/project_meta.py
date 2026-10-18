@@ -40,7 +40,11 @@ _FILE     = "project.json"
 _VERSION  = 1
 _UNKNOWN  = "unknown"   # project predates version stamping — never guess a number here
 
-_lock = threading.Lock()
+_lock = threading.RLock()
+
+# Asset options that default ON. Only a value that differs from its default is stored, so
+# switching one off writes False and an untouched asset keeps following the default.
+ASSET_OPT_DEFAULTS = {"no_mips": True}
 
 
 def current_version():
@@ -62,7 +66,9 @@ def load(project_dir):
     this existed) reads as an empty, fully-selected, unknown-provenance project — not an error."""
     _, p = _paths(project_dir)
     try:
-        with open(p, encoding="utf-8") as f:
+        # Windows cannot replace a file while another request holds it open for reading.
+        # Writers also call load under this lock, so it must be reentrant.
+        with _lock, open(p, encoding="utf-8") as f:
             d = json.load(f)
         if not isinstance(d, dict):
             raise ValueError("not an object")
@@ -114,13 +120,16 @@ def set_deselected(project_dir, game_rels):
 def get_asset_opts(project_dir, game_rel=None):
     """Per-asset export options. One asset's dict with game_rel, or the whole {game_rel: opts} map.
 
-    Keys in use (all optional, all defaulting to "vanilla behaviour" when absent):
-      no_mips   bool - ship a single top mip instead of the full chain (inject_texture --no-mips)
+    Keys in use (all optional; absent means ASSET_OPT_DEFAULTS, else "vanilla behaviour"):
+      no_mips   bool - ship a single top mip instead of the full chain (inject_texture --no-mips);
+                       on unless stored False
       lod_group str  - override the texture's LODGroup/TEXTUREGROUP_* (its texture group)
       blank     bool - ship the texture fully transparent instead of the edited PNG
       dye_off   bool - on a MATERIAL: also ship a neutral ColorID mask so the dye system stops
                        overpainting the BaseColor (see handlers/dye.py::stage_dye_off)
       lq_twin   bool - also stage the Marvel_LQ copy of this asset (only if that mount exists)
+      hidden_sections list - on a MESH: exact cooked slot identities hidden in every staged LOD;
+                       absent/empty means all sections shown (see handlers/meshvisibility.py)
       color_inten {param: float} - on a MATERIAL / MPC / Niagara asset: the HDR intensity split the
                        colour editor showed for each colour parameter (stored value = swatch x
                        intensity). Derived as max(rgb, 1) when absent, which is how every asset
@@ -134,17 +143,23 @@ def get_asset_opts(project_dir, game_rel=None):
     return dict(opts.get(game_rel) or {})
 
 
+def effective_asset_opts(opts):
+    """One asset's stored options with the defaults filled in, as export and the dialog read them."""
+    return {**ASSET_OPT_DEFAULTS, **(opts or {})}
+
+
 def set_asset_opts(project_dir, game_rel, opts):
-    """Merge `opts` into one asset's options. A key set to None/False/"" is REMOVED rather than
-    stored false: "not in the file" and "explicitly off" must stay the same state, or a later
-    default change would silently not reach projects that had only ever looked at the control."""
+    """Merge `opts` into one asset's options. A key set to its default (None/False/"" unless
+    ASSET_OPT_DEFAULTS says otherwise) is REMOVED rather than stored: "not in the file" and "the
+    default" must stay the same state, or a later default change would silently not reach
+    projects that had only ever looked at the control."""
     if not game_rel:
         return {}
     with _lock:
         d   = load(project_dir)
         cur = dict(d["asset_opts"].get(game_rel) or {})
         for k, v in (opts or {}).items():
-            if v in (None, False, ""):
+            if v in (None, "") or v == ASSET_OPT_DEFAULTS.get(k, False):
                 cur.pop(k, None)
             else:
                 cur[k] = v

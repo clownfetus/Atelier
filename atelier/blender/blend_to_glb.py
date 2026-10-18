@@ -15,6 +15,7 @@ import bpy
 argv = sys.argv[sys.argv.index("--") + 1:]
 src, dst = argv[0], argv[1]
 ratio = float(argv[2]) if len(argv) > 2 else 1.0
+detail_options=json.loads(argv[3]) if len(argv)>3 and argv[3].startswith('{') else {}
 
 bpy.ops.wm.open_mainfile(filepath=src)
 
@@ -39,13 +40,24 @@ if obj.data.shape_keys:
     basis=obj.data.shape_keys.reference_key
     for vertex in obj.data.vertices:vertex.co=basis.data[vertex.index].co
     obj.shape_key_clear()
-if ratio < 1.0:
-    mod = obj.modifiers.new(name="AtelierLOD", type="DECIMATE")
-    mod.decimate_type = "COLLAPSE"
-    mod.ratio = ratio
-    mod.use_collapse_triangulate = True     # emit triangles; the cooked format has no quads
+# Reduce each material separately so thin hair/eye sections retain geometry.
+bpy.ops.object.select_all(action='DESELECT');obj.select_set(True)
+bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.mesh.separate(type='MATERIAL');bpy.ops.object.mode_set(mode='OBJECT')
+parts=[part for part in bpy.data.objects if part.type=='MESH']
+for part in parts:
+    used={part.data.materials[face.material_index].name for face in part.data.polygons if part.data.materials[face.material_index]}
+    part_ratio=min((detail_options.get('section_ratios',{}).get(name,ratio) for name in used),default=ratio)
+    if part_ratio>=1:continue
+    original_data=part.data.copy();bpy.context.view_layer.objects.active=part
+    mod=part.modifiers.new(name='AtelierLOD',type='DECIMATE');mod.decimate_type='COLLAPSE'
+    mod.ratio=max(part_ratio,min(1,4/max(1,len(part.data.polygons))));mod.use_collapse_triangulate=True
     bpy.ops.object.modifier_apply(modifier=mod.name)
-after = (len(obj.data.vertices), len(obj.data.polygons))
+    if not part.data.polygons:
+        failed=part.data;part.data=original_data;bpy.data.meshes.remove(failed)
+        print('LOD_RETAINED '+','.join(sorted(used)))
+    else:bpy.data.meshes.remove(original_data)
+after=(sum(len(part.data.vertices) for part in parts),sum(len(part.data.polygons) for part in parts))
 print(f"DECIMATE ratio={ratio} verts {before[0]}->{after[0]} polys {before[1]}->{after[1]}")
 
 # Re-bind the armature that glb_to_blend.py unbound for editing. The glTF exporter decides
@@ -58,12 +70,11 @@ if arm is None:
 arm.hide_viewport = False
 arm.hide_render = False
 arm.hide_select = False
-if not any(m.type == "ARMATURE" for m in obj.modifiers):
-    mod = obj.modifiers.new(name="Armature", type="ARMATURE")
-    mod.object = arm
-    print("REBOUND armature for export")
-if obj.parent is None:
-    obj.parent = arm
+for part in parts:
+    if not any(m.type=='ARMATURE' for m in part.modifiers):
+        mod=part.modifiers.new(name='Armature',type='ARMATURE');mod.object=arm
+    if part.parent is None:part.parent=arm
+print('REBOUND armature for export')
 
 # Flush any still-modified image to disk before the mod is built, since the project PNGs these
 # point at are the exact files the builder injects.
@@ -85,9 +96,9 @@ for img in bpy.data.images:
 
 # Report surviving materials so the caller can fail loudly if decimation wiped a section
 # out entirely, rather than discovering it as a confusing "material not found" later.
-used = sorted({obj.data.materials[p.material_index].name
-               for p in obj.data.polygons
-               if obj.data.materials and obj.data.materials[p.material_index]})
+used = sorted({part.data.materials[p.material_index].name
+               for part in parts for p in part.data.polygons
+               if part.data.materials and part.data.materials[p.material_index]})
 print("MATERIALS " + "|".join(used))
 
 # Split by material before export -- Blender's glTF exporter (verified on 5.2 LTS) only writes
@@ -105,13 +116,7 @@ print("MATERIALS " + "|".join(used))
 # export (same joint count, same WEIGHTS_0/1 presence). export_scene.gltf's use_selection=False
 # then exports the whole scene as before: just the split parts + the Armature, since nothing
 # else survives the KEEP-list cleanup at the top of this file and glb_to_blend.py.
-bpy.ops.object.select_all(action="DESELECT")
-bpy.context.view_layer.objects.active = obj
-obj.select_set(True)
-bpy.ops.object.mode_set(mode="EDIT")
-bpy.ops.mesh.select_all(action="SELECT")
-bpy.ops.mesh.separate(type="MATERIAL")
-bpy.ops.object.mode_set(mode="OBJECT")
+# Already separated before decimation, preserving colours and section budgets.
 
 bpy.ops.export_scene.gltf(
     filepath=dst, export_format="GLB", use_selection=False, export_apply=False,

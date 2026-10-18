@@ -54,6 +54,8 @@ sandbox.setInterval = () => 0;
 sandbox.console = console;
 sandbox.globalThis = sandbox;
 sandbox.clearTimeout = clearTimeout; sandbox.setTimeout = setTimeout;
+sandbox.requestAnimationFrame = callback => setTimeout(() => callback(Date.now()), 0);
+sandbox.cancelAnimationFrame = clearTimeout;
 
 vm.createContext(sandbox);
 // Same shared-service order as index.html. Motion/SVG rendering is covered by the

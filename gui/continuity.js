@@ -35,7 +35,9 @@
     const commit = () => { if (!updated) { updated = true; const ready=update(); after?.(name); return ready; } };
     let current, deferred = false;
     const release = () => {
-      cleanup.splice(0).forEach(fn => fn());
+      // Last named, first restored: an element named before and after the update (the banner)
+      // must end with its original name, not the one the second call recorded.
+      cleanup.splice(0).reverse().forEach(fn => fn());
       if (active === current) active = null;
     };
     try {
@@ -61,11 +63,14 @@
     const match = /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const context = window.AtelierRoster?.describe(path);
     const story = match ? '/api/catalogue/hero/' + match[1].split('/')[1] + '/story' : null;
-    // A skin whose bundle has a nameplate of the same name shows it; every other folder keeps the
-    // hero's story art, which is also the fallback if the nameplate can't be loaded.
+    // Prefer the costume's verified nameplate, then the hero's own named nameplate.
     const skinKey = match?.[2] ? match[1] + match[2] : null;
-    const nameplate = skinKey && (artwork[skinKey]?.banner || context?.skin?.banner) || null;
-    const src = nameplate || story;
+    const nameplate = window.AtelierCatalogueArt?.bannerUrl(skinKey && (artwork[skinKey]?.banner || context?.skin?.banner) || null);
+    const heroNameplate = match && window.AtelierCatalogueArt?.bannerUrl(
+      artwork[match[1]]?.banner || context?.hero?.banner || '/api/catalogue/banner/'+match[1].split('/')[1]);
+    const plates = [...new Set([nameplate, heroNameplate].filter(Boolean))];
+    const bannerSources = [...plates, story].filter(Boolean);
+    const src = bannerSources[0];
     const preloaded = src && [...document.querySelectorAll('#library-hero img,.hero-portrait.loaded')].some(img=>img.complete && img.naturalWidth && img.getAttribute('src')===src);
     host.replaceChildren(); host.hidden = !match;
     host.classList.remove('has-art','has-art-colour','has-nameplate');host.style.removeProperty('--library-art-colour');
@@ -97,11 +102,12 @@
     const image = document.createElement('img');
     image.alt = ''; image.className = 'library-hero-art';
     const showNameplate = on => { image.classList.toggle('nameplate', on); host.classList.toggle('has-nameplate', on); };
-    showNameplate(!!nameplate);
+    let sourceIndex = 0;
+    const nextSource = () => { showNameplate(sourceIndex < plates.length); image.src = bannerSources[sourceIndex++]; };
     image.onload = () => { if(current()&&image.isConnected){host.classList.add('has-art'); window.AtelierPolish?.artwork(image);} };
     image.onerror = () => {
       if(!current())return;
-      if (nameplate && image.getAttribute('src') === nameplate) { showNameplate(false); image.src = story; return; }
+      if (sourceIndex < bannerSources.length) { nextSource(); return; }
       host.classList.remove('has-art'); image.remove();
     };
     host.classList.remove('has-art');
@@ -116,7 +122,7 @@
     detail.textContent = [skinPath && label(skinPath), path.slice((skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
     text.append(eyebrow, title, detail); host.append(image, text);
-    image.src=src;
+    nextSource();
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});
   }
@@ -125,17 +131,18 @@
   function library(from, to, direction, update) {
     const source = cardFor(to);
     const sourceLabel = source?.querySelector('.card-name');
-    const sourceArt = source?.querySelector('.hero-portrait.loaded');
-    const oldBanner = document.querySelector('#library-hero.has-art img');
+    const banner = document.getElementById('library-hero');
     document.documentElement.dataset.libraryDirection = direction;
+    // The banner enters and leaves on its own. Morphing the square card portrait into the wide
+    // story art zoomed and stretched two different pictures into each other.
     return transition(update, name => {
       name(document.querySelector('#grid-area > .grid'), 'atelier-grid');
       name(direction === 'back' ? document.querySelector('#breadcrumbs > :last-child') : sourceLabel, 'atelier-folder-name');
-      name(sourceArt || (direction === 'back' && oldBanner), 'atelier-portrait');
+      name(banner, 'atelier-banner');
     }, name => {
       name(document.querySelector('#grid-area > .grid'), 'atelier-grid');
       name(direction === 'back' ? cardFor(from)?.querySelector('.card-name') : sourceLabel && document.querySelector('#breadcrumbs > :last-child'), 'atelier-folder-name');
-      name(sourceArt ? document.querySelector('#library-hero img') : oldBanner && cardFor(from)?.querySelector('.hero-portrait'), 'atelier-portrait');
+      name(banner, 'atelier-banner');
     }, () => {
       const grid = document.querySelector('#grid-area > .grid');
       animate(grid, [{opacity: 0, transform: `translateX(${direction === 'back' ? -8 : 8}px)`}, {opacity: 1, transform: 'none'}]);

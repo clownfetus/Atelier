@@ -49,7 +49,7 @@
 #viewport-stage[data-backdrop=checker] { background-color:#b7bdc5; background-image:conic-gradient(#e0e3e8 25%,transparent 0 50%,#e0e3e8 0 75%,transparent 0); background-size:24px 24px; }
 #viewport-canvas { position:absolute; inset:58px 0 0; width:100%; height:calc(100% - 58px); display:block; background:transparent; outline-offset:-4px; touch-action:none; }
 .vp-showcase-backdrop {position:absolute;inset:58px 0 0;width:100%;height:calc(100% - 58px);pointer-events:none;}
-#viewport-stage.vp-showcase {background:#14161b;}
+#viewport-stage.vp-showcase[data-backdrop=gradient] .vp-showcase-backdrop {background:#14161b;}
 #viewport-inspect-tools, #viewport-tools { position:absolute; z-index:5; top:20px; display:flex; align-items:center; gap:12px; padding:0; background:transparent; border:0; }
 #viewport-inspect-tools { left:22px; }
 #viewport-inspect-tools {max-width:330px;flex-wrap:wrap;gap:6px;pointer-events:none;}
@@ -107,8 +107,19 @@
 .vp-material-search { display:flex; align-items:center; gap:8px; color:var(--muted); margin:0 24px 12px; border-bottom:1px solid var(--border); }
 #viewport-material-search { color:var(--text); background:transparent; min-width:0; width:100%; border:0; padding:8px 0; font-size:12px; outline-offset:0; }
 #viewport-mat-list { flex:0 1 auto; max-height:29%; min-height:48px; overflow:auto; padding:0 16px 12px; }
-.vp-mat { margin:0 0 3px; padding:0; border:0; }
+.vp-mat { margin:0 0 3px; padding:0; border:0; display:flex; flex-wrap:wrap;align-items:center; }
 #viewport-box .vp-material-select { width:100%; border:1px solid transparent; background:transparent; display:flex; align-items:center; justify-content:flex-start; gap:11px; min-height:44px; padding:10px 12px; font-size:15px; font-weight:400; text-align:left; }
+#viewport-box .vp-mat > .vp-material-select {flex:1;min-width:0;width:auto;}
+#viewport-box .vp-section-eye {width:36px;height:36px;min-width:36px;padding:8px;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);}
+#viewport-box .vp-section-eye[aria-pressed=true] {color:var(--text);background:var(--bg3);}
+#viewport-box .vp-section-eye:disabled {opacity:.45;}
+#viewport-box .vp-material-sections {flex-basis:100%;padding-left:27px;}
+#viewport-box .vp-section-row {display:flex;align-items:center;gap:4px;}
+#viewport-box .vp-section-row .vp-section-eye {width:28px;height:28px;min-width:28px;padding:4px;}
+#viewport-box .vp-section-select {flex:1;min-width:0;min-height:28px;text-align:left;border:0;background:transparent;color:var(--muted);font-size:12px;padding:5px 8px;}
+#viewport-box .vp-section-row:has([aria-pressed=true]) .vp-section-select {text-decoration:line-through;}
+#viewport-box .vp-obj:has(.vp-weapon-hand) {flex-wrap:wrap;}
+#viewport-box .vp-weapon-hand {max-width:160px;min-height:30px;font-size:12px;}
 #viewport-box .vp-material-select[aria-pressed=true] { color:var(--acc); background:var(--vp-selected); border-color:transparent; font-weight:600; }
 .vp-material-select .vp-material-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vp-material-select .vp-draft-marker { margin-left:auto; font-size:10px; color:var(--acc); }
@@ -228,4 +239,44 @@
   #viewport-tools,#viewport-inspect-tools { top:12px; }
   #viewport-box .vp-popover { width:260px;max-height:54vh; }
 }
+/* Skin identity (viewport-identity.js). The skin colour is decoration only: it rings the costume
+   icon, draws a line under the header and lights the card. Every control keeps the theme's inks. */
+#viewport-skin-icon { width:34px; height:34px; flex:none; border-radius:8px; object-fit:cover; object-position:center 20%;
+  background:var(--bg3); box-shadow:0 0 0 2px var(--vp-skin-colour,var(--border2)); transition:box-shadow 300ms; }
+#viewport-box.has-skin-colour #viewport-head::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--vp-skin-colour); pointer-events:none; }
+#viewport-skin-card { position:relative; isolation:isolate; flex:none; height:84px; margin:20px 24px 0; }
+#viewport-skin-card img { display:block; width:100%; height:100%; }
+#viewport-skin-card.is-nameplate img { object-fit:contain; filter:drop-shadow(0 6px 12px rgb(0 0 0 / .3)); }
+#viewport-skin-card.is-story img { object-fit:cover; object-position:center 30%; border-radius:8px; }
+#viewport-skin-card::before { content:''; position:absolute; inset:-14px -20px; z-index:-1; opacity:0; transition:opacity 300ms;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--vp-skin-colour) 38%,transparent),transparent); }
+#viewport-box.has-skin-colour #viewport-skin-card::before { opacity:1; }
+#viewport-skin-card:not([hidden]) + #viewport-mat-section #viewport-mat-head { padding-top:16px; }
+@media (max-height:760px) { #viewport-skin-card { display:none; } }
 @media (prefers-reduced-motion:reduce) { #viewport-box *,#viewport-box *::before,#viewport-box *::after { transition:none !important; } }
+
+/* Replacement destinations use the same controls and palette as the editor. */
+.mesh-edit-overlay .mesh-edit-modal { width:760px;max-width:calc(100vw - 48px);max-height:calc(100dvh - 40px);overflow:hidden;gap:14px; }
+.mesh-edit-modal > h2,.mesh-edit-modal > .mesh-edit-path { flex:none;margin:0; }
+.mesh-edit-content { display:flex;flex-direction:column;gap:16px;min-height:0;overflow-y:auto;padding-right:6px; }
+.mesh-edit-content > * { flex:none; }
+.mesh-edit-modal [hidden] { display:none!important; }
+.mesh-edit-footer { flex:none;display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--border);padding-top:12px; }
+.mesh-edit-footer #mesh-edit-status { margin:0;max-height:18vh;overflow:auto; }
+.mesh-edit-targets { display:grid;gap:16px; }
+@media (min-width:720px) { .mesh-edit-targets { grid-template-columns:1fr 1fr; } }
+.mesh-edit-targets h3 { margin:0 0 8px;font-size:13px;font-weight:600; }
+.mesh-edit-target-list { display:flex;flex-wrap:wrap;gap:6px; }
+.mesh-edit-target { max-width:100%;overflow-wrap:anywhere;white-space:normal;text-align:left;font-size:12px; }
+.mesh-edit-target[aria-pressed="true"] { background:var(--bg3);border-color:var(--text); }
+.mesh-edit-modal .mesh-edit-weapon-status { margin:6px 0 0;font-size:12px; }
+.mesh-edit-modal .mesh-edit-rig-help { margin:0;padding-left:12px;border-left:2px solid var(--border); }
+.mesh-import-details { border:1px solid var(--border);border-radius:8px;padding:12px; }
+.mesh-import-details > summary { cursor:pointer;font-weight:600; }
+.mesh-import-details[open] > summary { margin-bottom:12px; }
+.mesh-import-details p { font-size:12px;line-height:1.5; }
+.mesh-import-transform { display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px; }
+.mesh-import-transform label { display:flex;flex-direction:column;gap:5px;font-size:12px; }
+.mesh-import-transform input { width:100%;box-sizing:border-box; }
+.mesh-import-select { display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0;font-size:12px; }
+.mesh-import-select select { max-width:70%; }

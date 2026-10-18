@@ -4,19 +4,15 @@ UAssetTool parses a SkeletalMesh export only as far as the FReferenceSkeleton (s
 SkeletalMeshExport.cs) and keeps everything past it as one opaque `RemainingExtraData`
 blob, so there is no existing path to the geometry. This module reads that blob directly.
 
-WHAT IT CAN DO: move vertices (proportion editing) and change how many triangles a
-section draws. Both are byte-for-byte in-place patches -- no buffer grows or shrinks, so
-export SerialSize, the bulk-data descriptors and the ImportMap are all untouched. That is
-what makes this safe to ship through the ordinary create_mod_iostore path with no extra
-bookkeeping (contrast with the world builder, which must patch vanilla chunks in place for
-exactly the same reason -- see the comment in texture.py::build_mod).
+SUPPORTED EDITS: in-place vertex/index edits and full LOD rebuilds with changed
+topology. Rebuilds serialise positions, tangents, UVs, colours, skin weights and
+indices together, update streamed-resource metadata, and remap original morphs.
+The caller fixes package sizes before packing. Supported layouts are checked by
+meshsurvey before import; malformed or incomplete LODs stop publication.
 
-WHAT IT CANNOT DO: change the VERTEX count. Vertices are stored in parallel buffers
-(positions, packed tangents, UVs, colors, skin weights) that are concatenated one after
-another inside the streamed blob, so adding or removing vertices resizes every buffer and
-shifts everything downstream. That needs a full re-serialisation and is not implemented.
-Removing geometry is still possible via `tri_fraction`/`hide`, which only rewrites a
-section's NumTriangles.
+Replacements retain the destination's material sections and fixed bone palettes.
+This geometry pipeline does not create game skeleton assets, animation controls,
+cloth setups or physics bodies for a different model shape.
 
 BINARY LAYOUT (Marvel Rivals, UE 5.3, verified against SK_10290_1029304)
 
@@ -232,6 +228,10 @@ def find_extras(uexp):
     """Locate materials + skeleton anywhere in the .uexp. Confirmed to produce exactly one
     match across the full 5.9MB SK_10290_1029304.uexp -- the triple-count invariant has no
     false positives in practice."""
+    # Validate the following LOD chain to support one/two-bone weapon rigs.
+    from atelier.handlers.meshsurvey import find_extras as surveyed
+    try:return surveyed(uexp)
+    except ValueError:pass  # Legacy geometry-only fixtures have no LOD chain.
     for o in range(len(uexp) - 8):
         r = _try_extras(uexp, o, len(uexp))
         if r:
@@ -497,6 +497,26 @@ class Mesh:
         lk_esz, lk_cnt = struct.unpack_from("<II", blob, o); o += 8
         lod["lookup_off"], lod["lookup_esz"], lod["lookup_cnt"] = o, lk_esz, lk_cnt
         o += lk_esz * lk_cnt
+        record=lod.get('layout')
+        if record:
+            # Vertex colours can be absent outright or written as an empty
+            # buffer. Do not consume a colour header from the ray/morph tail.
+            # Resolve both layouts by walking the remaining structures to the
+            # exact end, as the format survey already does.
+            from atelier.handlers.meshsurvey import _resolve_tail
+            end=record['blob_end'];candidates=[o];colour_start=None;colour_end=None
+            if o+10<=end:
+                stride,count=struct.unpack_from('<II',blob,o+2)
+                if count==0:candidates.append(o+10)
+                elif count==lod['num_verts'] and stride==4 and o+18<=end:
+                    element,total=struct.unpack_from('<II',blob,o+10)
+                    if element*total==count*stride and o+18+element*total<=end:
+                        colour_start=o+18;colour_end=colour_start+element*total;candidates.append(colour_end)
+            has_cloth=any(section.get('cloth_asset',-1)>=0 for section in record.get('sections',[]))
+            tail=_resolve_tail(lambda offset:bytes(blob[offset:end]),candidates,has_cloth)
+            if tail.get('suffix_bytes') not in (0,4):raise ValueError('Could not validate the mesh colour buffer and trailing data')
+            lod['tail_off']=tail['tail_off'];lod['col_off']=colour_start if tail['tail_off']==colour_end else None
+            return
         o += 2                                            # FColorVertexBuffer StripFlags
         col_stride, col_nv = struct.unpack_from("<II", blob, o); o += 8
         if col_nv > 0:
@@ -627,7 +647,7 @@ class Mesh:
 
     def skin_weights(self, lod):
         """(bone_idx[N,8] section-local, weight[N,8] in [0,1]). FSkinWeightInfo is
-        Struct-of-Arrays per vertex -- BoneIndex[8] THEN BoneWeight[8], not interleaved
+        Struct-of-Arrays per vertex -- BoneIndex[N] THEN BoneWeight[N], not interleaved
         pairs (confirmed: interleaved gave weight sums far from 255 and out-of-BoneMap-
         range indices; SoA gives exact 255 sums and every index within its section's
         BoneMap). Only the first `max_bone_influences` columns are meaningful.
@@ -648,12 +668,21 @@ class Mesh:
             raise NotImplementedError("16-bit bone index/weight skin buffers not decoded")
         blob = bytes(self._blob(lod))
         if not lod.get("variable_bones"):
-            raw = np.frombuffer(blob, np.uint8, n * 16, lod["sw_off"]).reshape(n, 16)
-            idx, wgt = raw[:, :8].copy(), raw[:, 8:].copy()
             mi = lod["max_bone_influences"]
-            if mi < 8:
-                idx[:, mi:] = 0; wgt[:, mi:] = 0
-            return idx, wgt.astype(np.float32) / 255.0
+            # Fixed does not mean eight influences. Four-influence cooked meshes
+            # store four indices followed by four weights (8 bytes per vertex).
+            # Reading 16 crossed vertex boundaries and eventually read other
+            # buffers as weights, notably on Magik's normal body.
+            size=lod.get('sw_cnt',n*mi*2)*lod.get('sw_esz',1)
+            if not n or size % n or size//n % 2:
+                raise ValueError('Invalid fixed skin-weight buffer size')
+            width=size//n//2
+            if not 1<=mi<=width<=8:
+                raise NotImplementedError('Unsupported fixed skin-weight stride')
+            raw = np.frombuffer(blob, np.uint8, n * width * 2, lod["sw_off"]).reshape(n, width*2)
+            idx=np.zeros((n,8),np.uint16);wgt=np.zeros((n,8),np.float32)
+            idx[:,:mi]=raw[:,:mi];wgt[:,:mi]=raw[:,width:width+mi]/255.0
+            return idx, wgt
 
         lookup = np.frombuffer(blob, "<u4", n, lod["lookup_off"])
         data = np.frombuffer(blob, np.uint8, lod["sw_cnt"] * lod["sw_esz"], lod["sw_off"])
@@ -761,19 +790,37 @@ class Mesh:
             struct.pack_into("<I", self.uexp, osec["base_index_off"], ns["base_index"])
             struct.pack_into("<I", self.uexp, osec["base_vertex_off"], ns["base_vertex"])
             struct.pack_into("<I", self.uexp, osec["num_verts_off"], ns["num_verts"])
+            struct.pack_into("<I", self.uexp, osec["num_verts_off"]+4, ns["max_infl"])
             osec["num_verts"], osec["num_tris"] = ns["num_verts"], ns["num_tris"]
             osec["base_vertex"], osec["base_index"] = ns["base_vertex"], ns["base_index"]
+            osec['max_infl']=ns['max_infl']
 
         lod["num_verts"], lod["n_indices"], lod["idx_stride"] = total_nv, n_idx, idx_stride
+        if lod.get('layout'):lod['layout'].update(num_verts=total_nv,n_indices=n_idx,idx_stride=idx_stride)
         self._reindex_after_resize()
         return {"total_nv": total_nv, "idx_stride": idx_stride, "n_idx": n_idx,
-                'morph_targets':morph_count,'morph_vertices':morph_vertices,'morph_mode':mode}
+                'morph_targets':morph_count,'morph_vertices':morph_vertices,'morph_mode':mode,
+                'repaired_weight_vertices':sum(section.get('weights_repaired',0) for section in sections_in)}
 
     def _patch_mirror(self, lod, old_size, new_size, old_n_idx, new_n_idx, old_nv, new_nv):
         """The .uexp carries small mirrors of a streamed LOD's blob size + derived counts
         (index count, vertex count, NumBones=NumVerts*8) near that LOD's own section
         table -- find+replace within a bounded window starting right after this LOD's own
         sections, so an edit to one LOD can't accidentally match another LOD's mirror."""
+        record=lod.get('layout')
+        if record:
+            # The rebuilder writes full-precision UVs and fixed eight-influence
+            # weights. Copy that exact metadata into SerializeAvailabilityInfo;
+            # replacing matching integers corrupts fields when counts coincide
+            # and misses a source that used four or variable influences.
+            size_offset=record['size_offset']
+            if struct.unpack_from('<I',self.uexp,size_offset)[0]!=old_size:
+                raise ValueError('Streamed LOD size metadata changed during rebuild')
+            struct.pack_into('<I',self.uexp,size_offset,new_size)
+            struct.pack_into('<B16I',self.uexp,size_offset+8,2 if new_nv<=65536 else 4,new_n_idx,
+                lod['num_tex_coords'],new_nv,1,0,12,new_nv,4,new_nv if lod['col_off'] is not None else 0,
+                0,8,new_nv*8,new_nv,0,0,0)
+            return
         near = max(s["after"] for s in lod["sections"])
         mir = self.uexp.find(struct.pack("<I", old_size), near)
         if mir < 0:
@@ -798,6 +845,15 @@ class Mesh:
             if not isinstance(pos[n], tuple):
                 pos[n] = ("uexp", pos[n])
         for i, lod in enumerate(self.lods):
+            record=lod.get('layout')
+            if record:
+                if lod['buf']=='ubulk':
+                    entry=self._drm_entries[self._drm_map[i]]['rec_off']
+                    start=struct.unpack_from('<q',self.uasset,entry+4)[0];size=struct.unpack_from('<q',self.uasset,entry+20)[0]
+                    record.update(blob_start=start,blob_end=start+size)
+                lod['pos_off']=record['blob_start']+11+lod['n_indices']*lod['idx_stride']+POS_HEADER
+                self._locate_index_buffer(lod);self._locate_vertex_buffers(lod);self._locate_tail(i,lod)
+                continue
             n = lod["num_verts"]
             if n not in pos:
                 raise ValueError(f"could not re-locate the position buffer for a "
@@ -900,10 +956,9 @@ def set_material_triangles(mesh, sec_index, fraction):
     """Keep `fraction` of a material's triangles in every LOD (0.0 hides it entirely)."""
     applied = []
     for lod in mesh.lods:
-        sec = next((s for s in lod["sections"] if s["mat"] == sec_index), None)
-        if sec is None:
-            continue
-        applied.append(mesh.degenerate_triangles(lod, sec, fraction))
+        for sec in lod['sections']:
+            if sec['mat'] == sec_index:
+                applied.append(mesh.degenerate_triangles(lod, sec, fraction))
     return applied
 
 
@@ -1211,7 +1266,27 @@ def transfer_weights_from_vanilla(mesh, lod, sec, positions):
     return src_gi[j], src_w[j], dist, src_pos
 
 
-def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
+def original_sections(mesh, lod_index, slots):
+    """Section arrays from this LOD's original buffers for a partial replacement."""
+    lod=mesh.lods[lod_index]
+    chosen=[(i,section) for i,section in enumerate(lod['sections']) if mesh.materials[section['mat']]['slot_name'] in slots]
+    if not chosen:return {}
+    position=mesh.positions(lod);normal,tangent,tan_w=mesh.normals_tangents(lod)
+    uv=mesh.uvs(lod);color=mesh.colors(lod);indices,weights=mesh.skin_weights(lod)
+    result={}
+    for index,section in chosen:
+        lo=section['base_vertex'];hi=lo+section['num_verts'];mapping=np.asarray(mesh.section_bonemap(section),np.uint16)
+        triangles=np.frombuffer(mesh._blob(lod),'<u4' if lod['idx_stride']==4 else '<u2',
+            section['num_tris']*3,lod['idx_off']+section['base_index']*lod['idx_stride']).reshape(-1,3).astype(np.uint32)-lo
+        result[index]={'mat':section['mat'],'positions':position[lo:hi].copy(),'morph_rest':position[lo:hi].copy(),
+            'morph_ids':np.arange(lo,hi),'morph_lods':np.full(hi-lo,lod.get('layout',{}).get('source_index',lod_index)),
+            'normal':normal[lo:hi].copy(),'tangent':tangent[lo:hi].copy(),'tan_w':tan_w[lo:hi].copy(),
+            'uv':uv[lo:hi].copy(),'color':color[lo:hi].copy() if color is not None else None,
+            'global_idx':mapping[indices[lo:hi]],'weight':weights[lo:hi].copy(),'triangles':triangles,'bonemap':mapping.tolist()}
+    return result
+
+
+def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=None, repair_weights=False):
     """Convert an edited .glb back into the per-section arrays rebuild_lod expects.
 
     `reweight` is {slot name: 'all'|'zero_weight'} from the graft sidecar: those sections have
@@ -1295,6 +1370,9 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
     # .blend still carries all of the materials, so scoping this to one LOD would reject
     # every ordinary multi-LOD build.
     known = {m["slot_name"] for m in mesh.materials}
+    preserve_parts=set(preserve_parts or [])
+    if preserve_parts-known:raise ValueError('The saved untouched-part slots changed; import the replacement again')
+    preserved=original_sections(mesh,lod_index,preserve_parts)
     stray = sorted(n for n in by_mat if n is not None and n not in known)
     if stray:
         raise ValueError(
@@ -1303,7 +1381,9 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
             f"one of the existing slots instead: {', '.join(sorted(n for n in known if n))}")
 
     sections_in = []
-    for sec in lod["sections"]:
+    for section_index,sec in enumerate(lod["sections"]):
+        if section_index in preserved:
+            sections_in.append(preserved[section_index]);continue
         slot = mesh.materials[sec["mat"]]["slot_name"]
         prims = by_mat.get(slot)
         if not prims:
@@ -1415,6 +1495,12 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
         gi, w = collapse_weights_to_bonemap(gi, w, mesh.section_bonemap(sec), mesh.bones)
 
         dead = w.sum(1) <= 0
+        repaired=0
+        if dead.any() and repair_weights:
+            fitted,weights,_,_=transfer_weights_from_vanilla(mesh,lod,sec,pos[dead])
+            gi[dead]=fitted;w[dead]=weights;repaired=int(dead.sum())
+            dead=w.sum(1)<=0
+            print(f'[replacement] LOD{lod_index} {slot}: fitted {repaired} incompatible weight rows to the original section',flush=True)
         if dead.any():
             raise ValueError(
                 f"section {slot!r}: {int(dead.sum())} vertex/vertices carry no skin weight at "
@@ -1438,6 +1524,7 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None):
             "weight": w.astype("f4"),
             "triangles": np.concatenate(TRI).astype(np.uint32),
             "bonemap": mesh.section_bonemap(sec),
+            'weights_repaired':repaired,
         })
     return sections_in
 
@@ -1513,7 +1600,10 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
         global_idx[lo:hi] = bonemap[local_idx[lo:hi]]
 
     world, node_trs = _bone_world_matrices(mesh.bones)
-    ibm = np.linalg.inv(np.stack(world)).astype("f4")
+    # glTF matrices are column-major. Serialising NumPy's row-major array put
+    # translations in the last row; Blender then created every bone at (0,0,0)
+    # and posing deformed the mesh into spikes despite correct vertex groups.
+    ibm = np.linalg.inv(np.stack(world)).transpose(0,2,1).astype("f4")
 
     buf = bytearray()
     def add(arr):
@@ -1632,7 +1722,6 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
     for i, b in enumerate(mesh.bones):
         if b["parent"] != -1:
             nodes[b["parent"]]["children"].append(i)
-    ibm_off, ibm_len = add(ibm)
     skin = {"joints": list(range(len(mesh.bones))), "skeleton": 0,
            "inverseBindMatrices": accessor(ibm, F32, "MAT4")}
 

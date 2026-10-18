@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 
+from atelier import jobs
 from atelier.config import ASSETS_MODS, CNW, USMAP, _CACHE, get_import_root, project_base
 from atelier.handlers import mesh as _mesh
 from atelier.handlers import meshgraft as _meshgraft
@@ -110,12 +111,17 @@ def _run_blender(script, args, label):
     # Blender exits 0 even when the embedded script raises, so success must be judged by
     # the marker the script prints -- never by the return code alone.
     if f"{label}_OK" not in out:
+        if script=='replacement_to_blend.py':
+            message=next((line.split('ValueError: ',1)[1] for line in reversed(out.splitlines()) if line.startswith('ValueError: ')),None)
+            if message:
+                print(out,file=sys.stderr,flush=True)
+                raise ValueError(message)
         tail = "\n".join(l for l in out.splitlines() if l.strip())[-1500:]
         raise RuntimeError(f"Blender step {script} failed:\n{tail}")
     return out
 
 
-def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True):
+def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True, texture_root=None, pack_images=False, presentation_hidden=()):
     """Decode a mesh's top LOD to a .blend in the active project folder.
 
     Refuses up front on a format this pipeline cannot rebuild. The check runs here, at
@@ -144,7 +150,11 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
     manifest_path, manifest = blend_path + ".mat.json", None
     if with_materials:
         try:
-            manifest = _meshmat.build_manifest(game_rel, m, work_base=base)
+            manifest = _meshmat.build_manifest(game_rel, m, work_base=base,root=texture_root)
+            for index in presentation_hidden:
+                slot=manifest['slots'].get(m.materials[index]['slot_name'])
+                if slot is not None:slot['hidden']=True;slot['presentation_only_hidden']=True
+            manifest['pack_images']=pack_images
             json.dump(manifest, open(manifest_path, "w"), indent=1)
         except Exception as e:
             print(f"[meshedit] material/texture staging skipped: {e}", file=sys.stderr, flush=True)
@@ -159,6 +169,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
         if os.path.exists(glb):
             os.remove(glb)
     info = next((l for l in out.splitlines() if l.startswith("BLEND_OK")), "")
+    material_report=json.loads(next((line[len('MATERIAL_REPORT '):] for line in out.splitlines() if line.startswith('MATERIAL_REPORT ')),'{}'))
     if project_extract:
         from atelier.handlers.meshreplace import digest
         from atelier.storage import atomic_json
@@ -171,10 +182,12 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
             "warnings": report["warnings"] + ((manifest or {}).get("warnings") or []),
             "preflight": _survey.verdict_text(report),
             "textures": textures,
-            "materials": sorted((manifest or {}).get("slots", {}).keys())}
+            "materials": sorted((manifest or {}).get("slots", {}).keys()), 'material_report':material_report,
+            'material_manifest_complete':manifest is not None and not manifest.get('incomplete'),
+            'material_issues':(manifest or {}).get('incomplete',[])}
 
 
-def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
+def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=None):
     """Rebuild every LOD from the edited .blend into an export stage, ready to be packed.
 
     LOD0 uses the mesh as edited; each lower LOD is decimated to the triangle ratio that
@@ -188,11 +201,23 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     """
     if blend_path is None:
         from atelier.handlers.meshreplace import is_original, stage_original
-        if is_original(game_rel): return stage_original(game_rel,stage)
+        if is_original(game_rel):
+            info = stage_original(game_rel,stage)
+            from atelier.handlers.meshvisibility import apply_to_staged
+            info['visibility'] = apply_to_staged(game_rel, info['uasset'])
+            return info
     base = base_path or _resolve_base(game_rel)
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     if not os.path.exists(blend_path):
         raise RuntimeError(f"no .blend at {blend_path} -- run extract first")
+    if preserve_parts is None:
+        # Imported partial assets retain the original untouched sections at EVERY
+        # LOD. Once the user edits the Blender file, all its sections are editable.
+        from atelier.handlers.meshreplace import digest
+        try:
+            with open(project_base(game_rel)+'.mesh.json',encoding='utf-8') as stream:record=json.load(stream)
+        except (OSError,ValueError):record={}
+        preserve_parts=(record.get('validation',{}).get('preserved_parts',[]) if record.get('blend_sha256')==digest(blend_path) else [])
     m = _mesh.Mesh(base)
 
     graft = _meshgraft.load_graft(blend_path)
@@ -200,13 +225,19 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     repoints = _meshgraft.repoints_from(graft)
 
     lod0_tris = sum(s["num_tris"] for s in m.lods[0]["sections"])
+    top_counts={}
+    for section in m.lods[0]['sections']:top_counts[section['mat']]=top_counts.get(section['mat'],0)+section['num_tris']
     applied = []
     for i, lod in enumerate(m.lods):
+        jobs.progress(f'Building {os.path.basename(game_rel)} · detail level {i+1} of {len(m.lods)}…')
         ratio = 1.0 if i == 0 else (sum(s["num_tris"] for s in lod["sections"]) / lod0_tris)
         glb = f"{blend_path}.lod{i}.glb"
         if os.path.exists(glb):
             os.remove(glb)        # never let a previous run's output be mistaken for fresh
-        out = _run_blender("blend_to_glb.py", [blend_path, glb, f"{ratio:.6f}"], "GLB")
+        detail_counts={}
+        for section in lod['sections']:detail_counts[section['mat']]=detail_counts.get(section['mat'],0)+section['num_tris']
+        detail_ratios={m.materials[index]['slot_name']:min(1,count/max(1,top_counts.get(index,count))) for index,count in detail_counts.items()}
+        out = _run_blender("blend_to_glb.py", [blend_path, glb, f"{ratio:.6f}",json.dumps({'section_ratios':detail_ratios})], "GLB")
         from atelier.handlers.meshreplace import import_options
         options=import_options(json.loads(next((line[len('ATELIER_IMPORT_OPTIONS '):] for line in out.splitlines() if line.startswith('ATELIER_IMPORT_OPTIONS ')),'{}')))
         if i==0 and not options['keep_skeleton']:m.apply_skeleton_from_glb(glb)
@@ -214,13 +245,15 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
                      if l.startswith("MATERIALS ")), "")
         have = set(mats.split("|")) if mats else set()
         need = {m.materials[s["mat"]]["slot_name"] for s in lod["sections"]}
-        missing = sorted(n for n in need if n and n not in have)
+        missing = sorted(n for n in need if n and n not in have and n not in (preserve_parts or []))
         if missing:
             raise RuntimeError(
                 f"LOD{i} (decimate ratio {ratio:.3f}) lost every face of: {', '.join(missing)}. "
                 f"That section would be empty, which the engine does not tolerate. Give those "
                 f"materials more geometry, or raise the LOD ratio.")
-        secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight)
+        section_options={'preserve_parts':preserve_parts} if preserve_parts else {}
+        if options.get('repair_weights'):section_options['repair_weights']=True
+        secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight,**section_options)
         info = m.rebuild_lod(i, secs,keep_morphs=options['keep_morphs'])
         applied.append({"lod": i, "ratio": round(ratio, 4), **info})
         os.remove(glb)
@@ -240,7 +273,9 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None):
     r = uat(["fix", os.path.abspath(uasset), USMAP])
     if r.returncode != 0:
         raise RuntimeError("uat fix failed: " + ((r.stdout or "") + (r.stderr or ""))[-400:])
-    return {"applied": applied, "stage": stage, "uasset": uasset, "grafted": grafted}
+    from atelier.handlers.meshvisibility import apply_to_staged
+    visibility = apply_to_staged(game_rel, uasset)
+    return {"applied": applied, "stage": stage, "uasset": uasset, "grafted": grafted, "visibility": visibility}
 
 
 def build_from_blend(game_rel, blend_path=None, base_path=None, out_dir=None, mod_name=None):
@@ -281,6 +316,10 @@ def _resolve_base(game_rel):
     base = ensure_work_base(game_rel)
     if not base or not os.path.exists(base + ".uasset"):
         raise RuntimeError(f"mesh not found in the game paks: {game_rel}")
+    report=_survey.probe(base,read_tails=False,include_layout=True)
+    if any(lod.get('blob')=='missing' for lod in report.get('_layout',[])):
+        from atelier.handlers.meshstudio import complete_mesh_source
+        base=complete_mesh_source(game_rel)
     return base
 
 

@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 from wsgiref.util import setup_testing_defaults
 import zipfile
@@ -47,6 +49,46 @@ class Trash(unittest.TestCase):
         import shutil
         shutil.rmtree(self.root)
         AC.clear()
+
+    def test_metadata_restore_waits_for_an_open_reader(self):
+        PM.set_deselected(self.root, [self.tex])
+        snapshot = {'opts': {'no_mips': False}, 'deselected': True}
+        entered, release, replacing = threading.Event(), threading.Event(), threading.Event()
+        read_json, replace = PM.json.load, PM.os.replace
+        reader_id = None
+
+        def read(stream, *args, **kwargs):
+            if threading.get_ident() == reader_id:
+                entered.set()
+                if not release.wait(5):
+                    raise TimeoutError('Metadata reader was not released')
+            return read_json(stream, *args, **kwargs)
+
+        def read_metadata():
+            nonlocal reader_id
+            reader_id = threading.get_ident()
+            return PM.load(self.root)
+
+        def publish(source, destination):
+            replacing.set()
+            if not release.is_set():
+                raise PermissionError('Windows reader still holds project.json open')
+            return replace(source, destination)
+
+        with patch.object(PM.json, 'load', side_effect=read), patch.object(PM.os, 'replace', side_effect=publish):
+            with ThreadPoolExecutor(max_workers=2) as workers:
+                reader = workers.submit(read_metadata)
+                try:
+                    self.assertTrue(entered.wait(2))
+                    writer = workers.submit(PM.restore_asset, self.root, self.mat, snapshot)
+                    self.assertFalse(replacing.wait(.2))
+                finally:
+                    release.set()
+                self.assertIn(self.tex, reader.result(timeout=5)['deselected'])
+                writer.result(timeout=5)
+        self.assertTrue(replacing.is_set())
+        self.assertEqual(PM.get_asset_opts(self.root, self.mat), snapshot['opts'])
+        self.assertEqual(PM.get_deselected(self.root), {self.tex, self.mat})
 
     def seed(self, gr, ext='.png', legacy=False):
         base = C.project_base_legacy(gr) if legacy else C.project_base(gr)
@@ -95,12 +137,12 @@ class Trash(unittest.TestCase):
         texture = self.seed(self.tex); material = self.seed(self.mat, '.json')
         deleted = T.remove(str(self.root), [self.tex,self.mat])
         texture.write_bytes(b'new user edit')
-        PM.set_asset_opts(str(self.root), self.tex, {'no_mips':True})
+        PM.set_asset_opts(str(self.root), self.tex, {'no_mips':False})
         result = T.restore(str(self.root), deleted['entry'])
         self.assertFalse(result['ok']); self.assertEqual(result['conflicts'], [self.tex])
         self.assertEqual(result['game_rels'], [self.mat]); self.assertTrue(material.exists())
         self.assertEqual(texture.read_bytes(), b'new user edit')
-        self.assertEqual(PM.get_asset_opts(str(self.root), self.tex), {'no_mips':True})
+        self.assertEqual(PM.get_asset_opts(str(self.root), self.tex), {'no_mips':False})
         self.assertTrue((self.root/T.DIRECTORY/deleted['entry']).is_dir())
 
     def test_copy_failure_rolls_back_whole_delete(self):
@@ -146,11 +188,11 @@ class Trash(unittest.TestCase):
         manifest = json.loads((folder/'manifest.json').read_text()); manifest['state'] = 'moving'
         (folder/'manifest.json').write_text(json.dumps(manifest))
         # A crash left the delete half-done, and a newer edit was saved before the project reopened.
-        texture.write_bytes(b'newer edit'); PM.set_asset_opts(str(self.root), self.tex, {'no_mips': True})
+        texture.write_bytes(b'newer edit'); PM.set_asset_opts(str(self.root), self.tex, {'no_mips': False})
         for _ in range(2):  # Every project list, project switch and delete purges again.
             T.purge(str(self.root))
             self.assertEqual(texture.read_bytes(), b'newer edit')
-            self.assertEqual(PM.get_asset_opts(str(self.root), self.tex), {'no_mips': True})
+            self.assertEqual(PM.get_asset_opts(str(self.root), self.tex), {'no_mips': False})
             self.assertNotIn(self.tex, PM.get_deselected(str(self.root)))
             self.assertTrue(material.is_file()); self.assertIn(self.mat, PM.get_deselected(str(self.root)))
         self.assertEqual(json.loads((folder/'manifest.json').read_text())['state'], 'kept')

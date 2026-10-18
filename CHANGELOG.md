@@ -5,8 +5,58 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Model Studio's **Export to Blender** saves the visible body and held weapons
+  in one portable `.blend`, with connected materials, packed textures and
+  working deformation bones. The resting surface is checked before saving.
+  Game physics and animation controls are not recreated.
+- Character strips use each hero's verified nameplate, with a costume's matching
+  nameplate when available. A hero's named Immortal plate fills in when its plain
+  plate is unpublished. The artwork keeps its contrast and uses a gentler crop.
+- Banners fill the header edge to edge and switch to their
+  sharp 4× copy as soon as it is ready, without needing to leave the folder.
+  Story sharpening prioritizes requested artwork instead of processing the whole roster.
+- Costume cards use larger portraits with their names directly underneath.
+  Breadcrumbs have their own row, readable hero and costume names, and scrolling
+  for deep paths. Folder popups follow the hovered folder; asset preparation
+  progress appears inside the Mod tray and stays with its project.
 - A “What’s new” popup shows the bundled changelog once after an update, including
   skipped releases. Reopen it from the app menu at any time.
+- Krackle category emblems replace the Material Sharp category glyphs by default.
+- All 36 categories have distinct emblem inks, fitted to at least 3:1 contrast on
+  cards and thumbnails in either theme. The bubbles are transparent cut-outs.
+- Skin folders and Model Studio show the bundle's nameplate when its name matches
+  a unique costume on the same hero page, with the hero's own nameplate and then
+  story art as fallbacks.
+  Model Studio also shows the costume icon beside the title. Wide nameplates
+  sharpen in the background while the original remains available.
+- Hero and skin colours decorate artwork, icon rings and the Continue ribbon.
+  Buttons, toggles, focus, selections and text always use the selected theme;
+  the old optional artwork-accent setting no longer changes them.
+- Verified Lord portraits appear in breadcrumbs, pins, the Mod tray's included
+  hero list and Continue. Matched nameplate icons supply square skin badges;
+  single-hero Mod cards can carry the hero's verified KO emblem. Missing art
+  falls back gracefully; unlabeled numeric variants are never guessed.
+- Custom material textures can choose a folder within `/Game/Marvel/` and a
+  texture name under **Package location**. Invalid paths and collisions with
+  game assets, project assets or other custom slots are rejected on save and
+  export. Changing the image preserves the chosen package location.
+- Real native build/readback checks pass for custom diffuse (DXT1) and normal
+  (BC5) textures: chosen folders, texture names and material references survive
+  `.pak/.ucas/.utoc` creation and unpacking, with identical decoded pixels.
+- The release catalogue now includes verified nameplate metadata. Regenerate it
+  with `scripts/update_catalogue_seed.py`; packaging refuses an outdated seed.
+- Requested hero story banners are upscaled 4x once cached (Real-ESRGAN's compact anime model,
+  run on the CPU with numpy; BSD-3-Clause, bundled under `atelier/models`). The
+  banner has no border and enters on its own instead of zooming out of the card.
+- Skin chips on Home show each costume's icon. The hero grid fills the free height
+  with a visible scrollbar, follows the Size setting, and shares its row with the
+  filters; folder chips fill even columns.
+- Assets being edited dissolve into the Krackle dot lattice in their own colours;
+  edited materials show their saved colours.
+- **No mip maps** is on by default; switching it off is remembered per asset.
+- The current folder stays readable in a narrow breadcrumb, the search hint fits
+  its box, the empty Mod tray is centred and Process S maps explains what it needs.
+- The installer refreshes Explorer's icon cache so upgrades show the current mark.
 
 ## 1.0.0 — 18 October 2026
 

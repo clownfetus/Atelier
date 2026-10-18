@@ -11,18 +11,24 @@ export function createViewportInspection(api) {
   let lighting = 'studio', comparison = 'edited', regions = false, hovered = null;
   let revision = 0, requestedMode = 0, originalPromise = null, regionPromise = null, capture = null;
   const originals = new Map(), overlays = new Map(), variants = new Map(), textures = new Set();
+  const replacedCopy=new THREE.MeshBasicMaterial({visible:false});
   const originalTextures = new Set();
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
   let down = null, opener = null, assetsLoading = false;
   const reducedMotion = (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)'));
   const effects = createViewportEffects({renderer,scene,camera,modelRoot,grid,reduced:reducedMotion});
-  let cameraMove = null, revealBounds = null;
-  let showcaseMode=false,showcaseColors=null,showcaseBackdrop=null;
+  let cameraMove = null;
+  // Showcase keeps its own floor toggle so its default look stays floorless.
+  let showcaseMode=false,showcaseColors=null,showcaseBackdrop=null,showcaseGrid=false;
+  // Inspection overlays would leak into Showcase captures, so Showcase disables them with a reason.
+  const inspectOnly=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
   function showcaseInks(){return window.AtelierShowcaseArt.palette(showcaseColors||palette());}
+  // The default backdrop is the mode's own; plain colour and transparent replace the art.
+  const showcaseArt=()=>showcaseMode&&$('viewport-backdrop').value==='gradient';
   function drawShowcase(){
-    if(!showcaseMode)return;
+    if(!showcaseArt()){showcaseBackdrop?.remove();showcaseBackdrop=null;return;}
     if(!showcaseBackdrop){showcaseBackdrop=document.createElement('canvas');showcaseBackdrop.className='vp-showcase-backdrop';showcaseBackdrop.setAttribute('aria-hidden','true');$('viewport-stage').prepend(showcaseBackdrop);}
     const width=Math.max(1,$('viewport-stage').clientWidth),height=Math.max(1,$('viewport-stage').clientHeight-58);
     showcaseBackdrop.width=width;showcaseBackdrop.height=height;
@@ -31,21 +37,22 @@ export function createViewportInspection(api) {
   function setShowcase(value){
     showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));$('viewport-inspect').setAttribute('aria-pressed',String(!showcaseMode));
     $('viewport-stage').classList.toggle('vp-showcase',showcaseMode);showcaseBackdrop?.remove();showcaseBackdrop=null;
+    $('viewport-backdrop').options[0].textContent=showcaseMode?'Showcase art':'Studio';
+    $('viewport-showcase-note').hidden=!showcaseMode;
     if(showcaseMode){
       clearHover();drawShowcase();const skin=api.context?.().skin,stamp=revision;
       if(skin){const image=new Image();image.src='/api/catalogue/thumbnail/'+encodeURIComponent(skin);image.decode().then(()=>{if(stamp!==revision||!showcaseMode)return;showcaseColors=window.AtelierPolish?.samplePalette(image)||null;drawShowcase();}).catch(()=>{});}
     }
+    updateRegions();refresh();
+    $('viewport-comparison').hidden=comparison!=='wipe' || showcaseMode;
   }
   $('viewport-showcase').addEventListener('click',()=>setShowcase(true));$('viewport-inspect').addEventListener('click',()=>setShowcase(false));
-  const shadedPlane = new THREE.Plane(new THREE.Vector3(0,-1,0));
-  const wirePlane = new THREE.Plane(new THREE.Vector3(0,1,0));
-  renderer.localClippingEnabled = true;
+  // The reveal is one last Krackle sweep (viewport-effects.js) that leaves the loaded appearance behind it.
   let revealStart = null, reveal = 1;
-  const revealWire = new THREE.MeshBasicMaterial({color:0xaccbff, wireframe:true,
-    transparent:true, depthWrite:false, toneMapped:false});
-  function materialize() { revealBounds = bounds(); revealStart = reducedMotion.matches ? null : performance.now();if(showcaseMode){showcaseColors=null;setShowcase(true);} }
+  const scanAllowed=()=>!document.hidden && !reducedMotion.matches && window.AtelierMotionPolicy?.allows(2)!==false;
+  function materialize() { revealStart = scanAllowed() ? performance.now() : null;if(showcaseMode){showcaseColors=null;setShowcase(true);} }
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { revealStart = null; reveal = 1; finishCamera(); } });
-  window.addEventListener('pagehide', () => {revealWire.dispose();toonGradient.dispose();}, {once:true});
+  window.addEventListener('pagehide', () => {toonGradient.dispose();replacedCopy.dispose();}, {once:true});
 
   function worldBoxes() {
     const boxes = [];
@@ -135,11 +142,16 @@ export function createViewportInspection(api) {
     });
     $('viewport-stats').textContent = objects.length ? `${visible.length} / ${objects.length} objects · ${triangles.toLocaleString()} triangles` : 'No model loaded';
     $('viewport-hidden').hidden = !objects.length || !!visible.length;
-    grid.visible = showGrid && !!visible.length;
+    const floor = showcaseMode ? showcaseGrid : showGrid;
+    grid.visible = floor && !!visible.length; $('viewport-grid').setAttribute('aria-pressed', String(floor));
     for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turntable']) $(id).disabled = !visible.length;
     for (const id of ['viewport-poster','viewport-turntable']) $(id).disabled ||= !api.ready();
     for (const id of ['viewport-edited','viewport-original','viewport-wipe']) $(id).disabled = !Object.keys(api.materials().data).length;
     $('viewport-regions').disabled = !Object.values(api.materials().data).some(d => d.dyeable);
+    for (const [id,title] of inspectOnly) {
+      $(id).disabled ||= showcaseMode;
+      $(id).title = showcaseMode ? 'Inspect mode only: Showcase shows the finished look' : title;
+    }
     $('viewport-show-all').disabled = objects.every(o => o.root.visible);
   }
 
@@ -174,14 +186,17 @@ export function createViewportInspection(api) {
       const result = await api.fetch(`/api/material_original?game_rel=${encodeURIComponent(info.game_rel)}`).then(r => r.json());
       if (stamp !== revision) throw new DOMException('Preview changed', 'AbortError');
       if (!result.ok) throw Error(result.error || 'Original material unavailable');
-      const tex = result.textures || {};
+      const tex = result.textures || {}, roles=api.textureRoles(result);
       const map = tex.DyeingTexture
         ? await loadTexture(`/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&original=1`, stamp)
-        : tex.BaseColor ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(tex.BaseColor)}&original=1`, stamp) : null;
-      const emissiveMap = tex.Emissive ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(tex.Emissive)}&original=1`, stamp) : null;
+        : roles.basecolor ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(roles.basecolor)}&original=1`, stamp) : null;
+      const emissiveMap = roles.emissive ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(roles.emissive)}&original=1`, stamp) : null;
+      const alphaMap=roles.opacity ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(roles.opacity)}&original=1`,stamp) : null;
+      if(alphaMap)alphaMap.colorSpace=THREE.NoColorSpace;
       if (stamp !== revision) return;
       for (const material of materials) {
-        const original = material.clone(); original.map = map; original.emissiveMap = emissiveMap;
+        const original = material.clone(); original.map = map; original.emissiveMap = emissiveMap;original.alphaMap=alphaMap;
+        api.applySurface(original,result);
         api.tintOriginal(original, result);
         originals.get(material)?.dispose(); originals.set(material, original);
       }
@@ -234,7 +249,7 @@ export function createViewportInspection(api) {
 
   function updateRegions() {
     $('viewport-regions').setAttribute('aria-pressed', String(regions));
-    $('viewport-region-legend').hidden = !regions;
+    $('viewport-region-legend').hidden = !regions || showcaseMode;
   }
 
   function displayMaterial(source, original, showcase,comic=false) {
@@ -251,7 +266,7 @@ export function createViewportInspection(api) {
       toon.color.copy(base.color||new THREE.Color(0xffffff));toon.emissive.copy(base.emissive||new THREE.Color(0));
       for(const key of ['map','alphaMap','emissiveMap','normalMap','bumpMap','aoMap','displacementMap'])toon[key]=base[key]||null;
       for(const key of ['side','transparent','opacity','alphaTest','depthWrite','depthTest','blending','emissiveIntensity','normalMapType','bumpScale','aoMapIntensity','displacementScale','displacementBias'])if(base[key]!==undefined)toon[key]=base[key];
-      if(base.normalScale)toon.normalScale.copy(base.normalScale);toon.wireframe=false;toon.clippingPlanes=null;
+      if(base.normalScale)toon.normalScale.copy(base.normalScale);toon.wireframe=false;toon.clippingPlanes=null;toon.visible=source.visible;
       if(oldMap!==toon.map||oldAlpha!==toon.alphaTest||oldSide!==toon.side)toon.needsUpdate=true;
       return toon;
     }
@@ -265,54 +280,45 @@ export function createViewportInspection(api) {
       material.alphaTest = base.alphaTest; material.alphaMap = base.alphaMap; material.depthWrite = base.depthWrite;
       material.toneMapped = lighting === 'emissive' && !overlay;
     } else material.copy(base);
-    material.wireframe = !showcase && wireframe;
+    material.wireframe = !showcase && wireframe;material.visible=source.visible;
     // Tween disposable display colors in linear space, preserving exact saved values.
     if (!overlay) effects.tint(material,base,showcase,lighting==='emissive');
     if (oldMap !== material.map || oldWireframe !== material.wireframe || oldToneMapped !== material.toneMapped) material.needsUpdate = true;
-    if (!showcase && reveal < 1) {
-      material.clippingPlanes = [shadedPlane];
-    } else material.clippingPlanes = null;
     return material;
   }
 
-  function renderPass(original = false, showcase = false, wireOnly = false,comic=false) {
+  // Showcase honours View settings; the canonical mod-card poster ignores them.
+  function renderPass(original = false, showcase = false, comic=false,canonical=false) {
     const restore = [];
-    const gridVisible=grid.visible;
+    const gridVisible=grid.visible,toon=comic&&(canonical||lighting==='studio');
     try {
-    if(comic)grid.visible=false;
+    if(canonical)grid.visible=false;
     modelRoot.traverse(mesh => {
       if (!mesh.isMesh) return;
       restore.push([mesh, mesh.material]);
-      const shown = m => !m.visible ? m : wireOnly ? revealWire : displayMaterial(m, original, showcase,comic);
+      const shown = m => m.userData?.heldDuplicate ? replacedCopy : !m.visible ? m : displayMaterial(m, original, showcase,toon);
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(shown) : shown(mesh.material);
     });
       renderer.render(scene, camera);
-      if (!comic&&!wireOnly && lighting !== 'flat' && !regions) effects.drawBloom();
+      if (!canonical && lighting !== 'flat' && !(regions && !showcase)) effects.drawBloom();
     }
     finally { for (const [mesh, material] of restore) mesh.material = material;grid.visible=gridVisible; }
   }
 
-  function render(showcase = false,comic=showcaseMode) {
+  function render(showcase = false,comic=showcaseMode,canonical=false) {
     const captured=showcase;
     showcase ||= comic;
     if (!captured) { updateCamera(); updateAxes(); }
-    reveal = revealStart === null || showcase ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
-    if (reveal === 1) revealStart = null;
-    if (reveal < 1 && revealBounds && !revealBounds.isEmpty()) {
-      const height = THREE.MathUtils.lerp(revealBounds.min.y,revealBounds.max.y,reveal);
-      shadedPlane.constant = height; wirePlane.constant = -height; revealWire.clippingPlanes = [wirePlane];
+    if (!captured) {
+      if(!scanAllowed()){revealStart=null;effects.stopLoading();}
+      reveal = revealStart === null ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
+      if (reveal === 1) revealStart = null;
+      if (!assetsLoading && reveal===1) effects.stopLoading();
     }
     if (comparison !== 'wipe' || showcase) {
-      renderPass(!showcase && comparison === 'original', showcase,false,comic);
-      if (reveal < 1) {
-        const clear = renderer.autoClear, visible = grid.visible;
-        revealWire.opacity = (1 - reveal) * .8;
-        renderer.autoClear = false; grid.visible = false;
-        try { renderPass(false, false, true); }
-        finally { renderer.autoClear = clear; grid.visible = visible; }
-      }
-      if (!showcase && assetsLoading) effects.drawLoading(bounds());
-      else if (!showcase && reveal === 1) effects.drawOutline(hovered);
+      renderPass(!showcase && comparison === 'original', showcase,comic,canonical);
+      if (!captured && scanAllowed() && (assetsLoading || reveal < 1)) effects.drawLoading(bounds(), assetsLoading ? null : reveal);
+      else if (!showcase) effects.drawOutline(hovered);
       return;
     }
     const size = renderer.getSize(new THREE.Vector2());
@@ -322,6 +328,7 @@ export function createViewportInspection(api) {
       renderer.setScissor(0, 0, divider, size.y); renderPass(true); effects.drawOutline(hovered);
       renderer.setScissor(divider, 0, size.x - divider, size.y); renderPass(false); effects.drawOutline(hovered);
     } finally { renderer.setScissorTest(false); }
+    if (scanAllowed() && (assetsLoading || reveal<1)) effects.drawLoading(bounds(),assetsLoading?null:reveal);
   }
 
   function pick(event) {
@@ -336,7 +343,7 @@ export function createViewportInspection(api) {
       for (let node = hit.object; node && node !== modelRoot; node = node.parent) visible &&= node.visible;
       if (!visible || !hit.object.isMesh) continue;
       const material = Array.isArray(hit.object.material) ? hit.object.material[hit.face?.materialIndex || 0] : hit.object.material;
-      if (material) return {name:material.name,object:hit.object};
+      if (material?.visible) return {name:material.name,object:hit.object};
     }
     return null;
   }
@@ -370,7 +377,7 @@ export function createViewportInspection(api) {
   $('viewport-view').addEventListener('change', event => chooseView(event.target.value));
   $('viewport-fit').addEventListener('click', () => frame(true,true));
   $('viewport-wireframe').addEventListener('click', () => { wireframe = !wireframe; $('viewport-wireframe').setAttribute('aria-pressed', String(wireframe)); });
-  $('viewport-grid').addEventListener('click', () => { showGrid = !showGrid; $('viewport-grid').setAttribute('aria-pressed', String(showGrid)); refresh(); });
+  $('viewport-grid').addEventListener('click', () => { if (showcaseMode) showcaseGrid = !showcaseGrid; else showGrid = !showGrid; refresh(); });
   $('viewport-lighting').addEventListener('change', event => {
     lighting = event.target.value;
     lights.forEach((light,i) => { light.intensity = [.45,1.4,.5][i]; });
@@ -386,6 +393,7 @@ export function createViewportInspection(api) {
     $('viewport-stage').dataset.backdrop = mode;
     $('viewport-backdrop-color').hidden = mode !== 'solid';
     $('viewport-stage').style.setProperty('--viewport-backdrop', $('viewport-backdrop-color').value);
+    drawShowcase();
   }
   $('viewport-backdrop').addEventListener('change',backdrop);
   $('viewport-backdrop-color').addEventListener('input',backdrop); backdrop();
@@ -412,12 +420,12 @@ export function createViewportInspection(api) {
     return [...new Set(Object.entries(api.materials().data).flatMap(([name,d]) => (d.colors || []).filter(c => !/emiss|glow/i.test(c.name)).map(c => api.hex(api.materials().edited[name]?.[c.name] || c.rgba))))].slice(0,8);
   }
 
-  function posterCanvas(size, footer = 96,comic=showcaseMode) {
+  function posterCanvas(size, footer = 96,art=showcaseArt()) {
     const output = document.createElement('canvas'); output.width = size; output.height = size + footer;
     const context = output.getContext('2d');
     context.fillStyle = '#101217'; context.fillRect(0,size,size,footer);
     const mode = $('viewport-backdrop').value;
-    if(comic)window.AtelierShowcaseArt.draw(context,size,size,showcaseInks());
+    if(art)window.AtelierShowcaseArt.draw(context,size,size,showcaseInks());
     else if (mode !== 'checker') {
       const style = getComputedStyle($('viewport-stage'));
       const gradient = context.createLinearGradient(0,0,size,size);
@@ -441,7 +449,7 @@ export function createViewportInspection(api) {
     const dimensions=renderer.getSize(new THREE.Vector2()),ratio=renderer.getPixelRatio();
     const saved={position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),aspect:camera.aspect,near:camera.near,far:camera.far,min:controls.minDistance,max:controls.maxDistance,fit:fitOnResize,damping:controls.enableDamping};
     const animationState=api.pauseAnimation?.();
-    try{renderer.setPixelRatio(1);renderer.setSize(size,size,false);camera.aspect=1;camera.updateProjectionMatrix();frame(true);render(true,true);return posterCanvas(size,0,true);}
+    try{renderer.setPixelRatio(1);renderer.setSize(size,size,false);camera.aspect=1;camera.updateProjectionMatrix();frame(true);render(true,true,true);return posterCanvas(size,0,true);}
     finally{controls.enableDamping=false;camera.position.copy(saved.position);camera.up.copy(saved.up);controls.target.copy(saved.target);camera.aspect=saved.aspect;camera.near=saved.near;camera.far=saved.far;controls.minDistance=saved.min;controls.maxDistance=saved.max;controls.update();controls.enableDamping=saved.damping;fitOnResize=saved.fit;camera.updateProjectionMatrix();renderer.setPixelRatio(ratio);renderer.setSize(dimensions.x,dimensions.y,false);api.resumeAnimation?.(animationState);api.resize();}
   }
   function download(blob, extension) {
@@ -556,10 +564,11 @@ export function createViewportInspection(api) {
   }
   function setLoading(value) {
     assetsLoading=!!value;
+    revealStart=null;reveal=1;effects.stopLoading();
     renderer.domElement.setAttribute('aria-busy',String(assetsLoading));
     $('viewport-stage').classList.toggle('vp-assets-loading',assetsLoading);
   }
   return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,cardPoster,
-    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading,showcase:showcaseMode}),
+    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading,showcase:showcaseMode,grid:grid.visible}),
     resized:() => { if (fitOnResize && !capture && !cameraMove) frame(true);drawShowcase(); }, capturing:() => !!capture};
 }

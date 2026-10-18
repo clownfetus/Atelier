@@ -11,24 +11,26 @@ Two ways to get from a slot to its MI, in order of trust:
   1. the mesh's IMPORT TABLE -- FSkeletalMaterial.MaterialInterface is a real FPackageIndex
      (mesh.Mesh.materials[i]["pkg_idx"]), so `uat to_json` on the mesh plus the same import walk
      material.py uses for texture params gives the exact answer. Costs one big cached JSON.
-  2. by NAME through the pak index -- the MaterialSlotName as an asset name. This is what the 3D
-     viewport ships on (gui/viewport.js), and it is demonstrably not reliable enough to lead with:
-     see resolve_mesh_materials for the three ways it is wrong on the reference mesh alone.
+  2. by NAME through the pak index -- a fallback when the import cannot be resolved.
+     Model Studio now uses this same resolver; a coincidentally valid name must never
+     override the cooked mesh's actual material reference.
 """
 import concurrent.futures
+from contextvars import copy_context
 import hashlib
 import json
 import os
 import shutil
 import sys
+from atelier import jobs
 
 from atelier.config import CACHE_3DVIEW, USMAP, get_import_root, project_base, project_base_legacy
 from atelier.tools import uat
 
 # Texture parameter name -> the PBR role the Blender wiring understands. Matched case-insensitively
 # on the parameter name with non-alphanumerics stripped, so "Base Color"/"BaseColorMap" both land.
-# Anything unmatched still gets extracted and loaded as an unconnected image node -- MR's ColorID /
-# DyeingTexture masks are exactly that: real, editable, and wrong to guess a shader role for.
+# Unmatched game-effect inputs remain named editable group inputs and are reported
+# separately from mapped surface inputs. Dye masks have an explicit region shader.
 _ROLE_ALIASES = {
     "basecolor": "basecolor", "base": "basecolor", "diffuse": "basecolor", "albedo": "basecolor",
     "basecolormap": "basecolor", "basecolortexture": "basecolor", "diffusemap": "basecolor",
@@ -36,6 +38,13 @@ _ROLE_ALIASES = {
     "orm": "orm", "ormmap": "orm", "ormtexture": "orm", "maskmap": "orm", "mrao": "orm", "arm": "orm",
     "emissive": "emissive", "emissivemap": "emissive", "emission": "emissive",
     "emissivetexture": "emissive", "emissivecolor": "emissive",
+    "opacity": "opacity", "opacitymap": "opacity", "opacitymask": "opacity",
+    "opacitytexture": "opacity", "alphamap": "opacity", "alphamask": "opacity",
+    "shadowcoloruv1": "ao", "ambientocclusion": "ao", "aomap": "ao",
+    "speculartexture": "specular", "specularmap": "specular",
+    "anisotropybrightness": "anisotropy", "specularshift": "anisotropy_rotation",
+    "dyeingtexture": "dye", "sclerabasecolor": "sclera", "irisbasecolor": "iris",
+    "irisbaseao": "iris_ao", "irisheight": "iris_height", "highlightmask": "highlight",
 }
 
 
@@ -44,7 +53,7 @@ def _canon(name):
 
 
 def texture_role(param_name):
-    """PBR role for a texture parameter name, or None to load it unconnected."""
+    """Surface role, or None for an auxiliary game-effect group input."""
     return _ROLE_ALIASES.get(_canon(param_name))
 
 
@@ -86,7 +95,7 @@ def _mesh_json(mesh_game_rel, work_base):
     this JSON is big and slow -- it exists only as the exact fallback when name resolution is
     ambiguous, and is cached so it happens at most once per mesh."""
     jp = project_base(mesh_game_rel, CACHE_3DVIEW) + ".json"
-    if not os.path.exists(jp):
+    if not os.path.exists(jp) or os.path.getmtime(jp) < os.path.getmtime(work_base + '.uasset'):
         sub = os.path.dirname(jp)
         os.makedirs(sub, exist_ok=True)
         uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, os.path.abspath(sub)])
@@ -143,7 +152,6 @@ def resolve_mesh_materials(mesh_game_rel, mesh, work_base=None):
 
 def resolve_mesh_textures(slots):
     """Attach each slot's MI texture params: [{param, role, game_rel}] under key 'maps'."""
-    from atelier.handlers.material import read_material
     cache = {}
     for rec in slots:
         rec["maps"] = []
@@ -152,13 +160,62 @@ def resolve_mesh_textures(slots):
             continue
         if mi not in cache:
             try:
-                cache[mi] = read_material(mi, cache_only=True).get("textures", {})
+                cache[mi] = material_snapshot(mi)
+            except jobs.Cancelled:
+                raise
             except Exception as e:
                 print(f"[meshmat] material read failed for {mi}: {e}", file=sys.stderr, flush=True)
-                cache[mi] = {}
-        for param, tex_gr in sorted(cache[mi].items()):
-            rec["maps"].append({"param": param, "role": texture_role(param), "game_rel": tex_gr})
+                cache[mi] = {'material_error': str(e)}
+        rec['parameters'] = cache[mi]
+        for param, tex_gr in sorted(cache[mi].get('textures', {}).items()):
+            rec["maps"].append({"param": param, "role": texture_role(param), "game_rel": tex_gr,
+                                'uv': 1 if '(uv1)' in param.casefold() or _canon(param)=='anisotropybrightness' else 0})
     return slots
+
+
+def material_snapshot(game_rel):
+    """Port a material's effective parameters, with child values overriding parents.
+
+    Inspired by RivalsPorting's typed material export and recursive parameter
+    collection. This is separate from the material editor's own-property reads:
+    inherited defaults must not accidentally become edits to a child instance.
+    """
+    from atelier.handlers.material import mat_json, _mat_params, _mat_textures, _mat_surface, _gn, _ex_props
+    colors, scalars, textures, chain, custom_paths, owners = {}, {}, {}, [], {}, {}
+    current = game_rel
+    surface = None
+    while current:
+        if current.casefold() in {p.casefold() for p in chain} or len(chain) >= 64:
+            raise ValueError('Recursive material parent chain')
+        chain.append(current)
+        with open(mat_json(current, out_dir=CACHE_3DVIEW,prefer_exact=True), encoding='utf-8-sig') as stream:
+            document=json.load(stream)
+        c, s = _mat_params(document)
+        for row in c: colors.setdefault(row['name'], row)
+        for row in s: scalars.setdefault(row['name'], row)
+        for name,path in _mat_textures(document).items():
+            if name not in textures:textures[name]=path;owners[name]=current
+        from atelier.handlers import custom_texture
+        for name in custom_texture.assignments(current):
+            if owners.get(name)==current:custom_paths.setdefault(name,custom_texture.image_path(current,name))
+        if surface is None: surface=_mat_surface(document)
+        parent = _gn(_ex_props(document['Exports'][0]), 'Parent') or {}
+        index=parent.get('Value'); imports=document.get('Imports', [])
+        if not isinstance(index,int) or not -len(imports)<=index<0: break
+        reference=imports[-index-1]
+        surface['parent']=reference.get('ObjectName','')
+        if reference.get('ClassName')!='MaterialInstanceConstant': break
+        current=_mi_from_imports(document,index)
+    if 'eye' in (surface or {}).get('parent','').casefold() and 'glass' not in surface['parent'].casefold() and 'highlight' not in surface['parent'].casefold():
+        # The game's eye master supplies these defaults without MI texture overrides.
+        # RivalsPorting exposes the same four default inputs for its eye shader.
+        for param,name in [('ScleraBaseColor','T_EyeSclera_D'),('IrisBaseColor','T_Common_Eyes_03_D'),
+                           ('IrisHeight','T_Iris001_01_H'),('IrisBaseAO','T_Iris001_01_AO')]:
+            if param not in textures:
+                candidate=_best_candidate(_index_candidates(name),game_rel)
+                if candidate: textures[param]=candidate
+    return {'colors': list(colors.values()), 'scalars': list(scalars.values()), 'textures': textures,
+            'surface': surface or {}, 'parent_chain': chain, 'custom_paths':custom_paths}
 
 
 def _degenerate(png, limit=16):
@@ -206,11 +263,17 @@ def extract_textures_to_project(tex_game_rels, root=None):
     a .png beside it would show edits in Blender that silently never ship."""
     from atelier.handlers.texture import decode_to_png, ensure_work_base
     root = root or get_import_root()
+    project_root=get_import_root()
     grs = sorted(set(g for g in tex_game_rels if g))
     result = {}
 
     def _one(gr):
         dst = project_base(gr, root)
+        if os.path.normcase(os.path.realpath(root)) != os.path.normcase(os.path.realpath(project_root)):
+            for src in (project_base(gr,project_root)+'.png', project_base_legacy(gr,project_root)+'.png'):
+                if os.path.isfile(src):
+                    os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copy2(src,dst+'.png')
+                    return gr, {'path':dst+'.png','status':'existing','readonly':False}
         for cand, ro in ((dst + ".png", False), (project_base_legacy(gr, root) + ".png", False),
                          (dst + ".dds", True), (project_base_legacy(gr, root) + ".dds", True)):
             if os.path.exists(cand):
@@ -225,17 +288,30 @@ def extract_textures_to_project(tex_game_rels, root=None):
         # .dds beside its output, and a .dds in the project would outrank the user's painted .png.
         cache_base = project_base(gr, CACHE_3DVIEW)
         png = cache_base + ".png"
+        hdr=cache_base+'.hdr'
+        if os.path.isfile(hdr):
+            os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copyfile(hdr,dst+'.hdr')
+            return gr, {'path':dst+'.hdr','status':'existing','readonly':True,
+                        'note':'HDR source retained as a named input; game texture painting is unavailable.'}
         # A cached 4x4 is the signature of a failed mip recovery (see texture.decode_dds), not a
         # real texture -- handing one over as "editable" invites painting it and injecting a
         # destroyed map. Drop it and decode again; the cache predates the caller either way.
         if os.path.exists(png) and _degenerate(png):
             os.remove(png)
         if not os.path.exists(png):
-            wb = ensure_work_base(gr)
+            wb = ensure_work_base(gr,prefer_exact=True)
             if not wb:
                 return gr, {"path": None, "status": "missing", "readonly": False}
             png = decode_to_png(cache_base, wb)
         if not png or not os.path.exists(png) or _degenerate(png):
+            from atelier.handlers.meshimages import recover_inline_hdr
+            # Reuse the source lookup when a stale PNG was already present.
+            if 'wb' not in locals():wb=ensure_work_base(gr,prefer_exact=True)
+            hdr_record=recover_inline_hdr(wb,cache_base) if wb else None
+            if hdr_record:
+                os.makedirs(os.path.dirname(dst),exist_ok=True)
+                shutil.copyfile(hdr_record['path'],dst+'.hdr')
+                return gr,{**hdr_record,'path':dst+'.hdr'}
             return gr, {"path": None, "status": "failed", "readonly": False}
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         refreshed = os.path.exists(dst + ".png")
@@ -243,9 +319,24 @@ def extract_textures_to_project(tex_game_rels, root=None):
         return gr, {"path": dst + ".png", "status": "refreshed" if refreshed else "extracted",
                     "readonly": False}
 
+    def safe_one(gr):
+        from atelier import jobs
+        from atelier.tools import tex_semaphore
+        try:
+            with jobs.cancellable_lock(tex_semaphore):
+                return _one(gr)
+        except jobs.Cancelled:
+            raise
+        except Exception as error:
+            return gr, {'path': None, 'status': 'failed', 'readonly': False, 'error': str(error)}
     if grs:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
-            for gr, rec in ex.map(_one, grs):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(2, len(grs))) as ex:
+            # ContextVars carry both the pinned project and the cancellation/job
+            # token. Each worker needs its own copy; sharing one Context across
+            # simultaneous threads is invalid.
+            futures=[ex.submit(copy_context().run,safe_one,gr) for gr in grs]
+            for future in futures:
+                gr, rec = future.result()
                 result[gr] = rec
     return result
 
@@ -256,27 +347,43 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
     slots = resolve_mesh_textures(resolve_mesh_materials(mesh_game_rel, mesh, work_base))
     files = extract_textures_to_project(
         [mp["game_rel"] for rec in slots for mp in rec["maps"]], root=root)
-    out_slots, warnings = {}, []
-    for rec in slots:
+    out_slots, warnings, incomplete = {}, [], []
+    from atelier.handlers.meshvisibility import hidden_sections
+    hidden=hidden_sections(mesh_game_rel)
+    for index, rec in enumerate(slots):
         if not rec["slot"]:
             continue
         maps = []
+        if rec.get('parameters',{}).get('material_error'):
+            message=rec['slot']+': '+rec['parameters']['material_error'];warnings.append(message);incomplete.append(message)
         for mp in rec["maps"]:
             f = files.get(mp["game_rel"]) or {}
+            custom=rec.get('parameters', {}).get('custom_paths',{}).get(mp['param'])
+            if custom and os.path.isfile(custom):
+                if root and os.path.normcase(os.path.realpath(root)) != os.path.normcase(os.path.realpath(get_import_root())):
+                    identity=hashlib.sha1((rec['mi']+'|'+mp['param']).encode('utf-8')).hexdigest()
+                    path=os.path.join(root,'.custom',identity+'.png');os.makedirs(os.path.dirname(path),exist_ok=True);shutil.copy2(custom,path)
+                else:path=custom
+                f={'path':path,'status':'custom','readonly':False}
             if not f.get("path"):
-                warnings.append(f"{rec['slot']}: could not decode {os.path.basename(mp['game_rel'])}")
+                message=f"{rec['slot']}: could not decode {os.path.basename(mp['game_rel'])}"
+                warnings.append(message);incomplete.append(message)
                 continue
             if f.get("readonly"):
-                warnings.append(f"{os.path.basename(mp['game_rel'])} is a hand-authored .dds — "
+                warnings.append(f.get('note') or f"{os.path.basename(mp['game_rel'])} is a hand-authored .dds — "
                                 f"shown in Blender but painting it there will not ship")
             role = mp["role"]
             if role in _HARMFUL_IF_BLACK and _is_black_placeholder(f["path"]):
-                role = None      # loaded but unconnected: an unused slot, not a real map
-            maps.append({"param": mp["param"], "role": role, "game_rel": mp["game_rel"],
+                role = None      # retain the unused source input without damaging the surface
+            maps.append({"param": mp["param"], "role": role, "game_rel": mp["game_rel"], 'uv': mp.get('uv',0),
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
-        out_slots[rec["slot"]] = {"mi": rec["mi"], "maps": maps}
+        out_slots[rec["slot"]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
+            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
+        from atelier.handlers.meshtextures import source_maps
+        maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))
         if not rec["mi"]:
-            warnings.append(f"{rec['slot']}: no material found — slot left untextured")
+            message=f"{rec['slot']}: no material found — slot left untextured"
+            warnings.append(message);incomplete.append(message)
     for gr, f in files.items():
         if f.get("status") in ("failed", "missing"):
             warnings.append(f"{os.path.basename(gr)}: could not decode ({f['status']}) — "
@@ -286,4 +393,4 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
                      "sha1": _sha1(f["path"]) if f.get("path") and
                              f.get("status") in ("extracted", "refreshed") else None}
                 for gr, f in files.items()}
-    return {"mesh": mesh_game_rel, "slots": out_slots, "textures": textures, "warnings": warnings}
+    return {"mesh": mesh_game_rel, "slots": out_slots, "textures": textures, "warnings": warnings, 'incomplete':incomplete}

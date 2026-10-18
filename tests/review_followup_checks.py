@@ -21,11 +21,16 @@ def run_review_followup_checks(context, url, report, checks):
         tab.wait_for_function('_editsInFlight.size === 1')
         tab.wait_for_timeout(100)
         assert len(held) == 1
+        assert tab.locator('#tray-progress .toast:visible').count() == 1
+        assert 'Preparing T_Shared for editing' in tab.locator('#tray-progress').inner_text()
+        assert tab.locator('#toast-area [data-operation-state=busy]').count() == 0
         tab.evaluate("_selectProject('Smoke B')")
         tab.wait_for_function("atelierProject() === 'Smoke B'")
+        assert tab.locator('#tray-progress').is_hidden()
         tab.evaluate('handleAssetClick(reviewItem)')
         tab.wait_for_function('_editsInFlight.size === 2')
         assert [route.request.headers['x-atelier-project'] for route in held] == ['Smoke%20A', 'Smoke%20B']
+        assert tab.locator('#tray-progress .toast:visible').count() == 1
         before = tab.locator('#status-msg').inner_text()
         held[0].fulfill(json={'ok': True})
         tab.wait_for_function('_editsInFlight.size === 1')

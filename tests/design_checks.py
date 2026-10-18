@@ -85,6 +85,10 @@ def run_design_checks(page, context, url, report, checks):
     checks.append('Folder icons fill 76% of their preview and stay contained at all four thumbnail sizes in both themes')
 
     page.reload()
+    page.wait_for_function("document.getElementById('grid-area').getAttribute('aria-busy') === 'false'")
+    # Reload opens Home, where category cards can be collapsed. Continue this
+    # theme-persistence check in the same folder surface used above.
+    page.evaluate("pushNav({path:'Foundation checks'})")
     page.wait_for_selector('#grid-area .card')
     assert page.locator('html').get_attribute('data-theme') == 'dark'
     page.emulate_media(color_scheme='light')

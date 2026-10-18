@@ -261,10 +261,18 @@ def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=Fals
     mask_gr, diff_gr = dye_slots(game_rel, original=True) if original else dye_slots(game_rel)
     if not mask_gr:
         raise RuntimeError("not a dyeing material (no %s slot): %s" % (MASK_SLOT, game_rel))
-    mask_im = _tex_image(mask_gr, original=True) if original else _tex_image(mask_gr)
+    def source_image(slot, texture):
+        if not original:
+            from atelier.handlers.custom_texture import image_path
+            custom = image_path(game_rel, slot)
+            if custom and os.path.isfile(custom):
+                with Image.open(custom) as image:
+                    return image.copy()
+        return _tex_image(texture, original=True) if original else _tex_image(texture)
+    mask_im = source_image(MASK_SLOT, mask_gr)
     if mask_im is None:
         raise RuntimeError("could not decode the ColorID mask: " + mask_gr)
-    diff_im = (_tex_image(diff_gr, original=True) if original else _tex_image(diff_gr)) if diff_gr else None
+    diff_im = source_image(DIFF_SLOT, diff_gr) if diff_gr else None
     if diff_im is None:                                  # dye-only preview if the diffuse is missing
         diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
     if dye_off:

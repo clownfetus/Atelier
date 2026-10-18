@@ -125,7 +125,8 @@
       const open=document.createElement('button'); open.className='roster-open'; open.textContent='Open '+hero.name; open.addEventListener('click',()=>navigate?.(hero.path)); skins.append(open);
       for (const skin of hero.skins || []) {
         const tile=document.createElement('button'); tile.className='roster-skin'; tile.title=skin.name; tile.setAttribute('aria-label',skin.name);
-        if(skin.icon){const icon=document.createElement('img');icon.className='roster-skin-icon';icon.alt='';icon.loading='lazy';icon.decoding='async';icon.src=skin.icon;icon.addEventListener('error',()=>icon.remove());tile.append(icon);}
+        if(skin.icon||skin.badge){const icon=document.createElement('img');icon.className='roster-skin-icon';icon.alt='';icon.loading='lazy';icon.decoding='async';
+          window.AtelierCatalogueArt.load(icon,[skin.icon,skin.badge]);tile.append(icon);}
         const label=document.createElement('span'); label.textContent=skin.name; tile.append(label);
         tile.addEventListener('click',()=>options.openSkin?options.openSkin(skin):navigate?.(skin.path)); skins.append(tile);
         tintSkin(tile,skin,hero);
@@ -143,7 +144,9 @@
       const label=document.createElement('strong');label.className='roster-hero-name';label.textContent=hero.name;
       const costumes=hero.skins?.length||0;
       const counts=document.createElement('span');counts.className='roster-counts';counts.textContent=`${costumes} costume${costumes===1?'':'s'} · ${count} edit${count===1?'':'s'}`;button.append(label,counts);
-      button.addEventListener('click',()=>choose(hero,button,true)); heroes.append(button);
+      button.addEventListener('click',()=>choose(hero,button,true));
+      button.addEventListener('dblclick',()=>navigate?.(hero.path));
+      heroes.append(button);
     }
     heroes.classList.add('k-screen');
     heroes.addEventListener('keydown',event=>{
@@ -184,11 +187,16 @@
     root.classList.remove('has-skin-colour');root.style.removeProperty('--continue-colour');
     if(!requested||!item)return;
     const inProject=project;
-    if(item.file_type==='texture'||item.skin_id){const img=document.createElement('img');img.alt='';img.src=item.file_type==='texture'?`/api/preview?game_rel=${encodeURIComponent(item.game_rel)}&_project=${encodeURIComponent(project)}`:'/api/catalogue/thumbnail/'+item.skin_id;img.onerror=()=>img.remove();root.append(img);}
+    if(item.file_type==='texture'||item.skin_id){const img=document.createElement('img');img.alt='';
+      const sources=item.file_type==='texture'?[`/api/preview?game_rel=${encodeURIComponent(item.game_rel)}&_project=${encodeURIComponent(project)}`]:
+        ['/api/catalogue/badge/'+item.skin_id,'/api/catalogue/icon/'+item.skin_id,'/api/catalogue/thumbnail/'+item.skin_id];
+      window.AtelierCatalogueArt.load(img,sources);root.append(img);}
     const copy=document.createElement('div'),title=document.createElement('strong');title.textContent='Pick up where you left off';
     const detail=document.createElement('p'),seconds=Math.max(0,Date.now()/1000-(item.modified||item.mtime||0));
     const ago=seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+' min ago':seconds<86400?Math.floor(seconds/3600)+' h ago':Math.floor(seconds/86400)+' d ago';
-    detail.textContent=[item.char_name,item.skin_name,item.name].filter(Boolean).join(' · ')+', edited '+ago;copy.append(title,detail);root.append(copy);
+    detail.textContent=[item.char_name,item.skin_name,item.name].filter(Boolean).join(' · ')+', edited '+ago;
+    const heroChip=window.AtelierCatalogueArt?.heroChip(item);if(heroChip)detail.prepend(heroChip);
+    copy.append(title,detail);root.append(copy);
     const button=document.createElement('button');button.className='btn primary';button.textContent='Continue editing';button.addEventListener('click',()=>options.continue?.(item,editorFor(item)));root.append(button);
     // Match the library/roster identity art; an asset path also works when sidebar IDs are absent.
     const path=/^Characters\//i.test(item.game_rel) ? item.game_rel : ['Characters',item.char_id||item.skin_id?.slice(0,4),item.skin_id].filter(Boolean).join('/');

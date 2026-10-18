@@ -87,26 +87,27 @@ where supported, and context menus scale from the actual pointer/keyboard anchor
 The home roster reads existing catalogue metadata; it never scans containers,
 imports an asset or refreshes the remote catalogue. Selecting a hero reveals its
 costumes, with separate buttons to open the hero or a costume. Missing catalogue
-art leaves folder browsing available. Banners use the current hero/skin artwork;
-the category rule and asset glyphs reuse the existing 22 category colors. Edited
+art leaves folder browsing available. Skin banners use a uniquely matched
+same-hero nameplate, with the hero's story art as fallback; category emblems and
+asset glyphs use their category roles. Edited
 cards and sidebar rows share a clipped-corner marker. Sidebar material mosaics
 and curve sparklines read existing saved JSON only, with generic symbols on error.
 
 Both roster rows use side arrows, disabled at their scroll limits, with keyboard
-activation and reduced-motion support. Costume-name backgrounds sample their own
-cached artwork, blend it with the current surface and keep text at 4.5:1 contrast.
-These local colours follow theme changes independently of the optional global
-artwork accent. Missing artwork retains the normal surface. The Hood uses the
+activation and reduced-motion support. Hero artwork backgrounds, costume icon
+rings, banner washes and the Continue edge sample the strongest saturated hue
+weighted by its coverage, falling back to a common colour for neutral artwork.
+Names and counts keep theme text on a plain panel. Missing artwork retains the
+normal surface. The Hood uses the
 published 0011 avatar because its default 0010 asset is a blank silhouette.
 
 High contrast, Blueprint and Comic ink extend the preset list. Comfortable keeps
 the existing density; Compact reduces control and row padding. Preferences use
-`atelier.motion`, `atelier.density` and `atelier.adaptiveAccent`, remain local to
-the browser profile, and synchronize across its windows. Optional artwork accent
-sampling is an explicit exception to the previous no-extraction guideline: it
-only runs on already loaded catalogue artwork in a hero/skin context, changes UI
-accent roles through the existing contrast correction, and never recolors images
-or project data. Outside that context, the selected palette's accent returns.
+`atelier.motion` and `atelier.density`, remain local to the browser profile and
+synchronize across its windows. **Hero and skin colours are decoration only.**
+Never use them for buttons, toggles, focus outlines, selection states or body
+text. The chosen theme owns those roles and Krackle status/ownership inks.
+Legacy `atelier.adaptiveAccent` values no longer recolour theme roles.
 
 Native launch colors are mirrored into `_webview/window-theme.json`, independently
 of project/config data. The cache validates colors and resolves System against
@@ -126,6 +127,19 @@ render targets at 512px per side, and releases them on disable or close. Flat
 albedo and dye-region modes bypass bloom. Transparent captures retain alpha.
 Reduced motion settles reveal, camera and colours immediately. Lighting,
 comparison and capture never persist these display choices.
+
+Custom material textures retain content-addressed project images under
+`.atelier/custom_textures/`. Package location edits change only the material's
+slot metadata: a `T_` name and folder in `/Game/Marvel/`, previewed in full before
+saving. The default remains `Atelier/Custom/<material-slot-hash>/T_<name>`.
+Explicit folders accept letters, numbers and underscores, up to 160 characters
+total and 64 per segment. Traversal, drive/UNC paths, encoded separators,
+Windows device names, Plugins and Marvel_LQ roots are refused. Names allow up to
+60 characters after `T_`. Save and export reject case-insensitive collisions with
+indexed game packages, existing project assets and every other custom slot.
+Changing an image retains its chosen location; changing a location retains the
+image. Failed validation keeps the previous assignment and editor input. Replies
+are bound to their originating project and material editor.
 
 Model Studio has its own blue/slate surface tokens, labelled header, broad stage,
 contextual right inspector and bottom playback bar. Its main action is Save changes.
@@ -157,7 +171,7 @@ viewport loader samples the current artwork and lightens its accent for contrast
 
 Job feedback, ownership markers, empty states and occasional brand moments use **Krackle**, after Jack Kirby's krackle (credited here only; the product calls it Krackle). Energy defines the silhouette, bubbles give it texture and movement, and at small sizes the silhouette survives with minimal texture. Krackle never draws outlines, gradients or symbols: busy is a ring of dots a charge travels around, success a starburst, completed-with-warnings a cracked ring whose chunk falls out, failure a splat. The shapes give outcomes personality; adjacent text ("Mod exported", "Mod exported with warnings", "Export failed"; "Succeeded with warnings" in Activity) carries the meaning.
 
-- Concentrate it: substantial jobs (export, import, saves, loading, Activity), restrained ownership markers, empty states, and showcase moments (logo entrance, first export). Button presses, hover, typing, search, theme changes and dialog backdrops stay plain. Chrome and category emblems keep Material Sharp glyphs.
+- Concentrate it: substantial jobs (export, import, saves, loading, Activity), restrained ownership markers, empty states, category emblems and showcase moments (logo entrance, first export). Chrome keeps Material Sharp glyphs.
 - Keep edited artwork trustworthy: never texture a colour swatch, a dye preview or the material-inspection viewport. A comic viewport mode would be an explicit showcase mode.
 - Compose, don't scatter: bubbles gather into deliberate dark masses on the shadow side, with clean energy elsewhere and a clear silhouette edge. Bubbles sit at least one dot step inside the shape, so thin bands such as the ring keep only a sparse centreline. Success is mostly clean; failure carries one substantial mass. Highlights are crisp Paper specks, never a soft glow.
 - Outcome colours are fixed per measured surface (`--krackle-*` in `gui/motion/krackle.css`); bubbles use Ink, except Paper holes in light-surface success. Paper glints are not counted as inks. Semantic UI colours remain separate.
@@ -174,7 +188,7 @@ The A mark is drawn in Krackle. A rounded A of solid energy, wide-footed as befo
 
 The previous mark, an Image Gen raster, separated its strokes with a diagonal cut about 0.6px wide at 32px, so its one distinctive detail vanished in the header and taskbar, and its alpha edges carried cyan fringing. `scripts/brand_mark.py` now draws the mark from geometry and writes `gui/brand/atelier-mark.svg` (editable vector), `gui/brand/atelier-mark.png` (256px interface raster for the header, launch splash and favicon), `icon.ico` (a drawing per size, 16–256px) and `icon.png` (1024px, Linux desktop entry). Run it after any change; `--check` fails when a file is stale and runs with the logo browser checks. No new logo/font/icon runtime dependency is required.
 
-Category artwork uses 22 `--studio-icon-*` roles: folder, character, UI,
+Asset glyphs and the Sharp fallback use 22 `--studio-icon-*` roles: folder, character, UI,
 texture, VFX, material, curve, mesh, text, nameplate, plugin, weapon, unknown,
 animation, audio, map, light, logic, data, tools, environment and movie.
 Each family has its own color in both themes; folders, assets and home shortcuts
@@ -266,11 +280,53 @@ Names and numeric IDs come from [donutman07/MarvelRivalsCharacterIDs](https://gi
 
 Matching uses costume-page numeric game IDs first. When a recolor page omits an ID, only a unique normalized exact name within the same hero is accepted. No fuzzy matching is used. Conflicting IDs, ambiguous names and NPCs sharing a playable hero's name are not silently assigned unrelated skin art. Missing skin art uses a labelled hero portrait; unavailable heroes use the folder symbol. Default skin IDs are not invented.
 
-The current seed contains 54 hero portraits and 690 matched costume artworks: 558 by source ID and 132 by exact name. Six named skins use hero fallbacks. Sixty entries have no artwork, mostly NPCs and future/unlisted heroes. Unknown skin folders can also fall back to their known hero. These counts describe the seed snapshot, not guaranteed future source coverage.
+The current seed contains 820 entries, with 700 matched costumes (564 by source ID,
+136 by exact name), 459 matched costume nameplates and 54 hero nameplates, each
+paired with its square icon. All 54 heroes with published portraits have a
+verified nameplate: 44 plain plates and 10 Immortal fallbacks. Seven
+named skins use hero fallbacks. Unknown skin folders can also fall back to their
+known hero. These counts describe the seed snapshot, not future source coverage.
+
+Nameplates are paired only when normalized names match exactly and uniquely on
+both sides of one hero page. Costume art fallbacks never inherit a nameplate.
+The library header prefers the costume's exact nameplate, then the hero's own
+nameplate. Hero plates match the roster's name exactly on that hero's page; when
+the plain plate is absent, the unique `Immortal <hero name>` plate is used. No
+unrelated costume plate is borrowed. Model Studio uses the same order above its
+Materials list. Story artwork is the final fallback when no plate is available.
+The strip fills the container to its sides and the controls below. Artwork
+occupies the right side with a modest bleed past its slanted edge. The text
+surface fades out before the character, keeping the image's colour and contrast.
+The title uses the costume icon, then the matched square nameplate badge, then
+the hero avatar. Wide nameplate reads request lazy 4× sharpening at every display
+scale. Story reads queue the requested hero instead of sharpening the whole roster
+at launch. Originals stay visible while the CPU works; visible banners check for
+completion and decode the sharp replacement before swapping it in. Failed
+sharpening keeps the original and uses a retry cooldown.
+
+Costume cards give the portrait the full card width and a taller frame, with the
+name directly beneath it. Breadcrumbs and history controls occupy their own row;
+names stay intact and deep paths scroll horizontally. Tooltips follow actual
+pointer movement or keyboard focus, without opening on programmatically focused
+first folders. Asset preparation uses the Mod tray's project-scoped progress area.
+
+Lord portraits and KO emblems come from RivalSkins' Lord Icons and Kill Icons
+pages. Only an explicit default `Hero Deluxe Avatar` or `Hero Deluxe KO Prompt 1`
+page label that matches one known playable hero establishes ownership. Numeric
+filenames alone, alternate forms, ambiguous labels and partial names are ignored.
+Lord portraits decorate breadcrumbs, pinned character folders, included Mod tray
+heroes and Continue, falling back to the avatar and then the hero portrait.
+Single-hero Mod cards may use the verified hero KO emblem; it is not evidence of
+a costume or bundle match. Square nameplate badges supply skin fallbacks.
+
+Run `.venv\\Scripts\\python.exe scripts/update_catalogue_seed.py` before a release.
+It uses the normal catalogue parser and cached item metadata, writes only the
+verified metadata seed, and preserves it on failure. `Atelier.spec` checks parser
+version and matched nameplate coverage before either platform is packaged.
 
 At every backend launch, the frontend starts one background catalogue check through `/api/catalogue/status`. The worker checks the ID list and roster; a changed source, changed parser version or 24-hour age triggers a full metadata refresh. Individual costume pages are cached for seven days. This avoids recrawling hundreds of pages on each launch. Images load lazily when browsing and are cached by source URL under `ATELIER_DATA_DIR/_cache/catalogue`. Changed URLs produce new cache files; artwork replaced at an identical URL remains cached until that cache entry is removed.
 
-Network requests have time/size limits, an explicit HTTPS source allowlist, redirect validation and at most three concurrent artwork requests. Only verified WebP images are accepted. Metadata is published atomically after a successful refresh; offline or changed-source failures retain the last usable catalogue. Fresh installations need a connection to fetch images the first time; cached images remain available offline. Neither update checks nor image failure block editing or export. This is an artwork update check; Atelier's existing application updater is unchanged.
+Network requests have time/size limits, an explicit HTTPS source allowlist, redirect validation and at most three concurrent artwork requests. Costume/nameplate images require verified WebP; hero artwork accepts verified PNG/WebP and caches it as WebP. Metadata is published atomically after a successful refresh; offline or changed-source failures retain the last usable catalogue. Fresh installations need a connection to fetch images the first time; cached images remain available offline. Neither update checks nor image failure block editing or export. This is an artwork update check; Atelier's existing application updater is unchanged.
 
 `/api/browse` keeps existing names, paths and type identifiers and adds optional `thumbnail`/`hero_fallback` fields plus display labels. The two new GET endpoints have no project writes. New previews do not enter imported assets, sidecars, built containers or mods folders.
 
@@ -354,11 +410,9 @@ editor preferences are local and never change exported content.
 
 Krackle outcomes reserve Paper/Ink for success, gold/brown for warnings and
 pink/rose for failures. Surface luminance selects the set, including dark preview
-surfaces inside a light theme. Adaptive Charge and Rift apply only in hero/skin
-context. They reach 3:1 contrast, reserve ΔE 25 from outcomes, avoid a 12° hue
-window around saturated warning/fault colours, and stay ΔE 25 / 35° apart from
-each other. Distances consistently use CIE76, D65 CIELAB. A small SHIFTED label
-explains adjustments; hand-picked clashes can be retained with CLASH.
+surfaces inside a light theme. Charge and Rift use the theme's measured inks;
+hero artwork never changes controls, selection/ownership markers or outcome
+colours. The old adaptive-accent setting and its SHIFTED/CLASH display are retired.
 
 The Motion dial is Full (tiers 0–3), Calm (0–1) or Off (stills). OS reduced
 motion forces Off. One large Tier 2/3 moment may own the screen at a time;
@@ -374,8 +428,14 @@ five bubbles before a numeric count. Halo rings and bubbles around HDR swatches
 never cover the colour itself. Primary-button pops and theme waves are Full-only;
 actions never wait for them. The Build drop starts only with a dispatched job.
 
-All 36 category energy emblems have review candidates at both scales, with a
-disabled experimental flag. Material Sharp remains active until D4 approval.
+All 36 category energy emblems are drawn at both scales and replace the Material
+Sharp category glyphs; folders without an emblem keep the Krackle folder.
+Each category owns a distinct `EMBLEM_INKS` colour at relative luminance about
+0.207. Studio's inks pass 3:1 against light and dark card bodies and thumbnails;
+other themes refit them with `AtelierKrackleInks.fit` into `--k-emblem-<class>`.
+Hand-placed bubbles are SVG mask cut-outs, so the underlying surface shows
+through. Energy stays solid: no outlines, gradients or painted bubble colours.
+Regenerate with `python scripts/krackle_art.py`, or verify with `--check`.
 Particle stages batch preallocated circle commands by integer ink key, because
 the [Canvas Path2D API](https://html.spec.whatwg.org/multipage/canvas.html#path2d-objects)
 has no reset operation. Filter fallback uses real RAF intervals relative to the

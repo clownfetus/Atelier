@@ -13,6 +13,11 @@ from atelier.hero_artwork import HeroArtwork, PAGES, PREFIX, parse_assets
 
 
 def page(kind, ids):
+    if kind in ('lord', 'kill'):
+        suffix = 'Deluxe Avatar' if kind == 'lord' else 'Deluxe KO Prompt 1'
+        return ''.join(f'<img src="{PREFIX}{"lord-icons" if kind == "lord" else "kill-icons"}/'
+                       f'{"Magik" if cid == "1029" else "Thor"}%20{suffix.replace(" ", "%20")}.png" '
+                       f'alt="{"Magik" if cid == "1029" else "Thor"} {suffix}">' for cid in ids).encode()
     folder, filename = {'avatar':('hero-icons-avatars', 'img_squarehead_{}0010_avatar'),
         'logo':('hero-logos', 'img_herologo_{}_logo'), 'story':('hero-story-images', 'img_herostory_{}01_hover')}[kind]
     return ''.join(f'<img src="{PREFIX}{folder}/{filename.format(cid)}.png">' for cid in ids).encode()
@@ -23,6 +28,9 @@ class Artwork(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        worker = patch.object(HeroArtwork, '_start_sharpening')
+        self.workers = worker.start()
+        self.addCleanup(worker.stop)
         raw = BytesIO()
         Image.new('RGBA', (136,136), (10,100,200,120)).save(raw, 'PNG')
         self.raw = raw.getvalue()
@@ -36,6 +44,27 @@ class Artwork(unittest.TestCase):
         self.assertEqual(list(result), ['1029'])
         self.assertTrue(result['1029'].endswith('10290010_avatar.png'))
 
+    def test_lord_and_kill_ownership_requires_an_exact_page_label(self):
+        for kind, folder, filename, suffix in (
+                ('lord', 'lord-icons', 'item_herohead_21029020', 'Deluxe Avatar'),
+                ('kill', 'kill-icons', 'item_kill_2102912', 'Deluxe KO Prompt 1')):
+            url = f'{PREFIX}{folder}/{filename}.png'
+            html = f'<img src="{url}" alt="Magik {suffix}">'
+            self.assertEqual(parse_assets(html, kind, {'magik': '1029'}), {'1029': url})
+            self.assertEqual(parse_assets(f'<img src="{url}" alt="{filename}">', kind, {'magik': '1029'}), {})
+            self.assertEqual(parse_assets(html, kind, {'magneto': '1037'}), {})
+            self.assertEqual(parse_assets(html.replace('Magik ', 'Dark Magik '), kind, {'magik': '1029'}), {})
+            self.assertEqual(parse_assets(html + html.replace(filename, filename+'1'), kind, {'magik': '1029'}), {})
+            self.assertEqual(parse_assets(html.replace('rivalskins.com/', 'rivalskins.com.evil/'), kind, {'magik': '1029'}), {})
+
+    def test_hero_names_exclude_npcs_and_ambiguous_ids(self):
+        art = HeroArtwork(self.root)
+        entries = {'1029': {'name': 'Magik'}, '2029': {'name': 'Magik'},
+                   '1035': {'name': 'Thor'}, '1099': {'name': 'Thor'}}
+        with patch('atelier.hero_artwork.threading.Thread') as worker:
+            art.start_update(entries)
+        self.assertEqual(worker.call_args.kwargs['args'], ({'magik': '1029'},))
+
     def test_each_launch_checks_all_pages_and_downloads_only_new_artwork(self):
         ids, calls = ['1029'], []
         def fetch(url):
@@ -44,16 +73,17 @@ class Artwork(unittest.TestCase):
             return (page(kind, ids) if kind else self.raw), {}
         with patch('atelier.hero_artwork.fetch', side_effect=fetch):
             first = HeroArtwork(self.root)
-            first.update({})
+            first.update({'magik': '1029', 'thor': '1035'})
             self.assertIsNotNone(first.image('1029', 'avatar'))
             self.assertIsNotNone(first.image('1029', 'logo'))
             ids.append('1035')
             second = HeroArtwork(self.root)
-            second.update({})
-        self.assertEqual(Counter(calls)[PAGES['avatar']], 2)
-        self.assertEqual(Counter(calls)[PAGES['logo']], 2)
-        self.assertEqual(Counter(calls)[PAGES['story']], 2)
-        self.assertEqual(len([url for url in calls if url not in PAGES.values()]), 6)
+            second.update({'magik': '1029', 'thor': '1035'})
+        for kind, url in PAGES.items():
+            self.assertEqual(Counter(calls)[url], 2, kind)
+            self.assertIsNotNone(second.image('1035', kind), kind)
+        self.assertIsNone(second.status()['error'])
+        self.assertEqual(len([url for url in calls if url not in PAGES.values()]), 10)
         self.assertEqual(second.status()['avatars'], 2)
         self.assertEqual(second.status()['logos'], 2)
         self.assertIsNotNone(second.image('1035','avatar'))
@@ -82,16 +112,77 @@ class Artwork(unittest.TestCase):
             return (page(kind, ['1029']) if kind else self.raw), {}
         with patch('atelier.hero_artwork.fetch', side_effect=fetch):
             artwork = HeroArtwork(self.root)
-            artwork.update({})
+            artwork.update({'magik': '1029', 'thor': '1035'})
         offline = HeroArtwork(self.root)
         with patch('atelier.hero_artwork.fetch', side_effect=OSError('offline')):
-            offline.update({})
+            offline.update({'magik': '1029', 'thor': '1035'})
             icon = offline.image('1029','avatar')
             self.assertIsNotNone(icon)
             with Image.open(icon) as image:
                 self.assertEqual(image.getpixel((0,0))[3],120)
         self.assertIn('offline', offline.status()['error'])
         self.assertFalse(offline.status()['updating'])
+
+    def test_story_banners_are_served_upscaled_and_sharpened_even_offline(self):
+        def fetch(url):
+            kind = next((k for k,v in PAGES.items() if v==url), None)
+            return (page(kind, ['1029']) if kind else self.raw), {}
+        with patch('atelier.hero_artwork.fetch', side_effect=fetch):
+            artwork = HeroArtwork(self.root)
+            artwork.update({'magik': '1029', 'thor': '1035'})
+        original = artwork.image('1029', 'story')
+        self.assertFalse(original.name.endswith('-x4.webp'))
+        self.assertEqual(artwork.sharp_pending, [original])
+        artwork._sharpen_banners()
+        story = artwork.image('1029', 'story')
+        self.assertTrue(story.name.endswith('-x4.webp'), story)
+        with Image.open(story) as image:
+            self.assertEqual(image.size, (544, 544))
+            self.assertEqual(image.mode, 'RGBA')
+        # A banner cached before sharpening existed is upscaled on the next launch, offline too.
+        story.unlink()
+        self.assertFalse(artwork.image('1029', 'story').name.endswith('-x4.webp'))
+        offline = HeroArtwork(self.root)
+        with patch('atelier.hero_artwork.fetch', side_effect=OSError('offline')):
+            offline.update({'magik': '1029', 'thor': '1035'})
+        self.assertEqual(offline.image('1029', 'story'), original)
+        offline._sharpen_banners()
+        self.assertTrue(offline.image('1029', 'story').name.endswith('-x4.webp'))
+
+    def test_a_failed_upscale_keeps_serving_the_original_banner(self):
+        def fetch(url):
+            kind = next((k for k,v in PAGES.items() if v==url), None)
+            return (page(kind, ['1029']) if kind else self.raw), {}
+        with patch('atelier.hero_artwork.fetch', side_effect=fetch), \
+             patch('atelier.upscale.upscale', side_effect=MemoryError('no room')):
+            artwork = HeroArtwork(self.root)
+            artwork.update({'magik': '1029', 'thor': '1035'})
+            artwork.image('1029', 'story')
+            artwork._sharpen_banners()
+        story = artwork.image('1029', 'story')
+        self.assertIsNotNone(story)
+        self.assertFalse(story.name.endswith('-x4.webp'))
+        self.assertIsNone(artwork.status()['error'])
+        self.assertEqual(artwork.sharp_pending, [])
+        self.assertFalse(artwork.sharp_running)
+
+    def test_only_requested_stories_are_queued_once_without_blocking_navigation(self):
+        artwork = HeroArtwork(self.root)
+        artwork.entries = {cid: {'story': f'{PREFIX}hero-story-images/img_herostory_{cid}01_hover.png'}
+                           for cid in ('1029', '1035')}
+        for entry in artwork.entries.values():
+            path = artwork._path(entry['story'])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new('RGBA', (8, 8)).save(path, 'WEBP')
+        path = artwork.image('1035', 'story')
+        self.assertEqual(artwork.image('1035', 'story'), path)
+        self.assertEqual(artwork.sharp_pending, [path])
+        self.assertEqual(self.workers.call_count, 1)
+        with patch('atelier.upscale.upscale', side_effect=lambda image: image.resize((32,32))):
+            artwork._sharpen_banners()
+        self.assertEqual(artwork.image('1035', 'story'), artwork._sharp_path(path))
+        self.assertEqual(artwork.sharp_pending, [])
+        self.assertFalse(artwork._sharp_path(artwork._path(artwork.entries['1029']['story'])).exists())
 
 
 if __name__ == '__main__':

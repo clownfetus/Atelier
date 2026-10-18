@@ -49,11 +49,6 @@
 <div id="topbar">
   <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
   <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
-  <div id="nav-btns">
-    <button class="nav-btn" id="btn-back"    title="Back"    disabled><i data-lucide="arrow-left"  size="15"></i></button>
-    <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
-  </div>
-  <nav id="breadcrumbs" aria-label="Asset location"></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
     <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets, IDs…" aria-keyshortcuts="Control+f Meta+f">
@@ -69,6 +64,13 @@
 
   <!-- explorer -->
   <main id="explorer" aria-label="Asset library">
+    <div class="library-location">
+      <div id="nav-btns">
+        <button class="nav-btn" id="btn-back" title="Back" disabled><i data-lucide="arrow-left" size="15"></i></button>
+        <button class="nav-btn" id="btn-forward" title="Forward" disabled><i data-lucide="arrow-right" size="15"></i></button>
+      </div>
+      <nav id="breadcrumbs" aria-label="Asset location"></nav>
+    </div>
     <div id="startup-splash" role="status"><img src="/static/brand/atelier-mark.png" alt=""><span id="startup-label">Opening your library…</span><progress id="startup-progress" aria-label="Container indexing"></progress></div>
     <div class="library-heading"><h1>Asset library</h1><span id="library-count" aria-live="polite"></span><span id="library-category-line" class="card-icon folder-icon" aria-hidden="true"></span></div>
     <section id="library-hero" aria-label="Current character" hidden></section>
@@ -114,8 +116,12 @@
     <button class="btn" id="bulk-edit-open" type="button" hidden>Bulk VFX / curves</button>
     <div class="mod-tray-actions">
       <button class="btn" id="add-asset-open" type="button" title="Add a texture, mesh or material with your own name and game folder">Add asset</button>
-      <button class="btn" id="process-s-maps" type="button" disabled title="Process all edited _D textures with same-folder S maps. Bicubic resize, Color blend at 100%; S dimensions and alpha are preserved.">Process S maps</button>
+      <!-- The hint sits on a wrapper: a disabled button shows no tooltip of its own. -->
+      <div id="process-s-maps-wrap"><button class="btn" id="process-s-maps" type="button" disabled aria-describedby="process-s-maps-hint">Process S maps</button>
+        <span id="process-s-maps-hint" hidden></span></div>
     </div>
+    <div id="mod-tray-heroes" aria-label="Heroes in this mod" hidden></div>
+    <div id="tray-progress" aria-label="Asset preparation" aria-live="polite"></div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
@@ -240,13 +246,13 @@
             <h3>Model</h3>
             <label class="vp-setting">Preview mesh<select id="viewport-model-choice" aria-label="Preview mesh"></select></label>
             <p id="viewport-model-hint">Preview one mesh at a time, or combine parts below.</p>
-            <details id="viewport-obj-section"><summary>Combine mesh parts <span id="viewport-obj-count"></span></summary>
+            <details id="viewport-obj-section"><summary>Body parts &amp; weapons <span id="viewport-obj-count"></span></summary>
               <div id="viewport-obj-head"><button id="viewport-show-all" class="vp-text-button">Show all parts</button></div>
               <div id="viewport-obj-list"></div>
             </details>
             <div id="viewport-chroma-row" style="display:none"><label for="viewport-chroma">Material set</label><select id="viewport-chroma"></select></div>
             <button id="viewport-mesh-edit" title="Add this model to the edit list and choose a replacement"><i data-lucide="plus" size="16"></i> Add to edit list</button>
-            <button id="viewport-blender-btn" disabled title="Extract the selected mesh for editing in Blender"><i data-lucide="box" size="16"></i> Edit in Blender</button>
+            <button id="viewport-blender-btn" disabled title="Export the visible body and weapons with materials and packed textures"><i data-lucide="box" size="16"></i> Export to Blender</button>
           </div></details>
           <details id="viewport-settings-menu" class="vp-menu"><summary><span>View settings</span><i data-lucide="chevron-down" size="14"></i></summary><div class="vp-popover">
             <h3>View settings</h3>
@@ -271,6 +277,7 @@
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
+      <p id="viewport-showcase-note" hidden>Wireframe and dye regions are Inspect tools; Showcase shows the finished look.</p>
       <details class="vp-shortcuts"><summary>Navigation &amp; shortcuts</summary><p>Drag to orbit · Right-drag to pan · Scroll to zoom<br>F — fit · W — wireframe · G — grid<br>1 — front · 3 — right · 7 — top<br>Double-click a part to frame it.</p><span id="viewport-stats" role="status">No model loaded</span></details>
       </div></details>
         </div>
@@ -528,7 +535,7 @@
       <div class="setup-field"><label class="setup-label" for="settings-density">Density</label><select id="settings-density" class="setup-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
       <div class="setup-field"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="full">Full</option><option value="calm">Calm</option><option value="off">Off</option></select></div>
       <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-foley"><span class="switch-track"></span></span>Formation sounds</label><p class="setup-note">Optional drop, pop and splat sounds. Full motion only.</p></div>
-      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-adaptive-accent"><span class="switch-track"></span></span>Use character artwork for the library accent <span id="krackle-accent-status" hidden></span></label><p class="setup-note">Optional. Fits Charge and Rift to the current surface and keeps them distinct from outcomes. Artwork and project colours stay unchanged.</p></div>
+      <p class="setup-note">Hero and skin colours decorate artwork. Controls, selections and text follow your chosen theme.</p>
       <div class="setup-field">
         <label class="toggle-row" id="toggle-import-open-row">
           <span class="switch"><input type="checkbox" id="toggle-import-open" checked><span class="switch-track"></span></span>
@@ -860,6 +867,7 @@
 <script src="/static/tooltips.js"></script>
 <script src="/static/polish.js"></script>
 <script src="/static/roster.js"></script>
+<script src="/static/catalogue-art.js"></script>
 <script src="/static/continuity.js"></script>
 <script src="/static/dialog.js"></script>
 <script src="/static/setup-wizard.js"></script>
@@ -870,6 +878,7 @@
 <script src="/static/mod-card-data.js"></script>
 <script src="/static/mod-cards.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>
 </html>

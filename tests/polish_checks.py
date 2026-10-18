@@ -73,6 +73,10 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('.roster-skin').get_attribute('aria-label') == 'Fixture skin'
         checks.append('Home roster exposes catalogue heroes and their costumes without importing assets')
         tab.evaluate("pushNav({path:'Characters'})"); tab.wait_for_selector('.hero-portrait.loaded')
+        assert tab.locator('.artwork-card').evaluate("""card=>{
+          const art=card.querySelector('.card-thumb').getBoundingClientRect(), name=card.querySelector('.card-name').getBoundingClientRect();
+          return art.height>art.width && Math.abs(name.top-art.bottom)<1 && getComputedStyle(card).padding==='0px';
+        }""")
         tab.locator('#grid-area .card').click(); tab.wait_for_selector('#library-hero.has-art')
         assert 'Fixture hero' in tab.locator('#library-hero h2').inner_text()
         assert tab.locator('html').get_attribute('data-library-direction') == 'forward'
@@ -188,10 +192,13 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
 
         tab.evaluate("""() => {
           document.getElementById('settings-density').value='compact';document.getElementById('settings-density').dispatchEvent(new Event('change'));
-          document.getElementById('settings-adaptive-accent').click();
         }""")
         tab.wait_for_timeout(50)
         assert tab.locator('html').get_attribute('data-density') == 'compact'
+        theme_before = tab.evaluate("[getComputedStyle(document.documentElement).getPropertyValue('--acc'),getComputedStyle(document.querySelector('.btn.primary')).backgroundColor]")
+        tab.evaluate("window.dispatchEvent(new StorageEvent('storage',{key:'atelier.adaptiveAccent',newValue:'1'}));window.dispatchEvent(new CustomEvent('atelier:artwork',{detail:{accent:'#ff0000',colors:['#ff0000']}}))")
+        assert tab.evaluate("[getComputedStyle(document.documentElement).getPropertyValue('--acc'),getComputedStyle(document.querySelector('.btn.primary')).backgroundColor]") == theme_before
+        checks.append('Artwork and legacy adaptive-accent preferences preserve theme colours on controls')
         for preset in ('contrast','blueprint','comic'):
             tab.evaluate('(preset)=>document.querySelector(`[data-theme-preset="${preset}"]`).click()',preset)
             assert tab.locator('html').get_attribute('data-palette') == preset
@@ -217,6 +224,38 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
                 assert tab.evaluate('document.documentElement.scrollWidth===innerWidth')
                 tab.screenshot(path=str(report/f'polish-{theme}-{width}.png'))
         assert not errors, errors
+        tab.evaluate("pushNav({path:'Characters/1029/1029001/Textures'})")
+        tab.wait_for_function("document.querySelector('#breadcrumbs .active')?.textContent==='Textures'")
+        labels = tab.locator('#breadcrumbs .crumb-label').all_text_contents()
+        assert labels == ['Characters', 'Fixture hero', 'Fixture skin', 'Textures'], labels
+        assert tab.locator('#breadcrumbs .crumb-label').evaluate_all('(labels)=>labels.every(label=>label.scrollWidth<=label.clientWidth)'), labels
+        assert tab.locator('#breadcrumbs').evaluate("el=>el.closest('.library-location') && !el.closest('#topbar')")
+        checks.append('Breadcrumbs retain complete hero, costume and folder names in their own row at compact width')
+        # Keyboard focus on the first folder must not capture another folder's hover popup.
+        tab.evaluate("pushNav({path:''})")
+        tab.wait_for_selector('#grid-area .card')
+        tab.evaluate("""() => {
+          const grid=document.querySelector('#grid-area .grid');
+          const first=grid.querySelector('.card');first.title='First folder';
+          const second=first.cloneNode(true);second.title='Second folder';second.querySelector('.card-name').textContent='Second folder';grid.append(second);
+        }""")
+        first, second = tab.locator('#grid-area .card').nth(0), tab.locator('#grid-area .card').nth(1)
+        tab.mouse.move(1, 1)
+        first.focus()
+        tab.wait_for_timeout(450)
+        assert tab.locator('#atelier-tooltip').is_hidden()
+        tab.keyboard.press('Tab')
+        first.focus()
+        tab.wait_for_selector('#atelier-tooltip:visible')
+        second.hover()
+        tab.wait_for_function("document.querySelector('#atelier-tooltip:not([hidden])')?.textContent==='Second folder'")
+        assert second.get_attribute('aria-describedby') == 'atelier-tooltip'
+        assert 'atelier-tooltip' not in (first.get_attribute('aria-describedby') or '')
+        bounds, popup = second.bounding_box(), tab.locator('#atelier-tooltip').bounding_box()
+        assert abs(bounds['x']-popup['x']) < 2, (bounds,popup)
+        tab.keyboard.press('Escape')
+        assert second.get_attribute('title') == 'Second folder'
+        checks.append('Folder hover popups follow the pointer even while the first card retains keyboard focus; titles and descriptions restore on dismissal')
         checks.append('Polished character library fits dark/light at 1024×768 and 1400×900 without horizontal overflow')
     finally:
         if stored is not None:

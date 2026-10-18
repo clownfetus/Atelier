@@ -59,6 +59,7 @@ class Quiet(WSGIRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', type=Path, required=True)
+    parser.add_argument('--device-scale-factor', type=float, default=1, help='Display scale for HiDPI checks')
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
     parser.add_argument('--idle', type=Path, help='Optional real decoded standing-idle JSON for playback verification')
     parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
@@ -117,17 +118,20 @@ def main():
             }.get(path)
             if payload is not None:
                 route.fulfill(json=payload)
+            elif path.startswith('/api/catalogue/banner/'):
+                route.fulfill(status=404, body='No nameplate in this fixture')
             else:
                 route.continue_()
 
         try:
             with sync_playwright() as pw:
                 browser = pw.chromium.launch()
-                context = browser.new_context(viewport={'width': 1400, 'height': 900}, reduced_motion='no-preference')
+                context = browser.new_context(viewport={'width': 1400, 'height': 900}, reduced_motion='no-preference',
+                                              device_scale_factor=args.device_scale_factor)
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
                 page = context.new_page()
-                page.on('pageerror', lambda error: errors.append(str(error)))
+                page.on('pageerror', lambda error: errors.append(error.stack or str(error)))
                 page.add_init_script("""
                     // An unavailable remote key service must not block a configured launch.
                     const nativeFetch = window.fetch;
@@ -149,7 +153,7 @@ def main():
                     body=(ROOT / 'gui/viewport.js').read_text(encoding='utf-8') + HOOK,
                     content_type='text/javascript'))
                 page.goto(url)
-                page.wait_for_function("window.__vp && window.atelierProject() === 'Smoke A'")
+                page.wait_for_function("window.__vp && window.atelierProject?.() === 'Smoke A'")
                 page.wait_for_selector('#grid-area .folder-card, #grid-area .card')
                 page.wait_for_function("!document.querySelector('.overlay.active')")
                 assert page.evaluate('__remoteCalls.length') == 0
@@ -330,6 +334,15 @@ def main():
                     browser.close()
                     return
 
+                if args.appearance_only:
+                    from appearance_checks import run_appearance_checks
+                    run_appearance_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
                 from design_checks import run_design_checks
                 from showcase_checks import run_showcase_checks
                 run_showcase_checks(page,context,url,report,checks)
@@ -344,13 +357,6 @@ def main():
                 run_design_checks(page, context, url, report, checks)
                 from appearance_checks import run_appearance_checks
                 run_appearance_checks(page, context, url, report, checks)
-                if args.appearance_only:
-                    assert not errors, errors
-                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
-                    for check in checks:
-                        print('PASS '+check)
-                    browser.close()
-                    return
                 from polish_checks import run_polish_checks
                 run_polish_checks(page, context, url, report, checks)
                 from viewport_inspection_checks import run_viewport_inspection_checks
@@ -481,7 +487,10 @@ def main():
                 base_page = context.new_page()
                 base_page.set_viewport_size({'width': 1400, 'height': 900})
                 def original(file, mime):
-                    source = subprocess.run(['git', 'show', f'2a3f4e2:gui/{file}'], cwd=ROOT,
+                    # Disposable suite copies have no Git metadata. Read only
+                    # the historical comparison from the originating checkout.
+                    source = subprocess.run(['git', 'show', f'2a3f4e2:gui/{file}'],
+                        cwd=Path(os.environ.get('ATELIER_CHECK_SOURCE_ROOT', ROOT)),
                         capture_output=True, check=True).stdout
                     return lambda route: route.fulfill(body=source, content_type=mime)
                 base_page.route(url + '/', original('index.html', 'text/html'))

@@ -115,5 +115,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         checks.append('Completed builds use a green surface, strong status border, heading and controls in both themes')
         assert not errors,errors
         checks.append('Model import defaults skeleton, weights and morph preservation on; explicit checkbox choices upload with the target and supported model formats')
+        from catalogue_identity_checks import run_catalogue_identity_checks
+        run_catalogue_identity_checks(context, url, report, checks)
     finally:
         if not reuse_page:tab.close()

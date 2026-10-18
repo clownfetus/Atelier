@@ -54,6 +54,34 @@ window.__showcase={
             assert tab.evaluate('__showcase.restored()') and tab.evaluate('__showcase.snapshot()')==baseline
         assert not writes,writes
         checks.append('Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes')
+        def setting(id,value,event='change'):
+            tab.evaluate('([id,value,event])=>{const e=document.getElementById(id);e.value=value;e.dispatchEvent(new Event(event));}',[id,value,event])
+        tab.locator('#viewport-inspect').click()
+        inspect_grid=tab.evaluate('__inspection.presentation().grid')
+        tab.locator('#viewport-showcase').click()
+        showcase_grid=tab.evaluate('__inspection.presentation().grid')
+        tab.locator('#viewport-grid').evaluate('e=>e.click()')
+        assert tab.evaluate('__inspection.presentation().grid')!=showcase_grid
+        tab.locator('#viewport-inspect').click()
+        assert tab.evaluate('__inspection.presentation().grid')==inspect_grid
+        tab.locator('#viewport-showcase').click()
+        assert tab.evaluate('__inspection.presentation().grid')!=showcase_grid
+        tab.locator('#viewport-grid').evaluate('e=>e.click()')
+        for id in ('viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'):
+            assert tab.locator('#'+id).is_disabled()
+            assert 'Inspect' in tab.locator('#'+id).get_attribute('title')
+        setting('viewport-backdrop','solid');setting('viewport-backdrop-color','#35594d','input')
+        assert not tab.locator('.vp-showcase-backdrop').count()
+        assert tab.locator('#viewport-stage').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(53, 89, 77)'
+        for value in ('flat','emissive','studio'):setting('viewport-lighting',value)
+        tab.locator('#viewport-bloom').evaluate('e=>e.click()')
+        tab.wait_for_function('__inspection.presentation().targets===3')
+        assert tab.evaluate('__inspection.presentation().targets')==3
+        tab.locator('#viewport-bloom').evaluate('e=>e.click()')
+        tab.wait_for_function('__inspection.presentation().targets===0')
+        assert tab.evaluate('__inspection.presentation().targets')==0
+        setting('viewport-backdrop','gradient')
+        checks.append('Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls')
         for theme in ['dark','light']:
             tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
             tab.locator('#viewport-showcase').click();tab.screenshot(path=str(report/f'showcase-{theme}.png'),animations='disabled')

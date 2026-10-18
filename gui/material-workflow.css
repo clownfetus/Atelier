@@ -21,6 +21,11 @@
 #material-overlay .mat-restore { border: 0; border-radius: 4px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; padding: 4px 7px; cursor: pointer; margin-left: auto; }
 #material-overlay .mat-restore:hover { background: var(--bg3); }
 #material-overlay .mat-texture-help { margin: 0; padding: 9px 12px; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.5; color: var(--muted); }
+.mat-texture-location { margin:8px 12px; padding:8px; border:1px solid var(--border); border-radius:6px; }
+.mat-texture-location summary { cursor:pointer; font-size:12px; color:var(--text); }
+.mat-texture-location label { display:block; margin:10px 0 4px; font-size:12px; }
+.mat-texture-location input { display:block; width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); font:inherit; }
+.mat-texture-location .mat-subpath { margin:8px 0; overflow-wrap:anywhere; }
 #material-overlay .mat-texture.is-custom { border-left-color: var(--acc); }
 #material-overlay .mat-texture-thumb { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: 1px solid var(--border2); border-radius: 4px; color: var(--muted); overflow: hidden;
   background: repeating-conic-gradient(var(--bg3) 0 25%, var(--bg2) 0 50%) 0 0 / 10px 10px; }

@@ -11,7 +11,7 @@ from atelier import changelog
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 import atelier.config as _c   # module handle: several routes rewrite config globals in place
 from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS,
                             CNW,
@@ -279,9 +279,12 @@ def catalogue_hero_artwork(cid, kind):
     path = hero_artwork.image(cid, kind)
     if not path:
         response.status = 404
+        response.set_header('Cache-Control', 'no-store')
         return b''
     result = static_file(path.name, root=str(path.parent), mimetype='image/webp')
     result.headers['Cache-Control'] = 'no-cache'
+    if kind == 'story':
+        result.headers['X-Atelier-Upscale'] = 'ready' if path.stem.endswith('-x4') else 'pending'
     return result
 
 
@@ -292,18 +295,25 @@ def catalogue_icon(key):
 
 @app.get('/api/catalogue/banner/<key>')
 def catalogue_banner(key):
-    return catalogue_thumbnail(key, kind='banner')
+    return catalogue_thumbnail(key, kind='banner', sharp=request.query.get('sharp') == '1')
+
+
+@app.get('/api/catalogue/badge/<key>')
+def catalogue_badge(key):
+    return catalogue_thumbnail(key, kind='badge')
 
 
 @app.get('/api/catalogue/thumbnail/<key>')
-def catalogue_thumbnail(key, kind='thumbnail'):
-    path = getattr(catalogue, kind)(key)
+def catalogue_thumbnail(key, kind='thumbnail', sharp=False):
+    path = catalogue.banner(key, sharp=sharp) if kind == 'banner' else getattr(catalogue, kind)(key)
     if path is None:
         response.status = 404
         response.set_header('Cache-Control', 'no-store')
         return ''
     result = static_file(path.name, root=str(path.parent), mimetype='image/webp')
-    result.set_header('Cache-Control', 'private, max-age=86400')
+    result.set_header('Cache-Control', 'no-cache' if sharp else 'private, max-age=86400')
+    if kind == 'banner' and sharp:
+        result.set_header('X-Atelier-Upscale', 'ready' if path.stem.endswith('-x4') else 'pending')
     return result
 
 @app.route("/")
@@ -331,20 +341,8 @@ def api_skin_meshes():
     response.content_type = "application/json"
     if not skin_id:
         return json.dumps([])
-    seen, out = set(), []
-    for p, _c in skin_entries(skin_id):
-        nm = os.path.basename(p)
-        if not nm.lower().startswith("sk_") or not nm.lower().endswith(".uasset"):
-            continue
-        base = nm[:-7]
-        if _MESH_SKIP.search(base):
-            continue
-        gr = game_rel_for_skin(skin_id, skin_rel(p, skin_id))
-        if gr in seen:
-            continue
-        seen.add(gr)
-        out.append({"name": base, "game_rel": gr})
-    return json.dumps(out)
+    from atelier.handlers.meshstudio import skin_meshes
+    return json.dumps(skin_meshes(skin_id))
 
 @app.get("/api/browse_material_dirs")
 def api_browse_material_dirs():
@@ -476,6 +474,19 @@ def api_skin_materials():
     response.content_type = "application/json"
     if not skin_id:
         return json.dumps({"ok": False, "error": "missing skin_id"})
+    if body.get('meshes'):
+        from atelier.handlers.meshstudio import material_bindings
+        out = {}
+        for binding in material_bindings(skin_id, body['meshes']):
+            gr = binding.get('game_rel')
+            try:
+                params = read_material(gr, cache_only=True) if gr else {'colors': [], 'scalars': [], 'textures': {}}
+                out[binding['key']] = {**_viewport_material_payload(gr, params), **binding}
+            except jobs.Cancelled:
+                raise
+            except Exception as exc:
+                out[binding['key']] = {**binding, 'colors': [], 'scalars': [], 'textures': {}, 'material_error': str(exc)}
+        return json.dumps({'ok': True, 'materials': out})
     out, seen = {}, set()
     for p, _c in skin_entries(skin_id):
         jobs.checkpoint()
@@ -490,18 +501,38 @@ def api_skin_materials():
         try:
             params = read_material(gr, cache_only=True)
             jobs.checkpoint()
-            texs   = params.get("textures", {}) or {}
-            tvers  = {g: _tex_version(g) for g in texs.values()}   # edited-mtime stamps for cache-busting
             # Dyeing materials must render the COMPOSITE, not the raw diffuse. Chromas differ only in
             # their "Region N" colours over the same mask+diffuse, so handing three.js the BaseColor
             # renders every chroma identically. Free to detect — the slot is already in `textures`.
-            dyeable = "DyeingTexture" in texs
-            out[base] = {"game_rel": gr, "token": token(gr), **params, "tex_ver": tvers,
-                         "dyeable": dyeable,
-                         "dye_ver": _dye_version(gr, texs) if dyeable else "0"}
+            out[base] = _viewport_material_payload(gr, params)
         except Exception as e:
             print(f"[skin_materials] {base}: {e}", file=sys.stderr, flush=True)
     return json.dumps({"ok": True, "materials": out})
+
+
+def _viewport_material_payload(gr, params):
+    from atelier.handlers.meshmat import texture_role
+    texs = params.get('textures', {}) or {}
+    roles, texture_urls = {}, {}
+    custom = _custom_tex.assignments(gr) if gr else {}
+    for name, path in texs.items():
+        role = texture_role(name)
+        if role and role not in roles:
+            roles[role] = path
+            if name in custom:
+                texture_urls[role] = '/api/material_custom_texture/preview?' + urlencode({
+                    'game_rel': gr, 'slot': name, 'v': custom[name]['file']})
+    dyeable = 'DyeingTexture' in texs
+    return {'game_rel': gr, 'token': token(gr) if gr else None, **params, 'texture_roles': roles, 'texture_urls': texture_urls,
+            'tex_ver': {g: _tex_version(g) for g in texs.values()}, 'dyeable': dyeable,
+            'dye_ver': _dye_version(gr, texs) if dyeable else '0'}
+
+
+@app.post('/api/mesh_visibility')
+def api_mesh_visibility():
+    from atelier.handlers.meshvisibility import set_hidden
+    body = request.json or {}
+    return set_hidden(body.get('game_rel', ''), body.get('slot_index'), body.get('slot_name'), body.get('hidden'))
 
 
 @app.get("/api/idle_animations")
@@ -538,13 +569,14 @@ def _dye_version(game_rel, texs):
     parts = []
     jp = project_base(game_rel) + ".json"
     try:
-        parts.append(str(int(os.path.getmtime(jp))) if os.path.exists(jp) else "0")
+        parts.append(str(os.stat(jp).st_mtime_ns) if os.path.exists(jp) else "0")
     except OSError:
         parts.append("0")
     for slot in ("DyeingTexture", "BaseColor"):
         g = (texs or {}).get(slot)
         if g:
             parts.append(_tex_version(g))
+        parts.append((_custom_tex.assignments(game_rel).get(slot) or {}).get('file', '0'))
     return "-".join(parts)
 
 def _texture_png(game_rel, original=False):
@@ -567,7 +599,7 @@ def _texture_png(game_rel, original=False):
     with jobs.cancellable_lock(tex_semaphore):
         if os.path.exists(out_png):
             return out_png
-        cb = ensure_work_base(game_rel)     # retoc or UAssetTool per host; caches the result
+        cb = ensure_work_base(game_rel,prefer_exact=True)  # exact container/path first; bounded fallback when needed
         jobs.checkpoint()
         if not cb or not os.path.exists(cb + ".uasset"):
             return None
@@ -1356,8 +1388,12 @@ def api_catalogue_library():
         hero = describe(key, entry)
         hero['avatar'] = '/api/catalogue/hero/' + key + '/avatar'
         hero['logo'] = '/api/catalogue/hero/' + key + '/logo'
+        hero['banner'] = '/api/catalogue/banner/' + key if entry.get('banner') else None
+        hero['lord'] = '/api/catalogue/hero/' + key + '/lord'
+        hero['kill'] = '/api/catalogue/hero/' + key + '/kill'
         hero['skins'] = [{**describe(sid, skin), **({} if skin.get('hero_fallback') else {'icon': '/api/catalogue/icon/' + sid}),
-                          **({'banner': '/api/catalogue/banner/' + sid} if skin.get('banner') and not skin.get('hero_fallback') else {})}
+                          **({'banner': '/api/catalogue/banner/' + sid} if skin.get('banner') and not skin.get('hero_fallback') else {}),
+                          **({'badge': '/api/catalogue/badge/' + sid} if skin.get('badge') and not skin.get('hero_fallback') else {})}
                          for sid, skin in entries.items()
                          if re.fullmatch(r'\d{7}', sid) and skin.get('hero') == key and skin.get('image')]
         heroes.append(hero)
@@ -1620,6 +1656,9 @@ def api_imported():
     from atelier.ui_preview import saved_preview
     for item in items:
         item['modified'] = item['mtime']
+        hidden = item.get('opts', {}).get('hidden_sections') or []
+        if item['file_type'] == 'mesh' and hidden:
+            item['name'] += f" · {len(hidden)} hidden section{'s' if len(hidden) != 1 else ''}"
         preview = saved_preview(item['game_rel'], item['file_type'])
         if preview: item['ui_preview'] = preview
     return json.dumps(items)
@@ -2022,10 +2061,26 @@ def api_material_custom_texture():
     try:
         template = _custom_tex_slot(gr, slot)
         custom = _custom_tex.assign(gr, slot, upload.raw_filename or upload.filename,
-                                    upload.file.read(), template)
+                                    upload.file.read(), template, name=request.forms.getunicode('name'),
+                                    folder=request.forms.getunicode('folder'))
         return json.dumps({"ok": True, "game_rel": gr, "custom_textures": custom})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
+
+@app.post("/api/material_custom_texture/location")
+def api_material_custom_texture_location():
+    response.content_type = 'application/json'
+    body = request.json or {}
+    gr, slot = body.get('game_rel', ''), body.get('slot', '')
+    try:
+        if not isinstance(gr, str) or not gr or not isinstance(slot, str) or not slot:
+            raise ValueError('missing game_rel or slot')
+        _custom_tex_slot(gr, slot)
+        custom = _custom_tex.set_location(gr, slot, body.get('name'), body.get('folder'))
+        return json.dumps({'ok': True, 'game_rel': gr, 'custom_textures': custom})
+    except Exception as exc:
+        return json.dumps({'ok': False, 'error': str(exc)})
+
 
 @app.post("/api/material_custom_texture/clear")
 def api_material_custom_texture_clear():
@@ -2671,6 +2726,23 @@ def api_mesh_add():
     return add((request.json or {}).get('game_rel',''))
 
 
+@app.post('/api/model_blender_export')
+def api_model_blender_export():
+    from atelier.handlers.meshport import export
+    body=request.json or {}
+    return _submit_job('blender-export','Export model to Blender',lambda job:export(body.get('game_rel',''),body.get('weapons',[])))
+
+
+@app.post('/api/model_blender_open')
+def api_model_blender_open():
+    from atelier.handlers.meshport import destination
+    from atelier.handlers.meshedit import find_blender
+    target=destination((request.json or {}).get('game_rel',''))
+    if not target.is_file():raise ValueError('Export this model to Blender first')
+    subprocess.Popen([find_blender(),str(target)],creationflags=CNW)
+    return {'ok':True}
+
+
 @app.post('/api/mesh_replace')
 def api_mesh_replace():
     from atelier.handlers.meshreplace import prepare,import_options,MODEL_EXTENSIONS,COMPANIONS
@@ -2681,9 +2753,12 @@ def api_mesh_replace():
     upload=tempfile.TemporaryDirectory(prefix='atelier-model-upload-')
     try:
         options=import_options(json.loads(request.forms.get('options','{}')))
-        sources=[];seen=set();total=0
+        sources=[];companions=[];seen=set();total=0
+        if len(files)>32:raise ValueError('Choose one model and at most 31 companion files')
         for entry in files:
             name=os.path.basename(entry.filename.replace('\\','/'));extension=os.path.splitext(name)[1].lower()
+            from atelier.config import validate_game_rel
+            validate_game_rel(name)
             if extension not in MODEL_EXTENSIONS|COMPANIONS or name.lower() in seen:raise ValueError('Unexpected or duplicate replacement file')
             seen.add(name.lower());target=os.path.join(upload.name,name)
             with open(target,'wb') as output:
@@ -2692,8 +2767,9 @@ def api_mesh_replace():
                     if total>2*1024**3:raise ValueError('Replacement files exceed 2 GB')
                     output.write(chunk)
             if extension in MODEL_EXTENSIONS:sources.append(target)
-        if len(sources)!=1:raise ValueError('Choose one model file, plus its cooked companions when needed')
-        def run(job):return prepare(game_rel,sources[0],options)
+            else:companions.append(target)
+        if len(sources)!=1:raise ValueError('Choose one model file, plus its material JSON, PNG textures or cooked companions')
+        def run(job):return prepare(game_rel,sources[0],options,companions)
         return _submit_job('mesh-replace','Replace '+os.path.basename(game_rel),run,upload.cleanup)
     except BaseException:
         upload.cleanup();raise
@@ -3083,7 +3159,7 @@ def api_asset_opts():
     from atelier.handlers.texture import (TEXTURE_GROUPS, texture_props, texture_format,
                                           format_has_alpha)
     out = {"ok": True, "game_rel": gr,
-           "opts": _project_meta.get_asset_opts(get_import_root(), gr),
+           "opts": _project_meta.effective_asset_opts(_project_meta.get_asset_opts(get_import_root(), gr)),
            "groups": list(TEXTURE_GROUPS), "current_group": "", "has_lq": False,
            "dyeable": False, "mask": "", "format": "", "blank_alpha": True}
     try:
@@ -3137,7 +3213,7 @@ def api_asset_opts_save():
         clean["lod_group"] = g
     try:
         cur = _project_meta.set_asset_opts(get_import_root(), gr, clean)
-        return json.dumps({"ok": True, "opts": cur})
+        return json.dumps({"ok": True, "opts": _project_meta.effective_asset_opts(cur)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 

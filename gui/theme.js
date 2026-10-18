@@ -123,8 +123,6 @@
       'error': error, 'error-container': errorContainer, 'on-error-container': readable(fg, [errorContainer]),
     };
   }
-  let artworkAccent = null, artworkColors=[];
-  window.addEventListener('atelier:artwork', event => { artworkAccent = event.detail?.accent || null; artworkColors=event.detail?.colors||[]; applyNow(); });
   window.addEventListener('atelier:preferences', () => applyNow());
   function apply() { if (!window.AtelierPreferences?.revealTheme(applyNow)) applyNow(); }
   function applyNow() {
@@ -134,8 +132,9 @@
     applied.forEach(key => root.style.removeProperty(key));
     applied.clear();
     const set = (key, value) => { root.style.setProperty(key, value); applied.add(key); };
-    if (window.AtelierPreferences?.adaptive() && artworkAccent) p.accent = artworkAccent;
-    if (appearance.preset !== 'studio' || window.AtelierPreferences?.adaptive() && artworkAccent) {
+    // Catalogue colours belong to artwork decoration. Even a legacy adaptiveAccent preference
+    // must never replace the theme's controls, selection colours, text or ownership markers.
+    if (appearance.preset !== 'studio') {
       const derived = roles(p, mode);
       for (const [key, value] of Object.entries(derived)) set('--md-sys-color-' + key, value);
       const backgrounds = [derived.surface, derived['surface-container-low'], derived['surface-container-high']];
@@ -150,27 +149,20 @@
     const raised=getComputedStyle(root).getPropertyValue('--bg3').trim()||p.surface;
     const K=window.AtelierKrackleInks;
     root.dataset.krackleSurface=K?K.surfaceKind(surface):(luminance(p.surface)<.179?'dark':'light');
-    let guarded=null;
     if(K) {
       const defaults=K.defaults(surface);
-      if(window.AtelierPreferences?.adaptive()&&artworkAccent&&document.querySelector('#library-hero:not([hidden])'))
-        guarded=K.guard(artworkAccent,artworkColors[1]||defaults.rift,surface,{candidates:artworkColors.slice(2)});
-      set('--krackle-charge',guarded?.charge||K.fit(defaults.charge,surface));set('--krackle-rift',guarded?.rift||defaults.rift);
+      set('--krackle-charge',K.fit(defaults.charge,surface));set('--krackle-rift',defaults.rift);
       // Card thumbs paint --bg3, not the card's --bg2; .card-thumb reads this charge (krackle.css).
-      const lifted=K.defaults(raised),thumbInks=guarded&&K.guard(artworkAccent,artworkColors[1]||lifted.rift,raised,{candidates:artworkColors.slice(2)});
-      set('--krackle-charge-raised',thumbInks?.charge||K.fit(lifted.charge,raised));
-      if(thumbInks?.shifted)guarded.shifted=true;if(thumbInks?.clash)guarded.clash=true;
+      const lifted=K.defaults(raised);
+      set('--krackle-charge-raised',K.fit(lifted.charge,raised));
       for(const button of document.querySelectorAll('.btn.primary,#viewport-loading-motion-host')) {
         const background=button.id==='viewport-loading-motion-host'?'#14161b':getComputedStyle(button).backgroundColor;
         try {
-          const local=K.defaults(background),adaptive=guarded&&K.guard(artworkAccent,artworkColors[1]||local.rift,background,{candidates:artworkColors.slice(2)});
-          button.dataset.krackleSurface=K.surfaceKind(background);button.style.setProperty('--krackle-charge',adaptive?.charge||K.fit(local.charge,background));button.style.setProperty('--krackle-rift',adaptive?.rift||local.rift);
-          if(adaptive?.shifted)guarded.shifted=true;if(adaptive?.clash)guarded.clash=true;
+          const local=K.defaults(background);
+          button.dataset.krackleSurface=K.surfaceKind(background);button.style.setProperty('--krackle-charge',K.fit(local.charge,background));button.style.setProperty('--krackle-rift',local.rift);
         }catch(_){}
       }
     }
-    const inkStatus=document.getElementById('krackle-accent-status');
-    if(inkStatus){inkStatus.hidden=!guarded?.shifted&&!guarded?.clash;inkStatus.textContent=guarded?.clash?'CLASH':guarded?.shifted?'SHIFTED':'';}
     window.dispatchEvent(new Event('atelier:inks'));
     document.querySelectorAll('[data-theme-picker]').forEach(picker => { picker.value = preference; });
     renderSaved();

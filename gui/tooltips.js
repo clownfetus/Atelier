@@ -3,6 +3,7 @@
 (() => {
   'use strict';
   let owner, title, timer, tooltip, addedLabel = false;
+  let input = 'pointer';
   const id = 'atelier-tooltip';
   function hide() {
     clearTimeout(timer);
@@ -53,16 +54,24 @@
   document.addEventListener('pointerover', event => {
     // A view transition can retarget the stationary pointer after keyboard focus
     // moved. Preserve the focused control's description until focus/click leaves it.
-    if (owner?.contains(document.activeElement) && !owner.contains(event.target)) return;
+    if (input === 'keyboard' && owner?.contains(document.activeElement) && !owner.contains(event.target)) return;
     begin(event.target);
   });
-  document.addEventListener('focusin', event => begin(event.target));
+  let pointerX, pointerY;
+  document.addEventListener('pointermove', event => {
+    if (event.clientX === pointerX && event.clientY === pointerY) return;
+    pointerX = event.clientX; pointerY = event.clientY;
+    input = 'pointer';
+    // A real pointer move takes over from keyboard focus, including a focused first card.
+    begin(event.target);
+  });
+  document.addEventListener('focusin', event => { if (input === 'keyboard') begin(event.target); });
   for (const type of ['pointerout', 'focusout']) document.addEventListener(type, event => {
     if ((owner?.contains(event.target) || tooltip?.contains(event.target))
         && !owner?.contains(event.relatedTarget) && !tooltip?.contains(event.relatedTarget)) hide();
   });
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); }, true);
-  document.addEventListener('pointerdown', hide, true);
+  document.addEventListener('keydown', event => { input = 'keyboard'; if (event.key === 'Escape') hide(); }, true);
+  document.addEventListener('pointerdown', () => { input = 'pointer'; hide(); }, true);
   document.addEventListener('scroll', hide, true);
   window.addEventListener('blur', hide);
 })();
