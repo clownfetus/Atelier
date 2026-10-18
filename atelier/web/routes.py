@@ -1582,9 +1582,17 @@ def api_imported():
     items = all_imported()
     from atelier.ui_preview import saved_preview
     for item in items:
+        item['modified'] = item['mtime']
         preview = saved_preview(item['game_rel'], item['file_type'])
         if preview: item['ui_preview'] = preview
     return json.dumps(items)
+
+
+@app.get('/api/search')
+def api_search():
+    from atelier.search import search
+    response.content_type = 'application/json'
+    return json.dumps(search(request.query.getunicode('q', ''), request.query.get('limit', '50')))
 
 # ── single import (texture) ────────────────────────────────────────────────────
 
