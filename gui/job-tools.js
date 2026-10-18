@@ -6,6 +6,7 @@
   let timer, hidden = false, overlay, body, activityButton, rendered = '';
   // Krackle row glyphs: a job's glyph animates only when its state changes.
   const shownStates = new Map();
+  const rowGlyphs=new Set();
   function jobGlyph(job) {
     if (active.has(job.state)) return 'busy';
     if (job.state === 'succeeded') return (job.result?.skipped || []).length ? 'warning' : 'success';
@@ -19,7 +20,11 @@
     shownStates.set(job.id, state);
     try {
       row.querySelector('.job-state').prepend(host);
-      window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});
+      const glyph=window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});rowGlyphs.add(glyph);
+      if(job.state==='cancelled'&&!seen&&AtelierMotionPolicy.allows(1)&&!document.hidden) {
+        try{host.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(10px) scale(.3)',opacity:0}],{duration:240,fill:'forwards'});}catch(_){}
+        setTimeout(()=>{glyph.destroy();rowGlyphs.delete(glyph);host.remove();},260);
+      }
     } catch (_) { host.remove(); }
   }
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -71,6 +76,7 @@
     const focusedRow = document.activeElement.closest?.('.job-row');
     const focusJob = focusedRow?.dataset.jobId;
     const focusLabel = focusedRow ? document.activeElement.textContent : null;
+    for(const glyph of rowGlyphs)glyph.destroy();rowGlyphs.clear();
     body.replaceChildren();
     body.append(el('p', 'Project: ' + (window.atelierProject() || 'Default project')));
     body.append(el('p', 'Jobs belong to this project. Completed results remain available after reopening Atelier.'));
