@@ -1,5 +1,10 @@
 # Local development and reliability checks
 
+Wave 4a adds `test_krackle_inks.py` (a dependency-free Node colour harness) and
+`inks_dial_checks.py` in the full browser suite. Use `--inks-dial-only` for the
+focused browser run. It checks all palettes, measured surfaces, adaptive context,
+legacy preference migration, OS overrides, still frame counts and moment claims.
+
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
 storage, so an old cached page cannot mix with the new scripts and styles.

@@ -73,6 +73,7 @@ def main():
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
+    parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -154,6 +155,14 @@ def main():
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
                 from startup_update_checks import run_startup_update_checks
                 run_startup_update_checks(context, url, report, checks)
+
+                if args.inks_dial_only:
+                    from inks_dial_checks import run_inks_dial_checks
+                    run_inks_dial_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
 
                 if args.review_followups_only:
                     from review_followup_checks import run_review_followup_checks
@@ -270,6 +279,8 @@ def main():
                     return
 
                 from design_checks import run_design_checks
+                from inks_dial_checks import run_inks_dial_checks
+                run_inks_dial_checks(page,context,url,report,checks)
                 from find_checks import run_find_checks
                 run_find_checks(page, context, url, report, checks)
                 from trust_checks import run_trust_checks

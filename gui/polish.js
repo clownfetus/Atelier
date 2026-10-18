@@ -43,8 +43,8 @@
       host.append(slot);
     });
   }
-  function sample(image) {
-    if (!image?.complete || !image.naturalWidth) return null;
+  function samplePalette(image) {
+    if (!image?.complete || !image.naturalWidth) return [];
     try {
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
       const ctx = canvas.getContext('2d', {willReadFrequently:true}); ctx.drawImage(image,0,0,16,16);
@@ -54,12 +54,13 @@
         const key = [data[i],data[i+1],data[i+2]].map(n=>Math.round(n/32)*32).map(n=>Math.min(255,n));
         const color = '#'+key.map(n=>n.toString(16).padStart(2,'0')).join(''); buckets.set(color,(buckets.get(color)||0)+1);
       }
-      return [...buckets].sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
-    } catch (_) { return null; }
+      return [...buckets].sort((a,b)=>b[1]-a[1]).map(([color])=>color).slice(0,8);
+    } catch (_) { return []; }
   }
+  function sample(image) { return samplePalette(image)[0] || null; }
   function artwork(image) {
-    const accent = sample(image);
-    window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent}}));
+    const colors=samplePalette(image),accent=colors[0]||null;
+    window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent,colors}}));
     let loader = accent || '#accbff';
     const rgb = loader.slice(1).match(/../g).map(n=>parseInt(n,16));
     const luminance = values => values.map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
@@ -210,5 +211,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play});
 })();

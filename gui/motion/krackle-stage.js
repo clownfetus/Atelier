@@ -198,7 +198,18 @@
     var reducedPref = opts.reducedMotion === 'reduce' ? 'reduce' : 'system';
     var mql = null;
     try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
-    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.motion === 'reduce'; }
+    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.motion === 'reduce' || window.AtelierMotionPolicy?.allows(2)===false || microMode; }
+    var releaseMoment=null,microMode=false,microHost=null,micro=null;
+    function release() {if(releaseMoment)releaseMoment();releaseMoment=null;}
+    function clearMicro() {micro?.destroy();micro=null;microHost?.remove();microHost=null;microMode=false;canvas.style.display='';host.removeAttribute('data-am-micro');}
+    function ownership() {
+      if(reducedPref==='reduce'||window.AtelierMotionPolicy?.allows(2)===false){release();clearMicro();return;}
+      if(!releaseMoment)releaseMoment=window.AtelierMotion.moment?.claim(opts.kind||'formation',2)||null;
+      if(releaseMoment){clearMicro();return;}
+      microMode=true;canvas.style.display='none';host.setAttribute('data-am-micro','true');
+      if(!microHost){microHost=document.createElement('span');microHost.className='am-stage-micro';host.append(microHost);try{micro=window.AtelierMotion.krackleGlyph.mount(microHost,{state:state==='idle'?'info':state});}catch(_){}}
+      micro?.setState(state==='idle'?'info':state);
+    }
 
     // ── dot pool ──
     var rndSeed = 12345 + uid * 101, results = 0;
@@ -212,7 +223,7 @@
     for (var i0 = 0; i0 < POOL; i0++) { SF[i0] = 0.55 + 1.55 * Math.pow(kr(), 2.2); SPECK[i0] = kr() < 0.32 ? 1 : 0; M[i0] = 1; COLT[i0] = 1; }
 
     var form = 'idle', formStart = 0, clock = 0, carryHead = 0, kicked = false, fromInk = false;
-    var inks = [], hole = [18, 18, 22], glint = [251, 246, 234];
+    var inks = [], hole = [18, 18, 22], successHole=[18,18,22], glint = [238,229,207];
     var raf = 0, last = 0, sleeping = true, destroyed = false, frames = 0;
 
     function readInks() {
@@ -225,6 +236,7 @@
         parseColour(ctx, cs.getPropertyValue('--krackle-fault'), '#ad3032')
       ];
       hole = parseColour(ctx, cs.getPropertyValue('--krackle-hole'), '#121216');
+      successHole = parseColour(ctx, cs.getPropertyValue('--krackle-success-hole'), '#121216');
     }
 
     function headAngle(tau) { return carryHead + tau * 0.7 * TAU; }
@@ -499,7 +511,7 @@
           for (var fk in energy) { ctx.fillStyle = 'rgb(' + fk + ')'; ctx.fill(energy[fk]); }
         }
       }
-      ctx.fillStyle = 'rgb(' + hole.join(',') + ')'; ctx.fill(black);
+      ctx.fillStyle = 'rgb(' + (form==='success'?successHole:hole).join(',') + ')'; ctx.fill(black);
       ctx.fillStyle = 'rgba(' + glint.join(',') + ',0.9)'; ctx.fill(specks);
     }
 
@@ -528,6 +540,7 @@
     }
 
     function sleep() {
+      release();
       sleeping = true;
       host.setAttribute('data-am-sleeping', 'true');
       if (raf) cancelAnimationFrame(raf);
@@ -536,6 +549,9 @@
 
     function wake() {
       if (destroyed || form === 'idle') return;
+      if(document.hidden||!onScreen){sleep();return;}
+      ownership();
+      if(microMode){sleep();return;}
       sleeping = false;
       host.setAttribute('data-am-sleeping', 'false');
       if (reduced()) {
@@ -550,7 +566,8 @@
 
     function apply(next) {
       readInks();
-      if (next === 'idle') { form = 'idle'; render(); sleep(); return; }
+      if (next === 'idle') { form = 'idle'; clearMicro(); render(); sleep(); return; }
+      if(next==='busy')microMode=false;
       // Busy after busy (a quick check running straight into a build) keeps the
       // current performance; only a fresh start drops new ink.
       if (next === 'busy') { if (form !== 'busy' && form !== 'drop') enterForm('drop'); }
@@ -560,6 +577,7 @@
 
     function onEnvironment() {
       if (destroyed) return;
+      readInks();
       host.setAttribute('data-am-reduced', String(reduced()));
       if (document.hidden) { sleep(); return; }
       if (form !== 'idle' && (form === 'busy' || form === 'drop' || !settled(clock - formStart))) wake();
@@ -567,6 +585,7 @@
     }
     if (mql && typeof mql.addEventListener === 'function') mql.addEventListener('change', onEnvironment);
     document.addEventListener('visibilitychange', onEnvironment);
+    window.addEventListener('atelier:inks',onEnvironment);
     // A stage in a hidden dialog never draws; showing the dialog resumes it.
     var onScreen = true, io = null;
     if (typeof IntersectionObserver === 'function') {
@@ -600,9 +619,11 @@
         if (destroyed) return;
         destroyed = true;
         sleep();
+        clearMicro();
         if (io) io.disconnect();
         if (mql && typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onEnvironment);
         document.removeEventListener('visibilitychange', onEnvironment);
+        window.removeEventListener('atelier:inks',onEnvironment);
         if (canvas.parentNode === host) host.removeChild(canvas);
         if (filterSvg.parentNode === host) host.removeChild(filterSvg);
         ['data-atelier-motion', 'data-am-state', 'data-am-reduced', 'data-am-sleeping'].forEach(function (name) { host.removeAttribute(name); });

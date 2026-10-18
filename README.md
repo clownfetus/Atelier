@@ -1,5 +1,10 @@
 # Atelier: Modding Studio
 
+Settings and first-run setup offer a Full / Calm / Off Motion dial. Calm keeps
+small responses and still formations; Off uses stills. Your operating system's
+reduced-motion preference always takes precedence. Hero/skin artwork accents
+keep outcome colours distinct, with a SHIFTED label when adjustment is needed.
+
 Atelier is a desktop modding studio for Marvel Rivals. Browse game assets, edit
 textures and material parameters, preview models, and build mods from one interface.
 

@@ -286,7 +286,7 @@ def main():
                                         'animations': 0, 'sidebarAPI': True, 'clean': True}, empty_motion
                 result['empty_assets_motion'] = empty_motion
                 polish = window.evaluate_js("""(() => {
-                  const motion=document.getElementById('settings-motion');motion.value='reduce';motion.dispatchEvent(new Event('change'));
+                  const motion=document.getElementById('settings-motion');motion.value='off';motion.dispatchEvent(new Event('change'));
                   const density=document.getElementById('settings-density');density.value='compact';density.dispatchEvent(new Event('change'));
                   const operation=toastSpinner('Native packing fixture');operation.resolve('Native complete','success',4000);
                   const same=operation.isConnected && operation.dataset.operationState==='success';operation.remove();

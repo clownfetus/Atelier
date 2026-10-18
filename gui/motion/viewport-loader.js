@@ -57,6 +57,20 @@
     var generation = 0;
     var activeAnimations = [];
     var motionUnavailable = false;
+    var releaseMoment=null,microMode=false,microHost=null,micro=null,terminalTimer=0;
+    function release() {clearTimeout(terminalTimer);terminalTimer=0;if(releaseMoment)releaseMoment();releaseMoment=null;}
+    function clearMicro() {micro?.destroy();micro=null;microHost?.remove();microHost=null;microMode=false;if(svgEl)svgEl.style.display='';host.removeAttribute('data-am-micro');}
+    function largeAllowed() {return !motionUnavailable&&reducedPref!=='reduce'&&!Boolean(mql&&mql.matches)&&window.AtelierMotionPolicy?.allows(2)!==false&&!isDocumentHidden();}
+    function synchronizeMoment(canClaim=true) {
+      if(!largeAllowed()||currentState==='idle'||currentState==='ready'){release();clearMicro();return true;}
+      if(!canClaim&&!releaseMoment)return true;
+      if(!releaseMoment)releaseMoment=window.AtelierMotion.moment?.claim('viewport-load',2)||null;
+      if(releaseMoment){clearMicro();return true;}
+      cancelActiveAnimations();microMode=true;svgEl.style.display='none';host.setAttribute('data-am-micro','true');host.setAttribute('data-am-sleeping','true');
+      const state=currentState==='loading'?'busy':currentState==='empty'?'info':'error';
+      if(!microHost){microHost=document.createElement('span');microHost.className='am-stage-micro';host.append(microHost);try{micro=window.AtelierMotion.krackleGlyph.mount(microHost,{state});}catch(_){}}
+      micro?.setState(state);return false;
+    }
 
     var mql = null;
     try {
@@ -66,7 +80,7 @@
     } catch (_) {}
 
     function isReducedMotion() {
-      return motionUnavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches);
+      return motionUnavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches) || window.AtelierMotionPolicy?.allows(2)===false || microMode;
     }
 
     function isDocumentHidden() {
@@ -328,12 +342,16 @@
 
       currentState = nextState;
       host.setAttribute('data-am-state', currentState);
+      clearTimeout(terminalTimer);terminalTimer=0;
+      if(!synchronizeMoment())return;
       host.setAttribute('data-am-reduced', String(isReducedMotion()));
+      host.setAttribute('data-am-sleeping',String(isReducedMotion()||currentState==='idle'||currentState==='ready'));
 
       if (currentState === 'loading') {
         startLoadingSequence(true);
       } else if (currentState === 'empty' || currentState === 'error') {
         playOutcomeSettle(currentState);
+        if(releaseMoment)terminalTimer=setTimeout(()=>{release();host.setAttribute('data-am-sleeping','true');},currentState==='error'?3300:1500);
       } else {
         // 'idle' or 'ready' stops immediately and releases all WAAPI effects
         cancelActiveAnimations();
@@ -342,8 +360,10 @@
 
     function handleEnvironmentChange() {
       if (destroyed) return;
+      if(!synchronizeMoment(currentState==='loading'))return;
       var reduced = isReducedMotion();
       host.setAttribute('data-am-reduced', String(reduced));
+      host.setAttribute('data-am-sleeping',String(reduced||isDocumentHidden()||currentState!=='loading'));
 
       if (reduced || isDocumentHidden()) {
         cancelActiveAnimations();
@@ -385,6 +405,7 @@
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
+        release();clearMicro();
         cancelActiveAnimations();
         if (mql) {
           try {
@@ -404,6 +425,7 @@
         host.removeAttribute('data-atelier-motion');
         host.removeAttribute('data-am-state');
         host.removeAttribute('data-am-reduced');
+        host.removeAttribute('data-am-sleeping');
         if (mountedHosts) {
           if (mountedHosts.get(host) === instance) {
             mountedHosts.delete(host);

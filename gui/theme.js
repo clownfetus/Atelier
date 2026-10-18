@@ -123,8 +123,8 @@
       'error': error, 'error-container': errorContainer, 'on-error-container': readable(fg, [errorContainer]),
     };
   }
-  let artworkAccent = null;
-  window.addEventListener('atelier:artwork', event => { artworkAccent = event.detail?.accent || null; applyNow(); });
+  let artworkAccent = null, artworkColors=[];
+  window.addEventListener('atelier:artwork', event => { artworkAccent = event.detail?.accent || null; artworkColors=event.detail?.colors||[]; applyNow(); });
   window.addEventListener('atelier:preferences', () => applyNow());
   function apply() { if (!window.AtelierPreferences?.revealTheme(applyNow)) applyNow(); }
   function applyNow() {
@@ -146,6 +146,27 @@
       set('--studio-brand-color', blackMark ? '#000000' : '#ffffff');
       set('--studio-brand-filter', blackMark ? 'brightness(0)' : 'brightness(0) invert(1)');
     }
+    const surface=getComputedStyle(root).getPropertyValue('--bg2').trim()||p.surface;
+    const K=window.AtelierKrackleInks;
+    root.dataset.krackleSurface=K?K.surfaceKind(surface):(luminance(p.surface)<.179?'dark':'light');
+    let guarded=null;
+    if(K) {
+      const defaults=K.defaults(surface);
+      if(window.AtelierPreferences?.adaptive()&&artworkAccent&&document.querySelector('#library-hero:not([hidden])'))
+        guarded=K.guard(artworkAccent,artworkColors[1]||defaults.rift,surface,{candidates:artworkColors.slice(2)});
+      set('--krackle-charge',guarded?.charge||defaults.charge);set('--krackle-rift',guarded?.rift||defaults.rift);
+      for(const button of document.querySelectorAll('.btn.primary,#viewport-loading-motion-host')) {
+        const background=button.id==='viewport-loading-motion-host'?'#14161b':getComputedStyle(button).backgroundColor;
+        try {
+          const local=K.defaults(background),adaptive=guarded&&K.guard(artworkAccent,artworkColors[1]||local.rift,background,{candidates:artworkColors.slice(2)});
+          button.dataset.krackleSurface=K.surfaceKind(background);button.style.setProperty('--krackle-charge',adaptive?.charge||K.fit(local.charge,background));button.style.setProperty('--krackle-rift',adaptive?.rift||local.rift);
+          if(adaptive?.shifted)guarded.shifted=true;if(adaptive?.clash)guarded.clash=true;
+        }catch(_){}
+      }
+    }
+    const inkStatus=document.getElementById('krackle-accent-status');
+    if(inkStatus){inkStatus.hidden=!guarded?.shifted&&!guarded?.clash;inkStatus.textContent=guarded?.clash?'CLASH':guarded?.shifted?'SHIFTED':'';}
+    window.dispatchEvent(new Event('atelier:inks'));
     document.querySelectorAll('[data-theme-picker]').forEach(picker => { picker.value = preference; });
     renderSaved();
     document.querySelectorAll('[data-theme-preset]').forEach(button => {

@@ -104,7 +104,7 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
     try:
         tab.emulate_media(reduced_motion='no-preference')
         tab.goto(url); tab.wait_for_function('window.__inspection && window.atelierProject?.()')
-        tab.evaluate("document.getElementById('settings-motion').value='system';document.getElementById('settings-motion').dispatchEvent(new Event('change'))")
+        tab.evaluate("document.getElementById('settings-motion').value='full';document.getElementById('settings-motion').dispatchEvent(new Event('change'))")
         tab.wait_for_selector('#grid-area .card')
         tab.evaluate("AtelierViewport.open('1029001','Inspection fixtures — synthetic geometry')")
         tab.wait_for_selector('.vp-mat'); tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none'")
@@ -277,12 +277,12 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
             assert image.mode=='RGBA' and image.getpixel((0,0))[3]==0
         settings();tab.locator('#viewport-grid').click();tab.locator('#viewport-backdrop').select_option('gradient')
         checks.append('Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly')
-        tab.evaluate("document.getElementById('settings-motion').value='reduce';document.getElementById('settings-motion').dispatchEvent(new Event('change'));__inspection.tint([.2,.3,.4])")
+        tab.evaluate("document.getElementById('settings-motion').value='off';document.getElementById('settings-motion').dispatchEvent(new Event('change'));__inspection.tint([.2,.3,.4])")
         tab.locator('#viewport-fit').click();tab.wait_for_timeout(50)
         assert not tab.evaluate('__inspection.presentation().moving')
         state=tab.evaluate('__inspection.presentation().colors.find(c=>c.name==="MI_Body")')
         assert state['shown']==[.2,.3,.4],state
-        tab.evaluate("document.getElementById('settings-motion').value='system';document.getElementById('settings-motion').dispatchEvent(new Event('change'));__inspection.tint([.6,.2,.15])")
+        tab.evaluate("document.getElementById('settings-motion').value='full';document.getElementById('settings-motion').dispatchEvent(new Event('change'));__inspection.tint([.6,.2,.15])")
         tab.wait_for_timeout(180)
         checks.append('Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data')
         tab.locator('#viewport-expand').click()

@@ -154,7 +154,7 @@ Job feedback, ownership markers, empty states and occasional brand moments use *
 - Concentrate it: substantial jobs (export, import, saves, loading, Activity), restrained ownership markers, empty states, and showcase moments (logo entrance, first export). Button presses, hover, typing, search, theme changes and dialog backdrops stay plain. Chrome and category emblems keep Material Sharp glyphs.
 - Keep edited artwork trustworthy: never texture a colour swatch, a dye preview or the material-inspection viewport. A comic viewport mode would be an explicit showcase mode.
 - Compose, don't scatter: bubbles gather into deliberate dark masses on the shadow side, with clean energy elsewhere and a clear silhouette edge. Bubbles sit at least one dot step inside the shape, so thin bands such as the ring keep only a sparse centreline. Success is mostly clean; failure carries one substantial mass. Highlights are crisp Paper specks, never a soft glow.
-- Colours come from the semantic tokens (`--krackle-*` in `gui/motion/krackle.css`); bubbles are holes showing the surface, and Paper glints are not counted as inks.
+- Outcome colours are fixed per measured surface (`--krackle-*` in `gui/motion/krackle.css`); bubbles use Ink, except Paper holes in light-surface success. Paper glints are not counted as inks. Semantic UI colours remain separate.
 - Interruption: a real result replaces any animation immediately and its text and controls render at once; busy-after-busy continues rather than restarting; only busy loops; settled or hidden stages stop drawing. The large stage belongs to the dialog the user has open; other jobs report through toasts and Activity.
 - Reduced motion (OS or Atelier's setting) shows the final pose of every state.
 
@@ -343,3 +343,17 @@ results group heroes, costumes, folders and assets, use one active keyboard row,
 and never alter the tray or current-folder selection while typing. Stale requests
 are aborted and cannot replace a newer result. Continue uses server file mtimes;
 editor preferences are local and never change exported content.
+
+Krackle outcomes reserve Paper/Ink for success, gold/brown for warnings and
+pink/rose for failures. Surface luminance selects the set, including dark preview
+surfaces inside a light theme. Adaptive Charge and Rift apply only in hero/skin
+context. They reach 3:1 contrast, reserve ΔE 25 from outcomes, avoid a 12° hue
+window around saturated warning/fault colours, and stay ΔE 25 / 35° apart from
+each other. Distances consistently use CIE76, D65 CIELAB. A small SHIFTED label
+explains adjustments; hand-picked clashes can be retained with CLASH.
+
+The Motion dial is Full (tiers 0–3), Calm (0–1) or Off (stills). OS reduced
+motion forces Off. One large Tier 2/3 moment may own the screen at a time;
+refused stages keep micro feedback, and each Tier 3 event is limited to once
+per kind per session. Calm/Off formations stop drawing. Real results interrupt
+motion immediately; hidden and settled stages release ownership.
