@@ -380,3 +380,25 @@ Particle stages batch preallocated circle commands by integer ink key, because
 the [Canvas Path2D API](https://html.spec.whatwg.org/multipage/canvas.html#path2d-objects)
 has no reset operation. Filter fallback uses real RAF intervals relative to the
 display baseline; browser checks log CPU cost separately from that frame budget.
+
+Showcase is an explicit Model Studio presentation mode. Disposable toon materials
+reuse source textures but never modify editable materials. Every render restores
+the original material object (including material-array identity) in `finally`;
+failed captures restore the camera and controls too. Inspect comparison, dye and
+colour previews retain their original values. Showcase is not persisted and a
+new model starts in Inspect. Its still screen and burst sit behind the display
+model; controls and text retain solid panel surfaces.
+
+Posters/turntables use the selected presentation mode. Mod cards request a clean
+Showcase capture only from a matching loaded project/skin without pending edits;
+otherwise they use labelled catalogue artwork or skip the optional card. Their
+counts come from completed applied entries, excluding packaging summaries and
+including explicitly reported generated textures. Version comes from the local
+build, and date is captured when the build finishes. Warning cards carry the
+cracked ring/skipped count; failed builds have no card. All lettering sits on a
+Paper footer. Cards are client canvases and never enter mod/project payloads.
+
+Opt-in foley synthesizes three brief stage sounds with WebAudio. It defaults off,
+requires Full and a visible document, starts only after an enabled user gesture,
+and cancels active sources when disabled, hidden or reduced. No audio assets or
+audio dependencies are downloaded. Micro feedback and refused stages stay silent.

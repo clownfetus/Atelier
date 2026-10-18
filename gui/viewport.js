@@ -221,6 +221,7 @@ function init() {
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
     materials:() => ({data:matData, byName:matsByName, edited}),
+    context:()=>({project:viewportProject,skin:currentSkin||meshSkin}),
     fetch:(url, options) => materialFetch(url, options), texture:materialTexture, url:projectUrl, hex:linToHex,
     tintOriginal, pickMaterial, label:materialLabel, notify:note, resize:onResize,
     ready:()=>!materialTask && !animation.loading() && !saving, refreshEdits:refreshFoot,
@@ -1309,4 +1310,8 @@ function focusPendingEdits() {
   }
 }
 
-window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits };
+function captureModPoster(context){
+  if(!inited||hasPendingEdits()||context.project!==viewportProject||!context.skin||context.skin!==(currentSkin||meshSkin))return null;
+  return inspection.cardPoster();
+}
+window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits,captureModPoster };

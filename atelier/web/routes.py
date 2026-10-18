@@ -142,6 +142,19 @@ class _ProjectScopePlugin:
 app.install(_ProjectScopePlugin())
 
 
+@app.get('/api/app_info')
+def api_app_info():
+    """Local build identity for client-only captures; no release/network check."""
+    try:
+        with open(VERSION_FILE,encoding='utf-8') as source:
+            version=source.read(100).strip()
+        if not re.fullmatch(r'\d+(?:\.\d+){1,3}',version):
+            version='development'
+    except OSError:
+        version='development'
+    return {'version':version}
+
+
 @app.get("/api/jobs")
 def api_jobs():
     return {"ok": True, "jobs": jobs.manager().list(get_active_project_for_request())}

@@ -594,6 +594,7 @@
     }
 
     function apply(next) {
+      var wasBusy=form==='busy'||form==='drop';
       readInks();
       if (next === 'idle') { form = 'idle'; clearMicro(); render(); sleep(); return; }
       if(next==='busy')microMode=false;
@@ -602,6 +603,10 @@
       if (next === 'busy') { if (form !== 'busy' && form !== 'drop') enterForm('drop'); }
       else { results++; enterForm(next); }
       wake();
+      if(!sleeping&&!microMode&&!reduced()&&!document.hidden&&releaseMoment&&window.AtelierMotionPolicy?.allows(3)){
+        const sound=next==='busy'&&!wasBusy?'drop':next==='success'?'pop':next==='error'?'splat':null;
+        if(sound)window.AtelierFoley?.play(sound);
+      }
     }
 
     function onEnvironment() {

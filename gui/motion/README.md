@@ -546,3 +546,35 @@ The merge guard measures RAF intervals against the observed refresh baseline;
 disable it even on an idle 60 Hz display. `perf()` reports sampled CPU costs and
 frame intervals; `surfaces_checks.py` logs the median and verifies the 8 ms ceiling
 plus a simulated slow-frame fallback. No Linux WebKitGTK result is claimed.
+
+Wave 4c adds explicit Inspect/Showcase controls. `viewport-inspection.js` creates
+one shared nearest-filtered toon ramp and disposable per-source toon variants.
+Only display draws use them. A `try/finally` restores every source material object
+and the grid; originals, textures, colours, alpha and editable drafts stay intact.
+Reopening a model resets to Inspect. `showcase-art.js` draws a still 45° screen
+and composed burst behind the model for the explicit mode and its captures.
+The normal viewport RAF owns all 3D drawing; there is no second animation loop.
+
+`AtelierViewport.captureModPoster(context)` refuses another project/skin, pending
+edits or an unready model. It returns a clean Showcase canvas with camera/render
+settings restored even on failure. `AtelierModCards.mount` is optional result UI:
+it uses that capture, a labelled catalogue fallback, or no card. Result resets
+abort old image/version work and revoke download URLs. Counts use completed
+applied entries (`mod-card-data.js`), not the selected list. Packaging summaries
+do not count as assets. Explicit custom-texture counts and dye-off masks do.
+Warning cards include a crack/skipped count; failure has no card. Footer text is
+always on Paper, and the build date survives reopening the last result. Clipboard
+failure explains Save PNG; no optional card failure changes the export result.
+`/api/app_info` is a local read of the bundled version, with no release request.
+
+`AtelierFoley.play(drop|pop|splat)` is called only by an owned, visible Full
+formation transition. Settings stores `atelier.foley` locally, default off.
+WebAudio is initialized by an enabled pointer gesture. Oscillators/noise and gain
+envelopes last 90–140 ms. Hiding, changing policy or disabling sounds cancels
+active sources before suspending, so no old sound resumes later. Page teardown
+closes the context. Unavailable or blocked WebAudio fails silently.
+
+`showcase_checks.py` checks render-time toon use, exact material restoration,
+capture camera/error restoration, all dial modes, silent audio gates, real card
+counts/actions and failed builds. `test_mod_cards.py` checks the pure report/context
+logic; frontend HTTP tests check local build identity. All are in the full suites.
