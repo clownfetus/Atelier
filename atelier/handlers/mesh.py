@@ -171,6 +171,18 @@ def find_name_table(uasset, min_run=20):
     return best_start, best
 
 
+def skeletal_name_table(uasset, asset_name):
+    """Small accessory meshes can have fewer than twenty package names."""
+    try:
+        return find_name_table(uasset)
+    except ValueError:
+        start, names = find_name_table(uasset, min_run=6)
+        required = {asset_name, 'SkeletalMesh', 'Default__SkeletalMesh', '/Script/Engine'}
+        if not required.issubset(names):
+            raise ValueError('Small name table does not identify this skeletal mesh')
+        return start, names
+
+
 def _try_extras(d, o, limit):
     """Validate a candidate FSkeletalMaterial[] + FReferenceSkeleton starting at `o`.
     Requires the triple invariant a real RefSkeleton always satisfies -- RefBoneInfo count
@@ -381,7 +393,7 @@ class Mesh:
         self._export_ss_off = self._bulk_start_off = None
         if os.path.exists(ua):
             self.uasset = bytearray(open(ua, "rb").read())
-            name_start, self.names = find_name_table(bytes(self.uasset))
+            name_start, self.names = skeletal_name_table(bytes(self.uasset), os.path.basename(base))
             extras = find_extras(bytes(self.uexp))
             self.materials = resolve_materials(extras["materials"], self.names)
             self.bones = parse_skeleton(self.uexp, extras, self.names)

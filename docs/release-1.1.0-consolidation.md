@@ -25,6 +25,8 @@ custom texture locations, and Model Studio editing, replacement and Blender expo
   hidden body when none is selected.
 - The completed Blender export action remains clickable in both themes and
   smaller windows. Unchanged mesh exports are labelled accurately.
+- Small skeletal accessories with short name tables now parse after class and
+  asset identity checks, resolving a real Venom accessory's section-mapping failure.
 - Previously separate Home, identity, artwork, loading and viewer checks now
   run in the full browser release gate. The new Blender export check exercises
   project-scoped HTTP jobs, progress, failure, retry and Activity history.

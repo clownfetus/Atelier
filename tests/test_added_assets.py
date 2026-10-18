@@ -192,7 +192,7 @@ class AddedAssets(unittest.TestCase):
         self.assertEqual(Path(A.source_base(gr) + '.uasset').read_bytes(), original)
         clone = self.root / 'B'; shutil.copytree(self.project, clone)
         with C.project_context(str(clone)):
-            self.assertTrue(Path(T.ensure_work_base(gr)).is_relative_to(clone))
+            self.assertTrue(Path(T.ensure_work_base(gr)).resolve().is_relative_to(clone.resolve()))
             self.assertEqual(Path(T.ensure_work_base(gr) + '.uasset').read_bytes(), original)
         removed = project_trash.remove(str(self.project), [gr]); self.add()
         self.assertFalse(project_trash.restore(str(self.project), removed['entry'])['ok'])

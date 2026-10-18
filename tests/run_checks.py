@@ -73,7 +73,10 @@ def main():
                                       text=True, encoding="utf-8", errors="replace", timeout=timeout)
                 output, code = proc.stdout + proc.stderr, proc.returncode
             except subprocess.TimeoutExpired as exc:
-                output, code = f"Suite exceeded {timeout} seconds: {exc}", 124
+                def captured(value):
+                    return value.decode('utf-8', errors='replace') if isinstance(value, bytes) else (value or '')
+                output = captured(exc.stdout) + captured(exc.stderr) + f"\nSuite exceeded {timeout} seconds: {exc}"
+                code = 124
             elapsed = round(time.monotonic() - started, 2)
             print(f"{'PASS' if code == 0 else 'FAIL'} {suite} ({elapsed}s)", flush=True)
             summaries = [line for line in output.splitlines()

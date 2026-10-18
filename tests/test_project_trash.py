@@ -160,7 +160,10 @@ class Trash(unittest.TestCase):
         entries = []
         for index in range(23):
             self.seed(self.tex)
-            with patch.object(T.time, 'time', return_value=1000000+index):
+            # Keep watchdog's rename queue on the real clock: a process-wide time.time
+            # patch can turn its delayed-event wait into a decades-long sleep on Linux.
+            with patch.object(T, 'time') as clock:
+                clock.time.return_value = 1000000 + index
                 entries.append(T.remove(str(self.root), [self.tex])['entry'])
         self.assertEqual(len(list((self.root/T.DIRECTORY).iterdir())),20)
         self.assertFalse((self.root/T.DIRECTORY/entries[0]).exists())

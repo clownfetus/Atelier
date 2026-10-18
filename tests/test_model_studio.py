@@ -68,6 +68,17 @@ class Studio(unittest.TestCase):
         self.slots = [{'index': 0, 'slot': 'MI_Body', 'mi': 'Characters/1029/1029001/Materials/MI_Body', 'via': 'imports'},
                       {'index': 1, 'slot': 'MI_Hair', 'mi': 'Characters/1029/1029001/Materials/MI_Hair', 'via': 'imports'}]
 
+    def test_small_skeletal_name_table_requires_class_and_export_identity(self):
+        names = ['lambert1', 'Root', 'SK_Tiny', '/Script/Engine', 'Class',
+                 'SkeletalMesh', 'Default__SkeletalMesh', 'Skeleton']
+        data = b'header\xff' + b''.join(struct.pack('<i', len(name) + 1) + name.encode() + b'\0' + bytes(4)
+                                      for name in names) + b'\xfftrailer'
+        self.assertEqual(mesh.skeletal_name_table(data, 'SK_Tiny'), (7, names))
+        with self.assertRaisesRegex(ValueError, 'identify this skeletal mesh'):
+            mesh.skeletal_name_table(data, 'SK_Other')
+        with self.assertRaisesRegex(ValueError, 'identify this skeletal mesh'):
+            mesh.skeletal_name_table(data.replace(b'SkeletalMesh', b'StaticObject'), 'SK_Tiny')
+
     def test_discovery_separates_held_weapons_from_bodies_and_props(self):
         paths = ['Meshes/SK_Body', 'Weapons/Sword/Meshes/SK_Sword', 'Weapons/Guns/Meshes/SK_Gun_L',
                  'Weapons/Guns/Meshes/SK_Gun_R', 'Weapons/MVP/Bullet/Meshes/SK_Bullet',

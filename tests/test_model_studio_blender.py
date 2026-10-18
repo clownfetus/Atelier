@@ -366,7 +366,8 @@ class BlenderPort(unittest.TestCase):
         with patch('atelier.handlers.texture.ensure_work_base',side_effect=source), \
              patch.object(meshmat,'CACHE_3DVIEW',str(self.root/'empty')):
             meshmat.extract_textures_to_project(['T_A','T_B'])
-        self.assertEqual(seen,[(str(self.root/'project'),'captured')]*2)
+        self.assertEqual([(Path(path).resolve(), context) for path, context in seen],
+                         [((self.root/'project').resolve(), 'captured')]*2)
 
 
 if __name__=='__main__':unittest.main()

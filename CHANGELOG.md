@@ -22,6 +22,8 @@ The app, installers and update checker identify each release by its full number,
   hidden sections can be restored without hiding other sections that share a material.
 - Model Studio recovers available texture maps, shows custom texture assignments,
   groups material controls and previews held weapons with hand selection.
+- Small skeletal accessories with short name tables now load their section mapping
+  after their mesh class and asset identity are verified.
 - Model and Blender exports report their actual preparation/build stages and
   offer cancellation. Preview settings and Showcase effects remain separate from edits.
 
