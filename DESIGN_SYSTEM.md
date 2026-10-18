@@ -47,8 +47,8 @@ a visible border, quiet hover fill and distinct imported-state outline.
 Left-aligned names occupy two lines so long explanatory
 folder labels do not stretch an entire row; full names remain in the card title
 and accessible name, and search still uses the complete text. Shape roles are
-6px for controls/previews, 8px for intermediate surfaces, 10px for asset cards and
-panels, and 12px for dialogs.
+6px for controls/previews and workspace panels/dialogs, and 8px for intermediate
+control surfaces. Dark workspace gutters use Ink between panels.
 Switches retain their rounded tracks. Hero portraits and category artwork keep
 their existing dimensions.
 
