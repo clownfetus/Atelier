@@ -13,11 +13,12 @@
   var VALID_STATES = new Set(['idle', 'saving', 'success', 'warning', 'error']);
   var TERMINAL_STATES = new Set(['success', 'warning', 'error']);
 
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var SAVING_LOOP_MS = 960;
-  var POP_DURATION_MS = 420;
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
+  var SAVING_LOOP_MS = window.AtelierMotion.beatMs;
+  var POP_DURATION_MS = 380;
   var CRACK_DURATION_MS = 620;
   var SPLAT_DURATION_MS = 560;
   var DIZZY_DURATION_MS = 1100;
@@ -103,6 +104,8 @@
       return reducedPref === 'reduce' || Boolean(mql && mql.matches);
     }
 
+    // Decorative follow-through (flecks, the dazed orbit) is Full only; Calm keeps the state change.
+    function decorative() { return !window.AtelierMotionPolicy || window.AtelierMotionPolicy.allows(2); }
     function isDocumentHidden() {
       return Boolean(typeof document !== 'undefined' && document.hidden);
     }
@@ -233,68 +236,68 @@
 
         if (targetState === 'success') {
           runAnimation(burst, [
-            { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0 },
-            { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.52 },
-            { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.76 },
+            { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
+            { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+            { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
             { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
-          ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
+          ], { duration: POP_DURATION_MS, easing: 'linear' });
           runAnimation(burstHole, [
             { transform: 'scale(0)', offset: 0 },
-            { transform: 'scale(0)', offset: 0.42 },
-            { transform: 'scale(1.35)', offset: 0.72 },
+            { transform: 'scale(0)', offset: 0.36, easing: EASE_STANDARD },
+            { transform: 'scale(1.35)', offset: 0.64, easing: EASE_SWAY },
             { transform: 'scale(1)', offset: 1 }
-          ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
-          for (var i = 0; i < flecks.length; i++) {
+          ], { duration: POP_DURATION_MS, easing: 'linear' });
+          for (var i = 0; decorative() && i < flecks.length; i++) {
             var fx = Number(flecks[i].getAttribute('cx')) - 12, fy = Number(flecks[i].getAttribute('cy')) - 12;
             runAnimation(flecks[i], [
-              { transform: 'translate(' + px(-fx * 0.8) + ', ' + px(-fy * 0.8) + ') scale(0.3)', opacity: 0, offset: 0 },
+              { transform: 'translate(' + px(-fx * 0.8) + ', ' + px(-fy * 0.8) + ') scale(0.3)', opacity: 0, offset: 0, easing: EASE_STANDARD },
               { opacity: 1, offset: 0.25 },
-              { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.6 },
+              { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.55, easing: EASE_FALL },
               { transform: 'translate(' + px(fx * 0.25) + ', ' + px(fy * 0.25) + ') scale(0)', opacity: 0, offset: 1 }
-            ], { duration: POP_DURATION_MS + 40, easing: EASE_STANDARD });
+            ], { duration: POP_DURATION_MS + 40, easing: 'linear' });
           }
         } else if (targetState === 'warning') {
           runAnimation(ring, [
-            { transform: 'scale(1.3)', opacity: 0, offset: 0 },
-            { transform: 'scale(0.93)', opacity: 1, offset: 0.42 },
-            { transform: 'scale(1.03)', opacity: 1, offset: 0.7 },
+            { transform: 'scale(1.3)', opacity: 0, offset: 0, easing: EASE_FALL },
+            { transform: 'scale(0.93)', opacity: 1, offset: 0.3, easing: EASE_STANDARD },
+            { transform: 'scale(1.03)', opacity: 1, offset: 0.6, easing: EASE_SWAY },
             { transform: 'scale(1)', opacity: 1, offset: 1 }
-          ], { duration: 380, easing: EASE_STANDARD });
+          ], { duration: 380, easing: 'linear' });
           var from = 'translate(' + px(CHUNK_FROM[0]) + ', ' + px(CHUNK_FROM[1]) + ')';
           runAnimation(chunk, [
             { transform: from, offset: 0 },
-            { transform: from, offset: 0.3, easing: EASE_FALL },
-            { transform: 'translate(0px, 0px)', offset: 0.62, easing: EASE_RISE },
-            { transform: 'translate(0px, -1.6px)', offset: 0.74, easing: EASE_FALL },
-            { transform: 'translate(0px, 0px)', offset: 0.86, easing: EASE_RISE },
-            { transform: 'translate(0px, -0.5px)', offset: 0.93, easing: EASE_FALL },
+            { transform: from, offset: 0.18, easing: EASE_FALL },
+            { transform: 'translate(0px, 0px)', offset: 0.56, easing: EASE_RISE },
+            { transform: 'translate(0px, -1.6px)', offset: 0.7, easing: EASE_FALL },
+            { transform: 'translate(0px, 0px)', offset: 0.84, easing: EASE_RISE },
+            { transform: 'translate(0px, -0.5px)', offset: 0.92, easing: EASE_FALL },
             { transform: 'translate(0px, 0px)', offset: 1 }
           ], { duration: CRACK_DURATION_MS, easing: 'linear' });
         } else if (targetState === 'error') {
           runAnimation(splat, [
-            { transform: 'scale(0.5)', opacity: 0, offset: 0 },
-            { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-            { transform: 'scale(1.2)', opacity: 1, offset: 0.52 },
-            { transform: 'scale(0.95)', opacity: 1, offset: 0.74 },
+            { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY },
+            { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+            { transform: 'scale(1.2)', opacity: 1, offset: 0.48, easing: EASE_SWAY },
+            { transform: 'scale(0.95)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
             { transform: 'scale(1)', opacity: 1, offset: 1 }
-          ], { duration: SPLAT_DURATION_MS - 40, easing: EASE_STANDARD });
+          ], { duration: SPLAT_DURATION_MS - 40, easing: 'linear' });
           for (var j = 0; j < sats.length; j++) {
             var sx = Number(sats[j].getAttribute('cx')) - 12, sy = Number(sats[j].getAttribute('cy')) - 12;
             var start = 'translate(' + px(-sx) + ', ' + px(-sy) + ') scale(0.3)';
             runAnimation(sats[j], [
               { transform: start, opacity: 0, offset: 0 },
-              { transform: start, opacity: 0, offset: 0.24 },
-              { transform: 'translate(' + px(sx * 0.12) + ', ' + px(sy * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.6 },
+              { transform: start, opacity: 0, offset: 0.26, easing: EASE_STANDARD },
+              { transform: 'translate(' + px(sx * 0.12) + ', ' + px(sy * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.55, easing: EASE_SWAY },
               { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
-            ], { duration: SPLAT_DURATION_MS, easing: EASE_STANDARD });
+            ], { duration: SPLAT_DURATION_MS, easing: 'linear' });
           }
           runAnimation(drip, [
             { transform: 'scaleY(0)', offset: 0 },
-            { transform: 'scaleY(0)', offset: 0.45 },
-            { transform: 'scaleY(1.15)', offset: 0.82 },
+            { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+            { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD },
             { transform: 'scaleY(1)', offset: 1 }
-          ], { duration: 640, easing: EASE_STANDARD });
-          runAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
+          ], { duration: 640, easing: 'linear' });
+          if (decorative()) runAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
             duration: DIZZY_DURATION_MS, delay: 260, fill: 'backwards', easing: 'linear'
           });
         }

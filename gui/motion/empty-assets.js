@@ -217,20 +217,21 @@
       currentState = 'entering';
       emptyHost.setAttribute(STATE_ATTR, 'entering');
 
-      var easing = 'cubic-bezier(0.2, 0, 0, 1)';
+      var easing = window.AtelierMotion.ease.standard;
       var started = [];
 
       try {
-        var fall = 'cubic-bezier(0.55, 0, 1, 0.45)';
-        var rise = 'cubic-bezier(0, 0.55, 0.45, 1)';
+        var fall = window.AtelierMotion.ease.fall;
+        var rise = window.AtelierMotion.ease.rise;
+        var sway = window.AtelierMotion.ease.sway;
         // The tray stamps up into place.
         started.push(nodes.gTray.animate(
           [
-            { transform: 'translateY(4px) scale(0.96)', opacity: 0.35 },
-            { transform: 'translateY(-1px) scale(1.01)', opacity: 1, offset: 0.6 },
+            { transform: 'translateY(4px) scale(0.96)', opacity: 0.35, easing: easing },
+            { transform: 'translateY(-1px) scale(1.01)', opacity: 1, offset: 0.6, easing: sway },
             { transform: 'translateY(0) scale(1)', opacity: 1 }
           ],
-          { duration: 300, easing: easing, fill: 'both' }
+          { duration: 300, easing: 'linear', fill: 'both' }
         ));
         // The registration dots fade in like a print plate.
         started.push(nodes.gGuides.animate(
@@ -254,11 +255,11 @@
         // The drop swings in on its thread and hangs, waiting for the first edit.
         started.push(nodes.drop.animate(
           [
-            { transform: 'translateY(-10px) scaleY(1.25)', opacity: 0 },
-            { transform: 'translateY(1.5px) scaleY(0.92)', opacity: 1, offset: 0.6 },
+            { transform: 'translateY(-10px) scaleY(1.25)', opacity: 0, easing: easing },
+            { transform: 'translateY(1.5px) scaleY(0.92)', opacity: 1, offset: 0.6, easing: sway },
             { transform: 'translateY(0) scaleY(1)', opacity: 1 }
           ],
-          { duration: 360, delay: 120, easing: easing, fill: 'both' }
+          { duration: 360, delay: 120, easing: 'linear', fill: 'both' }
         ));
 
         activeAnimations = started;

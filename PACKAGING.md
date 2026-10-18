@@ -1,4 +1,33 @@
-# Windows review package
+# Preparing a public release
+
+For 1.0.0, use `.github/workflows/release-candidate.yml` on
+`codex/release-1.0.0` (or dispatch it against the intended candidate commit).
+It builds the Windows installer and Linux AppImage, verifies upgrade from the
+pinned 0.4.1 installer on disposable Windows runners, checks the actual Linux
+GTK/WebKit window and tool refresh, then assembles the matching source archive,
+checksums and `VERIFICATION.json`. Every gate must pass before the
+`Atelier-1.0.0-release` artifact exists.
+
+Windows build inputs and Inno Setup are pinned in `requirements-build.txt` and
+`scripts/windows_toolchain.json`; bootstrap with `scripts/bootstrap_windows.ps1`.
+The native tools seed and previous release are pinned in
+`tests/fixtures/installer/release-1.0.0-inputs.json`. The Galacta template pair is
+provided through the two `GALACTA_TEMPLATE_*_B64` encrypted repository inputs.
+It is bundled only inside Atelier and is never added to Git or source archives.
+
+Do not run installer integration checks on a normal workstation. The current
+harness deliberately admits only explicitly configured disposable GitHub-hosted
+Windows runners. Upgrade/uninstall checks preserve synthetic projects, exports,
+settings, paths, user tools, mappings and browser preferences. The normal stable
+AppId remains unchanged so existing installations are found.
+
+The workflow does not publish a release. Review the passing workflow and exact
+hashes, prepare a draft with the release assets and `docs/release-1.0.0.md`, then
+publish the tested commit when ready. `scripts/release_bundle.py` rejects an
+installer or Linux artifact whose hash disagrees with its test report, and a
+Windows manifest whose source commit/version differs from the checkout.
+
+## Windows review package
 
 The portable review package contains `Atelier.exe` and its required `_internal`
 directory. It excludes native modding tools, local configuration, projects, game

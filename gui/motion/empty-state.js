@@ -10,9 +10,10 @@
   'use strict';
 
   var KINDS = new Set(['empty', 'none', 'error']);
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
   var mounted = typeof WeakMap === 'function' ? new WeakMap() : null;
 
   // krackle-art:empty-state:begin
@@ -75,27 +76,27 @@
         var bubbles = group.querySelectorAll('.am-empty-state-bubble');
         if (kind === 'empty') {
           run(group.querySelector('.am-empty-state-tray'), [
-            { transform: 'translateY(3px) scale(0.95)', opacity: 0.4 },
-            { transform: 'translateY(-0.6px) scale(1.01)', opacity: 1, offset: 0.6 },
+            { transform: 'translateY(3px) scale(0.95)', opacity: 0.4, easing: EASE_STANDARD },
+            { transform: 'translateY(-0.6px) scale(1.01)', opacity: 1, offset: 0.6, easing: EASE_SWAY },
             { transform: 'translateY(0) scale(1)', opacity: 1 }
-          ], { duration: 280, easing: EASE_STANDARD });
+          ], { duration: 280, easing: 'linear' });
         }
         if (kind === 'error') {
           run(group.querySelector('.am-empty-state-splat'), [
-            { transform: 'scale(0.5)', opacity: 0, offset: 0 }, { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-            { transform: 'scale(1.18)', opacity: 1, offset: 0.52 }, { transform: 'scale(0.96)', opacity: 1, offset: 0.74 },
+            { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY }, { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+            { transform: 'scale(1.18)', opacity: 1, offset: 0.48, easing: EASE_SWAY }, { transform: 'scale(0.96)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
             { transform: 'scale(1)', opacity: 1, offset: 1 }
-          ], { duration: 520, easing: EASE_STANDARD });
+          ], { duration: 520, easing: 'linear' });
           Array.prototype.forEach.call(group.querySelectorAll('.am-empty-state-sat'), function (sat, i) {
             run(sat, [
-              { transform: 'scale(0)', opacity: 0 }, { transform: 'scale(0)', opacity: 0, offset: 0.3 },
-              { transform: 'scale(1.3)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 520 + i * 30, easing: EASE_STANDARD });
+              { transform: 'scale(0)', opacity: 0 }, { transform: 'scale(0)', opacity: 0, offset: 0.3, easing: EASE_STANDARD },
+              { transform: 'scale(1.3)', opacity: 1, offset: 0.7, easing: EASE_SWAY }, { transform: 'scale(1)', opacity: 1 }
+            ], { duration: 520 + i * 30, easing: 'linear' });
           });
           run(group.querySelector('.am-empty-state-drip'), [
-            { transform: 'scaleY(0)' }, { transform: 'scaleY(0)', offset: 0.45 },
-            { transform: 'scaleY(1.15)', offset: 0.82 }, { transform: 'scaleY(1)' }
-          ], { duration: 640, easing: EASE_STANDARD });
+            { transform: 'scaleY(0)' }, { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+            { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD }, { transform: 'scaleY(1)' }
+          ], { duration: 640, easing: 'linear' });
         }
         Array.prototype.forEach.call(bubbles, function (bubble, i) {
           run(bubble, bounce(kind === 'none' ? 22 : 16), { duration: 460, delay: 60 + i * 70, fill: 'backwards', easing: 'linear' });

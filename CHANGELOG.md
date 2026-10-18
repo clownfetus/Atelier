@@ -1,7 +1,35 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**0.4.1**.
+**1.0.0**.
+
+## 1.0.0 — 18 October 2026
+
+- Consolidates the unmerged UI waves, motion review and latest Krackle A mark.
+- Hero-led Home, Everywhere search, costume entry points and Continue editing.
+- Recoverable project trash, Undo, themed confirmations and guided setup.
+- Mod tray / Build mod workflow, guarded image drops, readable caption results,
+  updated surfaces and palettes, and measured Krackle inks.
+- Full / Calm / Off motion with system reduced-motion precedence, shared timing
+  and once-per-launch presentation. Optional formation sounds are off by default.
+- Inspect / Showcase rendering, posters, turntables and client-created Mod cards.
+- Material replacement and restoration use the same themed confirmations as
+  other editors; confirmations cannot apply to a subsequently opened material.
+- Linux prerequisite checks accept its native UAssetTool without requiring a
+  Windows executable; packaged checks cover this after an actual 0.4.1 upgrade.
+- Pinned Windows compiler/build dependencies, complete candidate checks, native
+  WebKit AppImage checks and upgrade preservation from 0.4.1.
+
+
+- **Replace material** in the material editor searches installed materials by
+  character, skin, name or path and applies one to the target, preserving the
+  donor's parent, textures, static switches and cooked shader data through export.
+  The target retains its identity; its replacement parameters remain editable.
+- **Restore game defaults** returns the original target material after a swap.
+  Material replacement/default restoration and removal of incompatible texture,
+  dye and intensity options publish together with rollback on failure.
+- Circular donor parent chains are refused. Cross-character native container
+  build/readback and browser checks pass; appearance has not been tested in game.
 
 ## 0.4.1 — 16 October 2026
 

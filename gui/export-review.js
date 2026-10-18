@@ -50,17 +50,25 @@
       }
     });
   }
+  // Export feedback elsewhere (toast, button) holds still while this dialog's stage carries the job.
+  const announce = () => document.dispatchEvent(new Event('atelier:export-review'));
   function show() {
-    if (!overlay.classList.contains('active')) opener = document.activeElement;
+    const opening = !overlay.classList.contains('active');
+    if (opening) opener = document.activeElement;
     overlay.classList.add('active'); panel.focus();
+    if (opening) announce();
   }
   function hide() {
+    const closing = overlay.classList.contains('active');
     overlay.classList.remove('active');
+    if (closing) announce();
     if (opener?.isConnected && !opener.disabled) opener.focus();
     else if (!lastButton.hidden && !lastButton.disabled) lastButton.focus();
     else document.getElementById('install-btn').focus();
   }
+  let disposeCard=null;
   function reset(heading, state) {
+    disposeCard?.();disposeCard=null;
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
     showStage(state === 'review' ? 'idle' : state);
@@ -70,7 +78,7 @@
   function showStage(state) {
     try {
       if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
-        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156});
+        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156, kind:'export-review'});
       }
       stage?.setState(state);
     } catch (_) {
@@ -237,6 +245,7 @@
     if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
+    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt});
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
     if (!result.ok) button('Retry export', current.retry || callbacks.confirm, true).id = 'export-review-retry';
@@ -287,10 +296,17 @@
     },
     finish(snapshot, result) {
       if (current?.snapshot !== snapshot) return;
-      busy = false; current.result = result; lastResult = current;
+      busy = false; current.result = result;current.builtAt=new Date().toISOString(); lastResult = current;
       lastButton.hidden = false; lastButton.disabled = false;
       lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();
+    },
+    // True when the large stage will draw `state` for the current job: busy only while the dialog
+    // is open (it can be hidden mid-build), results always (finish() reopens the dialog).
+    staging(state) {
+      if (!stage || !stageHost?.isConnected || stageHost.dataset.amMicro === 'true') return false;
+      if (!window.AtelierMotionPolicy?.allows(2)) return false;
+      return state !== 'busy' || overlay.classList.contains('active');
     },
     notice(message) {
       if (!current) return;

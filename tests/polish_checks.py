@@ -11,7 +11,20 @@ def run_polish_checks(page, context, url, report, checks):
     tab.on('pageerror', lambda error: errors.append(str(error)))
     viewport = (Path(__file__).resolve().parents[1] / 'gui/viewport.js').read_text(encoding='utf-8')
     viewport += """
-window.__polishViewport={reveal:()=>inspection.materialize(),state:()=>({filmic:renderer.toneMapping===THREE.ACESFilmicToneMapping,
+window.__polishViewport={
+  revealFrames(){
+    const original=performance.now,base=performance.now();
+    try {
+      // Capture real renders at fixed reveal positions; screenshot scheduling on
+      // a software GPU can otherwise miss the entire 420ms transition.
+      performance.now=()=>base;inspection.materialize();
+      performance.now=()=>base+84;inspection.render();
+      const wire=renderer.domElement.toDataURL('image/png');
+      performance.now=()=>base+600;inspection.render();
+      return {wire,shaded:renderer.domElement.toDataURL('image/png')};
+    } finally {performance.now=original;}
+  },
+  state:()=>({filmic:renderer.toneMapping===THREE.ACESFilmicToneMapping,
   environment:!!scene.environment?.isTexture,materials:Object.values(matsByName).flat().map(m=>({opacity:m.opacity,wireframe:m.wireframe,color:m.color.toArray()}))})};
 loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshStandardMaterial({color:0x85aedd});material.name='MI_Fixture';
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),material);mesh.position.y=1;root.add(mesh);
@@ -51,7 +64,9 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
     tab.route('**/api/imported', lambda route: route.fulfill(json=[]))
     tab.route('**/api/jobs', lambda route: route.fulfill(json={'jobs':[]}))
     try:
+        tab.emulate_media(reduced_motion='no-preference')
         tab.goto(url); tab.wait_for_selector('#grid-area .card'); tab.wait_for_function('window.AtelierPolish && window.AtelierContinuity')
+        tab.bring_to_front()
         stored=tab.evaluate("Object.fromEntries(['motion','density','adaptiveAccent','theme','appearance','firstExportCelebrated'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
         assert not tab.locator('#startup-splash').count()
         tab.wait_for_selector('.roster-portrait'); tab.locator('.roster-portrait').click()
@@ -76,23 +91,22 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.evaluate("openMaterialEditor({name:'Fixture material',game_rel:'Fixture/MI_Fixture'})")
         tab.wait_for_selector('#matsw0'); tab.wait_for_timeout(250)
         assert tab.locator('.library-heading h1,#material-overlay h2').evaluate_all("(nodes)=>nodes.every(node=>getComputedStyle(node).fontVariationSettings.includes('80') && getComputedStyle(node).fontWeight==='650')")
-        assert tab.locator('#matsw0').evaluate("el=>el.style.boxShadow.includes('px') && el.style.opacity==='0.5'")
+        assert tab.locator('#matsw0').evaluate("el=>el.style.boxShadow==='none' && el.style.opacity==='0.5' && el.parentElement.querySelector('.hdr-ring i')")
         tab.evaluate('matCompare("original"); matRestoreParameter("colors",0)')
         tab.wait_for_timeout(180)
         tab.evaluate('closeMaterialEditor(true)'); tab.wait_for_timeout(250)
         assert not tab.locator('#material-overlay').evaluate("el=>el.classList.contains('active')")
         assert not tab.locator('.polish-ghost').count()
         checks.append('Folder direction, portrait/banner and breadcrumb transitions clean up; editors return to their card; HDR/alpha swatches keep real values')
+        tab.locator('#settings-motion').select_option('full',force=True)
         tab.evaluate("AtelierViewport.openMesh('Fixture/Body','Synthetic sphere')")
         tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none' && document.getElementById('viewport-animation').options.length===2")
         tab.wait_for_timeout(600)
         state=tab.evaluate('__polishViewport.state()'); assert state['filmic'] and state['environment'],state
         tab.wait_for_function("document.getElementById('viewport-animation').value!=='' && document.getElementById('viewport-play').getAttribute('aria-pressed')==='true'")
-        tab.evaluate('__polishViewport.reveal()'); tab.wait_for_timeout(80)
-        wire=tab.locator('#viewport-canvas').screenshot()
-        tab.wait_for_timeout(550)
-        shaded=tab.locator('#viewport-canvas').screenshot()
-        assert wire!=shaded
+        frames=tab.evaluate('__polishViewport.revealFrames()')
+        assert frames['wire'].startswith('data:image/png;base64,')
+        assert frames['wire']!=frames['shaded']
         assert tab.evaluate('__polishViewport.state().materials')==state['materials']
         tab.evaluate('AtelierViewport.close()')
         checks.append('Filmic studio environment and wireframe-to-shaded reveal render real Three.js geometry without changing editable materials; discovered idle starts automatically')
@@ -111,8 +125,34 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('.toast-repeat').count() == 1
         assert tab.locator('.toast-repeat').evaluate("el=>getComputedStyle(el.parentElement,'::after').animationPlayState==='paused'")
         tab.mouse.move(0,0); tab.wait_for_timeout(1050)
-        assert not tab.locator('.toast-repeat').count()
+        # The toast leaves its slot on time; its 120 ms exit fade then removes the faded copy.
+        assert not tab.locator('#toast-area .toast-repeat').count()
+        tab.wait_for_function("!document.querySelector('.toast-repeat')", timeout=1000)
         checks.append('Operation resolves on the same mount with literal text; repeats merge, bump and reset their paused countdown line')
+
+        full = tab.evaluate('!AtelierMotionPolicy.query().matches && !document.hidden')
+        tab.evaluate("""() => { document.getElementById('toast-area').replaceChildren();
+          window.leavingToast=toast('Exit fixture','info',5000); leavingToast.remove(); }""")
+        assert not tab.locator('#toast-area .toast').count()
+        if full:
+            assert tab.evaluate("(layer=>layer.inert && layer.contains(leavingToast) && !leavingToast.hasAttribute('role'))(document.getElementById('toast-exit-layer'))")
+        tab.wait_for_function('!leavingToast.isConnected', timeout=1000)
+        # Typing that keeps a folder empty rebuilds the empty state without replaying its entrance.
+        tab.locator('#search-scope').click()
+        assert tab.evaluate('AtelierSearch.scope()') == 'folder'
+
+        def empty_effects(text):
+            tab.locator('#search-input').fill(text)
+            tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=none]')
+            return tab.evaluate("document.querySelector('#empty-state [data-atelier-motion=empty-state]').getAnimations({subtree:true}).length")
+        first, repeat = empty_effects('zzqx'), empty_effects('zzqxy')
+        tab.locator('#search-input').fill('')
+        tab.wait_for_function("!document.querySelector('#empty-state [data-am-kind=none]')")
+        again = empty_effects('zzqx')
+        assert repeat == 0 and (not full or (first > 0 and again > 0)), (first, repeat, again)
+        tab.locator('#search-input').fill('')
+        tab.locator('#search-scope').click()
+        checks.append('A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance')
 
         tab.evaluate("""() => {
           sidebarData={m:{token:'m',game_rel:'Fixture/MI_Fixture',name:'Material fixture',file_type:'material',selected:true,ui_preview:{colors:[[.8,.1,.2,1],[.2,.4,.7,1]]}},
@@ -157,7 +197,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
             assert tab.locator('html').get_attribute('data-palette') == preset
             assert all(pair['ratio']>=4.5 for pair in measure_contrast(tab)),preset
         tab.evaluate("""() => {
-          const picker=document.getElementById('settings-motion');picker.value='reduce';picker.dispatchEvent(new Event('change'));
+          const picker=document.getElementById('settings-motion');picker.value='off';picker.dispatchEvent(new Event('change'));
           AtelierPolish.play(document.getElementById('library-count'),[{opacity:0},{opacity:1}],160);
         }""")
         assert tab.evaluate("AtelierMotionPolicy.query().matches && document.getElementById('library-count').getAnimations().length===0")

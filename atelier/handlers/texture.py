@@ -475,7 +475,7 @@ def stale_mip_imports(import_root=None):
     from PIL import Image
     out = []
     for dirpath, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d != ".atelier"]
+        dirs[:] = [d for d in dirs if d not in ('.atelier', '.atelier-trash')]
         for fname in files:
             if not fname.endswith(".png"):
                 continue

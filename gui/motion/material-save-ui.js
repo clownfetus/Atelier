@@ -46,8 +46,11 @@
       if (disposed) return;
       disposed = true;
       clearTimeout(timer);
-      stopMotion();
-      nativeRemove();
+      // Effects stop now; the glyph holds its still pose while the toast fades, then goes with it.
+      try { motion?.setReducedMotion('reduce'); } catch (_) { stopMotion(); }
+      const finish = () => { stopMotion(); nativeRemove(); };
+      try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, finish); return; } } catch (_) { /* Fall through. */ }
+      finish();
     }
     // All application removal paths use this element's remove(), never a last-toast query.
     el.remove = dispose;

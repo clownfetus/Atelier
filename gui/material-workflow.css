@@ -29,6 +29,16 @@
 #material-overlay .mat-texture .btn { flex: none; }
 #material-overlay .mat-foot { flex-wrap: wrap; }
 #material-overlay #mat-status { overflow-wrap: anywhere; }
+#material-overlay .mat-replacement-body { display: grid; gap: 8px; padding: 12px; font-size: 12px; }
+#material-overlay .mat-replacement-body p { margin: 0; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+#material-overlay .mat-replacement-body label { color: var(--text); }
+#material-overlay .mat-replacement-body input,
+#material-overlay .mat-replacement-body select { width: 100%; min-width: 0; min-height: 36px; box-sizing: border-box;
+  padding: 8px 10px; border: 1px solid var(--border2); border-radius: 4px; background: var(--bg2); color: var(--text); font: inherit; }
+#material-overlay .mat-source-search { display: flex; gap: 8px; }
+#material-overlay .mat-source-search input { flex: 1; }
+#material-overlay #mat-source-results { font-size: 11px; }
+#material-overlay #mat-use-source { justify-self: start; }
 #viewport-mat-list .vp-param { border-left: 2px solid transparent; padding-left: 4px; }
 #viewport-mat-list .vp-param.is-modified { border-left-color: var(--acc); }
 #viewport-mat-list .vp-param > span { flex: 1; }

@@ -9,11 +9,11 @@
 [data-atelier-motion="viewport-loader"] {
   --am-viewport-loader-size: 72px;
   --am-viewport-loader-fg: var(--studio-preview-on-surface, #e5e2e4);
-  --am-viewport-loader-accent: var(--skin-loader-accent, #accbff);
-  --am-viewport-loader-rift: #c3b3f2;
+  --am-viewport-loader-accent: var(--krackle-charge, #2a9fd6);
+  --am-viewport-loader-rift: var(--krackle-rift, #8a6cff);
   --am-viewport-loader-empty: #9aa8be;
-  --am-viewport-loader-error: #ffb4ab;
-  --am-viewport-loader-badge-bg: #14161b;
+  --am-viewport-loader-error: var(--krackle-fault, #e0407a);
+  --am-viewport-loader-badge-bg: #121216;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -37,7 +37,7 @@
 
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-energy { fill: currentColor; }
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-hole { fill: var(--am-viewport-loader-badge-bg); }
-[data-atelier-motion="viewport-loader"] .am-viewport-loader-glint { fill: #fbf6ea; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-glint { fill: #eee5cf; }
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-rift { fill: var(--am-viewport-loader-rift); }
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-hull { fill: var(--am-viewport-loader-fg); }
 [data-atelier-motion="viewport-loader"] .am-viewport-loader-drip-line {

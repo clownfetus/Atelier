@@ -50,6 +50,14 @@ def main():
     if os.name != 'nt':
         raise SystemExit('The frozen desktop smoke requires Windows.')
     exe = args.exe.resolve(strict=True)
+    import pefile
+    with pefile.PE(str(exe)) as pe:
+        stamps = {key.decode(): value.decode() for group in pe.FileInfo
+                  for item in group if hasattr(item, 'StringTable')
+                  for table in item.StringTable for key, value in table.entries.items()}
+    expected_version = (Path(__file__).resolve().parents[1] / 'version').read_text().strip()
+    assert stamps.get('FileVersion') == stamps.get('ProductVersion') == expected_version, stamps
+    assert stamps.get('ProductName') == 'Atelier', stamps
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
     data = report / 'isolated-data'
@@ -91,7 +99,7 @@ def main():
     hider = threading.Thread(target=hide_loop, daemon=True)
     hider.start()
     result = {'exe_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
-              'checks': [], 'page_errors': [], 'fixture_scope': 'Game browsing and remote checks only'}
+              'checks': [], 'page_errors': [], 'fixture_scope': 'Game browsing and remote checks only', 'windows_file_properties': stamps}
     try:
         wait_port(args.app_port, process)
         wait_port(args.debug_port, process)
@@ -148,6 +156,8 @@ def main():
                 exportReview: typeof AtelierExportReview === 'object',
                 originalComparison: typeof materialDirtyCount === 'function',
                 motions: Object.keys(AtelierMotion).sort(),
+                beatMs: AtelierMotion.beatMs, exitMs: AtelierMotion.exitMs,
+                modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley && window.AtelierModCards),
                 folderMotion: !!document.querySelector('link[href$="folder-flap.css"]'),
                 font: document.fonts.check('14px Roboto'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
@@ -156,10 +166,11 @@ def main():
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info
-            assert info['motions'] == ['emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader'], info
+            assert {'emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader', 'krackleGlyph', 'krackleStage'}.issubset(info['motions']), info
+            assert info['beatMs'] == 1040 and info['exitMs'] == 120 and info['modernFeedback'], info
             assert info['logo'] > 0 and info['emptyTray'] == 112 and info['singleMark'] == 1, info
             result['interface'] = info
-            result['checks'].append('All workflow modules, six motion sets, local font and logo load from the frozen bundle')
+            result['checks'].append('All workflow modules, shared timing, Krackle controllers, local font and latest logo load from the frozen bundle')
             for theme in ('light', 'dark'):
                 page.locator('#settings-theme').select_option(theme, force=True)
                 assert page.evaluate('document.documentElement.dataset.theme') == theme

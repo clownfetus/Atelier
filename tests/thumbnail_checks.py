@@ -74,6 +74,7 @@ def run_thumbnail_checks(page, context, url, report, checks):
         tab.wait_for_selector('#grid-area .card')
         render()
         ready(3)
+        tab.locator('#search-scope').click()
         tab.locator('#search-input').fill('T_N')
         ready(1)
         tab.locator('#search-input').fill('')

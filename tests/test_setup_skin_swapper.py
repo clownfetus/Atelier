@@ -12,7 +12,7 @@ import stage_galacta_template as ST
 class TemplateInstallation(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="atelier-template-install-")
-        root = Path(self.temporary.name)
+        root = Path(self.temporary.name).resolve()
         self.source, self.destination = root / "input", root / "Tools" / "Galacta"
         self.source.mkdir()
         self.destination.mkdir(parents=True)

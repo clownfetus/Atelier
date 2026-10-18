@@ -1,5 +1,6 @@
 // Assertions for the Phase 3 UI, evaluated inside dom_smoke.js's context — every identifier below
 // (matEditor, renderMatEditor, sidebarData, …) is gui/app.js's own. Throws on the first failure.
+(async () => {
 // ── material editor with a dyeable material ──────────────────────────────────
 matEditor = {
   game_rel: "Characters/1060/1060300/MI_Body", name: "MI_Body",
@@ -260,51 +261,51 @@ if (!mh.includes("no editable color or scalar parameters"))
 // project's saved sidecar) and Revert must ask before doing anything — as the material editor does.
 {
   const prompts = []; let answer = false; let apiCalls = 0;
-  globalThis.confirm = message => { prompts.push(message); return answer; };
+  globalThis.AtelierDialog = {confirm: async ({body}) => { prompts.push(body); return answer; }};
   const realApi = api;
-  api = async () => { apiCalls++; return { ok: false, error: "stub" }; };
+  api = async path => { if (/reset|revert_imported/.test(path)) apiCalls++; return { ok: false, error: "stub" }; };
 
   curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
-  if (closeCurveEditor() !== true || prompts.length) throw new Error("a clean curve editor must close without asking");
+  if (await closeCurveEditor() !== true || prompts.length) throw new Error("a clean curve editor must close without asking");
   curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: { R: true } };
-  if (closeCurveEditor() !== false || !curveEditor) throw new Error("declining must keep an edited curve open");
+  if (await closeCurveEditor() !== false || !curveEditor) throw new Error("declining must keep an edited curve open");
   answer = true;
-  if (closeCurveEditor() !== true || curveEditor) throw new Error("accepting must close the edited curve");
+  if (await closeCurveEditor() !== true || curveEditor) throw new Error("accepting must close the edited curve");
   answer = false;
 
   vfxEditor = { game_rel: "Fx/NS", name: "NS", groups: [{ stops: [0] }], scalars: [], vectors: [] };
   vfxEditor.baseline = _vfxSnapshot(vfxEditor);
   if (_vfxDirty()) throw new Error("a freshly loaded VFX editor must not be dirty");
   vfxEditor.groups[0].stops.push(1);
-  if (!_vfxDirty() || closeVfxEditor() !== false || !vfxEditor) throw new Error("an edited VFX draft closed silently");
-  if (closeVfxEditor(true) !== true || vfxEditor) throw new Error("a forced VFX close (after save) must not ask");
+  if (!_vfxDirty() || await closeVfxEditor() !== false || !vfxEditor) throw new Error("an edited VFX draft closed silently");
+  if (await closeVfxEditor(true) !== true || vfxEditor) throw new Error("a forced VFX close (after save) must not ask");
 
   worldEditor = { game_rel: "Maps/L", name: "L", edits: { lights: {}, fog: {}, grade: {}, visibility: {} } };
   worldEditor.baseline = _editSnapshot(worldEditor.edits);
   worldEditor.edits.fog.density = 0.2;
-  if (closeWorldEditor() !== false) throw new Error("edited level lighting closed silently");
+  if (await closeWorldEditor() !== false) throw new Error("edited level lighting closed silently");
   worldEditor.baseline = _editSnapshot(worldEditor.edits);
   const before = prompts.length;
-  if (closeWorldEditor() !== true || prompts.length !== before) throw new Error("a saved level editor must close without asking");
+  if (await closeWorldEditor() !== true || prompts.length !== before) throw new Error("a saved level editor must close without asking");
 
   textEditor = { game_rel: "Text/ST", name: "ST", entries: [], edits: {} };
   textEditor.baseline = _editSnapshot(textEditor.edits);
   textEditor.edits.KEY = "changed";
-  if (closeTextEditor() !== false) throw new Error("edited strings closed silently");
+  if (await closeTextEditor() !== false) throw new Error("edited strings closed silently");
 
   curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
   vfxEditor = { game_rel: "Fx/NS", name: "NS", groups: [], scalars: [], vectors: [] };
-  resetCurve(); resetVfx();
-  revertImported({ name: "T_Painted", game_rel: "Fixture/T_Painted", token: "kept" });
+  await resetCurve(); await resetVfx();
+  await revertImported({ name: "T_Painted", game_rel: "Fixture/T_Painted", token: "kept" });
   if (apiCalls) throw new Error("a declined Reset/Revert still reached the server");
   if (!prompts.some(p => p.includes("T_Painted"))) throw new Error("the revert prompt must name the asset");
 
   api = realApi; curveEditor = vfxEditor = worldEditor = textEditor = null;
-  delete globalThis.confirm;
+  delete globalThis.AtelierDialog;
 }
 
 // ── material texture slots: a slot can take the user's own image as a new texture ─────────────
-(async () => {
+await (async () => {
   const realApi = api, realFetch = projectFetch;
   matEditor = { game_rel: "Characters/1015/MI_Body", name: "MI_Body", colors: [], scalars: [],
                 textures: { Normal: "Characters/1015/T_Body_N", BaseColor: "Characters/1015/T_Body_D",
@@ -348,7 +349,7 @@ if (!mh.includes("no editable color or scalar parameters"))
 
   // Removing asks first; declining sends nothing.
   const prompts = []; let answer = false, cleared = [];
-  globalThis.confirm = m => { prompts.push(m); return answer; };
+  globalThis.AtelierDialog = {confirm: async ({body}) => { prompts.push(body); return answer; }};
   api = async (path, opts = {}) => {
     if (path !== "/api/material_custom_texture/clear") return [];
     cleared.push([path, JSON.parse(opts.body)]);
@@ -371,7 +372,8 @@ if (!mh.includes("no editable color or scalar parameters"))
   if (!prompts[0] || !prompts[0].includes("image is also removed from its texture slots"))
     throw new Error("the reset prompt must mention the images it removes");
 
-  api = realApi; projectFetch = realFetch; delete globalThis.confirm; delete globalThis.FormData;
+  api = realApi; projectFetch = realFetch; delete globalThis.AtelierDialog; delete globalThis.FormData;
   matEditor = null;
   console.log("DOM smoke: all render paths OK");
 })();   // a rejection here is unhandled, so node exits non-zero with the error
+})();

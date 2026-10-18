@@ -1,5 +1,26 @@
 # Local development and reliability checks
 
+Wave 4a adds `test_krackle_inks.py` (a dependency-free Node colour harness) and
+`inks_dial_checks.py` in the full browser suite. Use `--inks-dial-only` for the
+focused browser run. It checks all palettes, measured surfaces, adaptive context,
+legacy preference migration, OS overrides, still frame counts and moment claims.
+
+Wave 4b adds `--surfaces-only`: File-byte upload fixtures, caption/shape/font
+checks, real-progress launch presentation, policy gates and a recorded particle
+CPU median (`krackle-frame-perf.json`). It also simulates 8 ms refresh intervals
+followed by 40 ms intervals to test merge-filter fallback. Native WebView2 smoke
+uploads a pathless File to a disposable fixture endpoint and verifies its bytes
+and originating project header. Review candidates remain behind the disabled
+`atelier.experimentalKrackleEmblems` flag; both-scale sheets are generated with
+the artwork, not maintained separately. Run the full browser suite before a PR.
+
+Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
+WebAudio context (no test sounds reach the speakers). It checks disposable toon
+materials while rendering, exact source identity/JSON after Inspect, camera
+restoration on successful/failed captures, clipboard/download/folder actions,
+warning/failure cards and Full/Calm/Off/OS/hidden audio gates. The pure Node card
+data harness runs under `test_mod_cards.py`; HTTP tests verify `/api/app_info`.
+
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
 storage, so an old cached page cannot mix with the new scripts and styles.
@@ -48,6 +69,31 @@ This machine additionally has the official Microsoft DXC 1.9.2609.5 tools, and A
 For a fresh directory, use Atelier's Setup/Settings to select the game Paks folder, current mapping, Blender executable and a **development test-mods directory**. Keep native tools, AES keys, mappings, extracted game assets and local configuration out of Git. The source checkout contains none of those dependencies.
 
 ## Automated checks
+
+### Material replacement
+
+`_atelier_material_source` inside a saved material JSON records its donor. Export
+decodes the current vanilla donor, retains its complete import graph and cooked
+payload, renames its package/export identity to the target, then applies saved
+parameters and custom textures. The marker never enters the compiled package.
+Donor project edits are not read. Parent chains are checked for recursion before
+save and export. Default restoration reads pristine data before publication;
+the material and cleared texture/dye/intensity options share one recoverable
+project transaction.
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_material_replacement.py --suite test_material_original.py --suite test_custom_textures.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --material-replacement-only --report-dir 'D:\AtelierDev\material-replacement\browser'
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_material_replacement.py --report-dir 'D:\AtelierDev\material-replacement\native'
+```
+
+The native check writes only a new report/project/export directory and application
+caches; it never installs a mod. A real cross-character build/readback verified
+target identity, donor parent/package references, textures, parameters, static
+switches and the opaque cooked shader payload. Readback without base-game
+containers labels external imports `Export_N/Object`; their package identities
+and reference indices remain verifiable. In-game appearance is not established.
 
 ### Interface polish and continuity
 
@@ -785,3 +831,26 @@ The AppImage SHA-256 is
 `76717d20eebd47b6e25006e80e7928c314f32b5fd370a510af0263ad947aee9e`.
 Release documentation changes after that build do not alter the tested payload.
 The release assets include source, SHA256SUMS.txt and VERIFICATION.json.
+
+## Trust workflow checks
+
+`tests/test_project_trash.py` verifies byte-identical restoration, both project
+layouts, metadata/selection, conflicts, interrupted deletion, retention and archive
+exclusion. Trash lives inside `<project>/.atelier-trash`; remove/restore routes
+use the existing project reservation and write lock.
+
+Run `python tests/browser_smoke.py --trust-only --report-dir <folder>` for real
+disposable-file Undo, themed confirmation paths and the three-panel setup.
+These checks also run in the full browser suite. `tests/dom_checks.js` awaits
+editor leave promises; it still rejects server calls after a declined answer.
+Fixtures use a synthetic key, and no setup payloads or keys are logged.
+
+`tests/test_search.py` covers HTTP UTF-8 decoding, accent-insensitive grouping,
+caps/counts, index and catalogue replacement, and an active index builder. Its
+550,000-row benchmark measures cached 3–4 character queries against a 100 ms
+median budget. Search builds its own compact table without holding the index
+builder's lock, and rebuilds it when either immutable generation changes.
+
+`python tests/browser_smoke.py --find-only --report-dir <folder>` checks global
+search keyboard/stale-response behavior, explicit folder scope, roster filters,
+Continue and costume fallbacks. It is also included in the full browser suite.

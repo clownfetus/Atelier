@@ -22,6 +22,7 @@ FIXTURES = r"""() => {
     {type:'asset', name:'Failed original texture', file_type:'texture', game_rel:'Fixture/Original', imported:false}
   ];
   window.renderFolderMotionFixture = () => {
+    nav={path:'Folder motion fixtures'};
     document.getElementById('search-input').value = '';
     allItems = folderMotionItems;
     buildGrid(folderMotionItems.map(item => {
@@ -72,6 +73,7 @@ def run_folder_motion_checks(page, context, url, report, checks):
 
     try:
         motion_page.goto(url)
+        motion_page.bring_to_front()
         motion_page.wait_for_function("typeof buildGrid === 'function' && window.atelierProject?.()")
         motion_page.wait_for_selector('#grid-area .card')
         motion_page.emulate_media(reduced_motion='no-preference')
@@ -127,13 +129,15 @@ def run_folder_motion_checks(page, context, url, report, checks):
         motion_page.evaluate('renderFolderMotionFixture()')
         checks.append('Folder flap responds to pointer and retained keyboard focus without changing native click/Enter/Space navigation or focus outlines')
 
+        original_motion = motion_page.locator('#settings-motion').input_value()
         for preference in ('system', 'forced'):
             reset_pose()
             if preference == 'system':
                 motion_page.emulate_media(reduced_motion='reduce')
             else:
-                motion_page.evaluate("document.documentElement.dataset.reducedMotion='reduce'")
+                motion_page.locator('#settings-motion').select_option('off', force=True)
             card('Miscellaneous').hover()
+            motion_page.wait_for_function('AtelierMotionPolicy.query().matches && document.documentElement.dataset.motion === "reduce"')
             assert card('Miscellaneous').locator('.am-folder-flap-front').evaluate('el=>getComputedStyle(el).transitionDuration') == '0s'
             assert card('Miscellaneous').locator('.am-folder-flap-front').evaluate('el=>getComputedStyle(el).transform') != 'none'
             assert card('Miscellaneous').locator('.am-folder-flap').evaluate('el=>el.getAnimations({subtree:true}).length') == 0
@@ -142,7 +146,7 @@ def run_folder_motion_checks(page, context, url, report, checks):
             if preference == 'system':
                 motion_page.emulate_media(reduced_motion='no-preference')
             else:
-                motion_page.evaluate('delete document.documentElement.dataset.reducedMotion')
+                motion_page.locator('#settings-motion').select_option(original_motion, force=True)
 
         # A separate touch context tests CSS media gating without launching another application instance.
         touch_context = context.browser.new_context(has_touch=True, viewport={'width': 800, 'height': 600})

@@ -84,6 +84,13 @@
       return dens < 0.04 ? null : {x: x, y: y, r: P * 0.5 * Math.sqrt(dens) * 0.92, k: K_CHARGE, m: 0};
     });
   }
+  function fMask(P,mask) {
+    return lattice(-240,-240,240,240,P,function(x,y){
+      var px=Math.min(mask.width-1,Math.max(0,Math.round((x+240)/480*(mask.width-1))));
+      var py=Math.min(mask.height-1,Math.max(0,Math.round((y+240)/480*(mask.height-1))));
+      return mask.data[(py*mask.width+px)*4+3]>128?{x:x,y:y,r:P*.5,k:K_CHARGE,m:0}:null;
+    });
+  }
   function fBurst(P, rnd) {
     var S = 205, n = 10 + Math.floor(rnd() * 3), ph = rnd() * TAU, pts = [];
     for (var k = 0; k < n * 2; k++) {
@@ -192,17 +199,29 @@
     host.appendChild(filterSvg);
     host.appendChild(canvas);
     var gooOk = typeof ctx.filter === 'string';
-    var gooSlow = 0, gooFrames = 0;
+    var gooSlow=0,gooFrames=0,frameBaseline=1000/60;
 
     var state = STATES.has(opts.state) ? opts.state : 'idle';
     var reducedPref = opts.reducedMotion === 'reduce' ? 'reduce' : 'system';
     var mql = null;
     try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
-    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.motion === 'reduce'; }
+    function reduced() { return reducedPref === 'reduce' || Boolean(mql && mql.matches) || document.documentElement.dataset.motion === 'reduce' || window.AtelierMotionPolicy?.allows(2)===false || microMode; }
+    var releaseMoment=null,microMode=false,microHost=null,micro=null;
+    function release() {if(releaseMoment)releaseMoment();releaseMoment=null;}
+    function clearMicro() {micro?.destroy();micro=null;microHost?.remove();microHost=null;microMode=false;canvas.style.display='';host.removeAttribute('data-am-micro');}
+    function ownership() {
+      if(reducedPref==='reduce'||window.AtelierMotionPolicy?.allows(2)===false){release();clearMicro();return;}
+      if(!releaseMoment)releaseMoment=window.AtelierMotion.moment?.claim(opts.kind||'formation',opts.tier||2)||null;
+      if(releaseMoment){clearMicro();return;}
+      microMode=true;canvas.style.display='none';host.setAttribute('data-am-micro','true');
+      if(!microHost){microHost=document.createElement('span');microHost.className='am-stage-micro';host.append(microHost);try{micro=window.AtelierMotion.krackleGlyph.mount(microHost,{state:state==='idle'?'info':state});}catch(_){}}
+      micro?.setState(state==='idle'?'info':state);
+    }
 
     // ── dot pool ──
     var rndSeed = 12345 + uid * 101, results = 0;
     var sample = [fRing(P), fBurst(P, mulberry32(1)), fCracked(P, mulberry32(2)), fSplat(P, mulberry32(3))];
+    if(opts.mask)sample.push(fMask(P,opts.mask));
     var POOL = Math.max.apply(null, sample.map(function (f) { return f.length; })) + 60;
     function F() { return new Float32Array(POOL); }
     var X = F(), Y = F(), VX = F(), VY = F(), R = F(), TX = F(), TY = F(), TR = F(), PA = F(), PR = F(), BASE = F(), DELAY = F();
@@ -212,8 +231,33 @@
     for (var i0 = 0; i0 < POOL; i0++) { SF[i0] = 0.55 + 1.55 * Math.pow(kr(), 2.2); SPECK[i0] = kr() < 0.32 ? 1 : 0; M[i0] = 1; COLT[i0] = 1; }
 
     var form = 'idle', formStart = 0, clock = 0, carryHead = 0, kicked = false, fromInk = false;
-    var inks = [], hole = [18, 18, 22], glint = [251, 246, 234];
+    var progress=0;
+    var inks = [], hole = [18, 18, 22], successHole=[18,18,22], glint = [238,229,207];
     var raf = 0, last = 0, sleeping = true, destroyed = false, frames = 0;
+    var frameCosts=new Float32Array(240),frameIntervals=new Float32Array(240),costCount=0;
+    // Path2D has no reset operation. Reuse circle command buffers and native
+    // beginPath batches instead of allocating a Path2D per ink every frame.
+    function circlePool(coloured) {
+      var cap=POOL+48;
+      return {x:new Float32Array(cap),y:new Float32Array(cap),r:new Float32Array(cap),next:new Int32Array(cap),
+        heads:new Int32Array(coloured?262144:1).fill(-1),keys:new Uint32Array(cap),n:0,used:0};
+    }
+    var energy=circlePool(true),loose=circlePool(true),black=circlePool(false),specks=circlePool(false),colourStrings=new Map();
+    function resetPool(pool) {for(var i=0;i<pool.used;i++)pool.heads[pool.keys[i]]=-1;pool.n=pool.used=0;}
+    function colourKey(r,g,b){return (((r|0)>>2)<<12)|(((g|0)>>2)<<6)|((b|0)>>2);}
+    function cssInk(key){if(!colourStrings.has(key))colourStrings.set(key,'rgb('+((key>>12)*4)+','+(((key>>6)&63)*4)+','+((key&63)*4)+')');return colourStrings.get(key);}
+    function addCircle(pool,key,x,y,r) {
+      var i=pool.n;if(i>=pool.x.length)return;
+      if(pool.heads[key]===-1)pool.keys[pool.used++]=key;
+      pool.x[i]=x;pool.y[i]=y;pool.r[i]=r;pool.next[i]=pool.heads[key];pool.heads[key]=i;pool.n++;
+    }
+    function drawPool(context,pool,colour) {
+      for(var k=0;k<pool.used;k++){
+        var key=pool.keys[k];context.beginPath();
+        for(var i=pool.heads[key];i!==-1;i=pool.next[i]){context.moveTo(pool.x[i]+pool.r[i],pool.y[i]);context.arc(pool.x[i],pool.y[i],pool.r[i],0,TAU);}
+        context.fillStyle=colour||cssInk(key);context.fill();
+      }
+    }
 
     function readInks() {
       var cs = getComputedStyle(host);
@@ -225,9 +269,10 @@
         parseColour(ctx, cs.getPropertyValue('--krackle-fault'), '#ad3032')
       ];
       hole = parseColour(ctx, cs.getPropertyValue('--krackle-hole'), '#121216');
+      successHole = parseColour(ctx, cs.getPropertyValue('--krackle-success-hole'), '#121216');
     }
 
-    function headAngle(tau) { return carryHead + tau * 0.7 * TAU; }
+    function headAngle(tau) { return carryHead + tau * (1000 / (window.AtelierMotion.beatMs * 2)) * TAU; }
     function waveAt(a, head) {
       var dlt = (((head - a) % TAU) + TAU) % TAU, tr = 0.45 * TAU;
       if (dlt < tr) return Math.pow(1 - dlt / tr, 1.6);
@@ -255,7 +300,7 @@
       form = name; formStart = clock; kicked = false;
       var rnd = mulberry32(rndSeed + CODE[name] + 1 + results * 977);
       if (name === 'drop') { enterDrop(rnd); return; }
-      var shape = name === 'busy' ? fRing(P) : name === 'success' ? fBurst(P, rnd) : name === 'warning' ? fCracked(P, rnd) : fSplat(P, rnd);
+      var shape = name === 'busy' ? (opts.mask?fMask(P,opts.mask):fRing(P)) : name === 'success' ? fBurst(P, rnd) : name === 'warning' ? fCracked(P, rnd) : fSplat(P, rnd);
       if (shape.length > POOL - 4) { shape.sort(function (a, b) { return b.r - a.r; }); shape.length = POOL - 4; }
       var solid = {}, Q = Math.SQRT1_2 / P;
       function cell(t) { return [Math.round((t.x + t.y) * Q), Math.round((t.y - t.x) * Q)]; }
@@ -415,15 +460,11 @@
     }
 
     function inkOf(i) {
+      if(opts.mask&&form==='busy'&&TY[i]<240-480*progress)return colourKey(68,72,80);
       var a = inks[KFROM[i]], b = inks[KTO[i]], t = COLT[i], w = 0;
       var r = a[0] + (b[0] - a[0]) * t, g = a[1] + (b[1] - a[1]) * t, bl = a[2] + (b[2] - a[2]) * t;
       if (w > 0) { r += (glint[0] - r) * w; g += (glint[1] - g) * w; bl += (glint[2] - bl) * w; }
-      return ((r | 0) & ~3) + ',' + ((g | 0) & ~3) + ',' + ((bl | 0) & ~3);
-    }
-
-    function addCircle(map, key, x, y, r) {
-      var p = map[key]; if (!p) { p = map[key] = new Path2D(); }
-      p.moveTo(x + r, y); p.arc(x, y, r, 0, TAU);
+      return colourKey(r,g,bl);
     }
 
     function render() {
@@ -432,11 +473,11 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, S, S);
       if (form === 'idle') return;
-      var energy = {}, loose = {}, black = new Path2D(), specks = new Path2D(), anyEnergy = false;
+      resetPool(energy);resetPool(loose);resetPool(black);resetPool(specks);var anyEnergy=false;
       function bubble(x, y, r, i) {
         if (r < 1.6 / scale) return;
-        black.moveTo(x + r, y); black.arc(x, y, r, 0, TAU);
-        if (SPECK[i] && r > P * 0.55) { var sr = Math.max(1 / scale, r * 0.22); specks.moveTo(x - r * 0.36 + sr, y - r * 0.38); specks.arc(x - r * 0.36, y - r * 0.38, sr, 0, TAU); }
+        addCircle(black,0,x,y,r);
+        if (SPECK[i] && r > P * 0.55) { var sr = Math.max(1 / scale, r * 0.22);addCircle(specks,0,x-r*.36,y-r*.38,sr); }
       }
       function minB(i) { return Math.max(P * 0.2 * SF[i], 2.4 / scale); }
       for (var i = 0; i < POOL; i++) {
@@ -452,7 +493,7 @@
         } else {
           addCircle(energy, key, X[i], Y[i], (M[i] >= 0.5 ? R[i] + halo * 0.65 : rb + halo * 0.8)); anyEnergy = true;
           // The charge crest swells and catches crisp Paper highlights, never an airbrushed glow.
-          if (WAVE[i] > 0.6 && i % 3 === 0) { var hr = Math.max(1.4 / scale, R[i] * 0.38); specks.moveTo(X[i] - R[i] * 0.35 + hr, Y[i] - R[i] * 0.4); specks.arc(X[i] - R[i] * 0.35, Y[i] - R[i] * 0.4, hr, 0, TAU); }
+          if (WAVE[i] > 0.6 && i % 3 === 0) { var hr = Math.max(1.4 / scale, R[i] * 0.38);addCircle(specks,0,X[i]-R[i]*.35,Y[i]-R[i]*.4,hr); }
           if (!SH[i]) continue;
           // Bubbles grow in with their dot; a mass's bubbles overlap past the dot spacing.
           var grow = Math.min(1.1, Math.max(0.5, R[i] / Math.max(1e-3, BASE[i])));
@@ -461,8 +502,8 @@
         }
       }
       if (form === 'drop' && !reduced() && tau < DROP_T + 0.3) {
-        var ckey = inks[K_CHARGE].join(',');
-        var blob = function (x, y, r) { addCircle(energy, ckey, x, y, r + 6); anyEnergy = true; black.moveTo(x + r * 0.45, y); black.arc(x, y, r * 0.45, 0, TAU); };
+        var ckey = colourKey.apply(null,inks[K_CHARGE]);
+        var blob = function (x, y, r) { addCircle(energy, ckey, x, y, r + 6); anyEnergy = true;addCircle(black,0,x,y,r*.45); };
         if (tau < DROP_T) {
           var u = tau / DROP_T, yy = -620 + 620 * u * u, st = 1 + 0.8 * u, dy = 0;
           for (var q = 0; q < 10; q++) { var r = 30 * Math.pow(1 - q / 10, 1.45); blob(0, yy - dy, Math.max(1.6, r)); dy += Math.max(2.5, r * 0.55) * st; }
@@ -480,27 +521,24 @@
         for (var rp = 0; rp < 40; rp++) { var ra = rp / 40 * TAU, rx = Math.cos(ra) * rad, ry = Math.sin(ra) * rad, rs = (3 + 4 * amp) / k; ctx.moveTo(rx + rs, ry); ctx.arc(rx, ry, rs, 0, TAU); }
         ctx.fill();
       }
-      for (var lk in loose) { ctx.fillStyle = 'rgb(' + lk + ')'; ctx.fill(loose[lk]); }
+      drawPool(ctx,loose);
       if (anyEnergy) {
         if (gooOk) {
           gooCtx.setTransform(1, 0, 0, 1, 0, 0);
           gooCtx.clearRect(0, 0, S, S);
           gooCtx.setTransform(scale, 0, 0, scale, S / 2, S / 2);
-          for (var ek in energy) { gooCtx.fillStyle = 'rgb(' + ek + ')'; gooCtx.fill(energy[ek]); }
-          var t0 = performance.now();
+          drawPool(gooCtx,energy);
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.filter = 'url(#' + filterId + ')';
           ctx.drawImage(gooCanvas, 0, 0);
           ctx.restore();
-          gooSlow = gooSlow * 0.8 + (performance.now() - t0) * 0.2;
-          if (++gooFrames > 8 && gooSlow > 12) gooOk = false;
         } else {
-          for (var fk in energy) { ctx.fillStyle = 'rgb(' + fk + ')'; ctx.fill(energy[fk]); }
+          drawPool(ctx,energy);
         }
       }
-      ctx.fillStyle = 'rgb(' + hole.join(',') + ')'; ctx.fill(black);
-      ctx.fillStyle = 'rgba(' + glint.join(',') + ',0.9)'; ctx.fill(specks);
+      drawPool(ctx,black,'rgb('+(form==='success'?successHole:hole).join(',')+')');
+      drawPool(ctx,specks,'rgba('+glint.join(',')+',0.9)');
     }
 
     function settled(tau) {
@@ -515,6 +553,8 @@
     function frame(now) {
       raf = 0;
       if (destroyed) return;
+      var cpuStart=performance.now(),interval=last?now-last:0;
+      if(interval>0){frameBaseline=Math.min(frameBaseline,interval);gooSlow=gooSlow*.8+Math.max(0,interval-frameBaseline)*.2;if(gooOk&&++gooFrames>8&&gooSlow>14)gooOk=false;}
       var dt = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60;
       last = now;
       clock += dt;
@@ -522,12 +562,14 @@
       if (form === 'drop' && tau > DROP_DUR) enterForm('busy');
       update(dt);
       render();
+      frameCosts[costCount%240]=performance.now()-cpuStart;frameIntervals[costCount%240]=interval;costCount++;
       frames++;
       if (settled(clock - formStart) || document.hidden || !onScreen) { sleep(); return; }
       raf = requestAnimationFrame(frame);
     }
 
     function sleep() {
+      release();
       sleeping = true;
       host.setAttribute('data-am-sleeping', 'true');
       if (raf) cancelAnimationFrame(raf);
@@ -536,6 +578,9 @@
 
     function wake() {
       if (destroyed || form === 'idle') return;
+      if(document.hidden||!onScreen){sleep();return;}
+      ownership();
+      if(microMode){sleep();return;}
       sleeping = false;
       host.setAttribute('data-am-sleeping', 'false');
       if (reduced()) {
@@ -549,17 +594,24 @@
     }
 
     function apply(next) {
+      var wasBusy=form==='busy'||form==='drop';
       readInks();
-      if (next === 'idle') { form = 'idle'; render(); sleep(); return; }
+      if (next === 'idle') { form = 'idle'; clearMicro(); render(); sleep(); return; }
+      if(next==='busy')microMode=false;
       // Busy after busy (a quick check running straight into a build) keeps the
       // current performance; only a fresh start drops new ink.
       if (next === 'busy') { if (form !== 'busy' && form !== 'drop') enterForm('drop'); }
       else { results++; enterForm(next); }
       wake();
+      if(!sleeping&&!microMode&&!reduced()&&!document.hidden&&releaseMoment&&window.AtelierMotionPolicy?.allows(3)){
+        const sound=next==='busy'&&!wasBusy?'drop':next==='success'?'pop':next==='error'?'splat':null;
+        if(sound)window.AtelierFoley?.play(sound);
+      }
     }
 
     function onEnvironment() {
       if (destroyed) return;
+      readInks();
       host.setAttribute('data-am-reduced', String(reduced()));
       if (document.hidden) { sleep(); return; }
       if (form !== 'idle' && (form === 'busy' || form === 'drop' || !settled(clock - formStart))) wake();
@@ -567,6 +619,7 @@
     }
     if (mql && typeof mql.addEventListener === 'function') mql.addEventListener('change', onEnvironment);
     document.addEventListener('visibilitychange', onEnvironment);
+    window.addEventListener('atelier:inks',onEnvironment);
     // A stage in a hidden dialog never draws; showing the dialog resumes it.
     var onScreen = true, io = null;
     if (typeof IntersectionObserver === 'function') {
@@ -583,6 +636,8 @@
     host.setAttribute('data-am-sleeping', 'true');
 
     var handle = {
+      perf:function(){var n=Math.min(costCount,240),costs=Array.from(frameCosts.subarray(0,n)).sort((a,b)=>a-b);return {samples:n,medianMs:n?costs[Math.floor(n/2)]:0,filter:gooOk,baselineMs:frameBaseline,intervals:Array.from(frameIntervals.subarray(0,n))};},
+      setProgress: function(value) {progress=clamp01(Number(value)||0);if(form==='busy'&&sleeping)render();},
       setState: function (next) {
         if (destroyed || !STATES.has(next) || next === state) return;
         state = next;
@@ -600,9 +655,11 @@
         if (destroyed) return;
         destroyed = true;
         sleep();
+        clearMicro();
         if (io) io.disconnect();
         if (mql && typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onEnvironment);
         document.removeEventListener('visibilitychange', onEnvironment);
+        window.removeEventListener('atelier:inks',onEnvironment);
         if (canvas.parentNode === host) host.removeChild(canvas);
         if (filterSvg.parentNode === host) host.removeChild(filterSvg);
         ['data-atelier-motion', 'data-am-state', 'data-am-reduced', 'data-am-sleeping'].forEach(function (name) { host.removeAttribute(name); });

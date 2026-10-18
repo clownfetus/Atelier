@@ -1,12 +1,13 @@
-import os, json, shutil, tempfile, threading
-from atelier.storage import atomic_json, publish_files
-from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root,
+import os, json, shutil, tempfile, threading, hashlib
+from atelier.storage import atomic_json, publish_files, publish_project_json
+from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root, validate_game_rel,
                             project_base, project_base_legacy)
 from atelier.tools import uat
 from atelier import jobs
 from atelier.paths import pak_game_path
 
 _original_lock = threading.Lock()
+_SOURCE_KEY = "_atelier_material_source"
 
 def is_material(path_or_name):
     return os.path.basename(path_or_name).upper().startswith("MI_")
@@ -156,10 +157,10 @@ def read_material(game_rel, cache_only=False):
     d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d),
-            "texture_classes": _mat_texture_classes(d)}
+            "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, "")}
 
-def read_material_original(game_rel):
-    """Read pristine game parameters without creating, changing or resetting a project copy.
+def _original_document(game_rel):
+    """Read a pristine document without creating, changing or resetting a project copy.
 
     mat_json() deliberately prioritizes project edits, even for cache-only reads, so
     original comparison must use the vanilla viewport cache/extractor directly.
@@ -174,15 +175,16 @@ def read_material_original(game_rel):
     def read(path):
         with open(path, encoding="utf-8-sig") as stream:
             data = json.load(stream)
-        colors, scalars = _mat_params(data)
-        return data, {"colors": colors, "scalars": scalars, "textures": _mat_textures(data)}
+        _mat_params(data)  # validate before cache publication
+        _mat_textures(data)
+        return data
 
     # One original conversion at a time prevents duplicate work and same-asset
     # races without an unbounded table of per-asset locks.
     with _original_lock:
         if os.path.isfile(jp):
             try:
-                return read(jp)[1]
+                return read(jp)
             except (json.JSONDecodeError, KeyError, IndexError, TypeError):
                 pass  # An incomplete old cache can be repaired after a successful decode.
         with tex_semaphore:
@@ -199,9 +201,158 @@ def read_material_original(game_rel):
                 output = os.path.join(temporary, os.path.basename(jp))
                 if not os.path.isfile(output):
                     raise RuntimeError("Original material conversion produced no JSON")
-                data, params = read(output)
+                data = read(output)
                 atomic_json(jp, data)
-                return params
+                return data
+
+
+def read_material_original(game_rel):
+    """Original comparison bypasses saved edits, including a replacement's donor snapshot."""
+    d = _original_document(game_rel)
+    colors, scalars = _mat_params(d)
+    return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d)}
+
+
+def _material_path(game_rel):
+    """Accept a browser path or a copied UE object/package path, never a filesystem path."""
+    from atelier.index import get_content_prefix
+    if not isinstance(game_rel, str):
+        raise ValueError("Choose a material path")
+    gr = game_rel.strip().replace("\\", "/")
+    if gr.startswith("/Game/Marvel/"):
+        gr = gr[len("/Game/Marvel/"):]
+    if gr.lower().endswith(".uasset"):
+        gr = gr[:-7]
+    elif "." in gr.rsplit("/", 1)[-1]:
+        package, obj = gr.rsplit(".", 1)
+        if obj == package.rsplit("/", 1)[-1]:
+            gr = package
+    validate_game_rel(gr)
+    if not is_material(gr) or "." in gr.rsplit("/", 1)[-1]:
+        raise ValueError("Choose a material instance (MI_…)")
+    # These are the package paths understood by the material/texture readers.
+    if gr.casefold().startswith(("plugins/", "marvel_lq/")) or \
+            get_content_prefix(gr).rstrip("/").casefold() != "marvel/content/marvel":
+        raise ValueError("Choose a material from the main game content")
+    return gr
+
+
+def _material_export(d, game_rel):
+    tops = [e for e in d.get("Exports", [])
+            if not e.get("OuterIndex") and e.get("ObjectName") == os.path.basename(game_rel)]
+    if len(tops) != 1:
+        raise ValueError("Material must have one matching top-level export")
+    index = tops[0].get("ClassIndex")
+    imports = d.get("Imports", [])
+    if not isinstance(index, int) or index >= 0 or -index > len(imports) or \
+            imports[-index - 1].get("ObjectName") != "MaterialInstanceConstant":
+        raise ValueError("Only MaterialInstanceConstant assets can be used as replacements")
+    return tops[0]
+
+
+def _retarget_material(d, source, target):
+    """Keep the entire donor (including shader data and import indices); rename only its identity."""
+    ex = _material_export(d, source)
+    ex["ObjectName"] = os.path.basename(target)
+    old, new = "/Game/Marvel/" + source, "/Game/Marvel/" + target
+    # Exact package/object self references only. Never rewrite the donor character's
+    # texture/parent paths: those must continue to resolve to the installed game assets.
+    def visit(value):
+        if isinstance(value, str):
+            if value == old:
+                return new
+            obj = old + "." + os.path.basename(source)
+            if value == obj or value.startswith(obj + ":"):
+                return new + "." + os.path.basename(target) + value[len(obj):]
+        elif isinstance(value, list):
+            return [visit(v) for v in value]
+        elif isinstance(value, dict):
+            return {k: visit(v) for k, v in value.items()}
+        return value
+    d = visit(d)
+    for name in (os.path.basename(target), new):
+        if name not in d.setdefault("NameMap", []):
+            d["NameMap"].append(name)
+    if isinstance(d.get("FolderName"), str) and d["FolderName"].startswith("/"):
+        d["FolderName"] = new
+    return d
+
+
+def _check_replacement_parents(d, source, target):
+    """Overriding an ancestor of the donor would make its parent chain recursive."""
+    visited = {source.casefold()}
+    while True:
+        ex = _material_export(d, source)
+        parent = _gn(_ex_props(ex), "Parent")
+        idx = (parent or {}).get("Value")
+        imports = d.get("Imports", [])
+        if not isinstance(idx, int) or idx >= 0:
+            return
+        if -idx > len(imports):
+            raise ValueError("Material has an invalid parent reference")
+        imp = imports[-idx - 1]
+        outer = imp.get("OuterIndex")
+        if not isinstance(outer, int) or outer >= 0 or -outer > len(imports):
+            raise ValueError("Material has an invalid parent package")
+        package = imports[-outer - 1].get("ObjectName", "")
+        if package.casefold() == ("/Game/Marvel/" + target).casefold():
+            raise ValueError("This source inherits from the target material. Choose a source with a different parent chain.")
+        if imp.get("ClassName") != "MaterialInstanceConstant":
+            return
+        source = _material_path(package)
+        if source.casefold() in visited or len(visited) >= 64:
+            raise ValueError("Source material has a recursive or excessively deep parent chain")
+        visited.add(source.casefold())
+        d = _original_document(source)
+
+
+def replace_material(game_rel, source_game_rel):
+    """Save an independent donor snapshot at the target; the donor's project edits are untouched.
+
+    Provenance travels inside the project JSON so it and the snapshot publish atomically.
+    Export consumes that marker itself and rebuilds from the current vanilla donor.
+    """
+    target, source = _material_path(game_rel), _material_path(source_game_rel)
+    if target != game_rel:
+        raise ValueError("Use the target's browser asset path")
+    if target.casefold() == source.casefold():
+        raise ValueError("Choose a different material, or restore game defaults")
+    _material_export(_original_document(target), target)
+    d = _original_document(source)
+    _check_replacement_parents(d, source, target)
+    d = _retarget_material(d, source, target)
+    d[_SOURCE_KEY] = source
+    jobs.checkpoint()
+    _publish_replacement(target, d)
+    return read_material(target)
+
+
+def _publish_replacement(game_rel, d):
+    """Replace the document and clear incompatible options in one recoverable transaction."""
+    from atelier import project_meta
+    root = get_import_root()
+    target = project_base(game_rel) + ".json"
+
+    def change(path, data):
+        with open(path, "rb") as stream:
+            before = hashlib.file_digest(stream, "sha256").hexdigest()
+        return {"path": os.path.relpath(path, root).replace("\\", "/"), "before": before, "data": data}
+
+    changes = [change(target, d) if os.path.isfile(target) else
+               {"path": os.path.relpath(target, root).replace("\\", "/"), "before": None, "data": d}]
+    meta_path = os.path.join(root, ".atelier", "project.json")
+    if os.path.isfile(meta_path):
+        meta_change = change(meta_path, None)
+        metadata = project_meta.load(root)
+        options = metadata["asset_opts"].get(game_rel, {})
+        for key in ("custom_textures", "color_inten", "dye_off"):
+            options.pop(key, None)
+        if not options:
+            metadata["asset_opts"].pop(game_rel, None)
+        metadata["last_version"] = project_meta.current_version() or metadata["last_version"]
+        meta_change["data"] = metadata
+        changes.append(meta_change)
+    publish_project_json(root, changes)
 
 def save_material(game_rel, colors, scalars):
     """Apply color/scalar edits and PERSIST them into the material's on-disk JSON."""
@@ -213,9 +364,9 @@ def save_material(game_rel, colors, scalars):
     return {"colors": cols, "scalars": scals}
 
 def reset_material(game_rel):
-    """Drop local edits: delete the project JSON (new + legacy paths) and re-derive from the .uasset."""
-    for jp in (project_base(game_rel) + ".json", project_base_legacy(game_rel) + ".json"):
-        if os.path.exists(jp): os.remove(jp)
+    """Read pristine data before replacing saved edits; extraction failure preserves the project."""
+    d = _original_document(game_rel)
+    _publish_replacement(game_rel, d)
     return read_material(game_rel)
 
 def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
@@ -228,11 +379,15 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
     from atelier.handlers import custom_texture
     custom = custom_texture.assignments(game_rel) if use_project else {}
     saved_colors, saved_scalars = {}, {}
+    source = game_rel
     project_bases = (project_base(game_rel), project_base_legacy(game_rel)) if use_project else ()
     for base in project_bases:
         if os.path.isfile(base + ".json"):
             with open(base + ".json", encoding="utf-8-sig") as stream:
-                cols, scals = _mat_params(json.load(stream))
+                saved = json.load(stream)
+                cols, scals = _mat_params(saved)
+                if saved.get(_SOURCE_KEY):
+                    source = _material_path(saved[_SOURCE_KEY])
             saved_colors = {c["name"]: c["rgba"] for c in cols}
             saved_scalars = {s["name"]: s["value"] for s in scals}
             break
@@ -242,20 +397,23 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
-    work_base = ensure_work_base(game_rel)
+    work_base = ensure_work_base(source)
     if not work_base or not os.path.isfile(work_base + ".uasset"):
-        raise RuntimeError(missing_reason(game_rel, "material"))
+        raise RuntimeError(missing_reason(source, "material"))
     os.makedirs(_CACHE, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".material-export-", dir=_CACHE) as temporary:
         result = uat(["to_json", os.path.abspath(work_base + ".uasset"), USMAP, temporary])
         if result.returncode != 0:
             raise RuntimeError("Could not decode current material: " +
                                ((result.stderr or result.stdout or "to_json failed").strip()[-500:]))
-        jp = os.path.join(temporary, os.path.basename(game_rel) + ".json")
+        jp = os.path.join(temporary, os.path.basename(source) + ".json")
         if not os.path.isfile(jp):
             raise RuntimeError("Current material conversion produced no JSON")
         with open(jp, encoding="utf-8-sig") as stream:
             d = json.load(stream)
+        if source != game_rel:
+            _check_replacement_parents(d, source, game_rel)
+            d = _retarget_material(d, source, game_rel)
         current_colors, current_scalars = _mat_params(d)
         missing = sorted((saved_colors.keys() - {c["name"] for c in current_colors}) |
                          (saved_scalars.keys() - {s["name"] for s in current_scalars}))

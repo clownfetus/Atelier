@@ -117,6 +117,7 @@
   opacity: 1;
 }
 [data-atelier-motion="export-feedback"] .am-export-feedback-fleck { opacity: 0; }
+[data-atelier-motion="export-feedback"] .am-export-feedback-fall {opacity:0;transform-origin:center;transform-box:fill-box;pointer-events:none;}
 
 /* Static fallback sibling helper */
 .am-export-feedback-slot {
@@ -131,6 +132,12 @@
 
 .am-export-feedback-slot[data-am-mounted="true"] > .am-export-feedback-fallback {
   display: none !important;
+}
+
+.am-export-feedback-slot[data-am-resetting="true"] { display: inline-grid; place-items: center; }
+.am-export-feedback-slot[data-am-resetting="true"] > * { grid-area: 1 / 1; }
+.am-export-feedback-slot[data-am-mounted="true"][data-am-resetting="true"] > .am-export-feedback-fallback {
+  display: inline-flex !important;
 }
 
 .toast .am-export-feedback-slot { width: 24px; height: 24px; }

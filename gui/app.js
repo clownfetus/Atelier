@@ -21,7 +21,6 @@ let   histIdx     = 0;
 let   allItems    = [];      // current grid items (raw from server)
 let   sidebarData = {};      // token -> {name, game_rel, skin_id, char_name, skin_name, selected}
 let   importing   = false;
-let   pendingClear  = null;
 let   pendingImportAll = null;
 let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
@@ -78,6 +77,7 @@ function projectFetch(path, opts = {}, project = _activeProjectName) {
 }
 window.atelierProject = () => _activeProjectName;
 window.atelierFetch = projectFetch;
+const _libraryQuery = () => window.AtelierSearch?.query() ?? document.getElementById('search-input').value.trim();
 async function api(path, opts = {}) {
   const { project = _activeProjectName, ...requestOpts } = opts;
   const res = await projectFetch(path, requestOpts, project);
@@ -86,6 +86,14 @@ async function api(path, opts = {}) {
   } catch {
     return { ok: false, error: `server error (${res.status})` };
   }
+}
+
+async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Continue', tone = 'danger') {
+  const project = _activeProjectName;
+  const editors = [matEditor, curveEditor, vfxEditor, worldEditor, textEditor];
+  const accepted = await AtelierDialog.confirm({title, body, confirmLabel, tone});
+  return accepted && project === _activeProjectName &&
+    editors.every((editor, i) => editor === [matEditor, curveEditor, vfxEditor, worldEditor, textEditor][i]);
 }
 
 // Reveal in the file manager. The endpoint reports why it could not, so surface that instead of
@@ -98,6 +106,12 @@ async function revealInExplorer(gameRel) {
   } catch (e) {
     toast(`Could not open the file manager: ${e.message}`, "warning", 6000);
   }
+}
+
+// Toasts fade out through AtelierPolish.leave when it is available; otherwise they go at once.
+function leaveToast(el, remove) {
+  try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, remove); return; } } catch (_) { /* Fall through. */ }
+  remove();
 }
 
 function toastSpinner(msg) {
@@ -113,28 +127,29 @@ function toastSpinner(msg) {
     const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
     el.prepend(icon); lucide.createIcons({nodes:[el]});
     try { window.AtelierKrackleGlyph?.toastIcon(el, state === 'error' ? 'error' : state); } catch (_) {}
-    setTimeout(() => el.remove(), duration);
+    setTimeout(() => leaveToast(el, () => el.remove()), duration);
   };
   document.getElementById("toast-area").appendChild(el);
   return el;
 }
 
 const _collatedToasts = new Map();
-function toast(msg, type = "info", duration = 3200) {
-  const key = type + '\n' + msg, existing = _collatedToasts.get(key);
+function toast(msg, type = "info", duration = 3200, instance = '') {
+  const key = type + '\n' + msg + '\n' + instance, existing = _collatedToasts.get(key);
   if (existing?.el.isConnected) { existing.repeat(); return existing.el; }
   const el = document.createElement("div");
   el.className = `toast ${type}`;
   const icon = type === "success" ? "check-circle"
              : type === "warning" ? "alert-triangle"
              : "info";
-  el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span>${msg}</span>`;
+  el.innerHTML = `<i data-lucide="${icon}" size="14"></i><span></span>`;
+  el.querySelector('span').textContent = msg;
   document.getElementById("toast-area").appendChild(el);
   lucide.createIcons({ nodes: [el] });
   el.setAttribute('role','status'); el.setAttribute('aria-atomic','true');
   let remaining = duration, start = Date.now(), t, repeats = 1, hovered = false;
   const remove = el.remove.bind(el);
-  el.remove = () => { clearTimeout(t); if (_collatedToasts.get(key)?.el === el) _collatedToasts.delete(key); remove(); };
+  el.remove = () => { clearTimeout(t); if (_collatedToasts.get(key)?.el === el) _collatedToasts.delete(key); leaveToast(el, remove); };
   const reset = () => {
     clearTimeout(t); remaining = duration; start = Date.now();
     el.classList.remove('toast-timed'); el.style.setProperty('--toast-duration', duration+'ms'); void el.offsetWidth; el.classList.add('toast-timed');
@@ -143,13 +158,15 @@ function toast(msg, type = "info", duration = 3200) {
   _collatedToasts.set(key,{el,repeat:() => {
     let badge = el.querySelector('.toast-repeat');
     if (!badge) { badge = document.createElement('span'); badge.className = 'toast-repeat'; el.append(badge); }
-    badge.textContent = '×' + (++repeats); reset();
+    badge.textContent = '×' + (++repeats);badge.setAttribute('aria-label',repeats+' repeats');
+    badge.style.setProperty('--repeat-count',Math.min(5,repeats));badge.classList.toggle('toast-repeat-number',repeats>5); reset();
     window.AtelierPolish?.play(badge,[{transform:'scale(.85)'},{transform:'scale(1)'}],120);
   }});
   reset();
   el.addEventListener("mouseenter", () => { hovered = true; clearTimeout(t); remaining = Math.max(0, remaining-(Date.now()-start)); });
   el.addEventListener("mouseleave", () => { hovered = false; start = Date.now(); t = setTimeout(() => el.remove(), remaining); });
   el.addEventListener("click", () => el.remove());
+  try {window.AtelierKrackleGlyph?.toastIcon(el,type);}catch(_){}
   return el;
 }
 
@@ -157,20 +174,19 @@ function setStatus(msg) {
   document.getElementById("status-msg").textContent = msg;
 }
 
-function toastExportFeedback(msg, type, duration, state) {
+function toastExportFeedback(msg, type, duration, state, options) {
   try {
-    if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state);
+    if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, type, duration, state, options);
   } catch (error) { console.warn("Export animation unavailable", error); }
   // Export still works when the optional animation scripts fail to load.
-  const text = _esc(msg);
-  if (state === "busy") return toastSpinner(text);
-  toast(text, type === "error" ? "warning" : type, duration);
+  if (state === "busy") return toastSpinner(msg);
+  toast(msg, type === "error" ? "warning" : type, duration);
 }
 
-function beginExportFeedback(project) {
+function beginExportFeedback(project, options) {
   window.AtelierPolish?.packing();
   let finish;
-  try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project); }
+  try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project, options); }
   catch (error) { console.warn("Export animation unavailable", error); }
   return state => {
     try { finish?.(state); }
@@ -183,7 +199,7 @@ function toastMaterialSave(msg, state = "success", duration = 4000) {
   try {
     if (window.AtelierMaterialSaveFeedback) return window.AtelierMaterialSaveFeedback.toast(msg, state, duration);
   } catch (error) { console.warn("Material save feedback unavailable", error); }
-  try { toast(_esc(msg), state === "error" ? "warning" : state, duration); }
+  try { toast(msg, state === "error" ? "warning" : state, duration); }
   catch (error) { console.warn("Material save notification unavailable", error); }
   return null;
 }
@@ -194,6 +210,17 @@ function skinIdFromPath(path) {
 }
 
 // ── navigation ────────────────────────────────────────────────────────────────
+async function openRosterSkin(skin) {
+  const project=_activeProjectName, skinId=skin.path?.split('/').at(-1);
+  if(!/^\d{7}$/.test(skinId||''))return;
+  try {
+    const meshes=await api('/api/skin_meshes?skin_id='+encodeURIComponent(skinId),{project});
+    if(project!==_activeProjectName)return;
+    if(Array.isArray(meshes)&&meshes.length)await window.AtelierViewport?.open(skinId,skin.name);
+    else {await pushNav({path:skin.path});toast('No meshes were found for this costume. Its folder is open.','info');}
+  } catch(error) {if(project===_activeProjectName){await pushNav({path:skin.path});toast('Could not load this costume’s meshes: '+error.message,'warning');}}
+}
+
 function pushNav(newNav, {focusPath = '__first__'} = {}) {
   const direction = nav.path && (!newNav.path || nav.path.startsWith(newNav.path + '/')) ? 'back' : 'forward';
   AtelierLibraryTools.closePreview();
@@ -204,8 +231,9 @@ function pushNav(newNav, {focusPath = '__first__'} = {}) {
   nav = { ...newNav };
   updateNavBtns();
   document.getElementById("search-input").value = "";
-  renderGrid(focusPath, direction);
+  const rendered = renderGrid(focusPath, direction);
   renderSidebar();
+  return rendered;
 }
 
 function updateNavBtns() {
@@ -319,6 +347,7 @@ let _gridThumbs = null;
 let _gridStatus = 'ready';
 let _gridRenderedPath = '';
 async function renderGrid(focusPath = null, direction = 'forward') {
+  window.AtelierSearch?.reset();
   const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
   allItems = [];
@@ -359,7 +388,10 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       const bannerReady = window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
       const category = path.split('/').reverse().map(part=>folderIconCls(part)).find(cls=>cls!=='folder-icon') || 'folder-icon';
       document.getElementById('library-category-line').className = 'card-icon ' + category;
-      window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}));
+      window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}), {
+        openSkin: openRosterSkin,
+        continue:(item,kind)=>kind==='studio'&&item.skin_id?window.AtelierViewport?.open(item.skin_id,item.skin_name):handleImportedFileAction({...item,file_type:kind==='studio'?item.file_type:kind}),
+      });
       buildGrid(data.map(_makeCard), false, focusElsewhere ? null : focusPath);
       _gridStatus = 'ready';
       renderBreadcrumbs();
@@ -406,17 +438,19 @@ function _mountEmptyArt(container, kind) {
 function renderHomePins() {
   window.AtelierLibraryPins?.render(document.getElementById("home-pins"), {
     isHome: !nav.path, onNavigate: path => pushNav({path}),
-    filter: document.getElementById("search-input").value.trim(),
+    filter: _libraryQuery(),
   });
 }
 
+let _homeCategoriesExpanded=false;
 function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs?.destroy();
   _gridThumbs = null;
   renderHomePins();
   const area = document.getElementById("grid-area");
+  area.classList.toggle('home-categories',!nav.path);
   window.AtelierTextureReconstruction?.disposeWithin(area);
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
   let filtered = AtelierLibraryTools.filter(cards, q);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
@@ -429,6 +463,9 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
   }
   filtered = AtelierLibraryTools.sort(filtered);
+  const moreCategories=!nav.path&&!q&&!AtelierLibraryTools.hasFilters()&&filtered.length>8;
+  const categoryCount=filtered.length;
+  if(moreCategories&&!_homeCategoriesExpanded)filtered=filtered.slice(0,8);
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -530,11 +567,17 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
     }
     const wrapper = window.AtelierLibraryPins?.decorate(card, el) || el;
+    el.classList.toggle('category-chip',!nav.path&&card.type==='folder');
+    wrapper.classList.toggle('home-category-wrap',!nav.path&&card.type==='folder');
     grid.appendChild(AtelierLibraryTools.decorate(card, el, wrapper));
   });
 
   area.innerHTML = "";
   area.appendChild(grid);
+  if(moreCategories) {
+    const more=document.createElement('button');more.className='btn home-category-more';more.textContent=_homeCategoriesExpanded?'Fewer folders':`+${categoryCount-8} more folders`;more.setAttribute('aria-expanded',String(_homeCategoriesExpanded));
+    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});area.append(more);
+  }
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
   _gridThumbs?.start(retryThumbs);
@@ -556,7 +599,7 @@ function updateImportedCard(gameRel, record) {
     }
     const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
   }
-  const q=document.getElementById('search-input').value.trim().toLowerCase();
+  const q=_libraryQuery().toLowerCase();
   const cards=AtelierLibraryTools.sort(AtelierLibraryTools.filter(allItems.map(_makeCard),q));
   if (!cards.length) {buildGrid(allItems.map(_makeCard));return;}
   const key=card=>card.rel_path||card.game_rel||card.label;
@@ -614,6 +657,7 @@ function libraryParent() {
   if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});
 }
 function applyLibraryView() {
+  window.AtelierSearch?.reset();
   if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard));
   else if (_gridStatus === 'loading') {
     const area=document.getElementById('grid-area');
@@ -631,7 +675,15 @@ AtelierLibraryTools.init({
     _ctxShow({preventDefault() {}, stopPropagation() {}, currentTarget: button, clientX: bounds.left + 12, clientY: bounds.top + 12}, _ctxItemsCard(card));
   },
 });
-document.getElementById("search-input").addEventListener("input", applyLibraryView);
+window.AtelierSearch?.init({changed:applyLibraryView, open:async (group,item)=>{
+  if(group==='assets') {
+    await pushNav({path:item.parent},{focusPath:item.game_rel});
+    [...document.querySelectorAll('#grid-area .card')].find(card=>card.dataset.libraryPath===item.game_rel)?.focus();
+  } else await pushNav({path:item.path});
+}});
+document.getElementById("search-input").addEventListener("input", () => {
+  if(!window.AtelierSearch || AtelierSearch.scope()==='folder')applyLibraryView();
+});
 
 document.addEventListener("keydown", e => {
   if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
@@ -650,6 +702,7 @@ document.addEventListener("keydown", e => {
 
 // ── asset click / single import ───────────────────────────────────────────────
 function handleImportedFileAction(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,item.file_type,_activeProjectName);
   const ft = item.file_type || "texture";
   switch (ft) {
     case "material":
@@ -694,7 +747,7 @@ async function _checkBlenderReady() {
 
 async function meshBlendExtract(game_rel, name, force = false) {
   if (!(await _checkBlenderReady())) return;
-  if (!confirm(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`))
+  if (!force && !(await _confirmAction(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`, 'Edit in Blender?', 'Extract', 'default')))
     return;
   const t = toastSpinner(`Preparing ${name} for Blender…`);
   setStatus(`Preparing ${name} for Blender…`);
@@ -710,7 +763,7 @@ async function meshBlendExtract(game_rel, name, force = false) {
         // The preflight refuses formats the rebuilder can't pack. Extracting anyway is useful for
         // INSPECTING such a mesh, so offer it -- but say plainly that a build will not work.
         t.resolve(res.error || 'Extraction needs confirmation', 'warning', 8000);
-        if (confirm(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`))
+        if (await _confirmAction(`${res.error}\n\nExtract it anyway for inspection? A build will fail.`, 'Extract for inspection?', 'Extract'))
           return meshBlendExtract(game_rel, name, true);
         return;
       }
@@ -857,6 +910,7 @@ function _matRefreshDirty() {
   save.disabled = busy;
   save.textContent = busy ? "Saving…" : n ? `Save changes (${n})` : "Save";
   document.getElementById("mat-reset").disabled = busy;
+  bodyMaterialBusy(busy);
   const revert = document.getElementById("mat-revert");
   if (revert) revert.disabled = busy || !n;
   ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
@@ -1009,12 +1063,14 @@ function _seedScalars(arr) {
 }
 
 async function openMaterialEditor(item) {
-  if (materialDirtyCount() && !confirm("Discard unsaved material parameters and open another material?")) return;
+  window.AtelierRoster?.rememberEditor(item.game_rel,'material',_activeProjectName);
+  if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
   matEditor = null;
   clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
+  document.getElementById("mat-body").inert = false;
   document.getElementById("mat-title").textContent = item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
@@ -1029,14 +1085,18 @@ async function openMaterialEditor(item) {
   matEditor = { game_rel: item.game_rel, name: item.name,
                 colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved",
                 textures: res.textures || {}, textureClasses: res.texture_classes || {},
-                custom: res.custom_textures || {} };
+                custom: res.custom_textures || {}, materialSource: res.material_source || "" };
   _matRemember(matEditor, res.original);
   renderMatEditor();
   loadSidebar();
+  await loadMaterialDye(item, current, project);
+}
+
+async function loadMaterialDye(item, current, project) {
   // Dyeing materials (chromas) recolour through the ColorID mask, so the "Region N" pickers below
   // do nothing visible on their own — attach a live composite so the user can see what they're doing.
   try {
-    const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`);
+    const di = await api(`/api/dye_info?game_rel=${encodeURIComponent(item.game_rel)}`, { project });
     if (di && di.dyeable && current() && matEditor) {
       const editor = matEditor;
       matEditor.dyeable = true;
@@ -1044,7 +1104,7 @@ async function openMaterialEditor(item) {
       matEditor.dyeView = "preview";
       matEditor.dyeUsed = Object.keys(di.used || {}).filter(k => k !== "0").sort();
       try {
-        const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`);
+        const ao = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`, { project });
         if (!current() || matEditor !== editor) return;
         matEditor.dyeOff = !!(ao && ao.opts && ao.opts.dye_off);
         matEditor.dyeMask = (ao && ao.mask) || "";
@@ -1279,7 +1339,7 @@ async function matCustomTextureClear(i) {
   const editor = matEditor, project = _activeProjectName, slot = _matTextureSlots(editor)[i];
   const own = slot && (editor.custom || {})[slot];
   if (!own) return;
-  if (!confirm(`Use the game texture in ${slot} again? Your image ${own.source || own.name} is removed from this material.`)) return;
+  if (!(await _confirmAction(`Use the game texture in ${slot} again? Your image ${own.source || own.name} is removed from this material.`, 'Remove custom texture?', 'Remove'))) return;
   const st = document.getElementById("mat-status");
   let res;
   try {
@@ -1360,6 +1420,7 @@ function renderMatEditor() {
     </div>
     <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
   </div><p class="mat-reference-note">${m.compareMode === "original" ? "Game original values are shown below each parameter. Changes apply only when you save." : "Saved values are from this project's last save. Compare Game original to inspect the unmodified material."}</p>`;
+  h += materialReplacementHtml(m, expanded);
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
     const reg  = m.dyeView === "regions";
@@ -1447,6 +1508,99 @@ function renderMatEditor() {
   reset.textContent = "Restore game defaults";
   reset.title = "Replace the project's saved material with original game values";
   _matRefreshDirty();
+}
+
+function bodyMaterialBusy(busy) {
+  document.querySelectorAll("#mat-replacement input, #mat-replacement button, #mat-replacement select")
+    .forEach(el => { el.disabled = busy; });
+}
+
+function materialReplacementHtml(m, expanded) {
+  return `<details id="mat-replacement" class="mat-parameter-group" data-mat-group="Replacement" ${expanded.get("Replacement") ? "open" : ""}>
+    <summary>Replace material<span>${m.materialSource ? "Using another material" : "Game material"}</span></summary>
+    <div class="mat-replacement-body">
+      <p>${m.materialSource ? `Source: <code>${_matEscape(m.materialSource)}</code>` : "This asset uses its original game material."}</p>
+      <p>Use a material from any character, including its parent, textures and shader settings. This is saved immediately and included in export.</p>
+      <label for="mat-source-search">Find a material by character, skin, name or path</label>
+      <div class="mat-source-search"><input id="mat-source-search" type="search" placeholder="e.g. galaxy, 1031, MI_Body" oninput="matSearchSources(this.value)">
+        <button type="button" class="btn" onclick="matSearchSources(document.getElementById('mat-source-search').value, true)">Search</button></div>
+      <p id="mat-source-status" role="status" aria-live="polite"></p>
+      <select id="mat-source-results" size="5" aria-label="Matching materials" hidden onchange="matChooseSource(this.value)"></select>
+      <label for="mat-source-path">Source material path</label>
+      <input id="mat-source-path" type="text" placeholder="Characters/…/Materials/MI_…" value="${_matEscape(m.sourceDraft || m.materialSource || "")}" oninput="matEditor.sourceDraft=this.value">
+      <p>UVs, vertex colors and character-specific shader inputs can affect the result. Animated game shaders are not fully represented in the 3D preview.</p>
+      <button type="button" id="mat-use-source" class="btn" onclick="replaceMaterialFromSource()">Use this material</button>
+    </div></details>`;
+}
+
+let _matSourceTimer = null, _matSourceRevision = 0;
+async function matSearchSources(query, immediate = false) {
+  clearTimeout(_matSourceTimer);
+  const revision = ++_matSourceRevision, editor = matEditor, project = _activeProjectName;
+  const current = () => matEditor === editor && project === _activeProjectName && revision === _matSourceRevision;
+  const status = document.getElementById("mat-source-status"), results = document.getElementById("mat-source-results");
+  if (!status || !results) return;
+  results.hidden = true;
+  if (query.trim().length < 2) { status.textContent = "Enter at least two characters."; return; }
+  const search = async () => {
+    if (!current()) return;
+    status.textContent = "Finding materials…";
+    try {
+      const res = await api(`/api/material_sources?q=${encodeURIComponent(query)}`, { project });
+      if (!current() || !status.isConnected) return;
+      if (!res.ok) throw new Error(res.error || "Search failed");
+      results.replaceChildren(...(res.materials || []).filter(path => path !== editor.game_rel)
+        .map(path => new Option(res.labels?.[path] ? `${res.labels[path]} — ${path}` : path, path)));
+      results.selectedIndex = -1;
+      results.hidden = !results.options.length;
+      status.textContent = `${results.options.length} matching materials${res.more ? " shown. Refine your search for more." : "."}`;
+    } catch (error) { if (current() && status.isConnected) status.textContent = error.message; }
+  };
+  if (immediate) await search();
+  else _matSourceTimer = setTimeout(search, 250);
+}
+
+function matChooseSource(path) {
+  if (!matEditor) return;
+  matEditor.sourceDraft = path;
+  document.getElementById("mat-source-path").value = path;
+}
+
+async function replaceMaterialFromSource() {
+  if (!matEditor || _materialSaving.has(matEditor)) return;
+  const editor = matEditor, project = _activeProjectName;
+  const source = document.getElementById("mat-source-path").value.trim();
+  const status = document.getElementById("mat-status");
+  if (!source) { status.textContent = "Choose or paste a source material path."; return; }
+  if (!(await _confirmAction(`Replace ${editor.name} with ${source}? This saves immediately and replaces its parameters and custom texture assignments.`
+    + (materialDirtyCount() ? " Unsaved parameter changes will be discarded." : ""), 'Replace material?', 'Replace'))) return;
+  if (matEditor !== editor || project !== _activeProjectName || _materialSaving.has(editor)) return;
+  const current = () => matEditor === editor && project === _activeProjectName;
+  _materialSaving.add(editor); _matRefreshDirty();
+  document.getElementById("mat-body").inert = true;
+  status.textContent = "Replacing material…";
+  try {
+    const res = await api("/api/material_replace", { project, method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: editor.game_rel, source_game_rel: source }) });
+    if (!res.ok) throw new Error(res.error || "Replacement failed");
+    if (project === _activeProjectName) loadSidebar();
+    if (!current()) { toast(`${project}: Replaced ${editor.name}`, "success"); return; }
+    const revision = ++_materialOpenRevision;
+    editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars);
+    editor.textures = res.textures || {}; editor.textureClasses = res.texture_classes || {};
+    editor.custom = res.custom_textures || {}; editor.materialSource = res.material_source || "";
+    editor.sourceDraft = editor.materialSource; editor.compareMode = "saved";
+    editor.dyeable = false; editor.dyeOff = false;
+    _matRemember(editor);
+    renderMatEditor();
+    document.getElementById("mat-status").textContent = "Replacement saved. Export this material to apply it in game.";
+    loadMaterialDye({ game_rel: editor.game_rel }, () => current() && revision === _materialOpenRevision, project);
+  } catch (error) { if (current()) status.textContent = "Error: " + error.message; }
+  finally {
+    _materialSaving.delete(editor);
+    if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
+  }
 }
 
 // Writes one colour row's inputs back from state. `except` is the id of the element the user is
@@ -1563,13 +1717,16 @@ async function saveMaterial() {
 
 async function resetMaterial() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
-  const ownTextures = Object.keys(matEditor.custom || {}).length;
-  if (!confirm("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
-               + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""))) return;
   const editor = matEditor, project = _activeProjectName;
+  const ownTextures = Object.keys(matEditor.custom || {}).length;
+  if (!(await _confirmAction("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
+               + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""), 'Restore game values?', 'Restore'))) return;
+  if (matEditor !== editor || project !== _activeProjectName || _materialSaving.has(editor)) return;
+  const structural = !!editor.materialSource;
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;
   _materialSaving.add(editor); _matRefreshDirty();
+  if (structural) document.getElementById("mat-body").inert = true;
   document.getElementById("mat-status").textContent = "Resetting…";
   try {
     const res = await api("/api/material_reset", {
@@ -1579,23 +1736,30 @@ async function resetMaterial() {
     });
     if (!current()) return;
     if (res.ok) {
-      const newer = JSON.stringify(materialSaveSnapshot(editor)) !== submitted;
+      const newer = !structural && JSON.stringify(materialSaveSnapshot(editor)) !== submitted;
       if (!newer) { editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars); }
       const original = { colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
       _materialReferences.set(editor, { saved: original, original });
       editor.custom = res.custom_textures || {};
+      editor.materialSource = "";
+      editor.dyeable = false; editor.dyeOff = false;
       if (res.textures) { editor.textures = res.textures; editor.textureClasses = res.texture_classes || {}; }
       renderMatEditor();
       dyeRefresh(0); loadSidebar();
       document.getElementById("mat-status").textContent = newer ? "Game defaults restored; newer edits remain unsaved." : "Restored original game values.";
       toast(`Reset: ${matEditor.name}`, "info");
+      const revision = ++_materialOpenRevision;
+      loadMaterialDye({ game_rel: editor.game_rel }, () => current() && revision === _materialOpenRevision, project);
     } else { document.getElementById("mat-status").textContent = "Error: " + (res.error || "reset failed"); }
   } catch (e) { if (current()) document.getElementById("mat-status").textContent = "Error: " + e.message; }
-  finally { _materialSaving.delete(editor); if (current()) _matRefreshDirty(); }
+  finally {
+    _materialSaving.delete(editor);
+    if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
+  }
 }
 
-function closeMaterialEditor(force = false) {
-  if (force !== true && materialDirtyCount() && !confirm("Discard unsaved material parameters?")) return false;
+async function closeMaterialEditor(force = false) {
+  if (force !== true && materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters?"))) return false;
   ++_materialOpenRevision; ++_dyePreviewRevision; clearTimeout(_dyeTimer);
   const img = document.getElementById("dye-prev");
   if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
@@ -1611,7 +1775,7 @@ function closeMaterialEditor(force = false) {
 // loaded, saved or reset.
 const _editSnapshot = state => JSON.stringify(state);
 const _vfxSnapshot = v => _editSnapshot({ groups: v.groups, scalars: v.scalars, vectors: v.vectors });
-function _discardUnsaved(dirty, what) { return !dirty || confirm(`Discard unsaved ${what}?`); }
+async function _discardUnsaved(dirty, what) { return !dirty || await _confirmAction(`Discard unsaved ${what}?`); }
 function _curveDirty() { return !!curveEditor && Object.values(curveEditor.dirty || {}).some(Boolean); }
 function _vfxDirty() { return !!vfxEditor && _vfxSnapshot(vfxEditor) !== vfxEditor.baseline; }
 function _worldDirty() { return !!worldEditor && _editSnapshot(worldEditor.edits) !== worldEditor.baseline; }
@@ -1678,6 +1842,7 @@ function _resampleStops(channels) {
 }
 
 async function openCurveEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'curve',_activeProjectName);
   _syncBulkEditorAction();
   const ov = document.getElementById("curve-overlay");
   document.getElementById("curve-title").textContent = item.name;
@@ -1769,7 +1934,7 @@ async function saveCurve() {
 
 async function resetCurve() {
   const c = curveEditor; if (!c) return;
-  if (!confirm("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.", 'Restore curve?', 'Restore'))) return;
   document.getElementById("curve-status").textContent = "Resetting…";
   try {
     const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1780,8 +1945,8 @@ async function resetCurve() {
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
 }
 
-function closeCurveEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_curveDirty(), "curve edits")) return false;
+async function closeCurveEditor(force = false) {
+  if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
   const overlay = document.getElementById('curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -1825,6 +1990,7 @@ function _vfxGradCss(g) {
 }
 
 async function openVfxEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'vfx',_activeProjectName);
   _syncBulkEditorAction();
   const ov = document.getElementById("vfx-overlay");
   document.getElementById("vfx-title").textContent = item.name;
@@ -2041,7 +2207,7 @@ async function saveVfx() {
 }
 async function resetVfx() {
   const v = vfxEditor; if (!v) return;
-  if (!confirm("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.", 'Restore effect?', 'Restore'))) return;
   document.getElementById("vfx-status").textContent = "Resetting…";
   try {
     const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -2054,8 +2220,8 @@ async function resetVfx() {
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
 }
-function closeVfxEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_vfxDirty(), "VFX edits")) return false;
+async function closeVfxEditor(force = false) {
+  if (force !== true && _vfxDirty() && !(await _discardUnsaved(true, "VFX edits"))) return false;
   const overlay = document.getElementById('vfx-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -2073,7 +2239,7 @@ document.getElementById("vfx-overlay").addEventListener("click", e => {
 
 // ── import all ────────────────────────────────────────────────────────────────
 function _shownTextures() {
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   const paths = new Set(AtelierLibraryTools.filter(allItems.map(_makeCard), q)
     .filter(i => i.type === 'asset' && i.file_type === 'texture').map(i => i.game_rel));
   return allItems.filter(i => i.type === 'asset' && i.file_type === 'texture' && paths.has(i.game_rel));
@@ -2089,7 +2255,7 @@ document.getElementById("view3d-fab").addEventListener("click", () => {
 document.getElementById("import-all-btn").addEventListener("click", () => {
   const shown   = _shownTextures();
   const pending = shown.filter(i => !i.imported);
-  const q       = document.getElementById("search-input").value.trim();
+  const q       = _libraryQuery();
   if (!pending.length) { toast(q ? "All shown textures already edited" : "All textures already edited", "success"); return; }
   const sid = skinIdFromPath(nav.path);
   pendingImportAll = pending;
@@ -2183,7 +2349,7 @@ document.getElementById('bulk-edit-open').addEventListener('click', () => {
     toast('Save or reset this file’s changes before bulk editing.', 'warning'); return;
   }
   const eligible = item => ['curve','vfx'].includes(item.file_type) && item.game_rel;
-  const query = document.getElementById('search-input').value.trim().toLowerCase();
+  const query = _libraryQuery().toLowerCase();
   const folder = AtelierLibraryTools.filter(allItems.map(_makeCard), query).filter(eligible);
   const current = _bulkEditorKind === 'curve' ? curveEditor : vfxEditor;
   const edited = Object.values(sidebarData).filter(i => i.selected && eligible(i) && i.game_rel !== current.game_rel);
@@ -2271,6 +2437,7 @@ function handleSSE(d) {
     const banner = document.getElementById("usmap-update-banner");
     document.getElementById("usmap-update-name").textContent = d.name ? `(${d.name})` : "";
     banner.hidden = false;
+    window.AtelierSurfaces?.updateDrop('usmap',()=>{banner.scrollIntoView({block:'nearest'});document.getElementById('usmap-update-dismiss')?.focus();});
     lucide.createIcons({ nodes: [banner] });
     return;
   }
@@ -2388,7 +2555,7 @@ let _sbLastTok  = null;          // anchor for shift-click ranges
 
 function _sbVisible() {
   const all = Object.values(sidebarData);
-  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const q = _libraryQuery().toLowerCase();
   return q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
 }
 
@@ -2410,14 +2577,11 @@ function _sbMarkClick(item, e) {
   renderSidebar();
 }
 
-function sbDeleteMarked() {
+async function sbDeleteMarked() {
   const items = [...(_sbMarked || [])].map(t => sidebarData[t]).filter(Boolean);
   if (!items.length) return;
-  pendingClearMany = items;
-  document.getElementById("confirm-clear-title").textContent = `Delete ${items.length} assets?`;
-  document.getElementById("confirm-clear-msg").textContent =
-    `Delete your edits to these ${items.length} assets? Their edited files are removed from this project.`;
-  document.getElementById("confirm-clear-overlay").classList.add("active");
+  if (await _confirmAction(`Move your edits to these ${items.length} assets to the project trash for 7 days?`, `Delete ${items.length} assets?`, 'Delete'))
+    await performClearMany(items);
 }
 
 async function performClearMany(items) {
@@ -2433,7 +2597,7 @@ async function performClearMany(items) {
       _sbLastTok = null;
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted ${items.length} edited asset${items.length !== 1 ? "s" : ""}`, "info", 3500);
+      _trashUndo(res, project, `Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2444,7 +2608,9 @@ async function performClearMany(items) {
 }
 
 function renderSidebar() {
+  window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
   const list = document.getElementById("sidebar-list");
+  document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
   const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
   const previousRows = window.AtelierPolish?.sidebarBefore(list);
@@ -2460,16 +2626,16 @@ function renderSidebar() {
   const all = Object.values(sidebarData);
   window.AtelierSMapsUI?.update(all);
   if (!all.length) {
-    list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>No edited assets yet</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
+    list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>Your Mod tray is empty</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
     lucide.createIcons({ nodes: [list] });
     window.AtelierEmptyAssetsUI?.mount(_activeProjectName, list.querySelector('.sidebar-empty'));
     updateInstallBtn();
     return;
   }
-  const q     = document.getElementById("search-input").value.trim().toLowerCase();
+  const q     = _libraryQuery().toLowerCase();
   const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
   if (!items.length) {
-    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No edited assets match the search.</div>';
+    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
     updateInstallBtn();
     return;
   }
@@ -2632,8 +2798,16 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
   if (review) window.AtelierExportReview?.start(review);
-  const finishFeedback = beginExportFeedback(project);
-  const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy");
+  // While the review dialog's stage draws this job it is the one hero; the toast and button hold still.
+  const quiet = review ? state => !!window.AtelierExportReview?.staging?.(state) : null;
+  const finishFeedback = beginExportFeedback(project, {quiet});
+  const t = toastExportFeedback(`Exporting ${modName}…`, "", 0, "busy", {quiet});
+  // The busy toast resolves in place, so its charge hands over to the result instead of a new toast.
+  const settle = (message, outcome, duration) => {
+    if (t?.resolve && t.isConnected) { t.resolve(message, outcome, duration); return; }
+    t?.remove();
+    toastExportFeedback(message, outcome, duration, outcome, {quiet});
+  };
   try {
     const res = await (window.AtelierJobs?.run || api)(extra?.endpoint || "/api/install_mod", {
       project,
@@ -2646,12 +2820,11 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         ...(extra?.body || {}),
       }),
     });
-    t?.remove();
     if (res.ok) {
       const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
       if (outcome === 'success') window.AtelierPolish?.exported();
       finishFeedback(outcome);
-      toastExportFeedback(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000, outcome);
+      settle(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000);
       if (project === _activeProjectName) setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
       // A mod can build fine and still be missing a piece — one asset that would not stage. Saying
       // "Installed" and nothing else makes that look identical to the game ignoring the edit.
@@ -2659,30 +2832,29 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
         toastExportFeedback(`${res.skipped.length} item(s) did NOT go into the mod:\n• ` +
               res.skipped.slice(0, 4).join("\n• ") +
               (res.skipped.length > 4 ? `\n• +${res.skipped.length - 4} more` : ""),
-              "warning", 16000, "warning");
+              "warning", 16000, "warning", {quiet});
       }
       console.log("[export] staged:", res.applied, "\n[export] skipped:", res.skipped);
     } else if (res.cancelled) {
       finishFeedback('warning');
-      toastExportFeedback('Export cancelled. Project edits are preserved.', 'warning', 4500, 'warning');
+      settle('Export cancelled. Project edits are preserved.', 'warning', 4500);
       if (project === _activeProjectName) setStatus('Export cancelled');
     } else if (res.need_mods_folder) {
       _modsFolderSet = false;
       finishFeedback("warning");
-      toastExportFeedback("No mods folder set — opening Settings…", "warning", 3200, "warning");
+      settle("No mods folder set — opening Settings…", "warning", 3200);
       openPaths();
     } else {
       const outcome = res.built ? "warning" : "error";
       finishFeedback(outcome);
-      toastExportFeedback(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, outcome, 10000, outcome);
+      settle(`${res.built ? "Export succeeded; installation failed" : "Export failed"}: ${res.error || "unknown error"}`, outcome, 10000);
       if (project === _activeProjectName) setStatus(res.built ? `Exported → ${res.pak_path || ""}` : "");
     }
     if (review) window.AtelierExportReview?.finish(review, res);
     return res;
   } catch (e) {
-    t?.remove();
     finishFeedback("error");
-    toastExportFeedback(`Error: ${e.message}`, "error", 3200, "error");
+    settle(`Error: ${e.message}`, "error", 3200);
     if (project === _activeProjectName) setStatus("");
     const res = {ok: false, error: e.message};
     if (review) window.AtelierExportReview?.finish(review, res);
@@ -2874,23 +3046,42 @@ document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
 // ── clear individual / clear all ──────────────────────────────────────────────
-let pendingClearMany = null;     // several marked assets awaiting the one confirm dialog
 
-function clearImported(token, skipConfirm) {
+function _trashUndo(result, project, message) {
+  const notice = toast(message, 'info', 10000, result.entry || '');
+  if (!result.entry) return;
+  const undo = document.createElement('button');
+  undo.className = 'btn toast-undo'; undo.textContent = 'Undo';
+  undo.addEventListener('click', async event => {
+    event.stopPropagation();
+    if (undo.disabled) return;
+    undo.disabled = true;
+    try {
+      const restored = await api('/api/restore_imported', {
+        project, method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({entry:result.entry}),
+      });
+      if (project === _activeProjectName && restored.game_rels?.length) {
+        await loadSidebar(); await renderGrid();
+      }
+      if (restored.ok) { notice.remove(); toast('Edits restored', 'success'); }
+      else { undo.disabled = false; toast(restored.error || 'Could not restore edits', 'warning', 6000); }
+    } catch (error) { undo.disabled = false; toast(error.message, 'warning'); }
+  });
+  notice.append(undo);
+}
+
+async function clearImported(token, skipConfirm) {
   const item = sidebarData[token];
   if (!item) return;
-  pendingClearMany = null;
   if (skipConfirm) {
-    performClearImported(item);
+    await performClearImported(item);
     return;
   }
-  pendingClear = item;
   const ft   = item.file_type || "asset";
   const kind = ft.charAt(0).toUpperCase() + ft.slice(1);
-  document.getElementById("confirm-clear-title").textContent = `Delete ${kind}?`;
-  document.getElementById("confirm-clear-msg").textContent =
-    `Delete your edits to "${item.name}"? Its edited files are removed from this project.`;
-  document.getElementById("confirm-clear-overlay").classList.add("active");
+  if (await _confirmAction(`Move your edits to "${item.name}" to the project trash for 7 days?`, `Delete ${kind}?`, 'Delete'))
+    await performClearImported(item);
 }
 
 async function performClearImported(item) {
@@ -2906,7 +3097,7 @@ async function performClearImported(item) {
       delete sidebarData[item.token];
       window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
       renderSidebar();
-      toast(`Deleted: ${item.name}`, "info", 3000);
+      _trashUndo(res, project, `Deleted: ${item.name}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2916,38 +3107,11 @@ async function performClearImported(item) {
   }
 }
 
-document.getElementById("confirm-clear-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  pendingClear = null; pendingClearMany = null;
-});
-
-document.getElementById("confirm-clear-ok").addEventListener("click", async () => {
-  document.getElementById("confirm-clear-overlay").classList.remove("active");
-  if (pendingClearMany) {
-    const items = pendingClearMany; pendingClearMany = null;
-    await performClearMany(items);
-    return;
-  }
-  if (!pendingClear) return;
-  const item = pendingClear; pendingClear = null;
-  await performClearImported(item);
-});
-
-document.getElementById("clear-all-btn").addEventListener("click", () => {
+document.getElementById("clear-all-btn").addEventListener("click", async () => {
   const count = Object.keys(sidebarData).length;
   if (!count) { toast("No edited assets to clear", "info"); return; }
-  document.getElementById("confirm-clear-all-msg").textContent =
-    `All ${count} edited asset${count !== 1 ? "s" : ""} will be permanently deleted from local assets.`;
-  document.getElementById("confirm-clear-all-overlay").classList.add("active");
-});
-
-document.getElementById("confirm-clear-all-cancel").addEventListener("click", () => {
-  document.getElementById("confirm-clear-all-overlay").classList.remove("active");
-});
-
-document.getElementById("confirm-clear-all-ok").addEventListener("click", async () => {
+  if (!(await _confirmAction(`All ${count} edited asset${count !== 1 ? "s" : ""} will be moved to the project trash for 7 days. The project keeps at most 20 trash entries.`, 'Delete all edits?', 'Delete all'))) return;
   const project = _activeProjectName;
-  document.getElementById("confirm-clear-all-overlay").classList.remove("active");
   try {
     const res = await api("/api/delete_all_imported", {
       method: "POST",
@@ -2959,7 +3123,7 @@ document.getElementById("confirm-clear-all-ok").addEventListener("click", async 
       sidebarData = {};
       window.AtelierEmptyAssetsUI?.confirmed(project, 0);
       renderSidebar();
-      toast(`Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`, "info", 4000);
+      _trashUndo(res, project, `Deleted ${res.deleted} edited asset${res.deleted !== 1 ? "s" : ""}`);
       renderGrid().catch(() => {});
     } else {
       toast(`Delete failed: ${res.error}`, "warning");
@@ -2980,8 +3144,10 @@ async function checkIndexWarnings() {
     if (!res.failed || !res.failed.length) return;
     _indexWarnShown = true;
     const names = res.failed.map(f => f.container).join(", ");
-    toast(`${res.failed.length} pak container(s) could not be read: ${names}. ` +
+    const notice=toast(`${res.failed.length} pak container(s) could not be read: ${names}. ` +
           `Assets inside them are missing — check the AES key in Settings.`, "warning", 14000);
+    const settings=document.createElement('button');settings.className='btn toast-undo';settings.textContent='Settings';settings.addEventListener('click',event=>{event.stopPropagation();notice.remove();openPaths();});notice.append(settings);
+    window.AtelierSurfaces?.indexFailure(notice);
   } catch (e) {}
 }
 
@@ -3061,13 +3227,23 @@ async function checkSetup() {
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
-    const [aes, usmapPath] = await Promise.all([_fetchAesKeyValue(), _fetchUsmapPath()]);
     _pathsMode = false;
     _applySetupMode();
     document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
-    document.getElementById("setup-aes").value   = aes  || statusRes.aes_prefill  || "";
-    document.getElementById("setup-usmap").value = usmapPath || statusRes.usmap_prefill || "";
+    document.getElementById("setup-aes").value   = statusRes.aes_prefill || "";
+    document.getElementById("setup-usmap").value = statusRes.usmap_prefill || "";
+    window.AtelierSetup?.detected(statusRes.paks_prefill || '');
     _setSetupLoading(false);
+    for (const [kind, fetchValue] of [['aes', _fetchAesKeyValue], ['usmap', _fetchUsmapPath]]) {
+      const field = document.getElementById('setup-' + kind), initial = field.value;
+      window.AtelierSetup?.retrieval(kind, 'pending');
+      fetchValue().then(value => {
+        if (_pathsMode || !document.getElementById('setup-overlay').classList.contains('active')) return;
+        if (value && field.value === initial) field.value = value;
+        window.AtelierSetup?.retrieval(kind, value ? 'ready' : 'failed');
+        validateSetup();
+      });
+    }
     await validateSetup();
     return true;
   } catch (e) {
@@ -3088,6 +3264,7 @@ function _applySetupMode() {
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
+  window.AtelierSetup?.mode(paths);
 }
 
 async function openPaths() {
@@ -3270,6 +3447,7 @@ async function validateSetup() {
     blenderEl.classList.toggle("setup-valid",   blenderOk);
     blenderEl.classList.toggle("setup-invalid", blenderBad);
   }
+  window.AtelierSetup?.validation({pakOk, usmapOk, keyOk});
 }
 
 document.getElementById("setup-path").addEventListener("input", validateSetup);
@@ -3362,7 +3540,7 @@ document.getElementById("setup-blender-browse").addEventListener("click", async 
 
 function _resetSaveBtn() {
   const btn = document.getElementById("setup-save");
-  const label = _pathsMode ? "Save" : "Save & Continue";
+  const label = _pathsMode ? "Save" : "Open Atelier";
   btn.disabled = false;
   btn.innerHTML = `<i data-lucide="check" size="14"></i> <span id="setup-save-label">${label}</span>`;
   lucide.createIcons({ nodes: [btn] });
@@ -3531,8 +3709,15 @@ _ctxFileInput.addEventListener("change", async () => {
   _ctxFileInput.value = "";
   if (!file || !_ctxFileTarget) return;
   const game_rel = _ctxFileTarget;
-  const project = _activeProjectName;
   _ctxFileTarget = null;
+  await replaceTextureFromFile(file,game_rel);
+});
+
+const _isImageFile=file=>/^image\//i.test(file.type)||/\.(png|jpe?g|tga|bmp|dds|webp|tiff?)$/i.test(file.name||'');
+
+async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) {
+  if(!file||!game_rel)return;
+  if(!_isImageFile(file)){toast('Drop an image file to replace this texture.','warning');return;}
   const fd = new FormData();
   fd.append("file", file);
   fd.append("game_rel", game_rel);
@@ -3555,10 +3740,34 @@ _ctxFileInput.addEventListener("change", async () => {
     suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
     t.resolve(`Error: ${err.message}`, "error");
   }
+}
+
+// File bytes, never native file paths: WebView2 exposes ordinary File objects. Like Replace with
+// Image, a drop only replaces an edited texture; it overwrites that edit in place, and a stray drop
+// is easy to make, so it asks first.
+for(const name of ['dragenter','dragover','dragleave','drop'])document.getElementById('grid-area').addEventListener(name,async event=>{
+  const target=event.target.closest('.card'),item=target?._libraryCard;
+  if(item?.file_type!=='texture'||!event.dataTransfer?.types.includes('Files'))return;
+  event.preventDefault();
+  if(!item.imported){
+    event.dataTransfer.dropEffect='none';
+    if(name==='drop')toast('Edit this texture first, then drop an image to replace it.','info');
+    return;
+  }
+  if(name==='dragenter'||name==='dragover'){target.classList.add('k-texture-pool');event.dataTransfer.dropEffect='copy';}
+  else if(name==='dragleave'){if(!target.contains(event.relatedTarget))target.classList.remove('k-texture-pool');}
+  else {
+    target.classList.remove('k-texture-pool');
+    const file=event.dataTransfer.files[0];  // Read before awaiting: the drop's data expires with the event.
+    if(!file)return;
+    if(!_isImageFile(file)){toast('Drop an image file to replace this texture.','warning');return;}
+    if(await _confirmAction(`Replace your edit to "${item.label}" with ${file.name}? The current edit is overwritten and cannot be undone.`,'Replace texture?','Replace'))
+      await replaceTextureFromFile(file,item.game_rel);
+  }
 });
 
 async function revertImported(item) {
-  if (!confirm(`Revert ${item.name || item.game_rel} to the game original? This replaces your edited content for this asset.`)) return;
+  if (!(await _confirmAction(`Revert ${item.name || item.game_rel} to the game original? This replaces your edited content for this asset.`, 'Revert asset?', 'Revert'))) return;
   const project = _activeProjectName;
   const progress = toastSpinner('Restoring original…');
   try {
@@ -3809,8 +4018,8 @@ async function checkUpdate(pending = api("/api/update_check")) {
   lucide.createIcons();
 
   return new Promise(resolve => {
-    const dismiss = () => { overlay.classList.remove("active"); resolve(false); };
-    document.getElementById("update-later").onclick = dismiss;
+    const dismiss = (remind=false) => { overlay.classList.remove("active");if(remind)window.AtelierSurfaces?.updateDrop('app',()=>overlay.classList.add('active')); resolve(false); };
+    document.getElementById("update-later").onclick = ()=>dismiss(true);
     if (info.manual) {
       document.getElementById("update-now").onclick = async () => {
         try { await api("/api/update_open_release", { method: "POST" }); } catch {}
@@ -4027,6 +4236,7 @@ function _renderProjectPicker(projects, keepQuery) {
       : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
     lucide.createIcons({ nodes: [grid] });
     window.AtelierPolish?.empty(grid.firstElementChild, q ? 'No project matches your search' : 'No projects yet', q ? 'Try another project name.' : 'Create one to get started.');
+    if(!q)window.AtelierSurfaces?.emptyProjects(grid.firstElementChild);
     return;
   }
   projects.forEach(proj => {
@@ -4246,6 +4456,7 @@ function _showProjNameModal(ctx) {
 }
 
 document.getElementById("proj-new-btn").addEventListener("click", () => {
+  window.AtelierSurfaces?.newProjectMoment();
   _showProjNameModal({
     title: "New Project", value: "", okLabel: "Create",
     action: async name => {
@@ -4696,6 +4907,7 @@ function _rgb01Hex(c) { c = c || [1, 1, 1]; return "#" + _wHx(c[0] * 255) + _wHx
 function _hex01(h) { return [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; }
 
 async function openWorldEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'world',_activeProjectName);
   const ov = document.getElementById("world-overlay");
   document.getElementById("world-title").textContent = item.name;
   document.getElementById("world-sub").textContent = item.game_rel || "";
@@ -4806,8 +5018,8 @@ function _wireWorldInputs() {
   }));
 }
 
-function closeWorldEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_worldDirty(), "level edits")) return false;
+async function closeWorldEditor(force = false) {
+  if (force !== true && _worldDirty() && !(await _discardUnsaved(true, "level edits"))) return false;
   document.getElementById("world-overlay").classList.remove("active");
   return true;
 }
@@ -4830,7 +5042,7 @@ document.getElementById("world-save").addEventListener("click", async () => {
 
 document.getElementById("world-reset").addEventListener("click", async () => {
   if (!worldEditor) return;
-  if (!confirm("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.", 'Restore level?', 'Restore'))) return;
   const st = document.getElementById("world-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/world_reset", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -4852,6 +5064,7 @@ let textEditor = null;
 function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 async function openTextEditor(item) {
+  window.AtelierRoster?.rememberEditor(item.game_rel,'text',_activeProjectName);
   const ov = document.getElementById("text-overlay");
   document.getElementById("text-title").textContent = item.name;
   document.getElementById("text-sub").textContent = item.game_rel || "";
@@ -4895,8 +5108,8 @@ function renderTextEditor(filter) {
 
 document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
 
-function closeTextEditor(force = false) {
-  if (force !== true && !_discardUnsaved(_textDirty(), "text edits")) return false;
+async function closeTextEditor(force = false) {
+  if (force !== true && _textDirty() && !(await _discardUnsaved(true, "text edits"))) return false;
   document.getElementById("text-overlay").classList.remove("active");
   return true;
 }
@@ -4920,7 +5133,7 @@ document.getElementById("text-save").addEventListener("click", async () => {
 
 document.getElementById("text-reset").addEventListener("click", async () => {
   if (!textEditor) return;
-  if (!confirm("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.")) return;
+  if (!(await _confirmAction("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.", 'Restore text?', 'Restore'))) return;
   const st = document.getElementById("text-status"); st.textContent = "Resetting…";
   try {
     const res = await api("/api/text_reset", { method: "POST", headers: { "Content-Type": "application/json" },

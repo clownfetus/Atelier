@@ -1,6 +1,6 @@
 #define AppName "Atelier"
 #ifndef AppVersion
-  #define AppVersion "0.0.3"
+  #error AppVersion must be supplied by the build pipeline
 #endif
 #define AppPublisher "Atelier"
 #define AppExeName "Atelier.exe"
@@ -29,7 +29,14 @@
 AppId={{2E25ABE9-E3D5-4ABA-9E50-725BA75185AF}
 AppName={#AppName}
 AppVersion={#AppVersion}
+AppVerName=Atelier {#AppVersion}
+VersionInfoVersion={#AppVersion}
+SetupIconFile=icon.ico
+LicenseFile=LICENSE
+ArchitecturesAllowed=x64compatible
+MinVersion=10.0
 AppPublisher={#AppPublisher}
+AppPublisherURL=https://github.com/clownfetus/Atelier
 DefaultDirName={localappdata}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes

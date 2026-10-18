@@ -1,33 +1,31 @@
-# README screenshots
+# Atelier 1.0 screenshots
 
-The four current-interface screenshots were captured on 15 October 2026 from
-source commit `f0e4328b68f8cc7346a922516d7cf5c86ea57e43`. They show the actual
-Bottle-served frontend in Chromium at 1400 × 900, without cropping, compositing
-or image edits.
+Captured on 18 October 2026 from the consolidated 1.0.0 source using the actual
+Bottle-served interface in Microsoft Edge at 1400 × 900. Captures are unedited:
+no compositing, simulated UI, cropping or image generation.
 
 | File | View |
 | --- | --- |
-| `studio-dark.png` | Asset library, Atelier palette, dark mode |
-| `studio-light.png` | The same library and project in light mode |
-| `material-editor.png` | Material color/dye groups, scalar values and comparisons |
-| `appearance-settings.png` | Appearance settings with the Repak X palette |
+| `studio-dark.png` | Hero-led Home, global search, Mod tray, dark theme |
+| `studio-light.png` | The same configured installation in the light theme |
+| `material-editor.png` | Installed material parameters and comparisons |
+| `material-replacement.png` | The material replacement controls |
+| `model-studio.png` | Magik in the real Model Studio Inspect view |
+| `showcase.png` | The same model with Showcase presentation |
+| `appearance-settings.png` | Appearance palettes and motion preferences |
 
-All asset lists, material values, configured paths and validation responses use
-explicit synthetic fixtures in a disposable **Example Mod** project. There is
-no extracted game artwork, real project data or live AES key in these captures.
-No mod was built or installed. The screenshots demonstrate the interface, not
-native game compatibility or a completed installer release.
+The game installation is read through an isolated **Release Verification**
+project with an isolated test-mods destination. No material edits are saved and
+no mods are built or installed during capture. Game artwork belongs to its
+respective owners. These screenshots demonstrate the interface and preview;
+they do not establish in-game compatibility.
 
-The capture run reported no uncaught page errors. The complete existing
-Chromium/Bottle suite also passed all 88 groups with no page errors on the same
-source tree. Re-run that suite with:
+`screenshots.json` records image hashes and page errors. To reproduce, start
+`server.py` with a separate configured `ATELIER_DATA_DIR` and `ATELIER_PORT`, then:
 
 ```powershell
-.\.venv\Scripts\python.exe tests/browser_smoke.py --report-dir _work/readme-browser-checks
+python scripts/capture_release_screenshots.py --url http://127.0.0.1:8797 --output images
 ```
 
-Its deterministic review captures use `Smoke A` and additional workflow fixtures;
-see [the review screenshot notes](../docs/review/README.md) for their scope.
-
-The original `screenshot.png` and `skin_ids.png` remain available for historical
-references. `rivals_path.png` remains the Steam folder-location illustration.
+Older `screenshot.png` and `skin_ids.png` are historical references;
+`rivals_path.png` illustrates Steam's folder-location menu.

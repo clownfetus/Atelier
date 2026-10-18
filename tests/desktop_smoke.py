@@ -42,7 +42,12 @@ def main():
         def log_message(self, *_args):
             pass
 
+    replacement_uploads=[]
     def app(env, respond):
+        if args.fixtures and env['PATH_INFO']=='/api/replace_texture':
+            body=env['wsgi.input'].read(int(env.get('CONTENT_LENGTH','0')))
+            replacement_uploads.append({'project':env.get('HTTP_X_ATELIER_PROJECT'),'has_png':b'\x89PNG\r\n\x1a\n' in body,'has_filename':b'native-drop.png' in body})
+            data=json.dumps({'ok':True,'token':'native-drop-fixture'}).encode();respond('200 OK',[('Content-Type','application/json'),('Content-Length',str(len(data)))]);return [data]
         stubs = {'/api/update_check': {'available': False},
                  '/api/download_usmap': {'ok': True, 'path': C.USMAP},
                  '/api/prefetch_thumbs': {'ok': True},
@@ -108,6 +113,22 @@ def main():
                 assert all(t['settings'] == t['preference'] for t in themes), themes
                 assert [t['theme'] for t in themes[:2]] == ['light', 'dark'], themes
                 result['themes'] = themes
+                if args.fixtures:
+                    window.evaluate_js("""(() => {
+                      window.__nativeDrop=null;const old=refreshEditedTexture;let refreshed=false;
+                      refreshEditedTexture=()=>{refreshed=true;};
+                      const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
+                      const file=new File([bytes],'native-drop.png',{type:'image/png'});
+                      replaceTextureFromFile(file,'Fixture/NativeDrop').then(()=>{window.__nativeDrop={noPath:!file.path,refreshed};refreshEditedTexture=old;});
+                    })()""")
+                    deadline=time.monotonic()+10
+                    while time.monotonic()<deadline:
+                        native_drop=window.evaluate_js('window.__nativeDrop')
+                        if native_drop:break
+                        time.sleep(.05)
+                    assert native_drop=={'noPath':True,'refreshed':True},native_drop
+                    assert replacement_uploads==[{'project':'Desktop%20fixture','has_png':True,'has_filename':True}],replacement_uploads
+                    result['texture_byte_drop']=native_drop
                 appearance = window.evaluate_js("""(() => {
                   const picker = document.querySelector('#settings-theme');
                   const rows = [];
@@ -195,7 +216,8 @@ def main():
                   const name = document.createElement('div'); name.className = 'card-name';
                   name.textContent = item.label;
                   card.append(thumb, name);
-                  document.querySelector('#grid-area .grid').appendChild(card);
+                  const fullSize = document.createElement('div'); fullSize.className='grid'; fullSize.style.setProperty('--card-w','156px');
+                  fullSize.append(card); document.body.append(fullSize);
                   try {
                     const svg = card.querySelector('.am-folder-flap');
                     const front = svg.querySelector('.am-folder-flap-front');
@@ -206,7 +228,7 @@ def main():
                       transition:getComputedStyle(front).transitionDuration,
                       animations:svg.getAnimations({subtree:true}).length};
                   } finally {
-                    card.remove();
+                    fullSize.remove();
                   }
                 })()""")
                 assert 101 <= folder_motion['width'] <= 103, folder_motion
@@ -285,7 +307,7 @@ def main():
                                         'animations': 0, 'sidebarAPI': True, 'clean': True}, empty_motion
                 result['empty_assets_motion'] = empty_motion
                 polish = window.evaluate_js("""(() => {
-                  const motion=document.getElementById('settings-motion');motion.value='reduce';motion.dispatchEvent(new Event('change'));
+                  const motion=document.getElementById('settings-motion');motion.value='off';motion.dispatchEvent(new Event('change'));
                   const density=document.getElementById('settings-density');density.value='compact';density.dispatchEvent(new Event('change'));
                   const operation=toastSpinner('Native packing fixture');operation.resolve('Native complete','success',4000);
                   const same=operation.isConnected && operation.dataset.operationState==='success';operation.remove();

@@ -22,6 +22,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
     fixtures = [{**item, 'rel_path': item.get('rel_path', item.get('game_rel'))} for item in fixtures]
     def seed():
         target.evaluate("""items => {
+          if(window.AtelierSearch?.scope()==='everywhere')document.getElementById('search-scope').click();
           nav={path:'Characters/1015/1015502'};
           _pathLabels={'Characters/1015':'1015 — Storm','Characters/1015/1015502':'502 — Goddess of Thunder'};
           allItems=items; document.getElementById('search-input').value='';

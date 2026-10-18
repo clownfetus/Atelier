@@ -88,10 +88,13 @@ async function materialTexture(url, load = materialLoad) {
   finally { URL.revokeObjectURL(objectUrl); }
 }
 
-function canLeave() {
+async function canLeave() {
   if (inspection?.capturing()) { note('Cancel the capture or wait for it to finish before leaving.', 'warning'); return false; }
   if (saving) { note('Wait for the save to finish before leaving this preview.', 'warning'); return false; }
-  return !Object.keys(edited).length || window.confirm('Discard unsaved preview recolors?');
+  if (!Object.keys(edited).length) return true;
+  const gen = generation, project = viewportProject;
+  return await window.AtelierDialog.confirm({title:'Discard preview recolours?', body:'Discard unsaved preview recolors?', tone:'danger', confirmLabel:'Discard'})
+    && gen === generation && project === viewportProject && !saving;
 }
 
 function clearLiveDyes() {
@@ -218,15 +221,16 @@ function init() {
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
     materials:() => ({data:matData, byName:matsByName, edited}),
+    context:()=>({project:viewportProject,skin:currentSkin||meshSkin}),
     fetch:(url, options) => materialFetch(url, options), texture:materialTexture, url:projectUrl, hex:linToHex,
     tintOriginal, pickMaterial, label:materialLabel, notify:note, resize:onResize,
     ready:()=>!materialTask && !animation.loading() && !saving, refreshEdits:refreshFoot,
     pauseAnimation:()=>animation.pause(), resumeAnimation:state=>animation.resume(state)});
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
-  $('viewport-mesh-edit').addEventListener('click',()=>{
+  $('viewport-mesh-edit').addEventListener('click',async()=>{
     const index=objects.findIndex(object=>object.root.visible);
-    if(index>=0 && canLeave())window.AtelierMeshEdit?.add(meshMeta[index]);
+    if(index>=0 && await canLeave())window.AtelierMeshEdit?.add(meshMeta[index]);
   });
   $('viewport-mat-reset').addEventListener('click', revertEdits);
   $('viewport-back').addEventListener('click', close);
@@ -386,11 +390,11 @@ function refreshBlenderBtn() {
   const btn = $('viewport-blender-btn');
   if (btn) btn.disabled = !meshMeta.length;
 }
-function editInBlender() {
+async function editInBlender() {
   const target = meshMeta[objects.findIndex(object => object.root.visible)] || meshMeta[0];
   if (!target) return;
   if (typeof window.meshBlendExtract === 'function') {
-    close(); if ($('viewport-overlay').classList.contains('active')) return;
+    await close(); if ($('viewport-overlay').classList.contains('active')) return;
     window.meshBlendExtract(target.game_rel, target.name);
   }
   else note('Blender extraction unavailable', 'warning');
@@ -638,8 +642,8 @@ async function buildChromaPicker(skinId, meshGameRel) {
       + `${s.name === skinId ? ' — this skin' : ''} · ${s.materials} mat`
       + `${s.meshes ? `, ${s.meshes} mesh` : ', no mesh'}</option>`;
   }).join('');
-  sel.onchange = () => {
-    if (!canLeave()) { sel.value = chromaSkin || skinId; return; }
+  sel.onchange = async () => {
+    if (!(await canLeave())) { sel.value = chromaSkin || skinId; return; }
     chromaSkin = sel.value;
     $('viewport-status').textContent = `Materials: ${chromaSkin}`;
     loadMaterials(chromaSkin);
@@ -1062,6 +1066,7 @@ async function saveEdits() {
         body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
       }, project).then(r => r.json());
       if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
+      window.AtelierRoster?.rememberEditor(d.game_rel,'studio',project);
       ok++; d.colors = r.colors || d.colors.map(col => ({ ...col, rgba: submitted[name][col.name]?.slice() || col.rgba }));
       if (gen === generation && edited === draft) {
         for (const [param, rgba] of Object.entries(submitted[name])) {
@@ -1138,7 +1143,7 @@ function studioTitle(skinId, title) {
 }
 
 async function open(skinId, title) {
-  if (!canLeave()) return;
+  if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
   loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
@@ -1212,7 +1217,7 @@ async function open(skinId, title) {
 }
 
 async function openMesh(gameRel, name, skinId) {
-  if (!canLeave()) return;
+  if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
   loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
@@ -1258,8 +1263,8 @@ async function openMesh(gameRel, name, skinId) {
   }
 }
 
-function close() {
-  if (!canLeave()) return;
+async function close() {
+  if (!(await canLeave())) return;
   if (inited) clearModel();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
@@ -1305,4 +1310,8 @@ function focusPendingEdits() {
   }
 }
 
-window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits };
+function captureModPoster(context){
+  if(!inited||hasPendingEdits()||context.project!==viewportProject||!context.skin||context.skin!==(currentSkin||meshSkin))return null;
+  return inspection.cardPoster();
+}
+window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits,captureModPoster };

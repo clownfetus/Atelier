@@ -8,6 +8,15 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('/static/vendor/bricolage-grotesque/BricolageGrotesque-Latin.woff2') format('woff2');
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --md-sys-color-primary: #37639d;
@@ -62,6 +71,7 @@
   --studio-shadow: 0 12px 36px rgb(20 24 30 / 14%);
 
   --studio-font: 'Roboto', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --studio-display: 'Bricolage Grotesque', var(--studio-font);
   --studio-mono: 'Cascadia Code', ui-monospace, monospace;
   --studio-type-title: 600 20px/1.4 var(--studio-font);
   --studio-type-body: 400 14px/1.5 var(--studio-font);
@@ -72,14 +82,19 @@
   --studio-space-3: 12px;
   --studio-space-4: 16px;
   --studio-space-6: 24px;
+  --screen-dot:rgb(18 18 22 / 12%);
   --studio-shape-small: 6px;
   --studio-shape-medium: 8px;
-  --studio-shape-large: 10px;
-  --studio-shape-dialog: 12px;
+  --studio-shape-large: 6px;
+  --studio-shape-dialog: 6px;
+  --studio-workspace-gutter:var(--bg);
   --studio-shape-full: 999px;
   --studio-motion-fast: 120ms;
   --studio-motion-standard: 200ms;
+  --studio-motion-exit: 120ms;
   --studio-easing: cubic-bezier(.2, 0, 0, 1);
+  --studio-easing-exit: cubic-bezier(.3, 0, 1, 1);
+  --krackle-beat: 1040ms;
   --studio-control-height: 36px;
   --studio-icon-size: 18px;
 
@@ -110,6 +125,8 @@
 }
 
 :root[data-theme='dark'] {
+  --studio-workspace-gutter:#121216;
+  --screen-dot:rgb(238 229 207 / 13%);
   color-scheme: dark;
   --md-sys-color-primary: #98b7e2;
   --md-sys-color-on-primary: #173252;

@@ -1,16 +1,14 @@
 name: Build and verify release candidate
 on:
   push:
-    branches: [codex/release-0.4.0, 'release/*-candidate']
+    branches: ['codex/release-1.0.0', 'release/*-candidate']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 45
     env:
       PYTHONUTF8: '1'
       GH_TOKEN: ${{ github.token }}
@@ -18,23 +16,30 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt pyinstaller==6.22.3 playwright==1.64.0 setuptools
+      - name: Prepare pinned Windows compiler and build environment
+        shell: pwsh
+        run: |
+          ./scripts/bootstrap_windows.ps1 -Python (Get-Command python).Source -ToolchainDir "$env:RUNNER_TEMP/AtelierToolchain" -InstallWebView2
+          "ISCC=$env:ISCC" >> $env:GITHUB_ENV
+          "$PWD/.venv-build/Scripts" >> $env:GITHUB_PATH
+          & ./.venv-build/Scripts/python.exe -m pip install -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: python tests/run_checks.py --report-dir reports/backend
       - run: python -m playwright install chromium
-      - run: python tests/browser_smoke.py --viewer-followups-only --report-dir reports/viewer
+      - run: python tests/browser_smoke.py --report-dir reports/browser
       - run: python scripts/release_inputs.py
-      - name: Stage the Skin Swapper template from repository secrets (optional)
+      - name: Stage the Skin Swapper template from encrypted release inputs
         shell: pwsh
         env:
           GALACTA_UASSET: ${{ secrets.GALACTA_TEMPLATE_UASSET_B64 }}
           GALACTA_UEXP: ${{ secrets.GALACTA_TEMPLATE_UEXP_B64 }}
         run: |
           if (-not $env:GALACTA_UASSET -or -not $env:GALACTA_UEXP) {
-            Write-Host "Skin Swapper template secrets are not set; this build cannot export Project Galacta mods."
-            exit 0
+            throw "The complete Skin Swapper template pair is required for this release."
           }
           New-Item -ItemType Directory -Force Tools/Galacta | Out-Null
           [IO.File]::WriteAllBytes("$PWD/Tools/Galacta/GAL_ConfigTemplate.uasset", [Convert]::FromBase64String($env:GALACTA_UASSET))
@@ -46,9 +51,23 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content version -Raw).Trim()
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' Atelier.iss "/DAppVersion=$version"
+          & $env:ISCC Atelier.iss "/DAppVersion=$version"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/release_manifest.py --manifest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify the frozen WebView2 application
+        run: python tests/frozen_smoke.py --exe dist/Atelier/Atelier.exe --report-dir reports/frozen --viewer-checks --viewer-followups
+      - name: Archive the verified portable payload
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/Atelier -DestinationPath dist/Atelier-Windows-1.0.0.zip
+          python scripts/verify_portable.py --archive dist/Atelier-Windows-1.0.0.zip --manifest dist/installer-manifest.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-portable
+          path: dist/Atelier-Windows-1.0.0.zip
+          compression-level: 0
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-installer
@@ -98,9 +117,7 @@ jobs:
           path: ${{ runner.temp }}/installer-report
   linux:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -108,46 +125,35 @@ jobs:
         with:
           persist-credentials: false
       - name: Install native Linux GUI build dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb
+        run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core
       - run: python3 -m venv --system-site-packages .venv
-      - run: .venv/bin/python -m pip install --upgrade -r requirements.txt pyinstaller==6.22.3 setuptools
-      - run: .venv/bin/python tests/run_checks.py --suite test_morphs.py --suite test_packaging.py --report-dir reports/linux
+      - run: .venv/bin/python -m pip install -r requirements-build.txt
+      - run: .venv/bin/python tests/run_checks.py --report-dir reports/backend
       - run: .venv/bin/python scripts/release_inputs.py
-      - name: Stage the Skin Swapper template from repository secrets (optional)
+      - name: Stage the Skin Swapper template from encrypted release inputs
         shell: bash
         env:
           GALACTA_UASSET: ${{ secrets.GALACTA_TEMPLATE_UASSET_B64 }}
           GALACTA_UEXP: ${{ secrets.GALACTA_TEMPLATE_UEXP_B64 }}
         run: |
           if [ -z "$GALACTA_UASSET" ] || [ -z "$GALACTA_UEXP" ]; then
-            echo "Skin Swapper template secrets are not set; this build cannot export Project Galacta mods."
-            exit 0
+            echo "The complete Skin Swapper template pair is required for this release." >&2
+            exit 1
           fi
           mkdir -p Tools/Galacta
           printf '%s' "$GALACTA_UASSET" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uasset
           printf '%s' "$GALACTA_UEXP" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uexp
       - run: bash linux/build_appimage.sh
       - run: .venv/bin/python scripts/release_manifest.py
-      - name: Check native AppImage startup
+      - name: Verify native AppImage, WebKit setup and upgrade preservation
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/appimage-smoke"
-          cd "$RUNNER_TEMP/appimage-smoke"
-          "$GITHUB_WORKSPACE/dist/Atelier-$(tr -d "[:space:]" < "$GITHUB_WORKSPACE/version")-x86_64.AppImage" --appimage-extract > /dev/null
-          export ATELIER_DATA_DIR="$RUNNER_TEMP/atelier-smoke-data"
-          export ATELIER_PORT=8897
-          xvfb-run -a ./squashfs-root/usr/Atelier/Atelier --help > startup.log 2>&1 &
-          app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:8897/ > index.html; then
-              grep -q mesh-edit.js index.html
-              exit 0
-            fi
-            sleep 1
-          done
-          cat startup.log
-          exit 1
+          version="$(tr -d '[:space:]' < version)"
+          xvfb-run -a dbus-run-session -- bash -c '
+            openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+            export GTK_MODULES=gail:atk-bridge NO_AT_BRIDGE=0
+            .venv/bin/python tests/linux_appimage_smoke.py --appimage "dist/Atelier-'"$version"'-x86_64.AppImage" --source "$PWD" --previous-appimage "$RUNNER_TEMP/atelier-previous.AppImage" --report-dir "$RUNNER_TEMP/appimage-smoke"
+          '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: linux-appimage
@@ -159,4 +165,30 @@ jobs:
           name: linux-reports
           path: |
             reports
-            ${{ runner.temp }}/appimage-smoke/startup.log
+            ${{ runner.temp }}/appimage-smoke/*.json
+            ${{ runner.temp }}/appimage-smoke/*.jsonl
+            ${{ runner.temp }}/appimage-smoke/*.log
+            ${{ runner.temp }}/appimage-smoke/*.txt
+            ${{ runner.temp }}/appimage-smoke/*.png
+  bundle:
+    needs: [windows, installer, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: ${{ runner.temp }}/candidate-artifacts
+      - name: Assemble verified Windows, Linux and matching source assets
+        run: python scripts/release_bundle.py --artifacts "$RUNNER_TEMP/candidate-artifacts" --output "$RUNNER_TEMP/release"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Atelier-1.0.0-release
+          path: ${{ runner.temp }}/release
+          compression-level: 0
+          if-no-files-found: error

@@ -1,15 +1,34 @@
 // DOM integration only. Export requests, button availability and result messages stay in app.js.
 (() => {
   const runs = new WeakMap();
+  const resetting = new Set();
+  const motionQuery = window.AtelierMotionPolicy?.query() || window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  function stopResets() {
+    if (document.hidden || motionQuery?.matches) for (const dispose of [...resetting]) dispose();
+  }
+  document.addEventListener('visibilitychange', stopResets);
+  motionQuery?.addEventListener('change', stopResets);
+  window.addEventListener('pagehide', () => { for (const dispose of [...resetting]) dispose(); });
+  // Motions whose caller passed a quiet(state) predicate: while it holds (the export review's stage
+  // is drawing this job) they show still poses, and they follow the dialog as it is hidden or shown.
+  const quietMotions = new Map();
+  const quietMode = (quiet, state) => (quiet?.(state) ? 'reduce' : 'system');
+  document.addEventListener('atelier:export-review', () => {
+    for (const [motion, entry] of quietMotions) {
+      try { motion.setReducedMotion(quietMode(entry.quiet, entry.state)); } catch (_) { /* Optional presentation. */ }
+    }
+  });
 
-  function mountSlot(slot, state) {
+  function mountSlot(slot, state, quiet) {
     if (!slot || !window.AtelierMotion?.exportFeedback) return null;
     const host = slot.lastElementChild;
     try {
-      const motion = window.AtelierMotion.exportFeedback.mount(host, {state});
+      const motion = window.AtelierMotion.exportFeedback.mount(host, {state, reducedMotion: quietMode(quiet, state)});
+      if (quiet) quietMotions.set(motion, {quiet, state});
       slot.dataset.amMounted = 'true';
       const destroy = motion.destroy;
       motion.destroy = () => {
+        quietMotions.delete(motion);
         destroy();
         delete slot.dataset.amMounted;
       };
@@ -25,30 +44,61 @@
     }
   }
 
-  function begin(button, project = window.atelierProject?.()) {
+  // Settle a mounted motion into a new state, re-reading its quiet predicate first.
+  function settleMotion(motion, state) {
+    const entry = quietMotions.get(motion);
+    if (entry) { entry.state = state; motion.setReducedMotion(quietMode(entry.quiet, state)); }
+    motion.setState(state);
+  }
+
+  function begin(button, project = window.atelierProject?.(), {quiet} = {}) {
     const previous = runs.get(button);
-    if (previous) {
-      clearTimeout(previous.timer);
-      previous.motion?.destroy();
-    }
-    const run = {motion: mountSlot(button.querySelector('.am-export-feedback-slot'), 'busy'), timer: null};
+    previous?.dispose();
+    const slot = button.querySelector('.am-export-feedback-slot');
+    const run = {motion: mountSlot(slot, 'busy', quiet), timer: null, animations: [], disposed: false};
+    run.dispose = () => {
+      if (run.disposed) return;
+      run.disposed = true;
+      clearTimeout(run.timer);
+      resetting.delete(run.dispose);
+      for (const animation of run.animations) animation.cancel();
+      if (slot) delete slot.dataset.amResetting;
+      run.motion?.destroy();
+      if (runs.get(button) === run) runs.delete(button);
+    };
     runs.set(button, run);
     return state => {
       if (runs.get(button) !== run) return;
-      const reset = () => {
+      const reset = (animate = true) => {
         if (runs.get(button) !== run) return;
-        run.motion?.destroy();
-        runs.delete(button);
+        const fallback = slot?.firstElementChild, host = slot?.lastElementChild;
+        if (!animate || !run.motion || !fallback || !host || document.hidden || motionQuery?.matches ||
+            window.AtelierMotionPolicy?.allows(1) === false || !button.getClientRects().length) {
+          run.dispose(); return;
+        }
+        const finish = () => { if (runs.get(button) === run) run.dispose(); };
+        try {
+          // Keep both icons in the same fixed slot until the static download icon has arrived.
+          run.motion.setReducedMotion('reduce');
+          slot.dataset.amResetting = 'true';
+          resetting.add(run.dispose);
+          run.animations.push(host.animate([{opacity: 1}, {opacity: 0}],
+            {duration: AtelierMotion.exitMs, easing: AtelierMotion.ease.exit, fill: 'both'}));
+          run.animations.push(fallback.animate([{opacity: 0}, {opacity: 1}],
+            {duration: AtelierMotion.exitMs, easing: AtelierMotion.ease.standard, fill: 'both'}));
+          Promise.all(run.animations.map(animation => animation.finished)).then(finish, finish);
+          run.timer = setTimeout(finish, AtelierMotion.exitMs + 80);
+        } catch (_) { finish(); }
       };
       // An old project's result belongs to its toast, not the newly selected project's button.
-      if (project !== window.atelierProject?.()) { reset(); return; }
-      run.motion?.setState(state);
+      if (project !== window.atelierProject?.()) { reset(false); return; }
+      if (run.motion) settleMotion(run.motion, state);
       clearTimeout(run.timer);
-      run.timer = setTimeout(reset, 1800);
+      run.timer = setTimeout(() => reset(), 1800);
     };
   }
 
-  function toast(msg, type, duration, state) {
+  function toast(msg, type, duration, state, {quiet} = {}) {
     const el = document.createElement('div');
     el.className = `toast am-export-feedback-toast ${type}`;
     el.setAttribute('role', 'status'); el.setAttribute('aria-atomic', 'true');
@@ -67,7 +117,7 @@
     el.append(slot, label);
     document.getElementById('toast-area').appendChild(el);
     window.AtelierIcons?.createIcons({nodes: [slot]});
-    let motion = mountSlot(slot, state);
+    let motion = mountSlot(slot, state, quiet);
 
     let disposed = false, timer = null, remaining = duration, start = Date.now();
     const remove = el.remove.bind(el);
@@ -75,8 +125,11 @@
       if (disposed) return;
       disposed = true;
       clearTimeout(timer);
-      motion?.destroy();
-      remove();
+      // Effects stop now; the glyph holds its still pose while the toast fades, then goes with it.
+      try { motion?.setReducedMotion('reduce'); } catch (_) { /* Destroyed below. */ }
+      const finish = () => { motion?.destroy(); remove(); };
+      try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, finish); return; } } catch (_) { /* Fall through. */ }
+      finish();
     }
     // Existing _runInstall's t.remove(), click and timeout share one cleanup path.
     el.remove = dispose;
@@ -102,7 +155,7 @@
       label.textContent = message; state = outcome; duration = ms;
       el.className = `toast am-export-feedback-toast ${outcome === 'error' ? 'warning' : outcome}`;
       el.dataset.operationState = outcome;
-      try { motion?.setState(outcome); }
+      try { if (motion) settleMotion(motion, outcome); }
       catch (_) { try { motion?.destroy(); } catch (_) {} motion=null; delete slot.dataset.amMounted; }
       const fallback = slot.firstElementChild;
       fallback?.remove();

@@ -1,29 +1,44 @@
 # Atelier: Modding Studio
 
-Atelier is a desktop modding studio for Marvel Rivals. Browse game assets, edit
-textures and material parameters, preview models, and build mods from one interface.
+**Atelier 1.0** brings the Marvel Rivals modding workflow together: find heroes
+and assets, edit materials and textures, inspect models, and review your mod
+before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
+· [What's new in 1.0](docs/release-1.0.0.md)
 · [Development guide](DEVELOPMENT.md)
-· [Changelog](CHANGELOG.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier asset library in dark mode, with category folders, search, filters and edited assets](images/studio-dark.png)
+![Atelier 1.0 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-Screenshots show the current source interface with example data. The published
-installer can contain an earlier interface until a new release is published.
-See [screenshot details](images/README.md).
+## What's new in 1.0
 
-**Atelier 0.4.1** lets a material use your own images in its texture slots
-(experimental), fixes mesh editing in Blender, explains Model Studio load failures
-and brings the Krackle design language to Atelier's feedback. It builds on 0.4's
-redesigned Model Studio and model replacement. See the
-[release notes](docs/release-0.4.1.md) for details and verification.
+- **Find your next edit faster.** Home opens with hero portraits and costume
+  lists. Search Everywhere across heroes, skins, folders and assets, or narrow
+  the search to This folder. Continue editing reopens your latest project edit.
+- **Swap a whole material.** Search installed materials by character, skin, name
+  or path, use one on another asset, and restore the target's game defaults.
+- **Present your work.** Model Studio's Inspect and Showcase views offer
+  editable previews and cel-lit presentation. Create posters and turntables;
+  completed builds can produce a shareable Mod card.
+- **Recover deleted edits.** Project trash keeps deleted edits and export
+  options together. Undo is available immediately, with seven days of recovery.
+- **Make Atelier yours.** The latest Krackle A logo, comic-inspired surfaces,
+  readable result captions, new palettes and a Full / Calm / Off motion dial.
+  Optional formation sounds start off; system reduced-motion settings take
+  precedence.
+- **Start and build with clearer guidance.** Three-step setup, progress tied to
+  actual work, a Mod tray for edits, and a review before Build mod. A slow update
+  service no longer holds up launch.
+
+The app and download files use **1.0.0**. See the [release notes](docs/release-1.0.0.md)
+for verification and platform limits. Screenshots show the actual interface with
+an isolated, configured game installation; [capture details](images/README.md).
 
 ## Features
 
 - **Find assets:** character and skin names, current-folder search by name, ID or
-  path, type/status filters, sorting, adjustable tile sizes and pinned folders.
+  path, Everywhere search, type/status filters, sorting, adjustable tile sizes and pinned folders.
 - **Edit materials:** grouped color, dye-region and scalar parameters, explicit
   unsaved changes, comparison with saved values or the original game material,
   and individual value restoration.
@@ -52,11 +67,26 @@ redesigned Model Studio and model replacement. See the
 
 </details>
 
+## Model Studio and Showcase
+
+Inspect a model with material picking, lighting controls, original/edited
+comparison, and a before/after wipe. Switch to **Showcase** for cel lighting and
+a skin-colour dot backdrop. Returning to **Inspect** restores the editable
+materials; presentation does not save material changes.
+
+![Model Studio inspecting Magik from an isolated game installation](images/model-studio.png)
+
+![The same model in Showcase presentation](images/showcase.png)
+
+A completed build's **Mod card** records its actual asset counts and version/date.
+Copy the image or save a PNG. Cards use a matching loaded Showcase capture, or
+clearly labelled catalogue artwork when a capture is unavailable.
+
 ## Material editing
 
 ### Process S maps
 
-Click **Process S maps** under **Edited Assets** to process every imported texture
+Click **Process S maps** under **Mod tray** to process every imported texture
 whose name ends in `_D`. The export checkboxes and library filters do not limit
 this action. Matching uses the same game folder and the corresponding `_S` name;
 numbered D maps can share an unnumbered S map, with a pairing chooser whenever
@@ -69,7 +99,7 @@ is retained and transparent D pixels mask the color change. Photoshop is not
 required. The blend follows the [standard non-separable Color formula](https://www.w3.org/TR/compositing-1/#blendingcolor),
 rather than relying on a native Photoshop document or its color-profile settings.
 
-Processed S maps appear in Edited Assets for normal export. Activity lists the
+Processed S maps appear in Mod tray for normal export. Activity lists the
 pairings and skipped paths. Original S inputs and a batch record are retained
 inside the project's `.atelier/s-map-backups/` directory. Cancellation and failures
 before publication leave project images untouched; a failed publication rolls
@@ -83,13 +113,34 @@ save when ready. New edits made during a save remain marked as unsaved.
 
 ![Material editor showing color and dye-region groups, scalar parameters and saved-value comparisons](images/material-editor.png)
 
+### Replace a material
+
+Open the target material and expand **Replace material**. Search by character,
+skin, asset name or path, select a result (or paste its `/Game/Marvel/…` path),
+then click **Use this material**. Character and skin names use the installed
+reference table. The replacement saves immediately; export the target material
+through the Mod tray as usual.
+
+The donor's parent, textures, static switches and cooked shader data are kept,
+while the target keeps its package path and name. Donor project edits are not
+copied. You can edit the replacement's exposed parameters and texture slots.
+**Restore game defaults** restores the target's original material and removes
+custom texture assignments. Failed reads or publication preserve saved edits.
+
+This supports installed `MI_` material instances in the main game content, rather
+than arbitrary uploaded JSON. A source that inherits from the target is refused
+to prevent a circular parent chain. UVs, vertex colors and character-specific
+shader inputs can change the appearance on another model; animated shaders are
+not fully represented in the preview. Native container readback is verified;
+in-game appearance still needs checking.
+
 ## Appearance
 
 Open **Menu → Settings → Appearance** to choose a mode and palette. Use **Custom**
 to change the background, foreground, surface and accent, then name and save the
 palette to reuse it. Appearance is also available during first-run configuration.
 
-![Appearance settings showing dark mode, palette presets and editable custom colors](images/appearance-settings.png)
+![Appearance settings with palette presets and the Full, Calm and Off motion dial](images/appearance-settings.png)
 
 ## Installation
 
@@ -98,8 +149,9 @@ palette to reuse it. Appearance is also available during first-run configuration
 1. Download **AtelierSetup.exe** from the
    [latest official release](https://github.com/clownfetus/Atelier/releases/latest).
 2. Run the installer, then launch Atelier.
-3. In **Initial Configuration**, select your Marvel Rivals installation folder
-   and provide the current USMAP mapping and AES key when requested. The
+3. Follow **Find the game → Unlock the paks → Make it yours**. Select your
+   Marvel Rivals folder and provide a current USMAP mapping and AES key if
+   automatic retrieval is unavailable. The
    [Help section](#help) has links if automatic retrieval is unavailable.
 4. In **Menu → Settings**, choose your mods folder to enable **Copy to ~mods/**.
 
@@ -130,18 +182,35 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Basic workflow
 
+On first run, Find the game and Unlock the paks validate your installation before
+Make it yours offers palettes and motion. Key/mapping retrieval has manual
+fallbacks. Menu → Settings keeps the full configuration form.
+
 1. Create or open a project. The project button beside the Atelier logo shows
    the open project and its edit count; click it to switch projects.
 2. Browse to the assets you want to change. Edit material parameters or
    right-click a texture to replace it with an external image.
-3. Select the assets to include under **Edited Assets** and enter a mod filename.
+3. Select the assets to include under **Mod tray** and enter a mod filename.
    Enable **Copy to ~mods/** to install into your configured mods folder. Optional
    **Password Protect** uses the protection password from Settings.
-4. Click **Export Mod**, review the included assets and destination, then confirm.
+4. Click **Build mod**, review the included assets and destination, then confirm.
 
 Open **Activity** to review job progress and results or cancel work before file
 publication. Interrupted work is recorded after reopening and does not restart
 automatically.
+
+Deleting edits moves their files and export options into that project's trash.
+Choose **Undo** within 10 seconds to restore the batch; hovering pauses the toast.
+Shift-click Delete skips the prompt and keeps Undo available. Trash is kept for
+7 days, up to 20 batches, and is excluded from mods and project archives.
+Deleting an entire project remains permanent and asks for confirmation.
+
+Home leads with hero portraits, costume/edit counts and All / Edited / Recently
+opened filters. Costume buttons open Model Studio, or their folder when no mesh
+is available. **Continue editing** reopens the latest project edit in its editor.
+The search field defaults to **Everywhere**, grouping heroes, costumes, folders
+and assets. Switch to **This folder** for local filtering; arrow keys and Enter
+navigate global results, and Escape closes them.
 
 Use **Bulk VFX / curves** to preview a multiplier or RGB replacement across
 supported assets in the selection or current folder. RGB edits preserve alpha.
@@ -154,10 +223,10 @@ Atelier can export an edited character mesh as a mod for Project Galacta's
 Skin Swapper, which its Companion App then loads.
 
 1. Edit a skin's mesh in Blender or replace it with **Replace model…** using your
-   own BLEND, FBX, GLB or PSK file, then select it under **Edited Assets**.
+   own BLEND, FBX, GLB or PSK file, then select it under **Mod tray**.
 2. Set the mod filename. It becomes the Galacta folder name, so use letters,
    digits and underscores only.
-3. Click **Export Mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
+3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
    and skin come from the mesh and cannot be changed. Enter the skin name and
    author, and pick a form for multi-form heroes (Form 0 is the default).
 4. Click **Build Skin Swapper mod**, then add the mod in the Companion App.

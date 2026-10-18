@@ -32,11 +32,11 @@
     AtelierJobDialogs.trap(overlay,panel,hide);
     window.addEventListener('atelier-job',event=>{const job=event.detail;if(busy&&job.kind==='mesh-replace')status.textContent=job.stage;});
   }
-  function open(target){
+  async function open(target){
     if(!overlay)init();
     if(busy){overlay.classList.add('active');panel.focus();return;}
     if(AtelierViewport?.hasPendingEdits()){AtelierViewport.focusPendingEdits();toast('Save or revert the current recolours before replacing a model.','warning');return;}
-    AtelierViewport?.close();
+    await AtelierViewport?.close();
     if(document.querySelector('#viewport-overlay.active'))return;
     opener=document.activeElement;item=target;title.textContent='Replace '+(target.name||'model');description.textContent=target.game_rel;
     for(const control of Object.values(importControls))control.checked=true;

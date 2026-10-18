@@ -74,7 +74,7 @@ def run_material_workflow_checks(page, context, url, report, checks):
         tab.goto(url)
         tab.wait_for_function('window.atelierProject?.() && window.__materialWorkflowViewport')
         open_editor()
-        assert tab.locator('.mat-parameter-group summary').all_text_contents() == ['Surface colors1', 'Dye region 22', 'Scalar parameters1']
+        assert tab.locator('.mat-parameter-group:not(#mat-replacement) summary').all_text_contents() == ['Surface colors1', 'Dye region 22', 'Scalar parameters1']
         assert tab.evaluate('materialDirtyCount()') == 0
         assert 'Saved:' in tab.locator('#matrow0 .mat-reference').inner_text()
         tab.locator('#msn0').fill('.6')
@@ -101,14 +101,12 @@ def run_material_workflow_checks(page, context, url, report, checks):
         checks.append('Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft')
 
         tab.evaluate("matScalar(0, '.6', false)")
-        dismiss = lambda dialog: dialog.dismiss()
-        tab.on('dialog', dismiss)
         tab.locator('#mat-close').click()
+        tab.locator('#atelier-confirm-cancel').click()
         assert tab.locator('#material-overlay').evaluate("el=>el.classList.contains('active')")
         assert tab.evaluate("() => {const e=new Event('beforeunload',{cancelable:true}); window.dispatchEvent(e); return e.defaultPrevented;}")
-        tab.remove_listener('dialog', dismiss)
-        tab.once('dialog', lambda dialog: dialog.accept())
         tab.locator('#mat-close').click()
+        tab.locator('#atelier-confirm-ok').click()
         assert tab.evaluate('matEditor') is None
         open_editor('MI_Unavailable')
         behavior['original'] = 'fail'

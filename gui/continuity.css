@@ -20,7 +20,7 @@
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 ::view-transition { pointer-events:none; }
 ::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2,0,0,1); }
-::view-transition-old(atelier-grid) { animation: library-grid-out 120ms ease both; }
+::view-transition-old(atelier-grid) { animation: library-grid-out var(--studio-motion-exit) var(--studio-easing-exit) both; }
 ::view-transition-new(atelier-grid) { animation: library-grid-in 160ms cubic-bezier(.2,0,0,1) both; }
 :root[data-library-direction="back"] { --library-entry: -8px; }
 :root[data-library-direction="forward"] { --library-entry: 8px; }
@@ -30,8 +30,8 @@
 /* Native display transitions keep a closing overlay painted for its 120ms exit.
    Engines without discrete transitions retain the existing immediate close. */
 @supports (transition-behavior: allow-discrete) {
-  .overlay { opacity: 0; transition: opacity 120ms ease, display 120ms allow-discrete; }
-  .overlay.active { opacity: 1; }
+  .overlay { opacity: 0; transition: opacity var(--studio-motion-exit) var(--studio-easing-exit), display var(--studio-motion-exit) allow-discrete; }
+  .overlay.active { opacity: 1; transition-timing-function: var(--studio-easing), linear; }
   .overlay:not(.active) { pointer-events: none; }
   @starting-style { .overlay.active { opacity: 0; } }
 }

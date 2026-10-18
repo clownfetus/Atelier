@@ -11,11 +11,12 @@
 
   var VALID_STATES = new Set(['idle', 'busy', 'success', 'warning', 'error']);
 
-  var EASE_STANDARD = 'cubic-bezier(0.2, 0, 0, 1)';
-  var EASE_FALL = 'cubic-bezier(0.55, 0, 1, 0.45)';
-  var EASE_RISE = 'cubic-bezier(0, 0.55, 0.45, 1)';
-  var BUSY_DURATION_MS = 1040;
-  var POP_DURATION_MS = 420;
+  var EASE_STANDARD = window.AtelierMotion.ease.standard;
+  var EASE_FALL = window.AtelierMotion.ease.fall;
+  var EASE_RISE = window.AtelierMotion.ease.rise;
+  var EASE_SWAY = window.AtelierMotion.ease.sway;
+  var BUSY_DURATION_MS = window.AtelierMotion.beatMs;
+  var POP_DURATION_MS = 380;
   var CRACK_DURATION_MS = 620;
   var SPLAT_DURATION_MS = 560;
   var DIZZY_DURATION_MS = 1100;
@@ -33,7 +34,7 @@
   });
 
   // krackle-art:export-feedback:begin
-  var SVG_MARKUP = '<svg xmlns="http://www.w3.org/2000/svg" class="am-export-feedback-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor"><g class="am-export-feedback-idle"><g class="am-export-feedback-tray"><path class="am-export-feedback-energy am-export-feedback-well" d="M5.7 17.4 H18.3 A1.7 1.7 0 0 1 18.3 20.8 H5.7 A1.7 1.7 0 0 1 5.7 17.4 Z" /><circle class="am-export-feedback-hole" cx="8.2" cy="19.1" r="0.85" /><circle class="am-export-feedback-hole" cx="15.6" cy="19.1" r="0.6" /></g><g class="am-export-feedback-drop-group"><path class="am-export-feedback-energy am-export-feedback-drop" d="M12 2.6 C13.55 5.88 15.7 8.11 15.7 10.4 A3.7 3.7 0 1 1 8.3 10.4 C8.3 8.11 10.45 5.88 12 2.6 Z" /><circle class="am-export-feedback-hole" cx="13.1" cy="11.3" r="1.25" /></g></g><g class="am-export-feedback-busy"><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-0" cx="12" cy="3.8" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-1" cx="19.1" cy="7.9" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-2" cx="19.1" cy="16.1" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-3" cx="12" cy="20.2" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-4" cx="4.9" cy="16.1" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-5" cx="4.9" cy="7.9" r="2.15" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-0" cx="12" cy="3.8" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-1" cx="19.1" cy="7.9" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-2" cx="19.1" cy="16.1" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-3" cx="12" cy="20.2" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-4" cx="4.9" cy="16.1" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-5" cx="4.9" cy="7.9" r="1.05" /></g><g class="am-export-feedback-outcome am-export-feedback-outcome-success"><path class="am-export-feedback-energy am-export-feedback-burst" d="M22.98 14.23 L17.57 15.15 L19.57 20.25 L14.66 17.82 L13.28 23.13 L10.73 18.27 L6.49 21.75 L7.28 16.33 L1.81 16.65 L5.64 12.73 L1.02 9.77 L6.43 8.85 L4.43 3.75 L9.34 6.18 L10.72 0.87 L13.27 5.73 L17.51 2.25 L16.72 7.67 L22.19 7.35 L18.36 11.27 Z" /><circle class="am-export-feedback-hole am-export-feedback-burst-hole" cx="12.6" cy="12.4" r="2.35" /><g class="am-export-feedback-flecks"><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="16.51" cy="3.52" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="20.31" cy="16.8" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="7.49" cy="20.48" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="3.52" cy="7.49" r="1.05" /></g></g><g class="am-export-feedback-outcome am-export-feedback-outcome-warning"><g class="am-export-feedback-ring"><path class="am-export-feedback-arc" d="M11.61 17.99 A7.2 7.2 0 1 1 18.67 13.51" /><circle class="am-export-feedback-hole am-export-feedback-arc-hole" cx="5.05" cy="9.15" r="1.2" /></g><g class="am-export-feedback-chunk"><circle class="am-export-feedback-energy" cx="17.4" cy="20.9" r="2.2" /><circle class="am-export-feedback-hole" cx="17.9" cy="21.2" r="0.75" /></g></g><g class="am-export-feedback-outcome am-export-feedback-outcome-error"><g class="am-export-feedback-splat"><circle class="am-export-feedback-energy" cx="12" cy="12" r="5.52" /><circle class="am-export-feedback-energy" cx="7.92" cy="13.92" r="3.12" /><circle class="am-export-feedback-energy" cx="15.84" cy="9.6" r="3.12" /><circle class="am-export-feedback-energy" cx="14.88" cy="15.6" r="2.64" /><circle class="am-export-feedback-energy" cx="9.6" cy="8.4" r="2.4" /><circle class="am-export-feedback-hole" cx="12.48" cy="11.76" r="2.16" /><circle class="am-export-feedback-hole" cx="8.4" cy="13.68" r="1.08" /></g><g class="am-export-feedback-sats"><circle class="am-export-feedback-energy am-export-feedback-sat" cx="2.4" cy="7.68" r="1.44" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="22.08" cy="14.4" r="1.32" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="4.8" cy="20.16" r="1.2" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="19.92" cy="3.36" r="1.2" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="20.64" cy="20.64" r="0.96" /></g><g class="am-export-feedback-drip"><path class="am-export-feedback-drip-line" d="M8.64 16.32 V20.64" /><circle class="am-export-feedback-energy" cx="8.64" cy="21.6" r="1.68" /></g><g class="am-export-feedback-dizzy"><circle class="am-export-feedback-energy" cx="7.6" cy="3.3" r="1.45" /><circle class="am-export-feedback-hole" cx="7.9" cy="3.4" r="0.62" /></g></g></svg>';
+  var SVG_MARKUP = '<svg xmlns="http://www.w3.org/2000/svg" class="am-export-feedback-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor"><g class="am-export-feedback-idle"><g class="am-export-feedback-tray"><path class="am-export-feedback-energy am-export-feedback-well" d="M5.7 17.4 H18.3 A1.7 1.7 0 0 1 18.3 20.8 H5.7 A1.7 1.7 0 0 1 5.7 17.4 Z" /><circle class="am-export-feedback-hole" cx="8.2" cy="19.1" r="0.85" /><circle class="am-export-feedback-hole" cx="15.6" cy="19.1" r="0.6" /></g><g class="am-export-feedback-drop-group"><path class="am-export-feedback-energy am-export-feedback-drop" d="M12 2.6 C13.55 5.88 15.7 8.11 15.7 10.4 A3.7 3.7 0 1 1 8.3 10.4 C8.3 8.11 10.45 5.88 12 2.6 Z" /><circle class="am-export-feedback-hole" cx="13.1" cy="11.3" r="1.25" /></g></g><g class="am-export-feedback-fall"><path class="am-export-feedback-energy" d="M12 1 C13.89 5.62 16.5 9.21 16.5 12 A4.5 4.5 0 1 1 7.5 12 C7.5 9.21 10.11 5.62 12 1 Z" /><circle class="am-export-feedback-hole" cx="13" cy="13" r="1.4" /></g><g class="am-export-feedback-busy"><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-0" cx="12" cy="3.8" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-1" cx="19.1" cy="7.9" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-2" cx="19.1" cy="16.1" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-3" cx="12" cy="20.2" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-4" cx="4.9" cy="16.1" r="2.15" /><circle class="am-export-feedback-energy am-export-feedback-dot am-export-feedback-dot-5" cx="4.9" cy="7.9" r="2.15" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-0" cx="12" cy="3.8" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-1" cx="19.1" cy="7.9" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-2" cx="19.1" cy="16.1" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-3" cx="12" cy="20.2" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-4" cx="4.9" cy="16.1" r="1.05" /><circle class="am-export-feedback-hole am-export-feedback-dot-hole am-export-feedback-dot-hole-5" cx="4.9" cy="7.9" r="1.05" /></g><g class="am-export-feedback-outcome am-export-feedback-outcome-success"><path class="am-export-feedback-energy am-export-feedback-burst" d="M22.98 14.23 L17.57 15.15 L19.57 20.25 L14.66 17.82 L13.28 23.13 L10.73 18.27 L6.49 21.75 L7.28 16.33 L1.81 16.65 L5.64 12.73 L1.02 9.77 L6.43 8.85 L4.43 3.75 L9.34 6.18 L10.72 0.87 L13.27 5.73 L17.51 2.25 L16.72 7.67 L22.19 7.35 L18.36 11.27 Z" /><circle class="am-export-feedback-hole am-export-feedback-burst-hole" cx="12.6" cy="12.4" r="2.35" /><g class="am-export-feedback-flecks"><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="16.51" cy="3.52" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="20.31" cy="16.8" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="7.49" cy="20.48" r="1.05" /><circle class="am-export-feedback-energy am-export-feedback-fleck" cx="3.52" cy="7.49" r="1.05" /></g></g><g class="am-export-feedback-outcome am-export-feedback-outcome-warning"><g class="am-export-feedback-ring"><path class="am-export-feedback-arc" d="M11.61 17.99 A7.2 7.2 0 1 1 18.67 13.51" /><circle class="am-export-feedback-hole am-export-feedback-arc-hole" cx="5.05" cy="9.15" r="1.2" /></g><g class="am-export-feedback-chunk"><circle class="am-export-feedback-energy" cx="17.4" cy="20.9" r="2.2" /><circle class="am-export-feedback-hole" cx="17.9" cy="21.2" r="0.75" /></g></g><g class="am-export-feedback-outcome am-export-feedback-outcome-error"><g class="am-export-feedback-splat"><circle class="am-export-feedback-energy" cx="12" cy="12" r="5.52" /><circle class="am-export-feedback-energy" cx="7.92" cy="13.92" r="3.12" /><circle class="am-export-feedback-energy" cx="15.84" cy="9.6" r="3.12" /><circle class="am-export-feedback-energy" cx="14.88" cy="15.6" r="2.64" /><circle class="am-export-feedback-energy" cx="9.6" cy="8.4" r="2.4" /><circle class="am-export-feedback-hole" cx="12.48" cy="11.76" r="2.16" /><circle class="am-export-feedback-hole" cx="8.4" cy="13.68" r="1.08" /></g><g class="am-export-feedback-sats"><circle class="am-export-feedback-energy am-export-feedback-sat" cx="2.4" cy="7.68" r="1.44" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="22.08" cy="14.4" r="1.32" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="4.8" cy="20.16" r="1.2" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="19.92" cy="3.36" r="1.2" /><circle class="am-export-feedback-energy am-export-feedback-sat" cx="20.64" cy="20.64" r="0.96" /></g><g class="am-export-feedback-drip"><path class="am-export-feedback-drip-line" d="M8.64 16.32 V20.64" /><circle class="am-export-feedback-energy" cx="8.64" cy="21.6" r="1.68" /></g><g class="am-export-feedback-dizzy"><circle class="am-export-feedback-energy" cx="7.6" cy="3.3" r="1.45" /><circle class="am-export-feedback-hole" cx="7.9" cy="3.4" r="0.62" /></g></g></svg>';
   // krackle-art:export-feedback:end
 
   function px(value) {
@@ -99,6 +100,8 @@
       return motionUnavailable || reducedPref === 'reduce' || Boolean(mql && mql.matches);
     }
 
+    // Decorative follow-through (flecks, the dazed orbit) is Full only; Calm keeps the state change.
+    function decorative() { return !window.AtelierMotionPolicy || window.AtelierMotionPolicy.allows(2); }
     function isDocumentHidden() {
       return Boolean(typeof document !== 'undefined' && document.hidden);
     }
@@ -114,6 +117,7 @@
     var svgEl = q('.am-export-feedback-svg');
     var idleGroup = q('.am-export-feedback-idle');
     var dropGroup = q('.am-export-feedback-drop-group');
+    var fallingDrop=q('.am-export-feedback-fall');
     var trayGroup = q('.am-export-feedback-tray');
     var busyGroup = q('.am-export-feedback-busy');
     var dots = qa('.am-export-feedback-dot');
@@ -127,7 +131,7 @@
     var sats = qa('.am-export-feedback-sat');
     var drip = q('.am-export-feedback-drip');
     var dizzy = q('.am-export-feedback-dizzy');
-    var animatedNodes = [idleGroup, dropGroup, trayGroup, busyGroup, burst, burstHole, ring, chunk, splat, drip, dizzy]
+    var animatedNodes = [idleGroup, dropGroup,fallingDrop, trayGroup, busyGroup, burst, burstHole, ring, chunk, splat, drip, dizzy]
       .concat(dots, dotHoles, flecks, sats);
 
     function cancelActiveAnimations() {
@@ -206,44 +210,44 @@
 
     function playSuccess() {
       trackAnimation(burst, [
-        { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0 },
-        { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.52 },
-        { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.76 },
+        { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
+        { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+        { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
         { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
-      ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
+      ], { duration: POP_DURATION_MS, easing: 'linear' });
       trackAnimation(burstHole, [
         { transform: 'scale(0)', offset: 0 },
-        { transform: 'scale(0)', offset: 0.42 },
-        { transform: 'scale(1.35)', offset: 0.72 },
+        { transform: 'scale(0)', offset: 0.36, easing: EASE_STANDARD },
+        { transform: 'scale(1.35)', offset: 0.64, easing: EASE_SWAY },
         { transform: 'scale(1)', offset: 1 }
-      ], { duration: POP_DURATION_MS, easing: EASE_STANDARD });
-      for (var i = 0; i < flecks.length; i++) {
+      ], { duration: POP_DURATION_MS, easing: 'linear' });
+      for (var i = 0; decorative() && i < flecks.length; i++) {
         var d = centreOffset(flecks[i], 12, 12);
         trackAnimation(flecks[i], [
-          { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0 },
+          { transform: 'translate(' + px(-d[0] * 0.8) + ', ' + px(-d[1] * 0.8) + ') scale(0.3)', opacity: 0, offset: 0, easing: EASE_STANDARD },
           { opacity: 1, offset: 0.25 },
-          { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.6 },
+          { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.55, easing: EASE_FALL },
           { transform: 'translate(' + px(d[0] * 0.25) + ', ' + px(d[1] * 0.25) + ') scale(0)', opacity: 0, offset: 1 }
-        ], { duration: POP_DURATION_MS + 40, easing: EASE_STANDARD });
+        ], { duration: POP_DURATION_MS + 40, easing: 'linear' });
       }
     }
 
     function playWarning() {
       // The ring stamps down, then the broken-off chunk drops out and bounces twice.
       trackAnimation(ring, [
-        { transform: 'scale(1.3)', opacity: 0, offset: 0 },
-        { transform: 'scale(0.93)', opacity: 1, offset: 0.42 },
-        { transform: 'scale(1.03)', opacity: 1, offset: 0.7 },
+        { transform: 'scale(1.3)', opacity: 0, offset: 0, easing: EASE_FALL },
+        { transform: 'scale(0.93)', opacity: 1, offset: 0.3, easing: EASE_STANDARD },
+        { transform: 'scale(1.03)', opacity: 1, offset: 0.6, easing: EASE_SWAY },
         { transform: 'scale(1)', opacity: 1, offset: 1 }
-      ], { duration: 380, easing: EASE_STANDARD });
+      ], { duration: 380, easing: 'linear' });
       var from = 'translate(' + px(CHUNK_FROM[0]) + ', ' + px(CHUNK_FROM[1]) + ')';
       trackAnimation(chunk, [
         { transform: from, offset: 0 },
-        { transform: from, offset: 0.3, easing: EASE_FALL },
-        { transform: 'translate(0px, 0px)', offset: 0.62, easing: EASE_RISE },
-        { transform: 'translate(0px, -1.6px)', offset: 0.74, easing: EASE_FALL },
-        { transform: 'translate(0px, 0px)', offset: 0.86, easing: EASE_RISE },
-        { transform: 'translate(0px, -0.5px)', offset: 0.93, easing: EASE_FALL },
+        { transform: from, offset: 0.18, easing: EASE_FALL },
+        { transform: 'translate(0px, 0px)', offset: 0.56, easing: EASE_RISE },
+        { transform: 'translate(0px, -1.6px)', offset: 0.7, easing: EASE_FALL },
+        { transform: 'translate(0px, 0px)', offset: 0.84, easing: EASE_RISE },
+        { transform: 'translate(0px, -0.5px)', offset: 0.92, easing: EASE_FALL },
         { transform: 'translate(0px, 0px)', offset: 1 }
       ], { duration: CRACK_DURATION_MS, easing: 'linear' });
     }
@@ -251,29 +255,29 @@
     function playError() {
       // Squeezed to a point, then flung out into a splat that drips; one bubble is left dazed.
       trackAnimation(splat, [
-        { transform: 'scale(0.5)', opacity: 0, offset: 0 },
-        { transform: 'scale(0.26)', opacity: 1, offset: 0.2 },
-        { transform: 'scale(1.2)', opacity: 1, offset: 0.52 },
-        { transform: 'scale(0.95)', opacity: 1, offset: 0.74 },
+        { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY },
+        { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
+        { transform: 'scale(1.2)', opacity: 1, offset: 0.48, easing: EASE_SWAY },
+        { transform: 'scale(0.95)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
         { transform: 'scale(1)', opacity: 1, offset: 1 }
-      ], { duration: SPLAT_DURATION_MS - 40, easing: EASE_STANDARD });
+      ], { duration: SPLAT_DURATION_MS - 40, easing: 'linear' });
       for (var i = 0; i < sats.length; i++) {
         var d = centreOffset(sats[i], 12, 12);
         var start = 'translate(' + px(-d[0]) + ', ' + px(-d[1]) + ') scale(0.3)';
         trackAnimation(sats[i], [
           { transform: start, opacity: 0, offset: 0 },
-          { transform: start, opacity: 0, offset: 0.24 },
-          { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.6 },
+          { transform: start, opacity: 0, offset: 0.26, easing: EASE_STANDARD },
+          { transform: 'translate(' + px(d[0] * 0.12) + ', ' + px(d[1] * 0.12) + ') scale(1.2)', opacity: 1, offset: 0.55, easing: EASE_SWAY },
           { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
-        ], { duration: SPLAT_DURATION_MS, easing: EASE_STANDARD });
+        ], { duration: SPLAT_DURATION_MS, easing: 'linear' });
       }
       trackAnimation(drip, [
         { transform: 'scaleY(0)', offset: 0 },
-        { transform: 'scaleY(0)', offset: 0.45 },
-        { transform: 'scaleY(1.15)', offset: 0.82 },
+        { transform: 'scaleY(0)', offset: 0.45, easing: EASE_FALL },
+        { transform: 'scaleY(1.15)', offset: 0.8, easing: EASE_STANDARD },
         { transform: 'scaleY(1)', offset: 1 }
-      ], { duration: 640, easing: EASE_STANDARD });
-      trackAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
+      ], { duration: 640, easing: 'linear' });
+      if (decorative()) trackAnimation(dizzy, orbitFrames(DIZZY_ORBIT), {
         duration: DIZZY_DURATION_MS,
         delay: 260,
         fill: 'backwards',
@@ -320,6 +324,10 @@
         resetInlineStyles();
       } else if (currentState === 'busy') {
         startBusyLoop();
+        if(host.closest('#install-btn')&&!isReducedMotion()&&!isDocumentHidden()&&window.AtelierMotionPolicy?.allows(2)) {
+          trackAnimation(fallingDrop,[{transform:'translateY(-32px) scale(.7)',opacity:1},{transform:'translateY(0) scale(1)',opacity:1,offset:.94},{transform:'scale(1.3,.5)',opacity:0}],{duration:420,easing:EASE_FALL});
+          trackAnimation(busyGroup,[{opacity:0},{opacity:1}],{duration:120,delay:420,fill:'backwards'});
+        }
       } else {
         playTerminalTransition(currentState, prevState);
       }

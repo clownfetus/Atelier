@@ -68,8 +68,15 @@ def main():
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
     parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
+    parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
+    parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
+    parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
+    parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
+    parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
+    parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
+    parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -114,7 +121,7 @@ def main():
         try:
             with sync_playwright() as pw:
                 browser = pw.chromium.launch()
-                context = browser.new_context(viewport={'width': 1400, 'height': 900})
+                context = browser.new_context(viewport={'width': 1400, 'height': 900}, reduced_motion='no-preference')
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
                 page = context.new_page()
@@ -152,12 +159,48 @@ def main():
                 from startup_update_checks import run_startup_update_checks
                 run_startup_update_checks(context, url, report, checks)
 
+                if args.showcase_only:
+                    from showcase_checks import run_showcase_checks
+                    run_showcase_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
+
+                if args.surfaces_only:
+                    from surfaces_checks import run_surfaces_checks
+                    run_surfaces_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
+
+                if args.inks_dial_only:
+                    from inks_dial_checks import run_inks_dial_checks
+                    run_inks_dial_checks(page,context,url,report,checks)
+                    assert not errors,errors
+                    (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close();return
+
                 if args.review_followups_only:
                     from review_followup_checks import run_review_followup_checks
                     run_review_followup_checks(context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.material_replacement_only:
+                    from material_replacement_checks import run_material_replacement_checks
+                    from material_workflow_checks import run_material_workflow_checks
+                    run_material_replacement_checks(page, context, url, report, checks)
+                    run_material_workflow_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
                     browser.close()
                     return
 
@@ -168,6 +211,35 @@ def main():
                     (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks:print('PASS '+check)
                     browser.close();return
+
+                if args.trust_only:
+                    from trust_checks import run_trust_checks
+                    run_trust_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.find_only:
+                    from find_checks import run_find_checks
+                    run_find_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.library_only:
+                    from find_checks import run_find_checks
+                    from library_pins_checks import run_library_pins_checks
+                    from library_workflow_checks import run_library_workflow_checks
+                    for check in (run_find_checks,run_library_pins_checks,run_library_workflow_checks):check(page,context,url,report,checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:print('PASS '+check)
+                    browser.close()
+                    return
 
                 if args.polish_only:
                     from polish_checks import run_polish_checks
@@ -238,6 +310,16 @@ def main():
                     return
 
                 from design_checks import run_design_checks
+                from showcase_checks import run_showcase_checks
+                run_showcase_checks(page,context,url,report,checks)
+                from surfaces_checks import run_surfaces_checks
+                run_surfaces_checks(page,context,url,report,checks)
+                from inks_dial_checks import run_inks_dial_checks
+                run_inks_dial_checks(page,context,url,report,checks)
+                from find_checks import run_find_checks
+                run_find_checks(page, context, url, report, checks)
+                from trust_checks import run_trust_checks
+                run_trust_checks(page, context, url, report, checks)
                 run_design_checks(page, context, url, report, checks)
                 from appearance_checks import run_appearance_checks
                 run_appearance_checks(page, context, url, report, checks)
@@ -278,6 +360,8 @@ def main():
                 run_pin_label_checks(page, context, url, report, checks)
                 from material_workflow_checks import run_material_workflow_checks
                 run_material_workflow_checks(page, context, url, report, checks)
+                from material_replacement_checks import run_material_replacement_checks
+                run_material_replacement_checks(page, context, url, report, checks)
                 from export_review_checks import run_export_review_checks
                 run_export_review_checks(page, context, url, report, checks)
                 from skin_swapper_review_checks import run_skin_swapper_review_checks

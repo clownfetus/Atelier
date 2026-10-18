@@ -41,6 +41,7 @@ def run_design_checks(page, context, url, report, checks):
         page.locator('#setup-close').click()
     page.set_viewport_size({'width': 1400, 'height': 900})
     page.wait_for_function('document.fonts.check("14px Roboto")')
+    page.evaluate("pushNav({path:'Foundation checks'})")
     assert page.evaluate('document.querySelector(".studio-brand img").naturalWidth') > 0
     for theme in ('light', 'dark'):
         choose(theme)
@@ -80,7 +81,7 @@ def run_design_checks(page, context, url, report, checks):
     assert page.locator('#menu-btn').evaluate('(el)=>el===document.activeElement')
     page.locator('#grid-area .card').first.focus()
     assert page.locator('#grid-area .card').first.evaluate('(el)=>getComputedStyle(el).outlineStyle') == 'solid'
-    assert page.locator('#grid-area .card .studio-icon').first.evaluate('(el)=>el.getBoundingClientRect().width') > 90
+    assert page.locator('#grid-area .card .studio-icon').first.evaluate('(el)=>el.getBoundingClientRect().width') == 20
     card = page.locator('#grid-area .card').first
     card.hover()
     page.mouse.down()
