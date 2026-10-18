@@ -127,7 +127,7 @@ default-object imports `Export_0` and `Export_1`; Atelier renames them to the na
 | 2. No manual IDs | Hero and skin come from the mesh's game path and are only displayed. The build request carries no IDs; the server derives them again. | The review has no ID fields; `TargetHeroID`/`TargetSkinID` match the source mesh. |
 | 3. Galacta folder only | The stage is audited before packing: only the planned mesh and config packages may be in it. | The unpacked container holds only the Galacta folder. |
 | 4. No `skins.txt` | Atelier never creates, reads or writes it; the stage audit refuses a build containing one. | Your `skins.txt` is untouched after building and installing. |
-| 5. Revocation | `integrations.json` on Atelier's `main` switches the export off for every install. It is re-read before each build; the review then shows Galacta's message and the build refuses. | See "Off switch" below. |
+| 5. Revocation | Your flag at `0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json` switches the export off for every install. It is re-read before each build; the review then shows your message and the build refuses. | See "Off switch" below. |
 
 ## Inspect the output
 
@@ -159,25 +159,32 @@ Atelier's log for the session is in `<DataDir>\_logs`. Each build writes a line 
 
 ## Off switch
 
-Atelier reads `https://raw.githubusercontent.com/clownfetus/Atelier/main/integrations.json`:
+Atelier reads your flag at
+`https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json`:
 
 ```json
-{ "version": 1, "skin_swapper": { "enabled": true, "message": "" } }
+{ "enabled": true, "message": "" }
 ```
 
-To see the switched-off state without changing `main`, work offline so Atelier keeps its last
-known value:
+Set `enabled` to `false` to switch generation off for every install. When it's off, the export
+review shows your `message` (up to 300 characters) and a build is refused. Atelier re-reads the
+flag before every build, and opening the review refreshes it in the background once the last
+check is more than 6 hours old. If the flag can't be fetched, Atelier uses the last value it
+got, so people offline aren't blocked; an install that has never reached the flag treats the
+export as on.
 
-1. Disconnect from the network, or block `raw.githubusercontent.com`.
-2. Write `<DataDir>\_cache\integrations-flag.json`:
+To see the switched-off state without changing your published flag, work offline so Atelier
+keeps its last known value:
+
+1. Disconnect from the network, or block `0xsaturno.github.io`.
+2. Write `<DataDir>\_cache\skinswapper-flag.json`:
    ```json
    { "enabled": false, "message": "Paused for testing", "checked_at": 9999999999 }
    ```
 3. Open the export review again. The Skin Swapper option is disabled and shows your message,
    and a build is refused.
 
-Once back online, the next build or review reads `main` again. To switch generation off for
-everyone, ask the Atelier maintainers to set `enabled` to `false` on `main`.
+Once you're back online, the next build or review reads your published flag again.
 
 ## Questions for you
 
