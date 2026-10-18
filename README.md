@@ -61,7 +61,7 @@ redesigned Model Studio and model replacement. See the
 
 ### Process S maps
 
-Click **Process S maps** under **Edited Assets** to process every imported texture
+Click **Process S maps** under **Mod tray** to process every imported texture
 whose name ends in `_D`. The export checkboxes and library filters do not limit
 this action. Matching uses the same game folder and the corresponding `_S` name;
 numbered D maps can share an unnumbered S map, with a pairing chooser whenever
@@ -74,7 +74,7 @@ is retained and transparent D pixels mask the color change. Photoshop is not
 required. The blend follows the [standard non-separable Color formula](https://www.w3.org/TR/compositing-1/#blendingcolor),
 rather than relying on a native Photoshop document or its color-profile settings.
 
-Processed S maps appear in Edited Assets for normal export. Activity lists the
+Processed S maps appear in Mod tray for normal export. Activity lists the
 pairings and skipped paths. Original S inputs and a batch record are retained
 inside the project's `.atelier/s-map-backups/` directory. Cancellation and failures
 before publication leave project images untouched; a failed publication rolls
@@ -143,10 +143,10 @@ fallbacks. Menu → Settings keeps the full configuration form.
    the open project and its edit count; click it to switch projects.
 2. Browse to the assets you want to change. Edit material parameters or
    right-click a texture to replace it with an external image.
-3. Select the assets to include under **Edited Assets** and enter a mod filename.
+3. Select the assets to include under **Mod tray** and enter a mod filename.
    Enable **Copy to ~mods/** to install into your configured mods folder. Optional
    **Password Protect** uses the protection password from Settings.
-4. Click **Export Mod**, review the included assets and destination, then confirm.
+4. Click **Build mod**, review the included assets and destination, then confirm.
 
 Open **Activity** to review job progress and results or cancel work before file
 publication. Interrupted work is recorded after reopening and does not restart
@@ -176,10 +176,10 @@ Atelier can export an edited character mesh as a mod for Project Galacta's
 Skin Swapper, which its Companion App then loads.
 
 1. Edit a skin's mesh in Blender or replace it with **Replace model…** using your
-   own BLEND, FBX, GLB or PSK file, then select it under **Edited Assets**.
+   own BLEND, FBX, GLB or PSK file, then select it under **Mod tray**.
 2. Set the mod filename. It becomes the Galacta folder name, so use letters,
    digits and underscores only.
-3. Click **Export Mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
+3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
    and skin come from the mesh and cannot be changed. Enter the skin name and
    author, and pick a form for multi-form heroes (Form 0 is the default).
 4. Click **Build Skin Swapper mod**, then add the mod in the Companion App.

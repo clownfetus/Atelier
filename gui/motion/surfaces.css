@@ -23,3 +23,5 @@
 .toast-repeat {font-size:0;padding:0;width:calc(var(--repeat-count,1)*8px);height:8px;background:radial-gradient(circle,#121216 2px,transparent 2.2px) 0 0/8px 8px repeat-x;}
 .toast-repeat-number {font-size:12px;width:auto;height:auto;background:none;}
 .toast .toast-undo {background:#eee5cf;color:#121216;border-color:#121216;}
+#sel-count {display:inline-flex;align-items:center;gap:5px;}
+#sel-count::before {content:'';width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 28%,#eee5cf 0 1px,transparent 1.2px),radial-gradient(circle at 65% 68%,#121216 0 2px,transparent 2.2px),var(--krackle-charge);}

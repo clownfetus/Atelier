@@ -153,7 +153,8 @@ def svg(cls, view, body, size=None, extra=''):
 
 def export_feedback():
     p = 'am-export-feedback'
-    body = micro_drop_tray(p) + micro_busy(p) + micro_success(p) + micro_warning(p) + micro_error(p)
+    falling='<g class="am-export-feedback-fall">'+path(teardrop(12,12,4.5,1),p+'-energy')+circle(13,13,1.4,p+'-hole')+'</g>'
+    body = micro_drop_tray(p) + falling + micro_busy(p) + micro_success(p) + micro_warning(p) + micro_error(p)
     return svg(f'{p}-svg', 24, body, extra=' fill="currentColor"')
 
 
@@ -335,6 +336,10 @@ def targets():
             out.setdefault(MOTION / f'{name}.js', []).append((name, f'  var SVG_INNER = {js_literal(inner)};', 'js'))
     base, crest = spinner_masks()
     out.setdefault(MOTION / 'krackle.css', []).append(('spinner', f'  --krackle-ring-mask: {base};\n  --krackle-crest-mask: {crest};', 'css'))
+    corner='M0 0H24V24Z'
+    for x,y,r in [(10,3,1.3),(17,4,2),(20,10,1.6)]:
+        corner+=f'M{n(x+r)} {y}a{r} {r} 0 1 0 {-2*r} 0a{r} {r} 0 1 0 {2*r} 0Z'
+    out.setdefault(MOTION/'krackle.css',[]).append(('edited-corner','  --krackle-edited-mask: '+mask_uri("<path fill-rule='evenodd' d='"+corner+"'/>")+';','css'))
     return out
 
 

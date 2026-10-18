@@ -117,6 +117,7 @@
   opacity: 1;
 }
 [data-atelier-motion="export-feedback"] .am-export-feedback-fleck { opacity: 0; }
+[data-atelier-motion="export-feedback"] .am-export-feedback-fall {opacity:0;transform-origin:center;transform-box:fill-box;pointer-events:none;}
 
 /* Static fallback sibling helper */
 .am-export-feedback-slot {
