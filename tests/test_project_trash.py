@@ -133,6 +133,50 @@ class Trash(unittest.TestCase):
         saved=list((self.root/T.DIRECTORY).rglob('T_Test.png'))
         self.assertEqual(len(saved),1);self.assertEqual(saved[0].read_bytes(),before)
 
+    def test_conflicting_rollback_keeps_newer_settings_and_is_never_replayed(self):
+        texture = self.seed(self.tex); material = self.seed(self.mat, '.json'); before = texture.read_bytes()
+        result = T.remove(str(self.root), [self.tex, self.mat]); folder = self.root/T.DIRECTORY/result['entry']
+        manifest = json.loads((folder/'manifest.json').read_text()); manifest['state'] = 'moving'
+        (folder/'manifest.json').write_text(json.dumps(manifest))
+        # A crash left the delete half-done, and a newer edit was saved before the project reopened.
+        texture.write_bytes(b'newer edit'); PM.set_asset_opts(str(self.root), self.tex, {'no_mips': True})
+        for _ in range(2):  # Every project list, project switch and delete purges again.
+            T.purge(str(self.root))
+            self.assertEqual(texture.read_bytes(), b'newer edit')
+            self.assertEqual(PM.get_asset_opts(str(self.root), self.tex), {'no_mips': True})
+            self.assertNotIn(self.tex, PM.get_deselected(str(self.root)))
+            self.assertTrue(material.is_file()); self.assertIn(self.mat, PM.get_deselected(str(self.root)))
+        self.assertEqual(json.loads((folder/'manifest.json').read_text())['state'], 'kept')
+        T.purge(str(self.root), T.time.time() + 2 * T.MAX_AGE)
+        self.assertEqual([p.read_bytes() for p in folder.rglob('T_Test.png')], [before])
+
+    def test_locked_file_is_reported_as_json_and_rolled_back(self):
+        files = [self.seed(self.mat, '.json')] + [self.seed(self.mesh, ext) for ext in ('.blend', '.mesh.json')]
+        original = os.replace
+        def replace(source, dest):
+            if str(source).endswith('SK_Test.blend') and T.DIRECTORY in str(dest):
+                raise PermissionError(13, 'The process cannot access the file because it is being used by another process', str(source))
+            return original(source, dest)
+        with patch.object(T.os, 'replace', side_effect=replace):
+            result = call('/api/delete_imported', {'game_rels':[self.mat, self.mesh]})
+        self.assertFalse(result['ok'])
+        self.assertIn('SK_Test.blend could not be moved to the project trash', result['error'])
+        self.assertIn('Close any program using it', result['error'])
+        self.assertTrue(all(p.is_file() for p in files))
+        self.assertTrue(PM.get_asset_opts(str(self.root), self.mesh)['blank'])
+        self.assertEqual(list((self.root/T.DIRECTORY).iterdir()), [])
+
+    def test_interrupted_http_delete_reports_where_earlier_files_remain(self):
+        texture = self.seed(self.tex); self.seed(self.mat, '.json'); original = os.replace
+        def replace(source, dest):
+            if str(dest).endswith('MI_Test.json') and T.DIRECTORY in str(dest):
+                texture.write_bytes(b'new external edit')
+                raise OSError('interrupted')
+            return original(source, dest)
+        with patch.object(T.os, 'replace', side_effect=replace):
+            result = call('/api/delete_imported', {'game_rels':[self.tex, self.mat]})
+        self.assertFalse(result['ok']); self.assertIn('earlier files remain', result['error'])
+
     def test_trash_is_absent_from_discovery_counts_and_project_archive(self):
         self.seed(self.tex); self.seed(self.mat,'.json')
         result = call('/api/delete_all_imported')

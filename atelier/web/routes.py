@@ -2871,9 +2871,22 @@ def api_open_export_folder():
 # the asset returns on the next sidebar refresh and "Delete" looks like it did nothing.
 _EDIT_EXTS = project_trash.EDIT_EXTS
 
+def _delete_imported(grs):
+    """Move edits to the project trash. A move that fails rolls back and is reported, not raised."""
+    try:
+        return project_trash.remove(get_import_root(), grs)
+    except project_trash.Interrupted as error:
+        return {"ok": False, "error": str(error)}
+    except OSError as error:
+        # Usually a Windows sharing violation: another program has one of the files open.
+        name = os.path.basename(error.filename or "") or "A file"
+        hint = " Close any program using it and try again." if isinstance(error, PermissionError) else ""
+        return {"ok": False, "error": f"{name} could not be moved to the project trash "
+                                      f"({error.strerror or error}).{hint}"}
+
 def _delete_one_imported(gr):
     """Compatibility entry point; a batch request uses one shared trash entry instead."""
-    return project_trash.remove(get_import_root(), [gr])
+    return _delete_imported([gr])
 
 @app.post("/api/delete_imported")
 def api_delete_imported():
@@ -2885,13 +2898,13 @@ def api_delete_imported():
     response.content_type = "application/json"
     if not grs:
         return json.dumps({"ok": False, "error": "missing game_rel"})
-    return json.dumps(project_trash.remove(get_import_root(), grs))
+    return json.dumps(_delete_imported(grs))
 
 @app.post("/api/delete_all_imported")
 def api_delete_all_imported():
     items = all_imported()
     response.content_type = "application/json"
-    return json.dumps(project_trash.remove(get_import_root(), [item['game_rel'] for item in items]))
+    return json.dumps(_delete_imported([item['game_rel'] for item in items]))
 
 
 @app.post('/api/restore_imported')

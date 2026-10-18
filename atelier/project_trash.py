@@ -2,7 +2,9 @@
 
 Each request owns a manifest and mirrors both project layouts beneath files/.
 Manifests are written before moving anything, so interrupted deletes can be
-recovered on project open rather than silently losing half an edit.
+recovered on project open rather than silently losing half an edit. Earlier
+files that a newer edit has replaced stay in a 'kept' entry, which is never
+rolled back again or aged out.
 """
 import json
 import os
@@ -19,6 +21,10 @@ DIRECTORY = '.atelier-trash'
 EDIT_EXTS = ('.png', '.json', '.blend', '.blend.mat.json', '.blend1', '.mesh.json', '.mesh.glb')
 MAX_AGE = 7 * 24 * 3600
 MAX_ENTRIES = 20
+
+
+class Interrupted(RuntimeError):
+    """A delete stopped part-way and newer edits kept some earlier files in the trash."""
 
 
 def _inside(root, relative):
@@ -80,7 +86,7 @@ def remove(root, game_rels):
         for asset in assets:
             project_meta.restore_asset(root, asset['game_rel'], asset['project_meta'])
         if any(target.exists() for _, target in moved):
-            raise RuntimeError(f'Delete interrupted by newer edits. The earlier files remain in {folder}.')
+            raise Interrupted(f'Delete interrupted by newer edits. The earlier files remain in {folder}.')
         shutil.rmtree(folder)
         raise
     for asset in assets:
@@ -157,20 +163,27 @@ def purge(root, now=None):
             continue  # Unknown data is never silently discarded.
         if manifest.get('state') == 'moving':
             # Roll back an interrupted delete; existing edits always win.
+            kept = []
             for asset in manifest['assets']:
                 for relative in asset['files']:
                     source, target = _inside(folder / 'files', relative), _inside(root, relative)
                     if source.is_file() and not target.exists():
                         target.parent.mkdir(parents=True, exist_ok=True)
                         os.replace(source, target)
+                if any(_inside(folder / 'files', relative).is_file() for relative in asset['files']):
+                    kept.append(asset)  # A newer edit owns this asset, including its options and selection.
+                    continue
                 project_meta.restore_asset(root, asset['game_rel'], asset['project_meta'])
                 cached = asset.get('cache') or {}
                 if cached:
                     asset_cache.record(asset['game_rel'], cached['cache_path'], cached.get('pak', ''), cached.get('pfx', ''))
-            # Keep any conflicting files rather than deleting the only saved copy.
-            if any(p.is_file() for p in (folder / 'files').rglob('*')):
+            if not kept and not any(p.is_file() for p in (folder / 'files').rglob('*')):
+                shutil.rmtree(folder)
                 continue
-            shutil.rmtree(folder)
+            # Keep conflicting files rather than deleting the only saved copy, but never roll them
+            # back again: every replay would reset the newer edit's options and selection.
+            manifest.update(state='kept', assets=kept)
+            atomic_json(folder / 'manifest.json', manifest)
             continue
         if manifest.get('state') == 'ready':
             entries.append((deleted, folder))
