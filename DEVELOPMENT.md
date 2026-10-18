@@ -199,11 +199,13 @@ blocks `GAL_ConfigTemplate.*` everywhere).
   secrets `GALACTA_TEMPLATE_UASSET_B64` and `GALACTA_TEMPLATE_UEXP_B64`, for example
   with `[Convert]::ToBase64String([IO.File]::ReadAllBytes('GAL_ConfigTemplate.uasset'))`.
   Both workflow jobs write them to `Tools/Galacta/` before staging.
-- **Switching generation off (rule 5):** set `skin_swapper.enabled` to `false` in
-  `integrations.json` on `main`, with a short `message`. Atelier re-reads it from
-  GitHub when an export review offers the format (at most every six hours) and always
-  before a Skin Swapper build; the review shows the message. Offline installs keep
-  the last value they read.
+- **Switching generation off (rule 5):** Project Galacta publishes the switch itself at
+  `https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json` as
+  `{"enabled": true, "message": ""}`; nothing in this repository controls it. Atelier
+  re-reads it when an export review offers the format (at most every six hours) and
+  always before a Skin Swapper build, and caches it in `_cache/skinswapper-flag.json`.
+  When it is off the review shows Galacta's message and builds are refused. When it
+  can't be fetched, the last value Atelier got is used.
 
 ## Phase 2 evidence
 

@@ -16,8 +16,10 @@ Galacta's integration conditions are the contract this module enforces. In short
   3. Only the Galacta folder is written; no game path is overridden.
   4. skins.txt belongs to the Companion App. Nothing here creates, reads or writes it, and the stage
      audit refuses a build that would contain one.
-  5. Galacta can revoke this. integrations.json on the main branch switches generation off for
-     every install without a release (FLAG_URL); a build re-reads it before it starts.
+  5. Galacta can revoke this. Project Galacta publishes the switch itself (FLAG_URL), so every
+     install follows it without an Atelier release; a build re-reads it before it starts. When it
+     cannot be fetched the last value Atelier got is used, so offline users are not blocked, and
+     Galacta's message for a shutdown is shown in the export review.
 
 THE TEMPLATE is Galacta's file and may not be redistributed outside Atelier. This repository is
 public, so the template is never committed: it is read from Tools/Galacta/ (Tools/ is ignored by
@@ -56,7 +58,7 @@ PROPERTIES = (("TargetHeroID", "IntPropertyData"), ("TargetSkinID", "IntProperty
               ("Author", "StrPropertyData"), ("MeshToSwap", "ObjectPropertyData"))
 OPTIONAL_PROPERTIES = {"NativeClass"}          # present in the template; points at the class import
 TEMPLATE_NAME = "GAL_ConfigTemplate"
-FLAG_URL = "https://raw.githubusercontent.com/clownfetus/Atelier/main/integrations.json"
+FLAG_URL = "https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json"   # Project Galacta's own
 FLAG_MAX_AGE = 6 * 3600
 MOD_FOLDER_RE = re.compile(r"^[A-Za-z0-9_]{1,48}$")
 TEXT_LIMIT = 64
@@ -75,16 +77,15 @@ def template_files():
 
 
 def _flag_path():
-    return os.path.join(config.DATA_ROOT, "_cache", "integrations-flag.json")
+    return os.path.join(config.DATA_ROOT, "_cache", "skinswapper-flag.json")
 
 
 def parse_flag(payload):
-    """The published switch, {"skin_swapper": {"enabled": bool, "message": str}}, or None."""
-    entry = payload.get("skin_swapper") if isinstance(payload, dict) else None
-    if not isinstance(entry, dict) or not isinstance(entry.get("enabled"), bool):
+    """Galacta's published switch, {"enabled": bool, "message": str}, or None if malformed."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("enabled"), bool):
         return None
-    message = entry.get("message") if isinstance(entry.get("message"), str) else ""
-    return {"enabled": entry["enabled"], "message": message.strip()[:300]}
+    message = payload.get("message") if isinstance(payload.get("message"), str) else ""
+    return {"enabled": payload["enabled"], "message": message.strip()[:300]}
 
 
 def _read_flag():

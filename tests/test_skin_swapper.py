@@ -259,7 +259,7 @@ class ConfigVerify(unittest.TestCase):
 
 
 class OffSwitch(unittest.TestCase):
-    """Rule 5: Galacta can switch generation off for every install."""
+    """Rule 5: Galacta can switch generation off for every install, from its own published flag."""
     def setUp(self):
         Path(S._flag_path()).unlink(missing_ok=True)
 
@@ -275,8 +275,9 @@ class OffSwitch(unittest.TestCase):
 
     def test_galacta_can_switch_export_off_with_a_message(self):
         with patch.object(S.urllib.request, "urlopen",
-                          return_value=self.response({"skin_swapper": {"enabled": False, "message": "Paused by request"}})):
+                          return_value=self.response({"enabled": False, "message": "Paused by request"})) as fetch:
             self.assertTrue(S.refresh_flag())
+        self.assertEqual(fetch.call_args[0][0].full_url, S.FLAG_URL)
         self.assertEqual(S.flag_state(), (False, "Paused by request"))
         with patch.object(S, "template_files", return_value=(__file__, __file__)):
             state = S.status()
@@ -284,18 +285,19 @@ class OffSwitch(unittest.TestCase):
         self.assertEqual(state["reasons"], ["Paused by request"])
 
     def test_an_unreachable_or_malformed_switch_keeps_the_last_known_value(self):
-        with patch.object(S.urllib.request, "urlopen",
-                          return_value=self.response({"skin_swapper": {"enabled": False}})):
+        with patch.object(S.urllib.request, "urlopen", return_value=self.response({"enabled": False})):
             S.refresh_flag()
         with patch.object(S.urllib.request, "urlopen", side_effect=OSError("offline")):
             self.assertFalse(S.refresh_flag())
-        with patch.object(S.urllib.request, "urlopen", return_value=self.response({"skin_swapper": {"enabled": "yes"}})):
-            self.assertFalse(S.refresh_flag())
+        for malformed in ({"enabled": "yes"}, {"skin_swapper": {"enabled": True}}, ["enabled"]):
+            with patch.object(S.urllib.request, "urlopen", return_value=self.response(malformed)):
+                self.assertFalse(S.refresh_flag())
         self.assertEqual(S.flag_state()[0], False)
 
-    def test_the_published_file_in_this_repository_parses(self):
-        self.assertEqual(S.parse_flag(json.loads((ROOT / "integrations.json").read_text(encoding="utf-8"))),
-                         {"enabled": True, "message": ""})
+    def test_the_switch_is_galactas_own_published_flag(self):
+        self.assertEqual(S.FLAG_URL, "https://0xsaturno.github.io/ProjectGalacta/flags/skinswapper.json")
+        # The shape Galacta publishes there (17 Oct 2026).
+        self.assertEqual(S.parse_flag({"enabled": True, "message": ""}), {"enabled": True, "message": ""})
 
 
 class StageAudit(unittest.TestCase):
