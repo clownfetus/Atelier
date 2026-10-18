@@ -247,6 +247,8 @@ def main():
                     return
 
                 if args.library_only:
+                    from home_layout_checks import run_home_layout_checks
+                    run_home_layout_checks(page,context,url,report,checks)
                     from find_checks import run_find_checks
                     from library_pins_checks import run_library_pins_checks
                     from library_workflow_checks import run_library_workflow_checks

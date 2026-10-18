@@ -138,11 +138,18 @@ def main():
                 '/api/stale_mips': {'ok': True, 'count': 0},
                 '/api/usmap_update_check': {'ok': True},
                 '/api/catalogue/status': {'updating': False, 'portraits': 0},
+                '/api/catalogue/library': {'heroes': []},
             }
             from urllib.parse import urlparse
             def fixture(route):
-                value = fixtures.get(urlparse(route.request.url).path)
-                route.fulfill(json=value) if value is not None else route.continue_()
+                path = urlparse(route.request.url).path
+                value = fixtures.get(path)
+                if value is not None:
+                    route.fulfill(json=value)
+                elif path.startswith('/api/catalogue/banner/'):
+                    route.fulfill(status=404, body='No nameplate in this fixture')
+                else:
+                    route.continue_()
             context.route('**/api/**', fixture)
             context.route('https://**', lambda route: route.fulfill(json={}))
             page.reload()

@@ -5,6 +5,9 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Home keeps complete character cards, costume controls and category cards in
+  separate rows at every card size. Shorter windows scroll without overlapping.
+
 - Model Studio's **Export to Blender** saves the visible body and held weapons
   in one portable `.blend`, with connected materials, packed textures and
   working deformation bones. The resting surface is checked before saving.

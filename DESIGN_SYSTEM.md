@@ -310,6 +310,10 @@ names stay intact and deep paths scroll horizontally. Tooltips follow actual
 pointer movement or keyboard focus, without opening on programmatically focused
 first folders. Asset preparation uses the Mod tray's project-scoped progress area.
 
+Home reserves a complete hero row and its controls before sizing the category
+pane. The hero grid and categories scroll independently; shorter windows can
+also scroll the Home pane so the costume row never overlaps the folders below.
+
 Lord portraits and KO emblems come from RivalSkins' Lord Icons and Kill Icons
 pages. Only an explicit default `Hero Deluxe Avatar` or `Hero Deluxe KO Prompt 1`
 page label that matches one known playable hero establishes ownership. Numeric
