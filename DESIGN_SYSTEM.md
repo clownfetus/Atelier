@@ -40,7 +40,13 @@ Use semantic foreground/background pairs instead of adding hexadecimal colors to
 | Main text | `#23272e` | `#e4e6e9` |
 | Supporting text | `#565e6a` | `#b1b7c0` |
 
-Roboto is bundled locally with its SIL Open Font License; there is no font CDN request. The desktop scale uses 14px body text, 13px controls and asset names, 12px supporting labels and 20px titles. Controls are generally 36px tall; compact numeric editor controls remain 30px. The workspace has a 56px toolbar, 12px outer inset, 156px asset tiles with 134px previews and a resizable 240–520px export sidebar. Tested window sizes start at 1024×768.
+Roboto and the Latin Bricolage Grotesque display face are bundled with their SIL
+Open Font Licenses; there is no font CDN request. Bricolage at 80% width is for
+page titles, hero names, mod names and event lettering. Roboto remains 14px body,
+13px controls/asset names and 12px supporting labels; titles are 20px. Controls
+remain 36px tall (compact numeric fields 30px). The workspace keeps its 56px
+toolbar, 12px inset, 156px tiles with 134px previews and resizable 240–520px tray.
+Tested windows start at 1024×768.
 
 Resting asset cards enclose the preview and label in a low-container surface with
 a visible border, quiet hover fill and distinct imported-state outline.
@@ -357,3 +363,18 @@ motion forces Off. One large Tier 2/3 moment may own the screen at a time;
 refused stages keep micro feedback, and each Tier 3 event is limited to once
 per kind per session. Calm/Off formations stop drawing. Real results interrupt
 motion immediately; hidden and settled stages release ownership.
+
+The two offset radial layers in `.k-screen` form one 45° lattice in empty space.
+Roster labels keep a solid panel background, artwork stays exact, and caption
+text always sits on Paper. Caption outcomes use the light-surface ink set even
+inside a dark workspace. The left bleed carries the outcome; repeats add up to
+five bubbles before a numeric count. Halo rings and bubbles around HDR swatches
+never cover the colour itself. Primary-button pops and theme waves are Full-only;
+actions never wait for them. The Build drop starts only with a dispatched job.
+
+All 36 category energy emblems have review candidates at both scales, with a
+disabled experimental flag. Material Sharp remains active until D4 approval.
+Particle stages batch preallocated circle commands by integer ink key, because
+the [Canvas Path2D API](https://html.spec.whatwg.org/multipage/canvas.html#path2d-objects)
+has no reset operation. Filter fallback uses real RAF intervals relative to the
+display baseline; browser checks log CPU cost separately from that frame budget.

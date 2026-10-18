@@ -5,6 +5,15 @@ Wave 4a adds `test_krackle_inks.py` (a dependency-free Node colour harness) and
 focused browser run. It checks all palettes, measured surfaces, adaptive context,
 legacy preference migration, OS overrides, still frame counts and moment claims.
 
+Wave 4b adds `--surfaces-only`: File-byte upload fixtures, caption/shape/font
+checks, real-progress launch presentation, policy gates and a recorded particle
+CPU median (`krackle-frame-perf.json`). It also simulates 8 ms refresh intervals
+followed by 40 ms intervals to test merge-filter fallback. Native WebView2 smoke
+uploads a pathless File to a disposable fixture endpoint and verifies its bytes
+and originating project header. Review candidates remain behind the disabled
+`atelier.experimentalKrackleEmblems` flag; both-scale sheets are generated with
+the artwork, not maintained separately. Run the full browser suite before a PR.
+
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
 storage, so an old cached page cannot mix with the new scripts and styles.

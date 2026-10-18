@@ -140,10 +140,13 @@
     });
   }
   function exported() {
-    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return; localStorage.setItem('atelier.firstExportCelebrated','1'); } catch (_) {}
+    if(!window.AtelierMotionPolicy?.allows(3)||document.hidden)return;
+    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return; } catch (_) {}
     const colors = [...new Set([...document.querySelectorAll('.sb-item.selected img')].map(sample).concat(
       [...document.querySelectorAll('.sb-item.selected [data-swatch-color]')].map(node=>node.dataset.swatchColor)).filter(Boolean))].slice(0,6);
     if (!colors.length) return;
+    const release=window.AtelierMotion?.moment?.claim('first-export',3);if(!release)return;
+    try{localStorage.setItem('atelier.firstExportCelebrated','1');}catch(_){}
     const button=document.getElementById('install-btn'), rect=button.getBoundingClientRect();
     colors.forEach((color,index)=>{
       const dot=document.createElement('span'); dot.className='export-color-moment'; dot.style.background=color; dot.setAttribute('aria-hidden','true');
@@ -152,6 +155,7 @@
       else dot.style.transform=`translate(${index*10}px,-12px)`;
       setTimeout(()=>dot.remove(),reduced()?1800:480);
     });
+    setTimeout(release,500);
   }
   function swatchesBefore() { return new Map([...document.querySelectorAll('#mat-body input[type=color]')].map(node=>[node.id,node.value])); }
   function swatchesAfter(previous, colors=[]) {

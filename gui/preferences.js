@@ -37,8 +37,9 @@
   }, true);
   function revealTheme(update) {
     if (!origin || !window.AtelierMotionPolicy.allows(2) || !document.startViewTransition || document.hidden) { origin = null; return false; }
+    const release=window.AtelierMotion?.moment?.claim('theme-wave',2);if(!release){origin=null;return false;}
     const point = origin; origin = null; reveal?.skipTransition();
-    const current = document.startViewTransition(update); reveal = current;
+    let current;try{current=document.startViewTransition(update);}catch(_){release();return false;}reveal = current;
     current.ready.then(() => {
       const radius = Math.hypot(Math.max(point.x, innerWidth-point.x), Math.max(point.y, innerHeight-point.y));
       const wave=scale=>{
@@ -50,7 +51,7 @@
       themeAnimation = document.documentElement.animate({clipPath:[wave(.001),wave(1.5)]},
         {duration:240,easing:'cubic-bezier(.2,0,0,1)',pseudoElement:'::view-transition-new(root)'});
     }).catch(() => {});
-    current.finished.catch(() => {}).finally(() => { if (reveal === current) reveal = null; });
+    current.finished.catch(() => {}).finally(() => {release(); if (reveal === current) reveal = null; });
     return true;
   }
   changes.addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(2)) { themeAnimation?.cancel(); reveal?.skipTransition(); } });
