@@ -53,24 +53,57 @@
     }
   }
 
-  function banner(path, labels, artwork) {
-    bannerArgs=[path,labels,artwork];
+  function banner(path, labels = {}, artwork = {}) {
+    const args=[path,labels,artwork];bannerArgs=args;
     const host = document.getElementById('library-hero');
+    if(!host)return;
+    const current=()=>bannerArgs===args&&host.isConnected&&!host.hidden;
     const match = /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const context = window.AtelierRoster?.describe(path);
-    const src = match ? '/api/catalogue/hero/' + match[1].split('/')[1] + '/story' : null;
+    const story = match ? '/api/catalogue/hero/' + match[1].split('/')[1] + '/story' : null;
+    // A skin whose bundle has a nameplate of the same name shows it; every other folder keeps the
+    // hero's story art, which is also the fallback if the nameplate can't be loaded.
+    const skinKey = match?.[2] ? match[1] + match[2] : null;
+    const nameplate = skinKey && (artwork[skinKey]?.banner || context?.skin?.banner) || null;
+    const src = nameplate || story;
     const preloaded = src && [...document.querySelectorAll('#library-hero img,.hero-portrait.loaded')].some(img=>img.complete && img.naturalWidth && img.getAttribute('src')===src);
     host.replaceChildren(); host.hidden = !match;
-    window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent:null}}));
+    host.classList.remove('has-art','has-art-colour','has-nameplate');host.style.removeProperty('--library-art-colour');
+    window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent:null,colors:[]}}));
     if (!match) return;
     const heroPath = match[1], skinPath = match[2] ? heroPath + match[2] : null;
+    const skin={...context?.skin,...artwork[skinPath]},hero={...context?.hero,...artwork[heroPath]};
+    // Use the same costume icon / hero avatar as Home and Continue. Clear the old tint while
+    // loading, and bind every fallback to this render (including an A → B → A navigation).
+    const sources=[...new Set([
+      ...(skinPath&&!(skin.heroFallback??skin.hero_fallback) ? [skin.icon||'/api/catalogue/icon/'+match[2].slice(1),
+        skin.thumbnail||'/api/catalogue/thumbnail/'+match[2].slice(1),nameplate] : []),
+      hero.avatar||'/api/catalogue/hero/'+match[1].split('/')[1]+'/avatar',
+      hero.thumbnail||'/api/catalogue/thumbnail/'+match[1].split('/')[1],story,
+    ].filter(Boolean))];
+    const tint=(index=0)=>{
+      if(!current()||index>=sources.length)return;
+      const source=new Image();
+      source.onload=()=>{
+        if(!current())return;
+        const colour=window.AtelierPolish?.accent(source);
+        if(colour){host.style.setProperty('--library-art-colour',colour);host.classList.add('has-art-colour');}
+        else tint(index+1);
+      };
+      source.onerror=()=>tint(index+1);source.src=sources[index];
+    };
+    tint();
     const label = key => (labels[key] || (key===heroPath ? context?.hero?.name : context?.skin?.name) || key.split('/').at(-1)).replace(/^\d+\s*[—–-]\s*/, '');
-    const info = artwork[skinPath] || artwork[heroPath];
     const image = document.createElement('img');
     image.alt = ''; image.className = 'library-hero-art';
-    image.src = src;
-    image.onload = () => { if(image.isConnected){host.classList.add('has-art'); window.AtelierPolish?.artwork(image);} };
-    image.onerror = () => { host.classList.remove('has-art'); image.remove(); };
+    const showNameplate = on => { image.classList.toggle('nameplate', on); host.classList.toggle('has-nameplate', on); };
+    showNameplate(!!nameplate);
+    image.onload = () => { if(current()&&image.isConnected){host.classList.add('has-art'); window.AtelierPolish?.artwork(image);} };
+    image.onerror = () => {
+      if(!current())return;
+      if (nameplate && image.getAttribute('src') === nameplate) { showNameplate(false); image.src = story; return; }
+      host.classList.remove('has-art'); image.remove();
+    };
     host.classList.remove('has-art');
     if (preloaded) host.classList.add('has-art');
     const text = document.createElement('div'); text.className = 'library-hero-copy';
@@ -83,6 +116,7 @@
     detail.textContent = [skinPath && label(skinPath), path.slice((skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
     text.append(eyebrow, title, detail); host.append(image, text);
+    image.src=src;
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});
   }

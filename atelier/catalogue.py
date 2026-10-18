@@ -25,7 +25,7 @@ from atelier.storage import atomic_json
 IDS_URL = 'https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md'
 HEROES_URL = 'https://rivalskins.com/heroes/'
 DAY = 86400
-PARSER_VERSION = 2
+PARSER_VERSION = 3
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -55,6 +55,22 @@ def parse_ids(text):
     return chars
 
 
+def icon_url(image):
+    """img_<name>.webp -> img_icon_<name>.webp in the same costume folder, or None."""
+    if not isinstance(image, str):
+        return None
+    match = re.fullmatch(r'(.*/items/costume/\d+/img_)(?!icon_)([^/]+\.webp)', image)
+    return match[1] + 'icon_' + match[2] if match else None
+
+
+def nameplate_url(icon):
+    """A nameplate card's img_icon_<name>.webp -> its 848x192 banner img_<name>.webp, or None."""
+    if not isinstance(icon, str):
+        return None
+    match = re.fullmatch(r'(.*/items/nameplate/\d+/img_)icon_([^/]+\.webp)', icon)
+    return match[1] + match[2] if match and allowed_url(match[1] + match[2]) else None
+
+
 def allowed_url(url):
     if not isinstance(url, str):
         return False
@@ -68,6 +84,7 @@ def allowed_url(url):
     return (parsed.netloc == 'rivalskins.com' and (
         parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/')
         or parsed.path.startswith(('/hero/', '/item/', '/wp-content/uploads/marvel-assets/items/costume/',
+                                   '/wp-content/uploads/marvel-assets/items/nameplate/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-logos/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-icons-avatars/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-story-images/'))
@@ -94,10 +111,11 @@ def fetch(url, headers=None, limit=8 * 1024 * 1024):
 
 
 class Cards(HTMLParser):
-    """Read only roster portraits / costume cards, ignoring ads and other cosmetics."""
-    def __init__(self, roster=False):
+    """Read only roster portraits / one kind of hero-page card (costume or nameplate), ignoring
+    ads and other cosmetics."""
+    def __init__(self, roster=False, kind='costume'):
         super().__init__(convert_charrefs=True)
-        self.roster, self.items, self.card, self.webp = roster, [], None, None
+        self.roster, self.kind, self.items, self.card, self.webp = roster, kind, [], None, None
 
     def handle_starttag(self, tag, attributes):
         attrs = dict(attributes)
@@ -105,13 +123,13 @@ class Cards(HTMLParser):
             href = attrs.get('href', '').strip()
             self.card = {'page': href} if (
                 self.roster and href.startswith('https://rivalskins.com/hero/') or
-                not self.roster and attrs.get('data-type') == 'costume') else None
+                not self.roster and attrs.get('data-type') == self.kind) else None
             self.webp = None
         elif self.card is not None and tag == 'source' and attrs.get('type') == 'image/webp':
             self.webp = attrs.get('srcset', '').split(' ')[0]
         elif self.card is not None and tag == 'img':
             image = self.webp or attrs.get('src', '')
-            if '/items/costume/' in image and allowed_url(image):
+            if f'/items/{"costume" if self.roster else self.kind}/' in image and allowed_url(image):
                 self.items.append({**self.card, 'name': attrs.get('alt', ''), 'image': image})
                 self.card = None
 
@@ -120,8 +138,8 @@ class Cards(HTMLParser):
             self.card = None
 
 
-def parse_cards(text, roster=False):
-    parser = Cards(roster)
+def parse_cards(text, roster=False, kind='costume'):
+    parser = Cards(roster, kind)
     parser.feed(text)
     return parser.items
 
@@ -167,27 +185,35 @@ def build_entries(chars, roster, load_page, load_items):
         entry = {'name': char['name'], 'kind': 'hero', 'image': hero['image'] if hero else None,
                  'source': hero['page'] if hero else IDS_URL}
         entries[cid] = entry
-        costumes = parse_cards(load_page(hero['page'])) if hero else []
+        page = load_page(hero['page']) if hero else ''
+        costumes = parse_cards(page)
         if hero and not costumes:
             raise ValueError(f'No costume cards found for {char["name"]}; retaining previous catalogue')
+        plates = {}
+        for plate in parse_cards(page, kind='nameplate'):
+            plates.setdefault(normalized(plate['name']), []).append(nameplate_url(plate['image']))
         for sid, name in char['skins'].items():
             entries[sid] = {'name': name, 'kind': 'skin', 'hero': cid,
                             'image': entry['image'], 'source': entry['source'], 'hero_fallback': True}
         for costume, artwork in zip(costumes, load_items([c['page'] for c in costumes])):
+            name = normalized(costume['name'])
+            same_name = [c for c in costumes if normalized(c['name']) == name]
             skin_ids = artwork['ids']
             # Some recolor pages omit game IDs. Accept only a unique exact name
             # within this hero, never a fuzzy match or a conflicting supplied ID.
             if not skin_ids:
-                matches = [sid for sid, name in char['skins'].items()
-                           if normalized(name) == normalized(costume['name'])]
-                same_name = [c for c in costumes if normalized(c['name']) == normalized(costume['name'])]
+                matches = [sid for sid, skin in char['skins'].items() if normalized(skin) == name]
                 skin_ids = matches if len(matches) == len(same_name) == 1 else []
+            # A bundle's nameplate shares its costume's name on the same hero page. Pair them only
+            # when that name is unique on both sides; anything else keeps the hero's story banner.
+            plate = plates.get(name, []) if name else []
+            banner = plate[0] if len(plate) == len(same_name) == 1 else None
             for sid in skin_ids:
                 if not sid.startswith(cid):
                     continue  # Never cross hero boundaries, including transformation/NPC IDs.
                 entries[sid] = {'name': char['skins'].get(sid, costume['name']), 'kind': 'skin', 'hero': cid,
                                 'image': artwork['image'], 'source': costume['page'], 'hero_fallback': False,
-                                'match': 'id' if artwork['ids'] else 'name'}
+                                'match': 'id' if artwork['ids'] else 'name', **({'banner': banner} if banner else {})}
     return entries
 
 
@@ -209,6 +235,7 @@ class Catalogue:
             if not all(re.fullmatch(r'\d{4}(?:\d{3})?', key) and isinstance(entry, dict)
                        and isinstance(entry.get('name'), str)
                        and (entry.get('image') is None or allowed_url(entry['image']))
+                       and (entry.get('banner') is None or allowed_url(entry['banner']))
                        for key, entry in data['entries'].items()):
                 return None
             return data
@@ -237,7 +264,8 @@ class Catalogue:
         if not entry:
             return None
         return {'name': entry.get('name'), 'thumbnail': f'/api/catalogue/thumbnail/{key}' if entry.get('image') else None,
-                'hero_fallback': entry.get('hero_fallback', False)}
+                'hero_fallback': entry.get('hero_fallback', False),
+                'banner': f'/api/catalogue/banner/{key}' if sid and entry.get('banner') and not entry.get('hero_fallback') else None}
 
     def start_update(self):
         with self.lock:
@@ -302,8 +330,27 @@ class Catalogue:
     def thumbnail(self, key):
         if not re.fullmatch(r'\d{4}(?:\d{3})?', key):
             return None
+        return self._cached(self.data.get('entries', {}).get(key, {}).get('image'))
+
+    def icon(self, key):
+        """A costume's square head-and-shoulders icon, published beside its art as img_icon_<name>.
+        Hero-portrait fallbacks have no costume of their own, so they get none."""
+        if not re.fullmatch(r'\d{7}', key):
+            return None
         entry = self.data.get('entries', {}).get(key, {})
-        url = entry.get('image')
+        return None if entry.get('hero_fallback') else self._cached(icon_url(entry.get('image')))
+
+    def banner(self, key):
+        """The 848x192 nameplate published with a skin's bundle, or None when it has no matched one."""
+        if not re.fullmatch(r'\d{7}', key):
+            return None
+        entry = self.data.get('entries', {}).get(key, {})
+        url = entry.get('banner')
+        if entry.get('hero_fallback') or not isinstance(url, str) or '/items/nameplate/' not in url:
+            return None
+        return self._cached(url)
+
+    def _cached(self, url):
         if not url or not allowed_url(url):
             return None
         cache_key = hashlib.sha256(url.encode()).hexdigest()

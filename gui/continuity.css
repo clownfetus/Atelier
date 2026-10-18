@@ -1,19 +1,33 @@
 #library-hero[hidden] { display: none; }
 #library-hero {
   position: relative; isolation: isolate; overflow: hidden; flex: 0 0 auto;
-  min-height: 156px; margin: 0 16px 12px; border: 1px solid var(--border);
-  border-radius: var(--studio-shape-large); background: var(--md-sys-color-surface-container);
+  min-height: 156px; margin: 0 16px 12px;
+  border-radius: var(--studio-shape-large);
+  --library-hero-surface: var(--md-sys-color-surface-container);
+  background-color: var(--library-hero-surface); transition: background-color 300ms var(--studio-easing);
 }
+/* The skin's colour (else the hero art's), as decoration only: a faint wash and an edge along the
+   bottom. The theme's surface and text inks stay in charge of everything readable. */
+#library-hero.has-art-colour { --library-hero-surface: color-mix(in srgb, var(--library-art-colour) 9%, var(--md-sys-color-surface-container)); }
+#library-hero::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; z-index: 3;
+  background: var(--library-art-colour); opacity: 0; transition: opacity 300ms var(--studio-easing); pointer-events: none; }
+#library-hero.has-art-colour::before { opacity: 1; }
 .library-hero-art { position: absolute; inset: 0 0 0 auto; width: 62%; height: 100%; object-fit: cover; object-position: center 30%; opacity: 0; mask-image:linear-gradient(90deg,transparent,#000 55%); }
 .has-art .library-hero-art { opacity: 1; }
 #library-hero::after {
   content: ''; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(90deg, var(--md-sys-color-surface-container) 25%, transparent 100%);
+  background: linear-gradient(90deg, var(--library-hero-surface) 25%, transparent 100%);
 }
 .library-hero-copy { position: relative; z-index: 2; width: fit-content; max-width: 65%; padding: 22px 24px; }
 .library-hero-copy > span { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); }
 .library-hero-copy h2 { display:flex; align-items:center; gap:10px; margin: 8px 0; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
 .library-hero-copy p { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+/* A skin's nameplate is a slanted card with transparent corners. It is shown whole and crisp at the
+   right, never cropped or washed out like story art, so the copy wraps beside it instead of over it. */
+.library-hero-art.nameplate { inset: 12px 16px auto auto; width: auto; height: calc(100% - 24px); max-width: 58%;
+  object-fit: contain; object-position: right center; mask-image: none; filter: drop-shadow(0 6px 12px rgb(0 0 0 / .32)); }
+#library-hero.has-nameplate::after { content: none; }
+.has-nameplate .library-hero-copy { max-width: calc(42% - 32px); }
 @media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 14px 20px; } .library-hero-copy h2 { font-size: 24px; } }
 
 /* Only the grid container moves. Shared elements have their own named snapshots. */

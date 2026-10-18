@@ -375,7 +375,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       if (item.type === "folder" && item.label && item.label !== item.name) {
         _pathLabels[item.rel_path] = item.label;
       }
-      if (item.type === 'folder' && item.thumbnail) _folderArtwork[item.rel_path] = {thumbnail:item.thumbnail, heroFallback:item.hero_fallback};
+      if (item.type === 'folder' && item.thumbnail) _folderArtwork[item.rel_path] = {thumbnail:item.thumbnail, heroFallback:item.hero_fallback, banner:item.banner};
     }
 
     AtelierLibraryPins.updateLabels(_pathLabels);
@@ -463,9 +463,12 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
   }
   filtered = AtelierLibraryTools.sort(filtered);
-  const moreCategories=!nav.path&&!q&&!AtelierLibraryTools.hasFilters()&&filtered.length>8;
-  const categoryCount=filtered.length;
-  if(moreCategories&&!_homeCategoriesExpanded)filtered=filtered.slice(0,8);
+  const categoryCount=filtered.filter(card=>card.type==='folder').length;
+  const moreCategories=!nav.path&&!q&&!AtelierLibraryTools.hasFilters()&&categoryCount>8;
+  if(moreCategories&&!_homeCategoriesExpanded) {
+    let shownFolders=0;
+    filtered=filtered.filter(card=>card.type!=='folder'||shownFolders++<8);
+  }
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -567,8 +570,6 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsCard(card)));
     }
     const wrapper = window.AtelierLibraryPins?.decorate(card, el) || el;
-    el.classList.toggle('category-chip',!nav.path&&card.type==='folder');
-    wrapper.classList.toggle('home-category-wrap',!nav.path&&card.type==='folder');
     grid.appendChild(AtelierLibraryTools.decorate(card, el, wrapper));
   });
 
@@ -576,7 +577,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   area.appendChild(grid);
   if(moreCategories) {
     const more=document.createElement('button');more.className='btn home-category-more';more.textContent=_homeCategoriesExpanded?'Fewer folders':`+${categoryCount-8} more folders`;more.setAttribute('aria-expanded',String(_homeCategoriesExpanded));
-    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});area.append(more);
+    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});grid.append(more);
   }
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);

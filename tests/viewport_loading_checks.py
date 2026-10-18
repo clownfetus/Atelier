@@ -95,6 +95,8 @@ def run_hero_artwork_checks(page, context, url, report, checks, *, reuse_page=Fa
         raw=BytesIO();colour=(210,40,50,255) if '1029' in route.request.url else (30,130,200,255)
         Image.new('RGBA',(32,32),colour).save(raw,'PNG');route.fulfill(body=raw.getvalue(),content_type='image/png')
     tab.route('**/api/catalogue/thumbnail/*',portrait)
+    # These fixtures have text-only costume entries; unavailable icons fall back to their portraits.
+    tab.route('**/api/catalogue/icon/*',lambda route:route.fulfill(status=404,body='No icon in this fixture'))
     tab.route('**/static/viewport.js',lambda route:route.fulfill(
         body=(ROOT/'gui/viewport.js').read_text(encoding='utf-8')+HOOK,content_type='text/javascript'))
     tab.route('**/api/skin_meshes?*',lambda route:route.fulfill(json=[{
@@ -113,20 +115,32 @@ def run_hero_artwork_checks(page, context, url, report, checks, *, reuse_page=Fa
         assert tab.locator('.roster-skins').get_by_text('Amethyst Armor',exact=True).count()==1
         tab.locator('.roster-portrait').nth(1).click()
         assert tab.locator('.roster-skins').get_by_text('Space Knight',exact=True).count()==1
-        tab.wait_for_selector('.roster-skin[data-artwork-colour]')
-        blue=tab.locator('.roster-skin').evaluate('el=>getComputedStyle(el).backgroundColor')
-        tab.locator('.roster-portrait').first.click();tab.wait_for_selector('.roster-skin[data-artwork-colour]')
-        red=tab.locator('.roster-skin').evaluate('el=>getComputedStyle(el).backgroundColor')
-        assert blue!=red
+        control_colours="""el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.color,s.borderTopColor];}"""
+        def costume_colours():
+            tab.wait_for_selector('.roster-skin[data-artwork-colour]')
+            return tab.locator('.roster-skin').evaluate("""el=>{
+              const s=getComputedStyle(el);
+              return {accent:getComputedStyle(el,'::before').backgroundColor,
+                control:[s.backgroundColor,s.color,s.borderTopColor]};
+            }""")
+        original_theme=tab.locator('#settings-theme').input_value()
         for theme in ('dark','light'):
-            tab.evaluate('(theme)=>document.documentElement.dataset.theme=theme',theme)
-            tab.wait_for_timeout(50)
+            tab.locator('#settings-theme').select_option(theme,force=True)
+            tab.locator('.roster-portrait').nth(1).click()
+            blue=costume_colours()
+            tab.locator('.roster-portrait').first.click()
+            red=costume_colours()
+            themed_control=tab.locator('.roster-open').evaluate(control_colours)
+            assert blue['accent']=='rgb(30, 130, 200)',(theme,blue)
+            assert red['accent']=='rgb(210, 40, 50)',(theme,red)
+            assert blue['control']==red['control']==themed_control,(theme,blue,red,themed_control)
             assert tab.locator('.roster-skin').evaluate(r"""el=>{
               const s=getComputedStyle(el),rgb=x=>x.match(/[\d.]+/g).slice(0,3).map(Number);
               const lum=c=>c.map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((s,n,i)=>s+n*[.2126,.7152,.0722][i],0);
               const a=lum(rgb(s.color)),b=lum(rgb(s.backgroundColor));return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;
             }""")
-        checks.append('Skin name backgrounds sample their own portrait colours and retain readable text in light and dark themes')
+        tab.locator('#settings-theme').select_option(original_theme,force=True)
+        checks.append('Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark')
         tab.locator('.roster-portrait').nth(1).click()
         tab.evaluate("window.dispatchEvent(new CustomEvent('atelier:catalogue-updated'))")
         tab.wait_for_timeout(100)
@@ -139,6 +153,7 @@ def run_hero_artwork_checks(page, context, url, report, checks, *, reuse_page=Fa
         for i in range(20):heroes.append({'name':f'Hero {i}','path':f'Characters/{1100+i}','avatar':'/api/catalogue/hero/1029/avatar','skins':[]})
         tab.evaluate("window.dispatchEvent(new CustomEvent('atelier:catalogue-updated'))")
         tab.wait_for_function('document.querySelectorAll(".roster-portrait").length===22')
+        tab.set_viewport_size({'width':1024,'height':768})
         tab.emulate_media(reduced_motion='reduce')
         tab.locator('.roster-portrait').first.focus();tab.keyboard.press('ArrowRight')
         assert tab.locator('.roster-portrait').nth(1).evaluate('el=>el===document.activeElement')
@@ -147,8 +162,9 @@ def run_hero_artwork_checks(page, context, url, report, checks, *, reuse_page=Fa
         tab.wait_for_function('document.querySelector(".roster-strip").scrollTop>0')
         tab.keyboard.press('Home')
         assert tab.locator('.roster-portrait').first.evaluate('el=>el===document.activeElement')
-        assert tab.locator('.roster-strip').evaluate('el=>getComputedStyle(el).scrollbarWidth')=='none'
-        tab.set_viewport_size({'width':1024,'height':768});tab.wait_for_timeout(100)
+        tab.wait_for_function("""()=>{const strip=document.querySelector('.roster-strip');
+          return strip.firstElementChild.getBoundingClientRect().top>=strip.getBoundingClientRect().top;}""")
+        tab.wait_for_timeout(100)
         tab.screenshot(path=str(report/'roster-wall-keyboard.png'))
         assert tab.locator('#hero-roster').evaluate('el=>el.scrollWidth<=el.clientWidth')
         checks.append('Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows')
