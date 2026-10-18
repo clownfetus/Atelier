@@ -436,10 +436,10 @@ first-export colour moment throws the skin's colours as bubbles; edited sidebar
 rows keep their accent corner with a single bubble. Every loop stops under OS or
 Atelier reduced motion (`[data-motion=reduce]`).
 
-Deliberately not Krackle: button presses, hover, typing, search, theme changes,
-dialog backdrops, category emblems, colour swatches and the material-inspection
-viewport. A comic render mode for the viewport would be an explicitly chosen
-showcase mode, separate from inspection.
+Typing, dialog backdrops and material inspection stay plain. Full allows a brief
+primary-button pop and a bubble theme wave; Calm/Off skip both. Category
+emblems remain Material Sharp pending D4 approval. Swatch interiors and dye /
+texture previews keep their exact content; HDR energy stays outside the swatch.
 
 `tests/krackle_motion_checks.py` (via `tests/browser_smoke.py`) covers the spinner,
 job toast glyphs and fallbacks, empty states, the stage's sleep, hidden-dialog and
@@ -492,3 +492,32 @@ on completion, hiding or disposal. A Tier 3 kind can claim only once per page
 session. Result states interrupt work immediately. Theme changes repaint still
 formations without replaying a result. Tests cover the colour guard, every
 palette, migration, OS overrides, stopped frames and competing stage ownership.
+
+Wave 4b adds the local OFL Latin Bricolage display face, empty-space `.k-screen`,
+Paper caption toasts, Mod tray corners and real Build drop. All existing toast
+APIs, live regions and hover-paused timers remain. Repeat badges show up to five
+bubbles, then a number. The update drop opens the existing offer/notice; it never
+blocks input. Container progress drives index formations and a once-per-launch
+A sampled from the original PNG. Calm/Off retain the plain launch splash. Index
+failures show the KO result beside the original explanation and Settings action.
+
+Texture drops upload `File` bytes through `replaceTextureFromFile`, the same
+project-scoped FormData path as Replace with Image. Success uses the existing
+texture refresh/reconstruction. Calm/Off keep the final preview without particles.
+Cancelled Activity glyphs drain once; replaced rows dispose their controllers.
+The empty-project drop starts the original creation dialog immediately. All
+transient button/project bubbles release on hiding, policy changes and teardown.
+
+Category candidates are generated at 24 and 102 px by `krackle_art.py`; review
+HTML and both-theme PNG sheets live in `docs/review/wave-4b`. The hidden local
+`atelier.experimentalKrackleEmblems=1` flag is for review only and defaults off.
+Control glyphs keep Material Sharp. D4 remains a user decision.
+
+Particle rendering uses preallocated circle command buffers, linked per integer
+ink key, and native `beginPath` batches. Path2D has no reset method, so reusing
+Path2D instances would accumulate geometry (see the WHATWG Canvas path API).
+The merge guard measures RAF intervals against the observed refresh baseline;
+14 ms of sustained excess disables merging. An absolute 14 ms threshold would
+disable it even on an idle 60 Hz display. `perf()` reports sampled CPU costs and
+frame intervals; `surfaces_checks.py` logs the median and verifies the 8 ms ceiling
+plus a simulated slow-frame fallback. No Linux WebKitGTK result is claimed.

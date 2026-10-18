@@ -82,6 +82,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         mode('full');tab.emulate_media(reduced_motion='reduce');tab.wait_for_timeout(100)
         assert tab.evaluate('AtelierMotionPolicy.tier()')==0
         tab.evaluate('perfStage.destroy();perfHost.remove()');tab.emulate_media(reduced_motion='no-preference')
+        mode('full')
         fallback=tab.evaluate("""() => {
           const nativeRAF=requestAnimationFrame,nativeCancel=cancelAnimationFrame;let next;
           window.requestAnimationFrame=fn=>{next=fn;return 987654;};window.cancelAnimationFrame=()=>{};
@@ -101,6 +102,22 @@ def run_surfaces_checks(page,context,url,report,checks):
             if value!='full':assert not tab.locator('.k-button-pop').count()
             tab.wait_for_timeout(230)
         tab.evaluate('popButton.remove()')
+        tab.evaluate("""() => {
+          window.buildDone=beginExportFeedback(atelierProject());
+          const host=document.getElementById('install-btn-motion-host');
+          if(host.dataset.amState!=='busy')throw Error('Build did not charge');
+          buildDone('warning');if(host.dataset.amState!=='warning')throw Error('Result did not interrupt the drop');
+          const splash=document.createElement('div');splash.id='startup-splash';splash.innerHTML='<progress id="startup-progress" max="10" value="2"></progress>';document.body.append(splash);
+          const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=()=>null;
+          try{AtelierSurfaces.startupProgress({total:10,current:2});if(splash.querySelector('canvas'))throw Error('Canvas fallback lost');}finally{HTMLCanvasElement.prototype.getContext=original;AtelierSurfaces.startupDone();splash.remove();}
+          const animate=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI fixture');};
+          try{AtelierSurfaces.updateDrop('fallback',()=>window.fallbackOpened=true);}finally{Element.prototype.animate=animate;}
+        }""")
+        tab.locator('.k-update-drop').click();assert tab.evaluate('fallbackOpened')
+        tab.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
+        assert not tab.locator('.k-button-pop,.k-project-fall').count()
+        tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))")
+        checks.append('Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles')
         assert tab.evaluate("!AtelierCategoryEmblems.enabled()&&Object.keys(AtelierCategoryEmblems.names).length===36")
         checks.append('Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; the 36 category candidates remain disabled pending D4 review')
         review=context.new_page()

@@ -5,7 +5,8 @@
 (() => {
   'use strict';
   const records = new WeakMap(), live = new Set();
-  const reduced = (window.AtelierMotionPolicy?.query() || window.matchMedia('(prefers-reduced-motion: reduce)'));
+  const motionQuery=window.AtelierMotionPolicy?.query()||window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduced={get matches(){return motionQuery.matches||window.AtelierMotionPolicy?.allows(2)===false;},addEventListener:(...args)=>motionQuery.addEventListener(...args)};
   const MAX_CANVASES = 4;
 
   function dispose(record) {
