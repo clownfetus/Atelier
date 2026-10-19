@@ -1,0 +1,44 @@
+name: Attach a verified build artifact to a draft release
+# Copies a file from an earlier workflow run's artifact onto a release inside GitHub, for
+# assets too large to upload reliably from a maintainer's connection. The file must match
+# the release's own SHA256SUMS.txt before it is attached.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Workflow run that built the artifact
+        required: true
+      artifact:
+        description: Artifact name in that run
+        required: true
+      file:
+        description: File inside the artifact
+        required: true
+      tag:
+        description: Release tag
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  attach:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id }}
+      ARTIFACT: ${{ inputs.artifact }}
+      FILE: ${{ inputs.file }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Download, match SHA256SUMS.txt and attach
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -n "$ARTIFACT" -D artifact
+          gh release download "$TAG" -p SHA256SUMS.txt -D sums
+          expected=$(awk -v f="$FILE" '$2==f {print $1}' sums/SHA256SUMS.txt)
+          actual=$(sha256sum "artifact/$FILE" | cut -d' ' -f1)
+          echo "expected=$expected actual=$actual"
+          test -n "$expected" && test "$expected" = "$actual"
+          gh release upload "$TAG" "artifact/$FILE" --clobber
