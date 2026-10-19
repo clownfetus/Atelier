@@ -14,6 +14,9 @@ from atelier import config, jobs
 
 MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
 _PROP_PATH = re.compile(r"(?:^|/)(?:emote|mvp|bullet\w*|projectile\w*|turret\w*|effects?|vfx|summons?|minions?|pets?|demon)(?:/|$)", re.I)
+# These ability/body-part rigs live under Weapons but are not held equipment.
+# Keep them selectable; attaching one automatically can dwarf the body and camera.
+_OPTIONAL_WEAPON = re.compile(r"(?:^|_)(?:DevouringSymbiote(?:_Hand)?|SpikedTentacles|Head|Plane\d*)(?:_|$)", re.I)
 
 
 def skin_meshes(skin_id):
@@ -37,7 +40,8 @@ def skin_meshes(skin_id):
         if gr.casefold() in seen:
             continue
         seen.add(gr.casefold())
-        result.append({"name": name, "game_rel": gr, "kind": "weapon" if weapon else "body"})
+        result.append({"name": name, "game_rel": gr, "kind": "weapon" if weapon else "body",
+                       **({'auto_equip': not bool(_OPTIONAL_WEAPON.search(name))} if weapon else {})})
     return sorted(result, key=lambda r: (r["kind"] == "weapon", r["game_rel"].casefold()))
 
 

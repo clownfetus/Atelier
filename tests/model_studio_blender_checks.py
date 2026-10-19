@@ -27,6 +27,8 @@ def main():
         weapons=[row for row in meshes if row['kind']=='weapon']
         if args.weapon:
             weapons=[row for row in weapons if row['game_rel'] in args.weapon];assert len(weapons)==len(args.weapon),args.weapon
+        else:
+            weapons=[row for row in weapons if row.get('auto_equip',True)]
         # One ordinary held weapon per case; Magik also tests independent dual copies.
         selected=[{'game_rel':weapon['game_rel'],'hand':'both' if skin=='1029001' else 'auto'} for weapon in (weapons if args.weapon else weapons[:1])]
         print('Exporting real Blender scene '+skin,flush=True)

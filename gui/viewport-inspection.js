@@ -252,6 +252,11 @@ export function createViewportInspection(api) {
     $('viewport-region-legend').hidden = !regions || showcaseMode;
   }
 
+  // three.js rebuilds a shader on its own for only a few changes. Texture slots, side and blending
+  // also select the shader variant, so a display copy compiled before its source's maps arrived
+  // must be rebuilt: otherwise a late black emissive mask leaves the whole part glowing white.
+  const variantSlots=['map','alphaMap','emissiveMap','normalMap','bumpMap','aoMap','lightMap','roughnessMap','metalnessMap','displacementMap','specularMap','gradientMap'];
+  const shaderVariant=m=>variantSlots.map(key=>m[key]?1:0).join('')+[m.side,m.transparent,m.blending,m.vertexColors,m.flatShading,m.alphaHash,m.premultipliedAlpha,m.toneMapped].join();
   function displayMaterial(source, original, showcase,comic=false) {
     if (!source.visible) return source;
     const base = original ? originals.get(source) || source : source;
@@ -262,16 +267,16 @@ export function createViewportInspection(api) {
       pair = {standard:base.clone(), flat:new THREE.MeshBasicMaterial(),toon:new THREE.MeshToonMaterial({gradientMap:toonGradient})}; variants.set(base, pair);
     }
     if(comic){
-      const toon=pair.toon,oldMap=toon.map,oldAlpha=toon.alphaTest,oldSide=toon.side;
+      const toon=pair.toon,oldMap=toon.map,oldAlpha=toon.alphaTest,variant=shaderVariant(toon);
       toon.color.copy(base.color||new THREE.Color(0xffffff));toon.emissive.copy(base.emissive||new THREE.Color(0));
       for(const key of ['map','alphaMap','emissiveMap','normalMap','bumpMap','aoMap','displacementMap'])toon[key]=base[key]||null;
       for(const key of ['side','transparent','opacity','alphaTest','depthWrite','depthTest','blending','emissiveIntensity','normalMapType','bumpScale','aoMapIntensity','displacementScale','displacementBias'])if(base[key]!==undefined)toon[key]=base[key];
       if(base.normalScale)toon.normalScale.copy(base.normalScale);toon.wireframe=false;toon.clippingPlanes=null;toon.visible=source.visible;
-      if(oldMap!==toon.map||oldAlpha!==toon.alphaTest||oldSide!==toon.side)toon.needsUpdate=true;
+      if(oldMap!==toon.map||oldAlpha!==toon.alphaTest||variant!==shaderVariant(toon))toon.needsUpdate=true;
       return toon;
     }
     const material = flat ? pair.flat : pair.standard;
-    const oldMap = material.map, oldWireframe = material.wireframe, oldToneMapped = material.toneMapped;
+    const oldMap = material.map, oldWireframe = material.wireframe, variant = shaderVariant(material);
     if (flat) {
       material.map = overlay || (lighting === 'emissive' ? base.emissiveMap : base.map);
       material.color.copy(lighting === 'emissive' && !overlay ? base.emissive : overlay ? new THREE.Color(0xffffff) : base.color);
@@ -283,7 +288,7 @@ export function createViewportInspection(api) {
     material.wireframe = !showcase && wireframe;material.visible=source.visible;
     // Tween disposable display colors in linear space, preserving exact saved values.
     if (!overlay) effects.tint(material,base,showcase,lighting==='emissive');
-    if (oldMap !== material.map || oldWireframe !== material.wireframe || oldToneMapped !== material.toneMapped) material.needsUpdate = true;
+    if (oldMap !== material.map || oldWireframe !== material.wireframe || variant !== shaderVariant(material)) material.needsUpdate = true;
     return material;
   }
 

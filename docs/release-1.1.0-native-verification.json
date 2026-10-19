@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "release_version": "1.1.0",
+  "verified_at_utc": "2026-10-18T23:56:28.893084+00:00",
+  "source_base_commit": "5631bd47d52b9ecb82db960df460ae8df15f7521",
+  "tested_source_sha256": {
+    "atelier/added_assets.py": "76d64e55dfb2ace5ddc75228bcc7757bd8ee0234ceaef7c40d6d972870b00649",
+    "atelier/handlers/mesh.py": "77969d326018a950feb77fca5f21ae4c43b3ff7be9773ee15c19c49f49cbff23",
+    "atelier/handlers/meshstudio.py": "a8bcae8c9d6a1eb7be46de93ea0fd7c4a20207f07adea920d7288ede00e9b509",
+    "atelier/handlers/meshport.py": "e80e2d6f26679e29298750f3013b778d95a1d4f628d79e06d140176def3b6adf",
+    "atelier/handlers/meshreplace.py": "40dbc50547cf970da08bce6e01fd2bc9c5ee810f038f2490dabc3ca752879c52",
+    "atelier/handlers/meshtextures.py": "f6d0a12556da1a124149d6a8710c76ecef735bd66b65ad9518b1e1ecac30e317",
+    "atelier/handlers/meshimages.py": "3827cfe1627a9b245c258f87eff140d1b6bfa3dad69131ba7aadffe37d63f30c",
+    "atelier/handlers/material.py": "78cc1666db67220be9dc0301ef5123a1a6f5faf9e8be1e865279ffa161722886",
+    "atelier/handlers/custom_texture.py": "d4c841981f36890fa917933c3efe4182cb5c02150b0b8b8c2b8063db8b0c2a4d",
+    "atelier/handlers/texture.py": "27eaecabc0ac7c85e1f4b014a08dc9921753dfcd7720ca5c4640855835430a8e",
+    "atelier/storage.py": "959c61382ac84343ee6af9b48e1f0aa7dc3e76d8e6369faf1f03394d021abfd6",
+    "gui/viewport.js": "053189de377eb8f467ac2031aa0fe9157715318e961af89f1ca48f03658a2901",
+    "gui/viewport-attachments.js": "a19a3f3e884ffe566974622104afac5a107bee6a9483204dc5ed99b0d4641939",
+    "gui/viewport-inspection.js": "d3d8b7f10cc29096ff9ad555f5a0e0af2d2d4679c5809c471384c0e1acc93adb"
+  },
+  "backend": {
+    "suite_count": 41,
+    "passed": true,
+    "expected_legacy_native_skips": 2,
+    "evidence": {
+      "report": "backend-final/results.json",
+      "sha256": "c25642454a04019d351d20c014c45e029b5a234f54074ef6effdfa9cf814586b"
+    }
+  },
+  "native_checks": [
+    {
+      "feature": "Named texture, material and skeletal mesh additions",
+      "passed": true,
+      "checks": [
+        "native add and library/Mod tray discovery for texture, material and mesh",
+        "renamed mesh retains its skeleton, materials and LODs",
+        "added mesh creates a local GLB preview without Blender or a game index entry",
+        "added texture edits, material edits and unchanged mesh build together",
+        "all three custom package paths and export names survive native container readback; the texture decodes"
+      ],
+      "evidence": {
+        "report": "native-added-assets-fixed/results.json",
+        "sha256": "627e4ca1791350c0c3f7961381bbb3a530875933e82d5298d0aa69586e485c6e"
+      }
+    },
+    {
+      "feature": "Custom DXT1 and BC5 texture package locations",
+      "passed": true,
+      "checks": [
+        "real material loaded; chosen folder/name persist after changing both custom slot images",
+        "native compilation preserves both chosen texture export names, package paths, formats and material import links",
+        "production build_mod publishes a complete native container set with no skipped assets",
+        "unpacked native containers retain the exact folder, export names, Texture2D material links and untouched texture parameters",
+        "both unpacked textures retain their 64x64 resolution, format and decoded pixel hashes",
+        "source project hashes and game container metadata remain unchanged; outputs are report-local"
+      ],
+      "seconds": 67.91,
+      "evidence": {
+        "report": "native-custom-textures/results.json",
+        "sha256": "c8e54e6df4ac50b348ac746ef7a58780a4b4eae5194f23b9d0aab11c772cb449"
+      }
+    },
+    {
+      "feature": "Combined imported body and both weapons",
+      "passed": true,
+      "mesh_count": 3,
+      "material_count": 2,
+      "custom_texture_count": 8,
+      "packages_read_back": 13,
+      "evidence": {
+        "report": "combined-body-guns/results.json",
+        "sha256": "12a97948ba21df7ed0a1003a662f1500fb8dc0a5afb54ea707b273703f9b0b55"
+      }
+    },
+    {
+      "feature": "Fresh FBX weapon and four-texture bundle native container readback",
+      "passed": true,
+      "mesh_count": 1,
+      "material_count": 1,
+      "custom_texture_count": 4,
+      "evidence": {
+        "report": "replacement-weapon-native-readback.json",
+        "sha256": "946c41aeb0f22643b9905290d96730605d4b1ee1d77c0a2fc04e504059884d41"
+      }
+    },
+    {
+      "feature": "Saved section visibility export",
+      "passed": true,
+      "lod_count": 4,
+      "streamed_bytes_verified": 421143,
+      "evidence": {
+        "report": "model-visibility-readback/results.json",
+        "sha256": "1382801b52e95d1fe3863c8568cb4b4e294c5ee8f9acf87095bba7618d8cb2f7"
+      }
+    },
+    {
+      "feature": "Real PSK body replacement",
+      "passed": true,
+      "lod_count": 4,
+      "original_skeleton_preserved": true,
+      "rig_bones": 429,
+      "preview_bounds_metres": [
+        1.1702043414115906,
+        2.1171974469616544,
+        1.1002855598926544
+      ],
+      "input_file_hashes_unchanged": true,
+      "evidence": {
+        "report": "replacement-body/results.json",
+        "sha256": "c985fc6d4680eb96a8d96bbbe40f753b56a7737a209c10a8ed41fc62454e7bcc"
+      }
+    },
+    {
+      "feature": "Real FBX weapon replacement with material bundle",
+      "passed": true,
+      "lod_count": 4,
+      "original_skeleton_preserved": true,
+      "rig_bones": 6,
+      "preview_bounds_metres": [
+        0.5551813133060932,
+        0.31052764505147934,
+        0.1225239746272564
+      ],
+      "input_file_hashes_unchanged": true,
+      "evidence": {
+        "report": "replacement-weapon-final/results.json",
+        "sha256": "3de74532b388e7984bb126e0db2e1e0c8490bb7a2d50a81f9842d0adc36c5bea"
+      }
+    },
+    {
+      "feature": "Portable Blender export: Magik body and both held swords",
+      "passed": true,
+      "blender": "5.1.2",
+      "mesh_count": 3,
+      "packed_images": 52,
+      "pose_deformation_verified": true,
+      "maximum_restoration_error": 0.0,
+      "file_saved_during_audit": false,
+      "evidence": {
+        "report": "blender-reopen-magik.json",
+        "sha256": "bf6a749082034abc335a13ae97f81563bc751b803a610df4e2590b0569692728"
+      }
+    },
+    {
+      "feature": "Portable Blender export: Venom default body without optional ability props",
+      "passed": true,
+      "blender": "5.1.2",
+      "mesh_count": 1,
+      "packed_images": 21,
+      "pose_deformation_verified": true,
+      "maximum_restoration_error": 0.0,
+      "file_saved_during_audit": false,
+      "evidence": {
+        "report": "blender-reopen-venom-default-final.json",
+        "sha256": "dd87689fa19edab08fb1fe63968a8a68b049f9caed611f9d0a919b0a1faef598"
+      }
+    },
+    {
+      "feature": "Portable Blender export: Adam Warlock MAGUS body",
+      "passed": true,
+      "blender": "5.1.2",
+      "mesh_count": 1,
+      "packed_images": 35,
+      "pose_deformation_verified": true,
+      "maximum_restoration_error": 0.0,
+      "file_saved_during_audit": false,
+      "evidence": {
+        "report": "blender-reopen-1046500.json",
+        "sha256": "bd22e6768fd352d51ac4c0363e67386d93309278195a252e5ac37b3d2c7aa613"
+      }
+    }
+  ],
+  "isolation": {
+    "private_application_data_and_projects": true,
+    "game_mod_installation_performed": false,
+    "user_input_files_modified": false,
+    "game_container_writes_performed": false
+  },
+  "limitations": [
+    "No in-game rendering or gameplay playtest was performed.",
+    "Game-specific shader effects, runtime physics and animation controls are not recreated in exported Blender scenes.",
+    "These native workflow runs used Windows; Linux/Wine asset workflows were not exercised by this report."
+  ],
+  "private_data_excluded": [
+    "AES keys",
+    "mapping contents",
+    "game assets",
+    "project contents",
+    "absolute user source-file paths"
+  ],
+  "source_hash_normalization": "Decode UTF-8 text, normalize CRLF and lone CR line endings to LF, then hash its UTF-8 bytes. Any existing BOM is preserved.",
+  "updated_at_utc": "2026-10-19T00:18:10.250771+00:00",
+  "post_native_source_changes": [
+    {
+      "file": "gui/viewport.js",
+      "native_runs_sha256": "6abeb6597e6809b50ff1919fd2e5b032052e694f68cd0358d4bffc225ac29fdf",
+      "final_sha256": "053189de377eb8f467ac2031aa0fe9157715318e961af89f1ca48f03658a2901",
+      "change": "Preview base-colour selection prefers the canonical BaseTint over effect colours such as VenousGrowthBaseColor (three added lines in pickBaseIdx)."
+    },
+    {
+      "file": "gui/viewport-inspection.js",
+      "native_runs_sha256": "ca77b1e8f2230c1f1470ad25ee92d9b2ec7a93099ce844f4ce2ae211c34f4358",
+      "final_sha256": "d3d8b7f10cc29096ff9ad555f5a0e0af2d2d4679c5809c471384c0e1acc93adb",
+      "change": "Inspect and Showcase display copies rebuild their shader when texture slots, side or blending change after the first frame."
+    }
+  ],
+  "post_native_source_note": "Both changes affect browser preview rendering only and were made after the native export, readback and Blender runs listed above; those runs were not repeated. They are covered by preview_checks and the frontend regressions in tests/test_model_studio_frontend.py.",
+  "preview_checks": [
+    {
+      "feature": "Model Studio Inspect and Showcase material preview: real Venom 1035001",
+      "passed": true,
+      "checks": [
+        "previous inspection code with T_Common_Black emissive masks held for 4 s reproduces the flat white head in Inspect (head luminance 239)",
+        "final code under the same forced late masks and under a natural load renders the textured face, teeth and tongue in Inspect (head luminance 191) and Showcase",
+        "captures switch Inspect, Showcase and back to Inspect with the pointer away from the model; no hover outline is shown",
+        "console errors match the pre-fix baseline: missing catalogue art in the isolated data and an undecodable control-rig mesh",
+        "browser suites --viewport-only, --showcase-only, --viewport-loading-only, --surfaces-only and --changelog-only passed"
+      ],
+      "evidence": [
+        {
+          "report": "venom-inspect-fix/control-head-delayed/results.json",
+          "sha256": "e71d77f91022682a08f49ae2b2e45f108dc639486e88aef4aa2846ef75046610"
+        },
+        {
+          "report": "venom-inspect-fix/fixed-delayed/results.json",
+          "sha256": "09a775b1d7616f04a0a367a55ae1fbce93385035fcea73110026b29c487d9505"
+        },
+        {
+          "report": "venom-inspect-fix/fixed-natural/results.json",
+          "sha256": "91833d8a73efff6ab1a995fc2443e9e7b9f1bc92b8aa73f2734a03da427915bd"
+        },
+        {
+          "report": "venom-inspect-fix/fixed-natural/venom-inspect.png",
+          "sha256": "89167dea58ddadeae4e7e4e5693150a3fda4c330becc7644b6a8a8752ff85589"
+        },
+        {
+          "report": "venom-inspect-fix/fixed-natural/venom-showcase.png",
+          "sha256": "721ed6f2651c861e19ce16d6b648b9970ba58206bf0b66830b41fa5dbed9fa87"
+        },
+        {
+          "report": "browser-inspect-fix/surfaces/results.json",
+          "sha256": "3eea4fb8e386d177f6535ec45ee3067360a1fd90c1c0cd1e2e8016465a42ed2e"
+        }
+      ]
+    }
+  ]
+}

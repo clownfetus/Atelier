@@ -14,6 +14,17 @@ class PublicationRecoveryError(RuntimeError):
     """A replacement could not be rolled back; callers must not reuse its output."""
 
 
+def _filesystem_path(path, *, force=False):
+    """Use Windows extended paths internally without changing public artifact paths."""
+    path = os.fspath(path)
+    if os.name != 'nt' or path.startswith('\\\\?\\'):
+        return path
+    absolute = os.path.abspath(path)
+    if not force and len(absolute) < 248:
+        return path
+    return '\\\\?\\UNC\\' + absolute[2:] if absolute.startswith('\\\\') else '\\\\?\\' + absolute
+
+
 def atomic_json(path, data, **kwargs):
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
@@ -55,7 +66,7 @@ def _rollback(folder, destination, entries):
         name = entry["name"]
         if not _plain_name(name):
             raise RuntimeError("Invalid publication journal")
-        target = os.path.join(destination, name)
+        target = _filesystem_path(os.path.join(destination, name))
         if entry["had_old"]:
             backup = os.path.join(folder, "backup", name)
             if not os.path.isfile(backup):
@@ -73,12 +84,13 @@ def recover_publications(destination):
     Caller must hold the publication lock. Unknown/incomplete journals are retained
     for inspection; no path supplied by a journal is trusted outside its directory.
     """
+    destination = _filesystem_path(destination)
     if not os.path.isdir(destination):
         return
     for name in os.listdir(destination):
         if not name.startswith(_PREFIX):
             continue
-        folder = os.path.join(destination, name)
+        folder = _filesystem_path(os.path.join(destination, name), force=True)
         if not os.path.isdir(folder) or os.path.islink(folder):
             continue
         journal = os.path.join(folder, "journal.json")
@@ -98,7 +110,7 @@ def publish_files(sources, destination):
     backups allow the next publication to recover after process interruption.
     No game files outside the explicit artifact set are touched.
     """
-    sources = [os.path.abspath(p) for p in sources]
+    sources = [_filesystem_path(os.path.abspath(p)) for p in sources]
     names = [os.path.basename(p) for p in sources]
     if not sources or len(set(n.lower() for n in names)) != len(names):
         raise ValueError("Empty or duplicate mod artifact set")
@@ -107,11 +119,14 @@ def publish_files(sources, destination):
     for p in sources:
         if not os.path.isfile(p) or not os.path.getsize(p):
             raise RuntimeError("Missing or empty mod artifact: " + os.path.basename(p))
-    destination = os.path.abspath(destination)
+    public_destination = os.path.abspath(destination)
+    destination = _filesystem_path(public_destination)
     with _publish_lock:
         os.makedirs(destination, exist_ok=True)
         recover_publications(destination)
-        folder = tempfile.mkdtemp(prefix=_PREFIX, dir=destination)
+        # Journal children add enough depth to exceed MAX_PATH even when each
+        # final asset path fits. This spelling also covers rollback and cleanup.
+        folder = tempfile.mkdtemp(prefix=_PREFIX, dir=_filesystem_path(destination, force=True))
         os.makedirs(os.path.join(folder, "new"))
         os.makedirs(os.path.join(folder, "backup"))
         entries, publishing = [], False
@@ -121,7 +136,7 @@ def publish_files(sources, destination):
                 shutil.copy2(src, staged)
                 if _digest(src) != _digest(staged):
                     raise RuntimeError("Artifact copy failed verification: " + name)
-                target = os.path.join(destination, name)
+                target = _filesystem_path(os.path.join(destination, name))
                 had_old = os.path.exists(target)
                 if had_old:
                     shutil.copy2(target, os.path.join(folder, "backup", name))
@@ -130,7 +145,7 @@ def publish_files(sources, destination):
             atomic_json(journal, {"state": "publishing", "entries": entries})
             publishing = True
             for name in names:
-                os.replace(os.path.join(folder, "new", name), os.path.join(destination, name))
+                os.replace(os.path.join(folder, "new", name), _filesystem_path(os.path.join(destination, name)))
             atomic_json(journal, {"state": "committed", "entries": entries})
         except Exception as error:
             if publishing:
@@ -144,7 +159,7 @@ def publish_files(sources, destination):
             raise
         # A cleanup failure after commit must not turn a successful publication into a failure.
         shutil.rmtree(folder, ignore_errors=True)
-    return [os.path.join(destination, n) for n in names]
+    return [os.path.join(public_destination, n) for n in names]
 
 
 def recover_destination(destination):

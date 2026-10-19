@@ -164,6 +164,9 @@ function pickBaseIdx(colors) {
   const score = n => {
     n = (n || '').toLowerCase();
     if (/emissive|glow|spec|rim|fresnel|subsurf|sss|ambient|shadow|_ao\b/.test(n)) return -10;
+    // A global tint takes precedence over colours for a named material effect,
+    // e.g. Venom's VenousGrowthBaseColor must not replace its white BaseTint.
+    if (/^(?:base[ _-]?(?:color|tint)|albedo|diffuse)(?:[ _-]?color)?$/.test(n)) return 8;
     if (/base.?color|albedo|diffuse/.test(n)) return 6;
     if (/main.?color|body.?color|skin.?color/.test(n)) return 5;
     if (/^color$|_color\b|tint/.test(n)) return 4;
@@ -473,7 +476,7 @@ function syncAttachments() {
     const choices=bodies.map(body=>bindWeapon(weapon,body,weapon.hand==='both'?'right':weapon.hand || 'auto')).filter(Boolean)
       .sort((a,b)=>(b.joints?.length || 0)-(a.joints?.length || 0));
     weapon.binding=choices[0] || null;
-    const side=weapon.binding?.side || 'r',automatic=!occupied.has(side);
+    const side=weapon.binding?.side || 'r',automatic=weapon.autoEquip!==false && !occupied.has(side);
     weapon.root.visible=!!weapon.binding && (weapon.enabled ?? automatic);
     if(weapon.root.visible)occupied.add(side);
     if (weapon.root.visible) updateWeapon(weapon,weapon.binding);
@@ -1354,7 +1357,7 @@ async function open(skinId, title, preferredMesh=null) {
         if (kind!=='weapon') animation.register(gltf);
         gltf.scene.visible = kind!=='weapon' && !objects.some(object=>object.kind!=='weapon');
         modelRoot.add(gltf.scene);
-        objects.push({ name: meshes[i].name, kind, root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf),
+        objects.push({ name: meshes[i].name, kind, autoEquip:meshes[i].auto_equip!==false, root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf),
           ...(kind==='weapon'&&meshes[i].game_rel===preferredMesh?{enabled:true}:{}) });
         meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
         loaded++;

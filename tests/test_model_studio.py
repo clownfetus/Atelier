@@ -96,6 +96,16 @@ class Studio(unittest.TestCase):
         with patch('atelier.paths.skin_entries', return_value=[('Characters/1029/1029001/Meshes/SK_Body.uasset','')]):
             self.assertEqual([r['kind'] for r in meshstudio.skin_meshes('1029001')], ['body'])
 
+    def test_ability_meshes_remain_selectable_without_automatic_equipping(self):
+        names = ['SK_WP_1035001_DevouringSymbiote', 'SK_WP_1035001_DevouringSymbiote_Hand',
+                 'SK_WP_1035001_Head', 'SK_EQPT_1035001_Plane', 'SK_WP_1036001_Plane02',
+                 'SK_WP_1035001_SpikedTentacles', 'SK_WP_1035001_Sword', 'SK_WP_1035001_Gun_L']
+        entries = [('Characters/1035/1035001/Weapons/Parts/' + name + '.uasset', '') for name in names]
+        with patch('atelier.paths.skin_entries', return_value=entries):
+            rows = meshstudio.skin_meshes('1035001')
+        self.assertEqual({row['name'] for row in rows}, set(names))
+        self.assertEqual({row['name'] for row in rows if row['auto_equip']}, set(names[-2:]))
+
     def test_import_reference_beats_a_real_but_wrong_same_named_material(self):
         model=type('Model', (), {'materials':[{'slot_name':'MI_Body_01','pkg_idx':-1}]})()
         document={'Imports':[{'OuterIndex':-2,'ObjectName':'MI_Body'}, {'ObjectName':'/Game/Marvel/Characters/1029/1029001/Materials/MI_Body'}]}

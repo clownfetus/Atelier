@@ -2,7 +2,8 @@
 
 Requires Playwright in the test interpreter and an installed WebView2 runtime.
 Game browsing uses explicit HTTP fixtures; no game tools, exports or installs run.
-The application starts hidden, uses a fresh data directory and closes after checks.
+The application starts hidden, shows without focus for visual checks, uses a fresh
+data directory and closes after checks.
 """
 import argparse
 import ctypes
@@ -180,6 +181,15 @@ def main():
             assert info['logo'] > 0 and info['emptyTray'] == 112 and info['singleMark'] == 1, info
             result['interface'] = info
             result['checks'].append('All workflow modules, shared timing, Krackle controllers, local font and latest logo load from the frozen bundle')
+            # WebView2 throttles rendering in hidden native windows, including
+            # screenshots. Show only this isolated test window, without focus.
+            stop_hiding.set(); hider.join(timeout=2)
+            @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+            def show_viewer(hwnd, _):
+                pid=ctypes.c_ulong();ctypes.windll.user32.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
+                if pid.value==process.pid:ctypes.windll.user32.ShowWindow(hwnd,4)
+                return True
+            ctypes.windll.user32.EnumWindows(show_viewer,0)
             for theme in ('light', 'dark'):
                 page.locator('#settings-theme').select_option(theme, force=True)
                 assert page.evaluate('document.documentElement.dataset.theme') == theme
@@ -208,16 +218,6 @@ def main():
                 with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}{path}',timeout=10) as reply:
                     assert 'no-store' in reply.headers.get('Cache-Control', ''), path
             result['checks'].append('HTML and frontend assets prevent stale caching after the upgrade')
-            if args.viewer_checks or args.roster_checks or args.viewer_followups:
-                # WebView2 throttles animation frames in hidden native windows.
-                # Show only this isolated test window, without taking focus.
-                stop_hiding.set(); hider.join(timeout=2)
-                @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-                def show_viewer(hwnd, _):
-                    pid=ctypes.c_ulong();ctypes.windll.user32.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
-                    if pid.value==process.pid:ctypes.windll.user32.ShowWindow(hwnd,4)
-                    return True
-                ctypes.windll.user32.EnumWindows(show_viewer,0)
             if args.viewer_checks:
                 from viewport_inspection_checks import run_viewport_inspection_checks
                 source=Path(__file__).resolve().parents[1]/'gui'

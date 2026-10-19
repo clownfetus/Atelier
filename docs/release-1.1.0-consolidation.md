@@ -27,6 +27,16 @@ custom texture locations, and Model Studio editing, replacement and Blender expo
   smaller windows. Unchanged mesh exports are labelled accurately.
 - Small skeletal accessories with short name tables now parse after class and
   asset identity checks, resolving a real Venom accessory's section-mapping failure.
+- Venom's oversized ability meshes stay available for manual selection but no
+  longer auto-equip over the body in the initial preview.
+- Inspect display copies rebuild their shader when an emissive mask, other map,
+  side or blending arrives after the first frame. Venom's black emissive masks
+  could otherwise leave the head or torso glowing as a flat white/gray silhouette.
+  The preview tint also prefers the canonical `BaseTint` over effect colors such
+  as `VenousGrowthBaseColor`. Both are preview-only changes made after the native
+  export runs; they are covered by real Venom captures and frontend regressions.
+- Windows publication uses extended paths internally so its private transaction
+  can exceed the normal path limit while retaining verification and recovery.
 - Previously separate Home, identity, artwork, loading and viewer checks now
   run in the full browser release gate. The new Blender export check exercises
   project-scoped HTTP jobs, progress, failure, retry and Activity history.
@@ -37,6 +47,9 @@ Local checks cover backend regressions, both-theme responsive screenshots,
 custom texture and named-asset native build/readback, and real Model Studio and
 Blender workflows. Synthetic browser geometry is labelled as such. Native checks
 use isolated project/export directories and do not install mods into the game.
+The [native verification record](release-1.1.0-native-verification.json) lists
+the tested workflows, source hashes and evidence hashes without game assets or
+private project data.
 
 The release workflow reruns the final committed backend/browser checks and verifies
 the packaged WebView2 application, including its exact bundled changelog. Installer

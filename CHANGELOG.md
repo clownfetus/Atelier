@@ -15,6 +15,8 @@ The app, installers and update checker identify each release by its full number,
   Mod tray and Build mod flow, with collision protection and Delete/Undo support.
 - Copied skeletal meshes retain streamed detail levels and their bulk data.
   Incomplete uploaded meshes are rejected before changing the project.
+- Deep Windows export folders no longer fail when temporary publication paths
+  exceed the ordinary path limit; verified copies, rollback and recovery are retained.
 - Model replacement accepts model ZIPs or companion files together, with
   texture-bundle controls and a separate body/weapon destination picker. It keeps
   the game rig, checks all detail levels and can retain untouched sections.
@@ -24,6 +26,10 @@ The app, installers and update checker identify each release by its full number,
   groups material controls and previews held weapons with hand selection.
 - Small skeletal accessories with short name tables now load their section mapping
   after their mesh class and asset identity are verified.
+- Venom's ability props start hidden instead of obscuring the body as an automatic
+  held weapon. They remain available in the Model menu and as individual assets.
+- Inspect no longer shows a part as a flat white or gray silhouette when its emissive
+  mask loads late. Preview tints prefer a material's main base tint over effect colors.
 - Model and Blender exports report their actual preparation/build stages and
   offer cancellation. Preview settings and Showcase effects remain separate from edits.
 

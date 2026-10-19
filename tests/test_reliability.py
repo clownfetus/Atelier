@@ -306,6 +306,31 @@ class Reliability(unittest.TestCase):
         self.assertTrue(all(Path(p).read_bytes().startswith(b"new") for p in result))
         self.assertTrue(all(Path(p).read_bytes().startswith(b"unrelated") for p in other))
 
+    def test_deep_publication_keeps_normal_paths_and_rolls_back(self):
+        # The final asset fits MAX_PATH; the private journal/new/asset does not.
+        destination = self.mods / ('deep-' + 'x' * (210 - len(str(self.mods)) - 6))
+        stem = 'MI_WP_1066001_Gun_01'
+        sources = triple(self.root / 'new' / stem, b'new')
+        old = triple(destination / stem, b'old')
+        self.assertGreater(len(str(destination / '.atelier-publish-12345678' / 'new' / (stem + '.ucas'))), 260)
+        real_replace, failed = S.os.replace, False
+        def fail(src, dst):
+            nonlocal failed
+            if str(dst) == old[1] and not failed:
+                failed = True
+                raise PermissionError('locked second deep artifact')
+            return real_replace(src, dst)
+        with patch.object(S.os, 'replace', fail):
+            with self.assertRaises(PermissionError):
+                S.publish_files(sources, str(destination))
+        self.assertTrue(failed)
+        self.assertTrue(all(Path(path).read_bytes().startswith(b'old') for path in old))
+        result = S.publish_files(sources, str(destination))
+        self.assertEqual(result, old)
+        self.assertFalse(any(path.startswith('\\\\?\\') for path in result))
+        self.assertTrue(all(Path(path).read_bytes().startswith(b'new') for path in result))
+        self.assertFalse(list(destination.glob('.atelier-publish-*')))
+
     def test_failed_build_preserves_previous_export_and_other_staging(self):
         old = triple(self.out / "Demo_9999999_P", b"old")
         marker = self.cache / "build_stage/other/keep"

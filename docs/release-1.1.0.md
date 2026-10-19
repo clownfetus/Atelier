@@ -27,7 +27,8 @@ through container build and readback.
 - Section eye controls save hidden parts into the exported mesh and restore them
   independently, including sections that share a material.
 - Better texture recovery, custom texture assignments, grouped material controls
-  and held-weapon hand selection improve inspection.
+  and held-weapon hand selection improve inspection. Parts stay textured when
+  their masks load late, and previews use each material's main base tint.
 - Export progress follows preparation and build stages and supports cancellation.
   Inspect/Showcase presentation remains separate from saved edits.
 

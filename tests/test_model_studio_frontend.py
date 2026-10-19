@@ -11,6 +11,91 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which('node'),'Node is unavailable')
 class Frontend(unittest.TestCase):
+    def test_global_base_tint_precedes_effect_colours(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('function pickBaseIdx(colors)');
+const end=source.indexOf('// The emissive glow',start);
+assert.ok(start>=0 && end>start);
+const environment={};vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+const choose=names=>environment.pickBaseIdx(names.map(name=>({name})));
+assert.equal(choose(['BaseTint','VenousGrowthBaseColor','VenousGrowthColor']),0);
+assert.equal(choose(['VenousGrowthBaseColor','BaseTint']),1,'Order must not select the effect tint');
+assert.equal(choose(['EmissiveColor','BaseColor','RimColor']),1);
+assert.equal(choose(['FabricTint','SkinColor']),1,'Retain descriptive base-colour fallback');
+assert.equal(choose(['EmissiveColor','FresnelTint']),-1,'Do not tint the whole surface from lighting colours');
+console.log('PASS canonical base tint and effect colour selection');
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],
+                              capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
+    def test_optional_ability_mesh_needs_explicit_selection(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('function syncAttachments()');
+const end=source.indexOf('// One row per top-level mesh',start);
+assert.ok(start>=0 && end>start);
+const body={kind:'body',root:{visible:true}};
+const ability={kind:'weapon',autoEquip:false,root:{visible:false}};
+const sword={kind:'weapon',root:{visible:false}};
+const environment={objects:[body,ability,sword],matsByName:{},embeddedWeaponMaterials:()=>[],
+ bindWeapon:(_weapon,body)=>({side:'r',body}),updateWeapon:()=>{}};
+vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+environment.syncAttachments();
+assert.equal(ability.root.visible,false,'An optional ability rig must not obscure the body on open');
+assert.equal(sword.root.visible,true,'An ordinary held weapon still equips automatically');
+ability.enabled=true;environment.syncAttachments();
+assert.equal(ability.root.visible,true,'Explicit selection must make the optional effect available');
+assert.equal(sword.root.visible,false,'An explicitly selected rig reserves its hand');
+ability.enabled=false;environment.syncAttachments();
+assert.equal(ability.root.visible,false);assert.equal(sword.root.visible,true);
+body.root.visible=false;environment.syncAttachments();
+assert.equal(ability.root.visible,false);assert.equal(sword.root.visible,false);
+console.log('PASS optional ability selection and ordinary held weapon defaults');
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],
+                              capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
+    def test_display_copy_rebuilds_when_late_maps_change_shader_variant(self):
+        with tempfile.TemporaryDirectory(prefix='atelier-studio-three-') as folder:
+            folder=Path(folder)
+            vendor=(ROOT/'gui/vendor/three').as_uri()
+            loader=folder/'loader.mjs'
+            loader.write_text("export async function resolve(name,context,next){if(name==='three')return {url:"+json.dumps(vendor+'/three.module.min.js')+",shortCircuit:true};return next(name,context);}",encoding='utf-8')
+            script=folder/'checks.mjs'
+            script.write_text(r'''
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import * as THREE from 'three';
+const source=fs.readFileSync(process.argv[2],'utf8');
+const start=source.indexOf('const variantSlots='),end=source.indexOf('// Showcase honours View settings',start);
+assert.ok(start>=0 && end>start);
+const displayMaterial=new Function('THREE','originals','overlays','variants','toonGradient','effects',
+  "let lighting='studio',regions=false,wireframe=false;"+source.slice(start,end)+';return displayMaterial;')(
+  THREE,new Map(),new Map(),new Map(),null,{tint:()=>{}});
+// Venom's parts carry a white emissive colour masked by a black emissive texture that loads late.
+const part=new THREE.MeshStandardMaterial();part.emissive.set(0xffffff);part.emissiveIntensity=1.2;
+let shown=displayMaterial(part,false,false);const compiled=shown.version;
+assert.equal(displayMaterial(part,false,false).version,compiled,'An unchanged part keeps its compiled shader');
+part.emissiveMap=new THREE.Texture();part.needsUpdate=true;
+shown=displayMaterial(part,false,false);
+assert.equal(shown.emissiveMap,part.emissiveMap);
+assert.ok(shown.version>compiled,'A late emissive mask must rebuild the Inspect display shader');
+const masked=shown.version;part.side=THREE.DoubleSide;
+assert.ok(displayMaterial(part,false,false).version>masked,'Side selects a shader variant');
+const card=new THREE.MeshStandardMaterial();let toon=displayMaterial(card,false,true,true);const toonCompiled=toon.version;
+card.normalMap=new THREE.Texture();toon=displayMaterial(card,false,true,true);
+assert.equal(toon.normalMap,card.normalMap);assert.ok(toon.version>toonCompiled,'The Showcase copy follows the same rule');
+console.log('PASS display copies rebuild for late maps and surface variants');
+''',encoding='utf-8')
+            result=subprocess.run([shutil.which('node'),'--no-warnings','--experimental-loader',loader.as_uri(),str(script),str(ROOT/'gui/viewport-inspection.js')],
+                                  capture_output=True,text=True,encoding='utf-8',timeout=30)
+            self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
     def test_blender_export_requires_one_visible_body_and_uses_visible_weapons(self):
         script=r'''
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
