@@ -37,8 +37,11 @@ jobs:
           set -euo pipefail
           gh run download "$RUN_ID" -n "$ARTIFACT" -D artifact
           gh release download "$TAG" -p SHA256SUMS.txt -D sums
-          expected=$(awk -v f="$FILE" '$2==f {print $1}' sums/SHA256SUMS.txt)
+          expected=$(tr -d '\r' < sums/SHA256SUMS.txt | awk -v f="$FILE" '$2==f {print $1}')
           actual=$(sha256sum "artifact/$FILE" | cut -d' ' -f1)
           echo "expected=$expected actual=$actual"
-          test -n "$expected" && test "$expected" = "$actual"
+          # An && list is exempt from set -e, so fail explicitly.
+          if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+            echo "::error::$FILE does not match the release's SHA256SUMS.txt"; exit 1
+          fi
           gh release upload "$TAG" "artifact/$FILE" --clobber
