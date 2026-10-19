@@ -2733,6 +2733,14 @@ def api_model_blender_export():
     return _submit_job('blender-export','Export model to Blender',lambda job:export(body.get('game_rel',''),body.get('weapons',[])))
 
 
+@app.post('/api/model_blender_send')
+def api_model_blender_send():
+    from atelier.handlers.meshport import send_to_blender
+    body = request.json or {}
+    return _submit_job('blender-send', 'Send model to running Blender',
+                       lambda job: send_to_blender(body.get('game_rel', ''), body.get('weapons', [])))
+
+
 @app.post('/api/model_blender_open')
 def api_model_blender_open():
     from atelier.handlers.meshport import destination
