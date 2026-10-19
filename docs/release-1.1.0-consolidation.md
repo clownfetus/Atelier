@@ -55,6 +55,9 @@ The release workflow reruns the final committed backend/browser checks and verif
 the packaged WebView2 application, including its exact bundled changelog. Installer
 checks on Windows 2022 and 2025 cover clean install, running upgrade from **1.0.0**,
 changelog acknowledgement, reinstall and uninstall with preserved user data.
+After the running upgrade, the Windows check reloads to DOM readiness and then
+asserts the upgraded library and theme; on Windows 2022 the full page `load`
+event repeatedly exceeded 30 s, so it is no longer awaited.
 Ubuntu checks cover the actual **1.0.0 AppImage** upgrade, GTK/WebKit setup, native
 tools and preserved data. Inputs are pinned by SHA-256.
 

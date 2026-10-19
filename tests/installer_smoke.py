@@ -481,7 +481,9 @@ ConvertTo-Json -InputObject $items -Compress
                 route.fulfill(json=value) if value is not None else route.continue_()
             context.route('**/api/**', fixture)
             context.route('https://**', lambda route: route.fulfill(json={}))
-            page.reload()
+            # The UI assertions below are the gate; Windows 2022's WebView2 can hold the full
+            # load event past 30 s after an upgrade, so don't also wait for every subresource.
+            page.reload(wait_until='domcontentloaded')
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 4 && document.documentElement.dataset.theme === 'dark'")
             # Historical manifests can still exercise installers from before this feature.
             has_changelog = (upgrade / '_internal/gui/changelog.js').is_file()
