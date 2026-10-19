@@ -473,7 +473,10 @@ export function createViewportInspection(api) {
     $('viewport-playback').inert = true; $('viewport-capture-menu').inert = true;
     $('viewport-fit').disabled = true; api.refreshEdits?.();
     const blenderDisabled = $('viewport-blender-btn').disabled;
-    $('viewport-blender-btn').disabled = true; $('viewport-expand').disabled = true;
+    const liveDisabled = $('viewport-blender-send')?.disabled;
+    $('viewport-blender-btn').disabled = true;
+    if ($('viewport-blender-send')) $('viewport-blender-send').disabled = true;
+    $('viewport-expand').disabled = true;
     const size = renderer.getSize(new THREE.Vector2()), ratio = renderer.getPixelRatio();
     const saved = {position:camera.position.clone(), up:camera.up.clone(), target:controls.target.clone(), aspect:camera.aspect,
       near:camera.near, far:camera.far, fitOnResize, enabled:controls.enabled, min:controls.minDistance, max:controls.maxDistance};
@@ -520,7 +523,9 @@ export function createViewportInspection(api) {
       $('viewport-tools').inert = false; $('viewport-inspect-tools').inert = false;
       $('viewport-materials').inert = false;
       $('viewport-playback').inert = false; $('viewport-capture-menu').inert = false;
-      $('viewport-blender-btn').disabled = blenderDisabled; $('viewport-expand').disabled = false;
+      $('viewport-blender-btn').disabled = blenderDisabled;
+      if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
+      $('viewport-expand').disabled = false;
       $('viewport-capture-cancel').hidden = true; api.refreshEdits?.(); refresh(); api.resize();
       $('viewport-status').textContent = controller.signal.aborted ? 'Capture cancelled' : 'Capture finished';
     }
