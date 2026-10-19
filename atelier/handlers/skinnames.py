@@ -6,9 +6,11 @@ UI can label them. Purely cosmetic — nothing downstream depends on the names.
 """
 import os, re
 from atelier.config import TOOLS, dir_glob
+from atelier.skin_name_fixes import correct_skin_name
 
 _NAME = "MarvelRivalsCharacterIDs.md"
 _CACHE = None      # {"skins": {skin_id: {"skin": name, "char": id, "char_name": name}}, "chars": {id: name}}
+_CACHE_STAMP = None
 
 
 def _md_path():
@@ -47,14 +49,18 @@ def _parse():
             cur_char, cur_name = cid, cname
             chars[cid] = cname
         if re.fullmatch(r"\d{6,7}", sid):         # a skin row (present on both char and skin lines)
-            skins[sid] = {"skin": sname, "char": cur_char, "char_name": cur_name}
+            skins[sid] = {"skin": correct_skin_name(sid, sname), "char": cur_char, "char_name": cur_name}
     return {"skins": skins, "chars": chars}
 
 
 def _data():
-    global _CACHE
-    if _CACHE is None:
+    global _CACHE, _CACHE_STAMP
+    source = _md_path()
+    try:stamp = (source, os.stat(source).st_mtime_ns)
+    except OSError:stamp = (source, None)
+    if _CACHE is None or stamp != _CACHE_STAMP:
         _CACHE = _parse()
+        _CACHE_STAMP = stamp
     return _CACHE
 
 
