@@ -1,0 +1,166 @@
+{
+  "date": "2026-10-20",
+  "branch": "codex/consolidated-integrations",
+  "code_commit": "5d20527f97178d5bbb2a948812686118d24c6bde",
+  "worktrees": {
+    "before": 12,
+    "after": 1,
+    "archived_snapshots": 11,
+    "retired_saved_files_verified": 284,
+    "mismatches": 0
+  },
+  "backend": {
+    "suites": 44,
+    "failures": 0,
+    "report": "checks-accepted/results.json"
+  },
+  "safety_followup": [
+    {
+      "suite": "test_upstream_integrations.py",
+      "exit_code": 0,
+      "seconds": 0.72,
+      "summary": [
+        "Ran 12 tests in 0.201s"
+      ]
+    },
+    {
+      "suite": "test_mesh_optimizer.py",
+      "exit_code": 0,
+      "seconds": 0.48,
+      "summary": [
+        "Ran 4 tests in 0.185s"
+      ]
+    }
+  ],
+  "texture_followup": [
+    {
+      "suite": "test_upstream_integrations.py",
+      "exit_code": 0,
+      "seconds": 0.75,
+      "summary": [
+        "Ran 11 tests in 0.211s"
+      ]
+    },
+    {
+      "suite": "test_reliability.py",
+      "exit_code": 0,
+      "seconds": 1.28,
+      "summary": [
+        "Ran 28 tests in 0.538s"
+      ]
+    },
+    {
+      "suite": "test_thumbnails.py",
+      "exit_code": 0,
+      "seconds": 1.16,
+      "summary": [
+        "Ran 11 tests in 0.441s"
+      ]
+    }
+  ],
+  "browser": {
+    "exit_code": 0,
+    "seconds": 285.08,
+    "report": "checks-browser-final/browser_smoke/results.json"
+  },
+  "native_blender": {
+    "fixture": "Generated geometry; no game assets",
+    "sections": [
+      {
+        "material": 0,
+        "before": 1058,
+        "after": 422,
+        "vertices": 258,
+        "bytes": 17111,
+        "engine": "meshoptimizer",
+        "error": 0.005691469646990299,
+        "triangles": 422
+      },
+      {
+        "material": 1,
+        "before": 1058,
+        "after": 422,
+        "vertices": 258,
+        "bytes": 17111,
+        "engine": "meshoptimizer",
+        "error": 0.005690511781722307,
+        "triangles": 422
+      }
+    ]
+  },
+  "native_texture": {
+    "metadata": {
+      "w": 128,
+      "h": 128,
+      "fmt": "DXT1",
+      "mips": 8
+    },
+    "pooled": true,
+    "legacy": true,
+    "equal_pixels": true,
+    "size": [
+      128,
+      128
+    ],
+    "source_unchanged": true
+  },
+  "frozen_optimizer_probe": {
+    "passed": true,
+    "report": "frozen-build.log"
+  },
+  "changed_source_secret_scan": {
+    "files": 42,
+    "findings": []
+  },
+  "source_sha256": {
+    "Atelier.spec": "aa31b243c1f86a001ab866dcc2d0af4299325618a7ed0563e95a1147be680fc0",
+    "CHANGELOG.md": "ad67e96b14ed58d144a6d8fcc035fc5eb7c2d9b319d7714f75a8eeca2977f126",
+    "atelier/added_assets.py": "988019da0f64cdbb14c9f9fb76444441e8769fac2f5f2d1bdb7f8f0529d3bfa3",
+    "atelier/blender/material_nodes.py": "9de34347ef649ee29a2c919ed0136c3206d796aa05b95d370e8f0b58598df3a6",
+    "atelier/blender/psk_reader.py": "66a96936b29ca852c3b2969923274b5f0069f6950b27b51cd4017a297320a4f0",
+    "atelier/handlers/animation.py": "0ada31eb7c86246e5b85ab4a22bb8788706e3da656c3368d0244366efc3e8bbd",
+    "atelier/handlers/material.py": "2633b282a7faa44794d5d7d46f8e1b7eb25ac176dbcff01ff9f813abf53eccd2",
+    "atelier/handlers/mesh.py": "035bf965d56ee2d4a400e934c8c164c18612b83f138cca7174ec68ab1a08e7cb",
+    "atelier/handlers/meshedit.py": "7185736a71502e7cfe9bdf73ddda8f3e43d5f984f6558bc9dcfcb05ba9338174",
+    "atelier/handlers/meshmat.py": "effe3f349737521e01f79594860e881d6047d78a53290e96871b07cd7a173b41",
+    "atelier/handlers/meshstudio.py": "c3c181f465d951b2e8bc23a4d915fe223ef93d59917f20d4bdc32b7c38636234",
+    "atelier/handlers/meshsurvey.py": "bff34ee57f50816787187b9a3f90752a25a8830ffe601fe188a1c1b81a72cfb7",
+    "atelier/handlers/texture.py": "1e8281279956be54a72325e19d5fc4d32059ab4387396e1c6b089a2d71706914",
+    "atelier/index.py": "df030dae8ccde28a37fbbbb9ca8def056f30b81a75b5b7f936e60a96cf67dab9",
+    "atelier/inflight.py": "234c0fab2d9dcb4b33112a80453352721457ce369ce0ef05cfd4887261d58279",
+    "atelier/mesh_optimizer.py": "72818d2aed72edaad87d32db50d66c0d9c0271bb82fcb948ad501823170f8626",
+    "atelier/paths.py": "ff87c466157844dde4246a49c82b4f41210012e9a9a96e270507e921e6afb652",
+    "atelier/tools.py": "50d39dea2562feb2993c27d2e4f9acb7d09dd2be1388e6f79093df257aebe982",
+    "atelier/unreal_refs.py": "5571e09e4baba10971aeac9e2508f33b4346399d8da396e3c710efc6931253ef",
+    "atelier/vendor/meshoptimizer/LICENSE.md": "3883a2d559eedbb462336d9c0b0e8855589d0dfac46a343819add053be8e5569",
+    "atelier/vendor/meshoptimizer/README.md": "02a252d4004548a91a12d6ed1f9c1ec2ebd8db1b775feedf85f3b20941fd9278",
+    "atelier/vendor/meshoptimizer/simplifier.wasm": "a357a388a66eb7b039d888c8f44e3de1fd23c1e82f4ad19d89f48f080340e9b2",
+    "atelier/web/app.py": "62857ccf354e3460172d76a3ce573d50d762674c61c29a7ebb1128c30213fa30",
+    "atelier/web/browse.py": "37375b580e772133b428540c39847e84cec76052d727a2e9d3c68ad0d054e3ec",
+    "atelier/web/routes.py": "7c594fbfeae73181a8ae72fa989b62871262a4568a0c567ceb32366da89eafda",
+    "gui/app.js": "8f8a0534569b03f64c9a27f1c4cc856064ebc04e7073c58f25fd23aab192b655",
+    "gui/index.html": "9aff81e575183523fa8786dc6f7cec80442f418ac42d71f95209db7e9c4d8dca",
+    "gui/library-tools.css": "9b7d5ff8e0de9669cad7a26ee27476d977f0bf2f09008f3f6c3125ab5fa66136",
+    "gui/roster.css": "d556d8a9dcbe9a0bb6ed1322d429bf798ff610618ef8ddadf3ae6e034ec991a5",
+    "gui/s-maps.css": "d029135423cf4c8d5d3d247bcc54d3f5ec99a4aa16d8b3a984f4512158a8a205",
+    "gui/style.css": "6f644adea7e59f591b4d643c4132c28922bd7dad23a21d8bb14c14ced9754c4e",
+    "requirements.txt": "488cb9d6ddd6b6889c1395e9f9706dea8fdfc4914f1adff502f9872cbb65f9f2",
+    "scripts/vendor_meshoptimizer.py": "26829231e3fc05fdd232bd2684b9b8b076410c76f5eaaa8a031c3438dbadfddd",
+    "tests/added_assets_browser_checks.py": "20fd96e03e0d5ea62193fed46e12f39d30b72282230a03946852991d9333f140",
+    "tests/home_layout_checks.py": "aa47b4f09681d4708c400f66ea7e0779e34934a631cf6979168f7f58f7e771e4",
+    "tests/native_mesh_optimizer.py": "2bd1ecdb67f044cfb412e87371f34368b711e631a5aa30b0890c61edf12ebd04",
+    "tests/test_added_assets.py": "356a2ebe0c641488e862af6624491de7a198fbcecca1726f63f526b6d36ebef8",
+    "tests/test_custom_textures.py": "e7c88043d9d801c3647d2d762b8d90227866f672e7233f5def5c44a98bbbb293",
+    "tests/test_local_api_guard.py": "9fa8595e29adddf25f8f4d889362e7e7605ef1cd1036d6cffc36312ad1ea8e0a",
+    "tests/test_mesh_optimizer.py": "152b4da6b305401c26311d21238dae6bb8eee42e21b86b3a635239747f051773",
+    "tests/test_upstream_integrations.py": "95358f9641968e015e263b324b44d7d60838334fed5c19ab8f672fdcf0998404",
+    "tests/test_viewport_features.py": "8bbcf3a78ee574458552d121d00b439d5e8a45cfcf90697ad0912af6fcd29de5"
+  },
+  "limits": [
+    "No in-game execution",
+    "No Linux native run",
+    "No full installer build",
+    "No .uemodel importer",
+    "16-bit cooked skin-weight rebuilds remain blocked"
+  ]
+}

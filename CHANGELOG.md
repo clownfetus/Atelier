@@ -5,6 +5,18 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+### Asset pipeline and layout
+
+- Share Blender texture images without mixing color and data-map color spaces.
+- Read 16-bit skin weights for previews and preserve material gameplay tags in
+  portable Blender exports. Unsupported 16-bit rebuilds stop safely.
+- Follow nested package references and validate extracted PNGs before replacing
+  existing files. Repeated imported bone influences accumulate correctly.
+- Generate lower model detail levels with meshoptimizer while retaining section
+  borders, vertex channels and skinning boundaries.
+- Give Mod tray actions and the Continue card consistent spacing, including
+  narrow panes and both themes.
+
 ### Security
 
 - Websites open in your browser can no longer control Atelier while it runs. The local
