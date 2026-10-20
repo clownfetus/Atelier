@@ -20,6 +20,7 @@ os.environ['ATELIER_DATA_DIR'] = _data.name
 from atelier.handlers.mesh import Mesh
 from atelier.handlers import mesh, meshsurvey, meshmat, meshstudio
 from atelier.unreal_refs import imported_package
+from atelier.blender.psk_reader import normalized_weights
 from atelier.handlers import texture
 from PIL import Image as PillowImage
 
@@ -181,6 +182,13 @@ class ImportReferences(unittest.TestCase):
                         [{'ObjectName':'/Script/Engine.Material'}], ['broken']):
             self.assertIsNone(imported_package({'Imports':imports}, -1))
         self.assertIsNone(imported_package({'Imports':[{'ObjectName':'/Game/Marvel/MI_Body'}]}, True))
+
+
+class ImportedInfluences(unittest.TestCase):
+    def test_duplicate_vertex_bone_entries_accumulate_and_normalize_per_vertex(self):
+        source = [(.2, 0, 1), (.3, 0, 1), (.5, 0, 2), (.2, 1, 1), (.2, 1, 2), (0, 2, 0)]
+        result = {(point, bone):weight for weight, point, bone in normalized_weights(source)}
+        self.assertEqual(result, {(0, 1):.5, (0, 2):.5, (1, 1):.5, (1, 2):.5})
 
 
 if __name__ == '__main__':
