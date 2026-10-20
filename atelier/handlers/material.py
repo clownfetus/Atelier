@@ -67,14 +67,12 @@ def texture_slots(d):
         ii = -idx - 1
         if not (0 <= ii < len(imports)):
             continue
-        outer = imports[ii].get("OuterIndex")
-        pkg_import = None
-        if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
-            pkg_import = imports[-outer - 1]
-        pkg = (pkg_import or {}).get("ObjectName")
-        if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
+        from atelier.unreal_refs import imported_package
+        package = imported_package(d, idx)
+        if package:
+            pkg_import, game_rel = package
             out[nm] = {"entry": e, "value": pv, "import": imports[ii], "package": pkg_import,
-                       "game_rel": pkg[len("/Game/Marvel/"):],
+                       "game_rel": game_rel,
                        "class": imports[ii].get("ClassName") or ""}
     return out
 

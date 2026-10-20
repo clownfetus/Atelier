@@ -19,6 +19,7 @@ atexit.register(_data.cleanup)
 os.environ['ATELIER_DATA_DIR'] = _data.name
 from atelier.handlers.mesh import Mesh
 from atelier.handlers import mesh, meshsurvey, meshmat, meshstudio
+from atelier.unreal_refs import imported_package
 from atelier.handlers import texture
 from PIL import Image as PillowImage
 
@@ -162,6 +163,24 @@ class CookedMaterialTags(unittest.TestCase):
             manifest = meshmat.build_manifest('Meshes/SK_Body', model)
         self.assertEqual(manifest['slots']['Body']['gameplay_tags'], tags)
         self.assertNotIn('hidden_sections', manifest['slots']['Body'])
+
+
+class ImportReferences(unittest.TestCase):
+    def test_nested_imports_keep_the_full_package_and_live_reference(self):
+        package = {'ObjectName':'/Game/Marvel/Characters/Body/MI_Shared'}
+        document = {'Imports':[{'ObjectName':'MI_Shared', 'OuterIndex':-2},
+                               {'ObjectName':'Nested', 'OuterIndex':-3}, package]}
+        record, relative = imported_package(document, -1)
+        self.assertIs(record, package)
+        self.assertEqual(relative, 'Characters/Body/MI_Shared')
+        self.assertEqual(meshmat._mi_from_imports(document, -1), relative)
+
+    def test_cycles_invalid_indices_and_escaping_packages_do_not_resolve(self):
+        for imports in ([{'OuterIndex':-1}], [{'OuterIndex':True}], [{'OuterIndex':-99}],
+                        [{'ObjectName':'/Game/Marvel/../../escape'}],
+                        [{'ObjectName':'/Script/Engine.Material'}], ['broken']):
+            self.assertIsNone(imported_package({'Imports':imports}, -1))
+        self.assertIsNone(imported_package({'Imports':[{'ObjectName':'/Game/Marvel/MI_Body'}]}, True))
 
 
 if __name__ == '__main__':

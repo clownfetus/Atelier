@@ -104,19 +104,9 @@ def _mesh_json(mesh_game_rel, work_base):
 
 def _mi_from_imports(d, pkg_idx):
     """FPackageIndex -> MI game_rel via the import table (same walk as material._mat_textures)."""
-    imports = (d or {}).get("Imports", [])
-    if not isinstance(pkg_idx, int) or pkg_idx >= 0:
-        return None
-    ii = -pkg_idx - 1
-    if not (0 <= ii < len(imports)):
-        return None
-    outer = imports[ii].get("OuterIndex")
-    pkg = None
-    if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
-        pkg = imports[-outer - 1].get("ObjectName")
-    if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
-        return pkg[len("/Game/Marvel/"):]
-    return None
+    from atelier.unreal_refs import imported_package
+    package = imported_package(d, pkg_idx)
+    return package[1] if package else None
 
 
 def resolve_mesh_materials(mesh_game_rel, mesh, work_base=None):
