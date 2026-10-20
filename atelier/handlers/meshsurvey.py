@@ -112,9 +112,12 @@ def _try_extras_any_bonecount(d, o, limit):
         (ntag,) = struct.unpack_from("<I", d, o)
         if not 0 <= ntag <= 64:
             return None
+        if o + 4 + ntag * 8 > limit:
+            return None
+        tags = [struct.unpack_from('<ii', d, o + 4 + i*8) for i in range(ntag)]
         o += 4 + ntag * 8
         mats.append({"pkg_idx": pkg, "pkg_off": o-44-ntag*8, "slot_name_idx": slot[0],
-                     "imported_slot_name_idx": imported[0]})
+                     "imported_slot_name_idx": imported[0], 'tag_names': tags})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)

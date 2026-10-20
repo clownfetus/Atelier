@@ -18,6 +18,7 @@ _data = tempfile.TemporaryDirectory(prefix='atelier-upstream-')
 atexit.register(_data.cleanup)
 os.environ['ATELIER_DATA_DIR'] = _data.name
 from atelier.handlers.mesh import Mesh
+from atelier.handlers import mesh, meshsurvey
 from atelier.handlers import texture
 from PIL import Image as PillowImage
 
@@ -129,6 +130,21 @@ class TexturePublication(unittest.TestCase):
                 texture.texture_info(str(base)); self.assertEqual(worker.call_count, 1)
                 companion.write_bytes(b'new export data')
                 texture.texture_info(str(base)); self.assertEqual(worker.call_count, 2)
+
+
+class CookedMaterialTags(unittest.TestCase):
+    def test_tagged_material_layout_retains_fname_values_and_number_suffixes(self):
+        material = struct.pack('<i4i', -1, 0, 0, 0, 0)+bytes(20)
+        material += struct.pack('<i4i', 2, 1, 0, 2, 2)
+        skeleton = struct.pack('<I', 8)+bytes(8*12)+struct.pack('<I', 8)+bytes(8*80)+struct.pack('<I', 8)+bytes(8*12)
+        data = struct.pack('<I', 1)+material+skeleton
+        for parser in (mesh._try_extras, meshsurvey._try_extras_any_bonecount):
+            parsed = parser(data, 0, len(data))
+            self.assertIsNotNone(parsed)
+            materials = mesh.resolve_materials(parsed['materials'], ['MI_Body', 'MaterialTag.Body', 'MaterialTag.Number'])
+            self.assertEqual(materials[0]['gameplay_tags'], ['MaterialTag.Body', 'MaterialTag.Number_1'])
+        with self.assertRaisesRegex(ValueError, 'gameplay-tag'):
+            mesh.resolve_materials([{'slot_name_idx':0, 'imported_slot_name_idx':0, 'tag_names':[(99, 0)]}], ['MI_Body'])
 
 
 if __name__ == '__main__':

@@ -210,9 +210,12 @@ def _try_extras(d, o, limit):
         (ntag,) = struct.unpack_from("<I", d, o)
         if not 0 <= ntag <= 64:
             return None
+        if o + 4 + ntag * 8 > limit:
+            return None
+        tags = [struct.unpack_from('<ii', d, o + 4 + i*8) for i in range(ntag)]
         o += 4 + ntag * 8
         mats.append({"pkg_idx": pkg, "pkg_off": pkg_off,
-                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0]})
+                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0], 'tag_names': tags})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)
@@ -336,6 +339,12 @@ def resolve_materials(mats, names):
         m["slot_name"] = names[m["slot_name_idx"]] if 0 <= m["slot_name_idx"] < len(names) else None
         m["imported_slot_name"] = (names[m["imported_slot_name_idx"]]
                                    if 0 <= m["imported_slot_name_idx"] < len(names) else None)
+        tags = []
+        for index, number in m.get('tag_names', []):
+            if not 0 <= index < len(names) or number < 0:
+                raise ValueError('Invalid material gameplay-tag name')
+            tags.append(names[index] + ('_' + str(number-1) if number else ''))
+        m['gameplay_tags'] = tags
     return mats
 
 
