@@ -82,7 +82,7 @@ class IdleDiscovery(unittest.TestCase):
     mesh='Characters/1029/1029100/Meshes/10291/SK_Test'
 
     def test_candidates_prefer_matching_rig_and_exclude_halfbody_and_aimoffset(self):
-        entries=[(p,'pak') for p in [
+        entries=[(p,'pak','Marvel/Content/Marvel/') for p in [
             'Characters/1029/1029001/Animations/10290/HeroDetails/Lobby_Stand_Idle.uasset',
             'Characters/1029/1029001/Animations/10291/HeroDetails/Lobby_Half_Idle.uasset',
             'Characters/1029/1029001/Animations/10291/HeroDetails/Lobby_Stand_Idle_AO.uasset',
@@ -100,7 +100,7 @@ class IdleDiscovery(unittest.TestCase):
             run.assert_not_called()
 
     def test_flat_mesh_folders_discover_body_idle_without_weapon_or_partial_clips(self):
-        entries=[(p,'pak') for p in [
+        entries=[(p,'pak','Marvel/Content/Marvel/') for p in [
             'Characters/1057/1057001/Animations/HeroDetails/Lobby_Stand_Idle.uasset',
             'Characters/1057/1057001/Animations/HeroDetails/Lobby_Half_Idle.uasset',
             'Characters/1057/1057001/Weapons/Animations/Lobby_Stand_Idle.uasset']]

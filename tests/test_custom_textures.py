@@ -209,7 +209,7 @@ class CustomTextureTests(unittest.TestCase):
 
     def test_chosen_location_survives_image_changes_and_rewires_export(self):
         self.assign()
-        with patch('atelier.added_assets.ensure_index', return_value=[]):
+        with patch('atelier.index.ensure_index', return_value=[]):
             custom = CT.set_location(MI, 'BaseColor', 'Hood_Paint', '/Game/Marvel/MyMod/Textures', str(self.project))
             self.assertEqual(custom['BaseColor']['game_rel'], 'MyMod/Textures/T_Hood_Paint')
             self.assign(filename='different.png', data=png(color=(30,40,50,255)))
@@ -230,12 +230,12 @@ class CustomTextureTests(unittest.TestCase):
         for name in ('T_../Bad', 'T_bad.name', 'T_bad name', 'T_', 'T_'+'x'*61):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 CT.set_location(MI, 'BaseColor', name, 'MyMod/Textures', str(self.project))
-        with patch('atelier.added_assets.ensure_index', return_value=[('mymod/textures/t_paint.uasset',)]):
+        with patch('atelier.index.ensure_index', return_value=[('mymod/textures/t_paint.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/')]):
             with self.assertRaisesRegex(ValueError, 'already exists in the game'):
                 CT.set_location(MI, 'BaseColor', 'T_Paint', 'MyMod/Textures', str(self.project))
         self.assertEqual(CT.public(MI, str(self.project)), before)
         self.assertEqual(self.stored(), stored)
-        with patch('atelier.added_assets.ensure_index', return_value=[]):
+        with patch('atelier.index.ensure_index', return_value=[]):
             self.assign(slot='Normal')
             CT.set_location(MI, 'BaseColor', 'T_Paint', 'MyMod/Textures', str(self.project))
             with self.assertRaisesRegex(ValueError, 'Another material texture slot'):
@@ -244,7 +244,7 @@ class CustomTextureTests(unittest.TestCase):
             other.parent.mkdir(parents=True, exist_ok=True); other.write_bytes(png())
             with self.assertRaisesRegex(ValueError, 'already exists in this project'):
                 CT.set_location(MI, 'Normal', 'T_Other', 'MyMod/Textures', str(self.project))
-        with patch('atelier.added_assets.ensure_index', return_value=[('MyMod/Textures/T_Paint.uasset',)]), \
+        with patch('atelier.index.ensure_index', return_value=[('MyMod/Textures/T_Paint.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/')]), \
              patch.object(CT, 'get_import_root', return_value=str(self.project)):
             with self.assertRaisesRegex(ValueError, 'already exists in the game'):
                 M.stage_material(str(self.stage), MI, {}, {})
@@ -259,7 +259,7 @@ class CustomTextureTests(unittest.TestCase):
     def test_location_api_uses_the_originating_project_and_validates_the_slot(self):
         self.assign()
         body = {'game_rel': MI, 'slot': 'BaseColor', 'name': 'Chosen', 'folder': 'MyMod/Textures'}
-        with patch('atelier.added_assets.ensure_index', return_value=[]):
+        with patch('atelier.index.ensure_index', return_value=[]):
             result = json.loads(self.call('POST', '/api/material_custom_texture/location', body=body)[1])
             self.assertTrue(result['ok'], result)
             self.assertEqual(result['custom_textures']['BaseColor']['game_rel'], 'MyMod/Textures/T_Chosen')

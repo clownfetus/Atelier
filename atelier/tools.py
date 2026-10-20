@@ -321,7 +321,10 @@ class _PoolWorker:
     def request(self, req, secs):
         from atelier import jobs
         if self.proc is None or self.proc.poll() is not None:
-            self.proc, self.q = _spawn_worker()
+            try:
+                self.proc, self.q = _spawn_worker()
+            except OSError as error:
+                return {'success':False, 'message':f'UAssetTool worker could not start: {error}'}
         try:
             self.proc.stdin.write(json.dumps(_host_req(req)) + "\n"); self.proc.stdin.flush()
         except Exception as e:
