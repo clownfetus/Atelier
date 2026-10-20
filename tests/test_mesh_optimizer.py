@@ -2,11 +2,13 @@
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from atelier.mesh_optimizer import simplify_section
+from atelier import mesh_optimizer
 
 
 def grid(side=24):
@@ -23,6 +25,13 @@ def grid(side=24):
 
 
 class MeshOptimizer(unittest.TestCase):
+    def test_changed_module_is_rejected_before_compilation(self):
+        mesh_optimizer._runtime.cache_clear()
+        with patch.object(mesh_optimizer, '_WASM') as module:
+            module.read_bytes.return_value = b'changed module'
+            with self.assertRaisesRegex(RuntimeError, 'checksum'):
+                mesh_optimizer._runtime()
+
     def test_real_reduction_keeps_every_channel_on_its_original_vertex(self):
         original = grid(); before = original['triangles'].copy()
         result, report = simplify_section(original, .3)

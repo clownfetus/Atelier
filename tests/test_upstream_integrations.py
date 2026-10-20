@@ -75,6 +75,12 @@ class CookedSkinWeights(unittest.TestCase):
             np.testing.assert_array_equal(decoded[:, :4], [indices]*2)
             np.testing.assert_allclose(values.sum(axis=1), [1, 1])
 
+    def test_unsupported_16_bit_rebuild_stops_before_touching_the_mesh(self):
+        model = types.SimpleNamespace(lods=[{'bone_index_16':True}])
+        with self.assertRaisesRegex(NotImplementedError, 'cannot yet be rebuilt safely'):
+            Mesh.rebuild_lod(model, 0, [])
+        self.assertEqual(model.lods, [{'bone_index_16':True}])
+
     def test_variable_offsets_are_byte_offsets_and_keep_the_heaviest_eight(self):
         first = struct.pack('<4H', 300, 301, 65535, 0)
         second = struct.pack('<20H', *range(400, 410), *range(1, 11))
