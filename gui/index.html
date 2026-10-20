@@ -110,7 +110,9 @@
       <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
     <button class="btn" id="bulk-edit-open" type="button" hidden>Bulk VFX / curves</button>
-    <button class="btn" id="process-s-maps" type="button" disabled title="Process all edited _D textures with same-folder S maps. Bicubic resize, Color blend at 100%; S dimensions and alpha are preserved.">Process S maps</button>
+    <!-- The hint sits on a wrapper: a disabled button shows no tooltip of its own. -->
+    <div id="process-s-maps-wrap"><button class="btn" id="process-s-maps" type="button" disabled aria-describedby="process-s-maps-hint">Process S maps</button>
+      <span id="process-s-maps-hint" hidden></span></div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
@@ -235,13 +237,13 @@
             <h3>Model</h3>
             <label class="vp-setting">Preview mesh<select id="viewport-model-choice" aria-label="Preview mesh"></select></label>
             <p id="viewport-model-hint">Preview one mesh at a time, or combine parts below.</p>
-            <details id="viewport-obj-section"><summary>Combine mesh parts <span id="viewport-obj-count"></span></summary>
+            <details id="viewport-obj-section"><summary>Body parts &amp; weapons <span id="viewport-obj-count"></span></summary>
               <div id="viewport-obj-head"><button id="viewport-show-all" class="vp-text-button">Show all parts</button></div>
               <div id="viewport-obj-list"></div>
             </details>
             <div id="viewport-chroma-row" style="display:none"><label for="viewport-chroma">Material set</label><select id="viewport-chroma"></select></div>
             <button id="viewport-mesh-edit" title="Add this model to the edit list and choose a replacement"><i data-lucide="plus" size="16"></i> Add to edit list</button>
-            <button id="viewport-blender-btn" disabled title="Extract the selected mesh for editing in Blender"><i data-lucide="box" size="16"></i> Edit in Blender</button>
+            <button id="viewport-blender-btn" disabled title="Export the visible body and weapons with materials and packed textures"><i data-lucide="box" size="16"></i> Export to Blender</button>
           </div></details>
           <details id="viewport-settings-menu" class="vp-menu"><summary><span>View settings</span><i data-lucide="chevron-down" size="14"></i></summary><div class="vp-popover">
             <h3>View settings</h3>
@@ -266,6 +268,7 @@
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
+      <p id="viewport-showcase-note" hidden>Wireframe and dye regions are Inspect tools; Showcase shows the finished look.</p>
       <details class="vp-shortcuts"><summary>Navigation &amp; shortcuts</summary><p>Drag to orbit · Right-drag to pan · Scroll to zoom<br>F — fit · W — wireframe · G — grid<br>1 — front · 3 — right · 7 — top<br>Double-click a part to frame it.</p><span id="viewport-stats" role="status">No model loaded</span></details>
       </div></details>
         </div>
@@ -841,6 +844,7 @@
 <script src="/static/mod-card-data.js"></script>
 <script src="/static/mod-cards.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>
 </html>

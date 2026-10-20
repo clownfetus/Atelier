@@ -92,6 +92,11 @@ body {
   display: inline-flex;
   align-items: center;
 }
+/* Short of room, ancestors give way first (down to a few letters) and the current folder last. */
+.crumb { flex: 0 1 auto; min-width: 44px; }
+.crumb.active { flex-shrink: .05; min-width: 0; }
+.crumb.crumb-home { flex-shrink: 0; min-width: 0; }
+.crumb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crumb:hover { color: var(--text); background: var(--bg3); }
 .crumb.active { color: var(--text); cursor: default; }
 .crumb.active:hover { background: transparent; }
@@ -126,7 +131,7 @@ body {
 #searchbar:focus-within { border-color: var(--blue); }
 #searchbar svg { color: var(--muted); flex-shrink: 0; width: 20px; height: 20px; }
 #search-input {
-  width: 180px;
+  width: 220px; /* the full placeholder; under 1100px search.js shortens it to fit 140px */
   background: transparent;
   border: none;
   color: var(--text);
@@ -1409,7 +1414,7 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .library-heading h1 { font: var(--studio-type-title); }
 #library-count { font: var(--studio-type-detail); color: var(--muted); }
 .field-label { font: var(--studio-type-detail); color: var(--muted); }
-.sidebar-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 24px 16px; text-align: left; color: var(--muted); font: var(--studio-type-detail); }
+.sidebar-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 100%; box-sizing: border-box; padding: 24px 16px; text-align: center; color: var(--muted); font: var(--studio-type-detail); }
 .sidebar-empty strong { color: var(--text); font-weight: 500; font-size: 14px; }
 .sidebar-empty svg { width: 24px; height: 24px; margin-bottom: 4px; color: var(--muted); }
 .toggle-row { min-height: 32px; font-weight: 400; }

@@ -113,7 +113,7 @@ def _try_extras_any_bonecount(d, o, limit):
         if not 0 <= ntag <= 64:
             return None
         o += 4 + ntag * 8
-        mats.append({"pkg_idx": pkg, "slot_name_idx": slot[0],
+        mats.append({"pkg_idx": pkg, "pkg_off": o-44-ntag*8, "slot_name_idx": slot[0],
                      "imported_slot_name_idx": imported[0]})
     if o + 4 > limit:
         return None

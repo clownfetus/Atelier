@@ -272,7 +272,12 @@ function renderBreadcrumbs() {
   const crumb = (label, navState) => {
     const el = document.createElement(navState === null ? "span" : "button");
     el.className = "crumb" + (navState === null ? " active" : "");
-    el.textContent = label;
+    // The label is its own box so a narrow bar ellipsizes it instead of clipping the whole trail.
+    const text = document.createElement("span");
+    text.className = "crumb-label";
+    text.textContent = label;
+    el.title = label;
+    el.append(text);
     if (navState !== null) el.addEventListener("click", () => pushNav(navState));
     return el;
   };
@@ -285,7 +290,7 @@ function renderBreadcrumbs() {
 
   const parts = nav.path ? nav.path.split("/") : [];
   const homeCrumb = document.createElement(parts.length ? "button" : "span");
-  homeCrumb.className = "crumb" + (parts.length === 0 ? " active" : "");
+  homeCrumb.className = "crumb crumb-home" + (parts.length === 0 ? " active" : "");
   homeCrumb.title = "Asset library";
   homeCrumb.setAttribute("aria-label", "Asset library");
   homeCrumb.innerHTML = '<i data-lucide="house" size="18"></i>';
@@ -336,6 +341,7 @@ function _makeCard(item) {
     iconCls:   assetIconCls(ft),
     imported:  item.imported,
     token:     item.token,
+    swatches:  item.swatches,
     game_rel:  item.game_rel,
     rel_path:  item.rel_path,
     onClick:   () => handleAssetClick(item),
@@ -375,7 +381,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       if (item.type === "folder" && item.label && item.label !== item.name) {
         _pathLabels[item.rel_path] = item.label;
       }
-      if (item.type === 'folder' && item.thumbnail) _folderArtwork[item.rel_path] = {thumbnail:item.thumbnail, heroFallback:item.hero_fallback};
+      if (item.type === 'folder' && item.thumbnail) _folderArtwork[item.rel_path] = {thumbnail:item.thumbnail, heroFallback:item.hero_fallback, banner:item.banner};
     }
 
     AtelierLibraryPins.updateLabels(_pathLabels);
@@ -536,6 +542,8 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
         img.src = `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(project)}`;
       }
       thumb.appendChild(img);
+    } else if (card.imported && card.swatches?.length) {
+      thumb.appendChild(_editedDots(card.swatches));
     } else {
       thumb.appendChild(renderCardIcon(card, el));
     }
@@ -576,11 +584,46 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   area.appendChild(grid);
   if(moreCategories) {
     const more=document.createElement('button');more.className='btn home-category-more';more.textContent=_homeCategoriesExpanded?'Fewer folders':`+${categoryCount-8} more folders`;more.setAttribute('aria-expanded',String(_homeCategoriesExpanded));
-    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});area.append(more);
+    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});grid.append(more);
   }
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
   _gridThumbs?.start(retryThumbs);
+}
+
+// An edited material has no preview, so its saved colours fill the thumb as the Krackle 45° lattice,
+// in diagonal bands. Textures and glyphs being edited keep their own colours through the same
+// lattice as a mask (polish.css).
+function _editedDots(colors) {
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 96 96"); svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+  svg.setAttribute("class", "card-edited-dots"); svg.setAttribute("aria-hidden", "true");
+  const band = 192 / colors.length;
+  for (let y = 3, row = 0; y < 96; y += 6, row++) for (let x = row % 2 ? 9 : 3; x < 96; x += 12) {
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", 4);
+    dot.setAttribute("fill", colors[Math.min(colors.length - 1, Math.floor((x + y) / band))]);
+    dot.style.setProperty("--d", ((x + y) / 192).toFixed(3));
+    svg.append(dot);
+  }
+  return svg;
+}
+
+// The dissolve plays once, when an asset joins the edit list; cards already being edited are still.
+function _playEditDissolve(card) {
+  card.classList.remove("just-edited"); void card.offsetWidth; card.classList.add("just-edited");
+  setTimeout(() => card.classList.remove("just-edited"), 1400);
+}
+
+function _refreshEditedSwatches(gameRel, colors) {
+  const swatches = [...new Set(colors.map(([r, g, b]) => _rgbHex(r, g, b, Math.max(r, g, b, 1))))].slice(0, 6);
+  const item = allItems.find(row => row.game_rel === gameRel);
+  if (item) item.swatches = swatches;
+  const card = [...document.querySelectorAll('#grid-area .card')].find(node => node._libraryCard?.game_rel === gameRel);
+  if (!card || !swatches.length) return;
+  card._libraryCard.swatches = swatches;
+  const thumb = card.querySelector('.card-thumb'), current = thumb.querySelector('.card-edited-dots, .card-icon');
+  if (current) current.replaceWith(_editedDots(swatches));
 }
 
 function updateImportedCard(gameRel, record) {
@@ -592,6 +635,7 @@ function updateImportedCard(gameRel, record) {
   const button = [...grid.querySelectorAll('.card')].find(node => node._libraryCard?.game_rel === gameRel);
   if (button) {
     Object.assign(button._libraryCard, {imported:true, token:record.token});
+    if (!button.classList.contains('imported')) _playEditDissolve(button);
     button.classList.add('imported');
     if (!button.querySelector('.card-editing-badge')) {
       const badge=document.createElement('span');badge.className='card-editing-badge';badge.textContent='Editing';
@@ -1697,7 +1741,7 @@ async function saveMaterial() {
       if (intenLost) message += `\nColour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
         `will reopen with the intensity folded in (same colour in game, different numbers).`;
       notify(message, intenLost || newerEdits ? "warning" : "success", intenLost || newerEdits ? 8000 : 3200);
-      if (project === _activeProjectName) loadSidebar();
+      if (project === _activeProjectName) { loadSidebar(); _refreshEditedSwatches(submitted.game_rel, Object.values(submitted.colors)); }
       if (isCurrent()) {
         const refs = _materialReferences.get(editor);
         if (refs) refs.saved = {
@@ -3856,12 +3900,13 @@ function _ctxItemsSidebar(item) {
 // group, #21 duplicate into Marvel_LQ, #22 remove a texture) plus the dye-off toggle live on the
 // ASSET, not on the app: two projects can ship the same texture differently, so these are stored
 // per project (see project_meta.asset_opts) and shown wherever the asset is.
-const TEXOPT_LABELS = { blank: "blank", no_mips: "no mips", lod_group: "group", dye_off: "no dye",
+// Sidebar opts are stored differences from the defaults: no_mips is on unless stored false.
+const TEXOPT_LABELS = { blank: "blank", no_mips: "keeps mips", lod_group: "group", dye_off: "no dye",
                         lq_twin: "LQ", custom_textures: "own textures" };
 
 function _sbOptBadge(item) {
   const o = item.opts || {};
-  const on = Object.keys(TEXOPT_LABELS).filter(k => o[k]);
+  const on = Object.keys(TEXOPT_LABELS).filter(k => k === "no_mips" ? o[k] === false : o[k]);
   if (!on.length) return "";
   const label = on.map(k => k === "lod_group"
     ? String(o.lod_group).replace("TEXTUREGROUP_", "")
@@ -3952,8 +3997,8 @@ async function saveTexOpts() {
   if (!texOpts) return;
   const st = document.getElementById("texopt-status");
   st.textContent = "Saving…";
-  // Every key is sent, including the ones now off — the server treats false as "remove", which is
-  // how an option that was switched back off stops being an option at all.
+  // Every key is sent, including the ones now off — the server removes any value equal to its
+  // default, which is how an option switched back to its default stops being stored at all.
   const opts = { blank: false, no_mips: false, lq_twin: false, lod_group: "" };
   Object.assign(opts, texOpts.opts);
   try {

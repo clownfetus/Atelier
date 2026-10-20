@@ -1,11 +1,14 @@
 // One-click D/S processing; shared S targets ask for a D map instead of guessing.
 (() => {
   'use strict';
-  const button = document.getElementById('process-s-maps');
+  const button = document.getElementById('process-s-maps'), wrap = document.getElementById('process-s-maps-wrap');
+  const hint = document.getElementById('process-s-maps-hint');
+  const PAIRING = 'Recolours each S map from the D map in its folder (bicubic resize, Color blend at 100%; S size and alpha are kept). Keep both the D and S maps ticked in your Mod tray so the mod ships them together.';
   let busy = false, hasDiffuse = false, plan = null, project = '', overlay, panel, rows, status, applyButton;
   const el = (tag, text, cls) => window.AtelierJobDialogs.el(tag, text, cls);
   function setBusy(value) {
     busy = value; button.disabled = busy || !hasDiffuse;
+    wrap.title = hint.textContent = hasDiffuse ? PAIRING : 'Needs a D map (a texture ending in _D) in your Mod tray first. ' + PAIRING;
     button.textContent = busy ? 'Processing S maps…' : 'Process S maps';
     if (applyButton) applyButton.disabled = busy || !plan ||
       [...rows.querySelectorAll('select')].some(select => !select.value);
@@ -87,4 +90,5 @@
       } catch (error) { failure(error); }
     },
   };
+  setBusy(false);
 })();

@@ -9,14 +9,20 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PIL import Image
-from atelier.catalogue import (Catalogue, PARSER_VERSION, allowed_url,
-                               build_entries, parse_item, parse_cards, parse_ids)
+from atelier.catalogue import (Catalogue, PARSER_VERSION, allowed_url, build_entries, icon_url,
+                               nameplate_url, parse_item, parse_cards, parse_ids)
 
 IMAGE = 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/1/hero.webp'
 HERO = 'https://rivalskins.com/hero/magik/'
 CARDS = f'''<a data-type="costume" href="https://rivalskins.com/item/1/magik/">
  <picture><source srcset="{IMAGE}" type="image/webp"><img alt="Amethyst Armor" src="fallback.png"></picture></a>
  <a data-type="spray"><img src="{IMAGE}" alt="Wrong cosmetic"></a>'''
+PLATES = 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/29/'
+
+
+def nameplate(name, slug='amethyst-armor'):
+    return f'''<a href="https://rivalskins.com/item/2/magik-nameplate-{slug}/" data-type="nameplate">
+     <picture><source srcset="{PLATES}img_icon_{slug}.webp" type="image/webp"><img alt="{name}" src="x.png"></picture></a>'''
 
 
 class CatalogueTests(unittest.TestCase):
@@ -29,6 +35,16 @@ class CatalogueTests(unittest.TestCase):
             '1029': {'name': 'Magik', 'kind': 'hero', 'image': IMAGE},
             '1029100': {'name': 'Amethyst Armor', 'kind': 'skin', 'image': IMAGE}}}))
         self.catalogue = Catalogue(self.root / 'cache', self.seed)
+
+    def test_costume_icons_sit_beside_their_art_and_fallbacks_have_none(self):
+        base = 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/1/'
+        self.assertEqual(icon_url(base + 'img_king-in-white.webp'), base + 'img_icon_king-in-white.webp')
+        self.assertIsNone(icon_url(base + 'img_icon_king-in-white.webp'))
+        self.assertIsNone(icon_url('https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/46/img_nurse-pool.webp'))
+        self.assertIsNone(icon_url(None))
+        self.assertIsNone(self.catalogue.icon('1029'))
+        with patch.dict(self.catalogue.data['entries'], {'1029101': {'name': 'Fallback', 'kind': 'skin', 'image': IMAGE, 'hero_fallback': True}}):
+            self.assertIsNone(self.catalogue.icon('1029101'))
 
     def test_missing_trailing_pipe_and_old_duplicate(self):
         chars = parse_ids('| 1057 | Deadpool | 1057100 | X-Force?\n'
@@ -73,6 +89,53 @@ class CatalogueTests(unittest.TestCase):
         entries = build_entries(chars, roster, lambda _: CARDS,
                                 lambda _: [{'ids': ['1036100'], 'image': IMAGE}])
         self.assertTrue(entries['1029100']['hero_fallback'])  # Conflicting ID overrides the name.
+
+    def test_nameplate_banners_sit_beside_their_card_icons(self):
+        self.assertEqual(nameplate_url(PLATES + 'img_icon_nurse-pool.webp'), PLATES + 'img_nurse-pool.webp')
+        self.assertTrue(allowed_url(PLATES + 'img_nurse-pool.webp'))
+        for icon in (PLATES + 'img_nurse-pool.webp', IMAGE.replace('hero.webp', 'img_icon_hero.webp'),
+                     'https://rivalskins.com.evil/wp-content/uploads/marvel-assets/items/nameplate/29/img_icon_x.webp', None):
+            self.assertIsNone(nameplate_url(icon))
+        cards = parse_cards(CARDS + nameplate('AMETHYST ARMOR'), kind='nameplate')
+        self.assertEqual([(card['name'], card['image']) for card in cards],
+                         [('AMETHYST ARMOR', PLATES + 'img_icon_amethyst-armor.webp')])
+        self.assertEqual(len(parse_cards(CARDS + nameplate('AMETHYST ARMOR'))), 1)  # Costumes stay costumes.
+        wrong_folder = f'<a data-type="nameplate"><img src="{IMAGE}" alt="Amethyst Armor"></a>'
+        self.assertEqual(parse_cards(wrong_folder, kind='nameplate'), [])
+
+    def test_nameplate_matches_only_a_unique_same_named_costume(self):
+        chars = {'1029': {'name': 'Magik', 'skins': {'1029100': 'Amethyst Armor', '1029101': 'Unknown'}}}
+        roster = [{'name': 'Magik', 'image': IMAGE, 'page': HERO}]
+        def build(page):
+            return build_entries(chars, roster, lambda _: page,
+                                 lambda pages: [{'ids': ['1029100'], 'image': IMAGE} for _ in pages])
+        entries = build(CARDS + nameplate('AMETHYST ARMOR') + nameplate('Immortal Magik', 'immortal-magik'))
+        self.assertEqual(entries['1029100']['banner'], PLATES + 'img_amethyst-armor.webp')
+        self.assertNotIn('banner', entries['1029101'])  # Hero-portrait fallbacks never get one.
+        self.assertNotIn('banner', entries['1029'])
+        for page in (CARDS,  # No nameplate in the bundle.
+                     CARDS + nameplate('Amethyst Armour'),  # Close is not the same name.
+                     CARDS + nameplate('AMETHYST ARMOR') + nameplate('Amethyst Armor', 'amethyst-armor-2'),
+                     CARDS * 2 + nameplate('AMETHYST ARMOR')):  # Ambiguous on either side.
+            self.assertNotIn('banner', build(page)['1029100'])
+
+    def test_skin_banner_is_served_only_for_a_matched_nameplate(self):
+        data = io.BytesIO()
+        Image.new('RGBA', (16, 4)).save(data, format='WEBP')
+        banner = PLATES + 'img_amethyst-armor.webp'
+        entries = {'1029100': {'name': 'Amethyst Armor', 'kind': 'skin', 'image': IMAGE, 'banner': banner},
+                   '1029101': {'name': 'Fallback', 'kind': 'skin', 'image': IMAGE, 'banner': banner, 'hero_fallback': True},
+                   '1029102': {'name': 'No plate', 'kind': 'skin', 'image': IMAGE},
+                   '1029103': {'name': 'Not a plate', 'kind': 'skin', 'image': IMAGE, 'banner': IMAGE}}
+        with patch.dict(self.catalogue.data['entries'], entries), \
+             patch('atelier.catalogue.fetch', return_value=(data.getvalue(), {})) as get:
+            self.assertTrue(self.catalogue.banner('1029100').is_file())
+            get.assert_called_once_with(banner)
+            for key in ('1029', '1029101', '1029102', '1029103', '1029999', '../1029100'):
+                self.assertIsNone(self.catalogue.banner(key))
+            self.assertEqual(self.catalogue.describe('Characters/1029/1029100')['banner'], '/api/catalogue/banner/1029100')
+            for path in ('Characters/1029', 'Characters/1029/1029101', 'Characters/1029/1029102', 'Characters/1029/1029999'):
+                self.assertIsNone(self.catalogue.describe(path)['banner'])
 
     def test_npcs_are_not_playable_heroes(self):
         entries = build_entries({'4057': {'name': 'Deadpool', 'skins': {}}},

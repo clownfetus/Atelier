@@ -1,7 +1,7 @@
 // 3D viewport — loads a skin's meshes (decoded to glTF by AtelierMesh/CUE4Parse), renders them
 // in rest pose with three.js, and tints each part from its MI material params with live recolor.
-// The glTF names every material slot after its real MI (e.g. MI_1028500_Body), so mesh parts map
-// straight to the game's material instances — no guessing.
+// glTF labels are matched to cooked mesh slots through their import table. Body and weapon
+// sections keep separate identities even when their labels or material assets are shared.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
@@ -9,6 +9,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createViewportInspection } from './viewport-inspection.js';
 import { createViewportAnimation } from './viewport-animation.js';
 import { createViewportFloor } from './viewport-effects.js';
+import { textureRoles, applySurface } from './viewport-materials.js';
+import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials } from './viewport-attachments.js';
 
 const $ = id => document.getElementById(id);
 // The server says why a model is unavailable in the JSON body; three.js only reports the status
@@ -33,6 +35,9 @@ let inspection, soloSnapshot = null, soloTarget = null, materialReturnObserver =
 let animation, lastFrame = 0;
 let materialTask = null;
 let materialLoad = null;
+let modelLoad = null, modelLoading = false;
+const visibilityBusy = new Set();
+let meshSlots = [];
 let heroId = '';
 let selectedMaterial = null;
 
@@ -57,7 +62,7 @@ function cancelMaterialLoad() {
   const load = materialLoad;
   materialLoad = null;
   materialTask = null;
-  inspection?.setLoading(false);
+  inspection?.setLoading(modelLoading);
   if (!load) return;
   materialGeneration++;
   for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
@@ -71,6 +76,11 @@ function cancelMaterialLoad() {
 function materialFetch(url, options = {}, load = materialLoad) {
   return projectFetch(url, load ? {...options, signal:options.signal ? AbortSignal.any([options.signal, load.controller.signal]) : load.controller.signal,
     headers:{...options.headers, 'X-Atelier-Preview':load.id}} : options, load?.project ?? viewportProject);
+}
+
+function sceneFetch(url,options={}) {
+  const load=modelLoad;
+  return projectFetch(url,load?{...options,headers:{...options.headers,'X-Atelier-Preview':load.id}}:options,load?.project??viewportProject);
 }
 
 async function materialTexture(url, load = materialLoad) {
@@ -91,6 +101,7 @@ async function materialTexture(url, load = materialLoad) {
 async function canLeave() {
   if (inspection?.capturing()) { note('Cancel the capture or wait for it to finish before leaving.', 'warning'); return false; }
   if (saving) { note('Wait for the save to finish before leaving this preview.', 'warning'); return false; }
+  if (visibilityBusy.size) { note('Wait for the section visibility change to finish.', 'warning'); return false; }
   if (!Object.keys(edited).length) return true;
   const gen = generation, project = viewportProject;
   return await window.AtelierDialog.confirm({title:'Discard preview recolours?', body:'Discard unsaved preview recolors?', tone:'danger', confirmLabel:'Discard'})
@@ -108,7 +119,7 @@ function clearLiveDyes() {
 }
 
 function trimTextureCache() {
-  const used = new Set(Object.values(matsByName).flatMap(ms => ms.flatMap(m => [m.map, m.emissiveMap])));
+  const used = new Set(Object.values(matsByName).flatMap(ms => ms.flatMap(m => [m.map, m.emissiveMap, m.alphaMap])));
   for (const tex of baselineMaps.values()) used.add(tex);
   for (const [key, tex] of texCache) {
     if (texCache.size <= 64) break;
@@ -217,14 +228,14 @@ function init() {
 
   modelRoot = new THREE.Group();
   scene.add(modelRoot);
-  animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible), fetch:(url,options)=>projectFetch(url,options), frame:frameCamera, notify:note, changed:()=>inspection?.refresh()});
+  animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible && object.kind !== 'weapon'), fetch:sceneFetch, frame:frameCamera, notify:note, changed:()=>inspection?.refresh()});
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
     materials:() => ({data:matData, byName:matsByName, edited}),
     context:()=>({project:viewportProject,skin:currentSkin||meshSkin}),
     fetch:(url, options) => materialFetch(url, options), texture:materialTexture, url:projectUrl, hex:linToHex,
-    tintOriginal, pickMaterial, label:materialLabel, notify:note, resize:onResize,
-    ready:()=>!materialTask && !animation.loading() && !saving, refreshEdits:refreshFoot,
+    tintOriginal, textureRoles, applySurface, pickMaterial, label:materialLabel, notify:note, resize:onResize,
+    ready:()=>!modelLoading && !materialTask && !animation.loading() && !saving && !visibilityBusy.size, refreshEdits:refreshFoot,
     pauseAnimation:()=>animation.pause(), resumeAnimation:state=>animation.resume(state)});
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
@@ -237,7 +248,11 @@ function init() {
   $('viewport-material-search').addEventListener('input', filterMaterials);
   $('viewport-model-choice').addEventListener('change', event => {
     const value = event.target.value;
-    for (const [index, object] of objects.entries()) object.root.visible = value === 'all' || index === Number(value);
+    for (const [index, object] of objects.entries()) {
+      if (object.kind === 'weapon') { if (value === 'all') object.enabled=true; }
+      else object.root.visible = value === 'all' || index === Number(value);
+    }
+    syncAttachments();
     soloSnapshot = soloTarget = null;
     selectedMaterial = null;
     buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
@@ -282,6 +297,11 @@ function animate() {
   raf = requestAnimationFrame(animate);
   const now = performance.now();
   animation.update(lastFrame ? Math.min((now-lastFrame)/1000,.05) : 0); lastFrame = now;
+  for (const object of objects) if (object.kind === 'weapon') {
+    if(object.paired)object.paired.root.visible=object.root.visible && object.hand==='both' && !!object.paired.binding;
+    if(object.root.visible)updateWeapon(object, object.binding);
+    if(object.paired?.root.visible)updateWeapon(object.paired,object.paired.binding);
+  }
   controls.update();
   inspection.render();
 }
@@ -355,6 +375,11 @@ function setViewportLoaderState(state) {
 }
 
 function clearModel() {
+  modelLoading=false;
+  if (modelLoad) {
+    const load=modelLoad;modelLoad=null;
+    projectFetch('/api/viewport_cancel',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({id:load.id})},load.project).catch(()=>{});
+  }
   cancelMaterialLoad();
   animation?.reset(); lastFrame = 0;
   materialReturnObserver?.disconnect(); materialReturnObserver = null;
@@ -366,7 +391,7 @@ function clearModel() {
   clearLiveDyes();
   baselineMaps.clear();
   for (const ch of [...modelRoot.children]) { modelRoot.remove(ch); disposeTree(ch); }
-  matsByName = {}; matData = {}; edited = {}; currentSkin = null; objects = []; meshMeta = [];
+  matsByName = {}; matData = {}; edited = {}; currentSkin = null; objects = []; meshMeta = []; meshSlots=[];
   selectedMaterial = null;
   $('viewport-material-search').value = '';
   $('viewport-material-editor').replaceChildren(); $('viewport-material-editor').hidden = true;
@@ -384,20 +409,31 @@ function clearModel() {
   refreshFoot();
 }
 
-// The footer "Edit In Blender" button targets whichever mesh is currently loaded — the same
-// extraction the right-click "Edit in Blender" menu item runs on a single mesh card.
+// The studio exports the selected body and visible held weapons as one portable
+// Blender scene. The mesh card's editing route keeps its per-mesh round trip.
 function refreshBlenderBtn() {
   const btn = $('viewport-blender-btn');
   if (btn) btn.disabled = !meshMeta.length;
 }
 async function editInBlender() {
-  const target = meshMeta[objects.findIndex(object => object.root.visible)] || meshMeta[0];
+  if(objects.filter(object=>object.root.visible && object.kind!=='weapon').length>1){note('Choose one body form from Model before exporting to Blender.','info');return;}
+  const target = meshMeta[objects.findIndex(object => object.root.visible && object.kind !== 'weapon')] || meshMeta[0];
   if (!target) return;
-  if (typeof window.meshBlendExtract === 'function') {
-    await close(); if ($('viewport-overlay').classList.contains('active')) return;
-    window.meshBlendExtract(target.game_rel, target.name);
-  }
-  else note('Blender extraction unavailable', 'warning');
+  if (!(await canLeave())) return;
+  const weapons=objects.flatMap((object,index)=>object.kind==='weapon' && object.root.visible ? [{game_rel:meshMeta[index].game_rel,hand:object.hand || 'auto'}] : []);
+  const gen=generation,project=viewportProject;
+  const button=$('viewport-blender-btn');button.disabled=true;
+  note('Preparing model, materials and textures for Blender…','info');
+  try {
+    const result=await window.AtelierJobs.run('/api/model_blender_export',{method:'POST',project,headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:target.game_rel,weapons})});
+    if(!result.ok)throw Error(result.error || 'Blender export failed');
+    if(gen!==generation || project!==viewportProject)return;
+    note(`Blender scene saved · ${result.meshes} meshes · ${result.materials} materials · ${result.textures} packed textures`,result.warnings?.length?'warning':'success');
+    const open=document.createElement('button');open.type='button';open.textContent='Open in Blender';
+    open.addEventListener('click',()=>projectFetch('/api/model_blender_open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:target.game_rel})},project));
+    $('viewport-status').append(' ',open);
+  } catch(error) {if(gen===generation)note(error.message,'warning');}
+  finally {if(gen===generation)refreshBlenderBtn();}
 }
 
 // Sidebar shows the Objects panel and/or Materials panel independently, and hides itself entirely
@@ -412,15 +448,41 @@ function updateSidebarVisibility() {
 }
 
 function showAllObjects() {
-  for (const object of objects) object.root.visible = true;
+  for (const object of objects) { object.root.visible = true; if (object.kind==='weapon') object.enabled=true; }
+  syncAttachments();
   soloSnapshot = soloTarget = null; buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
 }
 
 function syncPreviewAnimation() {
   animation.reset();
-  for (const object of objects) if (object.root.visible) animation.register({scene:object.root, animations:object.animations || []});
-  const index = objects.findIndex(object=>object.root.visible);
+  for (const object of objects) if (object.root.visible && object.kind !== 'weapon') animation.register({scene:object.root, animations:object.animations || []});
+  const index = objects.findIndex(object=>object.root.visible && object.kind !== 'weapon');
   if (index >= 0) animation.discover(meshMeta[index].game_rel);
+}
+
+function syncAttachments() {
+  const held=objects.filter(object=>object.kind==='weapon');
+  for(const materials of Object.values(matsByName))for(const material of materials)material.userData.heldDuplicate=false;
+  for(const body of objects.filter(object=>object.kind!=='weapon')){
+    for(const material of embeddedWeaponMaterials(body,held))material.userData.heldDuplicate=true;
+  }
+  const bodies=objects.filter(object=>object.kind!=='weapon' && object.root.visible);
+  const occupied=new Set();
+  for (const weapon of objects.filter(object=>object.kind==='weapon').sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true))) {
+    const choices=bodies.map(body=>bindWeapon(weapon,body,weapon.hand==='both'?'right':weapon.hand || 'auto')).filter(Boolean)
+      .sort((a,b)=>(b.joints?.length || 0)-(a.joints?.length || 0));
+    weapon.binding=choices[0] || null;
+    const side=weapon.binding?.side || 'r',automatic=!occupied.has(side);
+    weapon.root.visible=!!weapon.binding && (weapon.enabled ?? automatic);
+    if(weapon.root.visible)occupied.add(side);
+    if (weapon.root.visible) updateWeapon(weapon,weapon.binding);
+    if(weapon.hand==='both' && weapon.binding) {
+      if(!weapon.paired){weapon.paired=pairedWeapon(weapon);modelRoot.add(weapon.paired.root);}
+      weapon.paired.binding=bindWeapon(weapon.paired,weapon.binding.body,'left');
+      weapon.paired.root.visible=weapon.root.visible && !!weapon.paired.binding;
+      if(weapon.paired.root.visible){updateWeapon(weapon.paired,weapon.paired.binding);occupied.add('l');}
+    } else if(weapon.paired)weapon.paired.root.visible=false;
+  }
 }
 
 // One row per top-level mesh loaded into modelRoot. Toggling hides/shows that mesh and re-frames
@@ -438,12 +500,21 @@ function buildObjectPanel() {
     cb.addEventListener('change', () => {
       soloSnapshot = soloTarget = null;
       o.root.visible = cb.checked;
+      if (o.kind==='weapon') o.enabled=cb.checked;
+      syncAttachments();
       buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
     });
     const lbl = document.createElement('span');
-    lbl.textContent = o.name || 'Object';
+    lbl.textContent = (o.kind==='weapon' ? 'Weapon · ' : '') + (o.name || 'Object');
     lbl.title = o.name || '';
     const label = document.createElement('label'); label.append(cb, lbl); row.appendChild(label);
+    if (o.kind==='weapon') {
+      const hand=document.createElement('select');hand.className='vp-weapon-hand';hand.setAttribute('aria-label','Attach '+o.name);
+      hand.replaceChildren(...[['auto','Match weapon rig'],['right','Right hand'],['left','Left hand'],['both','Both hands']].map(([value,label])=>new Option(label,value)));
+      hand.value=o.hand || 'auto';hand.addEventListener('change',()=>{o.hand=hand.value;o.enabled=true;syncAttachments();buildObjectPanel();buildPanel();frameCamera();});
+      row.append(hand);
+      if (!o.binding) cb.title='No compatible hand socket was found on the visible body.';
+    }
     const solo = document.createElement('button'); solo.className = 'vp-solo'; solo.textContent = 'Solo';
     solo.setAttribute('aria-label', `Isolate ${o.name || 'object'}`);
     solo.setAttribute('aria-pressed', String(soloTarget === o));
@@ -462,23 +533,24 @@ function buildObjectPanel() {
     list.appendChild(row);
   }
   $('viewport-obj-count').textContent = objects.length + (objects.length === 1 ? ' object' : ' objects');
-  const visible = objects.flatMap((object,index) => object.root.visible ? [index] : []);
+  const bodies=objects.flatMap((object,index)=>object.kind==='weapon'?[]:[index]);
+  const visible = bodies.filter(index=>objects[index].root.visible);
   if (!visible.length) $('viewport-model-menu').open=false;
   const select = $('viewport-model-choice');
-  select.replaceChildren(...objects.map((object,index) => new Option(`Mesh ${index + 1} · ${object.name}`, String(index))),
+  select.replaceChildren(...objects.flatMap((object,index) => object.kind==='weapon' ? [] : [new Option(`Mesh ${index + 1} · ${object.name}`, String(index))]),
     new Option('All mesh parts', 'all'), new Option('Custom visibility', 'custom'));
   select.querySelector('[value="custom"]').hidden = true;
-  select.value = visible.length === 1 ? String(visible[0]) : visible.length === objects.length ? 'all' : 'custom';
-  $('viewport-model-label').textContent = objects.length > 1
-    ? visible.length === 1 ? `Model ${visible[0] + 1} of ${objects.length}` : `${visible.length} mesh parts` : 'Model';
+  select.value = visible.length === 1 ? String(visible[0]) : visible.length === bodies.length ? 'all' : 'custom';
+  $('viewport-model-label').textContent = bodies.length > 1
+    ? visible.length === 1 ? `Model ${bodies.indexOf(visible[0]) + 1} of ${bodies.length}` : `${visible.length} body forms` : 'Model';
   $('viewport-model-hint').textContent = objects.length > 1
-    ? 'One mesh is shown at a time. Choose another, or combine parts below.' : 'This preview contains one mesh.';
+    ? 'Choose a body form. Compatible weapons follow its rig; use the controls below for other parts.' : 'This preview contains one mesh.';
   updateSidebarVisibility();
 }
 
 // Make a mesh material matte (glTF's default is fully metallic → renders black w/o env map) and
 // register it under its MI slot name so we can tint it from material params later.
-function prepMaterial(m) {
+function prepMaterial(m, meta, parser) {
   if (!m || !m.isMeshStandardMaterial) return;
   // Lobby meshes include a separate Unreal rim shell. Rendering it as an opaque
   // standard material hides the textured character underneath.
@@ -491,15 +563,26 @@ function prepMaterial(m) {
   // pure black. Ignore them so the albedo map and tint actually show.
   m.vertexColors = false;
   m.needsUpdate = true;
-  const nm = m.name || '';
+  const index=parser?.associations?.get(m)?.materials;
+  const sourceName=parser?.json?.materials?.[index]?.name || m.name || '';
+  m.userData.slotName=sourceName;
+  const nm=meta?.game_rel && Number.isInteger(index) ? `${meta.game_rel}::${index}` : sourceName;
+  m.name=nm;
+  if (meta?.game_rel && Number.isInteger(index)) {
+    let binding=meshSlots.find(item=>item.game_rel===meta.game_rel);
+    if (!binding) {binding={game_rel:meta.game_rel,slots:[]};meshSlots.push(binding);}
+    if (!binding.slots.some(slot=>slot.key===nm)) binding.slots.push({key:nm,name:sourceName,material_index:index});
+  }
   if (nm) (matsByName[nm] || (matsByName[nm] = [])).push(m);
 }
 
-function collectMats(root) {
+function collectMats(root, meta, parser) {
   root.traverse(o => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
-    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) prepMaterial(m);
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (!Object.values(matsByName).some(ms=>ms.includes(m))) prepMaterial(m,meta,parser);
+    }
   });
 }
 
@@ -532,14 +615,14 @@ async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0', url = 
   // but once the user edits one its stamp changes → we refetch and show the edit.
   ver = ver || '0';
   const gen = generation, matGen = materialGeneration;
-  const key = viewportProject + ':' + (url || texGameRel) + '@' + ver;
+  const key = viewportProject + ':' + (slot==='alphaMap'?'data:':'color:') + (url || texGameRel) + '@' + ver;
   let tex = texCache.get(key);
   if (!tex) {
     try {
       tex = await materialTexture(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`);
     } catch (e) { if (e.name !== 'AbortError') console.warn('viewport: texture load failed', name, slot, texGameRel, e); return false; }
     if (gen !== generation || matGen !== materialGeneration) { tex.dispose(); return; }
-    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.colorSpace = slot === 'alphaMap' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
     tex.flipY = false;                              // glTF UV convention (origin top-left)
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -584,7 +667,7 @@ function pickMaterial(name, openEditor = true) {
   row?.scrollIntoView({block:'nearest', inline:'nearest'});
   if (!openEditor) return;
   const info = matData[name];
-  if (!info) { note(`${name}: material parameters are unavailable.`, 'warning'); return; }
+  if (!info?.game_rel) { note('Material parameters are unavailable for this section.', 'warning'); return; }
   if (hasPendingEdits()) { note('Save or revert your studio changes before opening the full editor.', 'warning'); $('viewport-mat-save').focus(); return; }
   if (typeof window.openMaterialEditor !== 'function') { $('viewport-material-editor').querySelector('input')?.focus(); return; }
   const gen = generation, project = viewportProject;
@@ -664,13 +747,14 @@ function loadMaterials(skinId) {
   materialLoad = load;
   inspection?.setLoading(true);
   const task = loadMaterialSet(skinId, load).finally(() => load.spinner?.remove()); materialTask = task; inspection?.refresh();
-  const settled = () => { if (materialTask === task) { materialTask = null; inspection?.setLoading(false); inspection?.materialize(); inspection?.refresh(); } };
-  task.then(settled,settled); return task;
+  const settled = result => { if (materialTask === task) { materialTask = null; inspection?.setLoading(modelLoading); if(result!==false)inspection?.materialize(); inspection?.refresh(); } };
+  task.then(settled,()=>settled(false)); return task;
 }
 
 async function loadMaterialSet(skinId, load) {
   if (!skinId) return;
   currentSkin = skinId;
+  window.AtelierViewportIdentity?.show(skinId,heroId);
   const gen = generation;
   const matGen = ++materialGeneration;
   inspection?.clearMaterials();
@@ -693,7 +777,7 @@ async function loadMaterialSet(skinId, load) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // a foreign skin's MI names won't equal the slot names, so the server-side name filter would
       // drop everything — fetch all of them and match canonically here instead
-      body: JSON.stringify({ skin_id: skinId, names }),
+      body: JSON.stringify({ skin_id: skinId, names, ...(meshSlots.length ? {meshes:meshSlots} : {}) }),
     }, load).then(r => r.json());
     res = await readSet(foreign ? [] : slots);
     // Recolour meshes can retain the base skin's MI slot names. Let the canonical matching
@@ -705,14 +789,14 @@ async function loadMaterialSet(skinId, load) {
     if (e.name !== 'AbortError') console.warn('viewport: skin_materials request failed', e);
     if (spinner) spinner.remove();
     if (e.name !== 'AbortError' && gen === generation && matGen === materialGeneration) note('Materials could not be loaded. Reopen the preview to retry.', 'warning');
-    return;
+    return false;
   }
   if (gen !== generation || matGen !== materialGeneration) { if (spinner) spinner.remove(); return; }
   if (!res || !res.ok || !res.materials) {
     console.warn('viewport: skin_materials bad response', res);
     if (spinner) spinner.remove();
     note('Materials could not be loaded. Reopen the preview to retry.', 'warning');
-    return;
+    return false;
   }
 
   // Keep only materials that appear as slots on the loaded mesh; wire each part. `matName` is the
@@ -730,19 +814,26 @@ async function loadMaterialSet(skinId, load) {
     info.baseIdx = pickBaseIdx(info.colors);
     info.emiIdx  = pickEmissiveIdx(info.colors);
     matData[name] = info;
+    for (const material of matsByName[name] || []) {
+      material.visible=!info.hidden;applySurface(material,info);
+      material.map=null;material.emissiveMap=null;material.alphaMap=null;
+    }
     retint(name);
     const tex = info.textures || {};
+    const roles=textureRoles(info);
     const ver = info.tex_ver || {};
+    const urls = info.texture_urls || {};
     // Dyeing materials (CHROMAS): the skin's colour lives in the MI's "Region N" params applied
     // through the ColorID mask, NOT in the diffuse — every chroma of a skin shares one diffuse, so
     // loading BaseColor renders them all identically. Ask for the server-side composite instead.
     if (info.dyeable) {
       texJobs.push(applyMatTexture(name, tex.BaseColor || info.game_rel, 'map', info.dye_ver || '0',
         `/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(info.dye_ver || '0')}`));
-    } else if (tex.BaseColor) {
-      texJobs.push(applyMatTexture(name, tex.BaseColor, 'map', ver[tex.BaseColor]));                        // albedo
+    } else if (roles.basecolor) {
+      texJobs.push(applyMatTexture(name, roles.basecolor, 'map', ver[roles.basecolor], urls.basecolor));
     }
-    if (tex.Emissive)  texJobs.push(applyMatTexture(name, tex.Emissive, 'emissiveMap', ver[tex.Emissive])); // glow mask
+    if (roles.emissive) texJobs.push(applyMatTexture(name, roles.emissive, 'emissiveMap', ver[roles.emissive], urls.emissive));
+    if (roles.opacity) texJobs.push(applyMatTexture(name, roles.opacity, 'alphaMap', ver[roles.opacity], urls.opacity));
   }
   selectedMaterial = pendingSelection;
   buildPanel();   // parameters are ready; textures may still be in flight
@@ -769,12 +860,13 @@ async function loadMaterialSet(skinId, load) {
   let done = 0;
   const tick = () => { if (spinnerMsg && gen === generation && matGen === materialGeneration) spinnerMsg.textContent = `Loading textures… ${done}/${total}`; };
   tick();
-  const results=await Promise.allSettled(texJobs.map(p => p.then(value => { done++; tick();return value; })));
+  const results=await Promise.allSettled(texJobs.map(p => p.finally(() => { done++; tick(); })));
   if (spinner) spinner.remove();
   if (gen === generation && matGen === materialGeneration) {
     const failed=results.filter(result=>result.status==='rejected'||result.value===false).length;
     $('viewport-status').textContent = failed ? `${failed} texture${failed===1?'':'s'} could not load. Reopen the preview to retry.` : 'Materials ready';
     $('viewport-status').dataset.kind = failed ? 'warning' : 'success';
+    return !failed;
   }
 }
 
@@ -790,7 +882,7 @@ function buildPanel() {
   for (const object of objects) if (object.root.visible) object.root.traverseVisible(mesh => {
     if (mesh.isMesh) for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) visible.add(material.name);
   });
-  const names = Object.keys(matData).filter(name => !objects.length || visible.has(name)).sort();
+  const names = Object.keys(matData).filter(name => !objects.length || visible.has(name)).sort((a,b)=>materialGroup(a).localeCompare(materialGroup(b)) || materialLabel(a).localeCompare(materialLabel(b)));
   if (!names.includes(selectedMaterial)) selectedMaterial = null;
   const groups = new Map();
   for (const name of names) {const group=materialGroup(name);if(!groups.has(group))groups.set(group,[]);groups.get(group).push(name);}
@@ -811,21 +903,76 @@ function buildPanel() {
       const query=$('viewport-material-search').value.trim().toLowerCase();
       pickMaterial(query ? group.find(name=>(name+' '+materialLabel(name)).toLowerCase().includes(query)) || name : name,false);
     });
-    wrap.append(button); list.append(wrap);
+    wrap.append(button);
+    if (group.length===1) wrap.append(sectionEye(name));
+    else {
+      const sections=document.createElement('div');sections.className='vp-material-sections';
+      for (const part of group) {
+        const row=document.createElement('div');row.className='vp-section-row';row.dataset.section=part;
+        const choose=document.createElement('button');choose.className='vp-section-select';choose.textContent=materialLabel(part);
+        choose.addEventListener('click',()=>pickMaterial(part,false));
+        row.append(choose,sectionEye(part));sections.append(row);
+      }
+      wrap.append(sections);
+    }
+    wrap.classList.toggle('has-hidden-section',group.some(part=>matData[part].hidden));
+    list.append(wrap);
   }
   $('viewport-mat-count').textContent = names.length ? String(names.length) : '';
   buildMaterialInspector(names); filterMaterials();
   updateSidebarVisibility();
   refreshFoot();
+  window.AtelierIcons?.createIcons({nodes:[list]});
+}
+
+function sectionEye(name) {
+  const info=matData[name],button=document.createElement('button');
+  button.type='button';button.className='vp-section-eye';button.dataset.section=name;
+  const label=materialLabel(name),hidden=!!info.hidden;
+  button.setAttribute('aria-label',`${hidden?'Show':'Hide'} ${label}`);
+  button.setAttribute('aria-pressed',String(hidden));
+  button.disabled=visibilityBusy.has(name) || !Number.isInteger(info.slot_index) || !!info.mapping_error;
+  button.title=info.mapping_error || (!Number.isInteger(info.slot_index) ? 'Section export mapping is unavailable for this model.' : hidden ? 'Show this section in the preview and exported mod' : 'Hide this section in the preview and exported mod');
+  if(matsByName[name]?.some(material=>material.userData.heldDuplicate))button.title+=' · Its built-in copy is represented by the held weapon in this preview.';
+  const icon=document.createElement('i');icon.dataset.lucide=hidden?'eye-off':'eye';button.append(icon);
+  button.addEventListener('click',()=>toggleSection(name));
+  return button;
+}
+
+async function toggleSection(name) {
+  const info=matData[name],gen=generation,project=viewportProject;
+  if (!info || visibilityBusy.size || saving || modelLoading) return;
+  const hidden=!info.hidden;
+  if (hidden && !(await window.AtelierDialog.confirm({title:`Hide ${materialLabel(name)}?`,
+    body:'This part will be invisible in-game after you export the mod. You can restore it later with the eye button. Other sections using this material stay visible.',
+    confirmLabel:'Hide part'}))) return;
+  if (gen!==generation || project!==viewportProject) return;
+  const setPreview=value=>{
+    for(const [key,data] of Object.entries(matData))if(data.mesh_game_rel===info.mesh_game_rel && data.slot_index===info.slot_index){data.hidden=value;for(const material of matsByName[key] || [])material.visible=!value;}
+  };
+  setPreview(hidden);
+  visibilityBusy.add(name);buildPanel();inspection.refresh();
+  note(`Saving ${materialLabel(name)} visibility…`,'info');
+  try {
+    const result=await projectFetch('/api/mesh_visibility',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({game_rel:info.mesh_game_rel,slot_index:info.slot_index,slot_name:info.slot_name,hidden})},project).then(r=>r.json());
+    if (!result.ok) throw Error(result.error || 'Could not save section visibility');
+    if (gen!==generation || project!==viewportProject) return;
+    await window.loadSidebar?.();
+    note(`${materialLabel(name)} ${hidden?'hidden':'shown'} · saved for export`,'success');
+  } catch(error) { if(gen===generation){setPreview(!hidden);note(error.message,'warning');} }
+  finally {visibilityBusy.delete(name);if(gen===generation){buildPanel();inspection.refresh();}}
 }
 
 function materialLabel(name) {
+  name=matData[name]?.slot_name || matsByName[name]?.[0]?.userData?.slotName || name;
   const words = String(name).replace(/^(?:MI|M|Mat)[_-]/i,'').split(/[_-]+/).filter(word=>word && !/^\d{4,}$/.test(word));
   return (words.join(' ').replace(/([a-z])([A-Z])/g,'$1 $2') || 'Material').replace(/\b\w/g,letter=>letter.toUpperCase());
 }
 
 function materialGroup(name) {
   const label = materialLabel(name);
+  if (matData[name]?.mesh_game_rel && /\/weapons\//i.test(matData[name].mesh_game_rel)) return 'Weapon · '+label;
   if (/^Equip\b/i.test(label)) return 'Equipment';
   if (/^Hair\b/i.test(label)) return 'Hair';
   if (/^(Head|Face|Eyes?|Tooth|Teeth|Mouth)\b/i.test(label)) return 'Face';
@@ -920,9 +1067,11 @@ function colorField(name, color, label, references) {
         swatch.style.setProperty('--vp-saved-color',linToHex(color.rgba));code.textContent=linToHex(color.rgba);
         swatch.addEventListener('click',()=>{
           if (saving) return;
-          if (edited[name]) {delete edited[name][color.name];if(!Object.keys(edited[name]).length) delete edited[name];}
-          picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();retint(name);
-          if (matData[name].dyeable) dyeRebakeMesh(name);refreshFoot();
+          for(const peer of materialPeers(name)) {
+            if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
+            retint(peer);if(matData[peer].dyeable)dyeRebakeMesh(peer);
+          }
+          picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
         });
       }
       ref.append(text,swatch,code);comparison.append(ref);
@@ -934,24 +1083,33 @@ function colorField(name, color, label, references) {
 
 function revertMaterial(name) {
   if (saving || !edited[name]) return;
-  clearTimeout(_dyeMeshTimer[name]); _dyeMeshRevision[name] = (_dyeMeshRevision[name] || 0) + 1;
-  delete edited[name]; retint(name);
-  if (matData[name].dyeable) dyeRebakeMesh(name);
+  for(const peer of materialPeers(name)) {
+    clearTimeout(_dyeMeshTimer[peer]); _dyeMeshRevision[peer] = (_dyeMeshRevision[peer] || 0) + 1;
+    delete edited[peer]; retint(peer);
+    if (matData[peer].dyeable) dyeRebakeMesh(peer);
+  }
   buildPanel(); note('Material restored to saved colours','success');
+}
+
+function materialPeers(name) {
+  const path=matData[name]?.game_rel;
+  return path ? Object.keys(matData).filter(key=>matData[key].game_rel===path) : [name];
 }
 
 function onColorInput(matName, paramName, hex) {
   const [r, g, b] = hexToLin(hex);
   const d = matData[matName];
   const orig = (d.colors.find(c => c.name === paramName) || {}).rgba || [r, g, b, 1];
-  (edited[matName] || (edited[matName] = {}))[paramName] = [r, g, b, orig[3] ?? 1];
+  for(const peer of materialPeers(matName)) {
+    (edited[peer] ||= {})[paramName] = [r,g,b,orig[3] ?? 1];retint(peer);
+    if(matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer);
+  }
   // retint re-derives the mesh from the params, routing each to its real channel: EmissiveColor →
   // the emissive glow (through the emissive mask), a base/albedo tint → material.color. Editing the
   // emissive swatch recolours the glow; other params are saved but don't have a faithful preview.
   retint(matName);
   // Dyeing materials: the colour lives in the ColorID composite, not a flat tint. A "Region N" edit
   // must re-BAKE the albedo (server-side) and swap it onto the mesh — that's the faithful preview.
-  if (d && d.dyeable && /^Region\s+\d+\s*-/.test(paramName)) dyeRebakeMesh(matName);
   refreshFoot();
 }
 
@@ -1012,7 +1170,7 @@ async function dyeDownloadMesh(matName) {
     if (!r.ok) return;
     const u = URL.createObjectURL(await r.blob());
     const a = document.createElement('a');
-    a.href = u; a.download = matName + '_dyed.png';
+    a.href = u; a.download = materialLabel(matName).replace(/[^a-z0-9_-]/gi,'_') + '_dyed.png';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(u), 8000);
   } catch (e) { /* ignore */ }
@@ -1055,11 +1213,13 @@ async function saveEdits() {
   const draft = edited, gen = generation, project = viewportProject;
   const submitted = JSON.parse(JSON.stringify(edited));
   const targets = Object.fromEntries(names.map(name => [name, matData[name]]));
+  const savedPaths=new Set();
   saving = true; refreshFoot();
   let ok = 0;
   const failed = [];
   for (const name of names) {
     const d = targets[name];
+    if(savedPaths.has(d.game_rel))continue;
     try {
       const r = await projectFetch('/api/material_save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1067,13 +1227,17 @@ async function saveEdits() {
       }, project).then(r => r.json());
       if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
       window.AtelierRoster?.rememberEditor(d.game_rel,'studio',project);
-      ok++; d.colors = r.colors || d.colors.map(col => ({ ...col, rgba: submitted[name][col.name]?.slice() || col.rgba }));
-      if (gen === generation && edited === draft) {
-        for (const [param, rgba] of Object.entries(submitted[name])) {
-          // A newer edit made during the request is still unsaved.
-          if (JSON.stringify(edited[name]?.[param]) === JSON.stringify(rgba)) delete edited[name][param];
+      ok++;savedPaths.add(d.game_rel);
+      for(const key of names.filter(key=>targets[key].game_rel===d.game_rel)) {
+        const target=targets[key];
+        target.colors=r.colors || target.colors.map(col=>({...col,rgba:submitted[key][col.name]?.slice() || col.rgba}));
+        if (gen === generation && edited === draft) {
+          for (const [param, rgba] of Object.entries(submitted[key])) {
+            // A newer edit made during the request is still unsaved.
+            if (JSON.stringify(edited[key]?.[param]) === JSON.stringify(rgba)) delete edited[key][param];
+          }
+          if (!Object.keys(edited[key] || {}).length) delete edited[key];
         }
-        if (!Object.keys(edited[name] || {}).length) delete edited[name];
       }
     } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
   }
@@ -1085,6 +1249,7 @@ async function saveEdits() {
     : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`;
   const state = failed.length || newerEdits ? 'warning' : 'success';
   const currentProject = project === (window.atelierProject?.() || '');
+  if(currentProject && ok)await window.loadSidebar?.();
   // The singleton saving guard forbids another save until this operation finishes.
   saving = false;
   // Only the originating view owns its controls; old results keep their own notification.
@@ -1142,7 +1307,7 @@ function studioTitle(skinId, title) {
   return title && !/^3D Preview\b/i.test(title) ? title : skinId ? `Skin ${skinId}` : 'Mesh preview';
 }
 
-async function open(skinId, title) {
+async function open(skinId, title, preferredMesh=null) {
   if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
@@ -1151,6 +1316,7 @@ async function open(skinId, title) {
   updateHeroLogo(/^\d{4}/.exec(skinId)?.[0] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(skinId,title);
+  window.AtelierViewportIdentity?.show(skinId);
   $('viewport-status').textContent = '';
   inspection.show();
   $('viewport-loading').style.display = 'flex';
@@ -1158,17 +1324,23 @@ async function open(skinId, title) {
   if (!raf) animate();
   clearModel();
   const gen = generation;
+  modelLoading=true;modelLoad={id:crypto.randomUUID(),project:viewportProject};
+  loader.setRequestHeader({'X-Atelier-Project':encodeURIComponent(viewportProject),'X-Atelier-Preview':modelLoad.id});
+  inspection.setLoading(true);
   $('viewport-loading-msg').textContent = 'Decoding model…';
   startViewportLoader();
 
   try {
-    const meshes = await projectFetch(`/api/skin_meshes?skin_id=${encodeURIComponent(skinId)}`).then(r => r.json());
+    let meshes = await projectFetch(`/api/skin_meshes?skin_id=${encodeURIComponent(skinId)}`).then(r => r.json());
     if (gen !== generation) return;
     if (!Array.isArray(meshes) || !meshes.length) {
       setViewportLoaderState('empty');
       $('viewport-loading-msg').textContent = 'No meshes found for this skin.';
       return;
     }
+    if(preferredMesh&&!meshes.some(mesh=>mesh.game_rel===preferredMesh))meshes.push({name:preferredMesh.split('/').pop(),game_rel:preferredMesh,kind:/\/weapons\//i.test(preferredMesh)?'weapon':'body'});
+    const order=mesh=>mesh.kind==='weapon' ? 10+(mesh.game_rel===preferredMesh?-2:/_[lr]$/i.test(mesh.name)?-1:0) : mesh.game_rel===preferredMesh?-1:0;
+    meshes.sort((a,b)=>order(a)-order(b));
     let loaded = 0, firstError = '';
     for (let i = 0; i < meshes.length; i++) {
       $('viewport-loading-msg').textContent =
@@ -1176,14 +1348,17 @@ async function open(skinId, title) {
       try {
         const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(meshes[i].game_rel)}`);
         if (gen !== generation) { disposeTree(gltf.scene); return; }
-        collectMats(gltf.scene);
-        animation.register(gltf);
-        gltf.scene.visible = objects.length === 0;
+        const kind=meshes[i].kind || (/\/weapons\//i.test(meshes[i].game_rel)?'weapon':'body');
+        collectMats(gltf.scene,meshes[i],gltf.parser);
+        if (kind!=='weapon') animation.register(gltf);
+        gltf.scene.visible = kind!=='weapon' && !objects.some(object=>object.kind!=='weapon');
         modelRoot.add(gltf.scene);
-        objects.push({ name: meshes[i].name, root: gltf.scene, animations:gltf.animations });
+        objects.push({ name: meshes[i].name, kind, root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf),
+          ...(kind==='weapon'&&meshes[i].game_rel===preferredMesh?{enabled:true}:{}) });
         meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
         loaded++;
         frameCamera();
+        if (gltf.scene.visible) {destroyViewportLoader();$('viewport-loading').style.display='none';}
       } catch (e) {
         if (gen !== generation) return;
         const reason = await loadErrorText(e);
@@ -1199,12 +1374,13 @@ async function open(skinId, title) {
       return;
     }
     refreshBlenderBtn();
+    syncAttachments();
     buildObjectPanel();
     frameCamera();
     setViewportLoaderState('ready');
     destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
-    inspection.materialize();
+    modelLoading=false;
     loadMaterials(skinId);
     animation.discover(meshMeta[0].game_rel);
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
@@ -1213,10 +1389,14 @@ async function open(skinId, title) {
     if (gen !== generation) return;
     setViewportLoaderState('error');
     $('viewport-loading-msg').textContent = 'Error: ' + e.message;
+  } finally {
+    if(gen===generation) {modelLoading=false;if(!materialTask)inspection.setLoading(false);}
   }
 }
 
 async function openMesh(gameRel, name, skinId) {
+  const skin=skinId || skinFromGameRel(gameRel);
+  if (skin) return open(skin,name,gameRel);
   if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
@@ -1226,6 +1406,7 @@ async function openMesh(gameRel, name, skinId) {
   updateHeroLogo(/characters\/(\d{4})\//i.exec(gameRel)?.[1] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(_sk,name);
+  window.AtelierViewportIdentity?.show(_sk, /characters\/(\d{4})\//i.exec(gameRel)?.[1]);
   $('viewport-status').textContent = '';
   inspection.show();
   $('viewport-loading').style.display = 'flex';
@@ -1234,14 +1415,17 @@ async function openMesh(gameRel, name, skinId) {
   if (!raf) animate();
   clearModel();
   const gen = generation;
+  modelLoading=true;modelLoad={id:crypto.randomUUID(),project:viewportProject};
+  loader.setRequestHeader({'X-Atelier-Project':encodeURIComponent(viewportProject),'X-Atelier-Preview':modelLoad.id});
+  inspection.setLoading(true);
   startViewportLoader();
   try {
     const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(gameRel)}`);
     if (gen !== generation) { disposeTree(gltf.scene); return; }
-    collectMats(gltf.scene);
+    collectMats(gltf.scene,{game_rel:gameRel},gltf.parser);
     animation.register(gltf);
     modelRoot.add(gltf.scene);
-    objects.push({ name: name || 'Mesh', root: gltf.scene, animations:gltf.animations });
+    objects.push({ name: name || 'Mesh', kind:'body', root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf) });
     meshMeta.push({ name: name || 'Mesh', game_rel: gameRel });
     refreshBlenderBtn();
     buildObjectPanel();
@@ -1250,7 +1434,7 @@ async function openMesh(gameRel, name, skinId) {
     setViewportLoaderState('ready');
     destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
-    inspection.materialize();
+    modelLoading=false;
     loadMaterials(_sk);
     animation.discover(gameRel);
     buildChromaPicker(_sk, gameRel);   // same "materials from" picker as the skin path
@@ -1260,6 +1444,8 @@ async function openMesh(gameRel, name, skinId) {
     if (gen !== generation) return;
     setViewportLoaderState('error');
     $('viewport-loading-msg').textContent = 'Failed to load: ' + reason;
+  } finally {
+    if(gen===generation){modelLoading=false;if(!materialTask)inspection.setLoading(false);}
   }
 }
 
@@ -1269,6 +1455,7 @@ async function close() {
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
   inspection?.closed();
+  window.AtelierViewportIdentity?.clear();
 }
 
 $('viewport-close').addEventListener('click', close);
@@ -1285,20 +1472,25 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('beforeunload', event => {
-  if (saving || Object.values(edited).some(params => Object.keys(params).length)) {
+  if (saving || visibilityBusy.size || Object.values(edited).some(params => Object.keys(params).length)) {
     event.preventDefault(); event.returnValue = 'Preview recolors have unsaved changes.';
   }
 });
+window.addEventListener('pagehide', () => {
+  if(inited)clearModel();
+  if(raf){cancelAnimationFrame(raf);raf=0;}
+  inspection?.closed();window.AtelierViewportIdentity?.clear();
+});
 
 function hasPendingEdits() {
-  return saving || Object.values(edited).some(params => Object.keys(params).length);
+  return saving || visibilityBusy.size > 0 || Object.values(edited).some(params => Object.keys(params).length);
 }
 
 function focusPendingEdits() {
   if (!hasPendingEdits()) return;
   $('viewport-overlay').classList.add('active');
   const status = $('viewport-status');
-  status.textContent = saving ? 'Preview save in progress. Wait for it to finish before exporting.'
+  status.textContent = saving || visibilityBusy.size ? 'Preview save in progress. Wait for it to finish before exporting.'
     : 'Save or revert these unsaved preview recolors before exporting.';
   status.setAttribute('role', 'status');
   const save = $('viewport-mat-save');

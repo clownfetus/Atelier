@@ -3,6 +3,22 @@
 The app, installers and update checker identify each release by its full number, such as
 **1.0.0**.
 
+## Unreleased
+
+- Krackle category emblems replace the Material Sharp category glyphs by default.
+- Hero story banners are upscaled 4x once cached (Real-ESRGAN's compact anime model,
+  run on the CPU with numpy; BSD-3-Clause, bundled under `atelier/models`). The
+  banner has no border and enters on its own instead of zooming out of the card.
+- Skin chips on Home show each costume's icon. The hero grid fills the free height
+  with a visible scrollbar, follows the Size setting, and shares its row with the
+  filters; folder chips fill even columns.
+- Assets being edited dissolve into the Krackle dot lattice in their own colours;
+  edited materials show their saved colours.
+- **No mip maps** is on by default; switching it off is remembered per asset.
+- The current folder stays readable in a narrow breadcrumb, the search hint fits
+  its box, the empty Mod tray is centred and Process S maps explains what it needs.
+- The installer refreshes Explorer's icon cache so upgrades show the current mark.
+
 ## 1.0.0 — 18 October 2026
 
 - Consolidates the unmerged UI waves, motion review and latest Krackle A mark.

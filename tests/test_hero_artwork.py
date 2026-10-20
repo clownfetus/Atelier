@@ -93,6 +93,39 @@ class Artwork(unittest.TestCase):
         self.assertIn('offline', offline.status()['error'])
         self.assertFalse(offline.status()['updating'])
 
+    def test_story_banners_are_served_upscaled_and_sharpened_even_offline(self):
+        def fetch(url):
+            kind = next((k for k,v in PAGES.items() if v==url), None)
+            return (page(kind, ['1029']) if kind else self.raw), {}
+        with patch('atelier.hero_artwork.fetch', side_effect=fetch):
+            artwork = HeroArtwork(self.root)
+            artwork.update({})
+        story = artwork.image('1029', 'story')
+        self.assertTrue(story.name.endswith('-x4.webp'), story)
+        with Image.open(story) as image:
+            self.assertEqual(image.size, (544, 544))
+            self.assertEqual(image.mode, 'RGBA')
+        # A banner cached before sharpening existed is upscaled on the next launch, offline too.
+        story.unlink()
+        self.assertFalse(artwork.image('1029', 'story').name.endswith('-x4.webp'))
+        offline = HeroArtwork(self.root)
+        with patch('atelier.hero_artwork.fetch', side_effect=OSError('offline')):
+            offline.update({})
+        self.assertTrue(offline.image('1029', 'story').name.endswith('-x4.webp'))
+
+    def test_a_failed_upscale_keeps_serving_the_original_banner(self):
+        def fetch(url):
+            kind = next((k for k,v in PAGES.items() if v==url), None)
+            return (page(kind, ['1029']) if kind else self.raw), {}
+        with patch('atelier.hero_artwork.fetch', side_effect=fetch), \
+             patch('atelier.upscale.upscale', side_effect=MemoryError('no room')):
+            artwork = HeroArtwork(self.root)
+            artwork.update({})
+        story = artwork.image('1029', 'story')
+        self.assertIsNotNone(story)
+        self.assertFalse(story.name.endswith('-x4.webp'))
+        self.assertIsNone(artwork.status()['error'])
+
 
 if __name__ == '__main__':
     unittest.main()

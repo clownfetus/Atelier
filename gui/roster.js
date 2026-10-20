@@ -56,7 +56,7 @@
   function skinColour(url) {
     if(!colourCache.has(url))colourCache.set(url,new Promise(resolve=>{
       const image=new Image();image.decoding='async';
-      image.onload=()=>resolve(window.AtelierPolish?.sample(image) || null);
+      image.onload=()=>resolve(window.AtelierPolish?.accent(image) || null);
       image.onerror=()=>{colourCache.delete(url);resolve(null);};image.src=url;
     }));
     return colourCache.get(url);
@@ -70,7 +70,7 @@
   window.addEventListener('pagehide',()=>{cleanup();themeObserver.disconnect();});
   function image(item) {
     const img = document.createElement('img'); img.alt=''; img.loading='lazy'; img.decoding='async'; img.src=item.avatar||item.thumbnail||'';
-    img.addEventListener('load',()=>{const colour=window.AtelierPolish?.sample(img);if(colour)img.parentElement?.style.setProperty('--roster-accent',colour);});
+    img.addEventListener('load',()=>{const colour=window.AtelierPolish?.accent(img);if(colour)img.parentElement?.style.setProperty('--roster-accent',colour);});
     img.addEventListener('error',()=>{img.hidden=true;}); return img;
   }
   function render() {
@@ -78,9 +78,10 @@
     renderContinue();
     cleanup();root.replaceChildren(); root.hidden=false;
     if (!data.heroes?.length) { window.AtelierPolish?.empty(root,'Catalogue unavailable','Browse the library folders below. Saved artwork will return when available.'); return; }
-    const details=document.createElement('details'); details.open=true;
-    const summary=document.createElement('summary'); summary.textContent='Heroes'; details.append(summary);
+    // A plain section: the label shares the filter row, and the hero grid fills the free height.
+    const details=document.createElement('div'); details.className='roster-section';
     const filters=document.createElement('div');filters.className='roster-filters';filters.setAttribute('role','group');filters.setAttribute('aria-label','Filter heroes');
+    const heading=document.createElement('h2'); heading.className='roster-heading'; heading.textContent='Heroes'; filters.append(heading);
     for(const [value,label] of [['all','All'],['edited','Edited'],['recent','Recently opened']]) {
       const button=document.createElement('button');button.className='btn';button.textContent=label;button.setAttribute('aria-pressed',String(value===filter));button.addEventListener('click',()=>{filter=value;render();});filters.append(button);
     }
@@ -96,6 +97,7 @@
       const open=document.createElement('button'); open.className='roster-open'; open.textContent='Open '+hero.name; open.addEventListener('click',()=>navigate?.(hero.path)); skins.append(open);
       for (const skin of hero.skins || []) {
         const tile=document.createElement('button'); tile.className='roster-skin'; tile.title=skin.name; tile.setAttribute('aria-label',skin.name);
+        if(skin.icon){const icon=document.createElement('img');icon.className='roster-skin-icon';icon.alt='';icon.loading='lazy';icon.decoding='async';icon.src=skin.icon;icon.addEventListener('error',()=>icon.remove());tile.append(icon);}
         const label=document.createElement('span'); label.textContent=skin.name; tile.append(label);
         tile.addEventListener('click',()=>options.openSkin?options.openSkin(skin):navigate?.(skin.path)); skins.append(tile);
         tintSkin(tile,skin);
@@ -150,8 +152,11 @@
   function renderContinue() {
     const root=document.getElementById('continue-ribbon');if(!root)return;
     const item=[...edits].sort((a,b)=>(b.modified||b.mtime||0)-(a.modified||a.mtime||0))[0];root.replaceChildren();root.hidden=!requested||!item;
+    root.classList.remove('has-skin-colour');root.style.removeProperty('--continue-colour');
     if(!item)return;
     if(item.file_type==='texture'||item.skin_id){const img=document.createElement('img');img.alt='';img.src=item.file_type==='texture'?`/api/preview?game_rel=${encodeURIComponent(item.game_rel)}&_project=${encodeURIComponent(project)}`:'/api/catalogue/thumbnail/'+item.skin_id;img.onerror=()=>img.remove();root.append(img);}
+    // The skin's colour edges the ribbon (decoration only; its button keeps the theme's primary ink).
+    if(item.skin_id)skinColour('/api/catalogue/thumbnail/'+item.skin_id).then(colour=>{if(colour&&root.contains(copy)){root.style.setProperty('--continue-colour',colour);root.classList.add('has-skin-colour');}});
     const copy=document.createElement('div'),title=document.createElement('strong');title.textContent='Pick up where you left off';
     const detail=document.createElement('p'),seconds=Math.max(0,Date.now()/1000-(item.modified||item.mtime||0));
     const ago=seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+' min ago':seconds<86400?Math.floor(seconds/3600)+' h ago':Math.floor(seconds/86400)+' d ago';

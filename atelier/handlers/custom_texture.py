@@ -34,6 +34,7 @@ the same image in a BaseColor and a Normal slot becomes two packages, as it must
 encoded in its own slot's format.
 """
 import hashlib
+import base64
 import io
 import json
 import os
@@ -41,6 +42,7 @@ import re
 import shutil
 import sys
 import threading
+from pathlib import Path
 
 from atelier import project_meta
 from atelier.config import USMAP, get_import_root
@@ -230,6 +232,38 @@ def _uat_error(result, fallback):
             or fallback)
 
 
+def _preserve_export_bytes(doc, injected):
+    """Keep UE5 DATA_RESOURCES texture payloads opaque during a package rename.
+
+    The native JSON texture reader can lose inline mip bytes and mistake their
+    pixel data for subsequent mip headers. Renaming only needs the export table,
+    so use UAssetAPI's RawExport for each validated byte range. Name indices stay
+    stable (new names are appended), resource offsets are unchanged, and this
+    game's UE5 texture skip offsets are relative. The writer still recalculates
+    the package header and export offsets. Require an identical .uexp afterwards.
+    """
+    if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES':
+        return False
+    header=Path(injected).stat().st_size
+    payload=Path(injected[:-7]+'.uexp').read_bytes()
+    ranges=[]
+    for export in doc.get('Exports',[]):
+        offset,size=export.get('SerialOffset'),export.get('SerialSize')
+        if type(offset) is not int or type(size) is not int or size<=0 or not 0<=offset-header<=len(payload)-size:
+            raise RuntimeError('The encoded texture export range could not be validated')
+        start=offset-header;ranges.append((start,start+size))
+        export['$type']='UAssetAPI.ExportTypes.RawExport, UAssetAPI'
+        export['Data']=base64.b64encode(payload[start:start+size]).decode('ascii')
+        export['Extras']=''
+    cursor=0
+    for start,end in sorted(ranges):
+        if start!=cursor:raise RuntimeError('The encoded texture has an unsupported export layout')
+        cursor=end
+    if cursor!=len(payload)-4 or payload[-4:]!=b'\xc1\x83\x2a\x9e':
+        raise RuntimeError('The encoded texture payload could not be preserved completely')
+    return True
+
+
 def build_texture(scratch, template_game_rel, png, new_game_rel):
     """Encode `png` as a new texture package. Returns its files, all named after the new asset."""
     from atelier.handlers.texture import ensure_work_base, missing_reason
@@ -242,7 +276,7 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     os.makedirs(os.path.dirname(injected), exist_ok=True)
     r = uat(["inject_texture", os.path.abspath(work + ".uasset"), os.path.abspath(png),
              os.path.abspath(injected), "--usmap", USMAP])
-    if not os.path.isfile(injected):
+    if r.returncode or not os.path.isfile(injected):
         raise RuntimeError("your image could not be encoded: " + _uat_error(r, "inject_texture failed"))
     json_dir = os.path.join(scratch, "json", *parts[:-1])
     os.makedirs(json_dir, exist_ok=True)
@@ -253,13 +287,16 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     with open(jp, encoding="utf-8-sig") as f:
         doc = json.load(f)
     rename_package(doc, os.path.basename(template_game_rel), name, GAME_PREFIX + new_game_rel)
+    opaque=_preserve_export_bytes(doc,injected)
     with open(jp, "w", encoding="utf-8") as f:
         json.dump(doc, f)
     built = os.path.join(scratch, "out", *parts) + ".uasset"
     os.makedirs(os.path.dirname(built), exist_ok=True)
     r = uat(["from_json", os.path.abspath(jp), os.path.abspath(built), USMAP])
-    if not os.path.isfile(built):
+    if r.returncode or not os.path.isfile(built):
         raise RuntimeError("could not rename the encoded texture: " + _uat_error(r, "from_json produced no uasset"))
+    if opaque and Path(injected[:-7]+'.uexp').read_bytes()!=Path(built[:-7]+'.uexp').read_bytes():
+        raise RuntimeError('Renaming the texture altered its mip payload, so it was not shipped')
     # .uasset/.uexp from the rename; the bulk mips exactly as inject_texture wrote them.
     for ext in (".ubulk", ".uptnl"):
         if os.path.isfile(injected[:-7] + ext):

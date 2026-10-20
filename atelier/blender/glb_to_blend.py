@@ -5,8 +5,9 @@ Run by atelier.handlers.meshedit; not meant to be invoked by hand.
 
 The optional manifest (written by atelier.handlers.meshmat) maps each material slot to the
 textures its MaterialInstance samples, already staged as PNGs in the user's project folder.
-Those images are LINKED, never packed: the file on disk is the same one the mod builder
-injects, so painting it here and saving is the edit that ships.
+Edit-in-Blender images stay linked to the project files that the mod builder
+injects. The standalone Model Studio port sets pack_images in the manifest so
+the scene remains portable after its preparation directory is removed.
 """
 import json
 import os
@@ -20,6 +21,8 @@ import numpy as np
 argv = sys.argv[sys.argv.index("--") + 1:]
 src, dst = argv[0], argv[1]
 manifest_path = argv[2] if len(argv) > 2 else None
+manifest=json.load(open(manifest_path,encoding='utf-8')) if manifest_path and os.path.isfile(manifest_path) else {}
+portable=bool(manifest.get('pack_images'))
 
 
 # ── morph tracking attributes, past Blender's importer ─────────────────────────
@@ -140,22 +143,14 @@ if mesh_obj is None or arm_obj is None:
 if tracking is not None:
     _restore_tracking(mesh_obj.data, tracking)
 
-# UNBIND the armature for editing.
-#
-# The exported bone rest transforms are not trustworthy: positions convert cleanly between
-# UE and glTF, but the rotation quaternions do not survive the left-handed -> right-handed
-# change with only an axis rotation applied, so posed (Object Mode) display explodes the
-# mesh into spikes even though the underlying vertex data is correct. None of that reaches
-# the game -- the rebuild reuses the cooked skeleton verbatim and reads back only vertex
-# positions and weights -- so rather than ship a broken preview, drop the Armature modifier
-# and hide the armature. Vertex groups live on the MESH and are unaffected, so weights
-# survive editing untouched; blend_to_glb.py re-binds before export so skinning is written.
-for mod in [m for m in mesh_obj.modifiers if m.type == "ARMATURE"]:
-    mesh_obj.modifiers.remove(mod)
-arm_obj.hide_viewport = True
+# Keep the ordinary geometry round trip in component space while sculpting.
+# Portable exports retain the working deformation rig. Correct column-major
+# inverse bind matrices now keep its bone heads and resting surface intact.
+if not portable:
+    for mod in [m for m in mesh_obj.modifiers if m.type == "ARMATURE"]:mesh_obj.modifiers.remove(mod)
+arm_obj.hide_viewport = arm_obj.hide_select = not portable
 arm_obj.hide_render = True
-arm_obj.hide_select = True
-arm_obj.lock_location = arm_obj.lock_rotation = arm_obj.lock_scale = (True, True, True)
+arm_obj.lock_location = arm_obj.lock_rotation = arm_obj.lock_scale = (not portable,)*3
 
 bpy.context.view_layer.objects.active = mesh_obj
 mesh_obj.select_set(True)
@@ -171,19 +166,10 @@ def _socket(node, *names):
     return None
 
 
-def _principled(mat):
-    for n in mat.node_tree.nodes:
-        if n.type == "BSDF_PRINCIPLED":
-            return n
-    out = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None) \
-        or mat.node_tree.nodes.new("ShaderNodeOutputMaterial")
-    bsdf = mat.node_tree.nodes.new("ShaderNodeBsdfPrincipled")
-    mat.node_tree.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
-    return bsdf
-
-
 def _image_node(mat, path, colorspace, x, y, label):
     img = bpy.data.images.load(path, check_existing=True)
+    if img.users and img.colorspace_settings.name != colorspace:
+        img=img.copy()
     try:
         img.colorspace_settings.name = colorspace
     except Exception:
@@ -248,55 +234,32 @@ def _wire_normal(nt, tex, bsdf, y):
     nmap = nt.nodes.new("ShaderNodeNormalMap"); nmap.location = (240, y)
     nt.links.new(comb.outputs["Color"], nmap.inputs["Color"])
     nt.links.new(nmap.outputs["Normal"], _socket(bsdf, "Normal"))
+    return nmap
 
 
-def wire_material(mat, maps):
-    """Wire one material's PBR roles. Unknown params are still loaded, just unconnected --
-    MR's ColorID/dyeing masks are real editable textures with no sane shader role to guess."""
-    mat.use_nodes = True
-    nt = mat.node_tree
-    bsdf = _principled(mat)
-    n = 0
-    for i, mp in enumerate(maps):
-        path, role = mp.get("path"), mp.get("role")
-        if not path or not os.path.exists(path):
-            continue
-        srgb = role in ("basecolor", "emissive")
-        y = -320 * i
-        tex = _image_node(mat, path, "sRGB" if srgb else "Non-Color", -900, y, mp.get("param") or "")
-        n += 1
-        if role == "basecolor":
-            nt.links.new(tex.outputs["Color"], _socket(bsdf, "Base Color"))
-        elif role == "normal":
-            _wire_normal(nt, tex, bsdf, y)
-        elif role == "orm":
-            sep = nt.nodes.new("ShaderNodeSeparateColor"); sep.location = (-620, y)
-            nt.links.new(tex.outputs["Color"], sep.inputs["Color"])
-            nt.links.new(sep.outputs[1], _socket(bsdf, "Roughness"))     # G
-            nt.links.new(sep.outputs[2], _socket(bsdf, "Metallic"))      # B
-        elif role == "emissive":
-            em = _socket(bsdf, "Emission Color", "Emission")
-            if em:
-                nt.links.new(tex.outputs["Color"], em)
-            st = _socket(bsdf, "Emission Strength")
-            if st:
-                st.default_value = 1.0
-    return n
-
+sys.path.insert(0,os.path.dirname(__file__))
+from material_nodes import wire_material as wire_surface
 
 wired_mats = wired_imgs = 0
+material_report=[]
 if manifest_path and os.path.exists(manifest_path):
-    slots = (json.load(open(manifest_path, encoding="utf-8")) or {}).get("slots", {})
+    slots = manifest.get("slots", {})
     for mat in mesh_obj.data.materials:
         # Match by NAME: the slot name is the key the rebuild matches sections on, so it is also
         # the only stable identity a material has here. Renaming one breaks the build either way.
         rec = slots.get(mat.name) if mat else None
         if not rec:
             continue
-        got = wire_material(mat, rec.get("maps") or [])
-        if got:
+        report=wire_surface(mat,rec,_image_node,_wire_normal)
+        material_report.append(report)
+        if report['textures']:
             wired_mats += 1
-            wired_imgs += got
+            wired_imgs += report['textures']
+    if manifest.get('pack_images'):
+        bpy.ops.file.pack_all()
+
+print('MATERIAL_REPORT '+json.dumps({'materials':material_report,'images':wired_imgs,'blender':bpy.app.version_string,
+               'missing_images':[image.filepath for image in bpy.data.images if image.source=='FILE' and not image.packed_file and not os.path.isfile(bpy.path.abspath(image.filepath))]}))
 
 bpy.ops.wm.save_as_mainfile(filepath=dst)
 me = mesh_obj.data
