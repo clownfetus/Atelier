@@ -131,10 +131,9 @@ def browse(path='', file_type=None):
     from atelier.web.browse import _classify_file
     prefix = path + '/' if path else ''
     children = {}
-    for entry in ensure_index():
+    from atelier.index import prefix_entries
+    for entry in prefix_entries(prefix):
         gr = entry[0]
-        if not gr.casefold().startswith(prefix.casefold()):
-            continue
         rest = gr[len(prefix):]
         if '/' in rest:
             name = rest.split('/')[0]
@@ -220,7 +219,8 @@ def _retarget(doc, old_name, target, file_type, source_path=None):
 
 
 def _available(target):
-    if any(entry[0].casefold() == (target + '.uasset').casefold() for entry in ensure_index()):
+    from atelier.index import index_lookup
+    if (target + '.uasset').lower() in index_lookup():
         raise ValueError('An asset already exists in the game at this location. Choose another name or folder.')
     base = config.project_base(target)
     if any(os.path.exists(base + ext) for ext in ('.png', '.dds', '.json', '.blend', '.mesh.json', '.asset.json')):

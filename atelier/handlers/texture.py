@@ -3,7 +3,7 @@ from atelier.storage import container_files, publish_files, PublicationRecoveryE
 from atelier.config import (IMPORT_ROOT, WORK_IMPORT_ROOT, ASSETS_MODS, PAKS, USMAP, _CACHE,
                             check_prereqs, get_import_root, project_base, project_base_legacy,
                             dir_glob)
-from atelier.tools import uat, uat_json
+from atelier.tools import uat, uat_json, uat_pooled
 from atelier.paths import char_id, game_rel_for_skin, pak_game_path, skin_entries, filter_subpath, skin_rel
 
 _model_extract_lock=threading.Lock()
@@ -45,14 +45,63 @@ def _dds_header(w, h, fmt, linear):
         return bytes(hdr) + ext
     return bytes(hdr)
 
+# (abs uasset path, size, mtime_ns) -> {"w", "h", "fmt", "mips"}. The header of an extracted
+# texture never changes without its file changing, so this is safe to keep for the process.
+_INFO_CACHE = {}
+_INFO_LOCK = threading.Lock()
+
+
+def texture_info(uasset_base):
+    """{"w", "h", "fmt", "mips"} for an extracted texture: declared size, pixel format without the
+    PF_ prefix, and how many mips the asset carries. Empty dict when unreadable.
+
+    Reads the header through a pooled worker's get_texture_info (~0.2s) instead of a full one-shot
+    decode written to a scratch PNG, and remembers the answer per file version."""
+    ua = os.path.abspath(uasset_base + ".uasset")
+    try:
+        st = os.stat(ua)
+    except OSError:
+        return {}
+    key = (os.path.normcase(ua), st.st_size, st.st_mtime_ns)
+    with _INFO_LOCK:
+        hit = _INFO_CACHE.get(key)
+    if hit is not None:
+        return dict(hit)
+    info = {}
+    d = uat_pooled({"action": "get_texture_info", "file_path": ua, "usmap_path": USMAP})
+    data = (d or {}).get("data") or {}
+    if d and d.get("success") and data.get("is_texture") and data.get("width"):
+        fmt = str(data.get("pixel_format") or "")
+        info = {"w": int(data["width"]), "h": int(data["height"]),
+                "fmt": fmt[3:] if fmt.startswith("PF_") else fmt,
+                "mips": int(data.get("mip_count") or 0)}
+    else:
+        # Older tool, or the probe failed: the one-shot decode log carries the same header.
+        fd, probe = tempfile.mkstemp(prefix="_texinfo-", suffix=".png", dir=_CACHE)
+        os.close(fd)
+        try:
+            r = uat(["extract_texture", ua, os.path.abspath(probe), "--usmap", USMAP])
+        finally:
+            try: os.remove(probe)
+            except OSError: pass
+        log = (r.stdout or "") + (r.stderr or "")
+        m = re.search(r"Texture:\s*(\d+)x(\d+),\s*format=PF_(\w+)", log)
+        mm = re.search(r"Mip count:\s*(\d+)", log)
+        if m:
+            info = {"w": int(m.group(1)), "h": int(m.group(2)), "fmt": m.group(3),
+                    "mips": int(mm.group(1)) if mm else 0}
+    if info:
+        with _INFO_LOCK:
+            if len(_INFO_CACHE) > 4096:
+                _INFO_CACHE.clear()
+            _INFO_CACHE[key] = info
+    return dict(info)
+
+
 def _tex_info(uasset_base):
-    """(declared_w, declared_h, fourcc) from UAssetTool's own decode log."""
-    probe = os.path.join(_CACHE, "_texinfo.png")
-    r = uat(["extract_texture", os.path.abspath(uasset_base + ".uasset"), os.path.abspath(probe),
-             "--usmap", USMAP])
-    log = (r.stdout or "") + (r.stderr or "")
-    m = re.search(r"Texture:\s*(\d+)x(\d+),\s*format=PF_(\w+)", log)
-    return (int(m.group(1)), int(m.group(2)), m.group(3)) if m else (0, 0, "")
+    """(declared_w, declared_h, fourcc) -- see texture_info."""
+    i = texture_info(uasset_base)
+    return (i["w"], i["h"], i["fmt"]) if i else (0, 0, "")
 
 def decode_dds(import_base, uasset_base):
     """Write the LARGEST SHIPPED mip as a .dds next to import_base, block data untouched.
@@ -87,6 +136,11 @@ def decode_png(import_base, uasset_base):
     """Decode one extracted UE texture to .png. uasset_base is where .uasset lives; png goes to import_base."""
     if not os.path.exists(uasset_base + ".uasset"): return
     out_png = os.path.abspath(import_base + ".png")
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    d = uat_pooled({"action": "extract_texture_png", "file_path": os.path.abspath(uasset_base + ".uasset"),
+                    "output_path": out_png, "usmap_path": USMAP, "format": "png"})
+    if d is not None and os.path.exists(out_png):
+        return
     r = uat(["extract_texture", os.path.abspath(uasset_base + ".uasset"), out_png, "--usmap", USMAP])
     if not os.path.exists(out_png):
         print(f"  [warn] PNG decode failed for {os.path.basename(import_base)}: "
@@ -136,6 +190,16 @@ def decode_flat(game_rels, output_dir):
 def decode_thumb(uasset_path, thumb_path):
     """Decode the lowest available mip to a small thumbnail PNG (tries mip 4 → 3 → 2 → 0)."""
     os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
+    # Ask for the mip count once and decode the right level on a warm worker: the loop below
+    # launches a process per guess, and a single-mip UI texture paid for three failures first.
+    mips = texture_info(os.path.splitext(uasset_path)[0]).get("mips") or 0
+    if mips:
+        mip = next(m for m in (4, 3, 2, 0) if m < mips)
+        d = uat_pooled({"action": "extract_texture_png", "file_path": os.path.abspath(uasset_path),
+                        "output_path": os.path.abspath(thumb_path), "usmap_path": USMAP,
+                        "mip_index": mip, "format": "png"})
+        if d is not None and os.path.exists(thumb_path):
+            return True
     for mip in (4, 3, 2, 0):
         uat(["extract_texture", os.path.abspath(uasset_path), os.path.abspath(thumb_path),
              "--usmap", USMAP, "--mip", str(mip)])
@@ -556,7 +620,8 @@ def uat_filter(game_rels):
     if not pats:
         return []
     if sum(len(x) + 1 for x in pats) > 8000:
-        fp = os.path.join(_CACHE, "_uat_filter.txt")
+        # Per thread: two large batches at once must not overwrite each other's pattern list.
+        fp = os.path.join(_CACHE, f"_uat_filter-{os.getpid()}-{threading.get_ident()}.txt")
         os.makedirs(_CACHE, exist_ok=True)
         with open(fp, "w", encoding="utf-8") as f:
             f.write("\n".join(pats) + "\n")
@@ -582,6 +647,76 @@ def _note_mip_attempt(game_rel, base):
 
 
 def ensure_work_base(game_rel,prefer_exact=False):
+    """See _ensure_work_base. Serialised per asset: the viewport, Model Studio and an export often
+    ask for the same texture at once, and two extractions of one asset into the same folder were
+    both slow and liable to read each other's half-written files. The second caller now waits and
+    takes the first one's cached result."""
+    from atelier.inflight import key_lock
+    with key_lock("work", game_rel):
+        return _ensure_work_base(game_rel, prefer_exact)
+
+
+def prefetch_exact(game_rels):
+    """Extract every not-yet-cached asset in one retoc call per container, before a loop that would
+    otherwise ensure_work_base(prefer_exact=True) them one process at a time.
+
+    Best effort: anything this misses is extracted by ensure_work_base exactly as before, which
+    also still performs the staleness checks for assets that were already cached."""
+    import atelier.asset_cache as _ac
+    from atelier.added_assets import source_base
+    todo = []
+    for gr in dict.fromkeys(g for g in (game_rels or []) if g):
+        if source_base(gr):
+            continue
+        cached = _ac.get(gr)
+        if cached and os.path.exists((cached.get("cache_path") or "") + ".uasset"):
+            continue
+        todo.append(gr)
+    if len(todo) < 2:
+        return {}
+    # Hold every asset's lock (sorted, so two prefetches cannot deadlock) so a viewport request for
+    # one of them waits for this batch instead of extracting the same files underneath it.
+    from contextlib import ExitStack
+    from atelier.inflight import key_lock
+    with ExitStack() as held:
+        for gr in sorted(todo, key=str.lower):
+            held.enter_context(key_lock("work", gr))
+        return _prefetch_locked(todo)
+
+
+def _prefetch_locked(todo):
+    import atelier.asset_cache as _ac
+    from atelier.handlers.world import RETOC
+    found = {}
+    if os.path.isfile(RETOC):
+        try:
+            found = extract_via_retoc(todo)
+        except Exception as e:
+            print(f"  [warn] batched retoc extract failed: {e}", file=sys.stderr, flush=True)
+    # Without retoc (or for what it missed, e.g. patch containers) one UAssetTool legacy extract
+    # with every full path as a filter replaces one ~15s container scan per asset. Plugin assets
+    # stay with the per-asset path, which knows how to disambiguate them.
+    rest = [g for g in todo if g not in found and not is_plugin_asset(g)]
+    if len(rest) >= 2 and not prefers_retoc():
+        from atelier import jobs
+        os.makedirs(WORK_IMPORT_ROOT, exist_ok=True)
+        with jobs.cancellable_lock(_model_extract_lock):
+            r = uat(["extract_iostore_legacy", PAKS, os.path.abspath(WORK_IMPORT_ROOT)] + uat_filter(rest))
+        if r.returncode != 0:
+            print(f"  [warn] batched extract_iostore_legacy rc={r.returncode}: "
+                  f"{((r.stdout or '') + (r.stderr or '')).strip()[-300:]}", file=sys.stderr, flush=True)
+        for gr in rest:
+            cp, pak, pfx = extract_info(gr)
+            if cp and os.path.exists(cp + ".uasset"):
+                found[gr] = (cp, pak, pfx)
+    if found:
+        _ac.record_many([(gr, stem, pak or "", pfx or "") for gr, (stem, pak, pfx) in found.items()])
+        for gr, (stem, _pak, _pfx) in found.items():
+            _note_mip_attempt(gr, stem)
+    return {gr: stem for gr, (stem, _pak, _pfx) in found.items()}
+
+
+def _ensure_work_base(game_rel,prefer_exact=False):
     """Extracted .uasset stem (no ext) under WORK_IMPORT_ROOT, extracting from the paks on a miss.
     Returns None if the asset isn't in the game at all. Model Studio requests
     exact container/path extraction first to avoid repeated full-game scans and

@@ -205,10 +205,15 @@ def _start_worker():
     to DEVNULL, which is why nobody ever saw why a worker had stopped answering.
     """
     global _proc, _out_q
-    _out_q = queue.Queue()
-    _proc = hostos.popen_exe([UAT], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, cwd=ROOT, text=True, encoding="utf-8")
-    proc, q = _proc, _out_q
+    _proc, _out_q = _spawn_worker()
+    return _proc, _out_q
+
+
+def _spawn_worker():
+    """A new worker process and its stdout queue, not installed anywhere."""
+    q = queue.Queue()
+    proc = hostos.popen_exe([UAT], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, cwd=ROOT, text=True, encoding="utf-8")
 
     def pump_out():
         try:
@@ -293,8 +298,98 @@ def uat_json(req, timeout=None):
                 except Exception: pass
 
 
+# ── pooled workers for short per-asset requests ───────────────────────────────
+# uat_json's single worker is held for whole batch decodes, and the per-asset paths (viewport
+# texture decode, thumbnails, texture-info probes) used one-shot uat() instead: a fresh process per
+# texture that re-loads the .usmap and pays .NET startup every time, and for thumbnails up to four
+# of them (mip 4 -> 3 -> 2 -> 0). A small pool of persistent workers, sized like tex_semaphore,
+# keeps the same concurrency while paying startup once per worker. Measured 2026-10-20 on a
+# 2048² DXT5: one-shot extract_texture ~0.96s, warm worker extract_texture_png ~0.2-1.0s, and
+# get_texture_info 0.2s against a full one-shot decode for the same three numbers.
+
+class _PoolWorker:
+    def __init__(self):
+        self.proc = None
+        self.q = None
+
+    def kill(self):
+        p, self.proc, self.q = self.proc, None, None
+        if p and p.poll() is None:
+            try: p.kill()
+            except Exception: pass
+
+    def request(self, req, secs):
+        from atelier import jobs
+        if self.proc is None or self.proc.poll() is not None:
+            self.proc, self.q = _spawn_worker()
+        try:
+            self.proc.stdin.write(json.dumps(_host_req(req)) + "\n"); self.proc.stdin.flush()
+        except Exception as e:
+            self.kill()
+            return {"success": False, "message": f"UAssetTool worker not writable: {e}"}
+        deadline = time.monotonic() + secs
+        while True:
+            try:
+                jobs.checkpoint()
+            except jobs.Cancelled:
+                self.kill()
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                self.kill()
+                return {"success": False, "message": f"UAssetTool did not respond within {secs}s"}
+            try:
+                line = self.q.get(timeout=min(remaining, 0.2))
+            except queue.Empty:
+                continue
+            if line is None:
+                self.kill()
+                return {"success": False, "message": "UAssetTool worker closed unexpectedly"}
+            s_line = line.strip()
+            if s_line.startswith("{") and s_line.endswith("}"):
+                try:
+                    d = json.loads(s_line)
+                    if isinstance(d, dict) and ("success" in d or "data" in d): return d
+                except Exception: pass
+
+
+_pool_idle = queue.LifoQueue()
+for _ in range(_TEX_CONCURRENCY):
+    _pool_idle.put(_PoolWorker())
+_pool_all = list(_pool_idle.queue)
+_pool_unsupported = set()     # actions an older UAssetTool build answered "Unknown action" to
+
+
+def uat_pooled(req, timeout=None):
+    """One JSON request on a pooled persistent worker, or None when the action is unsupported.
+
+    Callers fall back to one-shot uat() on None, so an older UAssetTool build that lacks an action
+    degrades to the previous behaviour instead of failing."""
+    action = req.get("action")
+    if action in _pool_unsupported:
+        return None
+    from atelier import jobs
+    secs = UAT_TIMEOUT if timeout is None else timeout
+    while True:
+        try:
+            worker = _pool_idle.get(timeout=0.1)
+            break
+        except queue.Empty:
+            jobs.checkpoint()
+    try:
+        d = worker.request(req, secs)
+    finally:
+        _pool_idle.put(worker)
+    if not d.get("success") and str(d.get("message", "")).startswith("Unknown action"):
+        _pool_unsupported.add(action)
+        return None
+    return d
+
+
 @atexit.register
 def _shutdown():
+    for w in _pool_all:
+        w.kill()
     if _proc and _proc.poll() is None:
         try:
             _proc.terminate()

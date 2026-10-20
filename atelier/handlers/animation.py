@@ -23,8 +23,9 @@ def idle_candidates(mesh_rel):
     rig = mesh_path.split('/')[0] if '/' in mesh_path else hero
     from atelier.index import ensure_index
     candidates = []
-    for path, *_ in ensure_index():
-        if not path.lower().startswith(f"characters/{hero}/") or not path.lower().endswith('.uasset'):
+    from atelier.index import prefix_entries
+    for path, *_ in prefix_entries(f"characters/{hero}/"):
+        if not path.lower().endswith('.uasset'):
             continue
         name = os.path.basename(path)[:-7]
         relative = path.split('/')[3:]

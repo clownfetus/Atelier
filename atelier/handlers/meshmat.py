@@ -59,14 +59,8 @@ def texture_role(param_name):
 
 def _index_candidates(asset_name):
     """game_rels in the paks whose basename matches asset_name (no extension)."""
-    from atelier.index import ensure_index
-    want = asset_name.lower() + ".uasset"
-    out = []
-    for entry in ensure_index():
-        virt = entry[0]
-        if virt.lower().endswith("/" + want) or virt.lower() == want:
-            out.append(virt[:-7])           # strip .uasset -> game_rel
-    return out
+    from atelier.index import by_basename
+    return by_basename(asset_name)
 
 
 def _best_candidate(candidates, mesh_game_rel):
@@ -332,6 +326,19 @@ def extract_textures_to_project(tex_game_rels, root=None):
         except Exception as error:
             return gr, {'path': None, 'status': 'failed', 'readonly': False, 'error': str(error)}
     if grs:
+        # Textures with neither a project file nor a decoded viewport copy need extracting; do
+        # that as one batch rather than one exact-path extraction per texture inside the loop.
+        from atelier.handlers.texture import prefetch_exact
+        need = [gr for gr in grs
+                if not any(os.path.exists(c) for c in (project_base(gr, root) + ".png",
+                                                       project_base(gr, root) + ".dds",
+                                                       project_base(gr, CACHE_3DVIEW) + ".png"))]
+        try:
+            prefetch_exact(need)
+        except jobs.Cancelled:
+            raise
+        except Exception as error:
+            print(f"[meshmat] batched texture extract skipped: {error}", file=sys.stderr, flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(2, len(grs))) as ex:
             # ContextVars carry both the pinned project and the cancellation/job
             # token. Each worker needs its own copy; sharing one Context across

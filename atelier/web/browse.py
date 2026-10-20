@@ -221,21 +221,10 @@ def _browse_pak_level(rel_path):
     rel_path   = rel_path.strip("/")
     search_pfx = (rel_path.lower() + "/") if rel_path else ""
 
-    folders = {}  # lower_name -> original_name (first seen)
-    files   = {}  # lower_name -> original_name (first seen), .uasset basenames sans ext
-    for virt_path, *_ in ensure_index():
-        vl = virt_path.lower()
-        if search_pfx and not vl.startswith(search_pfx):
-            continue
-        rest = virt_path[len(search_pfx):]
-        if not rest:
-            continue
-        if "/" in rest:                          # descendant -> immediate subfolder
-            fname_orig = rest.split("/")[0]
-            folders.setdefault(fname_orig.lower(), fname_orig)
-        elif rest.lower().endswith(".uasset"):   # asset file directly at this level
-            name = rest[:-7]
-            files.setdefault(name.lower(), name)
+    # lower_name -> original_name. Memoised per index (index.children), so revisiting a level
+    # costs a dict lookup instead of a walk of every indexed asset.
+    from atelier.index import children
+    folders, files = children(rel_path)
 
     result = []
     for fname_lower in sorted(folders):
@@ -356,12 +345,8 @@ def _browse_nameplates():
     "where are they", which is the part that cost three people an afternoon each. A path the current
     paks don't have is listed anyway and said to be missing, because "it isn't there" is itself the
     answer to the question, and silently hiding it would recreate the empty node people reported."""
-    have = set()
-    for virt_path, *_ in ensure_index():
-        vl = virt_path.lower()
-        for rp, _desc in NAMEPLATE_PATHS:
-            if vl.startswith(rp.lower() + "/"):
-                have.add(rp)
+    from atelier.index import prefix_entries
+    have = {rp for rp, _desc in NAMEPLATE_PATHS if prefix_entries(rp + "/")}
     out = []
     for rp, desc in NAMEPLATE_PATHS:
         missing = rp not in have
@@ -424,22 +409,13 @@ def browse_dispatch(path):
 # ── kept for backwards compat (CLI / any callers) ────────────────────────────
 
 def all_char_ids():
-    seen = set()
-    for p, *_ in ensure_index():
-        m = re.match(r"Characters/(\d{4})/", p, re.IGNORECASE)
-        if m: seen.add(m.group(1))
-    return sorted(seen)
+    from atelier.index import children
+    return sorted(n for n in children("Characters")[0].values() if re.fullmatch(r"\d{4}", n))
 
 def char_skin_ids(cid):
-    seen = set()
-    pfx  = f"Characters/{cid}/".lower()
-    for p, *_ in ensure_index():
-        pl = p.lower()
-        if not pl.startswith(pfx): continue
-        rest = pl[len(pfx):]
-        sid  = rest.split("/")[0]
-        if re.match(r"^\d{7}$", sid): seen.add(sid)
-    return sorted(seen)
+    from atelier.index import children
+    return sorted(n.lower() for n in children(f"Characters/{cid}")[0].values()
+                  if re.match(r"^\d{7}$", n))
 
 _HERO_LABEL_RES = [re.compile(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})/", re.IGNORECASE)
                    for hp in CHAR_LABEL_PATHS]

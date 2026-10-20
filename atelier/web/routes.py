@@ -365,11 +365,10 @@ def api_browse_material_dirs():
     path = (request.query.get("path") or "").strip("/")
     depth = len(path.split("/")) if path else 0
     pfx = (path.lower() + "/") if path else ""
+    from atelier.index import prefix_entries
     acc = {}
-    for p, _c, _x in ensure_index():
+    for p, _c, _x in prefix_entries(pfx):
         pl = p.lower()
-        if pfx and not pl.startswith(pfx):
-            continue
         if not pl.endswith(".uasset"):
             continue
         parts = p.split("/")
