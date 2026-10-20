@@ -51,17 +51,23 @@
 .roster-filters .btn { padding:3px 9px; min-height:28px; font-size:11px; }
 .roster-filters [aria-pressed=true] { border-color:var(--acc); background:var(--bg3); }
 .roster-filter-empty { padding:12px; color:var(--muted); }
-#continue-ribbon { display:flex; align-items:center; gap:12px; margin:0 16px 12px; padding:12px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; }
+#continue-ribbon { display:flex; flex:0 0 auto; align-items:center; gap:12px; margin:12px 16px; padding:12px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; }
 #continue-ribbon[hidden] { display:none; }
 #continue-ribbon.has-skin-colour { box-shadow:inset 3px 0 0 var(--continue-colour); }
-#continue-ribbon img { width:44px; height:44px; object-fit:contain; }
+#continue-ribbon > img { width:44px; height:44px; flex:0 0 44px; object-fit:contain; border-radius:4px; }
+#continue-ribbon > .btn { flex:0 0 auto; justify-content:center; }
 .hero-chip-art, #continue-ribbon .hero-chip-art { width:20px; height:20px; flex:none; object-fit:contain; vertical-align:middle; }
 .crumb .hero-chip-art, #continue-ribbon .hero-chip-art { margin-right:6px; }
-#mod-tray-heroes { display:flex; flex-wrap:wrap; gap:6px; padding:0 12px 8px; }
+#mod-tray-heroes { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
 #mod-tray-heroes[hidden] { display:none; }
 .tray-hero-chip { display:inline-flex; align-items:center; gap:5px; max-width:100%; font-size:11px; color:var(--muted); }
 .tray-hero-chip > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #continue-ribbon div { flex:1; min-width:0; }
 #continue-ribbon p { font-size:12px; color:var(--muted); margin-top:4px; overflow-wrap:anywhere; }
+@container library (max-width: 540px) {
+  #continue-ribbon { flex-wrap:wrap; }
+  #continue-ribbon > div { flex-basis:calc(100% - 56px); }
+  #continue-ribbon > .btn { width:100%; }
+}
 /* Home folders and assets share the normal card sizing, pin and preview controls. */
 .home-category-more { flex:0 0 var(--card-w,156px);align-self:flex-start;min-height:36px;font-size:12px; }
