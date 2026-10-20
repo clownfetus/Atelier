@@ -23,6 +23,23 @@ def measure_contrast(page):
     }''')
 
 
+def assert_folder_icon_size(card):
+    measurements = card.locator('.card-thumb > .card-icon').evaluate('''icon => {
+      const thumb = icon.parentElement, css = getComputedStyle(thumb);
+      const box = icon.getBoundingClientRect(), bounds = thumb.getBoundingClientRect();
+      return {width: box.width, height: box.height,
+        contentWidth: thumb.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight),
+        contentHeight: thumb.clientHeight - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom),
+        contained: box.left >= bounds.left && box.top >= bounds.top &&
+          box.right <= bounds.right && box.bottom <= bounds.bottom};
+    }''')
+    assert measurements['contained'], measurements
+    # Folder artwork fills the preview; toolbar symbols keep their compact control size.
+    for dimension in ('width', 'height'):
+        content = measurements['content' + dimension.title()]
+        assert content > 0 and abs(measurements[dimension] - content * .76) < .5, measurements
+
+
 def run_design_checks(page, context, url, report, checks):
     picker = page.locator('#settings-theme')
     # Other workflow suites set this hidden preference directly; here exercise Settings.
@@ -54,12 +71,18 @@ def run_design_checks(page, context, url, report, checks):
         # Measure actual computed roles, including the brightest container background.
         contrast = measure_contrast(page)
         assert all(pair['ratio'] >= 4.5 for pair in contrast), (theme, contrast)
+        for size in (128, 156, 196, 236):
+            page.locator('#library-size').select_option(str(size))
+            assert card.bounding_box()['width'] == size
+            assert_folder_icon_size(card)
+        page.locator('#library-size').select_option('156')
         for width, height in ((1024,768), (1280,800), (1400,900), (1920,1080)):
             page.set_viewport_size({'width': width, 'height': height})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             assert page.locator('#install-btn').is_visible()
             page.screenshot(path=str(report / f'{theme}-{width}x{height}.png'), animations='disabled')
     checks.append('Light/dark color pairs pass 4.5:1; shell fits four desktop sizes; local font/logo load')
+    checks.append('Folder icons fill 76% of their preview and stay contained at all four thumbnail sizes in both themes')
 
     page.reload()
     page.wait_for_selector('#grid-area .card')
@@ -81,8 +104,9 @@ def run_design_checks(page, context, url, report, checks):
     assert page.locator('#menu-btn').evaluate('(el)=>el===document.activeElement')
     page.locator('#grid-area .card').first.focus()
     assert page.locator('#grid-area .card').first.evaluate('(el)=>getComputedStyle(el).outlineStyle') == 'solid'
-    assert page.locator('#grid-area .card .studio-icon').first.evaluate('(el)=>el.getBoundingClientRect().width') == 20
     card = page.locator('#grid-area .card').first
+    assert_folder_icon_size(card)
+    assert page.locator('#menu-btn > .studio-icon').evaluate('(el)=>el.getBoundingClientRect().width') == 18
     card.hover()
     page.mouse.down()
     try:
