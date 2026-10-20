@@ -273,9 +273,19 @@ def catalogue_hero_artwork(cid, kind):
     return result
 
 
+@app.get('/api/catalogue/icon/<key>')
+def catalogue_icon(key):
+    return catalogue_thumbnail(key, kind='icon')
+
+
+@app.get('/api/catalogue/banner/<key>')
+def catalogue_banner(key):
+    return catalogue_thumbnail(key, kind='banner')
+
+
 @app.get('/api/catalogue/thumbnail/<key>')
-def catalogue_thumbnail(key):
-    path = catalogue.thumbnail(key)
+def catalogue_thumbnail(key, kind='thumbnail'):
+    path = getattr(catalogue, kind)(key)
     if path is None:
         response.status = 404
         response.set_header('Cache-Control', 'no-store')
@@ -1334,7 +1344,9 @@ def api_catalogue_library():
         hero = describe(key, entry)
         hero['avatar'] = '/api/catalogue/hero/' + key + '/avatar'
         hero['logo'] = '/api/catalogue/hero/' + key + '/logo'
-        hero['skins'] = [describe(sid, skin) for sid, skin in entries.items()
+        hero['skins'] = [{**describe(sid, skin), **({} if skin.get('hero_fallback') else {'icon': '/api/catalogue/icon/' + sid}),
+                          **({'banner': '/api/catalogue/banner/' + sid} if skin.get('banner') and not skin.get('hero_fallback') else {})}
+                         for sid, skin in entries.items()
                          if re.fullmatch(r'\d{7}', sid) and skin.get('hero') == key and skin.get('image')]
         heroes.append(hero)
     response.content_type = 'application/json'
@@ -3011,7 +3023,7 @@ def api_asset_opts():
     from atelier.handlers.texture import (TEXTURE_GROUPS, texture_props, texture_format,
                                           format_has_alpha)
     out = {"ok": True, "game_rel": gr,
-           "opts": _project_meta.get_asset_opts(get_import_root(), gr),
+           "opts": _project_meta.effective_asset_opts(_project_meta.get_asset_opts(get_import_root(), gr)),
            "groups": list(TEXTURE_GROUPS), "current_group": "", "has_lq": False,
            "dyeable": False, "mask": "", "format": "", "blank_alpha": True}
     try:
@@ -3065,7 +3077,7 @@ def api_asset_opts_save():
         clean["lod_group"] = g
     try:
         cur = _project_meta.set_asset_opts(get_import_root(), gr, clean)
-        return json.dumps({"ok": True, "opts": cur})
+        return json.dumps({"ok": True, "opts": _project_meta.effective_asset_opts(cur)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 

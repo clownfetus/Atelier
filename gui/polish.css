@@ -15,6 +15,19 @@
 .sb-item::after { content:''; position:absolute; top:0; right:0; width:10px; height:10px; background:var(--acc); clip-path:polygon(0 0,100% 100%,100% 0); pointer-events:none; }
 .card.imported { border:3px solid var(--green); padding:8px; box-shadow:0 0 0 1px color-mix(in srgb,var(--green) 35%,transparent),var(--studio-elevation-card); }
 .card.imported:hover { border-color:var(--green); box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 50%,transparent); }
+/* Being edited, a card's preview dissolves into the Krackle 45° lattice (two offset square grids)
+   and keeps its own colours. Edited materials draw their saved colours as the same lattice. */
+@property --edit-dot { syntax:'<length>'; inherits:false; initial-value:2.6px; }
+.card.imported .card-thumb > :is(img, .card-icon, .thumbnail-fallback, .texture-reconstruction) {
+  --edit-mask:radial-gradient(circle,#000 var(--edit-dot),transparent calc(var(--edit-dot) + .5px));
+  -webkit-mask:var(--edit-mask) 0 0/8px 8px,var(--edit-mask) 4px 4px/8px 8px;
+  mask:var(--edit-mask) 0 0/8px 8px,var(--edit-mask) 4px 4px/8px 8px;
+}
+.card-edited-dots { width:100%; height:100%; }
+:root[data-krackle=full] .card.just-edited .card-thumb > :is(img, .card-icon, .thumbnail-fallback) { animation:edit-dissolve 900ms var(--studio-easing) both; }
+:root[data-krackle=full] .card.just-edited .card-edited-dots circle { transform-box:fill-box; transform-origin:center; animation:edit-dot-in 420ms var(--studio-easing) calc(var(--d) * 420ms) both; }
+@keyframes edit-dissolve { from { --edit-dot:6px; } }
+@keyframes edit-dot-in { from { transform:scale(0); } }
 .card-editing-badge { position:absolute; bottom:5px; left:5px; padding:3px 7px; border-radius:4px; background:var(--green); color:#fff; font-size:11px; font-weight:750; line-height:1.2; pointer-events:none; }
 :root[data-theme='dark'] .card-editing-badge { color:#101b13; }
 .sb-item { position:relative; }

@@ -208,22 +208,24 @@ def t_options_round_trip_per_project():
     """Two projects can ship the same texture differently — this is not an app setting."""
     with sandbox() as sb:
         b = os.path.join(sb.root, "projB"); os.makedirs(b)
-        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": True, "lod_group": "TEXTUREGROUP_UI"})
+        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": False, "lod_group": "TEXTUREGROUP_UI"})
         PM.set_asset_opts(b, "UI/T_A", {"blank": True})
-        assert PM.get_asset_opts(sb.project, "UI/T_A") == {"no_mips": True, "lod_group": "TEXTUREGROUP_UI"}
+        assert PM.get_asset_opts(sb.project, "UI/T_A") == {"no_mips": False, "lod_group": "TEXTUREGROUP_UI"}
         assert PM.get_asset_opts(b, "UI/T_A") == {"blank": True}
-        assert PM.get_asset_opts(sb.project) == {"UI/T_A": {"no_mips": True, "lod_group": "TEXTUREGROUP_UI"}}
+        assert PM.get_asset_opts(sb.project) == {"UI/T_A": {"no_mips": False, "lod_group": "TEXTUREGROUP_UI"}}
 
 
 def t_switching_an_option_off_removes_it():
-    """"Off" and "never set" have to stay the same state.
+    """"The default" and "never set" have to stay the same state.
 
-    Storing no_mips=false would make a project that had only ever LOOKED at the control immune to a
-    later change of default — the same trap the deselected-set exists to avoid for selection."""
+    Storing an option at its default would make a project that had only ever LOOKED at the control
+    immune to a later change of default — the same trap the deselected-set exists to avoid for
+    selection. no_mips defaults on, so it is stored only when switched off."""
     with sandbox() as sb:
-        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": True, "blank": True})
-        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": False})
+        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": False, "blank": True})
+        PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": True})
         assert PM.get_asset_opts(sb.project, "UI/T_A") == {"blank": True}
+        assert PM.effective_asset_opts(PM.get_asset_opts(sb.project, "UI/T_A")) == {"no_mips": True, "blank": True}
         PM.set_asset_opts(sb.project, "UI/T_A", {"blank": False})
         raw = json.load(open(os.path.join(sb.project, ".atelier", "project.json"), encoding="utf-8"))
         assert raw.get("asset_opts") == {}, raw.get("asset_opts")
@@ -306,18 +308,18 @@ def _fake_project_texture(sb, game_rel, size=(64, 64)):
 
 
 def t_no_mips_reaches_the_tool():
-    """#20's mip half is one flag the tool already had — nothing was passing it."""
+    """#20's mip half is one flag the tool already had; it is on unless switched off."""
     with sandbox() as sb:
         write_asset(sb.paks, "pakchunkUI-Windows.utoc", "../../../Marvel/Content/Marvel", "UI", "T_A.uasset")
         _fake_project_texture(sb, "UI/T_A")
         rec = []
         with stub_uat(rec):
-            TX.stage_inject(os.path.join(sb.root, "stage"), "UI/T_A", {"no_mips": True})
+            TX.stage_inject(os.path.join(sb.root, "stage"), "UI/T_A", {})
         inj = next(a for a in rec if a[0] == "inject_texture")
         assert "--no-mips" in inj, inj
         rec2 = []
         with stub_uat(rec2):
-            TX.stage_inject(os.path.join(sb.root, "stage2"), "UI/T_A", {})
+            TX.stage_inject(os.path.join(sb.root, "stage2"), "UI/T_A", {"no_mips": False})
         assert "--no-mips" not in next(a for a in rec2 if a[0] == "inject_texture")
 
 
@@ -370,7 +372,7 @@ def t_blank_says_when_it_can_only_be_black():
             assert "opaque black" in desc and "DXT1" in desc, desc
             TX.texture_format = lambda wb: "DXT5"
             with stub_uat([]):
-                desc = TX.stage_inject(os.path.join(sb.root, "s2"), "UI/T_A", {"blank": True})
+                desc = TX.stage_inject(os.path.join(sb.root, "s2"), "UI/T_A", {"blank": True, "no_mips": False})
             assert desc.endswith("(blanked)"), desc
         finally:
             TX.texture_format = saved

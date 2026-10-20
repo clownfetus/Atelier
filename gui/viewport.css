@@ -228,4 +228,18 @@
   #viewport-tools,#viewport-inspect-tools { top:12px; }
   #viewport-box .vp-popover { width:260px;max-height:54vh; }
 }
+/* Skin identity (viewport-identity.js). The skin colour is decoration only: it rings the costume
+   icon, draws a line under the header and lights the card. Every control keeps the theme's inks. */
+#viewport-skin-icon { width:34px; height:34px; flex:none; border-radius:8px; object-fit:cover; object-position:center 20%;
+  background:var(--bg3); box-shadow:0 0 0 2px var(--vp-skin-colour,var(--border2)); transition:box-shadow 300ms; }
+#viewport-box.has-skin-colour #viewport-head::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--vp-skin-colour); pointer-events:none; }
+#viewport-skin-card { position:relative; isolation:isolate; flex:none; height:84px; margin:20px 24px 0; }
+#viewport-skin-card img { display:block; width:100%; height:100%; }
+#viewport-skin-card.is-nameplate img { object-fit:contain; filter:drop-shadow(0 6px 12px rgb(0 0 0 / .3)); }
+#viewport-skin-card.is-story img { object-fit:cover; object-position:center 30%; border-radius:8px; }
+#viewport-skin-card::before { content:''; position:absolute; inset:-14px -20px; z-index:-1; opacity:0; transition:opacity 300ms;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--vp-skin-colour) 38%,transparent),transparent); }
+#viewport-box.has-skin-colour #viewport-skin-card::before { opacity:1; }
+#viewport-skin-card:not([hidden]) + #viewport-mat-section #viewport-mat-head { padding-top:16px; }
+@media (max-height:760px) { #viewport-skin-card { display:none; } }
 @media (prefers-reduced-motion:reduce) { #viewport-box *,#viewport-box *::before,#viewport-box *::after { transition:none !important; } }

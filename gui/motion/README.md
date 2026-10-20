@@ -451,7 +451,7 @@ Atelier reduced motion (`[data-motion=reduce]`).
 
 Typing, dialog backdrops and material inspection stay plain. Full allows a brief
 primary-button pop and a bubble theme wave; Calm/Off skip both. Category
-emblems remain Material Sharp pending D4 approval. Swatch interiors and dye /
+emblems are Krackle energy marks (see below). Swatch interiors and dye /
 texture previews keep their exact content; HDR energy stays outside the swatch.
 
 `tests/krackle_motion_checks.py` (via `tests/browser_smoke.py`) covers the spinner,
@@ -528,15 +528,14 @@ Cancelled Activity glyphs drain once; replaced rows dispose their controllers.
 The empty-project drop starts the original creation dialog immediately. All
 transient button/project bubbles release on hiding, policy changes and teardown.
 
-Category candidates are generated at 24 and 102 px by `krackle_art.py`; review
-HTML and both-theme PNG sheets live in `docs/review/wave-4b`. The hidden local
-`atelier.experimentalKrackleEmblems=1` flag is for review only and defaults off.
-With it on, `icons.js` inlines the generated markup from `category-emblems.js`
+Category emblems are generated at 24 and 102 px by `krackle_art.py`; review
+HTML and both-theme PNG sheets live in `docs/review/wave-4b`. They are on by
+default: `icons.js` inlines the generated markup from `category-emblems.js`
 (an `<image>` SVG cannot see page variables), so emblems take the measured
 `--krackle-charge`/`--krackle-hole`, and each copy gets its own clip id. On a
 card that charge is the thumb's raised ink. The review sheet draws the candidates on
 Studio card and thumb surfaces with that fitted ink, so its PNGs match the app.
-Control glyphs keep Material Sharp. D4 remains a user decision.
+Control glyphs keep Material Sharp.
 
 Particle rendering uses preallocated circle command buffers, linked per integer
 ink key, and native `beginPath` batches. Path2D has no reset method, so reusing

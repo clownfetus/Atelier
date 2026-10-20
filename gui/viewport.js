@@ -1151,6 +1151,7 @@ async function open(skinId, title) {
   updateHeroLogo(/^\d{4}/.exec(skinId)?.[0] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(skinId,title);
+  window.AtelierViewportIdentity?.show(skinId);
   $('viewport-status').textContent = '';
   inspection.show();
   $('viewport-loading').style.display = 'flex';
@@ -1226,6 +1227,7 @@ async function openMesh(gameRel, name, skinId) {
   updateHeroLogo(/characters\/(\d{4})\//i.exec(gameRel)?.[1] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(_sk,name);
+  window.AtelierViewportIdentity?.show(_sk, /characters\/(\d{4})\//i.exec(gameRel)?.[1]);
   $('viewport-status').textContent = '';
   inspection.show();
   $('viewport-loading').style.display = 'flex';

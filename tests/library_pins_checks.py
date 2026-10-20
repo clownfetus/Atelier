@@ -51,8 +51,11 @@ def run_library_pins_checks(page, context, url, report, checks):
         assert glyph.get_attribute('data-lucide') == 'folder-map'
         assert 'map-folder-icon' in glyph.get_attribute('class')
         assert glyph.bounding_box()['width'] == 18
-        assert glyph.evaluate("""el=>el.querySelector('path').getAttribute('d') ===
-          AtelierSymbolPaths['folder-map'].body.match(/d="([^"]+)"/)[1]""")
+        # Category emblems replace the Sharp glyph by default; pins draw the same Krackle mark.
+        assert glyph.evaluate("""el=>{const expected=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          expected.innerHTML=AtelierCategoryEmblems.markup('map-folder-icon',24);
+          return el.querySelector('.k-category-emblem-energy path')?.getAttribute('d') ===
+            expected.querySelector('.k-category-emblem-energy path').getAttribute('d');}""")
         assert pins_page.evaluate('AtelierLibraryPins.list().find(pin=>pin.path==="Maps").iconCls') == 'map-folder-icon'
 
     try:
@@ -191,13 +194,18 @@ def run_library_pins_checks(page, context, url, report, checks):
                 pins_page.locator('#settings-theme').select_option(theme, force=True)
                 assert pins_page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 assert pins_page.locator('.library-pin-open').count() == 3
-                assert 60 <= folder('Maps').bounding_box()['width'] < 156
-                assert folder('Maps').locator('.card-icon').bounding_box()['width'] == 20
+                # Home uses the selected card size, including its pinned folder cards.
+                size=int(pins_page.locator('#library-size').input_value())
+                cards=pins_page.locator('#grid-area .card').evaluate_all(
+                    "nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON())")
+                assert cards and all(abs(card['width']-size)<1 and card['height']>size for card in cards),cards
+                thumb=folder('Maps').locator('.card-thumb').bounding_box()
+                assert abs(thumb['width']-thumb['height'])<1 and thumb['width']>60,thumb
                 assert pins_page.locator('#install-btn').is_visible()
                 pins_page.screenshot(path=str(report / f'library-pins-{theme}-{width}.png'), animations='disabled')
         assert not errors, errors
         assert not writes, writes
-        checks.append('Pinned home links and category chips fit both themes and desktop sizes without blocking export or issuing backend writes')
+        checks.append('Pinned home links and consistently sized folder cards fit both themes and desktop sizes without blocking export or issuing backend writes')
     finally:
         if not pins_page.is_closed():
             pins_page.evaluate('(args)=>args.raw===null ? localStorage.removeItem(args.key) : localStorage.setItem(args.key,args.raw)', {'key': KEY, 'raw': prior})

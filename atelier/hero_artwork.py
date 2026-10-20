@@ -1,4 +1,6 @@
-"""Hero avatars and emblems, checked once per launch and cached independently of costumes."""
+"""Hero avatars and emblems, checked once per launch and cached independently of costumes.
+
+Story banners are published at 344x120 but drawn far wider, so each is upscaled 4x once cached."""
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 import hashlib
@@ -6,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import re
+import sys
 import threading
 import time
 from urllib.parse import unquote, urlsplit
@@ -96,8 +99,15 @@ class HeroArtwork:
                 names[ALIASES.get(key, key)] = cid
         threading.Thread(target=self.update, args=(names,), name='atelier-hero-artwork', daemon=True).start()
 
+    def _path(self, url):
+        return self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp')
+
+    @staticmethod
+    def _sharp_path(path):
+        return path.with_name(path.stem + '-x4.webp')
+
     def _image(self, url):
-        path = self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp')
+        path = self._path(url)
         if path.is_file():
             return path
         with self.slots:
@@ -157,6 +167,29 @@ class HeroArtwork:
         finally:
             with self.lock:
                 self.state['updating'] = False
+        self._sharpen_banners()
+
+    def _sharpen_banners(self):
+        """Upscale each cached story banner once, after the refresh so it never holds one up.
+        Cached banners count even offline; until a banner is done its original is served."""
+        with self.lock:
+            originals = [self._path(entry['story']) for entry in self.entries.values() if 'story' in entry]
+        for path in originals:
+            target = self._sharp_path(path)
+            if target.is_file() or not path.is_file():
+                continue
+            try:
+                from atelier.upscale import upscale
+                with Image.open(path) as image:
+                    sharp = upscale(image)
+                staged = target.with_suffix(f'.{threading.get_ident()}.tmp')
+                try:
+                    sharp.save(staged, format='WEBP', quality=95, method=6)
+                    staged.replace(target)
+                finally:
+                    staged.unlink(missing_ok=True)
+            except Exception as exc:
+                print(f'[hero-artwork] keeping {path.name} at its original size: {exc}', file=sys.stderr, flush=True)
 
     def image(self, cid, kind):
         if not re.fullmatch(r'\d{4}', cid) or kind not in PAGES:
@@ -164,7 +197,9 @@ class HeroArtwork:
         with self.lock:
             url = self.entries.get(cid, {}).get(kind)
         # UI reads are local: a slow or offline artwork source never blocks navigation.
-        path = self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp') if url else None
+        path = self._path(url) if url else None
+        if path and kind == 'story' and self._sharp_path(path).is_file():
+            return self._sharp_path(path)
         return path if path and path.is_file() else None
 
 

@@ -64,6 +64,29 @@
     } catch (_) { return []; }
   }
   function sample(image) { return samplePalette(image)[0] || null; }
+  // The colour a costume or hero reads as: the hue with the most strong colour in it, rather than the
+  // most common pixel (often skin, hair or a grey suit). Falls back to sample() for grey artwork.
+  function accent(image) {
+    if (!image?.complete || !image.naturalWidth) return null;
+    try {
+      const size = 24, canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d', {willReadFrequently:true}); ctx.drawImage(image,0,0,size,size);
+      const data = ctx.getImageData(0,0,size,size).data, bins = Array.from({length:12}, () => [0,0,0,0]);
+      for (let i=0;i<data.length;i+=4) {
+        if (data[i+3]<128) continue;
+        const [r,g,b] = [data[i],data[i+1],data[i+2]].map(n=>n/255), max = Math.max(r,g,b), min = Math.min(r,g,b), d = max-min, l = (max+min)/2;
+        if (!d || l<.12 || l>.9) continue;
+        const hue = (max===r ? ((g-b)/d+6)%6 : max===g ? (b-r)/d+2 : (r-g)/d+4)*60, chroma = 1-Math.abs(2*l-1);
+        // Saturation alone overvalues dark blonde hair and skin. Chroma gives stronger costume
+        // colours enough weight to survive a larger, muted area without favouring a fixed hue.
+        const weight = (d/chroma)**2*d*d, bin = bins[Math.floor(((hue+15)%360)/30)];  // Reds sit in one bin.
+        bin[0]+=weight; bin[1]+=data[i]*weight; bin[2]+=data[i+1]*weight; bin[3]+=data[i+2]*weight;
+      }
+      const best = bins.reduce((a,b)=>b[0]>a[0]?b:a);
+      if (best[0]<.15) return sample(image);
+      return '#'+best.slice(1).map(n=>Math.round(n/best[0]).toString(16).padStart(2,'0')).join('');
+    } catch (_) { return null; }
+  }
   function artwork(image) {
     const colors=samplePalette(image),accent=colors[0]||null;
     window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent,colors}}));
@@ -278,5 +301,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,samplePalette,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

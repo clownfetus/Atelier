@@ -13,7 +13,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         tab.evaluate("value=>{const c=document.getElementById('settings-motion');c.value=value;c.dispatchEvent(new Event('change'));}",value)
     try:
         tab.goto(url);tab.wait_for_selector('#grid-area .card')
-        stored=tab.evaluate("Object.fromEntries(['motion','theme','appearance','experimentalKrackleEmblems'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
+        stored=tab.evaluate("Object.fromEntries(['motion','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
         assert tab.evaluate("document.fonts.load('650 24px \"Bricolage Grotesque\"').then(f=>f.length>0)")
         assert tab.locator('#explorer').evaluate('el=>getComputedStyle(el).borderRadius')=='6px'
         assert 'Mod tray' in tab.locator('#sidebar-header').inner_text()
@@ -128,8 +128,8 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert not tab.locator('.k-button-pop,.k-project-fall').count()
         tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))")
         checks.append('Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles')
-        assert tab.evaluate("!AtelierCategoryEmblems.enabled()&&Object.keys(AtelierCategoryEmblems.names).length===36")
-        checks.append('Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; the 36 category candidates remain disabled pending D4 review')
+        assert tab.evaluate("Object.keys(AtelierCategoryEmblems.names).length===36")
+        checks.append('Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; all 36 category emblems are available')
         escaped=tab.evaluate("""() => {
           const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),out=[];svg.setAttribute('viewBox','0 0 24 24');document.body.append(svg);
           try{for(const cls of Object.keys(AtelierCategoryEmblems.names))for(const scale of [24,102]){
@@ -142,30 +142,31 @@ def run_surfaces_checks(page,context,url,report,checks):
           return out;
         }""")
         assert not escaped,escaped
-        tab.evaluate("localStorage.setItem('atelier.experimentalKrackleEmblems','1');document.querySelector('[data-theme-preset=studio]').click();nav={path:'Emblem fixture'};buildGrid(['Characters','Weapons'].map(name=>_makeCard({type:'folder',name,rel_path:'Emblem fixture/'+name})))")
+        tab.evaluate("document.querySelector('[data-theme-preset=studio]').click();nav={path:'Emblem fixture'};buildGrid(['Characters','Weapons'].map(name=>_makeCard({type:'folder',name,rel_path:'Emblem fixture/'+name})))")
+        assert tab.evaluate("new Set(Object.values(AtelierCategoryEmblems.inks)).size===36")
         def emblem_inks():
             return tab.evaluate("""() => [...document.querySelectorAll('#grid-area .card svg.card-icon')].map(svg=>{
               const energy=getComputedStyle(svg.querySelector('.k-category-emblem-energy > *')).fill,probe=document.createElement('i');
-              svg.after(probe);probe.style.color='var(--krackle-charge)';const charge=getComputedStyle(probe).color;
-              probe.style.color='var(--krackle-charge-raised)';const raised=getComputedStyle(probe).color;
-              probe.style.color='var(--krackle-hole)';const hole=getComputedStyle(probe).color;probe.remove();
+              const cls=Object.keys(AtelierCategoryEmblems.names).find(name=>svg.classList.contains(name));
+              svg.after(probe);probe.style.color='var(--k-emblem-'+cls+')';const ink=getComputedStyle(probe).color;
+              probe.style.color='var(--krackle-charge-raised)';const raised=getComputedStyle(probe).color;probe.remove();
               const against=node=>AtelierKrackleInks.contrast(energy,getComputedStyle(node).backgroundColor);
-              // The card body is --bg2; the thumb behind the emblem is --bg3 and has its own fitted charge.
-              return {energy,charge,raised,hole,bubble:getComputedStyle(svg.querySelector('.k-category-emblem-bubbles > circle')).fill,
+              // The card body is --bg2 and the thumb behind the emblem --bg3; each ink is fitted to both.
+              return {cls,energy,ink,raised,bubbles:svg.querySelectorAll('mask .k-category-emblem-bubbles > circle').length,
                 contrast:against(svg.closest('.card')),thumbContrast:against(svg.closest('.card-thumb')),
                 card:getComputedStyle(svg.closest('.card')).backgroundColor,thumb:getComputedStyle(svg.closest('.card-thumb')).backgroundColor,
-                clip:svg.querySelector('clipPath').id,clipped:svg.querySelector('[clip-path]').getAttribute('clip-path')};
+                mask:svg.querySelector('mask').id,masked:svg.querySelector('.k-category-emblem-energy').getAttribute('mask')};
             })""")
         energy={};thumbs={};surfaces={}
         tab.mouse.move(0,0)  # A hovered card paints --bg3; measure the resting card.
         for theme in ['light','dark']:
             tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
             inks=emblem_inks()
-            assert len(inks)==2 and len({ink['clip'] for ink in inks})==2,inks
+            assert len(inks)==2 and len({ink['mask'] for ink in inks})==2 and inks[0]['energy']!=inks[1]['energy'],inks
             for ink in inks:
-                assert ink['energy']==ink['charge']==ink['raised'] and ink['bubble']==ink['hole'],(theme,ink)
+                assert ink['energy']==ink['ink'] and ink['bubbles'],(theme,ink)
                 assert ink['contrast']>=3 and ink['thumbContrast']>=3,(theme,ink)
-                assert ink['clipped']==f"url(#{ink['clip']})",ink
+                assert ink['masked']==f"url(#{ink['mask']})",ink
             energy[theme]=inks[0]['energy'];thumbs[theme]=round(inks[0]['thumbContrast'],2);surfaces[theme]=[inks[0]['card'],inks[0]['thumb']]
             tab.locator('#grid-area .grid').screenshot(path=str(report/f'category-emblems-app-{theme}.png'),animations='disabled')
             # Hovered, the body paints --bg3, so its edited corner takes the raised charge; the emblem keeps its ink.
@@ -175,14 +176,14 @@ def run_surfaces_checks(page,context,url,report,checks):
             hovered=tab.evaluate("""() => {const card=document.querySelector('#grid-area .card'),corner=getComputedStyle(card,'::after').backgroundColor;
               return {corner,contrast:AtelierKrackleInks.contrast(corner,getComputedStyle(card).backgroundColor),energy:getComputedStyle(card.querySelector('.k-category-emblem-energy > *')).fill};}""")
             card.evaluate("node=>node.classList.remove('imported')");tab.mouse.move(0,0);tab.wait_for_function(settled,arg='--bg2')
-            assert hovered['corner']==hovered['energy']==inks[0]['raised'] and hovered['contrast']>=3,(theme,hovered)
-        assert energy['light']!=energy['dark'],energy
+            assert hovered['corner']==inks[0]['raised'] and hovered['energy']==inks[0]['energy'] and hovered['contrast']>=3,(theme,hovered)
+        assert energy['light']==energy['dark'],energy  # Studio inks read in both themes, so an emblem keeps its colour.
         (report/'category-emblem-inks.json').write_text(json.dumps({'energy':energy,'thumbContrast':thumbs},indent=2))
-        print(f"D4 emblem energy on card thumbs: light {thumbs['light']}:1, dark {thumbs['dark']}:1",flush=True)
-        tab.evaluate("document.getElementById('grid-area').style.setProperty('--krackle-charge-raised','#7a4cd9')")
-        assert all(ink['energy']=='rgb(122, 76, 217)' for ink in emblem_inks())
-        tab.evaluate("document.getElementById('grid-area').style.removeProperty('--krackle-charge-raised');localStorage.removeItem('atelier.experimentalKrackleEmblems')")
-        checks.append('With the D4 flag on, card emblems are inlined with unique clip ids; their energy follows the thumb\'s raised --krackle-charge (3:1 on light and dark thumbs and cards, local overrides), a hovered card\'s edited corner takes that raised ink at 3:1 on --bg3, and bubbles follow --krackle-hole; all 36 silhouettes stay inside the 24-unit box')
+        print(f"Category emblem energy on card thumbs: light {thumbs['light']}:1, dark {thumbs['dark']}:1",flush=True)
+        tab.evaluate("document.getElementById('grid-area').style.setProperty('--k-emblem-char-icon','#7a4cd9')")
+        assert [ink['energy'] for ink in emblem_inks() if ink['cls']=='char-icon']==['rgb(122, 76, 217)']
+        tab.evaluate("document.getElementById('grid-area').style.removeProperty('--k-emblem-char-icon')")
+        checks.append('By default, card emblems are inlined with unique mask ids; each of the 36 categories has its own ink (3:1 on light and dark thumbs and cards, local overrides), bubbles are cut through it, a hovered card\'s edited corner takes the raised charge at 3:1 on --bg3, and all 36 silhouettes stay inside the 24-unit box')
         review=context.new_page()
         try:
             review.set_viewport_size({'width':1320,'height':1100});review.set_content((Path(__file__).resolve().parents[1]/'docs/review/wave-4b/category-emblems.html').read_text(encoding='utf-8'))
@@ -193,7 +194,7 @@ def run_surfaces_checks(page,context,url,report,checks):
                 assert sheet==[*surfaces[theme],energy[theme]],('review sheet differs from Studio cards',theme,sheet,surfaces[theme],energy[theme])
                 review.screenshot(path=str(report/f'category-emblems-{theme}.png'),full_page=True)
         finally:review.close()
-        checks.append('The D4 review sheet draws candidates on the Studio card and thumb surfaces with the same fitted ink as the app, in both themes')
+        checks.append('The category review sheet draws emblems on the Studio card and thumb surfaces with the same fitted ink as the app, in both themes')
         assert not errors,errors
     finally:
         if stored is not None:tab.evaluate("values=>{for(const [key,value] of Object.entries(values)){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}}",stored)

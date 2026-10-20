@@ -48,6 +48,9 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 CloseApplications=yes
 UninstallDisplayIcon={app}\{#AppExeName}
+; An upgrade keeps the exe's path, so Explorer keeps showing its cached icon; this asks it to
+; refresh at the end of setup so a redrawn mark reaches existing shortcuts.
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

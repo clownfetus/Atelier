@@ -17,6 +17,8 @@ datas = [
 ]
 # Do not collect developer __pycache__ files beside the standalone scripts.
 datas += [(str(script), 'atelier/blender') for script in Path('atelier/blender').glob('*.py')]
+# upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
+datas += [(str(item), 'atelier/models') for item in Path('atelier/models').iterdir() if item.is_file()]
 binaries = []
 hiddenimports = [
     'io_lib',

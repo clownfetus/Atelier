@@ -38,6 +38,9 @@
   }
   function init(options) {
     callbacks=options;const input=$('search-input'),chip=$('search-scope');
+    // The full hint fits the wide box only; the scope chip beside it already says where.
+    const wide=matchMedia('(min-width: 1101px)'),hint=input.placeholder,fit=()=>{input.placeholder=wide.matches?hint:'Search…';};
+    wide.addEventListener('change',fit);fit();
     chip.addEventListener('click',()=>{scope=scope==='everywhere'?'folder':'everywhere';chip.textContent=scope==='folder'?'This folder':'Everywhere';chip.setAttribute('aria-label','Search scope: '+chip.textContent);reset();callbacks.changed?.();if(scope==='everywhere')lookup();input.focus();});
     input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls','search-results');input.setAttribute('aria-expanded','false');
     input.addEventListener('input',()=>{reset();if(scope==='everywhere')timer=setTimeout(lookup,150);});

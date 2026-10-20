@@ -10,9 +10,8 @@ checks, real-progress launch presentation, policy gates and a recorded particle
 CPU median (`krackle-frame-perf.json`). It also simulates 8 ms refresh intervals
 followed by 40 ms intervals to test merge-filter fallback. Native WebView2 smoke
 uploads a pathless File to a disposable fixture endpoint and verifies its bytes
-and originating project header. Review candidates remain behind the disabled
-`atelier.experimentalKrackleEmblems` flag; both-scale sheets are generated with
-the artwork, not maintained separately. Run the full browser suite before a PR.
+and originating project header. Category emblems are on by default; both-scale
+review sheets are generated with the artwork, not maintained separately. Run the full browser suite before a PR.
 
 Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
 WebAudio context (no test sounds reach the speakers). It checks disposable toon

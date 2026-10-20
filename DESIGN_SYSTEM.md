@@ -374,8 +374,8 @@ five bubbles before a numeric count. Halo rings and bubbles around HDR swatches
 never cover the colour itself. Primary-button pops and theme waves are Full-only;
 actions never wait for them. The Build drop starts only with a dispatched job.
 
-All 36 category energy emblems have review candidates at both scales, with a
-disabled experimental flag. Material Sharp remains active until D4 approval.
+All 36 category energy emblems are drawn at both scales and replace the Material
+Sharp category glyphs; folders without an emblem keep the Krackle folder.
 Particle stages batch preallocated circle commands by integer ink key, because
 the [Canvas Path2D API](https://html.spec.whatwg.org/multipage/canvas.html#path2d-objects)
 has no reset operation. Filter fallback uses real RAF intervals relative to the

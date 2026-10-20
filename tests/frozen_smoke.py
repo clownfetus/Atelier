@@ -215,6 +215,9 @@ def main():
                 source=Path(__file__).resolve().parents[1]/'gui'
                 for name in ('roster.js','roster.css','polish.js'):
                     assert (source/name).read_bytes()==(exe.parent/'_internal'/'gui'/name).read_bytes(),name
+                models=Path(__file__).resolve().parents[1]/'atelier'/'models'
+                for name in ('realesr-animevideov3.npz','LICENSE-Real-ESRGAN.txt'):
+                    assert (models/name).read_bytes()==(exe.parent/'_internal'/'atelier'/'models'/name).read_bytes(),name
                 run_hero_artwork_checks(page,context,f'http://127.0.0.1:{args.app_port}',report,result['checks'],reuse_page=True)
                 result['checks'].append('Packaged roster and colour sampler match the verified source')
             browser.close()
