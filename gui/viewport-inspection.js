@@ -16,7 +16,7 @@ export function createViewportInspection(api) {
   let down = null, opener = null, assetsLoading = false;
   const reducedMotion = (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)'));
   const effects = createViewportEffects({renderer,scene,camera,modelRoot,grid,reduced:reducedMotion});
-  let cameraMove = null, revealBounds = null;
+  let cameraMove = null;
   let showcaseMode=false,showcaseColors=null,showcaseBackdrop=null;
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
@@ -37,15 +37,11 @@ export function createViewportInspection(api) {
     }
   }
   $('viewport-showcase').addEventListener('click',()=>setShowcase(true));$('viewport-inspect').addEventListener('click',()=>setShowcase(false));
-  const shadedPlane = new THREE.Plane(new THREE.Vector3(0,-1,0));
-  const wirePlane = new THREE.Plane(new THREE.Vector3(0,1,0));
-  renderer.localClippingEnabled = true;
+  // The reveal is one last Krackle sweep (viewport-effects.js) that leaves the loaded appearance behind it.
   let revealStart = null, reveal = 1;
-  const revealWire = new THREE.MeshBasicMaterial({color:0xaccbff, wireframe:true,
-    transparent:true, depthWrite:false, toneMapped:false});
-  function materialize() { revealBounds = bounds(); revealStart = reducedMotion.matches ? null : performance.now();if(showcaseMode){showcaseColors=null;setShowcase(true);} }
+  function materialize() { revealStart = reducedMotion.matches ? null : performance.now();if(showcaseMode){showcaseColors=null;setShowcase(true);} }
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { revealStart = null; reveal = 1; finishCamera(); } });
-  window.addEventListener('pagehide', () => {revealWire.dispose();toonGradient.dispose();}, {once:true});
+  window.addEventListener('pagehide', () => {toonGradient.dispose();}, {once:true});
 
   function worldBoxes() {
     const boxes = [];
@@ -269,13 +265,10 @@ export function createViewportInspection(api) {
     // Tween disposable display colors in linear space, preserving exact saved values.
     if (!overlay) effects.tint(material,base,showcase,lighting==='emissive');
     if (oldMap !== material.map || oldWireframe !== material.wireframe || oldToneMapped !== material.toneMapped) material.needsUpdate = true;
-    if (!showcase && reveal < 1) {
-      material.clippingPlanes = [shadedPlane];
-    } else material.clippingPlanes = null;
     return material;
   }
 
-  function renderPass(original = false, showcase = false, wireOnly = false,comic=false) {
+  function renderPass(original = false, showcase = false,comic=false) {
     const restore = [];
     const gridVisible=grid.visible;
     try {
@@ -283,11 +276,11 @@ export function createViewportInspection(api) {
     modelRoot.traverse(mesh => {
       if (!mesh.isMesh) return;
       restore.push([mesh, mesh.material]);
-      const shown = m => !m.visible ? m : wireOnly ? revealWire : displayMaterial(m, original, showcase,comic);
+      const shown = m => !m.visible ? m : displayMaterial(m, original, showcase,comic);
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map(shown) : shown(mesh.material);
     });
       renderer.render(scene, camera);
-      if (!comic&&!wireOnly && lighting !== 'flat' && !regions) effects.drawBloom();
+      if (!comic && lighting !== 'flat' && !regions) effects.drawBloom();
     }
     finally { for (const [mesh, material] of restore) mesh.material = material;grid.visible=gridVisible; }
   }
@@ -298,21 +291,10 @@ export function createViewportInspection(api) {
     if (!captured) { updateCamera(); updateAxes(); }
     reveal = revealStart === null || showcase ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
     if (reveal === 1) revealStart = null;
-    if (reveal < 1 && revealBounds && !revealBounds.isEmpty()) {
-      const height = THREE.MathUtils.lerp(revealBounds.min.y,revealBounds.max.y,reveal);
-      shadedPlane.constant = height; wirePlane.constant = -height; revealWire.clippingPlanes = [wirePlane];
-    }
     if (comparison !== 'wipe' || showcase) {
-      renderPass(!showcase && comparison === 'original', showcase,false,comic);
-      if (reveal < 1) {
-        const clear = renderer.autoClear, visible = grid.visible;
-        revealWire.opacity = (1 - reveal) * .8;
-        renderer.autoClear = false; grid.visible = false;
-        try { renderPass(false, false, true); }
-        finally { renderer.autoClear = clear; grid.visible = visible; }
-      }
-      if (!showcase && assetsLoading) effects.drawLoading(bounds());
-      else if (!showcase && reveal === 1) effects.drawOutline(hovered);
+      renderPass(!showcase && comparison === 'original', showcase,comic);
+      if (!showcase && (assetsLoading || reveal < 1)) effects.drawLoading(bounds(), assetsLoading ? null : reveal);
+      else if (!showcase) effects.drawOutline(hovered);
       return;
     }
     const size = renderer.getSize(new THREE.Vector2());
