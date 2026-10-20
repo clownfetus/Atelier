@@ -108,19 +108,21 @@ class TexturePublication(unittest.TestCase):
                      patch.object(texture, 'uat', return_value=types.SimpleNamespace(returncode=1)):
                     self.assertFalse(texture._decode_png_file('input.uasset', str(target)))
                 self.assertEqual(target.read_bytes(), original)
-                self.assertEqual(list(Path(directory).iterdir()), [target])
+                self.assertEqual([p for p in Path(directory).iterdir() if p.is_file()], [target])
+                self.assertFalse(list((Path(directory)/'.atelier').iterdir()))
 
     def test_older_tool_falls_back_and_publishes_a_valid_image(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)/'output.png'
             def legacy(arguments):
-                PillowImage.new('RGB', (8, 8), 'blue').save(arguments[2])
+                PillowImage.new('RGB', (8, 8), 'blue').save(arguments[2], format='PNG')
                 return types.SimpleNamespace(returncode=0)
             with patch.object(texture, 'uat_pooled', return_value=None), patch.object(texture, 'uat', side_effect=legacy):
                 self.assertTrue(texture._decode_png_file('input.uasset', str(target)))
             with PillowImage.open(target) as image:
                 self.assertEqual(image.size, (8, 8))
-            self.assertEqual(list(Path(directory).iterdir()), [target])
+            self.assertEqual([p for p in Path(directory).iterdir() if p.is_file()], [target])
+            self.assertFalse(list((Path(directory)/'.atelier').iterdir()))
 
     def test_texture_metadata_expires_when_a_companion_file_changes(self):
         with tempfile.TemporaryDirectory() as directory:

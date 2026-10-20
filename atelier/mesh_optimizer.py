@@ -26,8 +26,8 @@ def _runtime():
         raise RuntimeError('The bundled meshoptimizer checksum does not match')
     config = wasmtime.Config()
     config.consume_fuel = True
-    # This numeric core module needs none of the component, GC, exception or
-    # concurrency proposals. Disable them, including the features implicated in
+    # This numeric core needs no GC, exceptions or shared memory. Disable these
+    # proposals, including the features implicated in
     # upstream's October 2026 GC/exception advisories for the available PyPI build.
     config.wasm_gc = False
     config.wasm_exceptions = False

@@ -147,7 +147,11 @@ def _decode_png_file(uasset_path, out_png, mip=0):
     """
     out_png = os.path.abspath(out_png)
     os.makedirs(os.path.dirname(out_png), exist_ok=True)
-    descriptor, staged = tempfile.mkstemp(prefix='.decode-', suffix='.png', dir=os.path.dirname(out_png))
+    # UAssetTool rewrites the output extension to .png. Keep that extension and
+    # stage in reserved bookkeeping so project scans cannot list a partial edit.
+    staging = os.path.join(os.path.dirname(out_png), '.atelier')
+    os.makedirs(staging, exist_ok=True)
+    descriptor, staged = tempfile.mkstemp(prefix='decode-', suffix='.png', dir=staging)
     os.close(descriptor)
 
     def publish(success):
@@ -172,7 +176,7 @@ def _decode_png_file(uasset_path, out_png, mip=0):
         # Clear failed output before trying the older one-shot interface.
         if os.path.exists(staged):
             os.remove(staged)
-        result = uat(['extract_texture', os.path.abspath(uasset_path), staged, '--usmap', USMAP, '--mip', str(mip)])
+        result = uat(['extract_texture', os.path.abspath(uasset_path), staged, '--format', 'PNG', '--usmap', USMAP, '--mip', str(mip)])
         return publish(result.returncode == 0)
     finally:
         if os.path.exists(staged):
