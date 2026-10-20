@@ -252,7 +252,9 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         detail_counts={}
         for section in lod['sections']:detail_counts[section['mat']]=detail_counts.get(section['mat'],0)+section['num_tris']
         detail_ratios={m.materials[index]['slot_name']:min(1,count/max(1,top_counts.get(index,count))) for index,count in detail_counts.items()}
-        out = _run_blender("blend_to_glb.py", [blend_path, glb, f"{ratio:.6f}",json.dumps({'section_ratios':detail_ratios})], "GLB")
+        # Export intact vertex channels; meshoptimizer reduces the index buffers
+        # below, after the target LOD's own bone palette and morph IDs are known.
+        out = _run_blender("blend_to_glb.py", [blend_path, glb, '1.000000',json.dumps({'section_ratios':{}})], "GLB")
         from atelier.handlers.meshreplace import import_options
         options=import_options(json.loads(next((line[len('ATELIER_IMPORT_OPTIONS '):] for line in out.splitlines() if line.startswith('ATELIER_IMPORT_OPTIONS ')),'{}')))
         if i==0 and not options['keep_skeleton']:m.apply_skeleton_from_glb(glb)
@@ -269,8 +271,18 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         section_options={'preserve_parts':preserve_parts} if preserve_parts else {}
         if options.get('repair_weights'):section_options['repair_weights']=True
         secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight,**section_options)
+        simplification = []
+        if i > 0:
+            from atelier.mesh_optimizer import simplify_section
+            for section_index, section in enumerate(secs):
+                slot = m.materials[section['mat']]['slot_name']
+                if slot in (preserve_parts or []):
+                    continue
+                jobs.checkpoint()
+                secs[section_index], report = simplify_section(section, detail_ratios.get(slot, min(1, ratio)))
+                simplification.append({'slot':slot, **report})
         info = m.rebuild_lod(i, secs,keep_morphs=options['keep_morphs'])
-        applied.append({"lod": i, "ratio": round(ratio, 4), **info})
+        applied.append({"lod": i, "ratio": round(ratio, 4), 'simplification':simplification, **info})
         os.remove(glb)
 
     target = os.path.join(stage, *_pak_dir(game_rel).split("/"))

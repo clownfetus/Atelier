@@ -4,6 +4,7 @@ watchdog==6.0.0
 pillow==12.3.0
 numpy==2.5.4
 scipy==1.18.1
+wasmtime==49.0.0
 cryptography==50.0.2
 pywebview==6.2.1
 cffi==2.1.1
