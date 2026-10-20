@@ -965,17 +965,14 @@ def api_validate_mods_folder():
         return json.dumps({"status": "ok"})
     return json.dumps({"status": "missing"})
 
-# Blender is "blender.exe" on Windows and a plain "blender" binary everywhere else; both the
-# Settings validator and the file picker accept either so a config copied between the two works.
-_BLENDER_NAMES = ("blender.exe",) if hostos.IS_WINDOWS else ("blender", "blender.exe")
-
 @app.get("/api/validate_blender")
 def api_validate_blender():
+    from atelier.handlers.meshedit import BLENDER_NAMES
     path = request.query.get("path", "").strip()
     response.content_type = "application/json"
     if not path:
         return json.dumps({"status": "empty"})
-    if os.path.basename(path).lower() not in _BLENDER_NAMES:
+    if os.path.basename(path).lower() not in {name.lower() for name in BLENDER_NAMES}:
         return json.dumps({"status": "invalid"})
     if not os.path.exists(path):
         return json.dumps({"status": "missing"})
@@ -983,13 +980,14 @@ def api_validate_blender():
 
 @app.post("/api/pick_blender_file")
 def api_pick_blender_file():
+    from atelier.handlers.meshedit import BLENDER_NAMES
     body    = request.json or {}
     initial = body.get("initial") or ""
     response.content_type = "application/json"
     try:
         title = "Select blender.exe" if hostos.IS_WINDOWS else "Select the blender executable"
         return json.dumps({"ok": True, "path": hostos.pick_file(
-            title, tuple(_BLENDER_NAMES), initial)})
+            title, BLENDER_NAMES, initial)})
     except Exception as e:
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
@@ -1055,6 +1053,12 @@ def api_save_paks():
         # later as an empty asset browser with nothing pointing back at the typo.
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
+    from atelier.handlers.meshedit import BLENDER_NAMES, is_blender_executable
+    if has_blender and blender_path and not is_blender_executable(blender_path):
+        # Every Blender step launches this path unprompted; checked before anything is saved.
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error":
+                           f"The Blender path must be an existing {BLENDER_NAMES[0]} file."})
     paks_path, err = _validate_and_build_paks(path)
     if err:
         response.content_type = "application/json"

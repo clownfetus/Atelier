@@ -5,6 +5,14 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+### Security
+
+- Websites open in your browser can no longer control Atelier while it runs. The local
+  service now refuses requests from other sites and from DNS-rebinding addresses, so a
+  page can no longer reset app data, delete edits or change Settings behind your back.
+- **Settings** accepts only an existing Blender executable as the Blender path, and a
+  saved path to any other program is ignored instead of being launched.
+
 ## 1.1.0 — 19 October 2026
 
 ### Create and edit assets
