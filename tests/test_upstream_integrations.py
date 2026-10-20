@@ -18,6 +18,8 @@ _data = tempfile.TemporaryDirectory(prefix='atelier-upstream-')
 atexit.register(_data.cleanup)
 os.environ['ATELIER_DATA_DIR'] = _data.name
 from atelier.handlers.mesh import Mesh
+from atelier.handlers import texture
+from PIL import Image as PillowImage
 
 
 class BlenderImageCache(unittest.TestCase):
@@ -87,6 +89,46 @@ class CookedSkinWeights(unittest.TestCase):
             Mesh.skin_weights(types.SimpleNamespace(_blob=lambda _: bad), lod)
         with self.assertRaisesRegex(ValueError, 'vertex count'):
             Mesh.skin_weights(types.SimpleNamespace(_blob=lambda _: blob), {**lod, 'lookup_cnt':1})
+
+
+class TexturePublication(unittest.TestCase):
+    def test_failed_or_truncated_worker_output_never_replaces_an_existing_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)/'edited.png'
+            PillowImage.new('RGB', (4, 4), 'red').save(target)
+            original = target.read_bytes()
+            for success in (False, True):
+                def worker(request):
+                    Path(request['output_path']).write_bytes(b'partial PNG')
+                    return {'success':success}
+                with patch.object(texture, 'uat_pooled', side_effect=worker), \
+                     patch.object(texture, 'uat', return_value=types.SimpleNamespace(returncode=1)):
+                    self.assertFalse(texture._decode_png_file('input.uasset', str(target)))
+                self.assertEqual(target.read_bytes(), original)
+                self.assertEqual(list(Path(directory).iterdir()), [target])
+
+    def test_older_tool_falls_back_and_publishes_a_valid_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)/'output.png'
+            def legacy(arguments):
+                PillowImage.new('RGB', (8, 8), 'blue').save(arguments[2])
+                return types.SimpleNamespace(returncode=0)
+            with patch.object(texture, 'uat_pooled', return_value=None), patch.object(texture, 'uat', side_effect=legacy):
+                self.assertTrue(texture._decode_png_file('input.uasset', str(target)))
+            with PillowImage.open(target) as image:
+                self.assertEqual(image.size, (8, 8))
+            self.assertEqual(list(Path(directory).iterdir()), [target])
+
+    def test_texture_metadata_expires_when_a_companion_file_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)/'texture'; base.with_suffix('.uasset').write_bytes(b'header')
+            companion = base.with_suffix('.uexp'); companion.write_bytes(b'export')
+            response = {'success':True, 'data':{'is_texture':True, 'width':32, 'height':32, 'pixel_format':'PF_BC7', 'mip_count':3}}
+            with patch.object(texture, 'uat_pooled', return_value=response) as worker:
+                self.assertEqual(texture.texture_info(str(base))['fmt'], 'BC7')
+                texture.texture_info(str(base)); self.assertEqual(worker.call_count, 1)
+                companion.write_bytes(b'new export data')
+                texture.texture_info(str(base)); self.assertEqual(worker.call_count, 2)
 
 
 if __name__ == '__main__':

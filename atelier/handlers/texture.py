@@ -62,7 +62,14 @@ def texture_info(uasset_base):
         st = os.stat(ua)
     except OSError:
         return {}
-    key = (os.path.normcase(ua), st.st_size, st.st_mtime_ns)
+    stamps = [(st.st_size, st.st_mtime_ns)]
+    for ext in ('.uexp', '.ubulk', '.uptnl'):
+        try:
+            companion = os.stat(uasset_base + ext)
+            stamps.append((companion.st_size, companion.st_mtime_ns))
+        except OSError:
+            stamps.append(None)
+    key = (os.path.normcase(ua), *stamps)
     with _INFO_LOCK:
         hit = _INFO_CACHE.get(key)
     if hit is not None:
@@ -132,19 +139,52 @@ def decode_dds(import_base, uasset_base):
                 return out
     return None
 
-def decode_png(import_base, uasset_base):
-    """Decode one extracted UE texture to .png. uasset_base is where .uasset lives; png goes to import_base."""
-    if not os.path.exists(uasset_base + ".uasset"): return
-    out_png = os.path.abspath(import_base + ".png")
+def _decode_png_file(uasset_path, out_png, mip=0):
+    """Publish only a successful PNG, retaining the previous file on decoder failure.
+
+    UAssetToolRivals reports success independently of file creation. A failed
+    worker may leave partial output; it must never become a project texture.
+    """
+    out_png = os.path.abspath(out_png)
     os.makedirs(os.path.dirname(out_png), exist_ok=True)
-    d = uat_pooled({"action": "extract_texture_png", "file_path": os.path.abspath(uasset_base + ".uasset"),
-                    "output_path": out_png, "usmap_path": USMAP, "format": "png"})
-    if d is not None and os.path.exists(out_png):
+    descriptor, staged = tempfile.mkstemp(prefix='.decode-', suffix='.png', dir=os.path.dirname(out_png))
+    os.close(descriptor)
+
+    def publish(success):
+        if not success:
+            return False
+        try:
+            from PIL import Image
+            with Image.open(staged) as image:
+                if image.format != 'PNG':
+                    return False
+                image.verify()
+        except (OSError, ValueError, SyntaxError):
+            return False
+        os.replace(staged, out_png)
+        return True
+
+    try:
+        d = uat_pooled({'action':'extract_texture_png', 'file_path':os.path.abspath(uasset_path),
+                        'output_path':staged, 'usmap_path':USMAP, 'mip_index':mip, 'format':'png'})
+        if publish(d and d.get('success') is True):
+            return True
+        # Clear failed output before trying the older one-shot interface.
+        if os.path.exists(staged):
+            os.remove(staged)
+        result = uat(['extract_texture', os.path.abspath(uasset_path), staged, '--usmap', USMAP, '--mip', str(mip)])
+        return publish(result.returncode == 0)
+    finally:
+        if os.path.exists(staged):
+            os.remove(staged)
+
+
+def decode_png(import_base, uasset_base):
+    """Decode one extracted UE texture to .png. Existing output survives failures."""
+    if not os.path.exists(uasset_base + '.uasset'):
         return
-    r = uat(["extract_texture", os.path.abspath(uasset_base + ".uasset"), out_png, "--usmap", USMAP])
-    if not os.path.exists(out_png):
-        print(f"  [warn] PNG decode failed for {os.path.basename(import_base)}: "
-              f"{((r.stderr or '') + (r.stdout or '')).strip()[-200:]}", file=sys.stderr)
+    if not _decode_png_file(uasset_base + '.uasset', import_base + '.png'):
+        print(f'  [warn] PNG decode failed for {os.path.basename(import_base)}', file=sys.stderr)
 
 def decode_batch(uasset_paths, output_root=None, base_root=None):
     """Parallel-decode many extracted .uasset textures to .png.
@@ -195,15 +235,10 @@ def decode_thumb(uasset_path, thumb_path):
     mips = texture_info(os.path.splitext(uasset_path)[0]).get("mips") or 0
     if mips:
         mip = next(m for m in (4, 3, 2, 0) if m < mips)
-        d = uat_pooled({"action": "extract_texture_png", "file_path": os.path.abspath(uasset_path),
-                        "output_path": os.path.abspath(thumb_path), "usmap_path": USMAP,
-                        "mip_index": mip, "format": "png"})
-        if d is not None and os.path.exists(thumb_path):
+        if _decode_png_file(uasset_path, thumb_path, mip):
             return True
     for mip in (4, 3, 2, 0):
-        uat(["extract_texture", os.path.abspath(uasset_path), os.path.abspath(thumb_path),
-             "--usmap", USMAP, "--mip", str(mip)])
-        if os.path.exists(thumb_path):
+        if _decode_png_file(uasset_path, thumb_path, mip):
             return True
     return False
 
