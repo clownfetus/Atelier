@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "parser_version": 5,
+  "parser_version": 6,
   "entries": {
     "1011": {
       "name": "Hulk",
@@ -249,7 +249,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/25/img_icon_will-of-galacta.webp"
     },
     "1015300": {
-      "name": "QUEEN OF ORPHANS (Judicator Xiezhi)",
+      "name": "QUEEN OF ORPHANS",
       "kind": "skin",
       "hero": "1015",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/25/img_judicator-xiezhi.webp",
@@ -386,7 +386,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/11/img_icon_robe-of-relaxation.webp"
     },
     "1016302": {
-      "name": "CRANE DECEIVER (Immortal Firebird)",
+      "name": "CRANE DECEIVER",
       "kind": "skin",
       "hero": "1016",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/11/img_immortal-firebird.webp",
@@ -1387,7 +1387,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/21/img_icon_rocky-the-transfer.webp"
     },
     "1023308": {
-      "name": "GOLDEN ARTIFICIER",
+      "name": "GOLDEN ARTIFICER",
       "kind": "skin",
       "hero": "1023",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/21/img_golden-artificer.webp",
@@ -1409,7 +1409,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/21/img_icon_trash-king.webp"
     },
     "1023500": {
-      "name": "Symbiote Rocket",
+      "name": "Symbiote Raccoon",
       "kind": "skin",
       "hero": "1023",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/21/img_symbiote-raccoon.webp",
@@ -2162,7 +2162,7 @@
       "banner_style": "default"
     },
     "1029100": {
-      "name": "AMETHEYST ARMOR",
+      "name": "AMETHYST ARMOR",
       "kind": "skin",
       "hero": "1029",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/13/img_amethyst-armor.webp",
@@ -2213,7 +2213,7 @@
       "match": "name"
     },
     "1029303": {
-      "name": "NEW MILENNIA MIGHT",
+      "name": "NEW MILLENIA MIGHT",
       "kind": "skin",
       "hero": "1029",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/13/img_new-millennia-might.webp",
@@ -3038,7 +3038,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/9/img_icon_iron-pharaoh.webp"
     },
     "1034500": {
-      "name": "1872: STEAM POWER",
+      "name": "Steam Power",
       "kind": "skin",
       "hero": "1034",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/9/img_steam-power.webp",
@@ -3363,7 +3363,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/23/img_icon_coastal-wall-crawler.webp"
     },
     "1036500": {
-      "name": "2099: SPIDER-PUNK",
+      "name": "Spider-Punk 2099",
       "kind": "skin",
       "hero": "1036",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/23/img_spider-punk-2099.webp",
@@ -4258,7 +4258,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/28/img_icon_blood-soldier.webp"
     },
     "1041301": {
-      "name": "Polarity Knight",
+      "name": "POLARITY SOLDIER",
       "kind": "skin",
       "hero": "1041",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/28/img_polarity-soldier.webp",
@@ -5621,7 +5621,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/33/img_icon_winter-soldier.webp"
     },
     "1049504": {
-      "name": "BLOODLESS BESERKER",
+      "name": "BLOODLESS BERSERKER",
       "kind": "skin",
       "hero": "1049",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/33/img_bloodless-berserker.webp",
@@ -6545,7 +6545,7 @@
       "match": "id"
     },
     "1055102": {
-      "name": "Aurora Twilight",
+      "name": "Twilight Aurora",
       "kind": "skin",
       "hero": "1055",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/43/img_aurora-twilight.webp",
@@ -6943,7 +6943,7 @@
       "match": "name"
     },
     "1057800": {
-      "name": "WADE WILSON: SPIRIT SQUAD",
+      "name": "WADE WILSON: THE SPIRIT SQUAD",
       "kind": "skin",
       "hero": "1057",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/46/img_wade-wilson-the-spirit-squad.webp",
@@ -7136,7 +7136,7 @@
       "match": "name"
     },
     "1059500": {
-      "name": "BLOODY BLOODSTONE",
+      "name": "BLOODY BUTLER",
       "kind": "skin",
       "hero": "1059",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/47/img_bloody-bloodstone.webp",
@@ -7437,7 +7437,7 @@
       "banner_style": "immortal"
     },
     "1063100": {
-      "name": "SHADOWED NEMESIS",
+      "name": "SHADOWED GAZE",
       "kind": "skin",
       "hero": "1063",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/51/img_shadowed-gaze.webp",
@@ -7575,7 +7575,7 @@
       "match": "id"
     },
     "1065101": {
-      "name": "SEARING SPELLSTRIPE",
+      "name": "SEARING HEART",
       "kind": "skin",
       "hero": "1065",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/45/img_searing-spellstripe.webp",
@@ -7595,7 +7595,7 @@
       "badge": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/45/img_icon_will-of-galacta.webp"
     },
     "1065300": {
-      "name": "ROGUE REDUX",
+      "name": "SAVAGE SOUTH",
       "kind": "skin",
       "hero": "1065",
       "image": "https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/45/img_rogue-redux.webp",
@@ -8117,12 +8117,12 @@
       "source": "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md"
     }
   },
-  "refreshed_at": 1792363443.5199072,
+  "refreshed_at": 1792465085.6208081,
   "content_hash": "ce496bba6fc6495cc6b6ca5616e27bff9b34f709887cce21a5f699a5e88fee00",
   "sources": [
     "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md",
     "https://rivalskins.com/heroes/"
   ],
   "source_digest": "4ea29d45241430b2be87c72dc728c80202ca96d34b2d0c2e643eb8680f8f5a1f",
-  "checked_at": 1792363443.5199072
+  "checked_at": 1792465085.6208081
 }

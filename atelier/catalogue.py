@@ -1,6 +1,7 @@
 """Optional, cached browsing artwork. Never participates in asset import or mod export.
 
-Names come from donutman07; costume IDs and images are verified on RivalSkins.
+Names come from donutman07; costume IDs and images are verified on RivalSkins, whose
+card name replaces a different listed name when its page verifies exactly one game ID.
 Missing costumes use a labelled hero portrait, never a guessed skin image.
 Network work is explicit (start_update/thumbnail), bounded and independent of projects.
 """
@@ -25,7 +26,7 @@ from atelier.storage import atomic_json
 IDS_URL = 'https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md'
 HEROES_URL = 'https://rivalskins.com/heroes/'
 DAY = 86400
-PARSER_VERSION = 5
+PARSER_VERSION = 6
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -227,10 +228,16 @@ def build_entries(chars, roster, load_page, load_items):
             plate = plates.get(name, []) if name else []
             matched = plate[0] if len(plate) == len(same_name) == 1 else None
             banner = nameplate_url(matched['image']) if matched else None
-            for sid in skin_ids:
-                if not sid.startswith(cid):
-                    continue  # Never cross hero boundaries, including transformation/NPC IDs.
-                entries[sid] = {'name': char['skins'].get(sid, costume['name']), 'kind': 'skin', 'hero': cid,
+            # Never cross hero boundaries, including transformation/NPC IDs.
+            own_ids = [sid for sid in skin_ids if sid.startswith(cid)]
+            # A card whose page verifies exactly one game ID names that costume. donutman07's list
+            # carries typos and stale names (Cyclops' Shadowed Gaze is listed as SHADOWED NEMESIS).
+            verified = costume['name'].strip() if artwork['ids'] and len(own_ids) == 1 else ''
+            for sid in own_ids:
+                name = char['skins'].get(sid, costume['name'])
+                if verified and normalized(verified) != normalized(name):
+                    name = verified  # The same words in another case or punctuation keep the list's spelling.
+                entries[sid] = {'name': name, 'kind': 'skin', 'hero': cid,
                                 'image': artwork['image'], 'source': costume['page'], 'hero_fallback': False,
                                 'match': 'id' if artwork['ids'] else 'name',
                                 **({'banner': banner, 'badge': matched['image']} if banner else {})}

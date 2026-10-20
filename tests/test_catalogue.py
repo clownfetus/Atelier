@@ -72,10 +72,24 @@ class CatalogueTests(unittest.TestCase):
         entries = build_entries(chars, [{'name': 'Magik', 'image': IMAGE, 'page': HERO}], lambda _: CARDS,
                                 lambda _: [{'ids': ['1029100', '1036100'], 'image': IMAGE}])
         self.assertFalse(entries['1029100']['hero_fallback'])
-        self.assertEqual(entries['1029100']['name'], 'AMETHEYST ARMOR')
+        self.assertEqual(entries['1029100']['name'], 'Amethyst Armor')  # The verified card, not the list's typo.
+        self.assertEqual(entries['1029101']['name'], 'Unknown')
         self.assertTrue(entries['1029101']['hero_fallback'])
         self.assertNotIn('1029000', entries)  # Never invent a default game ID.
         self.assertNotIn('1036100', entries)
+
+    def test_card_name_only_names_a_single_verified_id(self):
+        chars = {'1029': {'name': 'Magik', 'skins': {'1029100': 'AMETHEYST ARMOR', '1029101': 'Amethyst Armor (Alt.)'}}}
+        roster = [{'name': 'Magik', 'image': IMAGE, 'page': HERO}]
+        entries = build_entries(chars, roster, lambda _: CARDS,
+                                lambda _: [{'ids': ['1029100', '1029101'], 'image': IMAGE}])
+        self.assertEqual(entries['1029100']['name'], 'AMETHEYST ARMOR')  # One card can't name two IDs.
+        self.assertEqual(entries['1029101']['name'], 'Amethyst Armor (Alt.)')
+        one = lambda _: [{'ids': ['1029100'], 'image': IMAGE}]
+        blank = CARDS.replace('alt="Amethyst Armor"', 'alt=" "')
+        self.assertEqual(build_entries(chars, roster, lambda _: blank, one)['1029100']['name'], 'AMETHEYST ARMOR')
+        chars['1029']['skins']['1029100'] = 'AMETHYST ARMOR'  # Same words: keep the list's spelling.
+        self.assertEqual(build_entries(chars, roster, lambda _: CARDS, one)['1029100']['name'], 'AMETHYST ARMOR')
 
     def test_unique_exact_name_only_when_source_omits_id(self):
         chars = {'1029': {'name': 'Magik', 'skins': {'1029100': 'AMETHYST ARMOR', '1029101': 'Amethyst Armor (Alt.)'}}}
