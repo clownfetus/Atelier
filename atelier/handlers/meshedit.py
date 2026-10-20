@@ -31,7 +31,19 @@ from atelier.tools import uat
 _BLENDER_DIRS = (r"C:\Program Files\Blender Foundation",
                  r"C:\Program Files (x86)\Blender Foundation")
 _BLENDER_EXE  = "blender.exe" if os.name == "nt" else "blender"
+# Blender is "blender.exe" on Windows and a plain "blender" binary (or the Flatpak export
+# _scan_blender_dirs finds) everywhere else; "blender.exe" stays valid off Windows so a config
+# copied between the two works.
+BLENDER_NAMES = (("blender.exe",) if os.name == "nt" else
+                 ("blender", "blender.exe", "org.blender.Blender"))
 _SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "blender")
+
+
+def is_blender_executable(path):
+    """True for an existing file named like Blender. Atelier launches the configured Blender
+    without asking, so a saved path to any other program must never be accepted or run."""
+    return (bool(path) and os.path.isfile(path) and
+            os.path.basename(path).lower() in {name.lower() for name in BLENDER_NAMES})
 
 
 def _scan_blender_dirs():
@@ -78,7 +90,7 @@ def blender_path_suggestion():
     still exists, else the highest-versioned auto-detected install, else ''."""
     from atelier.config import get_blender_path
     configured = get_blender_path()
-    if configured and os.path.exists(configured):
+    if is_blender_executable(configured):
         return configured
     found = _scan_blender_dirs()
     return found[-1] if found else ""
@@ -86,13 +98,14 @@ def blender_path_suggestion():
 
 def find_blender():
     """Locate the Blender executable. ATELIER_BLENDER wins, then the path configured in Settings,
-    then the highest-versioned auto-detected install."""
+    then the highest-versioned auto-detected install. A configured path that is not Blender is
+    skipped rather than run."""
     env = os.environ.get("ATELIER_BLENDER")
     if env and os.path.exists(env):
         return env
     from atelier.config import get_blender_path
     configured = get_blender_path()
-    if configured and os.path.exists(configured):
+    if is_blender_executable(configured):
         return configured
     found = _scan_blender_dirs()
     if not found:

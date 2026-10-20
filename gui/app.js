@@ -72,7 +72,13 @@ const ICON_CLS_TO_LUCIDE = {
 // ── helpers ───────────────────────────────────────────────────────────────────
 let _activeProjectName = "";
 function projectFetch(path, opts = {}, project = _activeProjectName) {
+  // The server only accepts JSON for state changes (see atelier/web/app.py), so a POST with no
+  // body or a plain string body is sent as JSON; FormData and Blob uploads keep their own type.
+  const sendsJson = String(opts.method || "GET").toUpperCase() !== "GET" &&
+    (opts.body == null || typeof opts.body === "string") &&
+    !Object.keys(opts.headers || {}).some(name => name.toLowerCase() === "content-type");
   return fetch(path, { ...opts, headers: { ...opts.headers,
+    ...(sendsJson ? { "Content-Type": "application/json" } : {}),
     "X-Atelier-Project": encodeURIComponent(project) } });
 }
 window.atelierProject = () => _activeProjectName;
