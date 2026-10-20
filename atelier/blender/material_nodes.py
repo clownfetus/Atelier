@@ -202,6 +202,7 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
     auxiliary=[name for name in textures if name not in used]
     material['atelier_material']=record.get('mi') or ''
     material['atelier_parent']=surface.get('parent','')
+    material['atelier_gameplay_tags']=json.dumps(record.get('gameplay_tags', []))
     material['atelier_auxiliary_parameters']=json.dumps(auxiliary)
     # Keep internal nodes readable in columns, and expose all source values in
     # one named group instead of disconnected image nodes scattered around a BSDF.

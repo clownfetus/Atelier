@@ -140,7 +140,8 @@ def resolve_mesh_materials(mesh_game_rel, mesh, work_base=None):
         if mi is None and slot:
             mi = _best_candidate(_index_candidates(slot), mesh_game_rel)
             via = "name" if mi else None
-        out.append({"slot": slot, "mi": mi, "via": via, "pkg_idx": m.get("pkg_idx")})
+        out.append({"slot": slot, "mi": mi, "via": via, "pkg_idx": m.get("pkg_idx"),
+                    'gameplay_tags': list(m.get('gameplay_tags', []))})
     return out
 
 
@@ -387,6 +388,7 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
             maps.append({"param": mp["param"], "role": role, "game_rel": mp["game_rel"], 'uv': mp.get('uv',0),
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
         out_slots[rec["slot"]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
+            'gameplay_tags': list(rec.get('gameplay_tags', [])),
             'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
         from atelier.handlers.meshtextures import source_maps
         maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))

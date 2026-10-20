@@ -210,7 +210,8 @@ def preview_bindings(game_rel, requested):
             continue
         slot = candidates[0]
         out.append({"key": item['key'], "mesh_game_rel": game_rel, "slot_index": slot['index'],
-                    "slot_name": slot['slot'], "game_rel": slot['mi'], "mapping_via": slot['via']})
+                    "slot_name": slot['slot'], "game_rel": slot['mi'], "mapping_via": slot['via'],
+                    'gameplay_tags': list(slot.get('gameplay_tags', []))})
     return out
 
 

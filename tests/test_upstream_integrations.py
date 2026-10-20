@@ -18,7 +18,7 @@ _data = tempfile.TemporaryDirectory(prefix='atelier-upstream-')
 atexit.register(_data.cleanup)
 os.environ['ATELIER_DATA_DIR'] = _data.name
 from atelier.handlers.mesh import Mesh
-from atelier.handlers import mesh, meshsurvey
+from atelier.handlers import mesh, meshsurvey, meshmat, meshstudio
 from atelier.handlers import texture
 from PIL import Image as PillowImage
 
@@ -145,6 +145,23 @@ class CookedMaterialTags(unittest.TestCase):
             self.assertEqual(materials[0]['gameplay_tags'], ['MaterialTag.Body', 'MaterialTag.Number_1'])
         with self.assertRaisesRegex(ValueError, 'gameplay-tag'):
             mesh.resolve_materials([{'slot_name_idx':0, 'imported_slot_name_idx':0, 'tag_names':[(99, 0)]}], ['MI_Body'])
+
+    def test_tags_follow_the_exact_slot_into_preview_and_blender_manifest(self):
+        tags = ['MaterialTag.Weapon.Visible']
+        model = types.SimpleNamespace(materials=[{'slot_name':'Body', 'gameplay_tags':tags}])
+        with patch.object(meshmat, '_index_candidates', return_value=[]):
+            slots = meshmat.resolve_mesh_materials('Meshes/SK_Body', model)
+        self.assertEqual(slots[0]['gameplay_tags'], tags)
+        with patch.object(meshstudio, 'cooked_slots', return_value=[{**slots[0], 'index':0}]):
+            binding = meshstudio.preview_bindings('Meshes/SK_Body', [{'key':'body', 'name':'Body'}])[0]
+        self.assertEqual(binding['gameplay_tags'], tags)
+        slots[0].update(maps=[], parameters={})
+        with patch.object(meshmat, 'resolve_mesh_materials', return_value=slots), \
+             patch.object(meshmat, 'resolve_mesh_textures', side_effect=lambda value:value), \
+             patch.object(meshmat, 'extract_textures_to_project', return_value={}):
+            manifest = meshmat.build_manifest('Meshes/SK_Body', model)
+        self.assertEqual(manifest['slots']['Body']['gameplay_tags'], tags)
+        self.assertNotIn('hidden_sections', manifest['slots']['Body'])
 
 
 if __name__ == '__main__':
