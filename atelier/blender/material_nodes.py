@@ -11,6 +11,25 @@ import re
 
 import bpy
 
+_images = {}
+
+
+def load_image(path, colorspace):
+    """Reuse an image by full path and colour space, including shared data maps.
+
+    RivalsPorting caches imported textures rather than rebuilding each slot.
+    A colour texture and a data texture must keep separate Blender datablocks.
+    The cache belongs to this background export process, never another project.
+    """
+    key = (os.path.normcase(os.path.realpath(path)), colorspace)
+    if key not in _images:
+        image = bpy.data.images.load(path, check_existing=True)
+        if image.users and image.colorspace_settings.name != colorspace:
+            image = image.copy()
+        image.colorspace_settings.name = colorspace
+        _images[key] = image
+    return _images[key]
+
 
 def _input(group, name, kind, default=None):
     socket=group.interface.new_socket(name=name,in_out='INPUT',socket_type=kind)
@@ -19,9 +38,7 @@ def _input(group, name, kind, default=None):
 
 
 def image_node(material,path,colorspace,x,y,label):
-    image=bpy.data.images.load(path,check_existing=True)
-    if image.users and image.colorspace_settings.name!=colorspace:image=image.copy()
-    image.colorspace_settings.name=colorspace
+    image=load_image(path,colorspace)
     node=material.node_tree.nodes.new('ShaderNodeTexImage');node.image=image;node.label=label;node.location=(x,y)
     return node
 
