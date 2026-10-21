@@ -37,6 +37,9 @@ MANIFEST = {
         ("AtelierAnimation/AtelierAnimation.exe", True),
         ("AtelierAnimation/CUE4Parse-Natives.dll", True),
         ("AtelierAnimation/oo2core_9_win64.dll", True),
+        ("AtelierImport/AtelierImport.exe", True),
+        ("AtelierImport/CUE4Parse-Natives.dll", True),
+        ("AtelierImport/oo2core_9_win64.dll", True),
         ("shaders/retoc-rivals-cli.exe", True),      # world.RETOC + plugin/text extracts
         ("shaders/oo2core_9_win64.dll", True),       # Oodle for retoc and io_lib
         ("shaders/dxc.exe", True),                   # shaders.DXC

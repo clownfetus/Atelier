@@ -73,6 +73,17 @@ class ModelGltf(unittest.TestCase):
         self.assertEqual(self.call(), (200, GLB))
         self.decode.assert_called_once()
 
+    def test_saved_geometry_precedes_the_native_import_server(self):
+        from atelier import import_server
+        from atelier.handlers import meshreplace
+        path=Path(C.project_base(MESH,C.project_dir('A'))+'.asset.json')
+        path.parent.mkdir(parents=True,exist_ok=True);path.write_text('{}')
+        edited=path.with_suffix('.glb');edited.write_bytes(GLB)
+        with patch.object(import_server,'available',return_value=True), \
+             patch.object(import_server,'mesh',side_effect=AssertionError('Must keep saved geometry')), \
+             patch.object(meshreplace,'preview',return_value=str(edited)):
+            self.assertEqual(self.call(),(200,GLB))
+
     def test_a_decoder_failure_reports_the_decoders_reason(self):
         self.decode.return_value = SimpleNamespace(returncode=3, stdout="reading SK_1024_1024503\n",
                                                    stderr="\nunsupported skeletal mesh version 7\n")

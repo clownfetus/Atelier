@@ -7,6 +7,9 @@ The app, installers and update checker identify each release by its full number,
 
 ### Asset pipeline and layout
 
+- Reuse one persistent game reader for model, material and texture previews on
+  Windows. Preserve original compressed texture blocks for exact dye-mask regions,
+  and omit unused facial morph data from the viewer while retaining full exports.
 - Open the selected body and equipped weapons first; load other forms and
   attachments when selected without discarding unsaved preview recolours.
 - Batch model, material and texture extraction, share in-flight image downloads,

@@ -1,5 +1,9 @@
 # Model loading follow-up — 21 October 2026
 
+This records the first loading revision. The subsequent
+[persistent import server verification](persistent-import-verification-2026-10-21.md)
+supersedes its implementation and timing results below.
+
 The earlier repository work was a set of focused adaptations, as documented in
 [the integration review](repository-integrations-2026-10-20.md). It did **not** add
 RivalsPorting's persistent import server. AtelierMesh still starts a decoder for

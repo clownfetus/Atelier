@@ -112,7 +112,7 @@ if (Missing-Tools) {
         if ($LASTEXITCODE -ne 0) { throw 'Unpacking the installer failed; see downloads\tools-extraction.log' }
         $source = Join-Path $unpacked '{app}\Tools'
     }
-    foreach ($item in 'UAssetTool.exe', 'UAssetGUI.exe', 'AtelierMesh', 'AtelierAnimation', 'shaders', 'MarvelRivalsCharacterIDs.md') {
+    foreach ($item in 'UAssetTool.exe', 'UAssetGUI.exe', 'AtelierMesh', 'AtelierAnimation', 'AtelierImport', 'shaders', 'MarvelRivalsCharacterIDs.md') {
         $from = Join-Path $source $item
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $tools -Recurse -Force }
     }

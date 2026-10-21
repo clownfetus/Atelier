@@ -197,7 +197,8 @@ def preview_bindings(game_rel, requested):
     """Map each glTF material independently; array order is never an identity guess."""
     if not isinstance(requested, list) or len(requested) > 256:
         raise ValueError('Invalid model material list')
-    slots = cooked_slots(game_rel)
+    from atelier import import_server
+    slots = import_server.mesh_slots(game_rel) or cooked_slots(game_rel)
     out = []
     for item in requested:
         if not isinstance(item, dict) or not isinstance(item.get('key'), str) or not isinstance(item.get('name'), str):
@@ -240,7 +241,9 @@ def material_bindings(skin_id, meshes):
             raise ValueError('Invalid model material identity')
     from atelier.handlers.texture import prefetch_exact
     try:
-        prefetch_exact([record['game_rel'] for record in meshes])
+        from atelier import import_server
+        if not import_server.available():
+            prefetch_exact([record['game_rel'] for record in meshes])
     except jobs.Cancelled:
         raise
     except Exception:

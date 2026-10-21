@@ -26,6 +26,11 @@ tracked/untracked source also has snapshot commits under
 
 ## Reviewed sources and resulting changes
 
+The table records the original consolidation. The later
+[persistent import server follow-up](persistent-import-verification-2026-10-21.md)
+adds a retained CUE4Parse reader for Windows previews, including exact compressed
+texture block transport; the earlier HTTP-server omission below is historical.
+
 These are focused integrations into Atelier's existing architecture. No whole
 application or Unreal editor plugin was copied into Atelier. Except for the
 explicitly vendored meshoptimizer module, implementations are local adaptations

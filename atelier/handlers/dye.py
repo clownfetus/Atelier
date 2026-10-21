@@ -62,6 +62,10 @@ def dye_slots(game_rel, original=False):
     if original:
         tex = M.read_material_original(game_rel).get("textures") or {}
         return tex.get(MASK_SLOT), tex.get(DIFF_SLOT)
+    from atelier import import_server
+    if import_server.available():
+        tex = M.read_material(game_rel, cache_only=True).get('textures') or {}
+        return tex.get(MASK_SLOT), tex.get(DIFF_SLOT)
     try:
         d = json.load(open(M.mat_json(game_rel), encoding="utf-8-sig"))
     except Exception:
@@ -76,7 +80,8 @@ def is_dyeable(game_rel):
 
 def dye_regions(game_rel, original=False):
     """{region_idx: {'ColorA': rgba, 'ColorB': rgba, 'ColorGChannel': rgba, ...}} from the MI."""
-    r = M.read_material_original(game_rel) if original else M.read_material(game_rel)
+    from atelier import import_server
+    r = M.read_material_original(game_rel) if original else M.read_material(game_rel, **({'cache_only': True} if import_server.available() else {}))
     out = collections.defaultdict(dict)
     for c in (r.get("colors") or []):
         n = c.get("name") or ""
@@ -114,7 +119,8 @@ def _stamp(game_rel):
     """Cache identity for a decoded source: which file it came from and when it last changed."""
     png = edited_png(game_rel)
     if not png:
-        return ("vanilla",)
+        from atelier import import_server
+        return ("vanilla", import_server.source_version()) if import_server.available() else ("vanilla",)
     try:
         return ("edit", png, int(os.path.getmtime(png)))
     except OSError:
@@ -124,7 +130,8 @@ def _stamp(game_rel):
 def _tex_image(game_rel, original=False):
     """Extract + decode a texture to a PIL image. decode_dds first: MR strips the top mip, and
     UAssetTool maps mip[i]->DataResource[i], so with mip0 absent it degrades to the 4x4 tail."""
-    stamp = ("vanilla",) if original else _stamp(game_rel)
+    from atelier import import_server
+    stamp = (("vanilla", import_server.source_version()) if import_server.available() else ("vanilla",)) if original else _stamp(game_rel)
     key = (game_rel, "original") if original else game_rel
     hit = _IMCACHE.get(key)
     if hit is not None and hit[0] == stamp:
@@ -144,6 +151,13 @@ def _tex_image_uncached(game_rel, original=False):
     if edited:
         im = Image.open(edited); im.load()
         return im
+    from atelier import import_server
+    if import_server.available():
+        try:
+            with Image.open(import_server.texture(game_rel)) as image:
+                return image.copy()
+        except import_server.ImportError:
+            pass  # Preserve the largest-shipped-mip compatibility decoder.
     with jobs.cancellable_lock(tex_semaphore):
         cb = TX.ensure_work_base(game_rel)      # retoc or UAssetTool per host; caches the result
         if not cb or not os.path.exists(cb + ".uasset"):

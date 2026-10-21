@@ -8,6 +8,7 @@ from atelier import hostos
 from atelier import operations
 from atelier import jobs
 from atelier import preview
+from atelier import import_server
 from atelier import changelog
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
@@ -413,6 +414,8 @@ def _model_glb(game_rel):
     if os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json'):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
+    if import_server.available():
+        return import_server.mesh(game_rel)
     asset   = pak_game_path(game_rel)                        # Marvel/Content/Marvel/.../SK_...
     out_dir = os.path.join(_CACHE, "gltf")
     glb     = os.path.join(out_dir, *asset.split("/")) + ".glb"
@@ -481,7 +484,8 @@ def api_skin_materials():
         # A cold character preview can reference dozens of materials. Extract
         # them together instead of rescanning the game containers for each one.
         try:
-            prefetch_exact([binding.get('game_rel') for binding in bindings])
+            if not import_server.available():
+                prefetch_exact([binding.get('game_rel') for binding in bindings])
         except jobs.Cancelled:
             raise
         except Exception as exc:
@@ -509,7 +513,7 @@ def api_skin_materials():
             textures.extend(path for role, path in roles.items() if role in ('basecolor', 'emissive', 'opacity') and role not in custom)
             if params.get('dyeable'):
                 textures.extend(params.get('textures', {}).get(slot) for slot in ('BaseColor', 'DyeingTexture'))
-        if any(textures):
+        if any(textures) and not import_server.available():
             try:
                 prefetch_exact(list(dict.fromkeys(path for path in textures if path)))
             except jobs.Cancelled:
@@ -591,7 +595,7 @@ def _tex_version(game_rel):
     textures stay cached across opens."""
     edited = _import_base(game_rel) + ".png"
     try:
-        return str(os.stat(edited).st_mtime_ns) if os.path.exists(edited) else "0"
+        return str(os.stat(edited).st_mtime_ns) if os.path.exists(edited) else import_server.source_version() if import_server.available() else "0"
     except OSError:
         return "0"
 
@@ -618,6 +622,11 @@ def _texture_png(game_rel, original=False):
     edited = _import_base(game_rel) + ".png"
     if not original and os.path.exists(edited):
         return edited
+    if import_server.available():
+        try:
+            return import_server.texture(game_rel)
+        except import_server.ImportError as exc:
+            print(f'[import] texture compatibility fallback for {game_rel}: {exc}', file=sys.stderr, flush=True)
     out_dir = CACHE_3DVIEW
     base    = project_base(game_rel, out_dir)   # no ext, subfolder-mirrored (no basename collisions)
     out_png = base + ".png"
@@ -3370,6 +3379,7 @@ def shutdown(timeout=15):
     """Stop admission, drain managed jobs, then release native worker/watchers."""
     if not jobs.shutdown(timeout):
         return False
+    import_server.shutdown()
     _thumb_executor.shutdown(wait=False, cancel_futures=True)
     _observer.stop()
     _observer.join(timeout=5)

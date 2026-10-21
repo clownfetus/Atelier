@@ -183,11 +183,31 @@ def read_material(game_rel, cache_only=False):
     """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance.
     cache_only=True routes any freshly-extracted JSON into CACHE_3DVIEW instead of the project
     folder — used by the 3D viewport's automatic per-mesh material reads."""
+    if cache_only:
+        native = _import_parameters(game_rel)
+        if native is not None:
+            return native
     d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None,
         **({'prefer_exact':True} if cache_only else {})), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d),
             "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, "")}
+
+
+def _import_parameters(game_rel, original=False):
+    from atelier import import_server
+    if not import_server.available():
+        return None
+    from atelier.added_assets import source_base
+    if source_base(game_rel):
+        return None
+    if not original and (os.path.isfile(project_base(game_rel)+'.json')
+                         or os.path.isfile(project_base_legacy(game_rel)+'.json')):
+        return None  # Saved edits and donor snapshots always win over vanilla data.
+    try:
+        return import_server.material(game_rel)
+    except import_server.ImportError:
+        return None  # Unsupported material layouts retain the exact editor reader.
 
 def _original_document(game_rel):
     """Read a pristine document without creating, changing or resetting a project copy.
@@ -246,6 +266,9 @@ def _original_document(game_rel):
 
 def read_material_original(game_rel):
     """Original comparison bypasses saved edits, including a replacement's donor snapshot."""
+    native = _import_parameters(game_rel, original=True)
+    if native is not None:
+        return native
     d = _original_document(game_rel)
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d)}

@@ -61,6 +61,19 @@ class Showcase(unittest.TestCase):
 
 
 class OriginalComparisons(unittest.TestCase):
+    def test_saved_texture_precedes_native_reader_and_original_bypasses_the_edit(self):
+        from atelier import import_server
+        with tempfile.TemporaryDirectory() as workspace:
+            root=Path(workspace);edited=root/'edited.png';edited.write_bytes(png('red'))
+            native=root/'native.png';native.write_bytes(png('blue'))
+            with patch.object(R,'_import_base',return_value=str(edited.with_suffix(''))), \
+                 patch.object(import_server,'available',return_value=True), \
+                 patch.object(import_server,'texture',return_value=str(native)) as read:
+                self.assertEqual(R._texture_png('Characters/Test/Body'),str(edited))
+                read.assert_not_called()
+                self.assertEqual(R._texture_png('Characters/Test/Body',original=True),str(native))
+                read.assert_called_once()
+
     def test_original_texture_ignores_project_png_without_replacing_it(self):
         with tempfile.TemporaryDirectory() as workspace:
             root=Path(workspace); edited=root/'edited.png'; edited.write_bytes(png('red'))

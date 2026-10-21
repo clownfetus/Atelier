@@ -28,7 +28,10 @@ def main():
     parser.add_argument('--debug-port',type=int,default=9449)
     parser.add_argument('--design-checks',action='store_true',help='Check the contextual Model Studio and capture visual QA states')
     parser.add_argument('--viewport-script',type=Path,help='Optional saved viewer script for a before/after performance comparison')
+    parser.add_argument('--import-server-checks',action='store_true',help='Source-only probe for persistent reader reuse and process shutdown')
     args=parser.parse_args()
+    if args.import_server_checks and not args.source:
+        parser.error('--import-server-checks requires the source launcher')
     data=args.data_root.resolve(strict=True)
     root=Path(__file__).resolve().parents[1]
     exe=args.exe.resolve(strict=True) if args.exe else None
@@ -50,11 +53,12 @@ def main():
     startup=subprocess.STARTUPINFO();startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=4
     if args.source:
         # Keep testing hooks in the launcher rather than in the shipped application.
+        probe=('from atelier import import_server; routes.app.get("/api/_native_import_stats")(import_server.stats); ' if args.import_server_checks else '')
         code=('import webview; create=webview.create_window; '
               'webview.create_window=lambda *a,**kw:create(*a,**dict(kw,hidden=True)); '
               'from atelier import hostos; hostos.notify=lambda *a:None; '
               'hostos.focus_window=lambda *a:None; '
-              'from atelier.web import routes; routes._get_latest_usmap_from_github=lambda:None; '
+              'from atelier.web import routes; routes._get_latest_usmap_from_github=lambda:None; '+probe+
               'import window; raise SystemExit(window.main())')
         command=[sys.executable,'-u','-B','-c',code]
     else:
@@ -113,6 +117,10 @@ def main():
             result['material_groups']=page.locator('.vp-mat').count()
             result['objects']=page.locator('.vp-obj').count()
             result['load_seconds']=round(time.monotonic()-load_started,2)
+            if args.import_server_checks:
+                result['import_server_first']=page.evaluate('()=>fetch("/api/_native_import_stats").then(r=>r.json())')
+                assert result['import_server_first']['initializations']==1
+                assert result['import_server_first']['requests']>3
             result['checks'].append('Native mesh/material/texture routes load a real game skin and enable capture')
             print('Ready: real geometry, materials and texture uploads',flush=True)
             def checked_bodies():
@@ -189,6 +197,12 @@ def main():
             page.locator('#viewport-settings-menu > summary').click()
             page.locator('#viewport-bloom').click();page.wait_for_timeout(150)
             page.locator('#viewport-bloom').click()
+            if args.import_server_checks:
+                stats=page.evaluate('()=>fetch("/api/_native_import_stats").then(r=>r.json())')
+                result['import_server_final']=stats
+                assert stats['pid']==result['import_server_first']['pid'],'Reader restarted during successful imports'
+                assert stats['initializations']==1
+                result['checks'].append('One persistent native game reader serves geometry, material and image imports')
             page.evaluate('AtelierViewport.close()')
             assert not page.locator('#viewport-overlay.active').count()
             assert not result['page_errors'],result['page_errors']
@@ -200,7 +214,25 @@ def main():
         process.terminate()
         try:process.wait(timeout=20)
         except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
+        if args.import_server_checks and result.get('import_server_final'):
+            import ctypes
+            from ctypes import wintypes
+            ctypes.windll.kernel32.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+            ctypes.windll.kernel32.OpenProcess.restype=wintypes.HANDLE
+            ctypes.windll.kernel32.CloseHandle.argtypes=[wintypes.HANDLE]
+            pid=result['import_server_final']['pid']
+            exited=False
+            deadline=time.monotonic()+10
+            while time.monotonic()<deadline:
+                handle=ctypes.windll.kernel32.OpenProcess(0x1000,False,pid)
+                if not handle:
+                    exited=True;break
+                ctypes.windll.kernel32.CloseHandle(handle);time.sleep(.1)
+            result['import_process_exited']=exited
+            if not exited:
+                result['error']='Persistent import process did not exit with its parent'
         (report/'results.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+    if args.import_server_checks:assert result.get('import_process_exited'),'Persistent child was left running'
     for check in result['checks']:print('PASS '+check)
 
 
