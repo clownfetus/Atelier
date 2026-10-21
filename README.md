@@ -1,17 +1,32 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.1** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1](docs/release-1.1.0.md)
+· [What's new in 1.1.1](docs/release-1.1.1.md)
 · [Development guide](DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.0 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier 1.1.1 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1
+## What's new in 1.1.1
+
+- **Find more folders by name.** Character and costume names and artwork follow
+  recognized IDs across the library, search, breadcrumbs, pins and asset pickers.
+- **Use HDR cubemaps.** Import Radiance panoramas, six-face strips or HDR DDS
+  cubemaps, including material reflection slots, with all six faces retained.
+- **Keep Blender projects smaller.** Pack model textures into the `.blend`
+  without adding them to the project; existing painted textures are preserved.
+- **Prepare models faster on Windows.** Reuse the game reader, batch extraction
+  and load the selected body and weapons before optional forms and attachments.
+- **Preview and export more reliably.** Character materials, masks, weapon grips,
+  alternate forms and the T_Visor texture export error have dedicated fixes.
+
+See the [patch notes](docs/release-1.1.1.md) for details and verification limits.
+
+## Included from 1.1
 
 - **Create assets at your own paths.** Add named textures, material instances and
   meshes, then edit, build, delete or recover them through the normal project workflow.
@@ -44,9 +59,11 @@ before building it. Available for Windows and Linux.
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-The app and download files use **1.1.0**. See the [release notes](docs/release-1.1.0.md)
+The app and download files use **1.1.1**. See the [release notes](docs/release-1.1.1.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
+
+![Named character and costume folders outside the Characters library](images/asset-library.png)
 
 ## Features
 
