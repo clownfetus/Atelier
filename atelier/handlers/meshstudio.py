@@ -16,6 +16,9 @@ from atelier import config, jobs
 MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
 _NON_PREVIEW_MESH = re.compile(r"(?:^|_)(?:pa|1p|fpp|fpphands)(?:_|$)", re.I)
 _PROP_PATH = re.compile(r"(?:^|/)(?:emote|mvp|bullet\w*|projectile\w*|turret\w*|effects?|vfx|summons?|minions?|pets?|demon)(?:/|$)", re.I)
+# Capwolf stores its full human transformation mesh beside its shield in Weapons.
+# This is a selectable body form, not equipment to attach over the current body.
+_BODY_FORM_PATH = re.compile(r"/weapons/caption/meshes/", re.I)
 # These ability/body-part rigs live under Weapons but are not held equipment.
 # Keep them selectable; attaching one automatically can dwarf the body and camera.
 _OPTIONAL_WEAPON = re.compile(r"(?:^|_)(?:DevouringSymbiote(?:_Hand)?|SpikedTentacles|Head|Plane\d*)(?:_|$)", re.I)
@@ -33,7 +36,7 @@ def skin_meshes(skin_id):
         name = name[:-7]
         if MESH_SKIP.search(name) or _NON_PREVIEW_MESH.search(name) or '/fpphands/' in path.lower():
             continue
-        weapon = "/weapons/" in path.lower()
+        weapon = "/weapons/" in path.lower() and not _BODY_FORM_PATH.search(path)
         if not weapon and '/slots/' in path.lower():
             continue
         if weapon and (_PROP_PATH.search(path) or re.search(r"(?:^|_)(?:1p|bullet\w*|projectile\w*)(?:_|$)", name, re.I)):

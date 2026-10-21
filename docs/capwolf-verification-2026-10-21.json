@@ -1,0 +1,630 @@
+{
+  "date": "2026-10-21",
+  "branch": "codex/consolidated-integrations",
+  "base_commit": "960d3f5e70e5219755285f656a126dbb3840b1f5",
+  "source_sha256_encoding": "UTF-8 source bytes with LF line endings",
+  "source_sha256": {
+    "atelier/handlers/meshstudio.py": "2bf473dfc1381837af1549d516b2feeac433dde96847d65946e7ee11babf0f9b",
+    "gui/viewport.js": "9f91dbc1ba7468f7ca297590027a284c8cdbb129407a29bde2e542bdf6ada5f7",
+    "tests/test_model_studio.py": "c4195fd73209596ba48f168270d6b8796d171eabc79c00e92f8362fcc0c9ef4e",
+    "tests/test_model_studio_frontend.py": "965446cc4949393028075046bba575cf33eb9ab845ba9eba6c328c06ec4f8686",
+    "tests/native_viewer_smoke.py": "24f7d9db544815382de74c9690126095f066a974fd703dc50df5922866f76f47"
+  },
+  "skin": "1022504",
+  "character": "Captain America / Capwolf",
+  "cause": "Weapons/Caption contains a complete alternate human body that was automatically equipped over the selected wolf body and reserved the shield hand.",
+  "fix": "Classify the Caption mesh as a body form; load it only when selected and group its materials using the object kind.",
+  "backend": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "win32",
+    "packages": {
+      "altgraph": "0.17.5",
+      "bottle": "0.13.4",
+      "cffi": "2.1.1",
+      "clr_loader": "0.3.1",
+      "cryptography": "50.0.2",
+      "greenlet": "3.5.6",
+      "numpy": "2.5.4",
+      "packaging": "26.3",
+      "pefile": "2024.8.26",
+      "pillow": "12.3.0",
+      "pip": "25.0.1",
+      "playwright": "1.64.0",
+      "proxy_tools": "0.1.0",
+      "pycparser": "3.11",
+      "pyee": "14.0.0",
+      "pyinstaller": "6.22.3",
+      "pyinstaller-hooks-contrib": "2026.8",
+      "pythonnet": "3.2.1",
+      "pywebview": "6.2.1",
+      "pywin32-ctypes": "0.2.3",
+      "scipy": "1.18.1",
+      "setuptools": "84.0.0",
+      "typing_extensions": "4.16.0",
+      "wasmtime": "49.0.0",
+      "watchdog": "6.0.0"
+    },
+    "results": [
+      {
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 1.05,
+        "summary": [
+          "Ran 18 tests in 0.287s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 1.27,
+        "summary": [
+          "Ran 6 tests in 1.032s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.86,
+        "summary": [
+          "Ran 28 tests in 1.024s"
+        ]
+      },
+      {
+        "suite": "test_model_gltf.py",
+        "exit_code": 0,
+        "seconds": 0.89,
+        "summary": [
+          "Ran 12 tests in 0.111s"
+        ]
+      }
+    ]
+  },
+  "browser": {
+    "browser-viewer": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+        "Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry",
+        "Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+        "Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+        "Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+        "Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+        "Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+        "Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+        "Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+        "Material chips show dye-region colours when no base tint exists and follow live edits",
+        "Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+        "Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+        "Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+        "Capture cancellation restores the camera and exits turntable rotation",
+        "Closing a loading viewer immediately removes its inline progress and cancels its backend load",
+        "Changing material skins cancels the previous request and keeps exactly one inline progress message",
+        "Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors",
+        "Shared texture slots download and decode one image while all three material assignments finish",
+        "Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark",
+        "Roster uses square hero avatars and text-only skin names; artwork refresh preserves selection and the viewer shows the matching hero logo",
+        "Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows",
+        "Skin side arrows browse an overflowing costume list without changing the selected hero",
+        "Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts",
+        "Viewport loader respects OS/forced reduced motion and visibility, with idempotent explicit teardown",
+        "Absent, throwing and partially failing WAAPI keep static artwork and cannot leave duplicate loader loops",
+        "Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses",
+        "Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes",
+        "Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures",
+        "Save/dirty guards protect close/reopen; public export guards retain drafts and focus Save/status without discard prompts",
+        "Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup",
+        "Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes",
+        "Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft",
+        "Material dirty drafts guard close/reload; original-read errors stay explicit and stale comparison/open responses cannot replace a newer editor",
+        "Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save",
+        "Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI",
+        "Dialog saves preserve project header and material payload; failed intensity persistence reports warning instead of full success",
+        "Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state",
+        "In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project",
+        "Viewport saves retain failed/newer recolors, retry the correct payload and leave replacement viewport status untouched",
+        "Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback",
+        "Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves"
+      ],
+      "page_errors": []
+    },
+    "browser-export": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Model Studio exports the selected body through project-scoped jobs, blocks hidden/multiple bodies and duplicate clicks, reports packed counts, keeps Open in Blender clickable in both themes and desktop sizes, and recovers from worker failure; Activity retains the outcomes"
+      ],
+      "page_errors": []
+    }
+  },
+  "native": {
+    "mode": "source",
+    "checks": [
+      "Native mesh/material/texture routes load a real game skin and enable capture",
+      "One body opens without decoding the alternate human form, and the real held weapon remains equipped",
+      "Native Model Studio shows one mesh, reveals only selected material controls, opens advanced and settings on demand, and switches meshes without stale selection",
+      "Original and side-by-side comparison load real game materials for both forms, including unchanged unmatched slots",
+      "The human transformation remains selectable as a body form; switching and restoring show exactly one body",
+      "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+      "One persistent native game reader serves geometry, material and image imports",
+      "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+    ],
+    "page_errors": [],
+    "asset_errors": [],
+    "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+    "requests": [
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FMeshes%2FSK_1022_1022504_Lobby",
+        "started_seconds": 0.829,
+        "finished_seconds": 10.938
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FWeapons%2FShield%2FMeshes%2FSK_WP_1022504_Shield",
+        "started_seconds": 11.063,
+        "finished_seconds": 11.688
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 11.782,
+        "finished_seconds": 13.422
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Body_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.797
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_02_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.766
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Tooth_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.766
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Head_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.782
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.985
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 14.047
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 14.079
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_M&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 13.954
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_04_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 15.797
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Weapon_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 15.797
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_Black&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.438,
+        "finished_seconds": 15.797
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FMeshes%2FSK_1022_1022504",
+        "started_seconds": 74.36,
+        "finished_seconds": 76.844
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 77.016,
+        "finished_seconds": 78.422
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Body_D&original=1",
+        "started_seconds": 91.61,
+        "finished_seconds": 92.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Body_D&original=1",
+        "started_seconds": 91.61,
+        "finished_seconds": 92.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_02_D&original=1",
+        "started_seconds": 91.61,
+        "finished_seconds": 92.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Tooth_D&original=1",
+        "started_seconds": 91.61,
+        "finished_seconds": 92.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Head_D&original=1",
+        "started_seconds": 91.704,
+        "finished_seconds": 92.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 91.719,
+        "finished_seconds": 92.313
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 91.719,
+        "finished_seconds": 92.313
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_D&original=1",
+        "started_seconds": 91.719,
+        "finished_seconds": 92.375
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 91.735,
+        "finished_seconds": 92.329
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_04_D&original=1",
+        "started_seconds": 91.829,
+        "finished_seconds": 92.375
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Weapon_D&original=1",
+        "started_seconds": 91.829,
+        "finished_seconds": 92.485
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Body_D&original=1",
+        "started_seconds": 91.844,
+        "finished_seconds": 92.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Body_D&original=1",
+        "started_seconds": 91.844,
+        "finished_seconds": 92.516
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_02_D&original=1",
+        "started_seconds": 91.938,
+        "finished_seconds": 92.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Tooth_D&original=1",
+        "started_seconds": 91.938,
+        "finished_seconds": 92.516
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Head_D&original=1",
+        "started_seconds": 91.954,
+        "finished_seconds": 92.625
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 91.954,
+        "finished_seconds": 92.61
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 92.063,
+        "finished_seconds": 92.625
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_D&original=1",
+        "started_seconds": 92.063,
+        "finished_seconds": 92.641
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_04_D&original=1",
+        "started_seconds": 92.063,
+        "finished_seconds": 92.641
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_Line_D&original=1",
+        "started_seconds": 92.063,
+        "finished_seconds": 92.735
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.329,
+        "finished_seconds": 92.75
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.329,
+        "finished_seconds": 92.75
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.329,
+        "finished_seconds": 92.766
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_M&original=1",
+        "started_seconds": 92.375,
+        "finished_seconds": 92.766
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_Black&original=1",
+        "started_seconds": 92.5,
+        "finished_seconds": 92.844
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.61,
+        "finished_seconds": 92.875
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.625,
+        "finished_seconds": 92.875
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Eqiup_03_M&original=1",
+        "started_seconds": 92.641,
+        "finished_seconds": 92.875
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FTextures%2FT_1022504_Hair_01_M&original=1",
+        "started_seconds": 92.735,
+        "finished_seconds": 92.875
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FWeapons%2FCaption%2FMeshes%2FSK_WP_1022504_Caption",
+        "started_seconds": 104.704,
+        "finished_seconds": 106.657
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 106.813,
+        "finished_seconds": 107.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FWeapons%2FCaption%2FTextures%2FT_1022504_Body_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 107.5,
+        "finished_seconds": 108.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FWeapons%2FCaption%2FTextures%2FT_1022504_Equip_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 107.5,
+        "finished_seconds": 108.204
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 107.5,
+        "finished_seconds": 107.625
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1022%2F1022504%2FWeapons%2FCaption%2FTextures%2FT_1022504_Head_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 107.5,
+        "finished_seconds": 108.204
+      }
+    ],
+    "first_model_seconds": 11.47,
+    "materials": 13,
+    "material_groups": 7,
+    "objects": 4,
+    "load_seconds": 20.16,
+    "import_server_first": {
+      "pid": 24480,
+      "initializations": 1,
+      "requests": 25,
+      "files": 893376,
+      "private_bytes": 872042496,
+      "managed_bytes": 829161264
+    },
+    "initial_parts": [
+      {
+        "name": "SK_1022_1022504_Lobby",
+        "visible": true
+      },
+      {
+        "name": "SK_1022_1022504",
+        "visible": false
+      },
+      {
+        "name": "SK_WP_1022504_Caption",
+        "visible": false
+      },
+      {
+        "name": "Weapon \u00b7 SK_WP_1022504_Shield",
+        "visible": true
+      }
+    ],
+    "initial_mesh_requests": [
+      "Characters/1022/1022504/Meshes/SK_1022_1022504_Lobby",
+      "Characters/1022/1022504/Weapons/Shield/Meshes/SK_WP_1022504_Shield"
+    ],
+    "second_model_seconds": 6.24,
+    "alternate_body_parts": [
+      {
+        "name": "SK_1022_1022504_Lobby",
+        "visible": false
+      },
+      {
+        "name": "SK_1022_1022504",
+        "visible": false
+      },
+      {
+        "name": "SK_WP_1022504_Caption",
+        "visible": true
+      },
+      {
+        "name": "Weapon \u00b7 SK_WP_1022504_Shield",
+        "visible": true
+      }
+    ],
+    "idles": [
+      {
+        "value": "Characters/1022/1022001/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1022001"
+      }
+    ],
+    "import_server_final": {
+      "pid": 24480,
+      "initializations": 1,
+      "requests": 49,
+      "files": 893376,
+      "private_bytes": 836669440,
+      "managed_bytes": 803012432
+    },
+    "import_process_exited": true
+  },
+  "parallel_cold_texture_checks": [
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Body_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Body_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Eqiup_02_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Eqiup_02_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Tooth_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Tooth_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Head_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Head_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Hair_Line_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Hair_Line_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Hair_01_M",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Hair_01_M.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Eqiup_03_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Eqiup_03_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Eqiup_03_M",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Eqiup_03_M.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Eqiup_04_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Eqiup_04_D.png"
+    },
+    {
+      "asset": "Characters/1022/1022504/Textures/T_1022504_Weapon_D",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\1022\\1022504\\Textures\\T_1022504_Weapon_D.png"
+    },
+    {
+      "asset": "Characters/Common/Textures/T_Common_Black",
+      "ok": true,
+      "path": "D:\\AtelierDev\\capwolf-20261021\\data\\_cache\\texture-stress\\imports\\v1\\e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755\\textures\\Marvel\\Content\\Marvel\\Characters\\Common\\Textures\\T_Common_Black.png"
+    }
+  ],
+  "earlier_texture_warning": {
+    "asset": "Characters/1022/1022504/Textures/T_1022504_Head_D",
+    "status": 500,
+    "response_body_captured": false,
+    "subsequent_same_request_status": 200,
+    "repeated_in_fresh_native_run": false,
+    "repeated_in_parallel_texture_run": false,
+    "note": "One transient response in the first run; not reproduced. Native smoke now fails on model/material/image HTTP errors."
+  },
+  "safety": {
+    "project_files_created": false,
+    "game_mods_installed": false,
+    "saved_visibility_modified": false,
+    "full_installer_tested": false
+  },
+  "evidence_root": "D:\\AtelierDev\\capwolf-20261021"
+}

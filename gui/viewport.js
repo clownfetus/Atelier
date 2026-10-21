@@ -1081,7 +1081,9 @@ function materialLabel(name) {
 
 function materialGroup(name) {
   const label = materialLabel(name);
-  if (matData[name]?.mesh_game_rel && /\/weapons\//i.test(matData[name].mesh_game_rel)) return 'Weapon · '+label;
+  const mesh = matData[name]?.mesh_game_rel;
+  const object = mesh && objects[meshMeta.findIndex(meta=>meta.game_rel===mesh)];
+  if (object?.kind === 'weapon') return 'Weapon · '+label;
   if (/^Equip\b/i.test(label)) return 'Equipment';
   if (/^Hair\b/i.test(label)) return 'Hair';
   if (/^(Head|Face|Eyes?|Tooth|Teeth|Mouth)\b/i.test(label)) return 'Face';

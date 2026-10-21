@@ -7,6 +7,8 @@ The app, installers and update checker identify each release by its full number,
 
 ### Asset pipeline and layout
 
+- Keep Capwolf's human transformation as a separate body choice instead of
+  automatically attaching it over the wolf. Its shield remains equipped normally.
 - Reuse one persistent game reader for model, material and texture previews on
   Windows. Preserve original compressed texture blocks for exact dye-mask regions,
   and omit unused facial morph data from the viewer while retaining full exports.

@@ -4,6 +4,9 @@ Windows previews now use a persistent native import server. One CUE4Parse reader
 serves mesh geometry, material parameters and texture pixels throughout the app
 session. This supersedes the [75-second loading revision](model-loading-verification-2026-10-21.md).
 
+The subsequent [Capwolf follow-up](capwolf-verification-2026-10-21.md) corrects
+discovery of its human transformation so only the selected body is displayed.
+
 ## Implementation
 
 - The app owns the decoder through inherited JSON pipes. Keys travel through the

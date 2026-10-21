@@ -27,6 +27,8 @@ def main():
     parser.add_argument('--app-port',type=int,default=8889)
     parser.add_argument('--debug-port',type=int,default=9449)
     parser.add_argument('--design-checks',action='store_true',help='Check the contextual Model Studio and capture visual QA states')
+    parser.add_argument('--deferred-body-rel',help='Verify this alternate body stays unloaded initially, then switches exclusively')
+    parser.add_argument('--expected-weapon-rel',help='Require this held weapon on the initial selected body')
     parser.add_argument('--viewport-script',type=Path,help='Optional saved viewer script for a before/after performance comparison')
     parser.add_argument('--import-server-checks',action='store_true',help='Source-only probe for persistent reader reuse and process shutdown')
     args=parser.parse_args()
@@ -42,7 +44,7 @@ def main():
         with socket.socket() as probe:
             if probe.connect_ex(('127.0.0.1',port))==0:raise SystemExit(f'Port {port} is already in use.')
     report=args.report_dir.resolve();report.mkdir(parents=True,exist_ok=False)
-    result={'mode':'source' if args.source else 'packaged','checks':[],'page_errors':[]}
+    result={'mode':'source' if args.source else 'packaged','checks':[],'page_errors':[],'asset_errors':[]}
     if exe:
         with exe.open('rb') as stream:
             result['exe_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
@@ -77,6 +79,14 @@ def main():
             browser=pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.debug_port}')
             context=browser.contexts[0];page=context.pages[0]
             page.on('pageerror',lambda error:result['page_errors'].append(str(error)))
+            def asset_response(response):
+                from urllib.parse import urlsplit
+                path=urlsplit(response.url).path
+                if response.status>=400 and path in ('/api/model_gltf','/api/skin_materials','/api/texture_png','/api/dye_texture'):
+                    try:message=response.text()[:1200]
+                    except Exception:message='Response body unavailable'
+                    result['asset_errors'].append(dict(url=response.url,status=response.status,error=message))
+            page.on('response',asset_response)
             page.on('console',lambda message:result['page_errors'].append(message.text)
                 if message.type=='error' and 'Shader Error' in message.text else None)
             if args.viewport_script:
@@ -125,6 +135,19 @@ def main():
             print('Ready: real geometry, materials and texture uploads',flush=True)
             def checked_bodies():
                 return page.locator('.vp-obj').evaluate_all('rows=>rows.filter(row=>!row.querySelector("label span").textContent.startsWith("Weapon · ") && row.querySelector("input").checked).length')
+            if args.deferred_body_rel:
+                from urllib.parse import parse_qs
+                result['initial_parts']=page.locator('.vp-obj').evaluate_all('rows=>rows.map(row=>({name:row.querySelector("label span").textContent,visible:row.querySelector("input").checked}))')
+                initial_meshes=[parse_qs(record['query']).get('game_rel',[''])[0]
+                                for record in result['requests'] if record['route']=='/api/model_gltf']
+                result['initial_mesh_requests']=initial_meshes
+                assert checked_bodies()==1,'A second body was automatically displayed'
+                assert args.deferred_body_rel not in initial_meshes,'An alternate body was auto-loaded as equipment'
+                if args.expected_weapon_rel:
+                    assert args.expected_weapon_rel in initial_meshes,'The alternate body prevented the held weapon from loading'
+                    weapon=args.expected_weapon_rel.rsplit('/',1)[-1]
+                    assert any(part['visible'] and part['name']=='Weapon · '+weapon for part in result['initial_parts'])
+                result['checks'].append('One body opens without decoding the alternate human form, and the real held weapon remains equipped')
             page.wait_for_function('document.getElementById("viewport-play").getAttribute("aria-pressed")==="true"',timeout=240000)
             if args.design_checks:
                 page.set_viewport_size({'width':1582,'height':995})
@@ -180,6 +203,24 @@ def main():
                 page.screenshot(path=str(report/'studio-real-comparison.png'))
                 page.locator('#viewport-edited').click()
                 result['checks'].append('Original and side-by-side comparison load real game materials for both forms, including unchanged unmatched slots')
+            if args.deferred_body_rel:
+                choices=page.locator('#viewport-model-choice option').evaluate_all('options=>options.map(option=>({value:option.value,label:option.label}))')
+                name=args.deferred_body_rel.rsplit('/',1)[-1]
+                alternate=next(option['value'] for option in choices if name in option['label'])
+                original=page.locator('#viewport-model-choice').input_value()
+                def choose_form(value):
+                    if not page.locator('#viewport-model-menu').evaluate('el=>el.open'):
+                        page.locator('#viewport-model-menu > summary').click()
+                    page.locator('#viewport-model-choice').select_option(value)
+                    page.wait_for_function('value=>document.getElementById("viewport-model-choice").value===value && !document.getElementById("viewport-model-choice").disabled && !document.getElementById("viewport-poster").disabled',arg=value,timeout=240000)
+                    assert checked_bodies()==1,'Switching a form left overlapping bodies visible'
+                choose_form(alternate)
+                result['alternate_body_parts']=page.locator('.vp-obj').evaluate_all('rows=>rows.map(row=>({name:row.querySelector("label span").textContent,visible:row.querySelector("input").checked}))')
+                assert any(part['name']==name and part['visible'] for part in result['alternate_body_parts'])
+                page.screenshot(path=str(report/'alternate-body-selected.png'))
+                choose_form(original)
+                page.screenshot(path=str(report/'single-body-restored.png'))
+                result['checks'].append('The human transformation remains selectable as a body form; switching and restoring show exactly one body')
             stage=page.locator('#viewport-canvas').bounding_box()
             page.mouse.move(stage['x']+stage['width']/2,stage['y']+stage['height']/2)
             page.wait_for_timeout(250)
@@ -206,6 +247,7 @@ def main():
             page.evaluate('AtelierViewport.close()')
             assert not page.locator('#viewport-overlay.active').count()
             assert not result['page_errors'],result['page_errors']
+            assert not result['asset_errors'],result['asset_errors']
             result['checks'].append('Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors')
             browser.close()
     except Exception as error:

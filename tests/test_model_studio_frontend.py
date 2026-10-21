@@ -11,6 +11,25 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which('node'),'Node is unavailable')
 class Frontend(unittest.TestCase):
+    def test_material_group_follows_body_classification_instead_of_its_folder(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('function materialGroup(name)'),end=source.indexOf('function filterMaterials()',start);
+const caption='Characters/1022/1022504/Weapons/Caption/Meshes/SK_WP_1022504_Caption';
+const shield='Characters/1022/1022504/Weapons/Shield/Meshes/SK_WP_1022504_Shield';
+const environment={materialLabel:name=>name,matData:{Body:{mesh_game_rel:caption},Shield:{mesh_game_rel:shield}},
+  meshMeta:[{game_rel:caption},{game_rel:shield}],objects:[{kind:'body'},{kind:'weapon'}]};
+vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+assert.equal(environment.materialGroup('Body'),'Body');
+assert.equal(environment.materialGroup('Shield'),'Weapon · Shield');
+assert.equal(environment.materialGroup('Unmapped'),'Unmapped');
+console.log('PASS body-form materials are not mislabelled as held weapons');
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],
+                              capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
     def test_global_base_tint_precedes_effect_colours(self):
         script=r'''
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');

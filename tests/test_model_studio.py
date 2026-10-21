@@ -98,6 +98,19 @@ class Studio(unittest.TestCase):
         with patch('atelier.paths.skin_entries', return_value=[('Characters/1029/1029001/Meshes/SK_Body.uasset','')]):
             self.assertEqual([r['kind'] for r in meshstudio.skin_meshes('1029001')], ['body'])
 
+    def test_capwolf_human_transformation_is_a_body_form_not_held_equipment(self):
+        base='Characters/1022/1022504/'
+        paths=['Meshes/SK_1022_1022504', 'Weapons/Caption/Meshes/SK_WP_1022504_Caption',
+               'Weapons/Shield/Meshes/SK_WP_1022504_Shield']
+        with patch('atelier.paths.skin_entries',return_value=[(base+p+'.uasset','') for p in paths]):
+            rows=meshstudio.skin_meshes('1022504')
+        by_name={row['name']:row for row in rows}
+        human=by_name['SK_WP_1022504_Caption']
+        self.assertEqual(human['kind'],'body')
+        self.assertNotIn('auto_equip',human)
+        self.assertEqual([row['name'] for row in rows if row['kind']=='weapon'],['SK_WP_1022504_Shield'])
+        self.assertTrue(by_name['SK_WP_1022504_Shield']['auto_equip'])
+
     def test_ability_meshes_remain_selectable_without_automatic_equipping(self):
         names = ['SK_WP_1035001_DevouringSymbiote', 'SK_WP_1035001_DevouringSymbiote_Hand',
                  'SK_WP_1035001_Head', 'SK_EQPT_1035001_Plane', 'SK_WP_1036001_Plane02',
