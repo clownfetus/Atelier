@@ -62,6 +62,11 @@ mixed builds, stale screenshots, failed platform results and changed source copy
 Nine fresh real-interface screenshots at 1400 × 900 have no page errors; their
 receipt binds each image to the version and exact interface source hashes.
 
+Hosted Linux validation exposed an outdated native-tool mock in the missing-cache
+texture recovery test. It now stops at the image decoder boundary and asserts
+that the recovered work copy reaches that decoder. The fixture needs neither
+Wine nor an installed native tool; packaged native-tool checks remain separate.
+
 Version, bundled changelog, release copy and fresh screenshots use **1.1.1**.
 The previous installers are pinned to the published **1.1.0** assets using their
 actual GitHub SHA-256 digests and Windows byte count. Native build inputs retain
