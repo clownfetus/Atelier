@@ -98,6 +98,30 @@ class Studio(unittest.TestCase):
         with patch('atelier.paths.skin_entries', return_value=[('Characters/1029/1029001/Meshes/SK_Body.uasset','')]):
             self.assertEqual([r['kind'] for r in meshstudio.skin_meshes('1029001')], ['body'])
 
+    def test_helpers_outside_weapons_do_not_replace_the_body(self):
+        base = 'Characters/1042/1042001/'
+        paths = ['Cues/104251/SM_SplineCables_RopeM2', 'Emote/Horn/Meshes/SK_Horn',
+                 'Animations/HeroDetails/Weapon/SK_Dragon', 'Slot/Accessories/Meshes/SK_Badge',
+                 '1042_Girl/Meshes/SK_1042_Girl_1042001', 'Meshes/SK_1042_1042001']
+        with patch('atelier.paths.skin_entries', return_value=[(base + p + '.uasset', '') for p in paths]):
+            rows = meshstudio.skin_meshes('1042001')
+        self.assertEqual([row['name'] for row in rows], ['SK_1042_1042001', 'SK_1042_Girl_1042001'])
+
+    def test_ability_props_static_duplicates_and_control_rigs_do_not_auto_equip(self):
+        prefix='Characters/1027/1027001/'
+        props=['SK_WP_IronWoodenWall','SK_WP_GiantArm_L','SK_WP_SporeBomb',
+               'SK_WP_HandGun_Container','SK_WP_FloatingGun','SK_WP_SpiderTentacles',
+               'SK_WP_Phoenix','SK_WP_Monster','SK_WP_SpearTie','SM_WP_Pistol']
+        held=['SK_WP_CannonL','SK_WP_CannonR','SK_WP_DesertEagle_L','SK_WP_Trident','SK_WP_Wand','SK_WP_Nunchaku_R']
+        paths=[prefix+'Weapons/Parts/'+name+'.uasset' for name in props+held]
+        paths += [prefix+'Meshes/SK_Body.uasset',prefix+'Meshes/SK_Body_OnGroot_CtrlRig.uasset',prefix+'Meshes/SK_Body_FA.uasset']
+        with patch('atelier.paths.skin_entries',return_value=[(path,'') for path in paths]):
+            rows=meshstudio.skin_meshes('1027001')
+        self.assertEqual({row['name'] for row in rows if row.get('auto_equip')},set(held))
+        self.assertTrue(set(props).issubset({row['name'] for row in rows}))
+        self.assertFalse(any('CtrlRig' in row['name'] for row in rows))
+        self.assertFalse(any(row['name'].endswith('_FA') for row in rows))
+
     def test_capwolf_human_transformation_is_a_body_form_not_held_equipment(self):
         base='Characters/1022/1022504/'
         paths=['Meshes/SK_1022_1022504', 'Weapons/Caption/Meshes/SK_WP_1022504_Caption',

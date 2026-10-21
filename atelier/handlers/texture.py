@@ -1068,6 +1068,7 @@ def stage_inject(stage, game_rel, opts=None):
     if not os.path.exists(out_ua):
         raise RuntimeError("inject failed: " + (((r.stderr or "") + (r.stdout or "")).strip()[-200:] or "unknown"))
     notes = []
+    group_changed = False
     if opts.get("no_mips"):
         notes.append("no mips")
     if opts.get("lod_group"):
@@ -1075,10 +1076,17 @@ def stage_inject(stage, game_rel, opts=None):
         # correct and shippable, the group is an extra the user asked for. Report, keep the texture.
         try:
             if set_texture_group(out_ua, opts["lod_group"]):
+                group_changed = True
                 notes.append(opts["lod_group"].replace("TEXTUREGROUP_", "group "))
         except Exception as e:
             print(f"  [warn] {game_rel}: texture group not applied: {e}", file=sys.stderr, flush=True)
             notes.append("texture group FAILED: %s" % e)
+    from atelier.added_assets import record as added_record
+    added = added_record(game_rel)
+    if (added and added['file_type'] == 'texture') or group_changed:
+        from atelier.handlers.custom_texture import repair_export_tail
+        with tempfile.TemporaryDirectory(prefix='texture-tail-') as scratch:
+            repair_export_tail(out_ua, scratch)
     if opts.get("lq_twin"):
         n = stage_lq_twin(stage, game_rel, out_ua)
         notes.append("+Marvel_LQ copy" if n else "no Marvel_LQ mount in these paks")

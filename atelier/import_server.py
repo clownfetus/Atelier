@@ -22,7 +22,7 @@ import time
 import uuid
 
 from atelier import config, hostos, jobs
-from atelier.storage import atomic_json
+from atelier.storage import atomic_json, _filesystem_path
 from atelier.inflight import key_lock
 
 VERSION = 1
@@ -91,7 +91,7 @@ def _target(root, kind, asset, suffix):
         contained = False
     if not contained:
         raise ValueError('Import cache path is outside the cache.')
-    return Path(target)
+    return Path(_filesystem_path(target))
 
 
 def _same_path(left, right):
@@ -280,6 +280,8 @@ def material(game_rel):
             raise ImportError('The import server returned invalid material parameters.')
         for texture in data['textures'].values():
             config.validate_game_rel(texture)
+        if (data.get('surface') or {}).get('parent_path'):
+            config.validate_game_rel(data['surface']['parent_path'])
         jobs.checkpoint()
         atomic_json(str(target), data)
         return data

@@ -319,6 +319,34 @@ class BlenderPort(unittest.TestCase):
         np.testing.assert_allclose(transform@meshport._bones(weapon)['WP_Sword'],
                                    meshport._bones(body)['weapon_r'],atol=1e-10)
 
+    def test_cannon_suffix_and_additional_weapon_families_use_the_authored_left_grip(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_l',0,(40,0,100)),bone('weapon_r',0,(-40,0,100))])
+        for family in ['Cannon','Wand','Trident','Nunchaku']:
+            weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('WP_Root'),
+                bone(family+'Root',0,(2,0,0),(1,0,0,0))])
+            transform,anchor=meshport.attachment_transform(body,weapon)
+            self.assertEqual(anchor,'weapon_l')
+            np.testing.assert_allclose(transform@meshport._bones(weapon)[family+'Root'],
+                                       meshport._bones(body)['weapon_l'],atol=1e-10)
+
+    def test_explicit_alignment_precedes_a_deforming_cannon_joint(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_l',0,(40,0,100))])
+        weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('Root'),bone('Align',0),
+            bone('Hand_l_Cannon1',1,(2,0,0),(1,0,0,0))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'weapon_l')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['Align'],
+                                   meshport._bones(body)['weapon_l'],atol=1e-10)
+
+    def test_hand_mounted_cannon_uses_wrist_instead_of_palm(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('hand_l',0,(30,0,100)),bone('weapon_l',1,(12,0,0))])
+        weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('Root'),bone('Align',0),
+            bone('Hand_l_Cannon1',1,(2,0,0),(1,0,0,0))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'hand_l')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['Align'],
+                                   meshport._bones(body)['hand_l'],atol=1e-10)
+
     def test_shared_sword_uses_the_handle_at_the_hand_instead_of_the_floor_origin(self):
         body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_r',0,(-48,7,101)),
             bone('Sword_Weapon_Root',0),bone('Sword_WeaponHandle',2,(0,0,20))])

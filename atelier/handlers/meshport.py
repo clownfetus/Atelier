@@ -32,15 +32,19 @@ def _bones(model):
 
 def attachment_transform(body, weapon, hand='auto'):
     body_bones,weapon_bones=_bones(body),_bones(weapon)
-    weapon_joint=lambda name: bool(re.search(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe',name,re.I)
+    weapon_joint=lambda name: bool(re.search(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe|cannon|launcher|rifle|katana|trident|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw',name,re.I)
                                   and not re.search(r'^root$|^pelvis$|^ik_|^weapon_[lr]$',name,re.I))
-    candidates=[name for name in weapon_bones if name in body_bones and re.search(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe',name,re.I) and not re.search(r'^ik_|^weapon_[lr]$',name,re.I)]
-    side='l' if hand=='left' or (hand=='auto' and re.search(r'(?:^|_)(?:l|left)(?:_|$)',os.path.basename(weapon.base),re.I)) else 'r'
+    candidates=[name for name in weapon_bones if name in body_bones and weapon_joint(name)]
+    side='l' if hand=='left' or (hand=='auto' and re.search(r'(?:^|_)(?:l|left)(?:_|$)|(?:cannon|launcher|gun|pistol|rifle|sword|katana|axe|stick|nunchaku)L(?:_|$)',os.path.basename(weapon.base),re.I)) else 'r'
     socket='weapon_'+side
+    alignment=next((name for name in weapon_bones if re.fullmatch(r'align(?:ment)?',name,re.I)),None)
+    if alignment and any(re.match(r'hand_[lr]_cannon',name,re.I) for name in weapon_bones) and 'hand_'+side in body_bones:
+        socket='hand_'+side
     grip=next((name for name in weapon_bones if re.search(r'handle|grip',name,re.I)),None)
     authored_grip=next((bone['name'] for bone in weapon.bones if weapon_joint(bone['name']) and
                        (bone['parent']<0 or not weapon_joint(weapon.bones[bone['parent']]['name']))),None)
-    grip=grip or (socket if socket in weapon_bones else None) or authored_grip or (candidates[0] if candidates else None)
+    source_socket='weapon_'+side
+    grip=grip or (source_socket if source_socket in weapon_bones else None) or alignment or authored_grip or (candidates[0] if candidates else None)
     grip=grip or next((bone['name'] for bone in weapon.bones if bone['parent']<0),None)
     if socket not in body_bones:
         if hand=='auto' and candidates:

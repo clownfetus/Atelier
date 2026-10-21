@@ -10,7 +10,7 @@ import { createViewportInspection } from './viewport-inspection.js';
 import { createViewportAnimation } from './viewport-animation.js';
 import { createViewportFloor } from './viewport-effects.js';
 import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, applyEmissive } from './viewport-materials.js';
-import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials } from './viewport-attachments.js';
+import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials, weaponSide } from './viewport-attachments.js';
 
 const $ = id => document.getElementById(id);
 // The server says why a model is unavailable in the JSON body; three.js only reports the status
@@ -478,13 +478,23 @@ async function loadObject(object, gen=generation) {
   return object.loading;
 }
 
+function weaponMatchesBody(weapon, body) {
+  const weaponPath=meshMeta[objects.indexOf(weapon)]?.game_rel || '';
+  const form=/\/Weapons\/(\d{4,5})\//i.exec(weaponPath)?.[1];
+  if(!form)return true;
+  const bodyPath=meshMeta[objects.indexOf(body)]?.game_rel || '';
+  const bodyForm=/\/Meshes\/(\d{4,5})\//i.exec(bodyPath)?.[1] || /\/SK_(\d{4,5})_/i.exec(bodyPath)?.[1];
+  return bodyForm===form;
+}
+
 async function loadAutomaticWeapons(gen=generation) {
   syncAttachments();
   const held=objects.filter(object=>object.kind==='weapon').sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true));
   for(const weapon of held) {
     if(gen!==generation)return;
     if(weapon.enabled===false || weapon.autoEquip===false && weapon.enabled!==true)continue;
-    const side=weapon.hand==='left' || !weapon.hand && /(?:^|_)(?:l|left)(?:_|$)/i.test(weapon.name)?'l':'r';
+    if(weapon.enabled!==true && !objects.some(body=>body.kind!=='weapon' && body.root.visible && weaponMatchesBody(weapon,body)))continue;
+    const side=weaponSide(weapon.name,weapon.hand || 'auto');
     if(weapon.enabled!==true && held.some(other=>other.root.visible && other.binding?.side===side))continue;
     await loadObject(weapon,gen);
     if(gen!==generation)return;
@@ -542,7 +552,8 @@ function syncAttachments() {
   const bodies=objects.filter(object=>object.kind!=='weapon' && object.loaded && object.root.visible);
   const occupied=new Set();
   for (const weapon of held.sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true))) {
-    const choices=bodies.map(body=>bindWeapon(weapon,body,weapon.hand==='both'?'right':weapon.hand || 'auto')).filter(Boolean)
+    const choices=bodies.filter(body=>weapon.enabled===true || weaponMatchesBody(weapon,body))
+      .map(body=>bindWeapon(weapon,body,weapon.hand==='both'?'right':weapon.hand || 'auto')).filter(Boolean)
       .sort((a,b)=>(b.joints?.length || 0)-(a.joints?.length || 0));
     weapon.binding=choices[0] || null;
     const side=weapon.binding?.side || 'r',automatic=weapon.autoEquip!==false && !occupied.has(side);
@@ -675,7 +686,7 @@ function retint(name) {
   const d = matData[name]; if (!d) return;
   const chip = [...document.querySelectorAll('.vp-mat')].find(row=>row.dataset.material===name)?.querySelector('.vp-material-chip');
   if (chip) chip.style.background=materialChipColor(name,d);
-  const baseRgb = paramRgb(name, d.baseIdx);
+  const baseRgb = d.eye_preview ? null : paramRgb(name, d.baseIdx);
   const emiRgb  = paramRgb(name, d.emiIdx);
   for (const m of (matsByName[name] || [])) {
     // albedo tint (base colour param, else white over the map / grey placeholder)
@@ -732,7 +743,7 @@ function frameCamera() {
 }
 
 function tintOriginal(material, data) {
-  const base = data.colors?.[pickBaseIdx(data.colors)];
+  const base = data.eye_preview ? null : data.colors?.[pickBaseIdx(data.colors)];
   if (base) material.color.setRGB(...base.rgba.slice(0,3).map(v=>Math.max(0,v)), THREE.LinearSRGBColorSpace);
   else material.color.setHex(material.map ? 0xffffff : 0xb8b8c0);
   applyEmissive(material, data);
@@ -897,7 +908,7 @@ async function loadMaterialSet(skinId, load, additions=null) {
     const name = resolveSlot(matName);
     if (!name || !slots.includes(name)) continue;
     matched++;
-    info.baseIdx = pickBaseIdx(info.colors);
+    info.baseIdx = info.eye_preview ? -1 : pickBaseIdx(info.colors);
     info.emiIdx  = pickEmissiveIdx(info.colors);
     matData[name] = info;
     // Unknown cooked slots keep their decoded appearance and remain read-only.
@@ -914,7 +925,10 @@ async function loadMaterialSet(skinId, load, additions=null) {
     // Dyeing materials (CHROMAS): the skin's colour lives in the MI's "Region N" params applied
     // through the ColorID mask, NOT in the diffuse — every chroma of a skin shares one diffuse, so
     // loading BaseColor renders them all identically. Ask for the server-side composite instead.
-    if (info.dyeable) {
+    if (info.eye_preview) {
+      texJobs.push(applyMatTexture(name, tex.ScleraBaseColor, 'map', info.eye_ver,
+        `/api/eye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${info.eye_ver}`));
+    } else if (info.dyeable) {
       texJobs.push(applyMatTexture(name, tex.BaseColor || info.game_rel, 'map', info.dye_ver || '0',
         `/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(info.dye_ver || '0')}`));
     } else if (roles.basecolor) {
@@ -1091,6 +1105,13 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   dismiss.setAttribute('aria-label','Deselect material'); dismiss.title = 'Deselect material'; dismiss.innerHTML = '<i data-lucide="x" size="17"></i>';
   dismiss.addEventListener('click',()=>{selectedMaterial=null;buildPanel();$('viewport-canvas').focus();});
   heading.append(title,dismiss); editor.append(heading);
+  if (info.surface?.preview_omitted) {
+    const hint=document.createElement('p');hint.className='vp-inspector-hint';
+    hint.textContent=info.surface.preview_omitted==='Animated game effect'
+      ? 'This animated effect is omitted from the preview. Its material edits still apply in-game.'
+      : 'This effect is disabled by its material settings.';
+    editor.append(hint);
+  }
   const siblings=names.filter(other=>materialGroup(other)===materialGroup(name));
   if (siblings.length>1) {
     const field=document.createElement('label');field.className='vp-part-picker';field.textContent='Material part';
@@ -1159,7 +1180,7 @@ function colorField(name, color, label, references) {
           if (saving) return;
           for(const peer of materialPeers(name)) {
             if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
-            retint(peer);if(matData[peer].dyeable)dyeRebakeMesh(peer);
+            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer);
           }
           picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
         });
@@ -1176,7 +1197,7 @@ function revertMaterial(name) {
   for(const peer of materialPeers(name)) {
     clearTimeout(_dyeMeshTimer[peer]); _dyeMeshRevision[peer] = (_dyeMeshRevision[peer] || 0) + 1;
     delete edited[peer]; retint(peer);
-    if (matData[peer].dyeable) dyeRebakeMesh(peer);
+    if (matData[peer].dyeable || matData[peer].eye_preview) dyeRebakeMesh(peer);
   }
   buildPanel(); note('Material restored to saved colours','success');
 }
@@ -1192,7 +1213,7 @@ function onColorInput(matName, paramName, hex) {
   const orig = (d.colors.find(c => c.name === paramName) || {}).rgba || [r, g, b, 1];
   for(const peer of materialPeers(matName)) {
     (edited[peer] ||= {})[paramName] = [r,g,b,orig[3] ?? 1];retint(peer);
-    if(matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer);
+    if(matData[peer].eye_preview || matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer);
   }
   // retint re-derives the mesh from the params, routing each to its real channel: EmissiveColor →
   // the emissive glow (through the emissive mask), a base/albedo tint → material.color. Editing the
@@ -1217,7 +1238,7 @@ function _dyeOverridesFor(matName) {
 }
 function dyeRebakeMesh(matName) {
   const d = matData[matName];
-  if (!d || !d.dyeable || !d.game_rel) return;
+  if (!d || (!d.dyeable && !d.eye_preview) || !d.game_rel) return;
   clearTimeout(_dyeMeshTimer[matName]);
   const gen = generation, matGen = materialGeneration, load = materialLoad;
   const revision = (_dyeMeshRevision[matName] || 0) + 1;
@@ -1225,9 +1246,9 @@ function dyeRebakeMesh(matName) {
   _dyeMeshTimer[matName] = setTimeout(async () => {
     let blobUrl;
     try {
-      const r = await materialFetch('/api/dye_preview', {
+      const r = await materialFetch(d.eye_preview ? '/api/eye_preview' : '/api/dye_preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_rel: d.game_rel, size: 1024, overrides: _dyeOverridesFor(matName) }),
+        body: JSON.stringify({ game_rel: d.game_rel, size: 1024, overrides: d.eye_preview ? edited[matName] || {} : _dyeOverridesFor(matName) }),
       }, load);
       if (!r.ok) return;
       blobUrl = URL.createObjectURL(await r.blob());
@@ -1373,7 +1394,7 @@ function revertEdits() {
     retint(name);
     // After a successful save the persisted dye may differ from the original cached map.
     // Rebuild with no draft overrides so Reset shows the last saved material.
-    if (matData[name].dyeable) dyeRebakeMesh(name);
+    if (matData[name].dyeable || matData[name].eye_preview) dyeRebakeMesh(name);
   }
   buildPanel();                                            // resets the pickers too
   note('Reverted unsaved changes', 'info');

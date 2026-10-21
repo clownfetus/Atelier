@@ -510,7 +510,7 @@ def api_skin_materials():
         for params in materials.values():
             roles = params.get('texture_roles', {})
             custom = params.get('texture_urls', {})
-            textures.extend(path for role, path in roles.items() if role in ('basecolor', 'emissive', 'opacity') and role not in custom)
+            textures.extend(path for role, path in roles.items() if role in ('basecolor', 'emissive', 'opacity', 'iris', 'sclera') and role not in custom)
             if params.get('dyeable'):
                 textures.extend(params.get('textures', {}).get(slot) for slot in ('BaseColor', 'DyeingTexture'))
         if any(textures) and not import_server.available():
@@ -546,8 +546,18 @@ def api_skin_materials():
     return json.dumps({"ok": True, "materials": out})
 
 
+def _preview_surface(params, original=False):
+    from atelier.handlers.material_preview import inherited_opacity, effect_surface, eye_layers
+    from atelier.index import by_basename
+    read = read_material_original if original else lambda path: read_material(path, cache_only=True)
+    return eye_layers(effect_surface(inherited_opacity(params, read, by_basename), read, by_basename), by_basename)
+
+
 def _viewport_material_payload(gr, params):
+    import hashlib
     from atelier.handlers.meshmat import texture_role
+    from atelier.handlers.material_preview import eye_material
+    params = _preview_surface(params)
     texs = params.get('textures', {}) or {}
     roles, texture_urls = {}, {}
     custom = _custom_tex.assignments(gr) if gr else {}
@@ -559,9 +569,12 @@ def _viewport_material_payload(gr, params):
                 texture_urls[role] = '/api/material_custom_texture/preview?' + urlencode({
                     'game_rel': gr, 'slot': name, 'v': custom[name]['file']})
     dyeable = 'DyeingTexture' in texs
+    eye = eye_material(params)
+    versions = {g: _tex_version(g) for g in texs.values()}
+    eye_version = hashlib.sha256(json.dumps([versions, params.get('colors'), params.get('scalars'), custom], sort_keys=True).encode()).hexdigest() if eye else '0'
     return {'game_rel': gr, 'token': token(gr) if gr else None, **params, 'texture_roles': roles, 'texture_urls': texture_urls,
-            'tex_ver': {g: _tex_version(g) for g in texs.values()}, 'dyeable': dyeable,
-            'dye_ver': _dye_version(gr, texs) if dyeable else '0'}
+            'tex_ver': versions, 'dyeable': dyeable,
+            'dye_ver': _dye_version(gr, texs) if dyeable else '0', 'eye_preview': eye, 'eye_ver': eye_version}
 
 
 @app.post('/api/mesh_visibility')
@@ -680,6 +693,61 @@ def api_texture_png():
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""
+
+@app.get('/api/eye_texture')
+@app.post('/api/eye_preview')
+def api_eye_texture():
+    from atelier.handlers.material_preview import eye_image, eye_material
+    from PIL import Image
+    import hashlib
+    body = (request.json or {}) if request.method == 'POST' else {}
+    if not isinstance(body, dict):
+        response.status = 400
+        return {'ok': False, 'error': 'Invalid eye preview request'}
+    gr = body.get('game_rel') or request.query.get('game_rel', '')
+    original = request.query.get('original') == '1'
+    try:
+        _c.validate_game_rel(gr)
+        params = _preview_surface(read_material_original(gr) if original else read_material(gr, cache_only=True), original=original)
+        if not eye_material(params):
+            raise ValueError('This material has no iris and sclera colour layers')
+        overrides = {} if original else body.get('overrides') or {}
+        if not isinstance(overrides, dict) or len(overrides) > 256:
+            raise ValueError('Invalid eye colour overrides')
+        if overrides:
+            colors = []
+            for color in params.get('colors', []):
+                rgba = overrides.get(color['name'], color['rgba'])
+                if not isinstance(rgba, list) or len(rgba) != 4 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in rgba):
+                    raise ValueError('Invalid eye colour override')
+                colors.append({**color, 'rgba': rgba})
+            params = {**params, 'colors': colors}
+        images = []
+        for slot in ('IrisBaseColor', 'ScleraBaseColor'):
+            path = None if original else _custom_tex.image_path(gr, slot)
+            path = path or _texture_png(params['textures'][slot], original=original)
+            if not path or not os.path.isfile(path):
+                raise ValueError('An eye colour texture is unavailable')
+            images.append(path)
+        stamp = [(os.path.realpath(path), os.stat(path).st_mtime_ns, os.path.getsize(path)) for path in images]
+        identity = hashlib.sha256(json.dumps(['eye-v1', stamp, params.get('colors', []), params.get('scalars', [])], sort_keys=True).encode()).hexdigest()
+        directory = os.path.join(CACHE_3DVIEW, 'eyes')
+        os.makedirs(directory, exist_ok=True)
+        target = os.path.join(directory, identity + '.png')
+        if not os.path.isfile(target):
+            with Image.open(images[0]) as iris, Image.open(images[1]) as sclera:
+                image = eye_image(iris, sclera, params)
+            with tempfile.TemporaryDirectory(prefix='.eye-', dir=directory) as scratch:
+                temporary = os.path.join(scratch, 'eye.png')
+                image.save(temporary, 'PNG')
+                jobs.checkpoint()
+                os.replace(temporary, target)
+        result = static_file(os.path.basename(target), root=directory, mimetype='image/png')
+        result.headers['Cache-Control'] = 'no-store'
+        return result
+    except (ValueError, OSError) as error:
+        response.status = 400
+        return {'ok': False, 'error': str(error)}
 
 @app.post("/api/showcase_webp")
 def api_showcase_webp():
@@ -1993,7 +2061,9 @@ def api_material_original():
     if not gr:
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
-        return json.dumps({"ok": True, "game_rel": gr, **read_material_original(gr)})
+        from atelier.handlers.material_preview import eye_material
+        params = _preview_surface(read_material_original(gr), original=True)
+        return json.dumps({"ok": True, "game_rel": gr, **params, 'eye_preview': eye_material(params)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 

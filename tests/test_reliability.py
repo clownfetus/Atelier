@@ -197,6 +197,23 @@ class Reliability(unittest.TestCase):
                 S.atomic_json(path, {"new": True})
         self.assertEqual(json.loads(path.read_text()), {"old": True})
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows extended path regression')
+    def test_atomic_json_publishes_a_long_native_material_path(self):
+        path = self.root / ('material-cache-' + 'a'*50) / ('b'*64) / ('character-' + 'c'*50) / ('MI_' + 'd'*70 + '.json')
+        self.assertGreater(len(str(path)), 260)
+        physical = Path(S._filesystem_path(path, force=True))
+        try:
+            S.atomic_json(path, {'opacity': 0})
+            self.assertEqual(json.loads(physical.read_text()), {'opacity': 0})
+            self.assertEqual(list(physical.parent.glob('.atelier-write-*')), [])
+        finally:
+            physical.unlink(missing_ok=True)
+            for parent in path.parents:
+                if parent == self.root:
+                    break
+                self.assertTrue(parent.is_relative_to(self.root))
+                Path(S._filesystem_path(parent, force=True)).rmdir()
+
     def test_config_setters_preserve_each_others_fields(self):
         jobs = [lambda: C.save_mods_folder("mods"), lambda: C.save_blender_path("blender"),
                 lambda: C.save_export_password("test-only"), lambda: C.set_active_project("B")]

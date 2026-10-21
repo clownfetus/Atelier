@@ -194,6 +194,26 @@ class PersistentImports(unittest.TestCase):
         self.assertTrue(all(row==results[0] for row in results))
         self.assertEqual(self.events.read_text().splitlines().count('material'),1)
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows long import-cache path')
+    def test_long_material_cache_paths_publish_and_read_without_another_request(self):
+        asset = 'Characters/Test/' + '/'.join(['LongMaterialFolder' * 3] * 3) + '/MI_Weapon'
+        target = S._target(S._source()[1], 'materials', S._asset(asset), '.json')
+        self.assertGreater(len(str(target)), 260)
+        try:
+            first = S.material(asset)
+            events = self.events.read_text()
+            self.assertEqual(S.material(asset), first)
+            self.assertEqual(self.events.read_text(), events)
+            self.assertTrue(target.is_file())
+        finally:
+            target.unlink(missing_ok=True)
+            cache = config._path_comparison_key(str(self.root / 'cache'))
+            for parent in target.parents:
+                if config._path_comparison_key(str(parent)) == cache:
+                    break
+                self.assertTrue(config._path_comparison_key(str(parent)).startswith(cache + os.sep))
+                parent.rmdir()
+
     def test_original_texture_blocks_preserve_mask_alpha_and_reuse_the_png(self):
         from PIL import Image
         path=S.texture('Characters/Test/T_Mask')

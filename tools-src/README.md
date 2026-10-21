@@ -119,3 +119,10 @@ stay in the external report directory. Probes never install a mod.
 See [shader reconstruction verification](../docs/shader-rebuild-verification-2026-10-21.md)
 and the earlier [native tool verification](../docs/native-tool-inputs-verification-2026-10-21.md)
 for the actual rebuild, shader validation/readback and desktop playback results.
+
+The [cross-character follow-up](../docs/character-preview-verification-2026-10-21.md)
+rebuilds AtelierImport with exact parent-material references and synchronous
+publication of its completed first-LOD bytes. This avoids the pinned exporter's
+unawaited file write and Windows staging-file sharing failures. The source pin
+in `native-tools.lock.json` includes both corrections; the shader and animation
+build inputs are unchanged.

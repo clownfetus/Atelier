@@ -280,6 +280,10 @@ def add(file_type, folder, name, source='', files=()):
             image = preview.with_suffix('.png')
             if not image.is_file():
                 raise ValueError('The texture could not be decoded for editing.')
+        # The typed UE5 texture JSON writer can append a second None terminator.
+        # A rename needs only the header: preserve the original cooked bytes.
+        trim = custom_texture._duplicate_none_bytes(doc, original + '.uasset') if file_type == 'texture' else 0
+        opaque = custom_texture._preserve_export_bytes(doc, original + '.uasset', trim_tail=trim) if file_type == 'texture' else False
         doc = _retarget(doc, os.path.basename(original), target, file_type, source_gr)
         compiled = work / 'compiled' / (target.rsplit('/', 1)[-1] + '.uasset')
         compiled.parent.mkdir()
@@ -288,6 +292,11 @@ def add(file_type, folder, name, source='', files=()):
         result = uat(['from_json', str(document), str(compiled), config.USMAP])
         if result.returncode != 0 or not compiled.is_file():
             raise ValueError('Could not build the new asset: ' + (result.stderr or result.stdout or 'conversion failed')[-500:])
+        if opaque:
+            payload = Path(original + '.uexp').read_bytes()
+            expected = payload[:-4-trim] + payload[-4:] if trim else payload
+            if compiled.with_suffix('.uexp').read_bytes() != expected:
+                raise ValueError('Renaming the texture altered its cooked payload; the asset was not added.')
         for ext in ('.ubulk', '.uptnl'):
             if os.path.isfile(original + ext):
                 shutil.copyfile(original + ext, compiled.with_suffix(ext))
@@ -301,6 +310,7 @@ def add(file_type, folder, name, source='', files=()):
                 result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
                 if result.returncode != 0 or not output.is_file():
                     raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
+            custom_texture.repair_export_tail(str(encoded), str(work / 'texture-tail'))
             custom_texture._verify_rename(str(work), str(baseline), str(encoded), compiled.stem)
             compiled = encoded
         verified = _read_package(str(compiled.with_suffix('')), str(work / 'readback'))

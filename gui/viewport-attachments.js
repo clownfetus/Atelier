@@ -30,19 +30,31 @@ export function pairedWeapon(weapon) {
   return {name:weapon.name,root,rig:attachmentRig({scene:root,parser:{json:{asset:{generator:weapon.rig.reflected?'SharpGLTF':''}}}})};
 }
 
-const weaponBone=name=>!/^root$|^pelvis$|^weapon_[lr]$|^ik_/i.test(name) && /weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe/i.test(name);
+const weaponLabel=/weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe|cannon|launcher|rifle|katana|trident|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw/i;
+const weaponBone=name=>!/^root$|^pelvis$|^weapon_[lr]$|^ik_/i.test(name) && weaponLabel.test(name);
 const physicalWorld=joint=>joint.node.matrixWorld.clone().multiply(joint.inverseExported).multiply(joint.physical);
+
+export function weaponSide(name, hand='auto') {
+  if(hand==='left')return 'l';
+  if(hand==='right')return 'r';
+  return /(?:^|_)(?:l|left)(?:_|$)|(?:cannon|launcher|gun|pistol|rifle|sword|katana|axe|stick|nunchaku)L(?:_|$)/i.test(name || '')?'l':'r';
+}
 
 export function bindWeapon(weapon, body, hand='auto') {
   const source=weapon.rig,target=body.rig;
   if (!source || !target) return null;
   const shared=[...source.nodes].filter(([name])=>weaponBone(name) && target.nodes.has(name));
-  const side=hand==='left' || (hand==='auto' && /(?:^|_)(?:l|left)(?:_|$)/i.test(weapon.name)) ? 'l' : 'r';
-  const socket=target.nodes.get('weapon_'+side);
+  const side=weaponSide(weapon.name,hand);
+  const alignment=[...source.nodes].find(([name])=>/^align(?:ment)?$/i.test(name))?.[1];
+  // Ultron's cannon rigs are authored from the wrist, while weapon_l/r are
+  // palm sockets. Moving a wrist rig to the palm leaves it below the hand.
+  const wrist=alignment && [...source.nodes.keys()].some(name=>/^hand_[lr]_cannon/i.test(name));
+  const socket=(wrist && target.nodes.get('hand_'+side)) || target.nodes.get('weapon_'+side);
   // Use the actual grip, which can be a child of the weapon root. Matching a
   // sword's origin to the hand would leave its handle offset by 20 cm on Magik.
   const grip=[...source.nodes].find(([name])=>/handle|grip/i.test(name))?.[1]
     || source.nodes.get('weapon_'+side)
+    || alignment
     // A generic wrapper such as WP_Root is not the grip. Its first weapon
     // joint can carry the authored half-turn (Blade's WP_Sword, for example).
     || [...source.nodes].find(([name,joint])=>weaponBone(name) &&
@@ -106,7 +118,7 @@ export function embeddedWeaponMaterials(body, weapons) {
     for(const group of groups){
       const material=materials[group.materialIndex];if(!material)continue;
       const label=material.userData?.slotName || material.name;
-      if(!/weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe/i.test(label))continue;
+      if(!weaponLabel.test(label))continue;
       let duplicate=group.count>0;
       for(let offset=group.start;duplicate && offset<group.start+group.count;offset++){
         const vertex=geometry.index?geometry.index.getX(offset):offset;let covered=0,total=0;

@@ -1,0 +1,1295 @@
+{
+  "schema": 1,
+  "date": "2026-10-21",
+  "platform": "Windows x64",
+  "scope": {
+    "characters": 54,
+    "body_forms": 63,
+    "ordinary_weapons": 62,
+    "optional_props_not_audited": 158,
+    "idle_rest_views": 178,
+    "material_packages": 733,
+    "all_discovered_forms_and_ordinary_weapons_verified": true,
+    "maximum_grip_error_metres": 1.2290421106600515e-07,
+    "maximum_grip_rotation_error_radians": 9.893293781696559e-07,
+    "unavailable": [
+      "Nightcrawler",
+      "Forge",
+      "Amaranth"
+    ],
+    "all_costumes_or_in_game_rendering_verified": false
+  },
+  "characters": [
+    {
+      "skin": "1011001",
+      "name": "Hulk",
+      "report": "eye-defaults-final",
+      "verified_body_forms": 3,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 6,
+      "material_packages": 30,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1014001",
+      "name": "Punisher",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 8,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 16,
+      "material_packages": 23,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1015001",
+      "name": "Storm",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1016001",
+      "name": "Loki",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 2,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1017001",
+      "name": "Human Torch",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1018001",
+      "name": "Doctor Strange",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1020001",
+      "name": "Mantis",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1021001",
+      "name": "Hawkeye",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 2,
+      "material_packages": 18,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1022001",
+      "name": "Captain America",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1023001",
+      "name": "Rocket Raccoon",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 5,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1024001",
+      "name": "Hela",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 12,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1025001",
+      "name": "Cloak & Dagger",
+      "report": "eye-defaults-final",
+      "verified_body_forms": 2,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 4,
+      "material_packages": 30,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1026001",
+      "name": "Black Panther",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 5,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1027001",
+      "name": "Groot",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 51,
+      "idle_rest_views": 2,
+      "material_packages": 7,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1028001",
+      "name": "Ultron",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 3,
+      "idle_rest_views": 2,
+      "material_packages": 8,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1029001",
+      "name": "Magik",
+      "report": "eye-defaults-final",
+      "verified_body_forms": 2,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 4,
+      "material_packages": 25,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1030001",
+      "name": "Moon Knight",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 7,
+      "idle_rest_views": 4,
+      "material_packages": 12,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1031001",
+      "name": "Luna Snow",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 17,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1032001",
+      "name": "Squirrel Girl",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 7,
+      "idle_rest_views": 2,
+      "material_packages": 17,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1033001",
+      "name": "Black Widow",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 5,
+      "optional_props_not_audited": 5,
+      "idle_rest_views": 8,
+      "material_packages": 13,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1034001",
+      "name": "Iron Man",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 6,
+      "idle_rest_views": 2,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1035001",
+      "name": "Venom",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 6,
+      "idle_rest_views": 2,
+      "material_packages": 3,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1036001",
+      "name": "Spider-Man",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 3,
+      "idle_rest_views": 2,
+      "material_packages": 5,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1037001",
+      "name": "Magneto",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 4,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1038001",
+      "name": "Scarlet Witch",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1039001",
+      "name": "Thor",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 4,
+      "material_packages": 16,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1040001",
+      "name": "Mr. Fantastic",
+      "report": "final-roster-v2",
+      "verified_body_forms": 3,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 6,
+      "material_packages": 20,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1041001",
+      "name": "Winter Soldier",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 4,
+      "idle_rest_views": 2,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1042001",
+      "name": "Peni Parker",
+      "report": "final-roster-v2",
+      "verified_body_forms": 2,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 8,
+      "idle_rest_views": 4,
+      "material_packages": 23,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1043001",
+      "name": "Star-Lord",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 12,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1044001",
+      "name": "Blade",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 4,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1045001",
+      "name": "Namor",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 4,
+      "idle_rest_views": 2,
+      "material_packages": 13,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1046001",
+      "name": "Adam Warlock",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 1,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1047001",
+      "name": "Jeff the Landshark",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 9,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1048001",
+      "name": "Psylocke",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 2,
+      "material_packages": 13,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1049001",
+      "name": "Wolverine",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 13,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1050001",
+      "name": "Invisible Woman",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 2,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 4,
+      "material_packages": 18,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1051001",
+      "name": "The Thing",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 8,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1052001",
+      "name": "Iron Fist (Lin Lie)",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 2,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1053001",
+      "name": "Emma Frost",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 2,
+      "material_packages": 12,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1054001",
+      "name": "Phoenix",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 3,
+      "idle_rest_views": 2,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1055001",
+      "name": "Daredevil",
+      "report": "final-roster-v2",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 4,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 6,
+      "material_packages": 18,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1056001",
+      "name": "Angela",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 5,
+      "optional_props_not_audited": 4,
+      "idle_rest_views": 8,
+      "material_packages": 16,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1057001",
+      "name": "Deadpool",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 4,
+      "optional_props_not_audited": 4,
+      "idle_rest_views": 6,
+      "material_packages": 10,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1058001",
+      "name": "Gambit",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 4,
+      "material_packages": 11,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1059001",
+      "name": "Elsa Bloodstone",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 3,
+      "optional_props_not_audited": 3,
+      "idle_rest_views": 6,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1060001",
+      "name": "White Fox",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 2,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 4,
+      "idle_rest_views": 4,
+      "material_packages": 24,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1061001",
+      "name": "Black Cat",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 8,
+      "idle_rest_views": 4,
+      "material_packages": 17,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1062001",
+      "name": "Devil Dinosaur",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 9,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1063001",
+      "name": "Cyclops",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 9,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1064001",
+      "name": "Jubilee",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 2,
+      "material_packages": 8,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    },
+    {
+      "skin": "1065001",
+      "name": "Rogue",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 0,
+      "optional_props_not_audited": 0,
+      "idle_rest_views": 2,
+      "material_packages": 9,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1066001",
+      "name": "The Hood",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 2,
+      "idle_rest_views": 2,
+      "material_packages": 20,
+      "materials_using_shared_eye_defaults": 1,
+      "findings": []
+    },
+    {
+      "skin": "1067001",
+      "name": "Gorr",
+      "report": "final-roster-remainder",
+      "verified_body_forms": 1,
+      "verified_ordinary_weapons": 2,
+      "optional_props_not_audited": 1,
+      "idle_rest_views": 4,
+      "material_packages": 14,
+      "materials_using_shared_eye_defaults": 0,
+      "findings": []
+    }
+  ],
+  "batches": [
+    {
+      "id": "final-roster-v2",
+      "characters_checked": 32,
+      "report_sha256": "8b9dd692dcef1b5688f54f290870c93388a3aff8ead1079fdfd66843746a3bd5",
+      "source_sha256": {
+        "gui/viewport.js": "7fe6dc82f24c9884b22b6496a12f04e268fd496000c177710e1439604a2eb47a",
+        "gui/viewport-attachments.js": "e21470a4a6260d2494562b97b1fb3feba71c8635f9be7d862de5d4e22206d7f0",
+        "gui/viewport-inspection.js": "d144335ee3d0d51e90b79d4a8e34f66438ce1e235e50c794dbaecb008383f8c0",
+        "atelier/handlers/meshstudio.py": "936de3876490585a750371607f7daeed55b87406593fa64a5caa4e1d0950b80b",
+        "atelier/handlers/material_preview.py": "94a2c6eba4190703d31e62667787c4081629df24ea3e175dd214877bc2f82aa5",
+        "atelier/handlers/material.py": "7166003155b739cb9f5d64941e6b35c39c34a6ec6efd6732d4b9b6d5c8e71b32",
+        "atelier/handlers/meshport.py": "ea3dbab495067e8f8682d107e7164b8312e33ffdc103d7feedc5377800043bfa",
+        "atelier/import_server.py": "9f3937748b9c5a02bd8468db96657167dbebc059d42f005405efc34811ebdc07",
+        "atelier/web/routes.py": "80ea10b7e348b1b969e5702041bbe25c01848074f40d633eb309d04a698fd1ba",
+        "atelier/storage.py": "e48cb3cf53f269ee7f92b15e25f29890d9362a7e46483d692622d62100bc08fd",
+        "tools-src/AtelierImport/Program.cs": "af4e8ca46e4f6d5194a8ea877dc1258abf16018ccd3e599c93939cd2ea5e79dd",
+        "tools-src/native-tools.lock.json": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98",
+        "tests/native_character_previews.py": "f789217b4f1698b643feb1e5f5e770c0ab463f434957a92e6b645a772c389791"
+      },
+      "ended_after_covered_subset": true
+    },
+    {
+      "id": "eye-defaults-final",
+      "characters_checked": 6,
+      "report_sha256": "05714e60aef7da676e42bba4251e00ebd3e1793ca564471250f8406e0aa56b38",
+      "source_sha256": {
+        "gui/viewport.js": "7fe6dc82f24c9884b22b6496a12f04e268fd496000c177710e1439604a2eb47a",
+        "gui/viewport-attachments.js": "e21470a4a6260d2494562b97b1fb3feba71c8635f9be7d862de5d4e22206d7f0",
+        "gui/viewport-inspection.js": "d144335ee3d0d51e90b79d4a8e34f66438ce1e235e50c794dbaecb008383f8c0",
+        "atelier/handlers/meshstudio.py": "936de3876490585a750371607f7daeed55b87406593fa64a5caa4e1d0950b80b",
+        "atelier/handlers/material_preview.py": "fb8ac9728cd22ee9138b29a112cc83d98ec03a7b6b042c1d8718e43f93132bd0",
+        "atelier/handlers/material.py": "7166003155b739cb9f5d64941e6b35c39c34a6ec6efd6732d4b9b6d5c8e71b32",
+        "atelier/handlers/meshport.py": "ea3dbab495067e8f8682d107e7164b8312e33ffdc103d7feedc5377800043bfa",
+        "atelier/import_server.py": "9f3937748b9c5a02bd8468db96657167dbebc059d42f005405efc34811ebdc07",
+        "atelier/web/routes.py": "c911dfcdca7ac383430b0f3ff39972bbefd772868e4e7d3505454451f78f2a90",
+        "atelier/storage.py": "e48cb3cf53f269ee7f92b15e25f29890d9362a7e46483d692622d62100bc08fd",
+        "tools-src/AtelierImport/Program.cs": "af4e8ca46e4f6d5194a8ea877dc1258abf16018ccd3e599c93939cd2ea5e79dd",
+        "tools-src/native-tools.lock.json": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98",
+        "tests/native_character_previews.py": "f789217b4f1698b643feb1e5f5e770c0ab463f434957a92e6b645a772c389791"
+      },
+      "ended_after_covered_subset": false
+    },
+    {
+      "id": "final-roster-remainder",
+      "characters_checked": 24,
+      "report_sha256": "2cdede15e5f474baeeadd29b8846a52f0a7cd17b5c75ffd97a4a332b95156dcf",
+      "source_sha256": {
+        "gui/viewport.js": "7fe6dc82f24c9884b22b6496a12f04e268fd496000c177710e1439604a2eb47a",
+        "gui/viewport-attachments.js": "e21470a4a6260d2494562b97b1fb3feba71c8635f9be7d862de5d4e22206d7f0",
+        "gui/viewport-inspection.js": "d144335ee3d0d51e90b79d4a8e34f66438ce1e235e50c794dbaecb008383f8c0",
+        "atelier/handlers/meshstudio.py": "936de3876490585a750371607f7daeed55b87406593fa64a5caa4e1d0950b80b",
+        "atelier/handlers/material_preview.py": "fb8ac9728cd22ee9138b29a112cc83d98ec03a7b6b042c1d8718e43f93132bd0",
+        "atelier/handlers/material.py": "7166003155b739cb9f5d64941e6b35c39c34a6ec6efd6732d4b9b6d5c8e71b32",
+        "atelier/handlers/meshport.py": "ea3dbab495067e8f8682d107e7164b8312e33ffdc103d7feedc5377800043bfa",
+        "atelier/import_server.py": "9f3937748b9c5a02bd8468db96657167dbebc059d42f005405efc34811ebdc07",
+        "atelier/web/routes.py": "ae7d9fc7e60cc5b437d778ea3eb387d7535850787a152a22cdae44ee22e25423",
+        "atelier/storage.py": "e48cb3cf53f269ee7f92b15e25f29890d9362a7e46483d692622d62100bc08fd",
+        "tools-src/AtelierImport/Program.cs": "af4e8ca46e4f6d5194a8ea877dc1258abf16018ccd3e599c93939cd2ea5e79dd",
+        "tools-src/native-tools.lock.json": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98",
+        "tests/native_character_previews.py": "f789217b4f1698b643feb1e5f5e770c0ab463f434957a92e6b645a772c389791"
+      },
+      "ended_after_covered_subset": false
+    }
+  ],
+  "regression": {
+    "unit_tests": 285,
+    "additional_phase_checks": 81,
+    "browser_checks": 225,
+    "browser_page_errors": 0,
+    "optional_phase4_native_skips": 2,
+    "suites": [
+      {
+        "report": "regression",
+        "suite": "browser_smoke.py",
+        "exit_code": 0,
+        "seconds": 436.95,
+        "summary": [
+          "PASS UI loads at three desktop sizes without uncaught JavaScript errors",
+          "PASS Configured startup does not wait for remote key/mapping downloads",
+          "PASS Startup shows the library while the release check is pending; the update offer appears once it answers",
+          "PASS Update offer appears above an empty project picker without requiring project creation",
+          "PASS Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+          "PASS Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+          "PASS Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+          "PASS A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+          "PASS The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+          "PASS First-run setup keeps priority and does not acknowledge notes the user has not seen",
+          "PASS A failed local notes request leaves the library usable without an unhandled error",
+          "PASS Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes",
+          "PASS Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls",
+          "PASS Formation sounds create no audio by default; opt-in drop/pop/splat synthesis follows actual stage transitions and stays silent in Calm, Off, OS reduced motion and hidden documents",
+          "PASS Mod cards use completed applied counts, a matching Showcase capture and local build version/date; copy/save/reveal work, warnings carry skipped counts and failed builds offer no card",
+          "PASS Showcase is session presentation only: reopening returns to Inspect and captures preserve the camera and editable source materials",
+          "PASS Local Latin display lettering loads; panels use 6px roles; Mod tray captions keep Ink text on Paper and repeats use five bubbles then a number",
+          "PASS Unedited textures refuse image drops; an edited texture asks before replacing, Cancel keeps it, and confirmed drops in Full/Calm/Off upload File bytes with the originating project header and the existing refresh; non-images send no request",
+          "PASS The hanging No projects drop opens the original New Project dialog immediately in all dial modes",
+          "PASS Launch energy follows real progress; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline",
+          "PASS Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles",
+          "PASS Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; all 36 category emblems are available",
+          "PASS By default, card emblems are inlined with unique mask ids; each of the 36 categories has its own ink (3:1 on light and dark thumbs and cards, local overrides), bubbles are cut through it, a hovered card's edited corner takes the raised charge at 3:1 on --bg3, and all 36 silhouettes stay inside the 24-unit box",
+          "PASS The category review sheet draws emblems on the Studio card and thumb surfaces with the same fitted ink as the app, in both themes",
+          "PASS Motion migrates system to Full and reduce to Off, preserving the legacy data-motion contract",
+          "PASS Fixed outcome inks follow measured surfaces on all six presets in both themes and custom dark/light palettes; card thumbs take a charge fitted to --bg3 (3:1) on every one",
+          "PASS The root charge is fitted to the resting card body (--bg2), and a hovered card body (--bg3) switches its edited corner to the raised charge: 3:1 resting and hovered on every preset and custom palette in both themes",
+          "PASS Hero artwork and legacy adaptive settings preserve theme inks on cards, selection markers and the readable model loader",
+          "PASS The arbiter refuses simultaneous large stages, shows a micro fallback, and permits each Tier 3 event only once per session",
+          "PASS Calm and Off stop particle drawing; OS reduced motion forces Off and is explained beside the dial",
+          "PASS Home leads with hero costume/edit counts, per-project recent/edited filters, keyboard movement, category chips and a Continue ribbon from actual edit time",
+          "PASS A costume opens Model Studio directly and the no-mesh case opens its folder with an explanation",
+          "PASS Everywhere supports debounced keyboard navigation and asset focus, rejects stale responses, and This folder keeps local filtering",
+          "PASS Empty projects hide Continue and an offline catalogue keeps the folder library usable",
+          "PASS Deleting an edit offers Undo and restores the byte-identical file through the real project routes",
+          "PASS Clear All uses one Undo batch, hover pauses its ten-second toast and reduced motion omits the row dissolve",
+          "PASS Themed confirmations render literal text, trap Tab, focus Cancel for danger, cancel on Escape/backdrop and restore focus",
+          "PASS Material, custom-texture, curve, effect, level and text reset/leave paths await themed answers and cancelled leave retains drafts",
+          "PASS Blender extraction, inspection override and asset Revert require their themed answers before sending work",
+          "PASS Viewport leave waits for the themed answer and cancelled navigation retains its recolour draft",
+          "PASS First-run setup validates three panels, supports Back and offline fallback, preserves the save payload and keeps Settings as a full form",
+          "PASS Light/dark color pairs pass 4.5:1; shell fits four desktop sizes; local font/logo load",
+          "PASS Folder icons fill 76% of their preview and stay contained at all four thumbnail sizes in both themes",
+          "PASS Theme persists across reloads, follows OS in System mode and stays fixed when explicitly selected",
+          "PASS Keyboard menu navigation/focus return work; folder symbols fill tiles; all rendered symbols are mapped",
+          "PASS Mode and palette changes preserve a live material draft; reduced motion disables effects",
+          "PASS Blocked localStorage does not prevent launch or in-session theme changes",
+          "PASS Settings presets show four swatches; six palettes pass contrast checks; native selects/options and monochrome brand follow the theme",
+          "PASS Dropdown popup selection works with ArrowDown/Enter; Escape dismisses without changing selection",
+          "PASS Native color inputs preserve readable BG/FG, save separate light/dark colors, survive reloads and preset changes, sync windows and correct low contrast",
+          "PASS Multiple named custom palettes persist, restore and delete safely; palette names render as literal text",
+          "PASS Themed tooltips preserve title/accessibility text and Escape; right-aligned menus remain onscreen and return keyboard focus",
+          "PASS First-time configuration includes the same appearance controls without a header selector",
+          "PASS Malformed or unavailable appearance storage falls back safely and allows session changes",
+          "PASS Unsupported customizable selects retain the native control with themed text/options and the correct OS color scheme",
+          "PASS Home roster exposes catalogue heroes and their costumes without importing assets",
+          "PASS Folder direction, portrait/banner and breadcrumb transitions clean up; editors return to their card; HDR/alpha swatches keep real values",
+          "PASS Filmic studio environment and wireframe-to-shaded reveal render real Three.js geometry without changing editable materials; discovered idle starts automatically",
+          "PASS Operation resolves on the same mount with literal text; repeats merge, bump and reset their paused countdown line",
+          "PASS A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance",
+          "PASS Saved sidebar colors/curves, fly/packing snapshots, row removal, rolling counts, real import outcomes and one-time mod-color celebration clean up",
+          "PASS Activity ring uses reported progress or an indeterminate running state and clears at completion; menu motion starts at its anchor",
+          "PASS Artwork and legacy adaptive-accent preferences preserve theme colours on controls",
+          "PASS Compact density and extra palettes persist; forced reduced motion is static and navigation works without View Transitions",
+          "PASS Breadcrumbs retain complete hero, costume and folder names in their own row at compact width",
+          "PASS Folder hover popups follow the pointer even while the first card retains keyboard focus; titles and descriptions restore on dismissal",
+          "PASS Polished character library fits dark/light at 1024\u00d7768 and 1400\u00d7900 without horizontal overflow",
+          "PASS Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+          "PASS Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry",
+          "PASS Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+          "PASS Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+          "PASS Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+          "PASS Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+          "PASS Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+          "PASS Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+          "PASS Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+          "PASS Material chips show dye-region colours when no base tint exists and follow live edits",
+          "PASS Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+          "PASS Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+          "PASS Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+          "PASS Capture cancellation restores the camera and exits turntable rotation",
+          "PASS Closing a loading viewer immediately removes its inline progress and cancels its backend load",
+          "PASS Changing material skins cancels the previous request and keeps exactly one inline progress message",
+          "PASS Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors",
+          "PASS Shared texture slots download and decode one image while all three material assignments finish",
+          "PASS Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark",
+          "PASS Roster uses square hero avatars and text-only skin names; artwork refresh preserves selection and the viewer shows the matching hero logo",
+          "PASS Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows",
+          "PASS Skin side arrows browse an overflowing costume list without changing the selected hero",
+          "PASS Character folder portraits stay transparent; hero and costume banners request story art by the exact character code",
+          "PASS Meshes have one 3D menu action; bulk controls appear inside a loaded compatible editor and hide on close or unsupported data",
+          "PASS Consecutive texture imports preserve grid, thumbnail, banner and existing sidebar nodes without reloading the library",
+          "PASS Asset and edit-list menus restore originals for every editable asset type through the preserve-entry endpoint",
+          "PASS Available high-resolution mips trigger automatic tracked repair and explain paint preservation and backups",
+          "PASS Edited grid assets have a three-pixel contrasting border and an explicit Editing badge",
+          "PASS Completed builds use a green surface, strong status border, heading and controls in both themes",
+          "PASS Model import defaults skeleton, weights and morph preservation on; explicit checkbox choices upload with the target and supported model formats",
+          "PASS At DPR 1, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, selected Mod tray heroes and Continue",
+          "PASS Model Studio keeps badge and HiDPI banner fallbacks, samples banner colour when the icon is transparent, ignores stale loads after switching or closing, and leaves control colours unchanged",
+          "PASS Custom texture location fields preview the exact package, retain rejected input, save with the originating project, and ignore a response after another editor opens",
+          "PASS Completed single-hero Mod cards include that hero\u2019s verified KO emblem; missing optional images never block editing",
+          "PASS Visible stories, hero nameplates and costume nameplates upgrade to 4\u00d7 without navigation; the strip has no outer gaps and right-side artwork keeps its original colour and contrast",
+          "PASS Model Studio exports the selected body through project-scoped jobs, blocks hidden/multiple bodies and duplicate clicks, reports packed counts, keeps Open in Blender clickable in both themes and desktop sizes, and recovers from worker failure; Activity retains the outcomes",
+          "PASS Export motion handles repeated states, terminal mounting, interruption and finished-effect cleanup",
+          "PASS OS/forced reduced motion stop CSS and WAAPI; hidden work pauses and completed one-shots stay settled",
+          "PASS Missing/throwing WAAPI preserves feedback; host/SVG removal and duplicate mounting clean up motion",
+          "PASS Real export hook preserves project headers/payload and distinguishes success, skipped work, partial install, settings and request errors",
+          "PASS Missing or throwing export presentation cannot block successful requests; fallback messages escape asset text",
+          "PASS Overlapping exports keep independent feedback; old operations/projects cannot overwrite current button results",
+          "PASS Export results crossfade back to the static icon in a fixed 20px slot; new operations and reduced motion cancel the reset safely",
+          "PASS Export toasts dispose on explicit removal, click and timeout; light/dark feedback captured",
+          "PASS Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts",
+          "PASS Viewport loader respects OS/forced reduced motion and visibility, with idempotent explicit teardown",
+          "PASS Absent, throwing and partially failing WAAPI keep static artwork and cannot leave duplicate loader loops",
+          "PASS Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses",
+          "PASS Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes",
+          "PASS Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures",
+          "PASS Save/dirty guards protect close/reopen; public export guards retain drafts and focus Save/status without discard prompts",
+          "PASS Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup",
+          "PASS Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes",
+          "PASS Folder motion applies only to generic visible folders, including failed hero portraits; category and asset fallbacks stay unchanged",
+          "PASS Folder flap responds to pointer and retained keyboard focus without changing native click/Enter/Space navigation or focus outlines",
+          "PASS OS/forced reduced motion retains static poses; coarse pointers avoid sticky hover while keyboard focus still opens folders",
+          "PASS Folder artwork fills the existing ~102px slot without clipping or shrinking category glyphs in both desktop themes",
+          "PASS Rapid hover reversals and grid rebuilds settle cleanly without duplicated artwork or surviving transitions",
+          "PASS Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI",
+          "PASS Dialog saves preserve project header and material payload; failed intensity persistence reports warning instead of full success",
+          "PASS Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state",
+          "PASS In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project",
+          "PASS Viewport saves retain failed/newer recolors, retry the correct payload and leave replacement viewport status untouched",
+          "PASS Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback",
+          "PASS Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves",
+          "PASS Any folder can be pinned independently of navigation, including nested/category folders; native card buttons stay intact",
+          "PASS Pins persist across reload, navigate by keyboard, filter on home, and unpin without removing folders or losing focus",
+          "PASS Existing v1 generic Maps pins gain current artwork; stored paths normalize/deduplicate safely, forged labels stay inert and corrupt storage does not block launch",
+          "PASS Pin changes synchronize between windows; blocked storage still supports pinning/navigation/unpinning for the session",
+          "PASS Pinned home links and consistently sized folder cards fit both themes and desktop sizes without blocking export or issuing backend writes",
+          "PASS Bulk review uses real HTTP jobs without project writes; applying saves both curves and preserves alpha",
+          "PASS Changing bulk controls invalidates approval; an external edit rejects the entire stale batch",
+          "PASS Activity cancels a running HTTP export; job records retain outcomes without saving input passwords",
+          "PASS Reloading restores project job history and cancelled/failed outcomes without resubmitting work",
+          "PASS Bulk dialog fits a compact desktop, traps keyboard focus and returns focus on Escape",
+          "PASS Cached original and imported texture previews remain visible after search and grid rebuilds, with the originating project in image URLs",
+          "PASS A completed thumbnail becomes visible through status recovery even when its SSE notification is missed",
+          "PASS Decode failures replace spinners with a clear fallback; Retry preview requests a fresh attempt and restores the image",
+          "PASS Status polling does not cancel a valid slow image response every two seconds",
+          "PASS Leaving a grid aborts thumbnail status requests and ignores late responses without altering the new folder",
+          "PASS A hung imported image request reaches a visible retryable fallback instead of spinning indefinitely",
+          "PASS Initial texture browsing and sidebar rendering remain still",
+          "PASS An external texture save reconstructs only the matching grid/sidebar previews after load, then shows the exact updated pixels",
+          "PASS Replace Texture triggers the same effect for both previews using the originating project",
+          "PASS Rapid saves replace in-flight effects; enabling reduced motion settles immediately and does not replay",
+          "PASS Failed image reads, absent motion controller and unavailable canvas keep usable static previews",
+          "PASS Project changes and grid/sidebar replacement dispose pending and running reconstruction layers",
+          "PASS Bulk updates cap reconstruction at four canvases; hidden pages release effects and do not replay",
+          "PASS One click runs real S-map jobs, imports the matching game S map, retains alpha/D files and lists unmatched maps in Activity",
+          "PASS Shared S maps require an explicit D choice; the chosen pairing is saved in the batch record and its S output appears in Mod tray",
+          "PASS Project switches reject stale pairing dialogs and the processing button disables when no edited D maps remain",
+          "PASS Add asset sits beside Process S maps, browses real game folders and uploads image bytes to a named project texture",
+          "PASS Game material copies and cooked mesh uploads join the Mod tray; duplicate destinations preserve existing edits",
+          "PASS Added folders appear in the asset library and stale project dialogs refuse to write",
+          "PASS Add asset supports Escape/focus return and stays within a 1024\u00d7768 window in both themes",
+          "PASS Category aliases resolve case-insensitively without matching custom folder/skin substrings; weapons retain full-size accessible crossed swords",
+          "PASS All 39 icon types retain large preview slots; the 36 category emblems reach 3:1 in both themes, and 18px home chips share category colors",
+          "PASS Library search matches combined names, IDs and paths; type/status filters and Edit All share the visible texture set",
+          "PASS Natural sorting and adjustable thumbnail size persist across reload; controls fit both themes at 1024px",
+          "PASS Arrow/Home/End navigation uses one active card; Space previews textures without importing, P opens mesh preview, Escape restores focus",
+          "PASS Folder entry and parent navigation preserve keyboard focus; loading/error filters cannot resurrect stale cards",
+          "PASS Nested pins retain hero/skin context across reload and partial metadata; old generic labels migrate, custom labels and v1 paths remain intact",
+          "PASS Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft",
+          "PASS Material dirty drafts guard close/reload; original-read errors stay explicit and stale comparison/open responses cannot replace a newer editor",
+          "PASS Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save",
+          "PASS Material search/select, cancellation and immediate replacement retain donor controls and project identity",
+          "PASS Restore game defaults returns the original parameter schema after replacement",
+          "PASS A confirmation for a closed material cannot replace or reset a subsequently opened editor",
+          "PASS A failed replacement retains unsaved parameters and re-enables the editor",
+          "PASS Stale search and replacement replies cannot overwrite a newer choice or another editor",
+          "PASS Export review lists included/excluded types and paths, keeps credentials private and supports keyboard cancellation",
+          "PASS Material/viewport drafts and saves block export; material guards recheck confirmation/dispatch, retaining drafts and editor focus",
+          "PASS Export uses reviewed project headers/payload, blocks stale reviews and duplicate clicks, and retains full warning results",
+          "PASS Partial installation exposes built files; retry and overwrite revalidate the original project/settings and cancellation restores review",
+          "PASS Destination/network failures preserve edits and a persistent manual retry without submitting unreviewed or automatic builds",
+          "PASS Skin Swapper review shows hero/skin read-only from the mesh, gates Build on live rule checks, sends forms without IDs, and explains a revoked switch",
+          "PASS Duplicate edit clicks deduplicate within a project; the same asset loads independently across projects and stale completion preserves current status",
+          "PASS Cancelling Skin Swapper overwrite then choosing Standard preserves the Standard endpoint and both selected assets on retry",
+          "PASS Skin Swapper retry retains its endpoint, author, skin name and reviewed form",
+          "PASS Empty tray enters once after a confirmed empty response, then stays static on repeat renders; owned effects are disposed before DOM replacement",
+          "PASS Only genuine empty projects get the illustration: filtered results, pending switches and errors do not; confirmed nonempty-to-empty transitions replay once and returning to a seen project does not",
+          "PASS Empty tray retains a 112px host and 96px painted width in both themes, matches its editable SVG, stays decorative and does not replay on theme changes",
+          "PASS Empty SVG handles interruption, duplicate mount, reduced motion, hidden/offscreen state, unavailable/partial WAAPI and mount failure without orphan effects or lost fallback",
+          "PASS The A mark vector, interface PNG and application icons match scripts/brand_mark.py",
+          "PASS Logo entrance runs once independently of pending startup configuration, preserves the original 32px PNG and wordmark position, then releases its effects",
+          "PASS The latest logo stays fully opaque, yields to the Full launch formation, enters once at completion, and discards hidden startup replays",
+          "PASS Logo controller deduplicates entrances, interrupts/reduces/settles safely, preserves host ownership and survives missing, throwing and partially failing WAAPI",
+          "PASS Logo load errors reject readiness safely; destroy settles pending readiness and page teardown restores the original fallback without leaked SVG",
+          "PASS Hidden/reduced-motion startup, absent animation/controller and PNG failures keep the static fallback and never replay on later visibility",
+          "PASS Every spinner renders as the Krackle charge ring and stops under reduced motion",
+          "PASS Caption notifications use micro formations; job results settle after one pop and controller failures keep the original icon",
+          "PASS Activity glyph rings fade into real results for 140ms, cancel on new work, and stay still under reduced motion",
+          "PASS Empty folder, no-match and failure grids keep their text and the static drawing as fallback while Krackle art settles",
+          "PASS Krackle stage loops only while busy, stops drawing once a result settles, honours reduced motion and cleans up",
+          "PASS Hidden Krackle stages stop drawing and resume when their dialog is shown",
+          "PASS Activity shows its running-jobs ring as six Krackle dots with a counting crest",
+          "PASS Mod tray buttons and Continue fit without clipped text or touching dividers at 240, 300 and 420-pixel tray widths in both themes",
+          "PASS A full 54-hero Home keeps complete portrait rows, costumes and categories separated at all four card sizes in both themes; short windows scroll and Heroes still collapses",
+          "PASS At DPR 1, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, selected Mod tray heroes and Continue",
+          "PASS Model Studio keeps badge and HiDPI banner fallbacks, samples banner colour when the icon is transparent, ignores stale loads after switching or closing, and leaves control colours unchanged",
+          "PASS Custom texture location fields preview the exact package, retain rejected input, save with the originating project, and ignore a response after another editor opens",
+          "PASS Completed single-hero Mod cards include that hero\u2019s verified KO emblem; missing optional images never block editing",
+          "PASS Visible stories, hero nameplates and costume nameplates upgrade to 4\u00d7 without navigation; the strip has no outer gaps and right-side artwork keeps its original colour and contrast",
+          "PASS Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (light)",
+          "PASS Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (light)",
+          "PASS Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (dark)",
+          "PASS Synchronous picker/API payload preserved; grey/unloaded/transparent/blocked sampling is safe; stale A-B-A artwork and old Continue callbacks cannot repaint; hero-only edits and recovered artwork work",
+          "PASS Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (dark)",
+          "PASS Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (custom-light)",
+          "PASS Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (custom-light)",
+          "PASS Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (custom-dark)",
+          "PASS Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (custom-dark)",
+          "PASS Real HTTP project writes stay in their originating project; traversal rejected",
+          "PASS Partial save failure retains the failed draft and captures the project",
+          "PASS Retry saves the retained draft",
+          "PASS Edits made during Save survive; leaving while saving is blocked",
+          "PASS An old texture response cannot overwrite a newer material set",
+          "PASS SSE error does not create duplicate EventSource connections"
+        ]
+      },
+      {
+        "report": "regression",
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 0.91,
+        "summary": [
+          "Ran 23 tests in 0.275s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.41,
+        "summary": [
+          "Ran 32 tests in 0.798s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 1.03,
+        "summary": [
+          "Ran 7 tests in 0.875s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_material_preview.py",
+        "exit_code": 0,
+        "seconds": 1.08,
+        "summary": [
+          "Ran 12 tests in 0.287s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_viewport_features.py",
+        "exit_code": 0,
+        "seconds": 0.88,
+        "summary": [
+          "Ran 13 tests in 0.126s"
+        ]
+      },
+      {
+        "report": "regression",
+        "suite": "test_frontend_cache.py",
+        "exit_code": 0,
+        "seconds": 0.7,
+        "summary": [
+          "Ran 4 tests in 0.087s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_material_original.py",
+        "exit_code": 0,
+        "seconds": 0.98,
+        "summary": [
+          "Ran 8 tests in 0.346s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_import_server.py",
+        "exit_code": 0,
+        "seconds": 2.62,
+        "summary": [
+          "Ran 19 tests in 2.293s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_reliability.py",
+        "exit_code": 0,
+        "seconds": 1.16,
+        "summary": [
+          "Ran 29 tests in 0.473s"
+        ]
+      },
+      {
+        "report": "final-unit-regression",
+        "suite": "test_native_build_inputs.py",
+        "exit_code": 0,
+        "seconds": 0.72,
+        "summary": [
+          "Ran 15 tests in 0.475s"
+        ]
+      },
+      {
+        "report": "regression",
+        "suite": "test_shader_build_inputs.py",
+        "exit_code": 0,
+        "seconds": 0.44,
+        "summary": [
+          "Ran 11 tests in 0.198s"
+        ]
+      },
+      {
+        "report": "safety-regression-final",
+        "suite": "test_jobs_bulk.py",
+        "exit_code": 0,
+        "seconds": 1.45,
+        "summary": [
+          "Ran 23 tests in 0.772s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_material_replacement.py",
+        "exit_code": 0,
+        "seconds": 1.22,
+        "summary": [
+          "Ran 11 tests in 0.585s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_local_api_guard.py",
+        "exit_code": 0,
+        "seconds": 0.95,
+        "summary": [
+          "Ran 17 tests in 0.161s"
+        ]
+      },
+      {
+        "report": "safety-regression-final",
+        "suite": "test_model_gltf.py",
+        "exit_code": 0,
+        "seconds": 0.86,
+        "summary": [
+          "Ran 12 tests in 0.107s"
+        ]
+      },
+      {
+        "report": "safety-regression-final",
+        "suite": "test_viewport_cancel.py",
+        "exit_code": 0,
+        "seconds": 1.34,
+        "summary": [
+          "Ran 4 tests in 0.710s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_texture_export_tail.py",
+        "exit_code": 0,
+        "seconds": 0.42,
+        "summary": [
+          "Ran 8 tests in 0.147s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_added_assets.py",
+        "exit_code": 0,
+        "seconds": 1.8,
+        "summary": [
+          "Ran 13 tests in 1.307s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_custom_textures.py",
+        "exit_code": 0,
+        "seconds": 1.33,
+        "summary": [
+          "Ran 16 tests in 0.669s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_model_studio_textures.py",
+        "exit_code": 0,
+        "seconds": 0.66,
+        "summary": [
+          "Ran 8 tests in 0.227s"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_phase3.py",
+        "exit_code": 0,
+        "seconds": 4.62,
+        "summary": [
+          "35 passed, 0 failed"
+        ]
+      },
+      {
+        "report": "final-import-regression",
+        "suite": "test_phase4.py",
+        "exit_code": 0,
+        "seconds": 4.5,
+        "summary": [
+          "  SKIP  The one thing that could go wrong silently: from_json writes .uasset/.uexp only. \u2014 UAssetTool not installed",
+          "  SKIP  DXT5's alpha block is independent, so a uniform zero alpha has to come back exactly zero. \u2014 UAssetTool not installed",
+          "46 passed, 0 failed, 2 skipped"
+        ]
+      }
+    ]
+  },
+  "native_importer": {
+    "independent_builds_identical": true,
+    "executable_sha256": "eba1941fac070a25e7bb8edad510bc9ccead9891dd2a598c4f63bfe439a8934c",
+    "source_sha256": "af4e8ca46e4f6d5194a8ea877dc1258abf16018ccd3e599c93939cd2ea5e79dd",
+    "lock_sha256": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98",
+    "sdk": "10.0.402",
+    "runtime": "10.0.13"
+  },
+  "visor_texture": {
+    "ok": true,
+    "in_game_verified": false,
+    "checks": [
+      "new image import and both mip modes have no unconsumed export bytes; project unchanged by export",
+      "existing saved texture repairs on export; original and copied project files remain unchanged",
+      "actual mod container readback retains the chosen path, 1024px image and exact serialized export extent",
+      "installed game container sizes and timestamps unchanged; no mod installed"
+    ],
+    "packages": {
+      "new-source": {
+        "serial_size": 3044,
+        "unconsumed_bytes": 0,
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "pixels_sha256": "8409707d696b85d8adb87d9bad5ee515bb8e4bab12ff859edb53c16bb7c3f073"
+      },
+      "new-single-mip": {
+        "serial_size": 524428,
+        "unconsumed_bytes": 0,
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "pixels_sha256": "8409707d696b85d8adb87d9bad5ee515bb8e4bab12ff859edb53c16bb7c3f073"
+      },
+      "mips-and-group": {
+        "serial_size": 3044,
+        "unconsumed_bytes": 0,
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "pixels_sha256": "8409707d696b85d8adb87d9bad5ee515bb8e4bab12ff859edb53c16bb7c3f073"
+      },
+      "repaired-legacy": {
+        "serial_size": 524428,
+        "unconsumed_bytes": 0,
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "pixels_sha256": "df94e40282fa83c033f75f13ff69fbb1cc4f6a3e4b965b05e32a7345d8bc4efd"
+      },
+      "container-readback": {
+        "serial_size": 524428,
+        "unconsumed_bytes": 0,
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "pixels_sha256": "df94e40282fa83c033f75f13ff69fbb1cc4f6a3e4b965b05e32a7345d8bc4efd"
+      }
+    },
+    "template": "Characters/1063/1063001/Textures/T_1063001_Equip_01_D"
+  },
+  "custom_material_slot_textures": {
+    "ok": true,
+    "checks": [
+      "real material loaded; chosen folder/name persist after changing both custom slot images",
+      "native compilation preserves both chosen texture export names, package paths, formats and material import links",
+      "production build_mod publishes a complete native container set with no skipped assets",
+      "unpacked native containers retain the exact folder, export names, Texture2D material links and untouched texture parameters",
+      "both unpacked textures retain their 64x64 resolution, format and decoded pixel hashes",
+      "source project hashes and game container metadata remain unchanged; outputs are report-local"
+    ],
+    "template_formats": {
+      "BaseColor": "DXT1",
+      "Normal": "BC5"
+    },
+    "in_game_verified": false
+  },
+  "source_sha256": {
+    "atelier/added_assets.py": "374e7b9ae45e29788b414aa9fff1debd860373bc4408fc27c44ba4f846ae7ec1",
+    "atelier/handlers/custom_texture.py": "18e8244331079f51d74af8ba8a62ea3a19c32fada874091738d257aaff4a465b",
+    "atelier/handlers/material.py": "82f24a70680e303a0ea9998374dc16c1c917c5d262194f01bd6d4e348bb6fb71",
+    "atelier/handlers/material_preview.py": "fb8ac9728cd22ee9138b29a112cc83d98ec03a7b6b042c1d8718e43f93132bd0",
+    "atelier/handlers/meshport.py": "ea3dbab495067e8f8682d107e7164b8312e33ffdc103d7feedc5377800043bfa",
+    "atelier/handlers/meshstudio.py": "936de3876490585a750371607f7daeed55b87406593fa64a5caa4e1d0950b80b",
+    "atelier/handlers/texture.py": "0b75a62260b61c2d0aa70d158e92af965c9821b4ddbab60ea3e61316d85558c2",
+    "atelier/import_server.py": "9f3937748b9c5a02bd8468db96657167dbebc059d42f005405efc34811ebdc07",
+    "atelier/storage.py": "e48cb3cf53f269ee7f92b15e25f29890d9362a7e46483d692622d62100bc08fd",
+    "atelier/web/routes.py": "ae7d9fc7e60cc5b437d778ea3eb387d7535850787a152a22cdae44ee22e25423",
+    "gui/viewport-attachments.js": "e21470a4a6260d2494562b97b1fb3feba71c8635f9be7d862de5d4e22206d7f0",
+    "gui/viewport-inspection.js": "d144335ee3d0d51e90b79d4a8e34f66438ce1e235e50c794dbaecb008383f8c0",
+    "gui/viewport.js": "7fe6dc82f24c9884b22b6496a12f04e268fd496000c177710e1439604a2eb47a",
+    "tests/native_added_texture.py": "9ed0ef39927ac72a59daaaee3a13f690925078e70e87e686f471273b94670b75",
+    "tests/native_character_previews.py": "f789217b4f1698b643feb1e5f5e770c0ab463f434957a92e6b645a772c389791",
+    "tests/test_import_server.py": "2a6c2a5f9faf9a8cad5279b639c5c0ed621dddaedc7efc9f75fbe4273ec76e2b",
+    "tests/test_material_preview.py": "778b94ac00c48a872cbfe5bc681733aa5d407363dae1de9b63e31a6c2e9755f1",
+    "tests/test_model_studio.py": "e221f52123566d4fec451caac9924d07b253e6ac88ed9656e529bc19edc47207",
+    "tests/test_model_studio_blender.py": "bdb43d4866ec143c96d1bccd11a0e4723a7e820f54aefe2c16f9b4aca04f257d",
+    "tests/test_model_studio_frontend.py": "b18ce6bf225257b496365ba760c7a8e4c584d04b7375f6917397a4dc0a8d04b8",
+    "tests/test_reliability.py": "667de31280682029ab8b7d32a90a7ab999b9b4af5a01b265812abe7d29757e05",
+    "tests/test_texture_export_tail.py": "3367d137ac6f443159e9ab31b6aa2c0743db5abffe8c4ae5921a211c88cfb7a6",
+    "tools-src/AtelierImport/Program.cs": "af4e8ca46e4f6d5194a8ea877dc1258abf16018ccd3e599c93939cd2ea5e79dd",
+    "tools-src/native-tools.lock.json": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98"
+  },
+  "safety": {
+    "dependency_consistency": true,
+    "changed_python_and_javascript_parse": true,
+    "credential_literal_scan": true,
+    "game_mod_installed": false,
+    "game_container_metadata_unchanged": true,
+    "legacy_texture_project_files_unchanged": true
+  }
+}

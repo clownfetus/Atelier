@@ -148,17 +148,12 @@ sealed class ImportService : IDisposable
         };
         var output = exporter.MeshLods.FirstOrDefault() ?? throw new InvalidDataException("The mesh has no renderable detail level");
         var target = Target("gltf", asset, ".glb");
-        // Exporter returns the same validated GLB bytes as the existing decoder.
-        var staging = Path.Combine(cache, "staging", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(staging);
-        try
-        {
-            if (!exporter.TryWriteToDir(new DirectoryInfo(staging), out _, out var saved))
-                throw new InvalidDataException("Mesh export failed");
-            var generated = Directory.GetFiles(staging, "*.glb", SearchOption.AllDirectories).Single();
-            Publish(target, File.ReadAllBytes(generated));
-        }
-        finally { Directory.Delete(staging, true); }
+        // TryWriteToDir starts an unawaited asynchronous write in the pinned
+        // exporter. Reading/deleting its staging file races that writer on
+        // Windows. The first-LOD GLB is already complete in FileData; publish
+        // those exact bytes synchronously before returning the cache path.
+        if (output.FileData.Length == 0) throw new InvalidDataException("Mesh export failed");
+        Publish(target, output.FileData);
         object[] slots = mesh switch
         {
             USkeletalMesh sk => sk.SkeletalMaterials.Select((material, index) => new { index, slot = material.MaterialSlotName.Text,
@@ -194,7 +189,8 @@ sealed class ImportService : IDisposable
             two_sided = overrides?.GetOrDefault("TwoSided", false) ?? false,
             opacity = Math.Clamp(scalars.FirstOrDefault(p => p.name.Equals("OpacityMultiplier", StringComparison.OrdinalIgnoreCase))?.value
                 ?? scalars.FirstOrDefault(p => p.name.Equals("Opacity", StringComparison.OrdinalIgnoreCase))?.value ?? 1, 0, 1),
-            mask_clip = Math.Clamp((double)(material.BasePropertyOverrides?.OpacityMaskClipValue ?? .3333f), 0, 1), parent = parentName };
+            mask_clip = Math.Clamp((double)(material.BasePropertyOverrides?.OpacityMaskClipValue ?? .3333f), 0, 1),
+            parent = parentName, parent_path = GameRel(parent) };
         // The existing editor omits zero-mask LinearColor structs (no editable
         // serialized payload). Keep its parameter and tint contract unchanged.
         var result = new { colors = material.VectorParameterValues.Where(p => p.ParameterValue is { } v &&

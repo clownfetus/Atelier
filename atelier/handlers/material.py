@@ -96,13 +96,15 @@ def _mat_surface(d):
     idx = parent.get("Value")
     imports = d.get("Imports", [])
     parent_name = imports[-idx-1].get("ObjectName", "") if isinstance(idx, int) and -len(imports) <= idx < 0 else ""
+    from atelier.unreal_refs import imported_package
+    package = imported_package(d, idx) if isinstance(idx, int) and -len(imports) <= idx < 0 else None
     blend = str(values.get("BlendMode") or "")
     if not blend:
         blend = "BLEND_Translucent" if "translucent" in parent_name.lower() else "BLEND_Opaque"
     return {"blend_mode": blend, "two_sided": bool(values.get("TwoSided", False)),
             "opacity": max(0.0, min(1.0, float(scalar.get("opacitymultiplier", scalar.get("opacity", 1.0))))),
             "mask_clip": max(0.0, min(1.0, _f(values.get("OpacityMaskClipValue", .3333)))),
-            "parent": parent_name}
+            "parent": parent_name, "parent_path": package[1] if package else None}
 
 def _mat_texture_classes(d):
     """{slot: UE class name} ('Texture2D', 'TextureCube', …) — only Texture2D slots can take a

@@ -40,6 +40,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 import threading
 from pathlib import Path
@@ -309,7 +310,71 @@ def _uat_error(result, fallback):
             or fallback)
 
 
-def _preserve_export_bytes(doc, injected):
+def _duplicate_none_bytes(doc, injected):
+    """Validate UE5's relative format chain before trimming a duplicate None.
+
+    The native JSON reader also reports a legitimate final None as Extras on
+    some injected textures. Follow the game's skip offsets rather than removing
+    everything the JSON reader did not consume.
+    """
+    exports = doc.get('Exports') or []
+    if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES' or len(exports) != 1:
+        return 0
+    export = exports[0]
+    if 'TextureExport' not in export.get('$type', '') or not export.get('IsTexture2D', True):
+        return 0
+    try:
+        names = doc['NameMap']
+        none = struct.pack('<II', names.index('None'), 0)
+        payload = Path(injected[:-7] + '.uexp').read_bytes()
+        raw = payload[:-4]
+        if payload[-4:] != b'\xc1\x83\x2a\x9e' or export['SerialOffset'] != Path(injected).stat().st_size or export['SerialSize'] != len(raw):
+            raise ValueError('Invalid texture export range')
+        fmt = str(export.get('PixelFormat', '')).removeprefix('PF_')
+        format_index = names.index('PF_' + fmt)
+        marker = struct.pack('<II', format_index, 0)
+        flags = struct.pack('<II', int(export.get('bCooked', True)), int(export.get('bSerializeMipData', True)))
+    except (KeyError, ValueError, OSError) as error:
+        raise RuntimeError('The texture export trailer could not be validated') from error
+
+    def end_of_formats(cursor):
+        for _ in range(16):
+            if not 0 <= cursor <= len(raw) - 8:
+                return None
+            index, number = struct.unpack_from('<II', raw, cursor)
+            cursor += 8
+            if not 0 <= index < len(names) or number:
+                return None
+            if names[index] == 'None':
+                return cursor
+            if not names[index].startswith('PF_') or cursor > len(raw) - 8:
+                return None
+            skip = struct.unpack_from('<q', raw, cursor)[0]
+            if skip < 0 or cursor + skip > len(raw) - 8:
+                return None
+            cursor += skip
+        return None
+
+    ends = []
+    cursor = raw.find(marker, 8, min(len(raw), 65536))
+    while cursor >= 0:
+        if raw[cursor-8:cursor] == flags:
+            end = end_of_formats(cursor)
+            if end is not None:
+                ends.append(end)
+        cursor = raw.find(marker, cursor + 1, min(len(raw), 65536))
+    ends = set(ends)
+    if len(ends) != 1:
+        raise RuntimeError('The cooked texture format chain could not be validated')
+    remaining = raw[ends.pop():]
+    if not remaining:
+        return 0
+    if remaining != none:
+        raise RuntimeError('The texture has unrecognized trailing data; choose another game texture template')
+    return len(none)
+
+
+def _preserve_export_bytes(doc, injected, *, trim_tail=0):
     """Keep UE5 DATA_RESOURCES texture payloads opaque during a package rename.
 
     The native JSON texture reader can lose inline mip bytes and mistake their
@@ -321,6 +386,8 @@ def _preserve_export_bytes(doc, injected):
     """
     if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES':
         return False
+    if trim_tail and (trim_tail != 8 or _duplicate_none_bytes(doc, injected) != trim_tail):
+        raise RuntimeError('The texture export trailer could not be validated')
     header=Path(injected).stat().st_size
     payload=Path(injected[:-7]+'.uexp').read_bytes()
     ranges=[]
@@ -330,7 +397,7 @@ def _preserve_export_bytes(doc, injected):
             raise RuntimeError('The encoded texture export range could not be validated')
         start=offset-header;ranges.append((start,start+size))
         export['$type']='UAssetAPI.ExportTypes.RawExport, UAssetAPI'
-        export['Data']=base64.b64encode(payload[start:start+size]).decode('ascii')
+        export['Data']=base64.b64encode(payload[start:start+size-trim_tail]).decode('ascii')
         export['Extras']=''
     cursor=0
     for start,end in sorted(ranges):
@@ -338,6 +405,37 @@ def _preserve_export_bytes(doc, injected):
         cursor=end
     if cursor!=len(payload)-4 or payload[-4:]!=b'\xc1\x83\x2a\x9e':
         raise RuntimeError('The encoded texture payload could not be preserved completely')
+    return True
+
+
+def repair_export_tail(uasset, scratch):
+    """Repair only a confirmed duplicate None in a privately staged texture.
+
+    Older added-asset copies can carry this eight-byte trailer into every later
+    injection. Keep the project source unchanged; rebuild its staged export.
+    """
+    folder = Path(scratch)
+    folder.mkdir(parents=True, exist_ok=True)
+    source = Path(uasset)
+    result = uat(['to_json', str(source.resolve()), USMAP, str(folder.resolve())])
+    document = folder / (source.stem + '.json')
+    if result.returncode or not document.is_file():
+        raise RuntimeError('Could not validate the texture export: ' + _uat_error(result, 'to_json failed'))
+    doc = json.loads(document.read_text(encoding='utf-8-sig'))
+    trim = _duplicate_none_bytes(doc, str(source))
+    if not trim:
+        return False
+    original = source.with_suffix('.uexp').read_bytes()
+    _preserve_export_bytes(doc, str(source), trim_tail=trim)
+    document.write_text(json.dumps(doc), encoding='utf-8')
+    output = folder / 'repaired' / source.name
+    output.parent.mkdir()
+    result = uat(['from_json', str(document.resolve()), str(output.resolve()), USMAP])
+    expected = original[:-4-trim] + original[-4:]
+    if result.returncode or not output.is_file() or not output.with_suffix('.uexp').is_file() or output.with_suffix('.uexp').read_bytes() != expected:
+        raise RuntimeError('Could not safely repair the texture export trailer')
+    for ext in ('.uasset', '.uexp'):
+        shutil.copyfile(output.with_suffix(ext), source.with_suffix(ext))
     return True
 
 
@@ -363,8 +461,9 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
         raise RuntimeError("could not read the encoded texture: " + _uat_error(r, "to_json produced no JSON"))
     with open(jp, encoding="utf-8-sig") as f:
         doc = json.load(f)
+    trim = _duplicate_none_bytes(doc, injected)
     rename_package(doc, os.path.basename(template_game_rel), name, GAME_PREFIX + new_game_rel)
-    opaque=_preserve_export_bytes(doc,injected)
+    opaque=_preserve_export_bytes(doc,injected,trim_tail=trim)
     with open(jp, "w", encoding="utf-8") as f:
         json.dump(doc, f)
     built = os.path.join(scratch, "out", *parts) + ".uasset"
@@ -372,7 +471,9 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     r = uat(["from_json", os.path.abspath(jp), os.path.abspath(built), USMAP])
     if r.returncode or not os.path.isfile(built):
         raise RuntimeError("could not rename the encoded texture: " + _uat_error(r, "from_json produced no uasset"))
-    if opaque and Path(injected[:-7]+'.uexp').read_bytes()!=Path(built[:-7]+'.uexp').read_bytes():
+    original_payload = Path(injected[:-7]+'.uexp').read_bytes() if opaque else b''
+    expected_payload = original_payload[:-4-trim] + original_payload[-4:] if trim else original_payload
+    if opaque and expected_payload!=Path(built[:-7]+'.uexp').read_bytes():
         raise RuntimeError('Renaming the texture altered its mip payload, so it was not shipped')
     # .uasset/.uexp from the rename; the bulk mips exactly as inject_texture wrote them.
     for ext in (".ubulk", ".uptnl"):

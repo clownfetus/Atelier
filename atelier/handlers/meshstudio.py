@@ -13,8 +13,8 @@ from types import SimpleNamespace
 
 from atelier import config, jobs
 
-MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
-_NON_PREVIEW_MESH = re.compile(r"(?:^|_)(?:pa|1p|fpp|fpphands)(?:_|$)", re.I)
+MESH_SKIP = re.compile(r"skeleton|physics|collision|ctrlrig|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
+_NON_PREVIEW_MESH = re.compile(r"(?:^|_)(?:pa|fa|1p|fpp|fpphands)(?:_|$)", re.I)
 _PROP_PATH = re.compile(r"(?:^|/)(?:emote|mvp|bullet\w*|projectile\w*|turret\w*|effects?|vfx|summons?|minions?|pets?|demon)(?:/|$)", re.I)
 # Capwolf stores its full human transformation mesh beside its shield in Weapons.
 # This is a selectable body form, not equipment to attach over the current body.
@@ -22,6 +22,10 @@ _BODY_FORM_PATH = re.compile(r"/weapons/caption/meshes/", re.I)
 # These ability/body-part rigs live under Weapons but are not held equipment.
 # Keep them selectable; attaching one automatically can dwarf the body and camera.
 _OPTIONAL_WEAPON = re.compile(r"(?:^|_)(?:DevouringSymbiote(?:_Hand)?|SpikedTentacles|Head|Plane\d*)(?:_|$)", re.I)
+# Weapons folders also contain summons, walls, portals and effects. Keep these
+# available for replacement/inspection without putting one into a hand on open.
+_HELD_WEAPON = re.compile(r"weapon|sword|blade|dagger|katana|gun|rifle|pistol|deserteagle|cannon|launcher|hammer|spear|trident|axe|shield|bow|staff|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw|slingshot|(?:^|_)arm$", re.I)
+_WEAPON_PROP = re.compile(r"container|floating|railgun|missile|projectile|bullet|tentacle|spear.?tie|spiderleg|(?:^|_)line(?:_|$)", re.I)
 
 
 def skin_meshes(skin_id):
@@ -37,7 +41,9 @@ def skin_meshes(skin_id):
         if MESH_SKIP.search(name) or _NON_PREVIEW_MESH.search(name) or '/fpphands/' in path.lower():
             continue
         weapon = "/weapons/" in path.lower() and not _BODY_FORM_PATH.search(path)
-        if not weapon and '/slots/' in path.lower():
+        # Emotes, animation helpers and cue geometry can sit beside Meshes,
+        # outside Weapons. They must not become the character's default body.
+        if not weapon and (re.search(r'/(?:slots?|animations|cues)/', path, re.I) or _PROP_PATH.search(path)):
             continue
         if weapon and (_PROP_PATH.search(path) or re.search(r"(?:^|_)(?:1p|bullet\w*|projectile\w*)(?:_|$)", name, re.I)):
             continue
@@ -46,8 +52,11 @@ def skin_meshes(skin_id):
             continue
         seen.add(gr.casefold())
         result.append({"name": name, "game_rel": gr, "kind": "weapon" if weapon else "body",
-                       **({'auto_equip': not bool(_OPTIONAL_WEAPON.search(name))} if weapon else {})})
-    return sorted(result, key=lambda r: (r["kind"] == "weapon", r["game_rel"].casefold()))
+                       **({'auto_equip': bool(name.lower().startswith('sk_') and _HELD_WEAPON.search(name)
+                                               and not (_OPTIONAL_WEAPON.search(name) or _WEAPON_PROP.search(name)))} if weapon else {})})
+    canonical = f'Characters/{skin_id[:4]}/{skin_id}/Meshes/'.casefold()
+    return sorted(result, key=lambda r: (r["kind"] == "weapon",
+                  not r['game_rel'].casefold().startswith(canonical), r["game_rel"].casefold()))
 
 
 def cooked_slots(game_rel):
@@ -78,7 +87,7 @@ def embedded_weapon_slots(body, weapons):
     presentation metadata for the portable Blender scene, not a project mod edit.
     """
     import numpy as np
-    weapon_name=re.compile(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe',re.I)
+    weapon_name=re.compile(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe|cannon|launcher|rifle|katana|trident|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw',re.I)
     names={bone['name'].casefold() for model in weapons for bone in model.bones
            if weapon_name.search(bone['name']) and not re.search(r'^root$|^pelvis$|^ik_|^weapon_[lr]$',bone['name'],re.I)}
     if not names:return set()
