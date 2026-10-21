@@ -27,6 +27,7 @@ def main():
     parser.add_argument('--app-port',type=int,default=8889)
     parser.add_argument('--debug-port',type=int,default=9449)
     parser.add_argument('--design-checks',action='store_true',help='Check the contextual Model Studio and capture visual QA states')
+    parser.add_argument('--viewport-script',type=Path,help='Optional saved viewer script for a before/after performance comparison')
     args=parser.parse_args()
     data=args.data_root.resolve(strict=True)
     root=Path(__file__).resolve().parents[1]
@@ -74,6 +75,9 @@ def main():
             page.on('pageerror',lambda error:result['page_errors'].append(str(error)))
             page.on('console',lambda message:result['page_errors'].append(message.text)
                 if message.type=='error' and 'Shader Error' in message.text else None)
+            if args.viewport_script:
+                context.route('**/static/viewport.js',lambda route:route.fulfill(
+                    body=args.viewport_script.read_text(encoding='utf-8'),content_type='text/javascript'))
             def fixture(value):
                 return lambda route:route.fulfill(json=value)
             for endpoint,payload in {'update_check':{'available':False},'usmap_update_check':{'ok':True},
@@ -87,9 +91,23 @@ def main():
             page.wait_for_function('!document.querySelector(".overlay.active")',timeout=120000)
             print(f'Ready: configured {result["mode"]} application; loading the real game skin',flush=True)
             load_started=time.monotonic()
-            if args.mesh_rel:page.evaluate('args=>AtelierViewport.openMesh(args.mesh,args.name)',{'mesh':args.mesh_rel,'name':args.name})
-            else:page.evaluate('args=>AtelierViewport.open(args.skin,args.name)',{'skin':args.skin,'name':args.name})
+            requests={}
+            result['requests']=[]
+            def started(request):
+                from urllib.parse import urlsplit
+                route=urlsplit(request.url)
+                if route.path in ('/api/model_gltf','/api/skin_materials','/api/texture_png','/api/dye_texture'):
+                    record={'route':route.path,'query':route.query,'started_seconds':round(time.monotonic()-load_started,3)}
+                    requests[request]=record;result['requests'].append(record)
+            def finished(request):
+                if request in requests:
+                    requests[request]['finished_seconds']=round(time.monotonic()-load_started,3)
+            page.on('request',started);page.on('requestfinished',finished)
+            page.on('requestfailed',lambda request:finished(request))
+            if args.mesh_rel:page.evaluate('args=>{void AtelierViewport.openMesh(args.mesh,args.name)}',{'mesh':args.mesh_rel,'name':args.name})
+            else:page.evaluate('args=>{void AtelierViewport.open(args.skin,args.name)}',{'skin':args.skin,'name':args.name})
             page.wait_for_function('document.getElementById("viewport-loading").style.display==="none"',timeout=240000)
+            result['first_model_seconds']=round(time.monotonic()-load_started,2)
             page.wait_for_function('document.querySelectorAll(".vp-mat").length>0 && !document.getElementById("viewport-poster").disabled',timeout=240000)
             result['materials']=int(page.locator('#viewport-mat-count').inner_text() or '0')
             result['material_groups']=page.locator('.vp-mat').count()
@@ -97,11 +115,13 @@ def main():
             result['load_seconds']=round(time.monotonic()-load_started,2)
             result['checks'].append('Native mesh/material/texture routes load a real game skin and enable capture')
             print('Ready: real geometry, materials and texture uploads',flush=True)
+            def checked_bodies():
+                return page.locator('.vp-obj').evaluate_all('rows=>rows.filter(row=>!row.querySelector("label span").textContent.startsWith("Weapon · ") && row.querySelector("input").checked).length')
             page.wait_for_function('document.getElementById("viewport-play").getAttribute("aria-pressed")==="true"',timeout=240000)
             if args.design_checks:
                 page.set_viewport_size({'width':1582,'height':995})
                 if page.locator('#viewport-expand').get_attribute('aria-pressed')!='true':page.locator('#viewport-expand').click()
-                assert page.locator('.vp-obj input:checked').count()==1
+                assert checked_bodies()==1
                 assert page.locator('#viewport-material-editor').is_hidden()
                 assert not page.locator('#viewport-box .vp-menu[open]').count()
                 assert result['materials']>=8,'The transformed rig lost its material mappings'
@@ -130,11 +150,15 @@ def main():
                 page.locator('#viewport-model-menu > summary').click()
                 page.screenshot(path=str(report/'studio-model-menu.png'))
                 if page.locator('.vp-obj').count()>1:
+                    lazy_started=time.monotonic()
                     page.locator('#viewport-model-choice').select_option('1')
-                    assert page.locator('.vp-obj input:checked').count()==1
+                    page.wait_for_function('document.getElementById("viewport-model-choice").value==="1" && !document.getElementById("viewport-model-choice").disabled',timeout=240000)
+                    result['second_model_seconds']=round(time.monotonic()-lazy_started,2)
+                    assert checked_bodies()==1
                     assert page.locator('#viewport-material-editor').is_hidden()
                     page.locator('#viewport-model-menu > summary').click()
                     page.locator('#viewport-model-choice').select_option('0')
+                    page.wait_for_function('document.getElementById("viewport-model-choice").value==="0" && !document.getElementById("viewport-model-choice").disabled',timeout=240000)
                 else:page.keyboard.press('Escape')
                 page.locator('#viewport-settings-menu > summary').click()
                 page.screenshot(path=str(report/'studio-view-settings.png'))

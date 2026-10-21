@@ -1,5 +1,6 @@
 import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from bottle import request, response, static_file
 
 from atelier.web.app import app
@@ -485,16 +486,38 @@ def api_skin_materials():
             raise
         except Exception as exc:
             print(f'[skin_materials] material prefetch failed: {exc}', file=sys.stderr, flush=True)
-        out = {}
-        for binding in bindings:
-            gr = binding.get('game_rel')
+        def read(gr):
             try:
-                params = read_material(gr, cache_only=True) if gr else {'colors': [], 'scalars': [], 'textures': {}}
-                out[binding['key']] = {**_viewport_material_payload(gr, params), **binding}
+                jobs.checkpoint()
+                return _viewport_material_payload(gr, read_material(gr, cache_only=True))
             except jobs.Cancelled:
                 raise
             except Exception as exc:
-                out[binding['key']] = {**binding, 'colors': [], 'scalars': [], 'textures': {}, 'material_error': str(exc)}
+                return {'colors': [], 'scalars': [], 'textures': {}, 'material_error': str(exc)}
+        paths = list(dict.fromkeys(binding.get('game_rel') for binding in bindings if binding.get('game_rel')))
+        # Bound native conversions and preserve both project selection and preview
+        # cancellation in every worker. Repeated slots share a single conversion.
+        with ThreadPoolExecutor(max_workers=min(4, max(1, len(paths)))) as pool:
+            pending = {gr: pool.submit(copy_context().run, read, gr) for gr in paths}
+            materials = {gr: future.result() for gr, future in pending.items()}
+        # The viewer needs only these channels. Extract them together before its
+        # parallel PNG requests, avoiding a whole container scan per cold image.
+        textures = []
+        for params in materials.values():
+            roles = params.get('texture_roles', {})
+            custom = params.get('texture_urls', {})
+            textures.extend(path for role, path in roles.items() if role in ('basecolor', 'emissive', 'opacity') and role not in custom)
+            if params.get('dyeable'):
+                textures.extend(params.get('textures', {}).get(slot) for slot in ('BaseColor', 'DyeingTexture'))
+        if any(textures):
+            try:
+                prefetch_exact(list(dict.fromkeys(path for path in textures if path)))
+            except jobs.Cancelled:
+                raise
+            except Exception as exc:
+                print(f'[skin_materials] texture prefetch failed: {exc}', file=sys.stderr, flush=True)
+        empty = {'colors': [], 'scalars': [], 'textures': {}}
+        out = {binding['key']: {**materials.get(binding.get('game_rel'), empty), **binding} for binding in bindings}
         return json.dumps({'ok': True, 'materials': out})
     out, seen = {}, set()
     for p, _c in skin_entries(skin_id):

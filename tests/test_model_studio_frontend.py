@@ -38,15 +38,17 @@ const source=fs.readFileSync(process.argv[1],'utf8');
 const start=source.indexOf('function syncAttachments()');
 const end=source.indexOf('// One row per top-level mesh',start);
 assert.ok(start>=0 && end>start);
-const body={kind:'body',root:{visible:true}};
-const ability={kind:'weapon',autoEquip:false,root:{visible:false}};
-const sword={kind:'weapon',root:{visible:false}};
-const environment={objects:[body,ability,sword],matsByName:{},embeddedWeaponMaterials:()=>[],
+const body={kind:'body',loaded:true,root:{visible:true}};
+const ability={kind:'weapon',loaded:true,autoEquip:false,root:{visible:false}};
+const sword={kind:'weapon',loaded:true,root:{visible:false}};
+const pending={kind:'weapon',loaded:false,enabled:true,root:{visible:false}};
+const environment={objects:[body,ability,sword,pending],matsByName:{},embeddedWeaponMaterials:()=>[],
  bindWeapon:(_weapon,body)=>({side:'r',body}),updateWeapon:()=>{}};
 vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
 environment.syncAttachments();
 assert.equal(ability.root.visible,false,'An optional ability rig must not obscure the body on open');
 assert.equal(sword.root.visible,true,'An ordinary held weapon still equips automatically');
+assert.equal(pending.root.visible,false,'An unloaded attachment must not reserve a hand or access an absent rig');
 ability.enabled=true;environment.syncAttachments();
 assert.equal(ability.root.visible,true,'Explicit selection must make the optional effect available');
 assert.equal(sword.root.visible,false,'An explicitly selected rig reserves its hand');

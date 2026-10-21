@@ -7,6 +7,11 @@ The app, installers and update checker identify each release by its full number,
 
 ### Asset pipeline and layout
 
+- Open the selected body and equipped weapons first; load other forms and
+  attachments when selected without discarding unsaved preview recolours.
+- Batch model, material and texture extraction, share in-flight image downloads,
+  and read material slots without scanning editable geometry. Original/Compare
+  retains decoded sections whose material could not be mapped.
 - Share Blender texture images without mixing color and data-map color spaces.
 - Read 16-bit skin weights for previews and preserve material gameplay tags in
   portable Blender exports. Unsupported 16-bit rebuilds stop safely.

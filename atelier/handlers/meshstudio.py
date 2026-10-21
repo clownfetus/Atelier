@@ -9,10 +9,12 @@ import re
 import struct
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from atelier import config, jobs
 
 MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
+_NON_PREVIEW_MESH = re.compile(r"(?:^|_)(?:pa|1p|fpp|fpphands)(?:_|$)", re.I)
 _PROP_PATH = re.compile(r"(?:^|/)(?:emote|mvp|bullet\w*|projectile\w*|turret\w*|effects?|vfx|summons?|minions?|pets?|demon)(?:/|$)", re.I)
 # These ability/body-part rigs live under Weapons but are not held equipment.
 # Keep them selectable; attaching one automatically can dwarf the body and camera.
@@ -29,7 +31,7 @@ def skin_meshes(skin_id):
         if not name.lower().startswith(("sk_", "sm_")) or not name.lower().endswith(".uasset"):
             continue
         name = name[:-7]
-        if MESH_SKIP.search(name):
+        if MESH_SKIP.search(name) or _NON_PREVIEW_MESH.search(name) or '/fpphands/' in path.lower():
             continue
         weapon = "/weapons/" in path.lower()
         if not weapon and '/slots/' in path.lower():
@@ -47,14 +49,19 @@ def skin_meshes(skin_id):
 
 def cooked_slots(game_rel):
     from atelier.handlers.texture import ensure_work_base
-    from atelier.handlers.mesh import Mesh
+    from atelier.handlers.mesh import skeletal_name_table, resolve_materials
+    from atelier.handlers.meshsurvey import find_extras
     from atelier.handlers.meshmat import resolve_mesh_materials
     config.validate_game_rel(game_rel)
-    base = ensure_work_base(game_rel)
+    base = ensure_work_base(game_rel, prefer_exact=True)
     if not base or not os.path.isfile(base + '.uasset'):
         raise ValueError('The original mesh is unavailable; section export cannot be mapped.')
     jobs.checkpoint()
-    mesh = Mesh(base)
+    # Slot identity needs the material header and package imports. Constructing
+    # an editable Mesh scans every geometry buffer and streamed LOD for no gain.
+    _, names = skeletal_name_table(Path(base + '.uasset').read_bytes(), os.path.basename(base))
+    extras = find_extras(Path(base + '.uexp').read_bytes())
+    mesh = SimpleNamespace(materials=resolve_materials(extras['materials'], names))
     slots = resolve_mesh_materials(game_rel, mesh, base)
     return [{**s, "index": i} for i, s in enumerate(slots)]
 
@@ -221,6 +228,23 @@ def material_bindings(skin_id, meshes):
     from atelier.handlers.meshvisibility import hidden_sections
     if not isinstance(meshes, list) or len(meshes) > 32:
         raise ValueError('Invalid model list')
+    for record in meshes:
+        if not isinstance(record, dict):
+            raise ValueError('Invalid model identity')
+        config.validate_game_rel(record.get('game_rel', ''))
+        requested = record.get('slots', [])
+        if not isinstance(requested, list) or len(requested) > 256 or any(
+            not isinstance(item, dict) or not isinstance(item.get('key'), str) or not isinstance(item.get('name'), str)
+            for item in requested
+        ):
+            raise ValueError('Invalid model material identity')
+    from atelier.handlers.texture import prefetch_exact
+    try:
+        prefetch_exact([record['game_rel'] for record in meshes])
+    except jobs.Cancelled:
+        raise
+    except Exception:
+        pass  # Per-mesh extraction below retains the compatibility fallback.
     candidates = {}
     canon = lambda n: re.sub(r'\d{6,}', '#', n.casefold())
     for path, _ in skin_entries(skin_id):

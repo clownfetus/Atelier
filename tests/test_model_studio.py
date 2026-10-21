@@ -84,7 +84,9 @@ class Studio(unittest.TestCase):
                  'Weapons/Guns/Meshes/SK_Gun_R', 'Weapons/MVP/Bullet/Meshes/SK_Bullet',
                  'Weapons/Emote/Meshes/SK_Flag', 'Weapons/Demon/Meshes/SK_Summon', 'Slots/Accessories/Meshes/SK_Badge',
                  'Weapons/Sword/Meshes/SK_Sword_Skeleton',
-                 'Weapons/Sword/Meshes/SK_Sword_PhysicsAsset', 'Meshes/SK_Body_Lobby']
+                 'Weapons/Sword/Meshes/SK_Sword_PhysicsAsset', 'Meshes/SK_Body_Lobby',
+                 'Meshes/SK_Body_PA', 'Meshes/SK_Body_FPP', 'Weapons/FPPhands/Meshes/SK_Hands',
+                 'Weapons/Guns/Meshes/SK_Gun_FPP', 'Weapons/Guns/Meshes/SK_Gun_1P']
         entries = [('Characters/1029/1029001/'+p+'.uasset', '') for p in paths]
         with patch('atelier.paths.skin_entries', return_value=entries):
             result = meshstudio.skin_meshes('1029001')
@@ -119,6 +121,29 @@ class Studio(unittest.TestCase):
         with patch.object(meshstudio,'cooked_slots',return_value=slots):
             out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
         self.assertEqual(out[0]['slot_name'],'MI_Body_01');self.assertEqual(out[0]['slot_index'],0)
+
+    def test_preview_batches_validated_mesh_sources_before_resolving_slots(self):
+        from atelier.handlers import texture
+        calls=[]
+        meshes=[{'game_rel':self.gr,'slots':[{'key':'body::0','name':'MI_Body'}]},
+                {'game_rel':self.gr+'_Other','slots':[{'key':'other::0','name':'MI_Body'}]}]
+        def resolve(gr, requested):
+            calls.append(('slots',gr))
+            return [{'key':requested[0]['key'],'slot_name':'MI_Body','game_rel':self.slots[0]['mi']}]
+        with patch.object(texture,'prefetch_exact',side_effect=lambda paths:calls.append(('prefetch',paths))), \
+             patch('atelier.paths.skin_entries',return_value=[]), patch.object(meshstudio,'preview_bindings',side_effect=resolve):
+            result=list(meshstudio.material_bindings('1029001',meshes))
+        self.assertEqual(calls[0],('prefetch',[self.gr,self.gr+'_Other']))
+        self.assertEqual(len(result),2)
+
+    def test_preview_rejects_invalid_batch_before_extraction(self):
+        from atelier.handlers import texture
+        for meshes in ([{'game_rel':'../outside'}], ['invalid'],
+                       [{'game_rel':self.gr,'slots':[{'key':'body::0','name':None}]}]):
+            with self.subTest(meshes=meshes), patch.object(texture,'prefetch_exact') as extract:
+                with self.assertRaises(ValueError):
+                    list(meshstudio.material_bindings('1029001',meshes))
+                extract.assert_not_called()
 
     def test_ambiguous_slot_is_never_guessed_from_a_partial_gltf(self):
         slots=[self.slots[0],{**self.slots[0],'index':1}]

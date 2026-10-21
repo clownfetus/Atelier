@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 from wsgiref.util import setup_testing_defaults
@@ -80,7 +81,7 @@ class OriginalComparisons(unittest.TestCase):
 
 
 class MaterialLoading(unittest.TestCase):
-    def preview(self, prefetch_error=None):
+    def preview(self, prefetch_error=None, textures=False, concurrent=False):
         from atelier import config
         from atelier.handlers import meshstudio, texture
         project = Path(config.project_dir('Preview batch fixture'))
@@ -91,6 +92,7 @@ class MaterialLoading(unittest.TestCase):
             {'key': 'body::2', 'slot_name': 'Unmapped', 'game_rel': None},
         ]
         seen = []
+        barrier = threading.Barrier(2) if concurrent else None
         def prefetch(paths):
             self.assertEqual(config.get_import_root(), str(project))
             seen.append(('prefetch', paths))
@@ -100,7 +102,16 @@ class MaterialLoading(unittest.TestCase):
             self.assertTrue(cache_only)
             self.assertEqual(config.get_import_root(), str(project))
             seen.append(('read', path))
-            return {'colors': [{'name': 'Tint', 'rgba': [1, 0, 0, 1]}], 'textures': {}, 'scalars': []}
+            if barrier:
+                barrier.wait(timeout=5)
+            maps = {}
+            if textures:
+                maps = {'BaseColor': 'Characters/Test/T_Diffuse', 'Normal': 'Characters/Test/T_UnusedNormal'}
+                if path.endswith('MI_Body'):
+                    maps['Opacity'] = 'Characters/Test/T_Opacity'
+                else:
+                    maps.update(DyeingTexture='Characters/Test/T_Mask', Emissive='Characters/Test/T_Emissive')
+            return {'colors': [{'name': 'Tint', 'rgba': [1, 0, 0, 1]}], 'textures': maps, 'scalars': []}
         body = json.dumps({'skin_id': '1029100', 'meshes': [{'game_rel': 'Characters/Test/SK_Body'}]}).encode()
         env = {}
         setup_testing_defaults(env)
@@ -110,8 +121,7 @@ class MaterialLoading(unittest.TestCase):
         statuses = []
         with patch.object(meshstudio, 'material_bindings', return_value=iter(bindings)), \
              patch.object(texture, 'prefetch_exact', side_effect=prefetch), \
-             patch.object(R, 'read_material', side_effect=read), \
-             patch.object(R, '_viewport_material_payload', side_effect=lambda path, params: params):
+             patch.object(R, 'read_material', side_effect=read):
             response = R.app(env, lambda status, headers, exc_info=None: statuses.append(status))
             try:
                 result = json.loads(b''.join(response))
@@ -129,7 +139,15 @@ class MaterialLoading(unittest.TestCase):
     def test_cold_preview_prefetches_before_reading_parameters_in_the_originating_project(self):
         seen = self.preview()
         self.assertEqual(seen[0], ('prefetch', ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair', None]))
-        self.assertEqual([row[1] for row in seen[1:]], ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair'])
+        self.assertCountEqual([row[1] for row in seen[1:]], ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair'])
+
+    def test_conversions_overlap_and_retain_the_request_project(self):
+        self.preview(concurrent=True)
+
+    def test_prefetches_only_viewport_texture_channels_and_shared_dye_inputs_once(self):
+        seen = self.preview(textures=True)
+        self.assertEqual(seen[-1], ('prefetch', ['Characters/Test/T_Diffuse', 'Characters/Test/T_Opacity',
+                                               'Characters/Test/T_Emissive', 'Characters/Test/T_Mask']))
 
     def test_failed_batch_falls_back_to_individual_material_reads(self):
         seen = self.preview(OSError('Fixture native extractor unavailable'))

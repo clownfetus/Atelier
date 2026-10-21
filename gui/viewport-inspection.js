@@ -178,7 +178,7 @@ export function createViewportInspection(api) {
     const stamp = revision, {data, byName} = api.materials();
     const jobs = Object.entries(byName).map(async ([name, materials]) => {
       const info = data[name];
-      if (!info) {
+      if (!info?.game_rel) {
         // Unmatched slots cannot be edited in this studio; retain their unmodified decoded form.
         for (const material of materials) originals.set(material,material.clone());
         return;

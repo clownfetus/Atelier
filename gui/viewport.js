@@ -28,6 +28,7 @@ async function loadErrorText(e) {
 const loader    = new GLTFLoader();
 const texLoader = new THREE.TextureLoader();
 const texCache  = new Map();   // texGameRel -> THREE.Texture, shared/reused across opens (never re-uploaded)
+const texPending = new Map();
 
 let renderer, scene, camera, controls, grid, modelRoot;
 let raf = 0, inited = false;
@@ -251,14 +252,15 @@ function init() {
   $('viewport-material-search').addEventListener('input', filterMaterials);
   $('viewport-model-choice').addEventListener('change', event => {
     const value = event.target.value;
-    for (const [index, object] of objects.entries()) {
-      if (object.kind === 'weapon') { if (value === 'all') object.enabled=true; }
-      else object.root.visible = value === 'all' || index === Number(value);
-    }
-    syncAttachments();
-    soloSnapshot = soloTarget = null;
-    selectedMaterial = null;
-    buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
+    const targets=objects.filter((object,index)=>value==='all' || object.kind!=='weapon' && index===Number(value));
+    changeObjects(targets,()=>{
+      for (const [index, object] of objects.entries()) {
+        if (object.kind === 'weapon') { if (value === 'all') object.enabled=true; }
+        else object.root.visible = object.loaded && (value === 'all' || index === Number(value));
+      }
+      soloSnapshot = soloTarget = null;
+      selectedMaterial = null;
+    },{automatic:true});
     $('viewport-model-menu').open = false;
   });
   $('viewport-blender-btn').addEventListener('click', editInBlender);
@@ -416,7 +418,7 @@ function clearModel() {
 // Blender scene. The mesh card's editing route keeps its per-mesh round trip.
 function refreshBlenderBtn() {
   const btn = $('viewport-blender-btn');
-  if (btn) btn.disabled = !meshMeta.length;
+  if (btn) btn.disabled = modelLoading || !objects.some(object=>object.loaded!==false && object.kind!=='weapon');
 }
 async function editInBlender() {
   const bodies=objects.filter(object=>object.root.visible && object.kind!=='weapon');
@@ -452,9 +454,88 @@ function updateSidebarVisibility() {
 }
 
 function showAllObjects() {
-  for (const object of objects) { object.root.visible = true; if (object.kind==='weapon') object.enabled=true; }
+  return changeObjects(objects,()=>{
+    for (const object of objects) { object.root.visible = !!object.loaded; if (object.kind==='weapon') object.enabled=true; }
+    soloSnapshot = soloTarget = null;
+  });
+}
+
+// Keep alternate forms and unused attachments in the picker without decoding them.
+// Their empty roots give every object a stable identity until it is selected.
+async function loadObject(object, gen=generation) {
+  if(object.loaded)return true;
+  if(object.loading)return object.loading;
+  const meta=meshMeta[objects.indexOf(object)];
+  if(!meta)return false;
+  object.loading=(async()=>{
+    try {
+      const gltf=await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(meta.game_rel)}`);
+      if(gen!==generation){disposeTree(gltf.scene);return false;}
+      collectMats(gltf.scene,meta,gltf.parser);
+      gltf.scene.visible=object.root.visible;
+      modelRoot.remove(object.root);
+      object.root=gltf.scene;object.animations=gltf.animations;object.rig=attachmentRig(gltf);
+      object.loaded=true;object.loadError=null;modelRoot.add(object.root);
+      return true;
+    } catch(error) {
+      if(gen!==generation)return false;
+      object.loadError=await loadErrorText(error);
+      console.warn('viewport: mesh load failed',object.name,object.loadError);
+      return false;
+    } finally {object.loading=null;}
+  })();
+  return object.loading;
+}
+
+async function loadAutomaticWeapons(gen=generation) {
   syncAttachments();
-  soloSnapshot = soloTarget = null; buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
+  const held=objects.filter(object=>object.kind==='weapon').sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true));
+  for(const weapon of held) {
+    if(gen!==generation)return;
+    if(weapon.enabled===false || weapon.autoEquip===false && weapon.enabled!==true)continue;
+    const side=weapon.hand==='left' || !weapon.hand && /(?:^|_)(?:l|left)(?:_|$)/i.test(weapon.name)?'l':'r';
+    if(weapon.enabled!==true && held.some(other=>other.root.visible && other.binding?.side===side))continue;
+    await loadObject(weapon,gen);
+    if(gen!==generation)return;
+    syncAttachments();
+  }
+}
+
+async function changeObjects(targets, apply, {automatic=false, attachments=true}={}) {
+  if(modelLoading || saving || visibilityBusy.size || inspection?.capturing()){buildObjectPanel();return;}
+  const gen=generation;
+  const pending=targets.filter(object=>!object.loaded);
+  const before=new Set(Object.keys(matsByName));
+  modelLoading=true;inspection?.setLoading(true);refreshBlenderBtn();
+  if(pending.length) {
+    note(`Loading ${pending.length===1?pending[0].name:'selected mesh parts'}…`,'info');
+  }
+  buildObjectPanel();
+  try {
+    // Finish the current batch before adding materials. Existing recolour drafts,
+    // dye maps and texture requests stay valid while another part is decoded.
+    if(materialTask)await materialTask;
+    if(gen!==generation)return;
+    for(const object of pending) {
+      await loadObject(object,gen);
+      if(gen!==generation)return;
+    }
+    if(targets.length && !targets.some(object=>object.loaded)) {
+      note('The selected mesh could not load. Select it again to retry.','warning');return;
+    }
+    apply();
+    if(automatic)await loadAutomaticWeapons(gen);
+    if(gen!==generation)return;
+    if(attachments)syncAttachments();
+    inspection?.clearMaterials();
+    buildObjectPanel();buildPanel();frameCamera();syncPreviewAnimation();
+    const names=Object.keys(matsByName).filter(name=>!before.has(name));
+    if(names.length)await loadMaterials(currentSkin || meshSkin,{names,meshes:meshSlots.filter(mesh=>mesh.slots.some(slot=>names.includes(slot.key)))});
+  } catch(error) {
+    if(gen===generation)note('The selected part could not load: '+error.message,'warning');
+  } finally {
+    if(gen===generation){modelLoading=false;inspection?.setLoading(!!materialTask);refreshBlenderBtn();buildObjectPanel();}
+  }
 }
 
 function syncPreviewAnimation() {
@@ -465,14 +546,11 @@ function syncPreviewAnimation() {
 }
 
 function syncAttachments() {
-  const held=objects.filter(object=>object.kind==='weapon');
+  const held=objects.filter(object=>object.kind==='weapon' && object.loaded);
   for(const materials of Object.values(matsByName))for(const material of materials)material.userData.heldDuplicate=false;
-  for(const body of objects.filter(object=>object.kind!=='weapon')){
-    for(const material of embeddedWeaponMaterials(body,held))material.userData.heldDuplicate=true;
-  }
-  const bodies=objects.filter(object=>object.kind!=='weapon' && object.root.visible);
+  const bodies=objects.filter(object=>object.kind!=='weapon' && object.loaded && object.root.visible);
   const occupied=new Set();
-  for (const weapon of objects.filter(object=>object.kind==='weapon').sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true))) {
+  for (const weapon of held.sort((a,b)=>Number(b.enabled===true)-Number(a.enabled===true))) {
     const choices=bodies.map(body=>bindWeapon(weapon,body,weapon.hand==='both'?'right':weapon.hand || 'auto')).filter(Boolean)
       .sort((a,b)=>(b.joints?.length || 0)-(a.joints?.length || 0));
     weapon.binding=choices[0] || null;
@@ -486,6 +564,9 @@ function syncAttachments() {
       weapon.paired.root.visible=weapon.root.visible && !!weapon.paired.binding;
       if(weapon.paired.root.visible){updateWeapon(weapon.paired,weapon.paired.binding);occupied.add('l');}
     } else if(weapon.paired)weapon.paired.root.visible=false;
+  }
+  for(const body of objects.filter(object=>object.kind!=='weapon' && object.loaded)){
+    for(const material of embeddedWeaponMaterials(body,held.filter(weapon=>weapon.root.visible)))material.userData.heldDuplicate=true;
   }
 }
 
@@ -501,12 +582,14 @@ function buildObjectPanel() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = o.root.visible;
+    cb.disabled = modelLoading;
     cb.addEventListener('change', () => {
-      soloSnapshot = soloTarget = null;
-      o.root.visible = cb.checked;
-      if (o.kind==='weapon') o.enabled=cb.checked;
-      syncAttachments();
-      buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
+      const checked=cb.checked;
+      changeObjects(checked?[o]:[],()=>{
+        soloSnapshot = soloTarget = null;
+        o.root.visible = checked;
+        if (o.kind==='weapon') o.enabled=checked;
+      });
     });
     const lbl = document.createElement('span');
     lbl.textContent = (o.kind==='weapon' ? 'Weapon · ' : '') + (o.name || 'Object');
@@ -515,15 +598,18 @@ function buildObjectPanel() {
     if (o.kind==='weapon') {
       const hand=document.createElement('select');hand.className='vp-weapon-hand';hand.setAttribute('aria-label','Attach '+o.name);
       hand.replaceChildren(...[['auto','Match weapon rig'],['right','Right hand'],['left','Left hand'],['both','Both hands']].map(([value,label])=>new Option(label,value)));
-      hand.value=o.hand || 'auto';hand.addEventListener('change',()=>{o.hand=hand.value;o.enabled=true;syncAttachments();buildObjectPanel();buildPanel();frameCamera();});
+      hand.disabled=modelLoading;
+      hand.value=o.hand || 'auto';hand.addEventListener('change',()=>{const value=hand.value;changeObjects([o],()=>{o.hand=value;o.enabled=true;});});
       row.append(hand);
-      if (!o.binding) cb.title='No compatible hand socket was found on the visible body.';
+      if (!o.loaded) cb.title='Loads when selected.';
+      else if (!o.binding) cb.title='No compatible hand socket was found on the visible body.';
     }
     const solo = document.createElement('button'); solo.className = 'vp-solo'; solo.textContent = 'Solo';
     solo.setAttribute('aria-label', `Isolate ${o.name || 'object'}`);
     solo.setAttribute('aria-pressed', String(soloTarget === o));
-    solo.disabled = objects.length < 2;
+    solo.disabled = modelLoading || objects.length < 2;
     solo.addEventListener('click', () => {
+      changeObjects([o],()=>{
       if (soloTarget === o) {
         for (const object of objects) object.root.visible = soloSnapshot.get(object) ?? true;
         soloSnapshot = soloTarget = null;
@@ -531,7 +617,7 @@ function buildObjectPanel() {
         if (!soloSnapshot) soloSnapshot = new Map(objects.map(object => [object,object.root.visible]));
         soloTarget = o; for (const object of objects) object.root.visible = object === o;
       }
-      buildObjectPanel(); buildPanel(); frameCamera(); syncPreviewAnimation();
+      },{attachments:false});
     });
     row.appendChild(solo);
     list.appendChild(row);
@@ -539,8 +625,10 @@ function buildObjectPanel() {
   $('viewport-obj-count').textContent = objects.length + (objects.length === 1 ? ' object' : ' objects');
   const bodies=objects.flatMap((object,index)=>object.kind==='weapon'?[]:[index]);
   const visible = bodies.filter(index=>objects[index].root.visible);
-  if (!visible.length) $('viewport-model-menu').open=false;
+  if (!visible.length && !modelLoading) $('viewport-model-menu').open=false;
   const select = $('viewport-model-choice');
+  select.disabled=modelLoading;
+  $('viewport-chroma').disabled=modelLoading;
   select.replaceChildren(...objects.flatMap((object,index) => object.kind==='weapon' ? [] : [new Option(`Mesh ${index + 1} · ${object.name}`, String(index))]),
     new Option('All mesh parts', 'all'), new Option('Custom visibility', 'custom'));
   select.querySelector('[value="custom"]').hidden = true;
@@ -622,17 +710,26 @@ async function applyMatTexture(name, texGameRel, slot = 'map', ver = '0', url = 
   const key = viewportProject + ':' + (slot==='alphaMap'?'data:':'color:') + (url || texGameRel) + '@' + ver;
   let tex = texCache.get(key);
   if (!tex) {
+    const pendingKey=gen+':'+matGen+':'+key;
+    let pending=texPending.get(pendingKey);
+    if(!pending) {
+      const load=materialLoad;
+      pending=(async()=>{
+        const decoded=await materialTexture(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`,load);
+        if(gen!==generation || matGen!==materialGeneration){decoded.dispose();return null;}
+        decoded.colorSpace = slot === 'alphaMap' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+        decoded.flipY = false;
+        decoded.wrapS = decoded.wrapT = THREE.RepeatWrapping;
+        if(renderer)decoded.anisotropy=renderer.capabilities.getMaxAnisotropy();
+        texCache.set(key,decoded);
+        return decoded;
+      })().finally(()=>texPending.delete(pendingKey));
+      texPending.set(pendingKey,pending);
+    }
     try {
-      tex = await materialTexture(url || `/api/texture_png?game_rel=${encodeURIComponent(texGameRel)}&v=${encodeURIComponent(ver)}`);
+      tex = await pending;
     } catch (e) { if (e.name !== 'AbortError') console.warn('viewport: texture load failed', name, slot, texGameRel, e); return false; }
-    if (gen !== generation || matGen !== materialGeneration) { tex.dispose(); return; }
-    tex.colorSpace = slot === 'alphaMap' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
-    tex.flipY = false;                              // glTF UV convention (origin top-left)
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    if (renderer) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    // Another request may have completed the same texture while this one loaded.
-    if (texCache.has(key)) { tex.dispose(); tex = texCache.get(key); }
-    else texCache.set(key, tex);
+    if(!tex)return;
   }
   if (gen !== generation || matGen !== materialGeneration) { trimTextureCache(); return; }
   const mats = matsByName[name] || [];
@@ -744,29 +841,35 @@ async function buildChromaPicker(skinId, meshGameRel) {
 // Transformed forms such as 10290 and 10291 have separate slots and must never share a key.
 const _canonName = n => String(n || '').toLowerCase().replace(/\d{6,}/g, '#');
 
-function loadMaterials(skinId) {
-  cancelMaterialLoad();
-  for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
-  const load = {id:crypto.randomUUID(), controller:new AbortController(), project:viewportProject, spinner:null};
+function loadMaterials(skinId, additions=null) {
+  if(!additions) {
+    cancelMaterialLoad();
+    for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
+  }
+  const load = additions && materialLoad && !materialLoad.controller.signal.aborted ? materialLoad
+    : {id:crypto.randomUUID(), controller:new AbortController(), project:viewportProject, spinner:null};
   materialLoad = load;
   inspection?.setLoading(true);
-  const task = loadMaterialSet(skinId, load).finally(() => load.spinner?.remove()); materialTask = task; inspection?.refresh();
+  const task = loadMaterialSet(skinId, load, additions).finally(() => load.spinner?.remove()); materialTask = task; inspection?.refresh();
   const settled = result => { if (materialTask === task) { materialTask = null; inspection?.setLoading(modelLoading); if(result!==false)inspection?.materialize(); inspection?.refresh(); } };
   task.then(settled,()=>settled(false)); return task;
 }
 
-async function loadMaterialSet(skinId, load) {
+async function loadMaterialSet(skinId, load, additions=null) {
   if (!skinId) return;
   currentSkin = skinId;
   window.AtelierViewportIdentity?.show(skinId,heroId);
   const gen = generation;
-  const matGen = ++materialGeneration;
-  inspection?.clearMaterials();
-  clearLiveDyes(); baselineMaps.clear();
+  const matGen = additions ? materialGeneration : ++materialGeneration;
+  if(!additions) {
+    inspection?.clearMaterials();
+    clearLiveDyes(); baselineMaps.clear();
+    matData = {}; edited = {};
+  }
   const pendingSelection = selectedMaterial;
-  matData = {}; edited = {};
   buildPanel();
-  const slots = Object.keys(matsByName);
+  const slots = additions?.names || Object.keys(matsByName);
+  const bindings = additions?.meshes || meshSlots;
   const foreign = !!(meshSkin && skinId !== meshSkin);   // applying another skin's materials
   const spinner = document.createElement('span'); spinner.className = 'vp-load-status';
   spinner.innerHTML = '<span>Loading materials…</span>';
@@ -781,7 +884,7 @@ async function loadMaterialSet(skinId, load) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // a foreign skin's MI names won't equal the slot names, so the server-side name filter would
       // drop everything — fetch all of them and match canonically here instead
-      body: JSON.stringify({ skin_id: skinId, names, ...(meshSlots.length ? {meshes:meshSlots} : {}) }),
+      body: JSON.stringify({ skin_id: skinId, names, ...(bindings.length ? {meshes:bindings} : {}) }),
     }, load).then(r => r.json());
     res = await readSet(foreign ? [] : slots);
     // Recolour meshes can retain the base skin's MI slot names. Let the canonical matching
@@ -813,11 +916,13 @@ async function loadMaterialSet(skinId, load) {
   const texJobs = [];
   for (const [matName, info] of Object.entries(res.materials)) {
     const name = resolveSlot(matName);
-    if (!name) continue;
+    if (!name || !slots.includes(name)) continue;
     matched++;
     info.baseIdx = pickBaseIdx(info.colors);
     info.emiIdx  = pickEmissiveIdx(info.colors);
     matData[name] = info;
+    // Unknown cooked slots keep their decoded appearance and remain read-only.
+    if(!info.game_rel)continue;
     for (const material of matsByName[name] || []) {
       material.visible=!info.hidden;applySurface(material,info);
       material.map=null;material.emissiveMap=null;material.alphaMap=null;
@@ -1345,50 +1450,45 @@ async function open(skinId, title, preferredMesh=null) {
     if(preferredMesh&&!meshes.some(mesh=>mesh.game_rel===preferredMesh))meshes.push({name:preferredMesh.split('/').pop(),game_rel:preferredMesh,kind:/\/weapons\//i.test(preferredMesh)?'weapon':'body'});
     const order=mesh=>mesh.kind==='weapon' ? 10+(mesh.game_rel===preferredMesh?-2:/_[lr]$/i.test(mesh.name)?-1:0) : mesh.game_rel===preferredMesh?-1:0;
     meshes.sort((a,b)=>order(a)-order(b));
-    let loaded = 0, firstError = '';
-    for (let i = 0; i < meshes.length; i++) {
-      $('viewport-loading-msg').textContent =
-        `Decoding ${meshes[i].name} (${i + 1}/${meshes.length})… first time can take a moment`;
-      try {
-        const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(meshes[i].game_rel)}`);
-        if (gen !== generation) { disposeTree(gltf.scene); return; }
-        const kind=meshes[i].kind || (/\/weapons\//i.test(meshes[i].game_rel)?'weapon':'body');
-        collectMats(gltf.scene,meshes[i],gltf.parser);
-        if (kind!=='weapon') animation.register(gltf);
-        gltf.scene.visible = kind!=='weapon' && !objects.some(object=>object.kind!=='weapon');
-        modelRoot.add(gltf.scene);
-        objects.push({ name: meshes[i].name, kind, autoEquip:meshes[i].auto_equip!==false, root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf),
-          ...(kind==='weapon'&&meshes[i].game_rel===preferredMesh?{enabled:true}:{}) });
-        meshMeta.push({ name: meshes[i].name, game_rel: meshes[i].game_rel });
-        loaded++;
-        frameCamera();
-        if (gltf.scene.visible) {setViewportLoaderState('ready');destroyViewportLoader();$('viewport-loading').style.display='none';}
-      } catch (e) {
-        if (gen !== generation) return;
-        const reason = await loadErrorText(e);
-        if (gen !== generation) return;
-        firstError = firstError || `${meshes[i].name}: ${reason}`;
-        console.warn('viewport: mesh load failed', meshes[i].name, reason);
-      }
+    for(const mesh of meshes) {
+      const kind=mesh.kind || (/\/weapons\//i.test(mesh.game_rel)?'weapon':'body');
+      const root=new THREE.Group();root.visible=false;
+      objects.push({name:mesh.name,kind,autoEquip:mesh.auto_equip!==false,root,loaded:false,
+        ...(kind==='weapon'&&mesh.game_rel===preferredMesh?{enabled:true}:{})});
+      meshMeta.push({name:mesh.name,game_rel:mesh.game_rel});
     }
-    $('viewport-status').textContent = loaded ? `${loaded} part${loaded !== 1 ? 's' : ''}` : '';
-    if (!loaded) {
+    // Load one body, then only weapons that can occupy an available hand. Hidden
+    // forms, duplicate static weapons and optional ability rigs stay on demand.
+    let body=null;
+    for(const candidate of objects.filter(object=>object.kind!=='weapon')) {
+      $('viewport-loading-msg').textContent=`Decoding ${candidate.name}… first time can take a moment`;
+      if(await loadObject(candidate,gen)){body=candidate;break;}
+      if(gen!==generation)return;
+    }
+    if(gen!==generation)return;
+    if (!body) {
       setViewportLoaderState('error');
-      $('viewport-loading-msg').textContent = 'Failed to load meshes.' + (firstError ? ' ' + firstError : '');
+      const failed=objects.find(object=>object.loadError);
+      $('viewport-loading-msg').textContent = 'Failed to load meshes. '+(failed?`${failed.name}: ${failed.loadError}`:'No body mesh found.');
       return;
     }
-    refreshBlenderBtn();
-    syncAttachments();
+    body.root.visible=true;
+    frameCamera();
+    setViewportLoaderState('ready');destroyViewportLoader();$('viewport-loading').style.display='none';
+    note('Loading equipped weapons…','info');
+    await loadAutomaticWeapons(gen);
+    if(gen!==generation)return;
+    modelLoading=false;
     buildObjectPanel();
+    refreshBlenderBtn();
     frameCamera();
     setViewportLoaderState('ready');
     destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
-    modelLoading=false;
     loadMaterials(skinId);
-    animation.discover(meshMeta[0].game_rel);
+    syncPreviewAnimation();
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
-    buildChromaPicker(skinId, meshes[0] && meshes[0].game_rel);
+    buildChromaPicker(skinId, meshMeta[objects.indexOf(body)].game_rel);
   } catch (e) {
     if (gen !== generation) return;
     setViewportLoaderState('error');
@@ -1429,8 +1529,9 @@ async function openMesh(gameRel, name, skinId) {
     collectMats(gltf.scene,{game_rel:gameRel},gltf.parser);
     animation.register(gltf);
     modelRoot.add(gltf.scene);
-    objects.push({ name: name || 'Mesh', kind:'body', root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf) });
+    objects.push({ name: name || 'Mesh', kind:'body', loaded:true, root: gltf.scene, animations:gltf.animations, rig:attachmentRig(gltf) });
     meshMeta.push({ name: name || 'Mesh', game_rel: gameRel });
+    modelLoading=false;
     refreshBlenderBtn();
     buildObjectPanel();
     frameCamera();

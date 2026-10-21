@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def run_viewport_loading_checks(page, context, url, report, checks):
     tab = context.new_page()
-    errors, cancelled, requests, failed = [], [], [], []
+    errors, cancelled, requests, failed, texture_requests = [], [], [], [], []
     held = []
     mode = ['materials']
     tab.on('pageerror',lambda error:errors.append(str(error)))
@@ -26,11 +26,16 @@ def run_viewport_loading_checks(page, context, url, report, checks):
     def materials(route):
         requests.append(route.request.headers['x-atelier-preview'])
         if mode[0]=='materials': held.append(route);return
-        route.fulfill(json={'ok':True,'materials':{'MI_Body':{
+        info={
             'game_rel':'Characters/1029/1029001/Materials/MI_Body','colors':[{'name':'Fresh tint','rgba':[1,1,1,1]}],
-            'scalars':[],'textures':{'BaseColor':'Characters/Test/SlowMap'} if mode[0]=='textures' else {}}}})
+            'scalars':[],'textures':{'BaseColor':'Characters/Test/SlowMap'} if mode[0] in ('textures','shared') else {}}
+        route.fulfill(json={'ok':True,'materials':{name:info for name in (
+            ('MI_Body','MI_Hair_01','MI_Hair_02') if mode[0]=='shared' else ('MI_Body',))}})
     tab.route('**/api/skin_materials',materials)
-    tab.route('**/api/texture_png?*',lambda route:held.append(route))
+    def texture(route):
+        texture_requests.append(route)
+        held.append(route)
+    tab.route('**/api/texture_png?*',texture)
     try:
         tab.goto(url)
         tab.wait_for_function('window.__inspection && window.atelierProject?.()')
@@ -73,6 +78,21 @@ def run_viewport_loading_checks(page, context, url, report, checks):
         assert tab.locator('#viewport-material-editor .vp-color-field[data-parameter="Fresh tint"]').count()==1
         assert not errors,errors
         checks.append('Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors')
+        tab.locator('#viewport-close').click()
+        mode[0]='shared'
+        before=len(texture_requests)
+        open_viewer()
+        tab.wait_for_function('document.getElementById("viewport-status").textContent.includes("Loading textures")')
+        tab.wait_for_timeout(150)
+        assert len(texture_requests)-before==1,'Three material slots must share one in-flight image download'
+        from io import BytesIO
+        from PIL import Image
+        image=BytesIO();Image.new('RGBA',(8,8),(20,80,160,255)).save(image,'PNG')
+        texture_requests[-1].fulfill(body=image.getvalue(),content_type='image/png')
+        tab.wait_for_function('document.getElementById("viewport-status").textContent==="Materials ready"')
+        assert not errors,errors
+        tab.locator('#viewport-close').click()
+        checks.append('Shared texture slots download and decode one image while all three material assignments finish')
     finally:
         for route in held:
             try: route.abort()

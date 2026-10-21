@@ -8,6 +8,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = r"""
 window.__inspection = {
+  decoded:[],
   frame:frameCamera, pick:pickMaterial,
   presentation:()=>inspection.presentationState(),
   tint:rgb=>Object.values(matsByName).flat()[0].color.setRGB(...rgb),
@@ -23,6 +24,8 @@ window.__inspection = {
     delete edited.MI_Cape;matData.MI_Cape=previous;buildPanel();return {initial,changed};
   },
   state:()=>({position:camera.position.toArray(), target:controls.target.toArray(), aspect:camera.aspect,
+    loaded:objects.map(o=>!!o.loaded), drafts:structuredClone(edited),
+    unmappedMap:!!matsByName.MI_Unmapped?.[0]?.map,
     visible:objects.map(o=>o.root.visible), materials:Object.values(matsByName).flat().map(m=>({name:m.name,color:m.color.toArray(),wireframe:m.wireframe})),
     geometries:renderer.info.memory.geometries, animating:!!raf}),
   fits:()=>{
@@ -43,6 +46,7 @@ window.__inspection = {
   canon:_canonName,
 };
 loader.loadAsync = async url=>{
+  window.__inspection.decoded.push(url);
   const cape=url.includes('Cape'); const group=new THREE.Group(); group.name=cape?'Cape fixture':'Body fixture';
   const material=new THREE.MeshStandardMaterial({color:0x85aedd}); material.name=cape?'MI_Cape':'MI_Body';
   const geometry=new THREE.BoxGeometry(cape?8:1.3,cape?.2:3,cape?.2:1);
@@ -50,6 +54,12 @@ loader.loadAsync = async url=>{
   if(!cape) for(const index of [1,2]) {
     const hair=new THREE.MeshStandardMaterial({color:0x444444});hair.name='MI_Hair_0'+index;
     const part=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.1),hair);part.position.set(index*.1,2.8,0);group.add(part);
+  }
+  if(!cape) {
+    const map=new THREE.DataTexture(new Uint8Array([20,80,160,255]),1,1);map.needsUpdate=true;
+    (window.__fixtureTextures||=[]).push(map);
+    const unknown=new THREE.MeshStandardMaterial({map});unknown.name='MI_Unmapped';
+    const part=new THREE.Mesh(new THREE.BoxGeometry(.05,.05,.05),unknown);part.position.set(.7,.5,0);group.add(part);
   }
   return {scene:group,animations:[]};
 };
@@ -91,9 +101,15 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         {'name':name+' fixture','game_rel':'Characters/1029/1029001/Meshes/'+name} for name in ('Body','Cape')]))
     materials = {name:dict(game_rel='Characters/1029/1029001/Materials/'+name,
         colors=[dict(name='Tint',rgba=[.6,.2,.15,1])],scalars=[],textures={},dyeable=name=='MI_Body') for name in ('MI_Body','MI_Cape','MI_Hair_01','MI_Hair_02')}
+    materials['MI_Unmapped']={'game_rel':None,'colors':[],'scalars':[],'textures':{},'mapping_error':'Fixture unknown slot'}
     tab.route('**/api/skin_materials', lambda route: route.fulfill(json={'ok':True,'materials':materials}))
-    tab.route('**/api/material_original?*', lambda route: route.fulfill(json={'ok':True,
-        'colors':[{'name':'Tint','rgba':[.05,.4,.8,1]}],'scalars':[],'textures':{}}))
+    unmapped_reads=[]
+    def original_material(route):
+        if 'game_rel=null' in route.request.url:
+            unmapped_reads.append(route.request.url)
+            return route.fulfill(json={'ok':False,'error':'Unknown slots have no material asset'})
+        route.fulfill(json={'ok':True,'colors':[{'name':'Tint','rgba':[.05,.4,.8,1]}],'scalars':[],'textures':{}})
+    tab.route('**/api/material_original?*', original_material)
     tab.route('**/api/material_params?*', lambda route: route.fulfill(json={'ok':True,
         'colors':[{'name':'Tint','rgba':[.6,.2,.15,1]}],'scalars':[]}))
     tab.route('**/api/dye_info?*', lambda route: route.fulfill(json={'dyeable':False}))
@@ -115,6 +131,9 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
             if not tab.locator('#viewport-model-menu').evaluate('el=>el.open'):
                 tab.locator('#viewport-model-menu > summary').click()
         assert tab.evaluate('__inspection.state().visible') == [True,False]
+        assert tab.evaluate('__inspection.state().loaded') == [True,False]
+        assert len(tab.evaluate('__inspection.decoded'))==1,'Hidden forms must not delay the first material batch'
+        assert tab.evaluate('__inspection.state().unmappedMap'),'An unmapped section must retain its decoded texture'
         assert tab.evaluate("__inspection.canon('MI_1029001_10290_Body')===__inspection.canon('MI_1029100_10290_Body') && __inspection.canon('MI_1029001_10290_Body')!==__inspection.canon('MI_1029001_10291_Body')")
         assert tab.locator('#viewport-material-editor').is_hidden()
         assert not tab.locator('#viewport-box input[type=color]:visible').count()
@@ -144,9 +163,22 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         tab.locator('#viewport-material-search').fill('no such material')
         assert tab.locator('#viewport-material-no-results').is_visible()
         tab.locator('#viewport-material-search').fill('')
+        tab.locator('.vp-material-select').filter(has_text='Body').click()
+        tab.locator('#viewport-material-editor input[type=color]').first.fill('#70459B')
+        drafts=tab.evaluate('__inspection.state().drafts')
         models(); tab.locator('#viewport-model-choice').select_option('1')
+        tab.wait_for_function('__inspection.state().visible[1] && !document.getElementById("viewport-model-choice").disabled')
         assert tab.evaluate('__inspection.state().visible') == [False,True]
+        assert len(tab.evaluate('__inspection.decoded'))==2
+        assert tab.evaluate('__inspection.state().drafts')==drafts,'Loading a second form must preserve unsaved recolours'
+        models(); tab.locator('#viewport-model-choice').select_option('0')
+        tab.wait_for_function('__inspection.state().visible[0] && !document.getElementById("viewport-model-choice").disabled')
+        tab.locator('.vp-material-select').filter(has_text='Body').click()
+        assert tab.locator('#viewport-material-editor .vp-hex').first.input_value()=='#70459B'
+        tab.locator('.vp-revert-material').click()
+        checks.append('Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry')
         models(); tab.locator('#viewport-model-choice').select_option('all')
+        tab.wait_for_function('__inspection.state().visible.every(Boolean) && !document.getElementById("viewport-model-choice").disabled')
         assert tab.evaluate('__inspection.state().visible') == [True,True]
         settings(); tab.keyboard.press('Escape')
         assert tab.locator('#viewport-overlay').is_visible() and not tab.locator('#viewport-settings-menu').evaluate('el=>el.open')
@@ -206,6 +238,7 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
                 assert 63 <= int(tab.locator('#viewport-wipe-range').input_value()) <= 67
                 tab.screenshot(path=str(report/'viewer-comparison.png'))
         assert baseline == tab.evaluate('__inspection.state().materials')
+        assert not unmapped_reads,'Original comparison must preserve unknown slots without requesting a null asset'
         settings()
         tab.locator('#viewport-regions').click()
         tab.wait_for_function("document.getElementById('viewport-regions').getAttribute('aria-pressed')==='true'")

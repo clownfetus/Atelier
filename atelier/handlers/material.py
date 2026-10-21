@@ -131,6 +131,13 @@ def _apply_mat_edits(d, colors, scalars):
                 pv["Value"] = float(scalars[nm])
 
 def mat_json(game_rel, out_dir=None, prefer_exact=False):
+    """Read project material JSON or publish one validated conversion per asset."""
+    from atelier.inflight import key_lock
+    with key_lock('material-json', os.path.realpath(out_dir or get_import_root()), game_rel):
+        return _mat_json(game_rel, out_dir, prefer_exact)
+
+
+def _mat_json(game_rel, out_dir=None, prefer_exact=False):
     """Extract the MI + convert to JSON as <basename>.json. Returns the json path.
     The active project dir always takes priority (edits/explicit imports live there); if no
     project copy exists, the JSON is produced in out_dir (defaults to the project dir — the

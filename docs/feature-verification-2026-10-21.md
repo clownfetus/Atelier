@@ -4,6 +4,10 @@ Verification of the consolidated Windows source checkout using disposable app
 data under `D:/AtelierDev/feature-tests-20261021`. Game files were inputs; exports
 and test installations stayed in report-local folders.
 
+A later investigation addressed the still-slow viewer path. See the
+[loading follow-up](model-loading-verification-2026-10-21.md) for the current
+on-demand loading behavior, measured timings and additional native/browser checks.
+
 ## Repairs found by feature testing
 
 1. **Cold Model Studio material loading.** A real two-form Magik preview exceeded
