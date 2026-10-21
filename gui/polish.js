@@ -117,7 +117,8 @@
       const source = [...document.querySelectorAll('#grid-area .card')].find(node=>node.dataset.libraryPath===path)?.querySelector('.card-thumb');
       const destination = [...document.querySelectorAll('.sb-item')].find(node=>node.dataset.gameRel===path)?.querySelector('.sb-thumb');
       if (!destination) return;
-      play(destination,[{boxShadow:'0 0 0 0 var(--acc)'},{boxShadow:'0 0 0 3px transparent'}],220);
+      if (!window.AtelierMotion?.workflow?.arrival(destination))
+        play(destination,[{boxShadow:'0 0 0 0 var(--acc)'},{boxShadow:'0 0 0 3px transparent'}],220);
       if (!source || reduced()) return;
       const {copy,rect} = ghost(source), end = destination.getBoundingClientRect();
       play(copy,[{opacity:.85,transformOrigin:'top left',transform:'none'},

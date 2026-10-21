@@ -1,0 +1,11 @@
+/* Transient energy sits on edges, never on the artwork or on interactive controls. */
+.k-workflow-canvas {
+  position: fixed;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2301;
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-workflow-canvas { display: none; }
+}
+:root:not([data-krackle=full]) .k-workflow-canvas { display: none; }

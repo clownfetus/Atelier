@@ -9,11 +9,12 @@ starburst; *completed with warnings* is a cracked ring whose broken chunk falls 
 shapes give each outcome its personality; the text beside them says what happened.
 
 Krackle is concentrated, not ambient. It appears for substantial job feedback
-(export, import, saves, loading, Activity), restrained ownership markers (edited
-rows), empty states and occasional showcase moments (the logo entrance, the first
-export). Routine typing, hovering, pressing and theme changes stay responsive
-without it, and chrome (toolbar, menus, form controls, category emblems) keeps its
-Material Sharp glyphs. Artwork being edited stays visually trustworthy: Krackle
+(export, import, saves, loading, Activity), meaningful selections and arrivals
+(heroes, folders, editors and Mod tray assets), restrained ownership markers,
+empty states and occasional showcase moments (the logo entrance, the first
+export). Typing, pointer hover and repeated selection stay plain. Toolbar,
+menu and form controls keep Material Sharp glyphs; category emblems use their
+shared cut-out artwork. Artwork being edited stays visually trustworthy: Krackle
 never textures a colour swatch or the material-inspection viewport.
 
 Presentation owns artwork and animation lifecycle; application code owns project
@@ -45,7 +46,23 @@ never take over that stage.
 | Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
 | Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
 | Krackle stage | Export review and edit import dialogs | 132-156px canvas particle formations |
+| Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
 | `krackle.css` | Every `.spinner`, progress bars, the Activity ring, import segments, edited rows | CSS only |
+
+`workflow-krackle.js` adds finite ink formations to committed everyday actions:
+selecting a different hero, arriving in a folder, opening a material/curve/VFX
+editor and an imported or saved asset landing in the Mod tray. They use the
+existing Charge/Paper roles with transparent punched bubbles. They do not alter
+artwork, swatches, selection, requests or saved state. Re-selecting the same hero,
+filtering, typing and failed navigation do not replay an arrival. Wide formations
+share `moment.js` ownership with import/export; workspace effects cannot float
+over an active dialog. At most three canvases run, for 480–560ms, with bounded
+pixel density and cleanup on hide, scroll, resize, palette/dial changes, removal
+and page exit. Missing Canvas/WAAPI support keeps the ordinary UI.
+
+Run `tests/browser_smoke.py --workflow-motion-only --report-dir <folder>` for the
+selection/navigation/editor/tray integration, reduced-motion, ownership and
+failure/lifecycle checks.
 
 ## Artwork source and rules
 

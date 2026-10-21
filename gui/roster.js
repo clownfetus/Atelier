@@ -118,6 +118,7 @@
     const skins=document.createElement('div'); skins.className='roster-skins'; skins.setAttribute('role','group'); skins.setAttribute('aria-label','Selected hero costumes');
     const skinCarousel=carousel(skins,'skins');
     function choose(hero, button,record=false) {
+      const changed = selected !== hero.path;
       selected = hero.path;
       if(record){recent=[hero.path,...recent.filter(path=>path!==hero.path)].slice(0,30);write({recent});}
       heroes.querySelectorAll('button').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));
@@ -132,6 +133,7 @@
         tintSkin(tile,skin,hero);
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
+      if (record && changed) window.AtelierMotion?.workflow?.hero(button);
     }
     const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;
     const shown=data.heroes.filter(hero=>filter==='all'||(filter==='edited'?editCount(hero)>0:recent.includes(hero.path)));

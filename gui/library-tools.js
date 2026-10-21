@@ -20,6 +20,7 @@
     return words(query).every(term => haystack.includes(term));
   }
   function filter(cards, query) {
+    syncFilterControls(query);
     return cards.filter(card => matches(card, query) &&
       (type === 'all' || (type === 'folder' ? card.type === 'folder' : card.type === 'asset' && card.file_type === type)) &&
       (status === 'all' || card.type === 'asset' && (status === 'edited' ? !!card.imported : !card.imported)));
@@ -42,14 +43,24 @@
     for (const id of ['library-type', 'library-status']) {
       const control = document.getElementById(id); if (control) control.value = 'all';
     }
+    syncFilterControls('');
     if (notify) callbacks.change?.();
   }
   function hasFilters() { return type !== 'all' || status !== 'all'; }
+  function syncFilterControls(query) {
+    const clear = document.getElementById('library-clear');
+    if (clear) clear.hidden = !hasFilters() && !String(query || '').trim();
+    for (const id of ['library-type', 'library-status']) {
+      const control = document.getElementById(id);
+      if (control) control.dataset.active = String(control.value !== 'all');
+    }
+  }
   function init(options) {
     callbacks = options;
     const explorer = document.getElementById('explorer');
     const size = document.getElementById('library-size'), order = document.getElementById('library-sort');
     size.value = String(prefs.size); order.value = prefs.sort;
+    syncFilterControls('');
     explorer.style.setProperty('--card-w', `${prefs.size}px`);
     size.addEventListener('change', () => {
       if (!sizes.has(+size.value)) return;
@@ -62,7 +73,10 @@
     document.getElementById('library-type').addEventListener('change', e => { type = e.target.value; callbacks.change?.(); });
     document.getElementById('library-status').addEventListener('change', e => { status = e.target.value; callbacks.change?.(); });
     document.getElementById('library-clear').addEventListener('click', () => {
+      const restoreFocus = document.activeElement === document.getElementById('library-clear');
+      const destination = type !== 'all' ? 'library-type' : status !== 'all' ? 'library-status' : 'search-input';
       document.getElementById('search-input').value = ''; resetFilters();
+      if (restoreFocus) document.getElementById(destination).focus();
     });
     document.getElementById('grid-area').addEventListener('keydown', onKey);
   }

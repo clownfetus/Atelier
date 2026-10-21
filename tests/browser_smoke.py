@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
+    parser.add_argument('--workflow-motion-only', action='store_true', help='Check Krackle hero, navigation, editor and tray motion')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
@@ -212,6 +213,14 @@ def main():
                     (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks:print('PASS '+check)
                     browser.close();return
+
+                if args.workflow_motion_only:
+                    from workflow_motion_checks import run_workflow_motion_checks
+                    run_workflow_motion_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close(); return
 
                 if args.inks_dial_only:
                     from inks_dial_checks import run_inks_dial_checks
@@ -374,6 +383,8 @@ def main():
                 run_surfaces_checks(page,context,url,report,checks)
                 from inks_dial_checks import run_inks_dial_checks
                 run_inks_dial_checks(page,context,url,report,checks)
+                from workflow_motion_checks import run_workflow_motion_checks
+                run_workflow_motion_checks(context, url, report, checks)
                 from find_checks import run_find_checks
                 run_find_checks(page, context, url, report, checks)
                 from trust_checks import run_trust_checks

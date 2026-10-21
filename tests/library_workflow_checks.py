@@ -35,12 +35,18 @@ def run_library_workflow_checks(page, context, url, report, checks):
         target.wait_for_selector('#grid-area .card')
         prior = target.evaluate('key=>localStorage.getItem(key)', key)
         seed()
+        assert target.locator('#library-clear').is_hidden()
         search = target.locator('#search-input')
         search.fill('storm 1015502 t_2')
+        assert target.locator('#library-clear').is_visible()
         assert names() == ['Texture 2'], names()
         search.fill('Materials/MI_Red')
         assert names() == ['Red surface'], names()
+        target.locator('#library-clear').focus()
+        target.keyboard.press('Enter')
+        assert search.input_value() == '' and search.evaluate('e=>e===document.activeElement')
         search.fill('')
+        assert target.locator('#library-clear').is_hidden()
         target.locator('#library-type').select_option('texture')
         target.locator('#library-status').select_option('unedited')
         assert names() == ['Texture 2']
@@ -49,8 +55,13 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert names() == ['Texture 10']
         target.locator('#library-type').select_option('mesh')
         assert target.locator('#empty-state').inner_text().startswith('No matches')
-        target.locator('#library-clear').click()
+        target.locator('#library-clear').focus()
+        target.keyboard.press('Enter')
         assert len(names()) == 5
+        assert target.locator('#library-clear').is_hidden()
+        assert target.locator('#library-type').input_value() == 'all'
+        assert target.locator('#library-status').input_value() == 'all'
+        assert target.locator('#library-type').evaluate('e=>e===document.activeElement')
         checks.append('Library search matches combined names, IDs and paths; type/status filters and Edit All share the visible texture set')
 
         target.locator('#library-sort').select_option('name')

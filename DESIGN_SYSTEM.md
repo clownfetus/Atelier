@@ -42,8 +42,9 @@ Use semantic foreground/background pairs instead of adding hexadecimal colors to
 
 Roboto and the Latin Bricolage Grotesque display face are bundled with their SIL
 Open Font Licenses; there is no font CDN request. Bricolage at 80% width is for
-page titles, hero names, mod names and event lettering. Roboto remains 14px body,
-13px controls/asset names and 12px supporting labels; titles are 20px. Controls
+page titles, mod names and event lettering. Hero card names use uncondensed 14px
+semibold Roboto, with room for two lines and 12px costume/edit counts. Roboto
+remains 14px body, 13px controls/asset names and 12px supporting labels; titles are 20px. Controls
 remain 36px tall (compact numeric fields 30px). The workspace keeps its 56px
 toolbar, 12px inset, 156px tiles with 134px previews and resizable 240–520px tray.
 Tested windows start at 1024×768.
@@ -214,6 +215,10 @@ The original home category ordering is independent of the new icon coverage.
 Search is explicitly scoped to the current folder. It matches combined name,
 hero/skin labels, IDs and full paths without case or accent sensitivity. Type
 and edited/not-edited filters share the visible texture set used by Edit All.
+The filter bar separates Type/Status from Sort/Size, with quiet native selects
+and a visible fill for active filters. Clear filters appears only for an active
+type/status filter or a This folder query. Clearing restores keyboard focus to
+the relevant control and keeps the remembered sort and tile size.
 Navigation clears transient search/filters. Recommended ordering, natural name
 sorting, type sorting and edited-first sorting retain folders first; four card
 widths (128, 156, 196 and 236px) resize previews with their cards. Sort and size
@@ -450,8 +455,11 @@ reuse source textures but never modify editable materials. Every render restores
 the original material object (including material-array identity) in `finally`;
 failed captures restore the camera and controls too. Inspect comparison, dye and
 colour previews retain their original values. Showcase is not persisted and a
-new model starts in Inspect. Its still screen and burst sit behind the display
-model; controls and text retain solid panel surfaces.
+new model starts in Inspect. Its backdrop uses a neutral centre, a smaller muted
+burst offset to the lower left, and sparse halftone dots at the edges. Coloured
+decoration leaves the central model area clear. The same drawing serves the
+live view, posters, turntables and Mod cards; it does not change model lighting
+or editable material values. Controls and text retain solid panel surfaces.
 
 Posters/turntables use the selected presentation mode. Mod cards request a clean
 Showcase capture only from a matching loaded project/skin without pending edits;

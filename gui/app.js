@@ -380,6 +380,7 @@ let _gridThumbs = null;
 let _gridStatus = 'ready';
 let _gridRenderedPath = '';
 async function renderGrid(focusPath = null, direction = 'forward') {
+  window.AtelierContinuity?.cancelWorkflow();
   window.AtelierSearch?.reset();
   const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
