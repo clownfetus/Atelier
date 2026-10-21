@@ -53,6 +53,22 @@ class MeshOptimizer(unittest.TestCase):
         self.assertEqual(result['bonemap'], [0, 1])
         self.assertLess(len(result['triangles']), len(section['triangles']))
 
+    def test_dense_character_sized_section_has_enough_fuel_and_preserves_vertices(self):
+        original = grid(192)
+        reduced, report = simplify_section(original, .25)
+        self.assertLess(len(reduced['triangles']), len(original['triangles'])//2)
+        self.assertLessEqual(report['error'], .010001)
+        for field in mesh_optimizer._VERTEX_FIELDS:
+            np.testing.assert_array_equal(reduced[field], original[field][reduced['morph_ids']])
+
+    def test_work_limit_is_bounded_and_reports_a_readable_error_without_mutation(self):
+        section = grid(192)
+        before = section['triangles'].copy()
+        with patch.object(mesh_optimizer, '_MAX_FUEL', 1_000_000_000):
+            with self.assertRaisesRegex(ValueError, 'simplifier work limit'):
+                simplify_section(section, .25)
+        np.testing.assert_array_equal(section['triangles'], before)
+
     def test_invalid_inputs_are_rejected_and_small_sections_stay_nonempty(self):
         section = grid(2)
         result, _ = simplify_section(section, .1)

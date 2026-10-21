@@ -165,8 +165,8 @@ def _add_import(doc, object_name, outer_index, template):
     imp["ObjectName"] = object_name
     imp["OuterIndex"] = outer_index
     doc["Imports"].append(imp)
-    if object_name not in doc["NameMap"]:
-        doc["NameMap"].append(object_name)
+    from atelier.unreal_names import add_names
+    add_names(doc, object_name)
     return -len(doc["Imports"])              # FPackageIndex for the entry just appended
 
 

@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from wsgiref.util import setup_testing_defaults
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -76,6 +77,63 @@ class OriginalComparisons(unittest.TestCase):
             D.dye_preview('Characters/Test/MI_Body',original=True,size=8,out_path=str(target))
             self.assertTrue(target.is_file())
             self.assertTrue(all(call.kwargs.get('original') for call in images.call_args_list))
+
+
+class MaterialLoading(unittest.TestCase):
+    def preview(self, prefetch_error=None):
+        from atelier import config
+        from atelier.handlers import meshstudio, texture
+        project = Path(config.project_dir('Preview batch fixture'))
+        project.mkdir(parents=True, exist_ok=True)
+        bindings = [
+            {'key': 'body::0', 'slot_name': 'Body', 'game_rel': 'Characters/Test/MI_Body'},
+            {'key': 'body::1', 'slot_name': 'Hair', 'game_rel': 'Characters/Test/MI_Hair'},
+            {'key': 'body::2', 'slot_name': 'Unmapped', 'game_rel': None},
+        ]
+        seen = []
+        def prefetch(paths):
+            self.assertEqual(config.get_import_root(), str(project))
+            seen.append(('prefetch', paths))
+            if prefetch_error:
+                raise prefetch_error
+        def read(path, cache_only=False):
+            self.assertTrue(cache_only)
+            self.assertEqual(config.get_import_root(), str(project))
+            seen.append(('read', path))
+            return {'colors': [{'name': 'Tint', 'rgba': [1, 0, 0, 1]}], 'textures': {}, 'scalars': []}
+        body = json.dumps({'skin_id': '1029100', 'meshes': [{'game_rel': 'Characters/Test/SK_Body'}]}).encode()
+        env = {}
+        setup_testing_defaults(env)
+        env.update(PATH_INFO='/api/skin_materials', REQUEST_METHOD='POST',
+                   CONTENT_TYPE='application/json', CONTENT_LENGTH=str(len(body)),
+                   HTTP_X_ATELIER_PROJECT='Preview%20batch%20fixture', **{'wsgi.input': BytesIO(body)})
+        statuses = []
+        with patch.object(meshstudio, 'material_bindings', return_value=iter(bindings)), \
+             patch.object(texture, 'prefetch_exact', side_effect=prefetch), \
+             patch.object(R, 'read_material', side_effect=read), \
+             patch.object(R, '_viewport_material_payload', side_effect=lambda path, params: params):
+            response = R.app(env, lambda status, headers, exc_info=None: statuses.append(status))
+            try:
+                result = json.loads(b''.join(response))
+            finally:
+                if hasattr(response, 'close'):
+                    response.close()
+        self.assertTrue(statuses[0].startswith('200'), statuses)
+        self.assertTrue(result['ok'])
+        self.assertEqual(list(result['materials']), ['body::0', 'body::1', 'body::2'])
+        self.assertEqual(result['materials']['body::0']['colors'][0]['rgba'], [1, 0, 0, 1])
+        self.assertEqual(result['materials']['body::2']['colors'], [])
+        self.assertFalse(list(project.iterdir()), 'Preview must not add project edits')
+        return seen
+
+    def test_cold_preview_prefetches_before_reading_parameters_in_the_originating_project(self):
+        seen = self.preview()
+        self.assertEqual(seen[0], ('prefetch', ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair', None]))
+        self.assertEqual([row[1] for row in seen[1:]], ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair'])
+
+    def test_failed_batch_falls_back_to_individual_material_reads(self):
+        seen = self.preview(OSError('Fixture native extractor unavailable'))
+        self.assertEqual(len([row for row in seen if row[0] == 'read']), 2)
 
 
 class IdleDiscovery(unittest.TestCase):

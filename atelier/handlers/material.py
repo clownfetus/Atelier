@@ -301,9 +301,8 @@ def _retarget_material(d, source, target):
             return {k: visit(v) for k, v in value.items()}
         return value
     d = visit(d)
-    for name in (os.path.basename(target), new):
-        if name not in d.setdefault("NameMap", []):
-            d["NameMap"].append(name)
+    from atelier.unreal_names import add_names
+    add_names(d, os.path.basename(target), new)
     if isinstance(d.get("FolderName"), str) and d["FolderName"].startswith("/"):
         d["FolderName"] = new
     return d

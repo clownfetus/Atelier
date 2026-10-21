@@ -14,6 +14,7 @@ import numpy as np
 
 _WASM = Path(__file__).with_name('vendor')/'meshoptimizer'/'simplifier.wasm'
 _SHA256 = 'a357a388a66eb7b039d888c8f44e3de1fd23c1e82f4ad19d89f48f080340e9b2'
+_MAX_FUEL = 50_000_000_000
 _VERTEX_FIELDS = ('positions', 'normal', 'tangent', 'tan_w', 'uv', 'color', 'global_idx', 'weight',
                   'morph_rest', 'morph_ids', 'morph_lods')
 
@@ -46,7 +47,11 @@ def _simplify(indices, positions, attributes, weights, locks, target):
     engine, module = _runtime()
     with wasmtime.Store(engine) as store:
         store.set_limits(memory_size=512*1024*1024, instances=1, memories=1)
-        store.set_fuel(1_000_000_000)
+        # A fixed billion instructions rejects ordinary character sections with
+        # around 70k triangles. Scale with the numeric input while retaining a
+        # hard ceiling, the guest memory limit and the pinned no-import module.
+        fuel = max(1_000_000_000, min(_MAX_FUEL, indices.size*attributes.shape[1]*2048))
+        store.set_fuel(fuel)
         instance = wasmtime.Instance(store, module, [])
         exports = instance.exports(store)
         exports['__wasm_call_ctors'](store)
@@ -68,9 +73,14 @@ def _simplify(indices, positions, attributes, weights, locks, target):
         lock = reserve(locks.tobytes())
         # LockBorder | RegularizeLight: retain joins and favour stable triangles
         # without spending the entire error budget on strong regularization.
-        count = exports['meshopt_simplifyWithAttributes'](store, output, source, indices.size,
-            pos, len(positions), positions.shape[1]*4, attr, attributes.shape[1]*4,
-            factor, len(weights), lock, target, .01, 1 | 64, error)
+        try:
+            count = exports['meshopt_simplifyWithAttributes'](store, output, source, indices.size,
+                pos, len(positions), positions.shape[1]*4, attr, attributes.shape[1]*4,
+                factor, len(weights), lock, target, .01, 1 | 64, error)
+        except wasmtime.Trap as exc:
+            if exc.trap_code == wasmtime.TrapCode.OUT_OF_FUEL:
+                raise ValueError('This mesh section exceeds the simplifier work limit. Reduce its geometry and retry.') from exc
+            raise
         result = np.frombuffer(memory.read(store, output, output+count*4), '<u4').copy()
         deviation, = struct.unpack('<f', memory.read(store, error, error+4))
     if count < 3 or count % 3 or count > indices.size or np.any(result >= len(positions)) or not math.isfinite(deviation):

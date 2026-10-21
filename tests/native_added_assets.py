@@ -33,9 +33,9 @@ def main():
     try:
         with C.project_context(str(project)):
             image = report / 'MyTexture.png'; Image.new('RGBA', (16, 16), (200, 40, 90, 255)).save(image)
-            texture = A.add('texture', 'Atelier/AddedAssetCheck/Textures', 'MyTexture', sources['texture'], [image])
-            material = A.add('material', 'Atelier/AddedAssetCheck/Materials', 'MyMaterial', sources['material'])
-            model = A.add('mesh', 'Atelier/AddedAssetCheck/Meshes', 'MyMesh', sources['mesh'])
+            texture = A.add('texture', 'Atelier/AddedAssetCheck/Textures', 'MyTexture_7', sources['texture'], [image])
+            material = A.add('material', 'Atelier/AddedAssetCheck/Materials', 'MyMaterial_8', sources['material'])
+            model = A.add('mesh', 'Atelier/AddedAssetCheck/Meshes', 'MyMesh_9', sources['mesh'])
             assets = [texture, material, model]
             assert {row['game_rel'] for row in B.all_imported()} == {row['game_rel'] for row in assets}
             assert len(B.browse_dispatch('Atelier/AddedAssetCheck')) == 3

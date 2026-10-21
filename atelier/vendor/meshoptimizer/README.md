@@ -12,6 +12,10 @@ https://github.com/zeux/meshoptimizer/blob/f0a684f11ead064e176775c9b796f82a55910
 
 `atelier.mesh_optimizer` uses Wasmtime with a 512 MiB guest memory limit and a
 fuel limit, checks this digest before compilation and rejects host imports.
+Fuel scales with index and attribute counts from a one-billion floor up to a
+50-billion ceiling; this admits ordinary dense character sections while keeping
+execution bounded. A limit failure reports an actionable error and leaves the
+authored mesh unchanged.
 The module has no filesystem, network or WASI access. Only this pinned module
 can be loaded; uploaded WASM is never accepted. GC, exceptions, shared-memory
 threads, memory64 and multiple memories are disabled. The Python API's current

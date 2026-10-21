@@ -240,6 +240,14 @@ class GeometryGate(unittest.TestCase):
 
 
 class ConfigPatch(unittest.TestCase):
+    def test_numeric_mesh_names_and_mod_folders_add_the_serializable_fname_bases(self):
+        e = entry(mod='Feature_7')
+        doc = S.patch_config(template_doc(), e, 'Skin', 'Author')
+        self.assertEqual(S.verify_config(doc, e, 'Skin', 'Author'), [])
+        for name in (e['mesh_name'], S.GAME_PREFIX+e['mesh_game_rel'],
+                     e['config_name'], S.GAME_PREFIX+e['config_game_rel']):
+            self.assertIn(name.rsplit('_', 1)[0], doc['NameMap'])
+
     def test_the_template_becomes_this_meshs_config(self):
         e = entry(sculpt=1)
         doc = S.patch_config(template_doc(), e, "The Redeemed Redux", "Tendo")

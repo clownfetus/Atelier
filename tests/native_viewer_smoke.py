@@ -1,4 +1,4 @@
-"""Verify the packaged viewer against configured local game data in an isolated directory.
+"""Verify the source or packaged viewer against real game data in an isolated directory.
 
 Reads game files and native tools; never imports, saves, exports or installs a mod.
 Use a dedicated data directory with a configured project and test-mods destination.
@@ -10,12 +10,15 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import time
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--exe',type=Path,required=True)
+    launch=parser.add_mutually_exclusive_group(required=True)
+    launch.add_argument('--exe',type=Path,help='Packaged Atelier executable')
+    launch.add_argument('--source',action='store_true',help='Launch this checkout in a hidden native WebView2 window')
     parser.add_argument('--data-root',type=Path,required=True)
     parser.add_argument('--report-dir',type=Path,required=True)
     parser.add_argument('--skin',default='1029100')
@@ -25,19 +28,37 @@ def main():
     parser.add_argument('--debug-port',type=int,default=9449)
     parser.add_argument('--design-checks',action='store_true',help='Check the contextual Model Studio and capture visual QA states')
     args=parser.parse_args()
-    data=args.data_root.resolve(strict=True);exe=args.exe.resolve(strict=True)
+    data=args.data_root.resolve(strict=True)
+    root=Path(__file__).resolve().parents[1]
+    exe=args.exe.resolve(strict=True) if args.exe else None
     config=json.loads((data/'mr_config.json').read_text(encoding='utf-8'))
-    if data==exe.parent or not (data/'test-mods').is_dir() or Path(config.get('mods_folder','')).resolve()!=data/'test-mods':
+    if data==(exe.parent if exe else root) or not (data/'test-mods').is_dir() or Path(config.get('mods_folder','')).resolve()!=data/'test-mods':
         raise SystemExit('Use isolated data with its own test-mods directory.')
     for port in (args.app_port,args.debug_port):
         with socket.socket() as probe:
             if probe.connect_ex(('127.0.0.1',port))==0:raise SystemExit(f'Port {port} is already in use.')
     report=args.report_dir.resolve();report.mkdir(parents=True,exist_ok=False)
-    result={'exe_sha256':hashlib.file_digest(exe.open('rb'),'sha256').hexdigest(),'checks':[],'page_errors':[]}
+    result={'mode':'source' if args.source else 'packaged','checks':[],'page_errors':[]}
+    if exe:
+        with exe.open('rb') as stream:
+            result['exe_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
+    else:
+        result['source_root']=str(root)
     env=dict(os.environ,ATELIER_DATA_DIR=str(data),ATELIER_PORT=str(args.app_port),
         WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.debug_port}')
     startup=subprocess.STARTUPINFO();startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=4
-    process=subprocess.Popen([str(exe)],cwd=exe.parent,env=env,startupinfo=startup)
+    if args.source:
+        # Keep testing hooks in the launcher rather than in the shipped application.
+        code=('import webview; create=webview.create_window; '
+              'webview.create_window=lambda *a,**kw:create(*a,**dict(kw,hidden=True)); '
+              'from atelier import hostos; hostos.notify=lambda *a:None; '
+              'hostos.focus_window=lambda *a:None; '
+              'from atelier.web import routes; routes._get_latest_usmap_from_github=lambda:None; '
+              'import window; raise SystemExit(window.main())')
+        command=[sys.executable,'-u','-B','-c',code]
+    else:
+        command=[str(exe)]
+    process=subprocess.Popen(command,cwd=root if args.source else exe.parent,env=env,startupinfo=startup)
     try:
         deadline=time.monotonic()+90
         while time.monotonic()<deadline:
@@ -60,8 +81,12 @@ def main():
                 context.route(f'**/api/{endpoint}',fixture(payload))
             context.route('https://**',lambda route:route.fulfill(json={}))
             page.reload();page.wait_for_function('window.AtelierViewport && window.atelierProject?.()',timeout=120000)
+            page.wait_for_function('!document.querySelector(".overlay.active") || document.querySelector("#changelog-overlay.active")',timeout=120000)
+            if page.locator('#changelog-done').is_visible():
+                page.locator('#changelog-done').click()
             page.wait_for_function('!document.querySelector(".overlay.active")',timeout=120000)
-            print('Ready: configured packaged application; loading the real game skin',flush=True)
+            print(f'Ready: configured {result["mode"]} application; loading the real game skin',flush=True)
+            load_started=time.monotonic()
             if args.mesh_rel:page.evaluate('args=>AtelierViewport.openMesh(args.mesh,args.name)',{'mesh':args.mesh_rel,'name':args.name})
             else:page.evaluate('args=>AtelierViewport.open(args.skin,args.name)',{'skin':args.skin,'name':args.name})
             page.wait_for_function('document.getElementById("viewport-loading").style.display==="none"',timeout=240000)
@@ -69,7 +94,8 @@ def main():
             result['materials']=int(page.locator('#viewport-mat-count').inner_text() or '0')
             result['material_groups']=page.locator('.vp-mat').count()
             result['objects']=page.locator('.vp-obj').count()
-            result['checks'].append('Packaged native mesh/material/texture routes load a real game skin and enable capture')
+            result['load_seconds']=round(time.monotonic()-load_started,2)
+            result['checks'].append('Native mesh/material/texture routes load a real game skin and enable capture')
             print('Ready: real geometry, materials and texture uploads',flush=True)
             page.wait_for_function('document.getElementById("viewport-play").getAttribute("aria-pressed")==="true"',timeout=240000)
             if args.design_checks:
@@ -135,7 +161,7 @@ def main():
             page.locator('#viewport-play').click()
             assert page.locator('#viewport-play').get_attribute('aria-pressed')=='false'
             page.locator('#viewport-animation').select_option('')
-            result['checks'].append('Packaged standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work')
+            result['checks'].append('Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work')
             page.locator('#viewport-settings-menu > summary').click()
             page.locator('#viewport-bloom').click();page.wait_for_timeout(150)
             page.locator('#viewport-bloom').click()

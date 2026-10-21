@@ -475,8 +475,18 @@ def api_skin_materials():
         return json.dumps({"ok": False, "error": "missing skin_id"})
     if body.get('meshes'):
         from atelier.handlers.meshstudio import material_bindings
+        from atelier.handlers.texture import prefetch_exact
+        bindings = list(material_bindings(skin_id, body['meshes']))
+        # A cold character preview can reference dozens of materials. Extract
+        # them together instead of rescanning the game containers for each one.
+        try:
+            prefetch_exact([binding.get('game_rel') for binding in bindings])
+        except jobs.Cancelled:
+            raise
+        except Exception as exc:
+            print(f'[skin_materials] material prefetch failed: {exc}', file=sys.stderr, flush=True)
         out = {}
-        for binding in material_bindings(skin_id, body['meshes']):
+        for binding in bindings:
             gr = binding.get('game_rel')
             try:
                 params = read_material(gr, cache_only=True) if gr else {'colors': [], 'scalars': [], 'textures': {}}

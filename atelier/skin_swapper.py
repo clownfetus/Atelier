@@ -48,6 +48,7 @@ import time
 import urllib.request
 
 from atelier import config
+from atelier.unreal_names import add_names
 
 GAME_PREFIX = "/Game/Marvel/"
 GALACTA = "ProjectGalacta"
@@ -317,11 +318,9 @@ def patch_config(doc, entry, skin_name, author):
         new = renames.get(name)
         if new is not None and new not in names:
             names[i] = new
-    for name in (config_package, entry["config_name"], CLASS_PACKAGE, CLASS_NAME, CDO_NAME,
+    add_names(doc, config_package, entry["config_name"], CLASS_PACKAGE, CLASS_NAME, CDO_NAME,
                  "/Script/Engine", "/Script/CoreUObject", "Package", "BlueprintGeneratedClass",
-                 "SkeletalMesh", mesh_path, entry["mesh_name"]):
-        if name not in names:
-            names.append(name)
+                 "SkeletalMesh", mesh_path, entry["mesh_name"])
     doc["FolderName"] = config_package
     export["ObjectName"] = entry["config_name"]
     package.update(ObjectName=CLASS_PACKAGE, ClassPackage="/Script/CoreUObject", ClassName="Package")
@@ -499,8 +498,7 @@ def _relocate(src, target, package, scratch):
     """Move a cooked mesh package to `package`, changing only its header. src/target are stems."""
     doc, json_path = _to_json(src + ".uasset", os.path.join(scratch, "json", os.path.basename(target)))
     doc["FolderName"] = package
-    if package not in doc.setdefault("NameMap", []):
-        doc["NameMap"].append(package)
+    add_names(doc, package)
     _from_json(doc, json_path, target + ".uasset")
     for ext in (".ubulk", ".uptnl"):
         if os.path.isfile(src + ext):

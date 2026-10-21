@@ -297,10 +297,8 @@ def rename_package(doc, old_name, new_name, new_package):
         raise RuntimeError(f"the template texture has {len(tops)} top-level exports named "
                            f"{old_name!r}, so it cannot be renamed safely")
     tops[0]["ObjectName"] = new_name
-    names = doc.setdefault("NameMap", [])
-    for n in (new_name, new_package):
-        if n not in names:
-            names.append(n)
+    from atelier.unreal_names import add_names
+    add_names(doc, new_name, new_package)
     folder = doc.get("FolderName")
     if isinstance(folder, str) and folder.startswith("/"):
         doc["FolderName"] = new_package

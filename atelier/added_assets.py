@@ -12,6 +12,7 @@ from atelier import config, jobs
 from atelier.index import ensure_index
 from atelier.storage import atomic_json, publish_project_files
 from atelier.tools import uat
+from atelier.unreal_names import add_names
 
 PACKAGE_EXTS = ('.uasset', '.uexp', '.ubulk', '.uptnl')
 IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds'}
@@ -212,9 +213,7 @@ def _retarget(doc, old_name, target, file_type, source_path=None):
     # Opaque cooked payloads can address existing FNames by index. Keep their entries stable.
     doc['NameMap'] = original_names
     doc['FolderName'] = new_package
-    for name in (new_name, new_package):
-        if name not in doc.setdefault('NameMap', []):
-            doc['NameMap'].append(name)
+    add_names(doc, new_name, new_package)
     return doc
 
 
