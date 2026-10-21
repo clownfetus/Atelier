@@ -172,7 +172,7 @@ vm.createContext(environment);vm.runInContext(source.slice(start,end),environmen
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {attachmentRig,bindWeapon,updateWeapon,pairedWeapon,embeddedWeaponMaterials} from 'ATTACHMENT';
-import {applySurface,textureRoles} from 'SURFACE';
+import {applySurface,textureRoles,emissiveColorIndex,applyEmissive} from 'SURFACE';
 const near=(actual,expected)=>assert.ok(actual.distanceTo(new THREE.Vector3(...expected))<1e-8,`${actual.toArray()} != ${expected}`);
 function rig(name,reflected=true){
  const scene=new THREE.Group(),root=new THREE.Bone(),socket=new THREE.Bone();root.name='root';socket.name=name;
@@ -193,6 +193,21 @@ near(new THREE.Vector3(.25,0,0).applyMatrix4(held.root.matrixWorld),[0,-1,0]);
 body.root.position.set(0,2,0);updateWeapon(held,binding);
 near(new THREE.Vector3(.25,0,0).applyMatrix4(held.root.matrixWorld),[0,1,0]);
 assert.equal(bindWeapon(held,body,'left'),null);
+// A wrapper root is not necessarily the authored grip. An inverted blade
+// joint below it must align to the socket instead of retaining the half-turn.
+const wrapped=new THREE.Group(),wrapper=new THREE.Bone(),blade=new THREE.Bone();
+wrapper.name='WP_Root';blade.name='WP_Sword';blade.position.set(.02,0,0);
+blade.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI);
+wrapped.add(wrapper);wrapper.add(blade);
+const dagger={name:'SK_Dagger',root:wrapped,rig:attachmentRig({scene:wrapped})};
+const daggerBinding=bindWeapon(dagger,body,'right');
+assert.equal(daggerBinding.grip.node,blade,'The articulated blade is the grip below the wrapper');
+updateWeapon(dagger,daggerBinding);
+const bladePhysical=blade.matrixWorld.clone().multiply(daggerBinding.grip.inverseExported).multiply(daggerBinding.grip.physical);
+const socketPhysical=body.rig.nodes.get('weapon_r').node.matrixWorld.clone()
+ .multiply(body.rig.nodes.get('weapon_r').inverseExported).multiply(body.rig.nodes.get('weapon_r').physical);
+assert.ok(bladePhysical.elements.every((value,i)=>Math.abs(value-socketPhysical.elements[i])<1e-8),
+ 'Grip position and orientation must both match the socket');
 const sharedBody=rig('SwordRoot'),sharedWeapon=rig('SwordRoot');
 binding=bindWeapon(sharedWeapon,sharedBody);assert.equal(binding.kind,'shared');
 sharedBody.root.position.set(3,0,0);updateWeapon(sharedWeapon,binding);
@@ -223,6 +238,20 @@ assert.equal(material.transparent,true);assert.equal(material.opacity,.8);assert
 applySurface(material,{surface:{blend_mode:'BLEND_Masked',opacity:1,mask_clip:.2}});
 assert.equal(material.alphaTest,.2);assert.equal(material.transparent,false);
 assert.deepEqual(textureRoles({textures:{DiffuseMap:'gem',OpacityMask:'hair'}}),{basecolor:'gem',opacity:'hair'});
+const skin={colors:[{name:'BaseGlowColor',rgba:[1,1,1,0]},{name:'EmissiveColor',rgba:[1,.02,.02,0]}],
+ scalars:[{name:'GlowStrength',value:8},{name:'EmissiveStrength',value:0}]};
+assert.equal(emissiveColorIndex(skin.colors),1,'A separate white base glow must not tint the emissive mask');
+assert.equal(emissiveColorIndex(null),-1);
+material.emissiveMap=new THREE.Texture();applyEmissive(material,skin);
+assert.equal(material.emissiveIntensity,0,'Disabled tattoos must not glow');
+assert.deepEqual(material.emissive.toArray(),[1,.02,.02]);
+skin.scalars[1].value=.038;applyEmissive(material,skin);
+assert.equal(material.emissiveIntensity,.038,'Small authored emission must not be raised to a brightness floor');
+skin.scalars[1].value=9;applyEmissive(material,skin,[.1,.2,.3]);
+assert.equal(material.emissiveIntensity,9);assert.deepEqual(material.emissive.toArray(),[.1,.2,.3]);
+skin.scalars[1].value=-1;applyEmissive(material,skin);assert.equal(material.emissiveIntensity,0);
+material.emissiveMap=null;applyEmissive(material,skin);
+assert.deepEqual(material.emissive.toArray(),[0,0,0],'Removing an emissive map must clear its previous glow');
 const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Array(18).fill(0),3));
 geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute([1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],4));
 geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute([1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],4));

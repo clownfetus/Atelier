@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createViewportInspection } from './viewport-inspection.js';
 import { createViewportAnimation } from './viewport-animation.js';
 import { createViewportFloor } from './viewport-effects.js';
-import { textureRoles, applySurface } from './viewport-materials.js';
+import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, applyEmissive } from './viewport-materials.js';
 import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials } from './viewport-attachments.js';
 
 const $ = id => document.getElementById(id);
@@ -183,21 +183,12 @@ function pickBaseIdx(colors) {
 // separate channel from base colour. Recolouring the glow means changing EmissiveColor, applied
 // through the emissive map, NOT multiplying the whole part's albedo.
 const EMISSIVE_RE = /emiss|glow/i;
-function pickEmissiveIdx(colors) {
-  if (!colors) return -1;
-  return colors.findIndex(c => EMISSIVE_RE.test(c.name || ''));
-}
 function paramRgb(name, idx) {
   const d = matData[name];
   if (!d || idx < 0 || !d.colors[idx]) return null;
   const p = d.colors[idx];
   const rgba = (edited[name] && edited[name][p.name]) || p.rgba;
   return rgba.slice(0,3).map(value=>Math.max(0,value)); // The renderer applies filmic tone mapping once.
-}
-function scalarVal(name, re) {
-  const d = matData[name]; if (!d) return null;
-  const s = (d.scalars || []).find(x => re.test(x.name || ''));
-  return s ? s.value : null;
 }
 
 function init() {
@@ -686,17 +677,11 @@ function retint(name) {
   if (chip) chip.style.background=materialChipColor(name,d);
   const baseRgb = paramRgb(name, d.baseIdx);
   const emiRgb  = paramRgb(name, d.emiIdx);
-  const emiStr  = scalarVal(name, /emiss.*stre|glow.*stre|emissivestrength/i);
   for (const m of (matsByName[name] || [])) {
     // albedo tint (base colour param, else white over the map / grey placeholder)
     if (baseRgb) m.color.setRGB(baseRgb[0], baseRgb[1], baseRgb[2], THREE.LinearSRGBColorSpace);
     else m.color.setHex(m.map ? 0xffffff : 0xb8b8c0);
-    // emissive glow: EmissiveColor tints the emissive mask (only meaningful once the map is applied)
-    if (m.emissiveMap) {
-      if (emiRgb) m.emissive.setRGB(emiRgb[0], emiRgb[1], emiRgb[2], THREE.LinearSRGBColorSpace);
-      else m.emissive.setHex(0xffffff);
-      m.emissiveIntensity = emiStr != null ? Math.min(3, Math.max(0.4, emiStr * 0.03)) : 1.2;
-    }
+    applyEmissive(m, d, emiRgb);
   }
 }
 
@@ -747,16 +732,10 @@ function frameCamera() {
 }
 
 function tintOriginal(material, data) {
-  const base = data.colors?.[pickBaseIdx(data.colors)], emissive = data.colors?.[pickEmissiveIdx(data.colors)];
+  const base = data.colors?.[pickBaseIdx(data.colors)];
   if (base) material.color.setRGB(...base.rgba.slice(0,3).map(v=>Math.max(0,v)), THREE.LinearSRGBColorSpace);
   else material.color.setHex(material.map ? 0xffffff : 0xb8b8c0);
-  material.emissive.setHex(0x000000);
-  if (material.emissiveMap) {
-    if (emissive) material.emissive.setRGB(...emissive.rgba.slice(0,3).map(v=>Math.max(0,v)), THREE.LinearSRGBColorSpace);
-    else material.emissive.setHex(0xffffff);
-    const strength = data.scalars?.find(s => /emiss.*stre|glow.*stre|emissivestrength/i.test(s.name))?.value;
-    material.emissiveIntensity = strength != null ? Math.min(3, Math.max(.4, strength*.03)) : 1.2;
-  }
+  applyEmissive(material, data);
 }
 
 function pickMaterial(name, openEditor = true) {
@@ -1041,7 +1020,7 @@ function sectionEye(name) {
   button.setAttribute('aria-label',`${hidden?'Show':'Hide'} ${label}`);
   button.setAttribute('aria-pressed',String(hidden));
   button.disabled=visibilityBusy.has(name) || !Number.isInteger(info.slot_index) || !!info.mapping_error;
-  button.title=info.mapping_error || (!Number.isInteger(info.slot_index) ? 'Section export mapping is unavailable for this model.' : hidden ? 'Show this section in the preview and exported mod' : 'Hide this section in the preview and exported mod');
+  button.title=info.mapping_error || info.visibility_warning || (!Number.isInteger(info.slot_index) ? 'Section export mapping is unavailable for this model.' : hidden ? 'Show this section in the preview and exported mod' : 'Hide this section in the preview and exported mod');
   if(matsByName[name]?.some(material=>material.userData.heldDuplicate))button.title+=' · Its built-in copy is represented by the held weapon in this preview.';
   const icon=document.createElement('i');icon.dataset.lucide=hidden?'eye-off':'eye';button.append(icon);
   button.addEventListener('click',()=>toggleSection(name));

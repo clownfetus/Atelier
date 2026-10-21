@@ -216,6 +216,16 @@ def preview_bindings(game_rel, requested):
             for i, (r, s) in enumerate(zip(requested, slots))
         ):
             candidates = [slots[item['material_index']]]
+        if len(candidates) > 1 and all(s.get('mi') for s in candidates) and len({s['mi'].casefold() for s in candidates}) == 1:
+            # SharpGLTF merges material definitions shared by multiple cooked
+            # slots. The material is unambiguous, but a single section is not.
+            # Keep its textures/parameters without guessing a visibility target.
+            out.append({'key': item['key'], 'mesh_game_rel': game_rel, 'slot_name': name,
+                        'game_rel': candidates[0]['mi'], 'mapping_via': candidates[0]['via'],
+                        'shared_slots': [{'slot_index': s['index'], 'slot_name': s['slot']} for s in candidates],
+                        'gameplay_tags': sorted({tag for s in candidates for tag in s.get('gameplay_tags', [])}),
+                        'visibility_warning': 'These parts share one preview material. Separate part visibility is unavailable.'})
+            continue
         if len(candidates) != 1:
             out.append({"key": item['key'], "slot_name": name, "mapping_error": 'This section could not be matched uniquely to a cooked mesh slot.'})
             continue
@@ -282,5 +292,7 @@ def material_bindings(skin_id, meshes):
                     binding['game_rel'] = matches[0]
                 elif matches:
                     binding['material_warning'] = 'This recolour has ambiguous material variants; the mesh material was kept.'
-            binding['hidden'] = any(s.get('slot_index') == binding.get('slot_index') and s.get('slot_name') == binding['slot_name'] for s in saved)
+            sections = binding.get('shared_slots') or [binding]
+            binding['hidden'] = all(any(s.get('slot_index') == section.get('slot_index') and
+                                       s.get('slot_name') == section['slot_name'] for s in saved) for section in sections)
             yield binding

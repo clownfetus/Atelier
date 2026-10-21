@@ -162,7 +162,33 @@ class Studio(unittest.TestCase):
         slots=[self.slots[0],{**self.slots[0],'index':1}]
         with patch.object(meshstudio,'cooked_slots',return_value=slots):
             out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
-        self.assertIn('mapping_error',out[0]);self.assertNotIn('slot_index',out[0])
+        self.assertNotIn('slot_index',out[0])
+        self.assertEqual(out[0]['game_rel'],self.slots[0]['mi'])
+        self.assertEqual(len(out[0]['shared_slots']),2)
+
+    def test_shared_hair_material_resolves_without_guessing_an_outline_section(self):
+        material='Characters/1029/1029001/Materials/MI_Hair'
+        slots=[{'index':3,'slot':'MI_HairCards','mi':material,'via':'imports'},
+               {'index':11,'slot':'MI_Outlines','mi':material,'via':'imports'}]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,[{'key':'body::3','name':'MI_Hair','material_index':3}])
+        self.assertEqual(out[0]['game_rel'],material)
+        self.assertNotIn('mapping_error',out[0]);self.assertNotIn('slot_index',out[0])
+        self.assertEqual(out[0]['shared_slots'],[{'slot_index':3,'slot_name':'MI_HairCards'},
+                                              {'slot_index':11,'slot_name':'MI_Outlines'}])
+
+    def test_same_material_basename_in_different_packages_stays_ambiguous(self):
+        slots=[self.slots[0],{**self.slots[0],'index':1,'mi':'Characters/Other/Materials/MI_Body'}]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
+        self.assertIn('mapping_error',out[0]);self.assertNotIn('game_rel',out[0])
+
+    def test_complete_ordered_duplicate_slots_keep_individual_visibility_targets(self):
+        slots=[self.slots[0],{**self.slots[0],'index':1}]
+        requested=[{'key':f'body::{i}','name':'MI_Body','material_index':i} for i in range(2)]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,requested)
+        self.assertEqual([row['slot_index'] for row in out],[0,1])
 
     def test_texture_aliases_are_canonical_and_masks_are_not_albedo(self):
         for name in ('DiffuseMap','Base Color Map','albedo'):

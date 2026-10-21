@@ -310,6 +310,15 @@ class BlenderPort(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'No weapon_l'):
             meshport.attachment_transform(types.SimpleNamespace(bones=[bone('root')]),weapon,'left')
 
+    def test_blade_grip_below_wrapper_keeps_its_authored_position_and_rotation(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_r',0,(-40,0,100))])
+        weapon=types.SimpleNamespace(base='SK_Dagger',bones=[bone('WP_Root'),
+            bone('WP_Sword',0,(2,0,0),(1,0,0,0)),bone('Sword01',1,(0,0,24))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'weapon_r')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['WP_Sword'],
+                                   meshport._bones(body)['weapon_r'],atol=1e-10)
+
     def test_shared_sword_uses_the_handle_at_the_hand_instead_of_the_floor_origin(self):
         body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_r',0,(-48,7,101)),
             bone('Sword_Weapon_Root',0),bone('Sword_WeaponHandle',2,(0,0,20))])

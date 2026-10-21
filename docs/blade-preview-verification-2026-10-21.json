@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-21",
+  "platform": "Windows x64",
+  "mesh": "Characters/1044/1044001/Meshes/SK_1044_1044001_Lobby",
+  "checks": [
+    "Real tattoo strength stays zero; shared hair and eyebrows receive both textures without guessing a section",
+    "Rendered blade vertices point along the hand socket in both real idle and rest poses; the authored grip stays in the hand",
+    "Original-material comparison renders without page or asset errors"
+  ],
+  "load_seconds": 11.03,
+  "page_errors": [],
+  "asset_errors": [],
+  "idle_weapon": {
+    "name": "SK_WP_1044001_Dagger",
+    "grip": "WP_Sword",
+    "tip_vertices": 190,
+    "direction_dot": 0.9999999999999692,
+    "grip_error": 3.0639575237281547e-09
+  },
+  "rest_weapon": {
+    "name": "SK_WP_1044001_Dagger",
+    "grip": "WP_Sword",
+    "tip_vertices": 190,
+    "direction_dot": 0.9999999999999996,
+    "grip_error": 2.7238806614700087e-09
+  },
+  "materials": [
+    {
+      "material": "Characters/1044/1044001/Material/Lobby/MI_1044001_Hair_02",
+      "diffuse_loaded": true,
+      "opacity_loaded": true,
+      "emissive_intensity": 0,
+      "shared_slots": [
+        {
+          "slot_index": 3,
+          "slot_name": "MI_Blade_1044001_Hair"
+        },
+        {
+          "slot_index": 11,
+          "slot_name": "MI_1044001_Outlines"
+        }
+      ],
+      "has_individual_visibility_target": false
+    },
+    {
+      "material": "Characters/1044/1044001/Material/Lobby/MI_1044001_Body",
+      "diffuse_loaded": true,
+      "opacity_loaded": false,
+      "emissive_intensity": 0,
+      "shared_slots": null,
+      "has_individual_visibility_target": true
+    },
+    {
+      "material": "Characters/1044/1044001/Material/Lobby/MI_1044001_Hair_01",
+      "diffuse_loaded": true,
+      "opacity_loaded": true,
+      "emissive_intensity": 0,
+      "shared_slots": null,
+      "has_individual_visibility_target": true
+    }
+  ],
+  "unit_suites": {
+    "test_model_studio.py": 21,
+    "test_model_studio_frontend.py": 6,
+    "test_model_studio_blender.py": 29,
+    "test_viewport_features.py": 13,
+    "test_frontend_cache.py": 4
+  },
+  "limits": [
+    "No in-game validation or new installer build.",
+    "A material merged across several cooked sections supports material editing; separate section hiding stays disabled."
+  ],
+  "blender_attachment": {
+    "check": "Blender assembly uses the actual authored WP_Sword grip on the real extracted mesh",
+    "matrix_max_error": 1.1102230246251565e-16,
+    "anchor": "weapon_r"
+  },
+  "browser_regression": {
+    "checks": 225,
+    "page_errors": [],
+    "seconds": 318.16
+  },
+  "safety_checks": [
+    "Dependency consistency passes",
+    "Changed Python files parse",
+    "No game-key literals in changed source and verification files",
+    "Whitespace check passes",
+    "Native test uses disposable application data and test-mods; no material save or mod install"
+  ]
+}

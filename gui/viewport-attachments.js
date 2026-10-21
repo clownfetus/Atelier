@@ -43,7 +43,10 @@ export function bindWeapon(weapon, body, hand='auto') {
   // sword's origin to the hand would leave its handle offset by 20 cm on Magik.
   const grip=[...source.nodes].find(([name])=>/handle|grip/i.test(name))?.[1]
     || source.nodes.get('weapon_'+side)
-    || [...source.nodes].find(([name,joint])=>weaponBone(name) && !joint.node.parent?.isBone)?.[1]
+    // A generic wrapper such as WP_Root is not the grip. Its first weapon
+    // joint can carry the authored half-turn (Blade's WP_Sword, for example).
+    || [...source.nodes].find(([name,joint])=>weaponBone(name) &&
+      (!joint.node.parent?.isBone || !weaponBone(joint.node.parent.name)))?.[1]
     || shared[0]?.[1]
     || [...source.nodes.values()].find(joint=>!joint.node.parent?.isBone);
   if (hand==='auto' && shared.length) {
