@@ -175,7 +175,7 @@ class NativeInputChecks(unittest.TestCase):
             output.writestr('Tools/AES_KEY.txt', b'fixture private configuration - exclude')
             output.writestr('../outside.txt', b'fixture traversal entry - exclude')
         self.lock['seed'] = {'sha256': N.digest(archive)}
-        self.lock['shader'] = dict(files={'retoc-rivals-cli.exe': sha(b'fixture shader')},
+        self.lock['shader'] = dict(seed_files={'retoc-rivals-cli.exe': sha(b'fixture shader')},
                                    source={'status': 'unavailable'})
         return archive
 
@@ -210,7 +210,7 @@ class NativeInputChecks(unittest.TestCase):
             F.stage_seed(archive, self.output, self.lock)
         self.assertEqual((self.output / 'user-file').read_bytes(), b'keep')
 
-    def test_repository_locks_all_managed_sources_and_discloses_missing_shader_source(self):
+    def test_repository_locks_managed_sources_and_the_reconstructed_shader_source(self):
         lock = N.load_lock()
         N.verify_files(ROOT, lock['recipe'])
         for tool, project in lock['managed'].items():
@@ -219,8 +219,11 @@ class NativeInputChecks(unittest.TestCase):
         sdk = json.loads((ROOT / 'tools-src/global.json').read_text())['sdk']
         self.assertEqual(sdk['version'], lock['dotnet']['sdk'])
         self.assertEqual(sdk['rollForward'], 'disable')
-        self.assertEqual(lock['shader']['source']['status'], 'unavailable')
-        self.assertIsNone(lock['shader']['source']['revision'])
+        self.assertEqual(lock['shader']['source']['status'], 'verified')
+        self.assertEqual(len(lock['shader']['source']['upstream_revision']), 40)
+        self.assertEqual(lock['shader']['source']['directory'], 'tools-src/AtelierShader')
+        self.assertEqual(lock['shader']['legacy']['source']['status'], 'unavailable')
+        self.assertIsNone(lock['shader']['legacy']['source']['revision'])
         self.assertEqual(len(lock['shader']['files']['retoc-rivals-cli.exe']), 64)
 
 

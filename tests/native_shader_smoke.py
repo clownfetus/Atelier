@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -26,6 +27,9 @@ def main():
     parser.add_argument('--paks', type=Path, required=True)
     parser.add_argument('--report-dir', type=Path, required=True)
     parser.add_argument('--validator', type=Path, help='Optional pinned DXV executable for independent DXIL validation')
+    parser.add_argument('--key-file', type=Path, help='Private container read key file; its contents are never logged')
+    parser.add_argument('--baseline-report', type=Path,
+                        help='Compare every index byte with a successful legacy probe of the same game containers')
     parser.add_argument('--reuse-index-from', type=Path,
                         help='Reuse a successful probe report with the exact same tool and game-container stamps')
     args = parser.parse_args()
@@ -43,11 +47,20 @@ def main():
         return {p.name: dict(size=p.stat().st_size, mtime_ns=p.stat().st_mtime_ns,
                             sha256=digest(p) if p.suffix == '.utoc' else None) for p in source_files}
     before = stamps()
+    environment = os.environ.copy()
+    if args.key_file:
+        environment['ATELIER_RETOC_AES_KEY'] = args.key_file.read_text(encoding='utf-8').strip()
+        key = environment['ATELIER_RETOC_AES_KEY'].removeprefix('0x').removeprefix('0X')
+        executable_bytes = retoc.read_bytes()
+        for spelling in (key.lower(), key.upper()):
+            assert spelling.encode() not in executable_bytes and spelling.encode('utf-16-le') not in executable_bytes
+        assert bytes.fromhex(key) not in executable_bytes
+        record['checks'].append('The configured game key is absent from the rebuilt executable')
 
     def run(executable, command, *arguments, expect_success=True):
         started = time.monotonic()
         result = subprocess.run([str(executable), command, *map(str, arguments)], cwd=executable.parent,
-            capture_output=True, text=True, errors='replace', timeout=600,
+            capture_output=True, text=True, errors='replace', timeout=600, env=environment,
             creationflags=subprocess.CREATE_NO_WINDOW)
         # Never retain raw help or embedded defaults, including on a native failure.
         log = re.sub(r'(?i)(?:0x)?[a-f0-9]{64}', '<redacted-key-or-hash>', result.stdout + result.stderr)
@@ -100,6 +113,18 @@ def main():
         assert libraries, 'No shader index entries produced'
         record['libraries'] = libraries
         record['index_sha256'] = {path.parent.name: digest(path) for path in index.glob('*/index.json')}
+        if args.baseline_report:
+            baseline = args.baseline_report.resolve(strict=True)
+            previous = json.loads((baseline / 'results.json').read_text(encoding='utf-8'))
+            assert previous.get('ok') and previous['game_containers'] == before
+            assert previous['tool']['files'] == load_lock()['shader']['legacy']['files']
+            assert libraries == previous['libraries']
+            actual = {path.parent.name: digest(path) for path in (baseline / 'index').glob('*/index.json')}
+            assert actual == record['index_sha256'], 'Reconstructed index differs from the legacy baseline'
+            if previous.get('index_sha256'):
+                assert actual == previous['index_sha256'], 'Legacy baseline changed since its successful test'
+            record['baseline_index_sha256'] = actual
+            record['checks'].append('Every index byte matches the verified legacy baseline for both full shader libraries')
         if args.reuse_index_from:
             assert libraries == verified['libraries'], 'Reused index totals changed'
             if verified.get('index_sha256'):
@@ -123,7 +148,9 @@ def main():
         os.environ['MR_TOOLS'] = str(tools)
         from atelier.handlers import dxc_ir
         ir = dxc_ir.disassemble(original[offset:offset + size])
-        rebuilt, signed = dxc_ir.assemble(ir)
+        edited_ir = ir.replace(b'float 1.000000e+00', b'float 5.000000e-01', 1)
+        assert edited_ir != ir, 'Selected shader has no testable floating-point constant'
+        rebuilt, signed = dxc_ir.assemble(edited_ir)
         assert signed, 'Pinned DXIL validator did not sign the rebuilt shader'
         modified = original[:offset] + rebuilt + original[offset + size:]
         (report / 'reassembled.dxbc').write_bytes(rebuilt)
@@ -138,14 +165,20 @@ def main():
             assert record['validator']['success'], 'DXV did not confirm the shader signature'
         record['dxil'] = dict(original_sha256=hashlib.sha256(original[offset:offset + size]).hexdigest(),
             reassembled_sha256=hashlib.sha256(rebuilt).hexdigest(), signed=signed,
-            bytes_changed=rebuilt != original[offset:offset + size])
-        record['checks'].append('Application DXC COM path disassembles, reassembles and signs the real shader IR')
+            bytes_changed=rebuilt != original[offset:offset + size], constant_changed_from=1.0, constant_changed_to=0.5,
+            original_blob_size=len(original), modified_blob_size=len(modified))
+        record['checks'].append('Application DXC COM path edits a real float constant, reassembles and signs the shader IR')
         if args.validator:
             record['checks'].append('Independent Microsoft DXV validation succeeds for the reassembled shader')
         print('Repacking and reading back the selected shader...', flush=True)
         stage, mod = report / 'stage', report / 'mod'
         run(retoc, 'patch-shader', *containers, '-l', library, '-s', chosen['index'],
             '-b', report / 'reassembled.bin', '-o', stage)
+        loose_libraries = list(stage.rglob('*.ushaderbytecode'))
+        metadata = list(stage.rglob('*.assetinfo.json'))
+        assert len(loose_libraries) == len(metadata) == 1 and metadata[0].parent == loose_libraries[0].parent
+        assert json.loads(metadata[0].read_text()) == {'ShaderCodeToAssets': []}
+        record['checks'].append('The complete loose shader library and its asset metadata share the Unreal content directory')
         run(retoc, 'pack', stage, '-o', mod)
         triples = list(mod.glob('*.utoc'))
         assert len(triples) == 1, 'Expected one isolated mod container'
@@ -157,10 +190,43 @@ def main():
         retained = extract(triples, library, untouched['index'], report / 'untouched-readback.bin')
         assert pristine == retained, 'An unedited shader changed during repacking'
         record['checks'].append('An unedited shader stays byte-identical after the library rebuild')
+        tampered_tools = report / 'tampered-tools'
+        tampered_tools.mkdir()
+        tampered_executable = tampered_tools / retoc.name
+        shutil.copyfile(retoc, tampered_executable)
+        (tampered_tools / 'oo2core_9_win64.dll').write_bytes(b'changed native library')
+        run(tampered_executable, 'pack', stage, '-o', report / 'tampered-mod', expect_success=False)
+        assert not (report / 'tampered-mod').exists()
+        record['checks'].append('A changed Oodle sidecar is refused without publishing a partial mod')
         run(retoc, 'extract-shader', *containers, '-l', library, '-s', '4294967295',
             '-o', report / 'invalid-index.bin', expect_success=False)
         assert not (report / 'invalid-index.bin').exists()
         record['checks'].append('An out-of-range shader index fails without publishing an output')
+        run(retoc, 'extract-shader', *containers, '-l', '../missing-library', '-s', '0',
+            '-o', report / 'missing-library.bin', expect_success=False)
+        assert not (report / 'missing-library.bin').exists()
+        bad_blob = report / 'truncated.bin'
+        bad_blob.write_bytes(modified[:offset + 30])
+        run(retoc, 'patch-shader', *containers, '-l', library, '-s', chosen['index'],
+            '-b', bad_blob, '-o', report / 'bad-stage', expect_success=False)
+        assert not (report / 'bad-stage').exists()
+        bad_wrapper = report / 'wrong-wrapper.bin'
+        changed = bytearray(modified)
+        changed[0] ^= 1
+        bad_wrapper.write_bytes(changed)
+        run(retoc, 'patch-shader', *containers, '-l', library, '-s', chosen['index'],
+            '-b', bad_wrapper, '-o', report / 'bad-wrapper-stage', expect_success=False)
+        assert not (report / 'bad-wrapper-stage').exists()
+        existing = report / 'preserved.bin'
+        existing.write_bytes(b'user data')
+        run(retoc, 'extract-shader', *containers, '-l', library, '-s', chosen['index'],
+            '-o', existing, expect_success=False)
+        assert existing.read_bytes() == b'user data'
+        record['checks'].append('Missing libraries, truncated DXBC, changed wrappers and existing output files fail without publishing or overwriting data')
+        run(retoc, 'info', triples[0])
+        pak_info = json.loads(run(retoc, 'info', triples[0].with_suffix('.pak')))
+        assert pak_info == {'encrypted_index': True, 'files': 0}, 'Companion pak lost its Rivals encrypted-index format'
+        record['checks'].append('The rebuilt container is readable by the ordinary info command')
         record['mod_files'] = {path.name: digest(path) for path in mod.iterdir() if path.is_file()}
         assert stamps() == before, 'Original game container stamps changed'
         record['checks'].append('Original game containers remain unchanged; no mod was installed')

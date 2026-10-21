@@ -23,7 +23,7 @@ def stage_seed(seed, output, lock=None):
         stage.mkdir()
         files = {}
         with zipfile.ZipFile(seed) as archive:
-            for group, inputs in [('AtelierMesh', lock['mesh']['files']), ('shaders', lock['shader']['files'])]:
+            for group, inputs in [('AtelierMesh', lock['mesh']['files']), ('shaders', lock['shader']['seed_files'])]:
                 for name in inputs:
                     rel = group + '/' + name
                     member = 'Tools/' + rel
@@ -38,7 +38,7 @@ def stage_seed(seed, output, lock=None):
                     files[rel] = inputs[name]
         verify_files(stage, files)
         provenance = dict(schema=1, seed=lock['seed'], files=files,
-                          shader_source_status=lock['shader']['source']['status'])
+                          shader_status='legacy seed only; build AtelierShader before use')
         (stage / 'input-provenance.json').write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
         created = False
         try:
@@ -73,7 +73,7 @@ def main():
                 shutil.copyfileobj(response, stream)
         stage_seed(seed, args.tools, lock)
     print(f'Pinned mesh/shader inputs staged: {args.tools.resolve()}')
-    print('The custom shader executable is a verified legacy binary; its original fork source is still unavailable.')
+    print('Build AtelierShader from pinned source before verifying or shipping the shader tool.')
 
 
 if __name__ == '__main__':

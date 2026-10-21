@@ -1,0 +1,43 @@
+[package]
+name = "atelier-shader"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Atelier shader commands for the pinned Rivals retoc library"
+
+[workspace]
+resolver = "2"
+members = ["upstream/retoc-rivals", "upstream/repak", "upstream/oodle_loader"]
+
+[workspace.package]
+repository = "https://github.com/natimerry/repak-rivals"
+authors = ["spuds", "trumank", "natimerry"]
+license = "MIT OR Apache-2.0"
+version = "3.10.2"
+edition = "2021"
+keywords = ["unreal-engine", "pak"]
+
+[workspace.dependencies]
+aes = "0.8.4"
+base64 = "0.22.1"
+strum = { version = "0.26", features = ["derive"] }
+sha1 = "0.10"
+hex = "0.4"
+
+[[bin]]
+name = "retoc-rivals-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "=1.0.100"
+clap = { version = "=4.5.53", features = ["derive"] }
+retoc = { path = "upstream/retoc-rivals" }
+repak = { path = "upstream/repak" }
+serde_json = "=1.0.145"
+tempfile = "=3.23.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = 3

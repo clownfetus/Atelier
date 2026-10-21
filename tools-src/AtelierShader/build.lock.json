@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "upstream": {
+    "repak-rivals": {
+      "url": "https://codeload.github.com/natimerry/repak-rivals/tar.gz/40e42b9130f52038a10d261f9f032e4dc661d1a2",
+      "sha256": "37cbb068f6dbab707a364f11e5c00c0cc18bab06b944d2c4e64ed811d14e7cd2",
+      "revision": "40e42b9130f52038a10d261f9f032e4dc661d1a2"
+    },
+    "retoc-rivals": {
+      "url": "https://codeload.github.com/natimerry/retoc-rivals/tar.gz/e6c985eac480275348976dcc6e8729c1de1bef40",
+      "sha256": "fff4f4364729675a3b6c3e42c11905fc6870dff20da0d94a01db1f7fcb15bfcd",
+      "revision": "e6c985eac480275348976dcc6e8729c1de1bef40"
+    }
+  },
+  "compiler": {
+    "rust_version": "1.96.0",
+    "rust_commit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "target": "x86_64-pc-windows-gnu",
+    "rust_archives": {
+      "cargo": {
+        "url": "https://static.rust-lang.org/dist/2026-05-28/cargo-1.96.0-x86_64-pc-windows-gnu.tar.xz",
+        "sha256": "06b3a0e42f80b420668a9b4e9e10cee1ad8d7fb75d1db8b85f7fb8358b465a4b"
+      },
+      "rustc": {
+        "url": "https://static.rust-lang.org/dist/2026-05-28/rustc-1.96.0-x86_64-pc-windows-gnu.tar.xz",
+        "sha256": "6472d5d19eebeaed5d611a073192bd8e2c378aa0fc4cd3fe514510b0aadeaff2"
+      },
+      "rust-std": {
+        "url": "https://static.rust-lang.org/dist/2026-05-28/rust-std-1.96.0-x86_64-pc-windows-gnu.tar.xz",
+        "sha256": "4502f0fdac8151b874723acb771cc5dca9a33df9f12a40081947909058bb46dc"
+      },
+      "rust-mingw": {
+        "url": "https://static.rust-lang.org/dist/2026-05-28/rust-mingw-1.96.0-x86_64-pc-windows-gnu.tar.xz",
+        "sha256": "092d13da42e200ce37b5caa2443fc43e991eac64fb5e2e178fb220cff799a995"
+      }
+    },
+    "llvm_archive": {
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/llvm-mingw-20261020-msvcrt-x86_64.zip",
+      "sha256": "52a3e3f584a74c3cde8ceb0c6960549683178e03b36818cb02b7ed109a68ff67"
+    }
+  },
+  "git_dependencies": {
+    "ser-hex": "git+https://github.com/trumank/ser-hex?rev=1518a7bb098b42b690b2ae306c0e5fd939265a2b#1518a7bb098b42b690b2ae306c0e5fd939265a2b",
+    "ue_reflection": "git+https://github.com/trumank/meatloaf.git?rev=0c6be9459ade5f4baa0028123fb5ccf22c4a0206#0c6be9459ade5f4baa0028123fb5ccf22c4a0206"
+  },
+  "native_files": {
+    "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+  },
+  "sources": {
+    "Cargo.toml": "44ce96efb151c30bfe88ae3352fb63c79c8356538d95e9e9afa970abb5167c5e",
+    "Cargo.lock": "8dd41f1acef03b66e34ef4798760f75e13c2ce2213292754a63b32fdfd3e5bfe",
+    "src/main.rs": "d3f171418bb0c34a289b3f52f3e2e11a3d278f3cfd05051f0d12d5dead1f2421",
+    "src/shader_commands.rs": "a36ab82ce9c5ebd27f6fe35976519be3575864d41f2fed99bd8aee030da6f69e"
+  },
+  "recipe": {
+    "scripts/build_shader_tool.py": "420cd9a3fcc6dbf8911541ef889fad6ac57c936d3047888e54085524e126a424",
+    "scripts/native_inputs.py": "1e4eb596b819f5c988201429670b786f7a7e0a8af93e5b4f887e777db2057095"
+  }
+}

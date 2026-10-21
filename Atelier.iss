@@ -85,6 +85,8 @@ Source: "dist\Atelier\Tools\AtelierImport\AtelierImport.exe"; DestDir: "{app}\To
 Source: "dist\Atelier\Tools\AtelierImport\CUE4Parse-Natives.dll"; DestDir: "{app}\Tools\AtelierImport"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\AtelierImport\oo2core_9_win64.dll"; DestDir: "{app}\Tools\AtelierImport"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\retoc-rivals-cli.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\build-inputs.json"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\licenses\*"; DestDir: "{app}\Tools\shaders\licenses"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\oo2core_9_win64.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\dxc.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\dxcompiler.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion

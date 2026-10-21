@@ -1,5 +1,10 @@
 # Native tool provenance and verification — 21 October 2026
 
+This earlier report describes the historical shader binary. The subsequent
+[shader reconstruction report](shader-rebuild-verification-2026-10-21.md) verifies
+the maintained source-built replacement. Source-availability statements below
+refer to the original custom fork, whose record now lives under `shader.legacy`.
+
 AtelierAnimation now rebuilds from checksum-pinned inputs. The original custom
 shader retoc fork source was **not found**. Its exact historical executable is
 pinned and tested, and the lock explicitly records that it is not source

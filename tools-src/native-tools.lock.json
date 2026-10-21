@@ -105,41 +105,28 @@
     }
   },
   "shader": {
-    "version": "retoc-rivals-cli 3.4.1",
+    "version": "retoc-rivals-cli 3.10.2-atelier.1",
     "source": {
-      "status": "unavailable",
-      "repository": null,
-      "revision": null,
-      "cargo_lock_sha256": null,
-      "build_recipe": null,
-      "note": "Original custom shader fork was not found. Public natimerry/repak-rivals v3.4.1 and current master do not contain its shader commands; they cannot reproduce this binary.",
-      "related_upstream": {
-        "repository": "https://github.com/natimerry/repak-rivals",
-        "revision": "c45019606900d5fd3c103b282814392295203272",
-        "retoc_submodule_revision": "5ba40fbbe995cd1803ec5fe23cbae96f8cc283bd",
-        "relationship": "same reported version only; custom fork ancestry unverified"
-      },
-      "compiler_evidence": {
-        "rustc_source_revision": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
-        "evidence": "Embedded /rustc/... source paths; flags, target, native linker and Cargo.lock remain unknown."
-      }
-    },
-    "original_binary_artifact": {
-      "url": "https://github.com/clownfetus/Atelier/releases/download/0.3.3/AtelierSetup.exe",
-      "sha256": "6ab75b4efee71abf80c4966fbaa62fd3f0454f49ea558a1eba1264f53a47a313"
+      "status": "verified",
+      "kind": "reconstructed from pinned upstream; original custom fork remains unavailable",
+      "build_lock": "AtelierShader/build.lock.json",
+      "build_lock_sha256": "ea14a3ae057822975189a440773a3d7582c78f70adfe3ae9562275a0aa01795a",
+      "repository": "https://github.com/clownfetus/Atelier",
+      "build_recipe": "scripts/build_shader_tool.py",
+      "upstream_repository": "https://github.com/natimerry/retoc-rivals",
+      "upstream_revision": "e6c985eac480275348976dcc6e8729c1de1bef40",
+      "directory": "tools-src/AtelierShader"
     },
     "commands": [
       "dump-shaders",
       "extract-shader",
       "patch-shader",
-      "patch-shaders",
-      "list-chunks",
-      "map-shaders",
-      "surgical-patch",
-      "pack"
+      "pack",
+      "unpack",
+      "info"
     ],
     "files": {
-      "retoc-rivals-cli.exe": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d",
+      "retoc-rivals-cli.exe": "3eaf66d4e48b13d00e63c46e5703e709556af709dc51b54c1d09c8b4b9c49165",
       "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
       "dxc.exe": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2",
       "dxcompiler.dll": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59",
@@ -149,13 +136,52 @@
       "file": "dxv.exe",
       "sha256": "74528e8e86cdafcb9ecaa26f21a9ad9de9102b0d84213b67435de798b5a807f9",
       "note": "Optional independent native-test input only; not shipped in the legacy seed or needed by Atelier."
+    },
+    "seed_files": {
+      "retoc-rivals-cli.exe": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+      "dxc.exe": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2",
+      "dxcompiler.dll": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59",
+      "dxil.dll": "64be2368211d257a038a7d4ea6bb3e24c878eb8d588c7b8414fccf759b69c2ac"
+    },
+    "legacy": {
+      "version": "retoc-rivals-cli 3.4.1",
+      "source": {
+        "status": "unavailable",
+        "repository": null,
+        "revision": null,
+        "cargo_lock_sha256": null,
+        "build_recipe": null,
+        "note": "Original custom shader fork was not found. Public natimerry/repak-rivals v3.4.1 and current master do not contain its shader commands; they cannot reproduce this binary.",
+        "related_upstream": {
+          "repository": "https://github.com/natimerry/repak-rivals",
+          "revision": "c45019606900d5fd3c103b282814392295203272",
+          "retoc_submodule_revision": "5ba40fbbe995cd1803ec5fe23cbae96f8cc283bd",
+          "relationship": "same reported version only; custom fork ancestry unverified"
+        },
+        "compiler_evidence": {
+          "rustc_source_revision": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+          "evidence": "Embedded /rustc/... source paths; flags, target, native linker and Cargo.lock remain unknown."
+        }
+      },
+      "original_binary_artifact": {
+        "url": "https://github.com/clownfetus/Atelier/releases/download/0.3.3/AtelierSetup.exe",
+        "sha256": "6ab75b4efee71abf80c4966fbaa62fd3f0454f49ea558a1eba1264f53a47a313"
+      },
+      "files": {
+        "retoc-rivals-cli.exe": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d",
+        "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+        "dxc.exe": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2",
+        "dxcompiler.dll": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59",
+        "dxil.dll": "64be2368211d257a038a7d4ea6bb3e24c878eb8d588c7b8414fccf759b69c2ac"
+      }
     }
   },
   "recipe": {
     "scripts/build_animation_decoder.py": "5714c485f41bc9fe87ee8dbbb7b8afec56553a1e079ecddeb9092e05367e5df8",
     "scripts/build_import_server.py": "60888fd230b7baa0a286971c7e98ca25484358cf31303f1a34d56ed7f6ecac7b",
     "scripts/dotnet_bundle.py": "0196bdeea1b9258237b246ba581124e1a6080d2899c4eb037284969f5846c05f",
-    "scripts/native_inputs.py": "21d95e55df44a7deb29624b2af0999d8b3f0971cec0e6cdddeaa56f433527ccf",
+    "scripts/native_inputs.py": "1e4eb596b819f5c988201429670b786f7a7e0a8af93e5b4f887e777db2057095",
     "scripts/pinned_dotnet.py": "cc8e9abc4ce0119f3e616e31f384d945af7d08457be600e98094c308996777e8"
   }
 }

@@ -43,9 +43,27 @@ def verify_shaders(tools, lock=None):
     lock = lock or load_lock()
     folder = Path(tools).resolve() / 'shaders'
     files = verify_files(folder, lock['shader']['files'])
+    source = lock['shader']['source']
+    if source['status'] != 'verified':
+        raise ValueError('Shader tool must be rebuilt from the pinned AtelierShader source')
+    source_lock_path = ROOT / 'tools-src' / source['build_lock']
+    if digest(source_lock_path) != source['build_lock_sha256']:
+        raise ValueError('Shader source build lock SHA-256 mismatch')
+    build_lock = json.loads(source_lock_path.read_text(encoding='utf-8'))
+    verify_files(source_lock_path.parent, build_lock['sources'])
+    verify_files(ROOT, build_lock['recipe'])
+    manifest = json.loads((folder / 'build-inputs.json').read_text(encoding='utf-8'))
+    if manifest.get('tool') != 'AtelierShader' or manifest.get('build_lock_sha256') != source['build_lock_sha256']:
+        raise ValueError('Shader executable has no matching source-build provenance')
+    for name in ('sources', 'recipe', 'upstream', 'compiler', 'git_dependencies', 'native_files'):
+        if manifest.get(name) != build_lock[name]:
+            raise ValueError('Shader build provenance differs from the pinned inputs: ' + name)
+    verify_files(folder, manifest['outputs'])
+    if manifest['outputs'].get('retoc-rivals-cli.exe') != files['retoc-rivals-cli.exe']:
+        raise ValueError('Shader provenance does not identify the pinned executable')
     executable = folder / 'retoc-rivals-cli.exe'
     flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if hasattr(subprocess, 'CREATE_NO_WINDOW') else {}
-    # Help includes a built-in game key. Only return capability names, never raw help.
+    # Retain this precaution for compatibility with historical executables.
     version = subprocess.run([str(executable), '--version'], cwd=folder,
         capture_output=True, text=True, timeout=15, **flags)
     help_result = subprocess.run([str(executable), '--help'], cwd=folder,
@@ -58,5 +76,6 @@ def verify_shaders(tools, lock=None):
                                                   help_result.stdout, re.M) for command in commands):
         raise ValueError('Shader executable is missing required custom commands')
     return dict(files=files, version=version.stdout.strip(), commands=commands,
-                source_status=lock['shader']['source']['status'],
-                rebuildable=lock['shader']['source']['status'] == 'verified')
+                source_status=source['status'], rebuildable=True,
+                source_kind=source['kind'], build_lock_sha256=source['build_lock_sha256'],
+                upstream=build_lock['upstream'])

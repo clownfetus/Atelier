@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--tool', choices=('all', 'animation', 'shader'), default='all')
     parser.add_argument('--report', type=Path)
     parser.add_argument('--require-shader-source', action='store_true',
-                        help='Fail if the original shader fork cannot be rebuilt from verified source')
+                        help='Require the maintained Atelier shader replacement and its source-build provenance')
     args = parser.parse_args()
     lock = load_lock()
     result = dict(lock_sha256=digest(LOCK_PATH))
@@ -21,13 +21,12 @@ def main():
         print('Animation dependencies: exact pinned mesh bundle and native libraries verified.')
     if args.tool in ('all', 'shader'):
         result['shader'] = verify_shaders(args.tools, lock)
-        print('Shader tool: exact legacy binary and custom commands verified; original source unavailable.'
-              if not result['shader']['rebuildable'] else 'Shader tool: verified source build.')
+        print('Shader tool: maintained source build, exact pinned inputs and application commands verified.')
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     if args.require_shader_source and not result.get('shader', {}).get('rebuildable'):
-        raise SystemExit('Original custom shader-fork source, Cargo.lock and build recipe are still missing.')
+        raise SystemExit('Build the shader replacement from its verified source and locked recipe first.')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 """Shader Studio backend — browse & disassemble Marvel Rivals' compiled shaders.
 
-The game ships ~871k SM6/DXIL shaders inside pakchunkShaderAsset + global (IoStore FShaderCodeArchive).
+The game's SM6/DXIL shaders live inside pakchunkShaderAsset + global (IoStore FShaderCodeArchive).
 Dumping every blob would be ~12GB, so we:
   1. build a lightweight SQLite index once (retoc `dump-shaders --index-only`, streamed in),
   2. browse/search it paginated, and
@@ -9,7 +9,7 @@ Dumping every blob would be ~12GB, so we:
 All three tools (retoc, dxc, oo2core) are bundled standalone under Tools/shaders — nothing external.
 """
 import os, re, json, sqlite3, subprocess, threading, struct, tempfile
-from atelier.config import ROOT, TOOLS, PAKS, CNW, dir_glob, _CACHE
+from atelier.config import ROOT, TOOLS, PAKS, CNW, dir_glob, _CACHE, retoc_env
 
 SHADER_TOOLS = os.path.join(TOOLS, "shaders")
 RETOC        = os.path.join(SHADER_TOOLS, "retoc-rivals-cli.exe")
@@ -100,14 +100,14 @@ def _set(**kw):
 def _build_index():
     try:
         os.makedirs(CACHE, exist_ok=True)
-        # 1) dump the per-library index.json (no blobs) — ~2 min on the real game.
-        _set(phase="Extracting shader index from the game (~2 min)…", pct=5)
+        # 1) Read per-library metadata without decompressing shader groups.
+        _set(phase="Preparing shader libraries…", pct=5)
         if os.path.isdir(IDX_DIR):
             import shutil
             shutil.rmtree(IDX_DIR, ignore_errors=True)
         os.makedirs(IDX_DIR, exist_ok=True)
         cmd = [RETOC, "dump-shaders", *_containers(), "-o", IDX_DIR, "--index-only"]
-        r = subprocess.run(cmd, capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+        r = subprocess.run(cmd, capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0:
             raise RuntimeError((r.stderr or r.stdout or "dump-shaders failed").strip().splitlines()[-1])
 
@@ -190,7 +190,7 @@ def disasm(lib, idx):
     blob_path = os.path.join(tmp, "shader.bin")
     try:
         cmd = [RETOC, "extract-shader", *_containers(), "-l", lib, "-s", str(idx), "-o", blob_path]
-        r = subprocess.run(cmd, capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+        r = subprocess.run(cmd, capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0 or not os.path.isfile(blob_path):
             return {"ok": False, "error": (r.stderr or r.stdout or "extract failed").strip().splitlines()[-1]}
         data = open(blob_path, "rb").read()
@@ -237,7 +237,7 @@ def edit_constants(lib, idx):
     blob_path = os.path.join(tmp, "shader.bin")
     try:
         r = subprocess.run([RETOC, "extract-shader", *_containers(), "-l", lib, "-s", str(idx),
-                            "-o", blob_path], capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+                            "-o", blob_path], capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0 or not os.path.isfile(blob_path):
             return {"ok": False, "error": (r.stderr or "extract failed").strip().splitlines()[-1]}
         data = open(blob_path, "rb").read()
@@ -298,7 +298,7 @@ def build_shader_mod(lib, idx, edits, mod_name=""):
     try:
         blob_path = os.path.join(tmp, "shader.bin")
         r = subprocess.run([RETOC, "extract-shader", *_containers(), "-l", lib, "-s", str(idx),
-                            "-o", blob_path], capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+                            "-o", blob_path], capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0 or not os.path.isfile(blob_path):
             return {"ok": False, "error": (r.stderr or "extract failed").strip().splitlines()[-1]}
         data = bytearray(open(blob_path, "rb").read())
@@ -315,13 +315,13 @@ def build_shader_mod(lib, idx, edits, mod_name=""):
         stage = os.path.join(tmp, "stage")
         r = subprocess.run([RETOC, "patch-shader", *_containers(), "-l", lib, "-s", str(idx),
                             "-b", blob_path, "-o", stage], capture_output=True, text=True,
-                           cwd=SHADER_TOOLS, creationflags=CNW)
+                           cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "patch-shader failed").strip().splitlines()[-1]}
 
         modout = os.path.join(tmp, "mod")
         r = subprocess.run([RETOC, "pack", stage, "-o", modout], capture_output=True, text=True,
-                           cwd=SHADER_TOOLS, creationflags=CNW)
+                           cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "pack failed").strip().splitlines()[-1]}
 
@@ -352,7 +352,7 @@ def disassemble_ir(lib, idx):
     try:
         bp = os.path.join(tmp, "s.bin")
         r = subprocess.run([RETOC, "extract-shader", *_containers(), "-l", lib, "-s", str(idx),
-                            "-o", bp], capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+                            "-o", bp], capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0 or not os.path.isfile(bp):
             return {"ok": False, "error": (r.stderr or "extract failed").strip().splitlines()[-1]}
         data = open(bp, "rb").read()
@@ -385,7 +385,7 @@ def build_shader_mod_ir(lib, idx, ir_text, mod_name=""):
 
         bp = os.path.join(tmp, "s.bin")
         r = subprocess.run([RETOC, "extract-shader", *_containers(), "-l", lib, "-s", str(idx),
-                            "-o", bp], capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+                            "-o", bp], capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0 or not os.path.isfile(bp):
             return {"ok": False, "error": (r.stderr or "extract failed").strip().splitlines()[-1]}
         data = open(bp, "rb").read()
@@ -397,12 +397,12 @@ def build_shader_mod_ir(lib, idx, ir_text, mod_name=""):
 
         stage = os.path.join(tmp, "stage")
         r = subprocess.run([RETOC, "patch-shader", *_containers(), "-l", lib, "-s", str(idx),
-                            "-b", bp, "-o", stage], capture_output=True, text=True, cwd=SHADER_TOOLS, creationflags=CNW)
+                            "-b", bp, "-o", stage], capture_output=True, text=True, cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "patch-shader failed").strip().splitlines()[-1]}
         modout = os.path.join(tmp, "mod")
         r = subprocess.run([RETOC, "pack", stage, "-o", modout], capture_output=True, text=True,
-                           cwd=SHADER_TOOLS, creationflags=CNW)
+                           cwd=SHADER_TOOLS, env=retoc_env(), creationflags=CNW)
         if r.returncode != 0:
             return {"ok": False, "error": (r.stderr or r.stdout or "pack failed").strip().splitlines()[-1]}
         triple = [f for f in dir_glob(modout, "*")
