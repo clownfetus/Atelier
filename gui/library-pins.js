@@ -30,6 +30,9 @@
     let prefix = '';
     return path.split('/').map((part, index) => {
       prefix = prefix ? `${prefix}/${part}` : part;
+      const identity = window.AtelierCatalogueArt?.describe(prefix);
+      if (part === identity?.char_id || part === identity?.skin_id)
+        return window.AtelierCatalogueArt.pathLabel(prefix).split('/').at(-1);
       const known = labels instanceof Map ? labels.get(prefix) :
         (labels && Object.hasOwn(labels, prefix) ? labels[prefix] : undefined);
       if (typeof known === 'string' && known.trim()) return readableLabel(known);

@@ -54,6 +54,7 @@ CUSTOM_ROOT = "Atelier/Custom"
 _OPT = "custom_textures"
 _STORE = os.path.join(".atelier", "custom_textures")
 _FILE_RE = re.compile(r"^[0-9a-f]{20}\.png$")
+_HDR_FILE_RE = re.compile(r"^[0-9a-f]{20}\.dds$")
 _NAME_RE = re.compile(r"^T_[A-Za-z0-9_]{1,60}$")
 MIN_SIDE, MAX_SIDE = 4, 8192
 _lock = threading.Lock()
@@ -146,6 +147,8 @@ def assignments(material_game_rel, project_dir=None):
     for slot, rec in (raw or {}).items() if isinstance(raw, dict) else ():
         if (isinstance(slot, str) and slot and isinstance(rec, dict)
                 and _FILE_RE.fullmatch(str(rec.get("file", ""))) and _NAME_RE.fullmatch(str(rec.get("name", "")))):
+            if rec.get('hdr_file') and (not _HDR_FILE_RE.fullmatch(str(rec['hdr_file'])) or rec.get('texture_class') != 'TextureCube'):
+                continue
             try:
                 package_game_rel(material_game_rel, slot, rec['name'], rec.get('folder'))
             except ValueError:
@@ -162,6 +165,8 @@ def public(material_game_rel, project_dir=None):
         result[slot] = {"name": rec["name"], "file": rec["file"], "source": rec.get("source") or "",
                         "size": rec.get("size") or [], "template": rec.get("template") or "",
                         "folder": path.rsplit('/', 1)[0] if '/' in path else '', "game_rel": path}
+        if rec.get('hdr_file'):
+            result[slot].update(texture_class='TextureCube', hdr=True, faces=6)
     return result
 
 
@@ -185,9 +190,10 @@ def prune(project_dir=None):
         for rec in (opts.get(_OPT) or {}).values() if isinstance(opts.get(_OPT), dict) else ():
             if isinstance(rec, dict):
                 used.add(rec.get("file"))
+                used.add(rec.get('hdr_file'))
     removed = 0
     for name in os.listdir(folder):
-        if _FILE_RE.match(name) and name not in used:
+        if (_FILE_RE.fullmatch(name) or _HDR_FILE_RE.fullmatch(name)) and name not in used:
             try:
                 os.remove(os.path.join(folder, name))
                 removed += 1
@@ -221,10 +227,30 @@ def _normalized_png(data):
     return out.getvalue(), (w, h)
 
 
-def assign(material_game_rel, slot, filename, data, template_game_rel, project_dir=None, *, name=None, folder=None):
+def assign(material_game_rel, slot, filename, data, template_game_rel, project_dir=None, *, name=None, folder=None, texture_class=None):
     """Store the user's image and assign it to one slot of one material. Returns public()."""
     project_dir = project_dir or get_import_root()
-    png, size = _normalized_png(data)
+    hdr_data = None
+    is_hdr = Path(filename).suffix.lower() == '.hdr' or (data[:4] == b'DDS ' and len(data) >= 128
+                                                       and int.from_bytes(data[112:116], 'little') & 0x200)
+    if texture_class == 'TextureCube' and not is_hdr:
+        raise ValueError('TextureCube slots need an HDR .hdr image or a six-face HDR DDS.')
+    if is_hdr:
+        if texture_class == 'Texture2D':
+            raise ValueError('Use a TextureCube slot for a six-face HDR cubemap.')
+        from atelier.handlers import hdr_texture
+        from atelier.handlers.texture import ensure_work_base
+        import tempfile
+        base = ensure_work_base(template_game_rel)
+        if not base: raise ValueError('The cubemap template could not be extracted.')
+        with tempfile.TemporaryDirectory(prefix='hdr-slot-') as scratch:
+            doc = hdr_texture.document(base, Path(scratch)/'template')
+            original, _, _ = hdr_texture.read_cooked(doc, base)
+            cube = hdr_texture.prepare(data, filename, original.format, len(original.mips), Path(scratch)/'prepare')
+            png, size = hdr_texture.preview_png(cube, Path(scratch)/'preview'), (cube.size, cube.size)
+            hdr_data = hdr_texture.write_dds(cube)
+    else:
+        png, size = _normalized_png(data)
     file = hashlib.sha256(png).hexdigest()[:20] + ".png"
     image_folder = store_dir(project_dir)
     target = os.path.join(image_folder, file)
@@ -244,9 +270,14 @@ def assign(material_game_rel, slot, filename, data, template_game_rel, project_d
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, target)
+        hdr_file = hashlib.sha256(hdr_data).hexdigest()[:20]+'.dds' if hdr_data is not None else None
+        if hdr_file:
+            from atelier.storage import _atomic_bytes
+            _atomic_bytes(os.path.join(image_folder, hdr_file), hdr_data)
         slots[slot] = {"name": name, "file": file, "size": list(size),
                        "source": os.path.basename((filename or "").replace("\\", "/"))[:120],
                        "template": template_game_rel,
+                       **({'hdr_file': hdr_file, 'texture_class': 'TextureCube'} if hdr_file else {}),
                        **({'folder': target_gr.rsplit('/', 1)[0] if '/' in target_gr else ''} if folder is not None else {})}
         _write(project_dir, material_game_rel, slots)
         prune(project_dir)
@@ -318,6 +349,9 @@ def _duplicate_none_bytes(doc, injected):
     everything the JSON reader did not consume.
     """
     exports = doc.get('Exports') or []
+    from atelier.handlers.hdr_texture import texture_class
+    if texture_class(doc) == 'TextureCube':
+        return 0  # The cube format chain is validated by the HDR path, not the 2D reader's flags.
     if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES' or len(exports) != 1:
         return 0
     export = exports[0]
@@ -449,10 +483,18 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     parts = new_game_rel.split("/")
     injected = os.path.join(scratch, "inject", *parts) + ".uasset"
     os.makedirs(os.path.dirname(injected), exist_ok=True)
-    r = uat(["inject_texture", os.path.abspath(work + ".uasset"), os.path.abspath(png),
-             os.path.abspath(injected), "--usmap", USMAP])
-    if r.returncode or not os.path.isfile(injected):
-        raise RuntimeError("your image could not be encoded: " + _uat_error(r, "inject_texture failed"))
+    from atelier.handlers import hdr_texture
+    if hdr_texture.candidate(work):
+        doc = hdr_texture.document(work, Path(scratch)/'hdr-template')
+        original, _, _ = hdr_texture.read_cooked(doc, work)
+        cube = hdr_texture.prepare(Path(png).read_bytes(), Path(png).name, original.format,
+                                   len(original.mips), Path(scratch)/'hdr-prepare')
+        hdr_texture.inject(work, injected, cube, Path(scratch)/'hdr-inject', doc=doc)
+    else:
+        r = uat(["inject_texture", os.path.abspath(work + ".uasset"), os.path.abspath(png),
+                 os.path.abspath(injected), "--usmap", USMAP])
+        if r.returncode or not os.path.isfile(injected):
+            raise RuntimeError("your image could not be encoded: " + _uat_error(r, "inject_texture failed"))
     json_dir = os.path.join(scratch, "json", *parts[:-1])
     os.makedirs(json_dir, exist_ok=True)
     r = uat(["to_json", os.path.abspath(injected), USMAP, os.path.abspath(json_dir)])
@@ -507,6 +549,15 @@ def _verify_rename(scratch, injected, built, name):
     as an ordinary texture edit would (stage_inject does not decode its output either)."""
     folder = os.path.join(scratch, "verify")
     os.makedirs(folder, exist_ok=True)
+    from atelier.handlers import hdr_texture
+    if hdr_texture.candidate(injected[:-7]):
+        before_doc = hdr_texture.document(injected[:-7], Path(folder)/'before')
+        after_doc = hdr_texture.document(built[:-7], Path(folder)/'after')
+        before = hdr_texture.read_cooked(before_doc, injected[:-7])[0]
+        after = hdr_texture.read_cooked(after_doc, built[:-7])[0]
+        if before != after or after_doc['Exports'][0]['ObjectName'] != name:
+            raise RuntimeError('Renaming the HDR cubemap changed its faces, mips or texture class.')
+        return
     before = _decoded(injected, os.path.join(folder, name + ".injected.png"))
     if before is None:
         print(f"  [warn] {name}: the encoded texture could not be decoded, so the rename is unverified",
@@ -540,10 +591,14 @@ def apply(doc, material_game_rel, slots, scratch, project_dir=None):
     staged = []
     for slot in sorted(slots):
         rec, cur = slots[slot], current[slot]
-        if cur["class"] != "Texture2D":
-            raise RuntimeError(f"{slot}: only Texture2D slots can use your own image "
+        if cur["class"] not in ("Texture2D", "TextureCube"):
+            raise RuntimeError(f"{slot}: only Texture2D and TextureCube slots can use your own image "
                                f"(this slot holds a {cur['class'] or 'non-texture'} asset)")
-        png = os.path.join(folder, rec["file"])
+        if cur['class'] == 'TextureCube' and not rec.get('hdr_file'):
+            raise RuntimeError(f'{slot}: TextureCube slots need an HDR image or six-face HDR DDS.')
+        if cur['class'] == 'Texture2D' and rec.get('hdr_file'):
+            raise RuntimeError(f'{slot}: an HDR cubemap cannot be assigned to a Texture2D slot.')
+        png = os.path.join(folder, rec.get('hdr_file') or rec["file"])
         if not os.path.isfile(png):
             raise RuntimeError(f"{slot}: your image {rec.get('source') or rec['file']} is missing "
                                f"from the project — choose it again in the material editor")

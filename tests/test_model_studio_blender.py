@@ -42,6 +42,37 @@ class BlenderPort(unittest.TestCase):
         self.child='Characters/1029/1029001/Materials/MI_Child'
         self.parent='Characters/1029/1029001/Materials/MI_Parent'
 
+    def test_blender_can_pack_cached_textures_without_adding_project_texture_edits(self):
+        game_rel = 'Meshes/SK_Body'
+        roots = []
+        def manifest(_gr, _mesh, work_base=None, root=None):
+            roots.append(root)
+            target = Path(root)/'Textures/T_Body.png'; target.parent.mkdir(parents=True, exist_ok=True)
+            Image.new('RGB', (8, 8), 'red').save(target)
+            return {'textures': {'Textures/T_Body': {'path': str(target)}}, 'slots': {}, 'warnings': []}
+        def blender(_script, args, _tag):
+            Path(args[1]).write_bytes(b'packed model')
+            return 'BLEND_OK\nMATERIAL_REPORT {}'
+        model = types.SimpleNamespace(lods=[{}], materials=[])
+        with patch.object(meshedit._survey, 'probe', return_value={'status': 'ok', 'warnings': []}), \
+             patch.object(meshedit._survey, 'verdict_text', return_value='Ready'), \
+             patch.object(meshedit._mesh, 'Mesh', return_value=model), \
+             patch.object(meshedit._mesh, 'export_glb', side_effect=lambda _model, _lod, path: Path(path).write_bytes(b'glb')), \
+             patch.object(meshedit._meshmat, 'build_manifest', side_effect=manifest), \
+             patch.object(meshedit, '_run_blender', side_effect=blender), \
+             patch.object(meshedit, '_CACHE', str(self.root/'cache')):
+            result = meshedit.extract_blend(game_rel, base_path='source', project_textures=False)
+        self.assertFalse(result['project_textures'])
+        self.assertTrue(Path(roots[0]).is_relative_to(self.root/'cache'))
+        self.assertFalse(list((self.root/'project').rglob('*.png')))
+        self.assertTrue(Path(result['blend']).is_file())
+        self.assertTrue(json.loads(Path(result['blend']+'.mat.json').read_text())['pack_images'])
+
+    def test_blender_texture_import_choice_requires_a_boolean(self):
+        with patch.object(meshedit._survey, 'probe', return_value={'status': 'ok'}), \
+             patch.object(meshedit._mesh, 'Mesh'), self.assertRaisesRegex(ValueError, 'true or false'):
+            meshedit.extract_blend('Meshes/SK_Body', base_path='source', project_textures='false')
+
     def test_texture_rename_preserves_inline_mips_without_interpreting_pixels_as_headers(self):
         injected=self.root/'encoded.uasset';injected.write_bytes(b'header')
         payload=b'properties'+bytes(range(256))*4+b'inline mips'

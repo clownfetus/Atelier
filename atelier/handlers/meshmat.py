@@ -248,6 +248,7 @@ def extract_textures_to_project(tex_game_rels, root=None):
     reported readonly: that .dds outranks a .png at inject time (texture.stage_inject), so writing
     a .png beside it would show edits in Blender that silently never ship."""
     from atelier.handlers.texture import decode_to_png, ensure_work_base
+    from atelier.handlers.hdr_texture import project_info as hdr_project_info
     root = root or get_import_root()
     project_root=get_import_root()
     grs = sorted(set(g for g in tex_game_rels if g))
@@ -259,7 +260,9 @@ def extract_textures_to_project(tex_game_rels, root=None):
             for src in (project_base(gr,project_root)+'.png', project_base_legacy(gr,project_root)+'.png'):
                 if os.path.isfile(src):
                     os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copy2(src,dst+'.png')
-                    return gr, {'path':dst+'.png','status':'existing','readonly':False}
+                    hdr = hdr_project_info(src[:-4])
+                    if hdr: shutil.copy2(src[:-4]+'.dds', dst+'.dds')
+                    return gr, {'path':dst+'.png','status':'existing','readonly':bool(hdr)}
         for cand, ro in ((dst + ".png", False), (project_base_legacy(gr, root) + ".png", False),
                          (dst + ".dds", True), (project_base_legacy(gr, root) + ".dds", True)):
             if os.path.exists(cand):
@@ -269,9 +272,9 @@ def extract_textures_to_project(tex_game_rels, root=None):
                 if cand.endswith(".png") and _degenerate(cand):
                     print(f"[meshmat] refreshing unusable {os.path.basename(cand)}", file=sys.stderr)
                     break
-                return gr, {"path": cand, "status": "existing", "readonly": ro}
-        # Decode into the viewport cache, then copy ONLY the .png across: decode_to_png leaves a
-        # .dds beside its output, and a .dds in the project would outrank the user's painted .png.
+                return gr, {"path": cand, "status": "existing", "readonly": ro or bool(hdr_project_info(cand[:-4]))}
+        # Decode into the viewport cache. For 2D textures copy only the PNG so a DDS
+        # cannot outrank painted pixels. Cubes retain their authoritative HDR DDS.
         cache_base = project_base(gr, CACHE_3DVIEW)
         png = cache_base + ".png"
         hdr=cache_base+'.hdr'
@@ -301,6 +304,14 @@ def extract_textures_to_project(tex_game_rels, root=None):
             return gr, {"path": None, "status": "failed", "readonly": False}
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         refreshed = os.path.exists(dst + ".png")
+        if hdr_project_info(cache_base):
+            # Keep the six-face HDR payload beside its preview; only the preview
+            # is used as a named Blender input. It is never a paintable HDR source.
+            from atelier.storage import publish_project_files, _digest
+            publish_project_files(root, [{'path': gr+ext, 'before': _digest(dst+ext) if os.path.isfile(dst+ext) else None,
+                                          'source': cache_base+ext} for ext in ('.dds', '.png')])
+            return gr, {'path':dst+'.png','status':'extracted','readonly':True,
+                        'note':'HDR cubemap preserved; this image is a tone-mapped preview.'}
         shutil.copyfile(png, dst + ".png")
         return gr, {"path": dst + ".png", "status": "refreshed" if refreshed else "extracted",
                     "readonly": False}

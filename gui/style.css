@@ -217,7 +217,10 @@ body {
 .card.artwork-card { padding: 0; gap: 0; overflow: hidden; }
 .card.artwork-card .card-thumb { aspect-ratio: 4 / 5; border-radius: 0; }
 .card.artwork-card .card-thumb img.hero-portrait { object-position: center bottom; }
-.card.artwork-card .card-name { min-height: 0; padding: 5px 9px 8px; }
+.card.artwork-card .card-name { width: calc(100% - 18px); margin: 5px 9px 8px; }
+.card-context { width: 100%; color: var(--muted); font: var(--studio-type-label); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card.artwork-card .card-context { padding: 6px 9px 0; }
+.card.artwork-card .card-context + .card-name { margin-top: 2px; }
 .card:active { background: var(--md-sys-color-primary-container); }
 .card-thumb .card-icon {
   color: var(--muted);

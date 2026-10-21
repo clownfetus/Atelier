@@ -810,16 +810,18 @@ async function buildChromaPicker(skinId, meshGameRel) {
   } catch (e) { if (gen === generation) row.style.display = 'none'; return; }
   list = list.filter(s => s.materials > 0);
   if (list.length < 2) { row.style.display = 'none'; return; }
-  sel.innerHTML = list.map(s => {
+  sel.replaceChildren(...list.map(s => {
     const label = s.label ? `${s.label} (${s.name})` : s.name;   // "COASTAL KUMIHO (1060501)"
-    return `<option value="${s.name}"${s.name === (chromaSkin || skinId) ? ' selected' : ''}>${label}`
-      + `${s.name === skinId ? ' — this skin' : ''} · ${s.materials} mat`
-      + `${s.meshes ? `, ${s.meshes} mesh` : ', no mesh'}</option>`;
-  }).join('');
+    const option = document.createElement('option'); option.value = s.name;
+    option.selected = s.name === (chromaSkin || skinId);
+    option.textContent = label + `${s.name === skinId ? ' — this skin' : ''} · ${s.materials} mat`
+      + `${s.meshes ? `, ${s.meshes} mesh` : ', no mesh'}`;
+    return option;
+  }));
   sel.onchange = async () => {
     if (!(await canLeave())) { sel.value = chromaSkin || skinId; return; }
     chromaSkin = sel.value;
-    $('viewport-status').textContent = `Materials: ${chromaSkin}`;
+    $('viewport-status').textContent = `Materials: ${sel.selectedOptions[0]?.textContent || chromaSkin}`;
     loadMaterials(chromaSkin);
   };
   row.style.display = '';

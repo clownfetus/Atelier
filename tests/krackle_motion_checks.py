@@ -124,12 +124,12 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         # The Krackle stage: busy keeps drawing, a result settles and stops, destroy cleans up.
         tab.evaluate("""() => {
           window.stageHost = document.createElement('div'); document.body.append(stageHost);
+          stageHost.style.cssText='position:fixed;top:20px;left:20px;width:160px;height:160px';
           window.stage = AtelierMotion.krackleStage.mount(stageHost, {state:'busy', size:160});
         }""")
         tab.wait_for_timeout(400)
         first = tab.evaluate('stage.frames()')
-        tab.wait_for_timeout(400)
-        assert tab.evaluate('stage.frames()') > first and tab.evaluate("stageHost.dataset.amSleeping") == 'false'
+        tab.wait_for_function('first=>stage.frames()>first&&stageHost.dataset.amSleeping==="false"', arg=first, timeout=8000)
         tab.evaluate("stage.setState('success')")
         tab.wait_for_function("stageHost.dataset.amSleeping === 'true'", timeout=8000)
         settled = tab.evaluate('stage.frames()')

@@ -4,6 +4,7 @@ import threading
 import unicodedata
 
 from atelier import index
+from atelier.identity import identity_tokens
 
 _lock = threading.Lock()
 _generation = None
@@ -28,7 +29,9 @@ def _table_for(entries, catalogue_data):
         names = {key:normalize(entry.get('name') or '') for key,entry in catalogue_data.get('entries',{}).items()}
         def text(path):
             parts = path.split('/')
-            context = [names.get(part, '') for part in parts[1:3]] if parts[0].lower()=='characters' else []
+            parts.extend(key for key in identity_tokens(parts[-1]) if key in names)
+            context = [names[part] for part in parts if part in names]
+            context.extend(names.get(part[:4], '') for part in parts if len(part) == 7 and part in names)
             return normalize(path)+' '+' '.join(context)
         for path, *_ in entries:
             kind = _classify_file(os.path.basename(path), path)
@@ -87,9 +90,10 @@ def search(query, limit=50):
                 groups[kind].append({'name':entry.get('name') or key, 'id':key, 'path':path})
     found = _matches(folder_text, terms)
     totals['folders'] = len(found)
-    groups['folders'] = [{'name':os.path.basename(folders[i]),'path':folders[i]} for i in found[:min(limit,8)]]
+    groups['folders'] = [catalogue.decorate({'type': 'folder', 'name':os.path.basename(folders[i]),
+                                           'path':folders[i]}) for i in found[:min(limit,8)]]
     found = _matches(haystacks, terms)
     totals['assets'] = len(found)
-    groups['assets'] = [{'name':os.path.basename(assets[i][0]), 'game_rel':assets[i][0],
-                         'type':assets[i][1], 'parent':assets[i][2]} for i in found[:limit]]
+    groups['assets'] = [catalogue.decorate({'name':os.path.basename(assets[i][0]), 'game_rel':assets[i][0],
+                         'type':assets[i][1], 'parent':assets[i][2]}) for i in found[:limit]]
     return {**groups,'totals':totals,'building':False}

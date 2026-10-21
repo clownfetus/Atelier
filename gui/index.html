@@ -549,6 +549,10 @@
           Open assets automatically after importing
         </label>
       </div>
+      <div class="setup-field">
+        <label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-blender-project-textures" checked><span class="switch-track"></span></span>Add model textures to the project when opening in Blender</label>
+        <p class="setup-note">Turn this off to keep textures packed in the Blender file. Only the model is added to your project.</p>
+      </div>
     </div>
     <div class="setup-foot">
       <div class="modal-row">
@@ -833,7 +837,7 @@
 
 <!-- ── context menu ── -->
 <div id="ctx-menu"></div>
-<input type="file" id="ctx-file-input" accept="image/*" style="display:none">
+<input type="file" id="ctx-file-input" accept="image/*,.hdr,.dds" style="display:none">
 
 <!-- Krackle folder; generated with motion/folder-flap.svg by scripts/krackle_art.py. -->
 <template id="folder-flap-template">

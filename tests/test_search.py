@@ -50,6 +50,18 @@ class Search(unittest.TestCase):
         self.assertEqual(S.search('')['totals']['assets'],0)
         self.assertEqual(len(S.search('cafe','bad')['assets']),50)
 
+    def test_names_resolve_in_flat_ui_vfx_and_plugin_paths(self):
+        paths = ['UI/Textures/HeroGallery/HeroDetail/Skin/BattleCustom/1029001/T_Portrait',
+                 'VFX/1029/1029001/Textures/T_Glow', 'Plugins/MarvelGAS/UI/1029001/T_Icon', 'UI/T_1029001_Card']
+        with patch.object(I, '_INDEX', [(path+'.uasset', 'fixture', 'mount') for path in paths]):
+            result = S.search('eclair cafe')
+            self.assertEqual(result['totals']['assets'], 4)
+            self.assertTrue(all(item['char_name'] == 'Éclair' and item['skin_name'] == 'Café armour'
+                                for item in result['assets']))
+            folder = next(item for item in result['folders'] if item['path'].endswith('/1029001'))
+            self.assertEqual(folder['display_name'], 'Café armour')
+            self.assertIn('1029001', folder['path'])
+
     def test_replaced_index_and_catalogue_invalidate_cached_table(self):
         S.search('cafe');first=S._table
         S.search('cafe');self.assertIs(first,S._table)

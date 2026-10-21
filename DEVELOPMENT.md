@@ -956,3 +956,17 @@ read the installed game; successful readback does not establish in-game renderin
 
 See [the feature verification report](docs/feature-verification-2026-10-21.md)
 for results, the cold-preview and simplifier fixes, evidence locations and limits.
+
+## Identity, HDR and Blender texture checks (22 October 2026)
+
+`tests/native_identity.py` compares browser/Python identities across the installed
+game's recognized ID folders and captures the actual legendary skin library.
+`tests/native_blender_texture_choice.py` checks that disabling project texture
+copies preserves existing paint, packs it in Blender and adds only model files.
+`tests/native_hdr_textures.py` builds HDR cubemaps and a material into an isolated
+mod, then checks every face/mip with the pinned independent CUE4Parse reader.
+The latter requires the exact SDK from `tools-src/native-tools.lock.json`.
+
+All three accept `--data-dir` and a fresh `--report-dir`. Use configured,
+isolated data, with a report-local test-mod destination for the HDR check.
+See [results, commands and supported HDR layouts](docs/identity-hdr-blender-verification-2026-10-22.md).

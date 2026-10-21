@@ -387,8 +387,10 @@ def api_browse_material_dirs():
     out = [v for v in acc.values() if v["materials"] or v["meshes"]]
     try:
         from atelier.handlers.skinnames import label_for
+        from atelier.catalogue import catalogue
         for v in out:
-            v["label"] = label_for(v["name"])      # "COASTAL KUMIHO" etc., None if unknown
+            display = catalogue.decorate({'type': 'folder', 'name': v['name'], 'rel_path': path.rstrip('/') + '/' + v['name']})
+            v["label"] = ' · '.join(filter(None, (display.get('context_label'), display.get('display_name')))) or label_for(v["name"])
     except Exception:
         pass
     out.sort(key=lambda v: v["name"])
@@ -1511,7 +1513,8 @@ def api_catalogue_library():
                          if re.fullmatch(r'\d{7}', sid) and skin.get('hero') == key and skin.get('image')]
         heroes.append(hero)
     response.content_type = 'application/json'
-    return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold())})
+    return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold()),
+                       'identities': catalogue.identity_entries()})
 
 @app.get("/api/browse")
 def api_browse():
@@ -2112,6 +2115,7 @@ def api_material_sources():
     """Search installed MI paths without importing any materials into the project."""
     from atelier.index import ensure_index
     from atelier.handlers.skinnames import char_name, skin_name
+    from atelier.catalogue import catalogue
     response.content_type = "application/json"
     query = (request.query.getunicode("q") or "").strip().casefold()
     if len(query) < 2:
@@ -2123,7 +2127,10 @@ def api_material_sources():
             continue
         parts = path.split("/")
         label = ""
-        if len(parts) > 3 and parts[0] == "Characters":
+        identity = catalogue.identity(path)
+        if identity:
+            label = " · ".join(n for n in (identity['char_name'], identity['skin_name']) if n)
+        if not label and len(parts) > 3 and parts[0] == "Characters":
             label = " · ".join(n for n in (char_name(parts[1]), skin_name(parts[2])) if n)
         if all(word in (path + " " + label).casefold() for word in words):
             matches[path[:-7]] = label
@@ -2152,7 +2159,7 @@ def api_material_replace():
 # See handlers/custom_texture.py. Assigned on upload, like dye-off: it is an export option on the
 # material, not one of the parameter edits the editor's Save writes into the material JSON.
 
-def _custom_tex_slot(gr, slot):
+def _custom_tex_slot(gr, slot, with_class=False):
     """The slot's current game texture, or ValueError naming why it cannot take a custom one."""
     if not is_material(gr):
         raise ValueError("custom textures can only be assigned to a material (MI_…)")
@@ -2160,10 +2167,10 @@ def _custom_tex_slot(gr, slot):
         slots = _material_mod.texture_slots(json.load(stream))
     if slot not in slots:
         raise ValueError(f"this material has no texture slot named {slot!r}")
-    if slots[slot]["class"] != "Texture2D":
+    if slots[slot]["class"] not in ("Texture2D", "TextureCube"):
         raise ValueError(f"{slot} holds a {slots[slot]['class'] or 'non-texture'} asset; "
-                         f"only Texture2D slots can use your own image")
-    return slots[slot]["game_rel"]
+                         f"only Texture2D and TextureCube slots can use your own image")
+    return (slots[slot]['game_rel'], slots[slot]['class']) if with_class else slots[slot]["game_rel"]
 
 @app.post("/api/material_custom_texture")
 def api_material_custom_texture():
@@ -2174,10 +2181,10 @@ def api_material_custom_texture():
     if not gr or not slot or not upload:
         return json.dumps({"ok": False, "error": "missing game_rel, slot or file"})
     try:
-        template = _custom_tex_slot(gr, slot)
+        template, texture_class = _custom_tex_slot(gr, slot, with_class=True)
         custom = _custom_tex.assign(gr, slot, upload.raw_filename or upload.filename,
                                     upload.file.read(), template, name=request.forms.getunicode('name'),
-                                    folder=request.forms.getunicode('folder'))
+                                    folder=request.forms.getunicode('folder'), texture_class=texture_class)
         return json.dumps({"ok": True, "game_rel": gr, "custom_textures": custom})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
@@ -2796,6 +2803,7 @@ def api_open_projects_folder():
 def api_replace_texture():
     from PIL import Image
     import io
+    response.content_type = 'application/json'
     gr     = request.forms.get("game_rel", "").strip()
     upload = request.files.get("file")
     if not gr or not upload:
@@ -2806,7 +2814,25 @@ def api_replace_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "asset not imported — edit it first"})
     try:
-        img = Image.open(io.BytesIO(upload.file.read())).convert("RGBA")
+        from atelier.handlers import hdr_texture
+        payload = upload.file.read(hdr_texture.MAX_BYTES + 1)
+        if len(payload) > hdr_texture.MAX_BYTES:
+            raise ValueError('Choose a replacement texture up to 512 MB.')
+        extension = os.path.splitext(upload.raw_filename or upload.filename)[1].lower()
+        cube_dds = payload[:4] == b'DDS ' and len(payload) >= 128 and int.from_bytes(payload[112:116], 'little') & 0x200
+        if extension == '.hdr' or extension == '.dds' and (cube_dds or hdr_texture.project_info(dst[:-4])):
+            info = hdr_texture.replace_project(gr, upload.raw_filename or upload.filename, payload)
+            thumb = os.path.join(THUMBS_DIR, *gr.split('/')) + '.png'
+            try:
+                if os.path.isfile(thumb): os.remove(thumb)
+            except OSError:
+                pass
+            return json.dumps({'ok': True, 'token': token(gr), 'game_rel': gr, **info})
+        if hdr_texture.project_info(dst[:-4]):
+            raise ValueError('Replace this TextureCube with an HDR .hdr image or cubemap DDS. Its PNG is a tone-mapped preview.')
+        if extension == '.dds' and payload[84:88] == b'DX10' and len(payload) >= 148 and int.from_bytes(payload[128:132], 'little') in hdr_texture.FORMATS:
+            raise ValueError('Use a TextureCube template for HDR replacements. HDR Texture2D replacement is not supported.')
+        img = Image.open(io.BytesIO(payload)).convert("RGBA")
         img.save(dst, "PNG")
         thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
         try:
@@ -2826,6 +2852,9 @@ def api_open_with():
     gr   = request.query.get("game_rel", "")
     if gr:
         path = _import_base(gr) + ".png"
+        from atelier.handlers.hdr_texture import project_info as hdr_project_info
+        if hdr_project_info(_import_base(gr)):
+            path = _import_base(gr) + '.dds'
     if path:
         abs_path = os.path.abspath(path)
         if os.path.exists(abs_path):
@@ -2909,13 +2938,14 @@ def api_mesh_blend_extract():
         report = meshsurvey.probe(base)
         if report["status"] != "ok" and not force:
             return json.dumps({"ok": False, "can_force": True, "error": meshsurvey.verdict_text(report)})
-        r = meshedit.extract_blend(gr, base_path=base, force=True)
+        r = meshedit.extract_blend(gr, base_path=base, force=True, project_textures=body.get('project_textures', True))
         # probe() reports warnings as bare keys ("morphs"); expand them so the UI shows the
         # sentence rather than the code.
         warnings = [meshsurvey.WARNINGS.get(w, w) for w in r["warnings"]]
         return json.dumps({"ok": True, "blend": r["blend"].replace("\\", "/"),
                            "preflight": r["preflight"], "warnings": warnings,
                            "textures": r["textures"], "materials": r["materials"],
+                           "project_textures": r.get('project_textures', True),
                            "info": r["info"]})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})

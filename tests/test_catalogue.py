@@ -193,9 +193,10 @@ class CatalogueTests(unittest.TestCase):
             build_entries({'1029': {'name': 'Magik', 'skins': {}}},
                           [{'name': 'Magik', 'image': IMAGE, 'page': HERO}], lambda _: '<html>Changed</html>', lambda _: [])
 
-    def test_only_character_and_skin_folder_paths(self):
-        for path in ('Characters/1029/1029100/Textures', 'Characters/1036/1029100', '../1029', 'UI/1029'):
+    def test_only_exact_identity_folder_paths(self):
+        for path in ('Characters/1029/1029100/Textures', 'Characters/1036/1029100', '../1029', 'UI/Com'):
             self.assertIsNone(self.catalogue.describe(path))
+        self.assertEqual(self.catalogue.describe('UI/1029')['name'], 'Magik')
         self.assertIn('1029100', self.catalogue.describe('Characters/1029/1029100')['thumbnail'])
         self.assertTrue(self.catalogue.describe('Characters/1029/1029999')['hero_fallback'])
 

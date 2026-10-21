@@ -187,6 +187,9 @@ def decode_png(import_base, uasset_base):
     """Decode one extracted UE texture to .png. Existing output survives failures."""
     if not os.path.exists(uasset_base + '.uasset'):
         return
+    from atelier.handlers import hdr_texture
+    if hdr_texture.extract_files(import_base, uasset_base):
+        return
     if not _decode_png_file(uasset_base + '.uasset', import_base + '.png'):
         print(f'  [warn] PNG decode failed for {os.path.basename(import_base)}', file=sys.stderr)
 
@@ -223,7 +226,12 @@ def decode_flat(game_rels, output_dir):
                 from PIL import Image
                 with Image.open(temporary + ".png") as image:
                     image.verify()
-                os.replace(temporary + ".png", dst + ".png")
+                if os.path.isfile(temporary + '.dds'):
+                    from atelier.storage import publish_project_files
+                    publish_project_files(output_dir, [{'path': gr+ext, 'before': None, 'source': temporary+ext}
+                                                      for ext in ('.dds', '.png')])
+                else:
+                    os.replace(temporary + ".png", dst + ".png")
     grs = list(game_rels)
     if not grs: return
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(grs))) as ex:
@@ -845,6 +853,9 @@ def decode_to_png(import_base, uasset_base):
     callers that must not produce one (a PROJECT folder, where a .dds outranks the .png at inject
     time) should decode into a cache dir and copy only the .png out."""
     os.makedirs(os.path.dirname(import_base), exist_ok=True)
+    from atelier.handlers import hdr_texture
+    if hdr_texture.extract_files(import_base, uasset_base):
+        return import_base + '.png'
     out_png = import_base + ".png"
     dds = None
     try:
@@ -1033,6 +1044,9 @@ def stage_inject(stage, game_rel, opts=None):
     work_base = ensure_work_base(game_rel)
     if not work_base or not os.path.exists(work_base + ".uasset"):
         raise RuntimeError(missing_reason(game_rel, "texture"))
+    from atelier.handlers import hdr_texture
+    if hdr_texture.candidate(work_base):
+        return hdr_texture.stage(stage, game_rel, work_base, import_base, opts)
     blank_note = ""
     if opts.get("blank"):
         # Generated fresh into the cache, never into the project: the project PNG is the user's

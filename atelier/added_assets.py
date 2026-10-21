@@ -15,8 +15,8 @@ from atelier.tools import uat
 from atelier.unreal_names import add_names
 
 PACKAGE_EXTS = ('.uasset', '.uexp', '.ubulk', '.uptnl')
-IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds'}
-CLASSES = {'texture': {'Texture2D'}, 'material': {'MaterialInstanceConstant'},
+IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds', '.hdr'}
+CLASSES = {'texture': {'Texture2D', 'TextureCube'}, 'material': {'MaterialInstanceConstant'},
            'mesh': {'SkeletalMesh', 'StaticMesh'}}
 PREFIXES = {'texture': 'T_', 'material': 'MI_', 'mesh': 'SK_'}
 GAME_ROOT = '/Game/Marvel/'
@@ -149,8 +149,10 @@ def browse(path='', file_type=None):
     for item in library_items(path):
         if item['type'] == 'folder' or item['file_type'] == file_type:
             children.setdefault(item['name'].casefold(), item)
+    from atelier.catalogue import catalogue
     return {'ok': True, 'path': path,
-            'items': sorted(children.values(), key=lambda item: (item['type'] != 'folder', item['name'].casefold()))}
+            'items': [catalogue.decorate(item) for item in sorted(children.values(),
+                      key=lambda item: (item['type'] != 'folder', item['name'].casefold()))]}
 
 
 def _read_package(base, directory):
@@ -271,13 +273,31 @@ def add(file_type, folder, name, source='', files=()):
                 _export(doc, os.path.basename(original), file_type)
             original_lods = _mesh_lods(original)
         image = None
+        from atelier.handlers import hdr_texture
+        is_cube = file_type == 'texture' and hdr_texture.texture_class(doc) == 'TextureCube'
+        hdr_cube = None
+        if is_cube:
+            hdr_cube, _, _ = hdr_texture.read_cooked(doc, original)
         if images:
-            png, _size = custom_texture._normalized_png(images[0].read_bytes())
+            if is_cube:
+                hdr_cube = hdr_texture.prepare(images[0].read_bytes(), images[0].name, hdr_cube.format,
+                                               len(hdr_cube.mips), work/'hdr-prepare')
+                png = hdr_texture.preview_png(hdr_cube, work/'hdr-preview')
+            else:
+                if images[0].suffix.lower() == '.hdr':
+                    raise ValueError('Choose a TextureCube game template for an HDR cubemap.')
+                payload = images[0].read_bytes()
+                if payload[:4] == b'DDS ' and len(payload) >= 128 and int.from_bytes(payload[112:116], 'little') & 0x200:
+                    raise ValueError('Choose a TextureCube game template for a six-face cubemap DDS.')
+                png, _size = custom_texture._normalized_png(payload)
             image = work / 'image.png'; image.write_bytes(png)
         elif file_type == 'texture':
-            preview = work / 'preview' / 'source'
-            texture.decode_to_png(str(preview), original)
-            image = preview.with_suffix('.png')
+            if is_cube:
+                image = work/'image.png'; image.write_bytes(hdr_texture.preview_png(hdr_cube, work/'hdr-preview'))
+            else:
+                preview = work / 'preview' / 'source'
+                texture.decode_to_png(str(preview), original)
+                image = preview.with_suffix('.png')
             if not image.is_file():
                 raise ValueError('The texture could not be decoded for editing.')
         # The typed UE5 texture JSON writer can append a second None terminator.
@@ -307,9 +327,12 @@ def add(file_type, folder, name, source='', files=()):
             encoded = work / 'encoded' / compiled.name
             for template, output in ((Path(original + '.uasset'), baseline), (compiled, encoded)):
                 output.parent.mkdir()
-                result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
-                if result.returncode != 0 or not output.is_file():
-                    raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
+                if is_cube:
+                    hdr_texture.inject(str(template.with_suffix('')), output, hdr_cube, work/('hdr-'+output.parent.name))
+                else:
+                    result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
+                    if result.returncode != 0 or not output.is_file():
+                        raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
             custom_texture.repair_export_tail(str(encoded), str(work / 'texture-tail'))
             custom_texture._verify_rename(str(work), str(baseline), str(encoded), compiled.stem)
             compiled = encoded
@@ -329,11 +352,15 @@ def add(file_type, folder, name, source='', files=()):
         package_path = '.atelier/added-assets/' + identity + '/' + compiled.stem
         marker = work / 'record.json'
         atomic_json(marker, {'version': 1, 'id': identity, 'file_type': file_type,
-                             'source': source_gr or packages[0].name})
+                             'source': source_gr or packages[0].name,
+                             **({'texture_class': 'TextureCube', 'hdr': True} if is_cube else {})})
         changes = [{'path': package_path + ext, 'before': None, 'source': str(compiled.with_suffix(ext))}
                    for ext in PACKAGE_EXTS if compiled.with_suffix(ext).is_file()]
         changes += [{'path': target + editor_ext, 'before': None, 'source': str(editor_file)},
                     {'path': target + '.asset.json', 'before': None, 'source': str(marker)}]
+        if is_cube:
+            dds = work/'image.dds'; dds.write_bytes(hdr_texture.write_dds(hdr_cube))
+            changes.append({'path': target+'.dds', 'before': None, 'source': str(dds)})
         jobs.checkpoint(); _available(target); jobs.begin_publication('Adding the asset to your project…')
         publish_project_files(root, changes)
     return {'ok': True, 'game_rel': target, 'file_type': file_type, 'name': target.rsplit('/', 1)[-1], 'token': token(target)}

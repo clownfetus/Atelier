@@ -18,6 +18,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BROWSER_SUITES = {
+    "shared_identity_checks.py": "--shared-identity-only",
+    "texture_workflow_checks.py": "--texture-workflows-only",
     "browser_smoke.py": None,
     "surfaces_checks.py": "--surfaces-only",
     "polish_checks.py": "--polish-only",

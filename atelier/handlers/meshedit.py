@@ -134,7 +134,7 @@ def _run_blender(script, args, label):
     return out
 
 
-def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True, texture_root=None, pack_images=False, presentation_hidden=()):
+def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True, texture_root=None, pack_images=False, presentation_hidden=(), project_textures=True):
     """Decode a mesh's top LOD to a .blend in the active project folder.
 
     Refuses up front on a format this pipeline cannot rebuild. The check runs here, at
@@ -153,6 +153,13 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
               "fail or produce a broken package.")
     m = _mesh.Mesh(base)
     project_extract = blend_path is None
+    if not isinstance(project_textures, bool):
+        raise ValueError('The project textures option must be true or false.')
+    if not project_textures:
+        import hashlib
+        owner = hashlib.sha256(os.path.realpath(get_import_root()).encode('utf-8')).hexdigest()[:16]
+        texture_root = texture_root or os.path.join(_CACHE, 'blender-textures', owner)
+        pack_images = True
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     os.makedirs(os.path.dirname(blend_path), exist_ok=True)
 
@@ -198,6 +205,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
             "preflight": _survey.verdict_text(report),
             "textures": textures,
             "materials": sorted((manifest or {}).get("slots", {}).keys()), 'material_report':material_report,
+            'project_textures': project_textures,
             'material_manifest_complete':manifest is not None and not manifest.get('incomplete'),
             'material_issues':(manifest or {}).get('incomplete',[])}
 

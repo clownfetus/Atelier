@@ -325,8 +325,8 @@ await (async () => {
     throw new Error("a custom slot must preview the stored image, cache-busted by its content hash");
   if (!th.includes("Use my own image…") || !th.includes("T_Body_N"))
     throw new Error("a game-texture slot must name its texture and offer an image");
-  if (!th.includes("Only 2D textures can use your own image"))
-    throw new Error("a non-2D slot must say why it cannot take an image");
+  if (!th.includes("Use my HDR cubemap…") || !th.includes("all six faces and HDR values"))
+    throw new Error("a cubemap slot must offer HDR input and explain the preserved faces and range");
   if (th.includes("Hood <1>") || th.includes("T_<Cube>"))
     throw new Error("asset and file names must be escaped");
 
@@ -339,7 +339,10 @@ await (async () => {
     return { json: async () => ({ ok: true, custom_textures: { ...matEditor.custom,
       Normal: { name: "T_Scales", file: "abcdef0123456789abcd.png", size: [512, 512], game_rel: "Atelier/Custom/n/T_Scales" } } }) }; };
   _matTexInput.click = () => {};                 // the stub element has no file dialog
+  matCustomTexturePick(1);                       // Env is a cubemap
+  if (_matTexInput.accept !== '.hdr,.dds') throw new Error('cubemap selection must request HDR or DDS');
   matCustomTexturePick(2);                       // sorted: BaseColor, Env, Normal
+  if (_matTexInput.accept.includes('.hdr')) throw new Error('2D selection must retain its image formats');
   await matCustomTextureUpload(_matTexTarget, { name: "scales.png" });
   if (sent.length !== 1 || sent[0][0] !== "/api/material_custom_texture" || sent[0][1].slot !== "Normal"
       || sent[0][1].game_rel !== "Characters/1015/MI_Body")

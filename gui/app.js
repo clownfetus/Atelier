@@ -321,14 +321,14 @@ function renderBreadcrumbs() {
     accumulated = accumulated ? `${accumulated}/${part}` : part;
     const isLast = i === parts.length - 1;
     const identity = window.AtelierRoster?.describe(accumulated);
-    const named = i === 1 && parts[0] === 'Characters' ? identity?.hero?.name :
-      i === 2 && parts[0] === 'Characters' ? identity?.skin?.name : null;
+    const named = part === identity?.char_id ? identity?.hero?.name :
+      part === identity?.skin_id ? identity?.skin?.name : null;
     const label = named || (_pathLabels[accumulated] || part).replace(/^\d+\s*[—–-]\s*/, '');
     bc.appendChild(sep());
     const node = crumb(label, isLast ? null : { path: accumulated });
     node.title = label + '\n' + accumulated;
-    if (i === 1 && parts[0].toLowerCase() === 'characters') {
-      const art = window.AtelierCatalogueArt?.heroChip(accumulated); if (art) node.prepend(art);
+    if (named && (part === identity?.char_id || !identity?.hero_path)) {
+      const art = window.AtelierCatalogueArt?.identityChip(accumulated); if (art) node.prepend(art);
     }
     bc.appendChild(node);
   }
@@ -340,6 +340,10 @@ function renderBreadcrumbs() {
 }
 
 // ── grid rendering ────────────────────────────────────────────────────────────
+window.addEventListener('atelier:identities-updated', () => {
+  renderBreadcrumbs(); window.AtelierLibraryPins?.updateLabels(_pathLabels); renderHomePins();
+  window.AtelierCatalogueArt?.tray(Object.values(sidebarData));
+});
 function _makeCard(item) {
   const parts = (item.game_rel || item.rel_path || "").split("/");
   const searchText = [item.char_name, item.skin_name, item.skin_id,
@@ -350,6 +354,8 @@ function _makeCard(item) {
       name:    item.name,
       rel_path: item.rel_path,
       label:   item.label || item.name,
+      displayName: item.display_name,
+      contextLabel: item.context_label,
       pinLabel: AtelierLibraryPins.makePinLabel(item.rel_path, _pathLabels),
       searchText,
       iconCls: folderIconCls(item.name),
@@ -362,6 +368,7 @@ function _makeCard(item) {
   return {
     type:      "asset",
     name:      item.name,
+    contextLabel: item.context_label,
     searchText,
     file_type: ft,
     label:     item.name,
@@ -582,9 +589,13 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
 
     const name = document.createElement("div");
     name.className = "card-name";
-    name.textContent = card.label;
+    name.textContent = card.displayName || card.label;
 
     el.appendChild(thumb);
+    if (card.contextLabel) {
+      const context = document.createElement('div'); context.className = 'card-context';
+      context.textContent = card.contextLabel; el.appendChild(context);
+    }
     el.appendChild(name);
     if (card.imported) {
       const editing = document.createElement('span');
@@ -821,7 +832,8 @@ async function _checkBlenderReady() {
 
 async function meshBlendExtract(game_rel, name, force = false) {
   if (!(await _checkBlenderReady())) return;
-  if (!force && !(await _confirmAction(`Extracting "${name}" will populate your Atelier project with LOTS of textures/materials. If you're not using a dedicated empty project, consider making a dedicated one for this.\n\nContinue?`, 'Edit in Blender?', 'Extract', 'default')))
+  const projectTextures = _store.get('atelier.blenderProjectTextures') !== '0';
+  if (projectTextures && !force && !(await _confirmAction(`Extracting "${name}" will add its textures to this project for painting in Blender. You can turn this off in Settings → Behavior.\n\nContinue?`, 'Edit in Blender?', 'Extract', 'default')))
     return;
   const t = toastSpinner(`Preparing ${name} for Blender…`);
   setStatus(`Preparing ${name} for Blender…`);
@@ -829,7 +841,7 @@ async function meshBlendExtract(game_rel, name, force = false) {
     const res = await api("/api/mesh_blend_extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel, force: force ? 1 : 0 }),
+      body: JSON.stringify({ game_rel, force: force ? 1 : 0, project_textures: projectTextures }),
     });
     setStatus("");
     if (!res.ok) {
@@ -849,7 +861,8 @@ async function meshBlendExtract(game_rel, name, force = false) {
     // Blender keeps painted pixels only in memory for LINKED images: saving the .blend does not
     // save them, and reopening silently restores the original. Say so once, up front, because
     // the failure is invisible until the user has already lost the work.
-    toast("Painted textures must be saved in Blender (Image ▸ Save) — saving the .blend alone isn't enough", "info", 12000);
+    toast(projectTextures ? "Painted textures must be saved in Blender (Image ▸ Save) — saving the .blend alone isn't enough" :
+      'Textures are packed in the Blender file. Only the model was added to your project.', "info", 12000);
     (res.warnings || []).slice(0, 4).forEach(w => toast(w, "warning", 9000));
     refreshSidebarEntry(game_rel, name, skinIdFromPath(nav.path));
     renderGrid();
@@ -1350,7 +1363,7 @@ function _matTexturesHtml(m, expanded) {
       encoded like the game texture in that slot (a normal map stays a normal map), and each side must be a
       power of two, such as 1024 or 2048.</p>`;
   slots.forEach((slot, i) => {
-    const own = custom[slot], cls = (m.textureClasses || {})[slot] || "Texture2D", is2d = cls === "Texture2D";
+    const own = custom[slot], cls = (m.textureClasses || {})[slot] || "Texture2D", is2d = cls === "Texture2D", isCube = cls === 'TextureCube';
     const thumb = own
       ? `<img src="/api/material_custom_texture/preview?game_rel=${encodeURIComponent(m.game_rel)}&slot=${encodeURIComponent(slot)}&_project=${encodeURIComponent(_activeProjectName)}&v=${encodeURIComponent(own.file)}" alt="">`
       : `<i data-lucide="image" size="18"></i>`;
@@ -1363,8 +1376,8 @@ function _matTexturesHtml(m, expanded) {
       <label title="${_matEscape(slot)}">${_matEscape(slot)}</label>
       <span class="mat-texture-thumb">${thumb}</span>
       <span class="mat-texture-name" title="${_matEscape(where)}">${what}</span>
-      ${is2d ? `<button type="button" class="btn" onclick="matCustomTexturePick(${i})"><i data-lucide="image-plus" size="13"></i> ${own ? "Change image…" : "Use my own image…"}</button>`
-             : `<span class="mat-tag">Only 2D textures can use your own image</span>`}
+      ${is2d || isCube ? `<button type="button" class="btn" onclick="matCustomTexturePick(${i})"><i data-lucide="image-plus" size="13"></i> ${isCube ? (own ? 'Change HDR cubemap…' : 'Use my HDR cubemap…') : own ? "Change image…" : "Use my own image…"}</button>`
+             : `<span class="mat-tag">This texture type cannot use a custom image</span>`}
       ${own ? `<button type="button" class="btn" onclick="matCustomTextureClear(${i})"><i data-lucide="rotate-ccw" size="13"></i> Use game texture</button>` : ""}
     </div>${own ? `<details class="mat-texture-location"><summary>Package location</summary>
       <label for="mattex-name-${i}">Texture name</label><input id="mattex-name-${i}" value="${_matEscape(own.name)}" maxlength="62" spellcheck="false" oninput="matCustomTexturePath(${i})">
@@ -1372,7 +1385,7 @@ function _matTexturesHtml(m, expanded) {
       <p class="mat-texture-help">Use folders within /Game/Marvel/. Letters, numbers and underscores only. Existing assets cannot be overwritten.</p>
       <p id="mattex-path-${i}" class="mat-subpath">/Game/Marvel/${_matEscape(own.game_rel)}</p>
       <button type="button" class="btn" onclick="matCustomTextureLocation(${i},this)">Save location</button>
-    </details>` : ''}</div>`;
+    </details>` : ''}${isCube ? '<p class="mat-texture-help">Use a .hdr panorama, six-face strip or HDR cubemap DDS. The preview is tone mapped; export keeps all six faces and HDR values.</p>' : ''}</div>`;
   });
   return h + `</details>`;
 }
@@ -1405,6 +1418,7 @@ function matCustomTexturePick(i) {
   const slot = _matTextureSlots(matEditor)[i];
   if (!slot) return;
   _matTexTarget = { editor: matEditor, slot, project: _activeProjectName };
+  _matTexInput.accept = matEditor.textureClasses?.[slot] === 'TextureCube' ? '.hdr,.dds' : '.png,.jpg,.jpeg,.tga,.bmp,.tif,.tiff,.webp';
   _matTexInput.value = "";
   _matTexInput.click();
 }
@@ -3447,6 +3461,9 @@ document.getElementById("setup-close").addEventListener("click", () => {
 });
 
 document.getElementById("toggle-import-open").checked = _openAfterImport;
+const blenderProjectTexturesToggle = document.getElementById('settings-blender-project-textures');
+blenderProjectTexturesToggle.checked = _store.get('atelier.blenderProjectTextures') !== '0';
+blenderProjectTexturesToggle.addEventListener('change', event => _store.set('atelier.blenderProjectTextures', event.target.checked ? '1' : '0'));
 _syncToggleRow("toggle-import-open");
 document.getElementById("toggle-import-open").addEventListener("change", e => {
   _openAfterImport = e.target.checked;
@@ -3835,7 +3852,7 @@ _ctxFileInput.addEventListener("change", async () => {
   await replaceTextureFromFile(file,game_rel);
 });
 
-const _isImageFile=file=>/^image\//i.test(file.type)||/\.(png|jpe?g|tga|bmp|dds|webp|tiff?)$/i.test(file.name||'');
+const _isImageFile=file=>/^image\//i.test(file.type)||/\.(png|jpe?g|tga|bmp|dds|hdr|webp|tiff?)$/i.test(file.name||'');
 
 async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) {
   if(!file||!game_rel)return;
@@ -3852,7 +3869,7 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
     if (data.ok) {
       suppressChangeToastUntil = Date.now() + 1500;
       suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));
-      t.resolve("Texture replaced", "success");
+      t.resolve(data.hdr ? 'HDR cubemap replaced · preview is tone mapped' : "Texture replaced", "success");
       refreshEditedTexture(game_rel, data.token);
     } else {
       suppressedImportGameRels.delete(_assetOperationKey(game_rel, project));

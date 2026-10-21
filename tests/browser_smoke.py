@@ -82,6 +82,8 @@ def main():
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
+    parser.add_argument('--shared-identity-only', action='store_true', help='Check named ID folders, search, pins and template picking in every content branch')
+    parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     args = parser.parse_args()
     report = args.report_dir.resolve()
@@ -181,6 +183,18 @@ def main():
                 if args.identity_only:
                     from release_interface_checks import run_release_interface_checks
                     run_release_interface_checks(page, context, browser, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.shared_identity_only or args.texture_workflows_only:
+                    from shared_identity_checks import run_shared_identity_checks
+                    from texture_workflow_checks import run_texture_workflow_checks
+                    if args.shared_identity_only: run_shared_identity_checks(context, url, report, checks)
+                    if args.texture_workflows_only: run_texture_workflow_checks(context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks:
@@ -387,6 +401,10 @@ def main():
                 run_workflow_motion_checks(context, url, report, checks)
                 from find_checks import run_find_checks
                 run_find_checks(page, context, url, report, checks)
+                from shared_identity_checks import run_shared_identity_checks
+                run_shared_identity_checks(context, url, report, checks)
+                from texture_workflow_checks import run_texture_workflow_checks
+                run_texture_workflow_checks(context, url, report, checks)
                 from trust_checks import run_trust_checks
                 run_trust_checks(page, context, url, report, checks)
                 run_design_checks(page, context, url, report, checks)

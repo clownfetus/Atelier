@@ -93,6 +93,12 @@ bones. Blender must be configured in Settings. Game physics and animation contro
 are not recreated. The per-mesh **Edit in Blender** action remains available for
 replacement round trips.
 
+For **Edit in Blender**, turn off **Menu → Settings → Behavior → Add model
+textures to the project when opening in Blender** to keep the project small.
+Textures are packed into the `.blend` instead of becoming project texture edits.
+Existing painted project textures are used and left unchanged. The setting is
+remembered and starts on to retain the existing painting workflow.
+
 The section eye controls save which parts are hidden in the exported mesh.
 Use **Replace model** to choose the body or a separate weapon, then import a
 supported model, a model ZIP, or companion files together. Existing game rigs and
@@ -123,6 +129,25 @@ Added assets appear in the library and Mod tray and use the normal editors and
 Build mod action. Existing assets at the destination are protected. Original
 source packages travel with the project and are included in Delete/Undo.
 Use the new package path when referencing the asset from a material or mesh.
+
+### HDR cubemaps
+
+Choose a game **TextureCube** as the template in **Add asset**, or import an
+existing HDR cubemap and use **Replace texture**. Supply a Radiance `.hdr` as a
+2:1 panorama or a horizontal/vertical strip of six square faces. Six-face HDR
+`.dds` files are also supported, including their authored mips. Face strips use
+the order **+X, −X, +Y, −Y, +Z, −Z**.
+
+The template keeps its TextureCube type and FloatRGBA or BC6H format. Atelier
+stores the HDR payload as DDS and displays a separate tone-mapped PNG preview.
+In a material's Texture slots, **Use my HDR cubemap…** assigns one directly to
+a reflection slot. Build the mod normally; Unreal Editor is not required.
+
+Faces are limited to 2048 pixels; image inputs to 32 megapixels and 512 MB.
+This currently supports complete inline UE5 cubemaps. HDR Texture2D, EXR,
+virtual textures and cube arrays are unsupported. Native packing and independent
+readback are verified; in-game rendering still needs confirmation. See the
+[verification details](docs/identity-hdr-blender-verification-2026-10-22.md).
 
 ### Process S maps
 

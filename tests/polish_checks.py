@@ -75,7 +75,10 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.evaluate("pushNav({path:'Characters'})"); tab.wait_for_selector('.hero-portrait.loaded')
         assert tab.locator('.artwork-card').evaluate("""card=>{
           const art=card.querySelector('.card-thumb').getBoundingClientRect(), name=card.querySelector('.card-name').getBoundingClientRect();
-          return art.height>art.width && Math.abs(name.top-art.bottom)<1 && getComputedStyle(card).padding==='0px';
+          const style=getComputedStyle(card.querySelector('.card-name'));
+          return art.height>art.width && name.top>=art.bottom && name.top-art.bottom<=8 &&
+            name.height<=2*parseFloat(style.lineHeight)+1 && style.paddingTop==='0px' &&
+            style.webkitLineClamp==='2' && getComputedStyle(card).padding==='0px';
         }""")
         tab.locator('#grid-area .card').click(); tab.wait_for_selector('#library-hero.has-art')
         assert 'Fixture hero' in tab.locator('#library-hero h2').inner_text()

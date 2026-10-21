@@ -231,15 +231,7 @@ def _browse_pak_level(rel_path):
         fname = folders[fname_lower]
         label = _label_folder(rel_path, fname)
         child = f"{rel_path}/{fname}" if rel_path else fname
-        portrait = catalogue.describe(child)
         item = {"type": "folder", "name": fname, "label": label, "rel_path": child}
-        if portrait:
-            if portrait['name']:
-                label_id = fname[-3:] if len(fname) == 7 else fname
-                item['label'] = f"{label_id} — {portrait['name']}"
-            item.update(thumbnail=portrait['thumbnail'], hero_fallback=portrait['hero_fallback'])
-            if portrait['banner']:
-                item['banner'] = portrait['banner']
         result.append(item)
     if not rel_path:
         pinned = [r for r in result if r["name"].lower() in ROOT_PINNED]
@@ -404,7 +396,12 @@ def browse_dispatch(path):
     items = _browse_game_dispatch(path)
     existing = {item.get('rel_path', item.get('game_rel', '')).casefold() for item in items}
     items.extend(item for item in library_items(path) if item['rel_path'].casefold() not in existing)
-    return items
+    from atelier.handlers.hdr_texture import project_info as hdr_project_info
+    result = [catalogue.decorate(item) for item in items]
+    for item in result:
+        if item.get('file_type') == 'texture' and item.get('imported'):
+            item.update(hdr_project_info(project_base(item['game_rel'])))
+    return result
 
 # ── kept for backwards compat (CLI / any callers) ────────────────────────────
 
@@ -426,6 +423,7 @@ def all_imported():
     are resolved through asset_cache by basename."""
     import atelier.asset_cache as _ac
     import atelier.project_meta as _pm
+    from atelier.handlers.hdr_texture import project_info as hdr_project_info
     import_root = get_import_root()
     if not os.path.isdir(import_root): return []
     deselected = _pm.get_deselected(import_root)
@@ -476,7 +474,7 @@ def all_imported():
                 if m:
                     cid, sid = m.group(1), m.group(2)
                     break
-            items.append({
+            items.append(catalogue.decorate({
                 "token": token(gr), "game_rel": gr, "name": name,
                 "file_type": ft,
                 "skin_id":   sid or "", "char_id": cid or "",
@@ -487,5 +485,6 @@ def all_imported():
                 # anything new to the project arrives included in the next export.
                 "selected": gr not in deselected,
                 "opts": all_opts.get(gr) or {},
-            })
+                **(hdr_project_info(fpath[:-4]) if ext == '.png' else {}),
+            }))
     return items

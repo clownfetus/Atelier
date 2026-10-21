@@ -66,14 +66,17 @@
     const host = document.getElementById('library-hero');
     if(!host)return;
     const current=()=>bannerArgs===args&&host.isConnected&&!host.hidden;
-    const match = /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const context = window.AtelierRoster?.describe(path);
+    const identity = window.AtelierCatalogueArt?.describe(path);
+    const match = identity?.hero ? [null, identity.hero.path, identity.skin ? '/' + identity.skin.id : null] :
+      /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const story = match ? '/api/catalogue/hero/' + match[1].split('/')[1] + '/story' : null;
     // Prefer the costume's verified nameplate, then the hero's own named nameplate.
-    const skinKey = match?.[2] ? match[1] + match[2] : null;
+    const skinKey = identity?.skin_path || (match?.[2] ? match[1] + match[2] : null);
+    const heroKey = identity?.hero_path || match?.[1];
     const nameplate = window.AtelierCatalogueArt?.bannerUrl(skinKey && (artwork[skinKey]?.banner || context?.skin?.banner) || null);
     const heroNameplate = match && window.AtelierCatalogueArt?.bannerUrl(
-      artwork[match[1]]?.banner || context?.hero?.banner || '/api/catalogue/banner/'+match[1].split('/')[1]);
+      artwork[heroKey]?.banner || context?.hero?.banner || '/api/catalogue/banner/'+match[1].split('/')[1]);
     const plates = [...new Set([nameplate, heroNameplate].filter(Boolean))];
     const bannerSources = [...plates, story].filter(Boolean);
     const src = bannerSources[0];
@@ -83,7 +86,7 @@
     window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent:null,colors:[]}}));
     if (!match) return;
     const heroPath = match[1], skinPath = match[2] ? heroPath + match[2] : null;
-    const skin={...context?.skin,...artwork[skinPath]},hero={...context?.hero,...artwork[heroPath]};
+    const skin={...context?.skin,...artwork[skinKey]},hero={...context?.hero,...artwork[heroKey]};
     // Use the same costume icon / hero avatar as Home and Continue. Clear the old tint while
     // loading, and bind every fallback to this render (including an A → B → A navigation).
     const sources=[...new Set([
@@ -119,13 +122,13 @@
     host.classList.remove('has-art');
     if (preloaded) host.classList.add('has-art');
     const text = document.createElement('div'); text.className = 'library-hero-copy';
-    const eyebrow = document.createElement('span'); eyebrow.textContent = 'CHARACTER LIBRARY';
+    const eyebrow = document.createElement('span'); eyebrow.textContent = /^Characters\//i.test(path) ? 'CHARACTER LIBRARY' : 'CHARACTER ASSETS';
     const title = document.createElement('h2'); title.textContent = label(heroPath);
     const logo=document.createElement('img'); logo.className='hero-emblem'; logo.alt='';
     logo.src='/api/catalogue/hero/'+match[1].split('/')[1]+'/logo'; logo.onerror=()=>logo.remove();
     title.prepend(logo);
     const detail = document.createElement('p');
-    detail.textContent = [skinPath && label(skinPath), path.slice((skinPath || heroPath).length + 1).split('/').join(' / '),
+    detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
     text.append(eyebrow, title, detail); host.append(image, text);
     nextSource();
@@ -133,6 +136,7 @@
     if (preloaded && image.decode) return image.decode().catch(()=>{});
   }
   window.addEventListener('atelier:catalogue-updated',()=>{if(bannerArgs)banner(...bannerArgs);});
+  window.addEventListener('atelier:identities-updated',()=>{if(bannerArgs)banner(...bannerArgs);});
 
   function library(from, to, direction, update) {
     const generation = ++workflowNavigation;

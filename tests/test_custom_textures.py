@@ -207,6 +207,26 @@ class CustomTextureTests(unittest.TestCase):
         self.assertEqual(CT.assignments(MI, str(self.project)), {})
         self.assertIsNone(CT.image_path(MI, "BaseColor", str(self.project)))
 
+    def test_hdr_records_cannot_point_outside_the_private_image_store(self):
+        original = self.assign()
+        record = project_meta.get_asset_opts(str(self.project), MI)['custom_textures']['BaseColor']
+        for filename, cls in (('../../outside.dds', 'TextureCube'),
+                              ('0123456789abcdef0123.dds', 'Texture2D')):
+            project_meta.set_asset_opts(str(self.project), MI, {'custom_textures': {
+                'BaseColor': {**record, 'hdr_file': filename, 'texture_class': cls}}})
+            self.assertEqual(CT.assignments(MI, str(self.project)), {})
+            self.assertIsNone(CT.image_path(MI, 'BaseColor', str(self.project)))
+        self.assertEqual(len(self.stored()), 1)
+
+    def test_wrong_texture_classes_fail_before_changing_an_existing_assignment(self):
+        original = self.assign(); stored = self.stored()
+        for filename, data, cls in (('preview.png', png(), 'TextureCube'),
+                                    ('sky.hdr', b'#?RADIANCE\n', 'Texture2D')):
+            with self.subTest(texture_class=cls), self.assertRaisesRegex(ValueError, 'TextureCube'):
+                CT.assign(MI, 'BaseColor', filename, data, BASE_TEX, str(self.project), texture_class=cls)
+            self.assertEqual(CT.public(MI, str(self.project)), original)
+            self.assertEqual(self.stored(), stored)
+
     def test_chosen_location_survives_image_changes_and_rewires_export(self):
         self.assign()
         with patch('atelier.index.ensure_index', return_value=[]):
@@ -342,7 +362,7 @@ class CustomTextureTests(unittest.TestCase):
         project_meta.set_asset_opts(str(self.project), MI, {"custom_textures": {
             "Reflection": {"name": "T_x", "file": "0123456789abcdef0123.png"}}})
         with patch.object(CT, "get_import_root", return_value=str(self.project)), \
-             self.assertRaisesRegex(RuntimeError, "only Texture2D"):
+             self.assertRaisesRegex(RuntimeError, "TextureCube slots need an HDR"):
             M.stage_material(str(self.stage), MI, {}, {})
         self.assertEqual(list(self.stage.rglob("*.uasset")), [])
 
@@ -406,7 +426,7 @@ class CustomTextureTests(unittest.TestCase):
                                                      "Reflection": "TextureCube"})
         # Rejections name the reason and change nothing.
         for form, error in (({"game_rel": MI, "slot": "Nope"}, "no texture slot named"),
-                            ({"game_rel": MI, "slot": "Reflection"}, "only Texture2D"),
+                            ({"game_rel": MI, "slot": "Reflection"}, "TextureCube slots need an HDR"),
                             ({"game_rel": BASE_TEX, "slot": "BaseColor"}, "only be assigned to a material")):
             with self.subTest(form=form):
                 res = json.loads(self.call("POST", "/api/material_custom_texture",

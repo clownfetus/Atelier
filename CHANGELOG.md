@@ -7,6 +7,15 @@ The app, installers and update checker identify each release by its full number,
 
 ### Asset pipeline and layout
 
+- Show character and costume names and artwork wherever their IDs appear in
+  asset folders, including legendary ultimate skins, search results, breadcrumbs,
+  pinned folders and asset pickers. Keep original asset paths available on hover.
+- Add HDR TextureCube import and replacement from Radiance panoramas, six-face
+  strips and HDR cubemap DDS files, including material reflection slots. Preserve
+  all six faces, HDR values and authored DDS mips; use a separate preview image.
+- Add a **Settings → Behavior** option to open models in Blender with packed
+  textures without adding texture files to the project. Existing painted textures
+  are preserved. Keep long costume captions within two aligned lines at Compact size.
 - Keep preview textures loading when Windows reports different spellings of the
   same cache path during parallel imports.
 - Sign reassembled Shader Studio shaders with the correct DirectX validator and
