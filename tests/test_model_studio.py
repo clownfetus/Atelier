@@ -84,7 +84,9 @@ class Studio(unittest.TestCase):
                  'Weapons/Guns/Meshes/SK_Gun_R', 'Weapons/MVP/Bullet/Meshes/SK_Bullet',
                  'Weapons/Emote/Meshes/SK_Flag', 'Weapons/Demon/Meshes/SK_Summon', 'Slots/Accessories/Meshes/SK_Badge',
                  'Weapons/Sword/Meshes/SK_Sword_Skeleton',
-                 'Weapons/Sword/Meshes/SK_Sword_PhysicsAsset', 'Meshes/SK_Body_Lobby']
+                 'Weapons/Sword/Meshes/SK_Sword_PhysicsAsset', 'Meshes/SK_Body_Lobby',
+                 'Meshes/SK_Body_PA', 'Meshes/SK_Body_FPP', 'Weapons/FPPhands/Meshes/SK_Hands',
+                 'Weapons/Guns/Meshes/SK_Gun_FPP', 'Weapons/Guns/Meshes/SK_Gun_1P']
         entries = [('Characters/1029/1029001/'+p+'.uasset', '') for p in paths]
         with patch('atelier.paths.skin_entries', return_value=entries):
             result = meshstudio.skin_meshes('1029001')
@@ -95,6 +97,43 @@ class Studio(unittest.TestCase):
     def test_skin_with_no_weapon_is_valid(self):
         with patch('atelier.paths.skin_entries', return_value=[('Characters/1029/1029001/Meshes/SK_Body.uasset','')]):
             self.assertEqual([r['kind'] for r in meshstudio.skin_meshes('1029001')], ['body'])
+
+    def test_helpers_outside_weapons_do_not_replace_the_body(self):
+        base = 'Characters/1042/1042001/'
+        paths = ['Cues/104251/SM_SplineCables_RopeM2', 'Emote/Horn/Meshes/SK_Horn',
+                 'Animations/HeroDetails/Weapon/SK_Dragon', 'Slot/Accessories/Meshes/SK_Badge',
+                 '1042_Girl/Meshes/SK_1042_Girl_1042001', 'Meshes/SK_1042_1042001']
+        with patch('atelier.paths.skin_entries', return_value=[(base + p + '.uasset', '') for p in paths]):
+            rows = meshstudio.skin_meshes('1042001')
+        self.assertEqual([row['name'] for row in rows], ['SK_1042_1042001', 'SK_1042_Girl_1042001'])
+
+    def test_ability_props_static_duplicates_and_control_rigs_do_not_auto_equip(self):
+        prefix='Characters/1027/1027001/'
+        props=['SK_WP_IronWoodenWall','SK_WP_GiantArm_L','SK_WP_SporeBomb',
+               'SK_WP_HandGun_Container','SK_WP_FloatingGun','SK_WP_SpiderTentacles',
+               'SK_WP_Phoenix','SK_WP_Monster','SK_WP_SpearTie','SM_WP_Pistol']
+        held=['SK_WP_CannonL','SK_WP_CannonR','SK_WP_DesertEagle_L','SK_WP_Trident','SK_WP_Wand','SK_WP_Nunchaku_R']
+        paths=[prefix+'Weapons/Parts/'+name+'.uasset' for name in props+held]
+        paths += [prefix+'Meshes/SK_Body.uasset',prefix+'Meshes/SK_Body_OnGroot_CtrlRig.uasset',prefix+'Meshes/SK_Body_FA.uasset']
+        with patch('atelier.paths.skin_entries',return_value=[(path,'') for path in paths]):
+            rows=meshstudio.skin_meshes('1027001')
+        self.assertEqual({row['name'] for row in rows if row.get('auto_equip')},set(held))
+        self.assertTrue(set(props).issubset({row['name'] for row in rows}))
+        self.assertFalse(any('CtrlRig' in row['name'] for row in rows))
+        self.assertFalse(any(row['name'].endswith('_FA') for row in rows))
+
+    def test_capwolf_human_transformation_is_a_body_form_not_held_equipment(self):
+        base='Characters/1022/1022504/'
+        paths=['Meshes/SK_1022_1022504', 'Weapons/Caption/Meshes/SK_WP_1022504_Caption',
+               'Weapons/Shield/Meshes/SK_WP_1022504_Shield']
+        with patch('atelier.paths.skin_entries',return_value=[(base+p+'.uasset','') for p in paths]):
+            rows=meshstudio.skin_meshes('1022504')
+        by_name={row['name']:row for row in rows}
+        human=by_name['SK_WP_1022504_Caption']
+        self.assertEqual(human['kind'],'body')
+        self.assertNotIn('auto_equip',human)
+        self.assertEqual([row['name'] for row in rows if row['kind']=='weapon'],['SK_WP_1022504_Shield'])
+        self.assertTrue(by_name['SK_WP_1022504_Shield']['auto_equip'])
 
     def test_ability_meshes_remain_selectable_without_automatic_equipping(self):
         names = ['SK_WP_1035001_DevouringSymbiote', 'SK_WP_1035001_DevouringSymbiote_Hand',
@@ -120,11 +159,60 @@ class Studio(unittest.TestCase):
             out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
         self.assertEqual(out[0]['slot_name'],'MI_Body_01');self.assertEqual(out[0]['slot_index'],0)
 
+    def test_preview_batches_validated_mesh_sources_before_resolving_slots(self):
+        from atelier.handlers import texture
+        calls=[]
+        meshes=[{'game_rel':self.gr,'slots':[{'key':'body::0','name':'MI_Body'}]},
+                {'game_rel':self.gr+'_Other','slots':[{'key':'other::0','name':'MI_Body'}]}]
+        def resolve(gr, requested):
+            calls.append(('slots',gr))
+            return [{'key':requested[0]['key'],'slot_name':'MI_Body','game_rel':self.slots[0]['mi']}]
+        with patch.object(texture,'prefetch_exact',side_effect=lambda paths:calls.append(('prefetch',paths))), \
+             patch('atelier.paths.skin_entries',return_value=[]), patch.object(meshstudio,'preview_bindings',side_effect=resolve):
+            result=list(meshstudio.material_bindings('1029001',meshes))
+        self.assertEqual(calls[0],('prefetch',[self.gr,self.gr+'_Other']))
+        self.assertEqual(len(result),2)
+
+    def test_preview_rejects_invalid_batch_before_extraction(self):
+        from atelier.handlers import texture
+        for meshes in ([{'game_rel':'../outside'}], ['invalid'],
+                       [{'game_rel':self.gr,'slots':[{'key':'body::0','name':None}]}]):
+            with self.subTest(meshes=meshes), patch.object(texture,'prefetch_exact') as extract:
+                with self.assertRaises(ValueError):
+                    list(meshstudio.material_bindings('1029001',meshes))
+                extract.assert_not_called()
+
     def test_ambiguous_slot_is_never_guessed_from_a_partial_gltf(self):
         slots=[self.slots[0],{**self.slots[0],'index':1}]
         with patch.object(meshstudio,'cooked_slots',return_value=slots):
             out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
-        self.assertIn('mapping_error',out[0]);self.assertNotIn('slot_index',out[0])
+        self.assertNotIn('slot_index',out[0])
+        self.assertEqual(out[0]['game_rel'],self.slots[0]['mi'])
+        self.assertEqual(len(out[0]['shared_slots']),2)
+
+    def test_shared_hair_material_resolves_without_guessing_an_outline_section(self):
+        material='Characters/1029/1029001/Materials/MI_Hair'
+        slots=[{'index':3,'slot':'MI_HairCards','mi':material,'via':'imports'},
+               {'index':11,'slot':'MI_Outlines','mi':material,'via':'imports'}]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,[{'key':'body::3','name':'MI_Hair','material_index':3}])
+        self.assertEqual(out[0]['game_rel'],material)
+        self.assertNotIn('mapping_error',out[0]);self.assertNotIn('slot_index',out[0])
+        self.assertEqual(out[0]['shared_slots'],[{'slot_index':3,'slot_name':'MI_HairCards'},
+                                              {'slot_index':11,'slot_name':'MI_Outlines'}])
+
+    def test_same_material_basename_in_different_packages_stays_ambiguous(self):
+        slots=[self.slots[0],{**self.slots[0],'index':1,'mi':'Characters/Other/Materials/MI_Body'}]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,[{'key':'body::0','name':'MI_Body','material_index':0}])
+        self.assertIn('mapping_error',out[0]);self.assertNotIn('game_rel',out[0])
+
+    def test_complete_ordered_duplicate_slots_keep_individual_visibility_targets(self):
+        slots=[self.slots[0],{**self.slots[0],'index':1}]
+        requested=[{'key':f'body::{i}','name':'MI_Body','material_index':i} for i in range(2)]
+        with patch.object(meshstudio,'cooked_slots',return_value=slots):
+            out=meshstudio.preview_bindings(self.gr,requested)
+        self.assertEqual([row['slot_index'] for row in out],[0,1])
 
     def test_texture_aliases_are_canonical_and_masks_are_not_albedo(self):
         for name in ('DiffuseMap','Base Color Map','albedo'):

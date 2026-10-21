@@ -71,6 +71,12 @@ The installer script verifies release SHA-256 digests and extracts files without
 
 This machine additionally has the official Microsoft DXC 1.9.2609.5 tools, and AtelierMesh from the developer's [0.3.4 release bundle](https://github.com/clownfetus/Atelier/releases/tag/0.3.4). Native smoke checks verify the commands Atelier actually calls. Do not replace these tools based on version numbers alone.
 
+The [native-tool input lock and build instructions](tools-src/README.md) now pin
+the exact compatible seed, CUE4Parse DLLs, .NET SDK/runtime and package archives.
+Use that recipe for AtelierAnimation and AtelierImport builds. The original
+shader retoc fork source remains unavailable; its tested legacy binary is pinned
+explicitly, with no claim that generic upstream retoc reproduces it.
+
 For a fresh directory, use Atelier's Setup/Settings to select the game Paks folder, current mapping, Blender executable and a **development test-mods directory**. Keep native tools, AES keys, mappings, extracted game assets and local configuration out of Git. The source checkout contains none of those dependencies.
 
 ## Automated checks
@@ -920,3 +926,47 @@ rejects an existing report directory and outputs inside the game's Paks folder.
 It publishes only into the report, copies global script containers for readback,
 and never installs into the game. This verifies native build/readback; it does
 not constitute an in-game rendering test or coverage of other texture formats.
+
+## Native model feature checks (21 October 2026)
+
+`tests/native_viewer_smoke.py --source` runs the current checkout in a hidden
+WebView2 window, using real game mesh, material, texture and animation routes.
+The existing `--exe` mode still tests a packaged executable. Use configured,
+isolated app data with an active project and a `test-mods` destination. Fresh
+data must have completed setup, including its AES setting. Release notes are
+acknowledged through their normal control before the model is opened.
+
+```powershell
+.\.venv\Scripts\python.exe tests/native_viewer_smoke.py --source `
+  --data-root 'D:\AtelierDev\phase-0-1' `
+  --report-dir 'D:\AtelierDev\new-native-viewer-check' --design-checks
+
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_model_workflows.py `
+  --report-dir 'D:\AtelierDev\new-native-model-check'
+```
+
+The model workflow creates a disposable project, exports a packed Blender scene,
+authors a small geometric change, imports it on the original skeleton, builds
+and unpacks all LODs, checks Skin Swapper when its template and publisher's flag
+allow it, restores the original, and verifies section hiding/restoration. It
+never installs a mod. `--mesh` selects another supported character mesh.
+Reports must be new directories outside the game's Paks folder. The scripts
+read the installed game; successful readback does not establish in-game rendering.
+
+See [the feature verification report](docs/feature-verification-2026-10-21.md)
+for results, the cold-preview and simplifier fixes, evidence locations and limits.
+
+## Identity, HDR and Blender texture checks (22 October 2026)
+
+`tests/native_identity.py` compares browser/Python identities across the installed
+game's recognized ID folders and captures the actual legendary skin library.
+`tests/native_blender_texture_choice.py` checks that disabling project texture
+copies preserves existing paint, packs it in Blender and adds only model files.
+`tests/native_hdr_textures.py` builds HDR cubemaps and a material into an isolated
+mod, then checks every face/mip with the pinned independent CUE4Parse reader.
+The latter requires the exact SDK from `tools-src/native-tools.lock.json`.
+
+All three accept `--data-dir` and a fresh `--report-dir`. Use configured,
+isolated data, with a report-local test-mod destination for the HDR check.
+See [results, commands and supported HDR layouts](docs/identity-hdr-blender-verification-2026-10-22.md).

@@ -1,0 +1,1611 @@
+{
+  "date": "2026-10-21",
+  "branch": "codex/consolidated-integrations",
+  "base_commit": "a55d089669a706b02e6be3fd066b6b60483ef71d",
+  "source_sha256_encoding": "UTF-8 source bytes with LF line endings",
+  "source_sha256": {
+    "atelier/import_server.py": "63d12e991b5f1f8331b2fbf712f7d8c44e26db3df7c81a0df40696ba7252566e",
+    "atelier/web/routes.py": "8b0d91ddfe05a39db5d164724c65eeff2175bd7e6afe76258950fb0f208bce27",
+    "atelier/handlers/material.py": "05fcc98135318192ecdd9599c54d219210228d3ce2c991c6a91317110a8a9c57",
+    "atelier/handlers/dye.py": "32b5d57f7c58538f7deb85bd7fc75665c244647bfbb84a8550d4a4e195d9fb7e",
+    "atelier/handlers/meshstudio.py": "014fe723e484a8489d519425a9bb95f7c11e555c32971b8a19caf53bf7455bca",
+    "scripts/build_import_server.py": "e1643fa38f5a0016392eb25457101ca112438af6f64673cf99158f8e2828028d",
+    "scripts/stage_tools.py": "832b71bbfef8ef77b271f9aa4afd8b021b865f43e86a431237b7c288712e2419",
+    "tools-src/AtelierImport/Program.cs": "a1bbc3100f75d183c5562d4320ced88e36aea54ea25ecdf680519e87eebc0ef6",
+    "tools-src/AtelierImport/AtelierImport.csproj": "51a4539755585094e5b582c95728b906bd3470c694be1ea1c699dece9b040722",
+    "tests/test_import_server.py": "24c26e0e2ea044a99cc2ab7466d8363325554d4ae192aed1fc65fe26b14eb74f",
+    "tests/native_viewer_smoke.py": "c08141c16374c1d00c107c99644ebf125cf8363422c73424a1a11c8b317cacb9",
+    ".github/workflows/release-candidate.yml": "3550dd02c3b7e92dffd97a9020546dff2c1c64801ba52b4a995f57744a04c7f9"
+  },
+  "native_sha256": {
+    "AtelierImport.exe": "8ea9f37fdd0cc9545b9ccb94cd46ed36627e71adf55a9638c99a22eed6e5f3e7",
+    "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+    "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+  },
+  "platform": "Windows x64 / WebView2; .NET SDK 10.0.402 build",
+  "transport": "Private inherited JSON pipes; one retained CUE4Parse provider; no additional listening port",
+  "character": "Black Widow",
+  "skin_id": "1033001",
+  "previous": {
+    "cold_seconds": 75.02,
+    "cached_seconds": 9.01,
+    "report": "model-loading-verification-2026-10-21.json"
+  },
+  "native_cold": {
+    "mode": "source",
+    "checks": [
+      "Native mesh/material/texture routes load a real game skin and enable capture",
+      "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+      "One persistent native game reader serves geometry, material and image imports",
+      "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+    ],
+    "page_errors": [],
+    "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+    "requests": [
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+        "started_seconds": 0.984,
+        "finished_seconds": 10.828
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+        "started_seconds": 10.953,
+        "finished_seconds": 11.625
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+        "started_seconds": 11.672,
+        "finished_seconds": 12.328
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 12.437,
+        "finished_seconds": 13.922
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_White&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.718
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Eyes_02_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.718
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.734
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_M&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.734
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.875
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.843
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_Head_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.968
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.89
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 15.953
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_MASK&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FTexture%2FT_1033001_Weapon_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 13.922,
+        "finished_seconds": 17.328
+      }
+    ],
+    "first_model_seconds": 11.39,
+    "materials": 13,
+    "material_groups": 12,
+    "objects": 12,
+    "load_seconds": 18.17,
+    "import_server_first": {
+      "pid": 22916,
+      "initializations": 1,
+      "requests": 30,
+      "files": 893376,
+      "private_bytes": 861736960,
+      "managed_bytes": 818682408
+    },
+    "idles": [
+      {
+        "value": "Characters/1033/1033001/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033001"
+      },
+      {
+        "value": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033504"
+      }
+    ],
+    "import_server_final": {
+      "pid": 22916,
+      "initializations": 1,
+      "requests": 31,
+      "files": 893376,
+      "private_bytes": 860004352,
+      "managed_bytes": 818715304
+    },
+    "import_process_exited": true
+  },
+  "native_cached": {
+    "mode": "source",
+    "checks": [
+      "Native mesh/material/texture routes load a real game skin and enable capture",
+      "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+      "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+    ],
+    "page_errors": [],
+    "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+    "requests": [
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+        "started_seconds": 1.016,
+        "finished_seconds": 1.172
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+        "started_seconds": 1.328,
+        "finished_seconds": 1.391
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+        "started_seconds": 1.391,
+        "finished_seconds": 1.453
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 1.562,
+        "finished_seconds": 3.234
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_White&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Eyes_02_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_M&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_Head_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.141
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.187
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_E&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_MASK&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FTexture%2FT_1033001_Weapon_D&v=e4d062c084d4984697a48ad9625c33727160fcd889ee64b75fd92b7391fd7755",
+        "started_seconds": 3.25,
+        "finished_seconds": 5.5
+      }
+    ],
+    "first_model_seconds": 2.42,
+    "materials": 13,
+    "material_groups": 12,
+    "objects": 12,
+    "load_seconds": 7.3,
+    "idles": [
+      {
+        "value": "Characters/1033/1033001/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033001"
+      },
+      {
+        "value": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033504"
+      }
+    ]
+  },
+  "native_full_feature_run": {
+    "mode": "source",
+    "checks": [
+      "Native mesh/material/texture routes load a real game skin and enable capture",
+      "Native Model Studio shows one mesh, reveals only selected material controls, opens advanced and settings on demand, and switches meshes without stale selection",
+      "Original and side-by-side comparison load real game materials for both forms, including unchanged unmatched slots",
+      "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+      "One persistent native game reader serves geometry, material and image imports",
+      "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+    ],
+    "page_errors": [],
+    "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+    "requests": [
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+        "started_seconds": 0.938,
+        "finished_seconds": 10.469
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+        "started_seconds": 10.578,
+        "finished_seconds": 11.453
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+        "started_seconds": 11.453,
+        "finished_seconds": 12.094
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 12.188,
+        "finished_seconds": 14.266
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_White&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 15.938
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Eyes_02_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 15.938
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 15.938
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_M&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 15.938
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_E&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.313
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_Head_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_E&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.391
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_E&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.328
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.266,
+        "finished_seconds": 16.344
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_MASK&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.282,
+        "finished_seconds": 16.36
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FTexture%2FT_1033001_Weapon_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 14.282,
+        "finished_seconds": 16.485
+      },
+      {
+        "route": "/api/model_gltf",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001",
+        "started_seconds": 69.719,
+        "finished_seconds": 72.188
+      },
+      {
+        "route": "/api/skin_materials",
+        "query": "",
+        "started_seconds": 72.407,
+        "finished_seconds": 73.61
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Head_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 73.61,
+        "finished_seconds": 74.469
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D_04&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 73.61,
+        "finished_seconds": 74.469
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_Line_D&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 73.61,
+        "finished_seconds": 74.36
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_Line_M&v=d0dd577653224d7f07d338782c3435b063aba63172cb5274fd951b424383aea7",
+        "started_seconds": 73.61,
+        "finished_seconds": 74.407
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_White&original=1",
+        "started_seconds": 85.766,
+        "finished_seconds": 86.25
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_D&original=1",
+        "started_seconds": 85.766,
+        "finished_seconds": 86.266
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_D&original=1",
+        "started_seconds": 85.782,
+        "finished_seconds": 86.313
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_D&original=1",
+        "started_seconds": 85.782,
+        "finished_seconds": 86.407
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_Head_D&original=1",
+        "started_seconds": 85.782,
+        "finished_seconds": 86.407
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D&original=1",
+        "started_seconds": 85.891,
+        "finished_seconds": 86.391
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_D&original=1",
+        "started_seconds": 85.891,
+        "finished_seconds": 86.422
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_D&original=1",
+        "started_seconds": 85.907,
+        "finished_seconds": 86.438
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FTexture%2FT_1033001_Weapon_D&original=1",
+        "started_seconds": 86.016,
+        "finished_seconds": 86.532
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FTexture%2FT_1033001_Weapon_D&original=1",
+        "started_seconds": 86.016,
+        "finished_seconds": 86.547
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FT_Common_White&original=1",
+        "started_seconds": 86.016,
+        "finished_seconds": 86.532
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_D&original=1",
+        "started_seconds": 86.016,
+        "finished_seconds": 86.563
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_D&original=1",
+        "started_seconds": 86.032,
+        "finished_seconds": 86.61
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Head_D&original=1",
+        "started_seconds": 86.125,
+        "finished_seconds": 86.672
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_D&original=1",
+        "started_seconds": 86.141,
+        "finished_seconds": 86.703
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2FCommon%2FTextures%2FTooth%2FT_Common_Tooth_D_04&original=1",
+        "started_seconds": 86.157,
+        "finished_seconds": 86.672
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_D&original=1",
+        "started_seconds": 86.25,
+        "finished_seconds": 86.719
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_Line_D&original=1",
+        "started_seconds": 86.25,
+        "finished_seconds": 86.735
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Eyes_02_D&original=1",
+        "started_seconds": 86.25,
+        "finished_seconds": 86.797
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_M&original=1",
+        "started_seconds": 86.266,
+        "finished_seconds": 86.813
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_E&original=1",
+        "started_seconds": 86.313,
+        "finished_seconds": 86.828
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_E&original=1",
+        "started_seconds": 86.422,
+        "finished_seconds": 86.844
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_E&original=1",
+        "started_seconds": 86.438,
+        "finished_seconds": 86.86
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FLobbyTexture%2FT_1033001_HairCup_MASK&original=1",
+        "started_seconds": 86.453,
+        "finished_seconds": 86.938
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Eyes_02_D&original=1",
+        "started_seconds": 86.532,
+        "finished_seconds": 86.953
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_01_M&original=1",
+        "started_seconds": 86.563,
+        "finished_seconds": 86.969
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_02_E&original=1",
+        "started_seconds": 86.61,
+        "finished_seconds": 86.969
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Body_E&original=1",
+        "started_seconds": 86.703,
+        "finished_seconds": 86.985
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Equip_01_E&original=1",
+        "started_seconds": 86.719,
+        "finished_seconds": 87.032
+      },
+      {
+        "route": "/api/texture_png",
+        "query": "game_rel=Characters%2F1033%2F1033001%2FTexture%2FT_1033001_Hair_Line_M&original=1",
+        "started_seconds": 86.735,
+        "finished_seconds": 87.032
+      }
+    ],
+    "first_model_seconds": 11.45,
+    "materials": 13,
+    "material_groups": 12,
+    "objects": 12,
+    "load_seconds": 18.2,
+    "import_server_first": {
+      "pid": 1720,
+      "initializations": 1,
+      "requests": 30,
+      "files": 893376,
+      "private_bytes": 854761472,
+      "managed_bytes": 818673432
+    },
+    "second_model_seconds": 5.92,
+    "idles": [
+      {
+        "value": "Characters/1033/1033001/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033001"
+      },
+      {
+        "value": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+        "label": "Lobby_Stand_Idle \u00b7 1033504"
+      }
+    ],
+    "import_server_final": {
+      "pid": 1720,
+      "initializations": 1,
+      "requests": 46,
+      "files": 893376,
+      "private_bytes": 832827392,
+      "managed_bytes": 804434048
+    },
+    "import_process_exited": true
+  },
+  "backend": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "win32",
+    "packages": {
+      "altgraph": "0.17.5",
+      "bottle": "0.13.4",
+      "cffi": "2.1.1",
+      "clr_loader": "0.3.1",
+      "cryptography": "50.0.2",
+      "greenlet": "3.5.6",
+      "numpy": "2.5.4",
+      "packaging": "26.3",
+      "pefile": "2024.8.26",
+      "pillow": "12.3.0",
+      "pip": "25.0.1",
+      "playwright": "1.64.0",
+      "proxy_tools": "0.1.0",
+      "pycparser": "3.11",
+      "pyee": "14.0.0",
+      "pyinstaller": "6.22.3",
+      "pyinstaller-hooks-contrib": "2026.8",
+      "pythonnet": "3.2.1",
+      "pywebview": "6.2.1",
+      "pywin32-ctypes": "0.2.3",
+      "scipy": "1.18.1",
+      "setuptools": "84.0.0",
+      "typing_extensions": "4.16.0",
+      "wasmtime": "49.0.0",
+      "watchdog": "6.0.0"
+    },
+    "results": [
+      {
+        "suite": "test_added_assets.py",
+        "exit_code": 0,
+        "seconds": 2.2,
+        "summary": [
+          "Ran 13 tests in 1.558s"
+        ]
+      },
+      {
+        "suite": "test_app_port.py",
+        "exit_code": 0,
+        "seconds": 2.39,
+        "summary": [
+          "Ran 5 tests in 2.205s"
+        ]
+      },
+      {
+        "suite": "test_blender_import.py",
+        "exit_code": 0,
+        "seconds": 0.3,
+        "summary": [
+          "Ran 1 test in 0.000s"
+        ]
+      },
+      {
+        "suite": "test_catalogue.py",
+        "exit_code": 0,
+        "seconds": 0.73,
+        "summary": [
+          "Ran 24 tests in 0.306s"
+        ]
+      },
+      {
+        "suite": "test_changelog.py",
+        "exit_code": 0,
+        "seconds": 0.97,
+        "summary": [
+          "Ran 10 tests in 0.138s"
+        ]
+      },
+      {
+        "suite": "test_custom_textures.py",
+        "exit_code": 0,
+        "seconds": 1.61,
+        "summary": [
+          "Ran 16 tests in 0.806s"
+        ]
+      },
+      {
+        "suite": "test_frontend_cache.py",
+        "exit_code": 0,
+        "seconds": 0.84,
+        "summary": [
+          "Ran 4 tests in 0.091s"
+        ]
+      },
+      {
+        "suite": "test_hero_artwork.py",
+        "exit_code": 0,
+        "seconds": 3.58,
+        "summary": [
+          "Ran 10 tests in 3.142s"
+        ]
+      },
+      {
+        "suite": "test_import_server.py",
+        "exit_code": 0,
+        "seconds": 3.23,
+        "summary": [
+          "Ran 16 tests in 2.809s"
+        ]
+      },
+      {
+        "suite": "test_jobs_bulk.py",
+        "exit_code": 0,
+        "seconds": 1.77,
+        "summary": [
+          "Ran 23 tests in 0.950s"
+        ]
+      },
+      {
+        "suite": "test_krackle_inks.py",
+        "exit_code": 0,
+        "seconds": 0.58,
+        "summary": [
+          "Ran 1 test in 0.374s"
+        ]
+      },
+      {
+        "suite": "test_local_api_guard.py",
+        "exit_code": 0,
+        "seconds": 1.31,
+        "summary": [
+          "Ran 17 tests in 0.290s"
+        ]
+      },
+      {
+        "suite": "test_material_original.py",
+        "exit_code": 0,
+        "seconds": 1.22,
+        "summary": [
+          "Ran 8 tests in 0.351s"
+        ]
+      },
+      {
+        "suite": "test_material_replacement.py",
+        "exit_code": 0,
+        "seconds": 1.49,
+        "summary": [
+          "Ran 11 tests in 0.626s"
+        ]
+      },
+      {
+        "suite": "test_mesh_optimizer.py",
+        "exit_code": 0,
+        "seconds": 1.27,
+        "summary": [
+          "Ran 6 tests in 0.900s"
+        ]
+      },
+      {
+        "suite": "test_mesh_replacement.py",
+        "exit_code": 0,
+        "seconds": 0.91,
+        "summary": [
+          "Ran 6 tests in 0.151s"
+        ]
+      },
+      {
+        "suite": "test_mod_cards.py",
+        "exit_code": 0,
+        "seconds": 0.41,
+        "summary": [
+          "Ran 1 test in 0.137s"
+        ]
+      },
+      {
+        "suite": "test_model_gltf.py",
+        "exit_code": 0,
+        "seconds": 0.95,
+        "summary": [
+          "Ran 12 tests in 0.122s"
+        ]
+      },
+      {
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 1.06,
+        "summary": [
+          "Ran 17 tests in 0.308s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.89,
+        "summary": [
+          "Ran 28 tests in 1.068s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 1.09,
+        "summary": [
+          "Ran 5 tests in 0.884s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_images.py",
+        "exit_code": 0,
+        "seconds": 0.47,
+        "summary": [
+          "Ran 7 tests in 0.041s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_textures.py",
+        "exit_code": 0,
+        "seconds": 0.86,
+        "summary": [
+          "Ran 8 tests in 0.262s"
+        ]
+      },
+      {
+        "suite": "test_morphs.py",
+        "exit_code": 0,
+        "seconds": 0.92,
+        "summary": [
+          "Ran 11 tests in 0.468s"
+        ]
+      },
+      {
+        "suite": "test_native_prereqs.py",
+        "exit_code": 0,
+        "seconds": 0.31,
+        "summary": [
+          "Ran 4 tests in 0.019s"
+        ]
+      },
+      {
+        "suite": "test_packaging.py",
+        "exit_code": 0,
+        "seconds": 1.11,
+        "summary": [
+          "Ran 14 tests in 0.785s"
+        ]
+      },
+      {
+        "suite": "test_patch_override.py",
+        "exit_code": 0,
+        "seconds": 0.45,
+        "summary": [
+          "11 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase1.py",
+        "exit_code": 0,
+        "seconds": 6.86,
+        "summary": [
+          "28 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase2.py",
+        "exit_code": 0,
+        "seconds": 1.16,
+        "summary": [
+          "18 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase3.py",
+        "exit_code": 0,
+        "seconds": 5.06,
+        "summary": [
+          "35 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase4.py",
+        "exit_code": 0,
+        "seconds": 4.91,
+        "summary": [
+          "  SKIP  The one thing that could go wrong silently: from_json writes .uasset/.uexp only. \u2014 UAssetTool not installed",
+          "  SKIP  DXT5's alpha block is independent, so a uniform zero alpha has to come back exactly zero. \u2014 UAssetTool not installed",
+          "46 passed, 0 failed, 2 skipped"
+        ]
+      },
+      {
+        "suite": "test_presentation.py",
+        "exit_code": 0,
+        "seconds": 0.86,
+        "summary": [
+          "Ran 4 tests in 0.024s"
+        ]
+      },
+      {
+        "suite": "test_project_recovery.py",
+        "exit_code": 0,
+        "seconds": 0.95,
+        "summary": [
+          "Ran 8 tests in 0.331s"
+        ]
+      },
+      {
+        "suite": "test_project_trash.py",
+        "exit_code": 0,
+        "seconds": 3.22,
+        "summary": [
+          "Ran 14 tests in 2.406s"
+        ]
+      },
+      {
+        "suite": "test_reliability.py",
+        "exit_code": 0,
+        "seconds": 1.41,
+        "summary": [
+          "Ran 28 tests in 0.565s"
+        ]
+      },
+      {
+        "suite": "test_s_maps.py",
+        "exit_code": 0,
+        "seconds": 1.28,
+        "summary": [
+          "Ran 9 tests in 0.395s"
+        ]
+      },
+      {
+        "suite": "test_search.py",
+        "exit_code": 0,
+        "seconds": 7.05,
+        "summary": [
+          "Ran 6 tests in 6.223s"
+        ]
+      },
+      {
+        "suite": "test_setup_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 0.38,
+        "summary": [
+          "Ran 4 tests in 0.078s"
+        ]
+      },
+      {
+        "suite": "test_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 1.83,
+        "summary": [
+          "Ran 53 tests in 0.919s"
+        ]
+      },
+      {
+        "suite": "test_thumbnails.py",
+        "exit_code": 0,
+        "seconds": 1.27,
+        "summary": [
+          "Ran 11 tests in 0.450s"
+        ]
+      },
+      {
+        "suite": "test_triage_exports.py",
+        "exit_code": 0,
+        "seconds": 1.78,
+        "summary": [
+          "Ran 21 tests in 1.330s"
+        ]
+      },
+      {
+        "suite": "test_unreal_names.py",
+        "exit_code": 0,
+        "seconds": 0.17,
+        "summary": [
+          "Ran 2 tests in 0.000s"
+        ]
+      },
+      {
+        "suite": "test_update_lifetime.py",
+        "exit_code": 0,
+        "seconds": 1.0,
+        "summary": [
+          "Ran 1 test in 0.038s"
+        ]
+      },
+      {
+        "suite": "test_upstream_integrations.py",
+        "exit_code": 0,
+        "seconds": 0.83,
+        "summary": [
+          "Ran 12 tests in 0.213s"
+        ]
+      },
+      {
+        "suite": "test_viewport_cancel.py",
+        "exit_code": 0,
+        "seconds": 1.53,
+        "summary": [
+          "Ran 4 tests in 0.751s"
+        ]
+      },
+      {
+        "suite": "test_viewport_features.py",
+        "exit_code": 0,
+        "seconds": 1.08,
+        "summary": [
+          "Ran 13 tests in 0.165s"
+        ]
+      }
+    ]
+  },
+  "final_source_filter_checks": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "win32",
+    "packages": {
+      "altgraph": "0.17.5",
+      "bottle": "0.13.4",
+      "cffi": "2.1.1",
+      "clr_loader": "0.3.1",
+      "cryptography": "50.0.2",
+      "greenlet": "3.5.6",
+      "numpy": "2.5.4",
+      "packaging": "26.3",
+      "pefile": "2024.8.26",
+      "pillow": "12.3.0",
+      "pip": "25.0.1",
+      "playwright": "1.64.0",
+      "proxy_tools": "0.1.0",
+      "pycparser": "3.11",
+      "pyee": "14.0.0",
+      "pyinstaller": "6.22.3",
+      "pyinstaller-hooks-contrib": "2026.8",
+      "pythonnet": "3.2.1",
+      "pywebview": "6.2.1",
+      "pywin32-ctypes": "0.2.3",
+      "scipy": "1.18.1",
+      "setuptools": "84.0.0",
+      "typing_extensions": "4.16.0",
+      "wasmtime": "49.0.0",
+      "watchdog": "6.0.0"
+    },
+    "results": [
+      {
+        "suite": "test_import_server.py",
+        "exit_code": 0,
+        "seconds": 3.26,
+        "summary": [
+          "Ran 16 tests in 2.850s"
+        ]
+      },
+      {
+        "suite": "test_changelog.py",
+        "exit_code": 0,
+        "seconds": 0.91,
+        "summary": [
+          "Ran 10 tests in 0.103s"
+        ]
+      }
+    ]
+  },
+  "browser": {
+    "browser-viewer": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+        "Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry",
+        "Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+        "Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+        "Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+        "Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+        "Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+        "Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+        "Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+        "Material chips show dye-region colours when no base tint exists and follow live edits",
+        "Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+        "Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+        "Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+        "Capture cancellation restores the camera and exits turntable rotation",
+        "Closing a loading viewer immediately removes its inline progress and cancels its backend load",
+        "Changing material skins cancels the previous request and keeps exactly one inline progress message",
+        "Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors",
+        "Shared texture slots download and decode one image while all three material assignments finish",
+        "Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark",
+        "Roster uses square hero avatars and text-only skin names; artwork refresh preserves selection and the viewer shows the matching hero logo",
+        "Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows",
+        "Skin side arrows browse an overflowing costume list without changing the selected hero",
+        "Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts",
+        "Viewport loader respects OS/forced reduced motion and visibility, with idempotent explicit teardown",
+        "Absent, throwing and partially failing WAAPI keep static artwork and cannot leave duplicate loader loops",
+        "Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses",
+        "Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes",
+        "Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures",
+        "Save/dirty guards protect close/reopen; public export guards retain drafts and focus Save/status without discard prompts",
+        "Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup",
+        "Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes",
+        "Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft",
+        "Material dirty drafts guard close/reload; original-read errors stay explicit and stale comparison/open responses cannot replace a newer editor",
+        "Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save",
+        "Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI",
+        "Dialog saves preserve project header and material payload; failed intensity persistence reports warning instead of full success",
+        "Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state",
+        "In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project",
+        "Viewport saves retain failed/newer recolors, retry the correct payload and leave replacement viewport status untouched",
+        "Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback",
+        "Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves"
+      ],
+      "page_errors": []
+    },
+    "browser-export": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Model Studio exports the selected body through project-scoped jobs, blocks hidden/multiple bodies and duplicate clicks, reports packed counts, keeps Open in Blender clickable in both themes and desktop sizes, and recovers from worker failure; Activity retains the outcomes"
+      ],
+      "page_errors": []
+    },
+    "browser-showcase": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes",
+        "Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls",
+        "Formation sounds create no audio by default; opt-in drop/pop/splat synthesis follows actual stage transitions and stays silent in Calm, Off, OS reduced motion and hidden documents",
+        "Mod cards use completed applied counts, a matching Showcase capture and local build version/date; copy/save/reveal work, warnings carry skipped counts and failed builds offer no card",
+        "Showcase is session presentation only: reopening returns to Inspect and captures preserve the camera and editable source materials"
+      ],
+      "page_errors": []
+    }
+  },
+  "geometry": {
+    "geometry_channels": [
+      "COLOR_0",
+      "JOINTS_0",
+      "NORMAL",
+      "POSITION",
+      "TANGENT",
+      "TEXCOORD_0",
+      "TEXCOORD_1",
+      "TEXCOORD_2",
+      "TEXCOORD_3",
+      "TEXCOORD_4",
+      "TEXCOORD_5",
+      "TEXCOORD_6",
+      "TEXCOORD_7",
+      "WEIGHTS_0"
+    ],
+    "attribute_comparisons": 168,
+    "rig_nodes": 580,
+    "exact_geometry_and_rig": true,
+    "previous_bytes": 73822932,
+    "preview_bytes": 15006272,
+    "omitted_morph_targets": 37
+  },
+  "material_comparisons": [
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Body",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Equip_01",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Equip_02",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Eyes_01",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Eyes_02",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Eyes_03",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Hair_01",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Hair_02",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Head",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Tooth",
+      "match": true,
+      "differing_fields": []
+    },
+    {
+      "material": "Characters/1033/1033001/Weapons/Stick_L/Materials/MI_1033001_Weapon",
+      "match": true,
+      "differing_fields": []
+    }
+  ],
+  "texture_comparisons": [
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Body_D.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Body_E.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Equip_01_D.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Equip_01_E.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Equip_02_D.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Equip_02_E.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Eyes_02_D.png",
+      "size": [
+        128,
+        128
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Hair_01_D.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Hair_01_M.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/LobbyTexture/T_1033001_HairCup_D.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/LobbyTexture/T_1033001_HairCup_MASK.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Texture/LobbyTexture/T_1033001_Head_D.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/1033/1033001/Weapons/Stick_L/Texture/T_1033001_Weapon_D.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/Common/Textures/T_Common_White.png",
+      "size": [
+        128,
+        128
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "texture": "Characters/Common/Textures/Tooth/T_Common_Tooth_D.png",
+      "size": [
+        512,
+        512
+      ],
+      "same_mip": true,
+      "rms": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "dye": {
+    "material": "Characters/1060/1060300/Materials/10600/MI_10600_1060300_Equip_01",
+    "regions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "material_parameters_exact": true,
+    "original_matches_vanilla": true,
+    "recolour_changes_preview": true,
+    "region_overlay": true,
+    "mask_size": [
+      2048,
+      2048
+    ],
+    "mask_rgba_rms": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "mask_region_indices_exact": true,
+    "project_files_created": 0,
+    "import_server_first": {
+      "pid": 24552,
+      "initializations": 1,
+      "requests": 4,
+      "files": 893376,
+      "private_bytes": 1228804096,
+      "managed_bytes": 784680280
+    },
+    "import_server_final": {
+      "pid": 24552,
+      "initializations": 1,
+      "requests": 5,
+      "files": 893376,
+      "private_bytes": 1228353536,
+      "managed_bytes": 784721400
+    }
+  },
+  "safety": {
+    "original_blocks_preserve_dye_regions": true,
+    "project_overrides_take_priority": true,
+    "key_on_command_line": false,
+    "extra_http_listener": false,
+    "user_projects_modified": false,
+    "game_mods_installed": false,
+    "excludes_nested_mods_and_known_galacta_loader": true,
+    "pip_check": "No broken requirements found",
+    "full_installer_tested": false,
+    "linux_tested": false
+  },
+  "evidence_root": "D:\\AtelierDev\\persistent-import-20261021"
+}

@@ -1,5 +1,6 @@
 import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from bottle import request, response, static_file
 
 from atelier.web.app import app
@@ -7,6 +8,7 @@ from atelier import hostos
 from atelier import operations
 from atelier import jobs
 from atelier import preview
+from atelier import import_server
 from atelier import changelog
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
@@ -365,11 +367,10 @@ def api_browse_material_dirs():
     path = (request.query.get("path") or "").strip("/")
     depth = len(path.split("/")) if path else 0
     pfx = (path.lower() + "/") if path else ""
+    from atelier.index import prefix_entries
     acc = {}
-    for p, _c, _x in ensure_index():
+    for p, _c, _x in prefix_entries(pfx):
         pl = p.lower()
-        if pfx and not pl.startswith(pfx):
-            continue
         if not pl.endswith(".uasset"):
             continue
         parts = p.split("/")
@@ -386,8 +387,10 @@ def api_browse_material_dirs():
     out = [v for v in acc.values() if v["materials"] or v["meshes"]]
     try:
         from atelier.handlers.skinnames import label_for
+        from atelier.catalogue import catalogue
         for v in out:
-            v["label"] = label_for(v["name"])      # "COASTAL KUMIHO" etc., None if unknown
+            display = catalogue.decorate({'type': 'folder', 'name': v['name'], 'rel_path': path.rstrip('/') + '/' + v['name']})
+            v["label"] = ' · '.join(filter(None, (display.get('context_label'), display.get('display_name')))) or label_for(v["name"])
     except Exception:
         pass
     out.sort(key=lambda v: v["name"])
@@ -413,6 +416,8 @@ def _model_glb(game_rel):
     if os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json'):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
+    if import_server.available():
+        return import_server.mesh(game_rel)
     asset   = pak_game_path(game_rel)                        # Marvel/Content/Marvel/.../SK_...
     out_dir = os.path.join(_CACHE, "gltf")
     glb     = os.path.join(out_dir, *asset.split("/")) + ".glb"
@@ -476,16 +481,49 @@ def api_skin_materials():
         return json.dumps({"ok": False, "error": "missing skin_id"})
     if body.get('meshes'):
         from atelier.handlers.meshstudio import material_bindings
-        out = {}
-        for binding in material_bindings(skin_id, body['meshes']):
-            gr = binding.get('game_rel')
+        from atelier.handlers.texture import prefetch_exact
+        bindings = list(material_bindings(skin_id, body['meshes']))
+        # A cold character preview can reference dozens of materials. Extract
+        # them together instead of rescanning the game containers for each one.
+        try:
+            if not import_server.available():
+                prefetch_exact([binding.get('game_rel') for binding in bindings])
+        except jobs.Cancelled:
+            raise
+        except Exception as exc:
+            print(f'[skin_materials] material prefetch failed: {exc}', file=sys.stderr, flush=True)
+        def read(gr):
             try:
-                params = read_material(gr, cache_only=True) if gr else {'colors': [], 'scalars': [], 'textures': {}}
-                out[binding['key']] = {**_viewport_material_payload(gr, params), **binding}
+                jobs.checkpoint()
+                return _viewport_material_payload(gr, read_material(gr, cache_only=True))
             except jobs.Cancelled:
                 raise
             except Exception as exc:
-                out[binding['key']] = {**binding, 'colors': [], 'scalars': [], 'textures': {}, 'material_error': str(exc)}
+                return {'colors': [], 'scalars': [], 'textures': {}, 'material_error': str(exc)}
+        paths = list(dict.fromkeys(binding.get('game_rel') for binding in bindings if binding.get('game_rel')))
+        # Bound native conversions and preserve both project selection and preview
+        # cancellation in every worker. Repeated slots share a single conversion.
+        with ThreadPoolExecutor(max_workers=min(4, max(1, len(paths)))) as pool:
+            pending = {gr: pool.submit(copy_context().run, read, gr) for gr in paths}
+            materials = {gr: future.result() for gr, future in pending.items()}
+        # The viewer needs only these channels. Extract them together before its
+        # parallel PNG requests, avoiding a whole container scan per cold image.
+        textures = []
+        for params in materials.values():
+            roles = params.get('texture_roles', {})
+            custom = params.get('texture_urls', {})
+            textures.extend(path for role, path in roles.items() if role in ('basecolor', 'emissive', 'opacity', 'iris', 'sclera') and role not in custom)
+            if params.get('dyeable'):
+                textures.extend(params.get('textures', {}).get(slot) for slot in ('BaseColor', 'DyeingTexture'))
+        if any(textures) and not import_server.available():
+            try:
+                prefetch_exact(list(dict.fromkeys(path for path in textures if path)))
+            except jobs.Cancelled:
+                raise
+            except Exception as exc:
+                print(f'[skin_materials] texture prefetch failed: {exc}', file=sys.stderr, flush=True)
+        empty = {'colors': [], 'scalars': [], 'textures': {}}
+        out = {binding['key']: {**materials.get(binding.get('game_rel'), empty), **binding} for binding in bindings}
         return json.dumps({'ok': True, 'materials': out})
     out, seen = {}, set()
     for p, _c in skin_entries(skin_id):
@@ -510,8 +548,18 @@ def api_skin_materials():
     return json.dumps({"ok": True, "materials": out})
 
 
+def _preview_surface(params, original=False):
+    from atelier.handlers.material_preview import inherited_opacity, effect_surface, eye_layers
+    from atelier.index import by_basename
+    read = read_material_original if original else lambda path: read_material(path, cache_only=True)
+    return eye_layers(effect_surface(inherited_opacity(params, read, by_basename), read, by_basename), by_basename)
+
+
 def _viewport_material_payload(gr, params):
+    import hashlib
     from atelier.handlers.meshmat import texture_role
+    from atelier.handlers.material_preview import eye_material
+    params = _preview_surface(params)
     texs = params.get('textures', {}) or {}
     roles, texture_urls = {}, {}
     custom = _custom_tex.assignments(gr) if gr else {}
@@ -523,9 +571,12 @@ def _viewport_material_payload(gr, params):
                 texture_urls[role] = '/api/material_custom_texture/preview?' + urlencode({
                     'game_rel': gr, 'slot': name, 'v': custom[name]['file']})
     dyeable = 'DyeingTexture' in texs
+    eye = eye_material(params)
+    versions = {g: _tex_version(g) for g in texs.values()}
+    eye_version = hashlib.sha256(json.dumps([versions, params.get('colors'), params.get('scalars'), custom], sort_keys=True).encode()).hexdigest() if eye else '0'
     return {'game_rel': gr, 'token': token(gr) if gr else None, **params, 'texture_roles': roles, 'texture_urls': texture_urls,
-            'tex_ver': {g: _tex_version(g) for g in texs.values()}, 'dyeable': dyeable,
-            'dye_ver': _dye_version(gr, texs) if dyeable else '0'}
+            'tex_ver': versions, 'dyeable': dyeable,
+            'dye_ver': _dye_version(gr, texs) if dyeable else '0', 'eye_preview': eye, 'eye_ver': eye_version}
 
 
 @app.post('/api/mesh_visibility')
@@ -559,7 +610,7 @@ def _tex_version(game_rel):
     textures stay cached across opens."""
     edited = _import_base(game_rel) + ".png"
     try:
-        return str(os.stat(edited).st_mtime_ns) if os.path.exists(edited) else "0"
+        return str(os.stat(edited).st_mtime_ns) if os.path.exists(edited) else import_server.source_version() if import_server.available() else "0"
     except OSError:
         return "0"
 
@@ -586,6 +637,11 @@ def _texture_png(game_rel, original=False):
     edited = _import_base(game_rel) + ".png"
     if not original and os.path.exists(edited):
         return edited
+    if import_server.available():
+        try:
+            return import_server.texture(game_rel)
+        except import_server.ImportError as exc:
+            print(f'[import] texture compatibility fallback for {game_rel}: {exc}', file=sys.stderr, flush=True)
     out_dir = CACHE_3DVIEW
     base    = project_base(game_rel, out_dir)   # no ext, subfolder-mirrored (no basename collisions)
     out_png = base + ".png"
@@ -639,6 +695,61 @@ def api_texture_png():
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""
+
+@app.get('/api/eye_texture')
+@app.post('/api/eye_preview')
+def api_eye_texture():
+    from atelier.handlers.material_preview import eye_image, eye_material
+    from PIL import Image
+    import hashlib
+    body = (request.json or {}) if request.method == 'POST' else {}
+    if not isinstance(body, dict):
+        response.status = 400
+        return {'ok': False, 'error': 'Invalid eye preview request'}
+    gr = body.get('game_rel') or request.query.get('game_rel', '')
+    original = request.query.get('original') == '1'
+    try:
+        _c.validate_game_rel(gr)
+        params = _preview_surface(read_material_original(gr) if original else read_material(gr, cache_only=True), original=original)
+        if not eye_material(params):
+            raise ValueError('This material has no iris and sclera colour layers')
+        overrides = {} if original else body.get('overrides') or {}
+        if not isinstance(overrides, dict) or len(overrides) > 256:
+            raise ValueError('Invalid eye colour overrides')
+        if overrides:
+            colors = []
+            for color in params.get('colors', []):
+                rgba = overrides.get(color['name'], color['rgba'])
+                if not isinstance(rgba, list) or len(rgba) != 4 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in rgba):
+                    raise ValueError('Invalid eye colour override')
+                colors.append({**color, 'rgba': rgba})
+            params = {**params, 'colors': colors}
+        images = []
+        for slot in ('IrisBaseColor', 'ScleraBaseColor'):
+            path = None if original else _custom_tex.image_path(gr, slot)
+            path = path or _texture_png(params['textures'][slot], original=original)
+            if not path or not os.path.isfile(path):
+                raise ValueError('An eye colour texture is unavailable')
+            images.append(path)
+        stamp = [(os.path.realpath(path), os.stat(path).st_mtime_ns, os.path.getsize(path)) for path in images]
+        identity = hashlib.sha256(json.dumps(['eye-v1', stamp, params.get('colors', []), params.get('scalars', [])], sort_keys=True).encode()).hexdigest()
+        directory = os.path.join(CACHE_3DVIEW, 'eyes')
+        os.makedirs(directory, exist_ok=True)
+        target = os.path.join(directory, identity + '.png')
+        if not os.path.isfile(target):
+            with Image.open(images[0]) as iris, Image.open(images[1]) as sclera:
+                image = eye_image(iris, sclera, params)
+            with tempfile.TemporaryDirectory(prefix='.eye-', dir=directory) as scratch:
+                temporary = os.path.join(scratch, 'eye.png')
+                image.save(temporary, 'PNG')
+                jobs.checkpoint()
+                os.replace(temporary, target)
+        result = static_file(os.path.basename(target), root=directory, mimetype='image/png')
+        result.headers['Cache-Control'] = 'no-store'
+        return result
+    except (ValueError, OSError) as error:
+        response.status = 400
+        return {'ok': False, 'error': str(error)}
 
 @app.post("/api/showcase_webp")
 def api_showcase_webp():
@@ -965,17 +1076,14 @@ def api_validate_mods_folder():
         return json.dumps({"status": "ok"})
     return json.dumps({"status": "missing"})
 
-# Blender is "blender.exe" on Windows and a plain "blender" binary everywhere else; both the
-# Settings validator and the file picker accept either so a config copied between the two works.
-_BLENDER_NAMES = ("blender.exe",) if hostos.IS_WINDOWS else ("blender", "blender.exe")
-
 @app.get("/api/validate_blender")
 def api_validate_blender():
+    from atelier.handlers.meshedit import BLENDER_NAMES
     path = request.query.get("path", "").strip()
     response.content_type = "application/json"
     if not path:
         return json.dumps({"status": "empty"})
-    if os.path.basename(path).lower() not in _BLENDER_NAMES:
+    if os.path.basename(path).lower() not in {name.lower() for name in BLENDER_NAMES}:
         return json.dumps({"status": "invalid"})
     if not os.path.exists(path):
         return json.dumps({"status": "missing"})
@@ -983,13 +1091,14 @@ def api_validate_blender():
 
 @app.post("/api/pick_blender_file")
 def api_pick_blender_file():
+    from atelier.handlers.meshedit import BLENDER_NAMES
     body    = request.json or {}
     initial = body.get("initial") or ""
     response.content_type = "application/json"
     try:
         title = "Select blender.exe" if hostos.IS_WINDOWS else "Select the blender executable"
         return json.dumps({"ok": True, "path": hostos.pick_file(
-            title, tuple(_BLENDER_NAMES), initial)})
+            title, BLENDER_NAMES, initial)})
     except Exception as e:
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
@@ -1055,6 +1164,12 @@ def api_save_paks():
         # later as an empty asset browser with nothing pointing back at the typo.
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
+    from atelier.handlers.meshedit import BLENDER_NAMES, is_blender_executable
+    if has_blender and blender_path and not is_blender_executable(blender_path):
+        # Every Blender step launches this path unprompted; checked before anything is saved.
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error":
+                           f"The Blender path must be an existing {BLENDER_NAMES[0]} file."})
     paks_path, err = _validate_and_build_paks(path)
     if err:
         response.content_type = "application/json"
@@ -1398,7 +1513,8 @@ def api_catalogue_library():
                          if re.fullmatch(r'\d{7}', sid) and skin.get('hero') == key and skin.get('image')]
         heroes.append(hero)
     response.content_type = 'application/json'
-    return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold())})
+    return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold()),
+                       'identities': catalogue.identity_entries()})
 
 @app.get("/api/browse")
 def api_browse():
@@ -1948,7 +2064,9 @@ def api_material_original():
     if not gr:
         return json.dumps({"ok": False, "error": "missing game_rel"})
     try:
-        return json.dumps({"ok": True, "game_rel": gr, **read_material_original(gr)})
+        from atelier.handlers.material_preview import eye_material
+        params = _preview_surface(read_material_original(gr), original=True)
+        return json.dumps({"ok": True, "game_rel": gr, **params, 'eye_preview': eye_material(params)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
@@ -1997,6 +2115,7 @@ def api_material_sources():
     """Search installed MI paths without importing any materials into the project."""
     from atelier.index import ensure_index
     from atelier.handlers.skinnames import char_name, skin_name
+    from atelier.catalogue import catalogue
     response.content_type = "application/json"
     query = (request.query.getunicode("q") or "").strip().casefold()
     if len(query) < 2:
@@ -2008,7 +2127,10 @@ def api_material_sources():
             continue
         parts = path.split("/")
         label = ""
-        if len(parts) > 3 and parts[0] == "Characters":
+        identity = catalogue.identity(path)
+        if identity:
+            label = " · ".join(n for n in (identity['char_name'], identity['skin_name']) if n)
+        if not label and len(parts) > 3 and parts[0] == "Characters":
             label = " · ".join(n for n in (char_name(parts[1]), skin_name(parts[2])) if n)
         if all(word in (path + " " + label).casefold() for word in words):
             matches[path[:-7]] = label
@@ -2037,7 +2159,7 @@ def api_material_replace():
 # See handlers/custom_texture.py. Assigned on upload, like dye-off: it is an export option on the
 # material, not one of the parameter edits the editor's Save writes into the material JSON.
 
-def _custom_tex_slot(gr, slot):
+def _custom_tex_slot(gr, slot, with_class=False):
     """The slot's current game texture, or ValueError naming why it cannot take a custom one."""
     if not is_material(gr):
         raise ValueError("custom textures can only be assigned to a material (MI_…)")
@@ -2045,10 +2167,10 @@ def _custom_tex_slot(gr, slot):
         slots = _material_mod.texture_slots(json.load(stream))
     if slot not in slots:
         raise ValueError(f"this material has no texture slot named {slot!r}")
-    if slots[slot]["class"] != "Texture2D":
+    if slots[slot]["class"] not in ("Texture2D", "TextureCube"):
         raise ValueError(f"{slot} holds a {slots[slot]['class'] or 'non-texture'} asset; "
-                         f"only Texture2D slots can use your own image")
-    return slots[slot]["game_rel"]
+                         f"only Texture2D and TextureCube slots can use your own image")
+    return (slots[slot]['game_rel'], slots[slot]['class']) if with_class else slots[slot]["game_rel"]
 
 @app.post("/api/material_custom_texture")
 def api_material_custom_texture():
@@ -2059,10 +2181,10 @@ def api_material_custom_texture():
     if not gr or not slot or not upload:
         return json.dumps({"ok": False, "error": "missing game_rel, slot or file"})
     try:
-        template = _custom_tex_slot(gr, slot)
+        template, texture_class = _custom_tex_slot(gr, slot, with_class=True)
         custom = _custom_tex.assign(gr, slot, upload.raw_filename or upload.filename,
                                     upload.file.read(), template, name=request.forms.getunicode('name'),
-                                    folder=request.forms.getunicode('folder'))
+                                    folder=request.forms.getunicode('folder'), texture_class=texture_class)
         return json.dumps({"ok": True, "game_rel": gr, "custom_textures": custom})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
@@ -2681,6 +2803,7 @@ def api_open_projects_folder():
 def api_replace_texture():
     from PIL import Image
     import io
+    response.content_type = 'application/json'
     gr     = request.forms.get("game_rel", "").strip()
     upload = request.files.get("file")
     if not gr or not upload:
@@ -2691,7 +2814,25 @@ def api_replace_texture():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "asset not imported — edit it first"})
     try:
-        img = Image.open(io.BytesIO(upload.file.read())).convert("RGBA")
+        from atelier.handlers import hdr_texture
+        payload = upload.file.read(hdr_texture.MAX_BYTES + 1)
+        if len(payload) > hdr_texture.MAX_BYTES:
+            raise ValueError('Choose a replacement texture up to 512 MB.')
+        extension = os.path.splitext(upload.raw_filename or upload.filename)[1].lower()
+        cube_dds = payload[:4] == b'DDS ' and len(payload) >= 128 and int.from_bytes(payload[112:116], 'little') & 0x200
+        if extension == '.hdr' or extension == '.dds' and (cube_dds or hdr_texture.project_info(dst[:-4])):
+            info = hdr_texture.replace_project(gr, upload.raw_filename or upload.filename, payload)
+            thumb = os.path.join(THUMBS_DIR, *gr.split('/')) + '.png'
+            try:
+                if os.path.isfile(thumb): os.remove(thumb)
+            except OSError:
+                pass
+            return json.dumps({'ok': True, 'token': token(gr), 'game_rel': gr, **info})
+        if hdr_texture.project_info(dst[:-4]):
+            raise ValueError('Replace this TextureCube with an HDR .hdr image or cubemap DDS. Its PNG is a tone-mapped preview.')
+        if extension == '.dds' and payload[84:88] == b'DX10' and len(payload) >= 148 and int.from_bytes(payload[128:132], 'little') in hdr_texture.FORMATS:
+            raise ValueError('Use a TextureCube template for HDR replacements. HDR Texture2D replacement is not supported.')
+        img = Image.open(io.BytesIO(payload)).convert("RGBA")
         img.save(dst, "PNG")
         thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
         try:
@@ -2711,6 +2852,9 @@ def api_open_with():
     gr   = request.query.get("game_rel", "")
     if gr:
         path = _import_base(gr) + ".png"
+        from atelier.handlers.hdr_texture import project_info as hdr_project_info
+        if hdr_project_info(_import_base(gr)):
+            path = _import_base(gr) + '.dds'
     if path:
         abs_path = os.path.abspath(path)
         if os.path.exists(abs_path):
@@ -2794,13 +2938,14 @@ def api_mesh_blend_extract():
         report = meshsurvey.probe(base)
         if report["status"] != "ok" and not force:
             return json.dumps({"ok": False, "can_force": True, "error": meshsurvey.verdict_text(report)})
-        r = meshedit.extract_blend(gr, base_path=base, force=True)
+        r = meshedit.extract_blend(gr, base_path=base, force=True, project_textures=body.get('project_textures', True))
         # probe() reports warnings as bare keys ("morphs"); expand them so the UI shows the
         # sentence rather than the code.
         warnings = [meshsurvey.WARNINGS.get(w, w) for w in r["warnings"]]
         return json.dumps({"ok": True, "blend": r["blend"].replace("\\", "/"),
                            "preflight": r["preflight"], "warnings": warnings,
                            "textures": r["textures"], "materials": r["materials"],
+                           "project_textures": r.get('project_textures', True),
                            "info": r["info"]})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
@@ -3334,6 +3479,7 @@ def shutdown(timeout=15):
     """Stop admission, drain managed jobs, then release native worker/watchers."""
     if not jobs.shutdown(timeout):
         return False
+    import_server.shutdown()
     _thumb_executor.shutdown(wait=False, cancel_futures=True)
     _observer.stop()
     _observer.join(timeout=5)

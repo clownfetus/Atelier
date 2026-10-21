@@ -59,14 +59,8 @@ def texture_role(param_name):
 
 def _index_candidates(asset_name):
     """game_rels in the paks whose basename matches asset_name (no extension)."""
-    from atelier.index import ensure_index
-    want = asset_name.lower() + ".uasset"
-    out = []
-    for entry in ensure_index():
-        virt = entry[0]
-        if virt.lower().endswith("/" + want) or virt.lower() == want:
-            out.append(virt[:-7])           # strip .uasset -> game_rel
-    return out
+    from atelier.index import by_basename
+    return by_basename(asset_name)
 
 
 def _best_candidate(candidates, mesh_game_rel):
@@ -110,19 +104,9 @@ def _mesh_json(mesh_game_rel, work_base):
 
 def _mi_from_imports(d, pkg_idx):
     """FPackageIndex -> MI game_rel via the import table (same walk as material._mat_textures)."""
-    imports = (d or {}).get("Imports", [])
-    if not isinstance(pkg_idx, int) or pkg_idx >= 0:
-        return None
-    ii = -pkg_idx - 1
-    if not (0 <= ii < len(imports)):
-        return None
-    outer = imports[ii].get("OuterIndex")
-    pkg = None
-    if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
-        pkg = imports[-outer - 1].get("ObjectName")
-    if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
-        return pkg[len("/Game/Marvel/"):]
-    return None
+    from atelier.unreal_refs import imported_package
+    package = imported_package(d, pkg_idx)
+    return package[1] if package else None
 
 
 def resolve_mesh_materials(mesh_game_rel, mesh, work_base=None):
@@ -146,7 +130,8 @@ def resolve_mesh_materials(mesh_game_rel, mesh, work_base=None):
         if mi is None and slot:
             mi = _best_candidate(_index_candidates(slot), mesh_game_rel)
             via = "name" if mi else None
-        out.append({"slot": slot, "mi": mi, "via": via, "pkg_idx": m.get("pkg_idx")})
+        out.append({"slot": slot, "mi": mi, "via": via, "pkg_idx": m.get("pkg_idx"),
+                    'gameplay_tags': list(m.get('gameplay_tags', []))})
     return out
 
 
@@ -263,6 +248,7 @@ def extract_textures_to_project(tex_game_rels, root=None):
     reported readonly: that .dds outranks a .png at inject time (texture.stage_inject), so writing
     a .png beside it would show edits in Blender that silently never ship."""
     from atelier.handlers.texture import decode_to_png, ensure_work_base
+    from atelier.handlers.hdr_texture import project_info as hdr_project_info
     root = root or get_import_root()
     project_root=get_import_root()
     grs = sorted(set(g for g in tex_game_rels if g))
@@ -274,7 +260,9 @@ def extract_textures_to_project(tex_game_rels, root=None):
             for src in (project_base(gr,project_root)+'.png', project_base_legacy(gr,project_root)+'.png'):
                 if os.path.isfile(src):
                     os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copy2(src,dst+'.png')
-                    return gr, {'path':dst+'.png','status':'existing','readonly':False}
+                    hdr = hdr_project_info(src[:-4])
+                    if hdr: shutil.copy2(src[:-4]+'.dds', dst+'.dds')
+                    return gr, {'path':dst+'.png','status':'existing','readonly':bool(hdr)}
         for cand, ro in ((dst + ".png", False), (project_base_legacy(gr, root) + ".png", False),
                          (dst + ".dds", True), (project_base_legacy(gr, root) + ".dds", True)):
             if os.path.exists(cand):
@@ -284,9 +272,9 @@ def extract_textures_to_project(tex_game_rels, root=None):
                 if cand.endswith(".png") and _degenerate(cand):
                     print(f"[meshmat] refreshing unusable {os.path.basename(cand)}", file=sys.stderr)
                     break
-                return gr, {"path": cand, "status": "existing", "readonly": ro}
-        # Decode into the viewport cache, then copy ONLY the .png across: decode_to_png leaves a
-        # .dds beside its output, and a .dds in the project would outrank the user's painted .png.
+                return gr, {"path": cand, "status": "existing", "readonly": ro or bool(hdr_project_info(cand[:-4]))}
+        # Decode into the viewport cache. For 2D textures copy only the PNG so a DDS
+        # cannot outrank painted pixels. Cubes retain their authoritative HDR DDS.
         cache_base = project_base(gr, CACHE_3DVIEW)
         png = cache_base + ".png"
         hdr=cache_base+'.hdr'
@@ -316,6 +304,14 @@ def extract_textures_to_project(tex_game_rels, root=None):
             return gr, {"path": None, "status": "failed", "readonly": False}
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         refreshed = os.path.exists(dst + ".png")
+        if hdr_project_info(cache_base):
+            # Keep the six-face HDR payload beside its preview; only the preview
+            # is used as a named Blender input. It is never a paintable HDR source.
+            from atelier.storage import publish_project_files, _digest
+            publish_project_files(root, [{'path': gr+ext, 'before': _digest(dst+ext) if os.path.isfile(dst+ext) else None,
+                                          'source': cache_base+ext} for ext in ('.dds', '.png')])
+            return gr, {'path':dst+'.png','status':'extracted','readonly':True,
+                        'note':'HDR cubemap preserved; this image is a tone-mapped preview.'}
         shutil.copyfile(png, dst + ".png")
         return gr, {"path": dst + ".png", "status": "refreshed" if refreshed else "extracted",
                     "readonly": False}
@@ -332,6 +328,19 @@ def extract_textures_to_project(tex_game_rels, root=None):
         except Exception as error:
             return gr, {'path': None, 'status': 'failed', 'readonly': False, 'error': str(error)}
     if grs:
+        # Textures with neither a project file nor a decoded viewport copy need extracting; do
+        # that as one batch rather than one exact-path extraction per texture inside the loop.
+        from atelier.handlers.texture import prefetch_exact
+        need = [gr for gr in grs
+                if not any(os.path.exists(c) for c in (project_base(gr, root) + ".png",
+                                                       project_base(gr, root) + ".dds",
+                                                       project_base(gr, CACHE_3DVIEW) + ".png"))]
+        try:
+            prefetch_exact(need)
+        except jobs.Cancelled:
+            raise
+        except Exception as error:
+            print(f"[meshmat] batched texture extract skipped: {error}", file=sys.stderr, flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(2, len(grs))) as ex:
             # ContextVars carry both the pinned project and the cancellation/job
             # token. Each worker needs its own copy; sharing one Context across
@@ -380,6 +389,7 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
             maps.append({"param": mp["param"], "role": role, "game_rel": mp["game_rel"], 'uv': mp.get('uv',0),
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
         out_slots[rec["slot"]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
+            'gameplay_tags': list(rec.get('gameplay_tags', [])),
             'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
         from atelier.handlers.meshtextures import source_maps
         maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))

@@ -1,9 +1,12 @@
 # Standing idle decoder
 
 Build with `scripts/build_animation_decoder.py --tools <Tools-directory>` and .NET
-SDK 10. The builder extracts the exact CUE4Parse assemblies from the installed
-AtelierMesh bundle and publishes a self-contained Windows helper with the same
-native decompression libraries. There are no runtime SDK or network dependencies.
+SDK **10.0.402**. The [native input lock and recipe](../README.md) pin the source,
+compiler/runtime, NuGet archives, exact AtelierMesh bundle, extracted CUE4Parse
+assemblies and native decompression libraries. Changed inputs and existing output
+folders are rejected. `--output <fresh-folder>` permits an independent build;
+`build-inputs.json` records its input/output hashes. There are no runtime SDK or
+network dependencies.
 CUE4Parse is [Apache 2.0 licensed](https://github.com/FabianFG/CUE4Parse).
 
 The helper reads a mesh and a non-additive standing idle from the local game paks.

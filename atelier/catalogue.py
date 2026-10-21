@@ -1,6 +1,7 @@
 """Optional, cached browsing artwork. Never participates in asset import or mod export.
 
-Names come from donutman07; costume IDs and images are verified on RivalSkins.
+Names come from donutman07; costume IDs and images are verified on RivalSkins, whose
+card name replaces a different listed name when its page verifies exactly one game ID.
 Missing costumes use a labelled hero portrait, never a guessed skin image.
 Network work is explicit (start_update/thumbnail), bounded and independent of projects.
 """
@@ -21,11 +22,12 @@ import urllib.request
 from PIL import Image
 from atelier import config as C
 from atelier.storage import atomic_json
+from atelier.identity import resolve_ids, identity_tokens
 
 IDS_URL = 'https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md'
 HEROES_URL = 'https://rivalskins.com/heroes/'
 DAY = 86400
-PARSER_VERSION = 5
+PARSER_VERSION = 6
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -227,10 +229,16 @@ def build_entries(chars, roster, load_page, load_items):
             plate = plates.get(name, []) if name else []
             matched = plate[0] if len(plate) == len(same_name) == 1 else None
             banner = nameplate_url(matched['image']) if matched else None
-            for sid in skin_ids:
-                if not sid.startswith(cid):
-                    continue  # Never cross hero boundaries, including transformation/NPC IDs.
-                entries[sid] = {'name': char['skins'].get(sid, costume['name']), 'kind': 'skin', 'hero': cid,
+            # Never cross hero boundaries, including transformation/NPC IDs.
+            own_ids = [sid for sid in skin_ids if sid.startswith(cid)]
+            # A card whose page verifies exactly one game ID names that costume. donutman07's list
+            # carries typos and stale names (Cyclops' Shadowed Gaze is listed as SHADOWED NEMESIS).
+            verified = costume['name'].strip() if artwork['ids'] and len(own_ids) == 1 else ''
+            for sid in own_ids:
+                name = char['skins'].get(sid, costume['name'])
+                if verified and normalized(verified) != normalized(name):
+                    name = verified  # The same words in another case or punctuation keep the list's spelling.
+                entries[sid] = {'name': name, 'kind': 'skin', 'hero': cid,
                                 'image': artwork['image'], 'source': costume['page'], 'hero_fallback': False,
                                 'match': 'id' if artwork['ids'] else 'name',
                                 **({'banner': banner, 'badge': matched['image']} if banner else {})}
@@ -276,16 +284,19 @@ class Catalogue:
             return {**self.state, 'entries': len(entries), 'portraits': sum(bool(e.get('image')) for e in entries.values())}
 
     def describe(self, path):
-        match = re.fullmatch(r'(?:Characters|VFX/Materials/Characters)/(\d{4})(?:/(\d{7}))?', path, re.I)
-        if not match:
+        entries = self.data.get('entries', {})
+        ids = resolve_ids(path, entries, leaf_only=True)
+        if not ids:
             return None
-        cid, sid = match.groups()
-        if sid and not sid.startswith(cid):
-            return None
+        return self._describe_id(ids['skin_id'] or ids['char_id'], entries)
+
+    def _describe_id(self, value, entries=None):
+        entries = self.data.get('entries', {}) if entries is None else entries
+        cid, sid = value[:4], value if len(value) == 7 else None
         key = sid or cid
-        entry = self.data.get('entries', {}).get(key)
+        entry = entries.get(key)
         if not entry and sid:
-            hero = self.data.get('entries', {}).get(cid)
+            hero = entries.get(cid)
             if hero:
                 entry = {**hero, 'name': None, 'hero_fallback': True}
                 key = cid
@@ -295,6 +306,68 @@ class Catalogue:
                 'hero_fallback': entry.get('hero_fallback', False),
                 'banner': f'/api/catalogue/banner/{key}' if entry.get('banner') and not entry.get('hero_fallback') else None,
                 'badge': f'/api/catalogue/badge/{key}' if sid and entry.get('badge') and not entry.get('hero_fallback') else None}
+
+    def identity(self, path):
+        entries = self.data.get('entries', {})
+        ids = resolve_ids(path, entries)
+        if not ids:
+            return None
+        cid, sid = ids['char_id'], ids['skin_id']
+        hero, skin = self._describe_id(cid, entries), self._describe_id(sid, entries) if sid else None
+        return {**ids, 'char_name': (hero or {}).get('name') or '',
+                'skin_name': (skin or {}).get('name') or '',
+                'hero': hero, 'skin': skin}
+
+    def identity_entries(self):
+        """Local display metadata for all known IDs, including entries without artwork."""
+        entries = self.data.get('entries', {})
+        return {key: {**self._describe_id(key, entries), 'id': key,
+                      'kind': entry.get('kind', 'hero' if len(key) == 4 else 'skin'),
+                      'hero': key[:4]}
+                for key, entry in entries.items()}
+
+    def decorate(self, item):
+        """Attach presentation metadata while preserving every original name and path."""
+        path = item.get('game_rel') or item.get('rel_path') or item.get('path') or ''
+        identity = self.identity(path)
+        if not identity:
+            return item
+        result = dict(item)
+        for key in ('char_id', 'skin_id', 'char_name', 'skin_name'):
+            if identity.get(key):
+                result[key] = identity[key]
+        result['identity_label'] = ' · '.join(filter(None, (identity['char_name'], identity['skin_name'])))
+        if item.get('type') != 'folder':
+            if resolve_ids(path.rpartition('/')[0], self.data.get('entries', {})) is None:
+                result['context_label'] = result['identity_label']
+            return result
+        portrait = self.describe(path)
+        if not portrait:
+            leaf = path.rsplit('/', 1)[-1]
+            if not resolve_ids(leaf, self.data.get('entries', {})):
+                return result
+            portrait = identity['skin'] or identity['hero']
+            if not portrait: return result
+            label = leaf
+            for token in identity_tokens(leaf):
+                if token in (identity['char_id'], identity['skin_id']): label = label.replace(token, '')
+            label = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', label).strip('_ -') or leaf
+            result.update(label=result['identity_label']+' — '+leaf, display_name=label,
+                          context_label=result['identity_label'], thumbnail=portrait['thumbnail'],
+                          hero_fallback=portrait['hero_fallback'])
+            return result
+        key = path.rstrip('/').rsplit('/', 1)[-1]
+        name = portrait.get('name') or (f'Skin {key[-3:]}' if len(key) == 7 else None)
+        if name:
+            label_id = key[-3:] if len(key) == 7 and identity['hero_path'] else key
+            context = identity['char_name'] if len(key) == 7 and not identity['hero_path'] else ''
+            result['label'] = ' — '.join(filter(None, (label_id, context, name)))
+            result['display_name'] = name
+            result['context_label'] = context
+        result.update(thumbnail=portrait['thumbnail'], hero_fallback=portrait['hero_fallback'])
+        if portrait.get('banner'):
+            result['banner'] = portrait['banner']
+        return result
 
     def start_update(self):
         with self.lock:

@@ -52,7 +52,7 @@
     });
     // The library already knows which skins have a nameplate; otherwise ask, then fall back.
     const known = skin && window.AtelierRoster?.describe(`Characters/${hero}/${skin}`)?.skin;
-    const nameplate = window.AtelierCatalogueArt?.bannerUrl(skin && (known ? known.banner : '/api/catalogue/banner/' + enc(skin)));
+    const nameplate = window.AtelierCatalogueArt?.bannerUrl(skin && (known && !known.unlisted ? known.banner : '/api/catalogue/banner/' + enc(skin)));
     const heroNameplate = hero && window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/' + enc(hero));
     const story = hero && '/api/catalogue/hero/' + enc(hero) + '/story';
     load(art, [nameplate, heroNameplate, story], stamp, src => {

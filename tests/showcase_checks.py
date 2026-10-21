@@ -54,6 +54,19 @@ window.__showcase={
             assert tab.evaluate('__showcase.restored()') and tab.evaluate('__showcase.snapshot()')==baseline
         assert not writes,writes
         checks.append('Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes')
+        composition=tab.evaluate("""() => {
+          const render=inks=>{const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');AtelierShowcaseArt.draw(ctx,c.width,c.height,inks);return ctx.getImageData(0,0,c.width,c.height).data;};
+          const a=render({charge:'#f94848',rift:'#ff0000'}),b=render({charge:'#19e06e',rift:'#00ffff'});
+          let centre=0,edge=0;
+          for(let y=0;y<768;y++)for(let x=0;x<1024;x++){
+            const i=(y*1024+x)*4,changed=a[i]!==b[i]||a[i+1]!==b[i+1]||a[i+2]!==b[i+2];
+            if(changed&&x>=533&&x<717&&y>=185&&y<507)centre++;
+            if(changed&&x<450)edge++;
+          }
+          return {centre,edge};
+        }""")
+        assert composition['centre']==0 and composition['edge']>100,composition
+        checks.append('Showcase keeps its central model area free of coloured burst/dot artwork while retaining the Krackle identity at the edge; the same drawing serves live and exported views')
         def setting(id,value,event='change'):
             tab.evaluate('([id,value,event])=>{const e=document.getElementById(id);e.value=value;e.dispatchEvent(new Event(event));}',[id,value,event])
         tab.locator('#viewport-inspect').click()

@@ -22,13 +22,13 @@
     sourceLabel.textContent = upload ? 'Game texture template' : 'Game asset to copy';
     name.placeholder = prefixes[kind.value] + {texture: 'MyTexture', mesh: 'MyMesh', material: 'MyMaterial'}[kind.value];
     help.textContent = {
-      texture: 'Images use the template’s texture format. Pick a matching diffuse, normal or mask texture.',
+      texture: 'Images use the template’s texture type and format. For HDR cubemaps, choose a TextureCube template and a .hdr panorama, six-face strip or cubemap DDS.',
       mesh: 'For FBX, GLB or Blender files, copy a game mesh first, then use Replace model.',
       material: 'Material files must be cooked material instances (MI_).',
     }[kind.value];
     source.placeholder = kind.value === 'texture' ? 'Characters/…/Textures/T_Body_D' :
       kind.value === 'mesh' ? 'Characters/…/Meshes/SK_Body' : 'Characters/…/Materials/MI_Body';
-    files.accept = kind.value === 'texture' ? '.png,.tga,.jpg,.jpeg,.webp,.bmp,.dds,.uasset,.uexp,.ubulk,.uptnl' : '.uasset,.uexp,.ubulk,.uptnl';
+    files.accept = kind.value === 'texture' ? '.png,.tga,.jpg,.jpeg,.webp,.bmp,.dds,.hdr,.uasset,.uexp,.ubulk,.uptnl' : '.uasset,.uexp,.ubulk,.uptnl';
     fileNames.textContent = [...files.files].map(file => file.name).join(', ') ||
       (kind.value === 'texture' ? 'Choose an image, or a cooked .uasset with its companion files.' :
         'Choose a cooked .uasset with its .uexp, .ubulk and .uptnl files when present.');
@@ -54,15 +54,22 @@
       if (request !== browseRequest || !overlay.classList.contains('active')) return;
       if (!result.ok) throw Error(result.error || 'Could not browse game folders.');
       browseLocation = result.path;
-      browserPath.textContent = '/Game/Marvel/' + browseLocation;
+      browserPath.textContent = '/Game/Marvel/' + (window.AtelierCatalogueArt?.pathLabel(browseLocation) || browseLocation);
+      browserPath.title = '/Game/Marvel/' + browseLocation;
       up.disabled = !browseLocation; useFolder.disabled = false; useFolder.hidden = browseMode !== 'folder';
       browserItems.replaceChildren();
       for (const item of result.items) {
-        const row = button((item.type === 'folder' ? 'Folder: ' : '') + item.name, () => {
+        const row = button((item.type === 'folder' ? 'Folder: ' : '') +
+          [item.type === 'folder' && item.context_label, item.display_name || item.label || item.name].filter(Boolean).join(' — '), () => {
           if (item.type === 'folder') { browseAt(item.rel_path); return; }
           source.value = item.game_rel; browser.hidden = true; source.focus(); refresh();
         });
-        row.dataset.path = item.rel_path || item.game_rel; browserItems.append(row);
+        row.dataset.path = item.rel_path || item.game_rel; row.title = row.dataset.path;
+        const art = window.AtelierCatalogueArt?.identityChip(item); if (art) row.prepend(art);
+        if (item.type !== 'folder' && item.identity_label) {
+          const detail = el('small', item.identity_label); row.append(detail);
+        }
+        browserItems.append(row);
       }
       if (!result.items.length) browserItems.append(el('p', browseMode === 'folder' ?
         'No subfolders. Use this folder, or type a new folder above.' : 'No matching assets in this folder.', 'add-asset-help'));

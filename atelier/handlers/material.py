@@ -67,14 +67,12 @@ def texture_slots(d):
         ii = -idx - 1
         if not (0 <= ii < len(imports)):
             continue
-        outer = imports[ii].get("OuterIndex")
-        pkg_import = None
-        if isinstance(outer, int) and outer < 0 and (-outer - 1) < len(imports):
-            pkg_import = imports[-outer - 1]
-        pkg = (pkg_import or {}).get("ObjectName")
-        if isinstance(pkg, str) and pkg.startswith("/Game/Marvel/"):
+        from atelier.unreal_refs import imported_package
+        package = imported_package(d, idx)
+        if package:
+            pkg_import, game_rel = package
             out[nm] = {"entry": e, "value": pv, "import": imports[ii], "package": pkg_import,
-                       "game_rel": pkg[len("/Game/Marvel/"):],
+                       "game_rel": game_rel,
                        "class": imports[ii].get("ClassName") or ""}
     return out
 
@@ -98,13 +96,15 @@ def _mat_surface(d):
     idx = parent.get("Value")
     imports = d.get("Imports", [])
     parent_name = imports[-idx-1].get("ObjectName", "") if isinstance(idx, int) and -len(imports) <= idx < 0 else ""
+    from atelier.unreal_refs import imported_package
+    package = imported_package(d, idx) if isinstance(idx, int) and -len(imports) <= idx < 0 else None
     blend = str(values.get("BlendMode") or "")
     if not blend:
         blend = "BLEND_Translucent" if "translucent" in parent_name.lower() else "BLEND_Opaque"
     return {"blend_mode": blend, "two_sided": bool(values.get("TwoSided", False)),
             "opacity": max(0.0, min(1.0, float(scalar.get("opacitymultiplier", scalar.get("opacity", 1.0))))),
             "mask_clip": max(0.0, min(1.0, _f(values.get("OpacityMaskClipValue", .3333)))),
-            "parent": parent_name}
+            "parent": parent_name, "parent_path": package[1] if package else None}
 
 def _mat_texture_classes(d):
     """{slot: UE class name} ('Texture2D', 'TextureCube', …) — only Texture2D slots can take a
@@ -133,6 +133,13 @@ def _apply_mat_edits(d, colors, scalars):
                 pv["Value"] = float(scalars[nm])
 
 def mat_json(game_rel, out_dir=None, prefer_exact=False):
+    """Read project material JSON or publish one validated conversion per asset."""
+    from atelier.inflight import key_lock
+    with key_lock('material-json', os.path.realpath(out_dir or get_import_root()), game_rel):
+        return _mat_json(game_rel, out_dir, prefer_exact)
+
+
+def _mat_json(game_rel, out_dir=None, prefer_exact=False):
     """Extract the MI + convert to JSON as <basename>.json. Returns the json path.
     The active project dir always takes priority (edits/explicit imports live there); if no
     project copy exists, the JSON is produced in out_dir (defaults to the project dir — the
@@ -178,11 +185,31 @@ def read_material(game_rel, cache_only=False):
     """{colors:[{name,rgba}], scalars:[{name,value}], textures:{slot:game_rel}} for an MI instance.
     cache_only=True routes any freshly-extracted JSON into CACHE_3DVIEW instead of the project
     folder — used by the 3D viewport's automatic per-mesh material reads."""
+    if cache_only:
+        native = _import_parameters(game_rel)
+        if native is not None:
+            return native
     d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None,
         **({'prefer_exact':True} if cache_only else {})), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d),
             "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, "")}
+
+
+def _import_parameters(game_rel, original=False):
+    from atelier import import_server
+    if not import_server.available():
+        return None
+    from atelier.added_assets import source_base
+    if source_base(game_rel):
+        return None
+    if not original and (os.path.isfile(project_base(game_rel)+'.json')
+                         or os.path.isfile(project_base_legacy(game_rel)+'.json')):
+        return None  # Saved edits and donor snapshots always win over vanilla data.
+    try:
+        return import_server.material(game_rel)
+    except import_server.ImportError:
+        return None  # Unsupported material layouts retain the exact editor reader.
 
 def _original_document(game_rel):
     """Read a pristine document without creating, changing or resetting a project copy.
@@ -241,6 +268,9 @@ def _original_document(game_rel):
 
 def read_material_original(game_rel):
     """Original comparison bypasses saved edits, including a replacement's donor snapshot."""
+    native = _import_parameters(game_rel, original=True)
+    if native is not None:
+        return native
     d = _original_document(game_rel)
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d)}
@@ -303,9 +333,8 @@ def _retarget_material(d, source, target):
             return {k: visit(v) for k, v in value.items()}
         return value
     d = visit(d)
-    for name in (os.path.basename(target), new):
-        if name not in d.setdefault("NameMap", []):
-            d["NameMap"].append(name)
+    from atelier.unreal_names import add_names
+    add_names(d, os.path.basename(target), new)
     if isinstance(d.get("FolderName"), str) and d["FolderName"].startswith("/"):
         d["FolderName"] = new
     return d

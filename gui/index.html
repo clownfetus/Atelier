@@ -33,6 +33,7 @@
 <link rel="stylesheet" href="/static/add-asset.css">
 <link rel="stylesheet" href="/static/motion/krackle.css">
 <link rel="stylesheet" href="/static/motion/surfaces.css">
+<link rel="stylesheet" href="/static/motion/workflow-krackle.css">
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
 <link rel="stylesheet" href="/static/motion/viewport-loader.css">
 <link rel="stylesheet" href="/static/viewport.css">
@@ -76,11 +77,15 @@
     <section id="library-hero" aria-label="Current character" hidden></section>
     <section id="continue-ribbon" aria-label="Continue editing" hidden></section>
     <div class="library-controls" role="group" aria-label="Library view controls">
+      <div class="library-filter-group" role="group" aria-label="Filter assets">
       <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
       <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
+      <button class="btn" id="library-clear" type="button" hidden>Clear filters</button>
+      </div>
+      <div class="library-view-group" role="group" aria-label="Library display">
       <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
       <label>Size <select id="library-size" aria-label="Thumbnail size"><option value="128">Compact</option><option value="156">Standard</option><option value="196">Large</option><option value="236">Extra large</option></select></label>
-      <button class="btn" id="library-clear" type="button">Clear filters</button>
+      </div>
       <span class="library-scope" title="Search and filters apply to the current folder. Sort and size are remembered.">This folder</span>
     </div>
     <section id="home-pins" aria-label="Pinned folders" hidden></section>
@@ -113,6 +118,7 @@
       <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
       <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
     </div>
+    <div class="mod-tray-tools">
     <button class="btn" id="bulk-edit-open" type="button" hidden>Bulk VFX / curves</button>
     <div class="mod-tray-actions">
       <button class="btn" id="add-asset-open" type="button" title="Add a texture, mesh or material with your own name and game folder">Add asset</button>
@@ -121,6 +127,7 @@
         <span id="process-s-maps-hint" hidden></span></div>
     </div>
     <div id="mod-tray-heroes" aria-label="Heroes in this mod" hidden></div>
+    </div>
     <div id="tray-progress" aria-label="Asset preparation" aria-live="polite"></div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
@@ -542,6 +549,10 @@
           Open assets automatically after importing
         </label>
       </div>
+      <div class="setup-field">
+        <label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-blender-project-textures" checked><span class="switch-track"></span></span>Add model textures to the project when opening in Blender</label>
+        <p class="setup-note">Turn this off to keep textures packed in the Blender file. Only the model is added to your project.</p>
+      </div>
     </div>
     <div class="setup-foot">
       <div class="modal-row">
@@ -826,7 +837,7 @@
 
 <!-- ── context menu ── -->
 <div id="ctx-menu"></div>
-<input type="file" id="ctx-file-input" accept="image/*" style="display:none">
+<input type="file" id="ctx-file-input" accept="image/*,.hdr,.dds" style="display:none">
 
 <!-- Krackle folder; generated with motion/folder-flap.svg by scripts/krackle_art.py. -->
 <template id="folder-flap-template">
@@ -850,6 +861,7 @@
 <script src="/static/motion/krackle-glyph.js"></script>
 <script src="/static/motion/empty-state.js"></script>
 <script src="/static/motion/krackle-stage.js"></script>
+<script src="/static/motion/workflow-krackle.js"></script>
 <script src="/static/motion/krackle-surfaces.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>

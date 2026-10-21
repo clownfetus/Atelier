@@ -31,7 +31,19 @@ from atelier.tools import uat
 _BLENDER_DIRS = (r"C:\Program Files\Blender Foundation",
                  r"C:\Program Files (x86)\Blender Foundation")
 _BLENDER_EXE  = "blender.exe" if os.name == "nt" else "blender"
+# Blender is "blender.exe" on Windows and a plain "blender" binary (or the Flatpak export
+# _scan_blender_dirs finds) everywhere else; "blender.exe" stays valid off Windows so a config
+# copied between the two works.
+BLENDER_NAMES = (("blender.exe",) if os.name == "nt" else
+                 ("blender", "blender.exe", "org.blender.Blender"))
 _SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "blender")
+
+
+def is_blender_executable(path):
+    """True for an existing file named like Blender. Atelier launches the configured Blender
+    without asking, so a saved path to any other program must never be accepted or run."""
+    return (bool(path) and os.path.isfile(path) and
+            os.path.basename(path).lower() in {name.lower() for name in BLENDER_NAMES})
 
 
 def _scan_blender_dirs():
@@ -78,7 +90,7 @@ def blender_path_suggestion():
     still exists, else the highest-versioned auto-detected install, else ''."""
     from atelier.config import get_blender_path
     configured = get_blender_path()
-    if configured and os.path.exists(configured):
+    if is_blender_executable(configured):
         return configured
     found = _scan_blender_dirs()
     return found[-1] if found else ""
@@ -86,13 +98,14 @@ def blender_path_suggestion():
 
 def find_blender():
     """Locate the Blender executable. ATELIER_BLENDER wins, then the path configured in Settings,
-    then the highest-versioned auto-detected install."""
+    then the highest-versioned auto-detected install. A configured path that is not Blender is
+    skipped rather than run."""
     env = os.environ.get("ATELIER_BLENDER")
     if env and os.path.exists(env):
         return env
     from atelier.config import get_blender_path
     configured = get_blender_path()
-    if configured and os.path.exists(configured):
+    if is_blender_executable(configured):
         return configured
     found = _scan_blender_dirs()
     if not found:
@@ -121,7 +134,7 @@ def _run_blender(script, args, label):
     return out
 
 
-def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True, texture_root=None, pack_images=False, presentation_hidden=()):
+def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_materials=True, texture_root=None, pack_images=False, presentation_hidden=(), project_textures=True):
     """Decode a mesh's top LOD to a .blend in the active project folder.
 
     Refuses up front on a format this pipeline cannot rebuild. The check runs here, at
@@ -140,6 +153,13 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
               "fail or produce a broken package.")
     m = _mesh.Mesh(base)
     project_extract = blend_path is None
+    if not isinstance(project_textures, bool):
+        raise ValueError('The project textures option must be true or false.')
+    if not project_textures:
+        import hashlib
+        owner = hashlib.sha256(os.path.realpath(get_import_root()).encode('utf-8')).hexdigest()[:16]
+        texture_root = texture_root or os.path.join(_CACHE, 'blender-textures', owner)
+        pack_images = True
     blend_path = blend_path or (project_base(game_rel) + ".blend")
     os.makedirs(os.path.dirname(blend_path), exist_ok=True)
 
@@ -185,6 +205,7 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
             "preflight": _survey.verdict_text(report),
             "textures": textures,
             "materials": sorted((manifest or {}).get("slots", {}).keys()), 'material_report':material_report,
+            'project_textures': project_textures,
             'material_manifest_complete':manifest is not None and not manifest.get('incomplete'),
             'material_issues':(manifest or {}).get('incomplete',[])}
 
@@ -239,7 +260,9 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         detail_counts={}
         for section in lod['sections']:detail_counts[section['mat']]=detail_counts.get(section['mat'],0)+section['num_tris']
         detail_ratios={m.materials[index]['slot_name']:min(1,count/max(1,top_counts.get(index,count))) for index,count in detail_counts.items()}
-        out = _run_blender("blend_to_glb.py", [blend_path, glb, f"{ratio:.6f}",json.dumps({'section_ratios':detail_ratios})], "GLB")
+        # Export intact vertex channels; meshoptimizer reduces the index buffers
+        # below, after the target LOD's own bone palette and morph IDs are known.
+        out = _run_blender("blend_to_glb.py", [blend_path, glb, '1.000000',json.dumps({'section_ratios':{}})], "GLB")
         from atelier.handlers.meshreplace import import_options
         options=import_options(json.loads(next((line[len('ATELIER_IMPORT_OPTIONS '):] for line in out.splitlines() if line.startswith('ATELIER_IMPORT_OPTIONS ')),'{}')))
         if i==0 and not options['keep_skeleton']:m.apply_skeleton_from_glb(glb)
@@ -256,8 +279,18 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         section_options={'preserve_parts':preserve_parts} if preserve_parts else {}
         if options.get('repair_weights'):section_options['repair_weights']=True
         secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight,**section_options)
+        simplification = []
+        if i > 0:
+            from atelier.mesh_optimizer import simplify_section
+            for section_index, section in enumerate(secs):
+                slot = m.materials[section['mat']]['slot_name']
+                if slot in (preserve_parts or []):
+                    continue
+                jobs.checkpoint()
+                secs[section_index], report = simplify_section(section, detail_ratios.get(slot, min(1, ratio)))
+                simplification.append({'slot':slot, **report})
         info = m.rebuild_lod(i, secs,keep_morphs=options['keep_morphs'])
-        applied.append({"lod": i, "ratio": round(ratio, 4), **info})
+        applied.append({"lod": i, "ratio": round(ratio, 4), 'simplification':simplification, **info})
         os.remove(glb)
 
     target = os.path.join(stage, *_pak_dir(game_rel).split("/"))

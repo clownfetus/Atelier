@@ -12,10 +12,11 @@ from atelier import config, jobs
 from atelier.index import ensure_index
 from atelier.storage import atomic_json, publish_project_files
 from atelier.tools import uat
+from atelier.unreal_names import add_names
 
 PACKAGE_EXTS = ('.uasset', '.uexp', '.ubulk', '.uptnl')
-IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds'}
-CLASSES = {'texture': {'Texture2D'}, 'material': {'MaterialInstanceConstant'},
+IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds', '.hdr'}
+CLASSES = {'texture': {'Texture2D', 'TextureCube'}, 'material': {'MaterialInstanceConstant'},
            'mesh': {'SkeletalMesh', 'StaticMesh'}}
 PREFIXES = {'texture': 'T_', 'material': 'MI_', 'mesh': 'SK_'}
 GAME_ROOT = '/Game/Marvel/'
@@ -131,10 +132,9 @@ def browse(path='', file_type=None):
     from atelier.web.browse import _classify_file
     prefix = path + '/' if path else ''
     children = {}
-    for entry in ensure_index():
+    from atelier.index import prefix_entries
+    for entry in prefix_entries(prefix):
         gr = entry[0]
-        if not gr.casefold().startswith(prefix.casefold()):
-            continue
         rest = gr[len(prefix):]
         if '/' in rest:
             name = rest.split('/')[0]
@@ -149,8 +149,10 @@ def browse(path='', file_type=None):
     for item in library_items(path):
         if item['type'] == 'folder' or item['file_type'] == file_type:
             children.setdefault(item['name'].casefold(), item)
+    from atelier.catalogue import catalogue
     return {'ok': True, 'path': path,
-            'items': sorted(children.values(), key=lambda item: (item['type'] != 'folder', item['name'].casefold()))}
+            'items': [catalogue.decorate(item) for item in sorted(children.values(),
+                      key=lambda item: (item['type'] != 'folder', item['name'].casefold()))]}
 
 
 def _read_package(base, directory):
@@ -213,14 +215,13 @@ def _retarget(doc, old_name, target, file_type, source_path=None):
     # Opaque cooked payloads can address existing FNames by index. Keep their entries stable.
     doc['NameMap'] = original_names
     doc['FolderName'] = new_package
-    for name in (new_name, new_package):
-        if name not in doc.setdefault('NameMap', []):
-            doc['NameMap'].append(name)
+    add_names(doc, new_name, new_package)
     return doc
 
 
 def _available(target):
-    if any(entry[0].casefold() == (target + '.uasset').casefold() for entry in ensure_index()):
+    from atelier.index import index_lookup
+    if (target + '.uasset').lower() in index_lookup():
         raise ValueError('An asset already exists in the game at this location. Choose another name or folder.')
     base = config.project_base(target)
     if any(os.path.exists(base + ext) for ext in ('.png', '.dds', '.json', '.blend', '.mesh.json', '.asset.json')):
@@ -272,15 +273,37 @@ def add(file_type, folder, name, source='', files=()):
                 _export(doc, os.path.basename(original), file_type)
             original_lods = _mesh_lods(original)
         image = None
+        from atelier.handlers import hdr_texture
+        is_cube = file_type == 'texture' and hdr_texture.texture_class(doc) == 'TextureCube'
+        hdr_cube = None
+        if is_cube:
+            hdr_cube, _, _ = hdr_texture.read_cooked(doc, original)
         if images:
-            png, _size = custom_texture._normalized_png(images[0].read_bytes())
+            if is_cube:
+                hdr_cube = hdr_texture.prepare(images[0].read_bytes(), images[0].name, hdr_cube.format,
+                                               len(hdr_cube.mips), work/'hdr-prepare')
+                png = hdr_texture.preview_png(hdr_cube, work/'hdr-preview')
+            else:
+                if images[0].suffix.lower() == '.hdr':
+                    raise ValueError('Choose a TextureCube game template for an HDR cubemap.')
+                payload = images[0].read_bytes()
+                if payload[:4] == b'DDS ' and len(payload) >= 128 and int.from_bytes(payload[112:116], 'little') & 0x200:
+                    raise ValueError('Choose a TextureCube game template for a six-face cubemap DDS.')
+                png, _size = custom_texture._normalized_png(payload)
             image = work / 'image.png'; image.write_bytes(png)
         elif file_type == 'texture':
-            preview = work / 'preview' / 'source'
-            texture.decode_to_png(str(preview), original)
-            image = preview.with_suffix('.png')
+            if is_cube:
+                image = work/'image.png'; image.write_bytes(hdr_texture.preview_png(hdr_cube, work/'hdr-preview'))
+            else:
+                preview = work / 'preview' / 'source'
+                texture.decode_to_png(str(preview), original)
+                image = preview.with_suffix('.png')
             if not image.is_file():
                 raise ValueError('The texture could not be decoded for editing.')
+        # The typed UE5 texture JSON writer can append a second None terminator.
+        # A rename needs only the header: preserve the original cooked bytes.
+        trim = custom_texture._duplicate_none_bytes(doc, original + '.uasset') if file_type == 'texture' else 0
+        opaque = custom_texture._preserve_export_bytes(doc, original + '.uasset', trim_tail=trim) if file_type == 'texture' else False
         doc = _retarget(doc, os.path.basename(original), target, file_type, source_gr)
         compiled = work / 'compiled' / (target.rsplit('/', 1)[-1] + '.uasset')
         compiled.parent.mkdir()
@@ -289,6 +312,11 @@ def add(file_type, folder, name, source='', files=()):
         result = uat(['from_json', str(document), str(compiled), config.USMAP])
         if result.returncode != 0 or not compiled.is_file():
             raise ValueError('Could not build the new asset: ' + (result.stderr or result.stdout or 'conversion failed')[-500:])
+        if opaque:
+            payload = Path(original + '.uexp').read_bytes()
+            expected = payload[:-4-trim] + payload[-4:] if trim else payload
+            if compiled.with_suffix('.uexp').read_bytes() != expected:
+                raise ValueError('Renaming the texture altered its cooked payload; the asset was not added.')
         for ext in ('.ubulk', '.uptnl'):
             if os.path.isfile(original + ext):
                 shutil.copyfile(original + ext, compiled.with_suffix(ext))
@@ -299,9 +327,13 @@ def add(file_type, folder, name, source='', files=()):
             encoded = work / 'encoded' / compiled.name
             for template, output in ((Path(original + '.uasset'), baseline), (compiled, encoded)):
                 output.parent.mkdir()
-                result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
-                if result.returncode != 0 or not output.is_file():
-                    raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
+                if is_cube:
+                    hdr_texture.inject(str(template.with_suffix('')), output, hdr_cube, work/('hdr-'+output.parent.name))
+                else:
+                    result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
+                    if result.returncode != 0 or not output.is_file():
+                        raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
+            custom_texture.repair_export_tail(str(encoded), str(work / 'texture-tail'))
             custom_texture._verify_rename(str(work), str(baseline), str(encoded), compiled.stem)
             compiled = encoded
         verified = _read_package(str(compiled.with_suffix('')), str(work / 'readback'))
@@ -320,11 +352,15 @@ def add(file_type, folder, name, source='', files=()):
         package_path = '.atelier/added-assets/' + identity + '/' + compiled.stem
         marker = work / 'record.json'
         atomic_json(marker, {'version': 1, 'id': identity, 'file_type': file_type,
-                             'source': source_gr or packages[0].name})
+                             'source': source_gr or packages[0].name,
+                             **({'texture_class': 'TextureCube', 'hdr': True} if is_cube else {})})
         changes = [{'path': package_path + ext, 'before': None, 'source': str(compiled.with_suffix(ext))}
                    for ext in PACKAGE_EXTS if compiled.with_suffix(ext).is_file()]
         changes += [{'path': target + editor_ext, 'before': None, 'source': str(editor_file)},
                     {'path': target + '.asset.json', 'before': None, 'source': str(marker)}]
+        if is_cube:
+            dds = work/'image.dds'; dds.write_bytes(hdr_texture.write_dds(hdr_cube))
+            changes.append({'path': target+'.dds', 'before': None, 'source': str(dds)})
         jobs.checkpoint(); _available(target); jobs.begin_publication('Adding the asset to your project…')
         publish_project_files(root, changes)
     return {'ok': True, 'game_rel': target, 'file_type': file_type, 'name': target.rsplit('/', 1)[-1], 'token': token(target)}

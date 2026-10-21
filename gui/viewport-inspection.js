@@ -178,7 +178,7 @@ export function createViewportInspection(api) {
     const stamp = revision, {data, byName} = api.materials();
     const jobs = Object.entries(byName).map(async ([name, materials]) => {
       const info = data[name];
-      if (!info) {
+      if (!info?.game_rel) {
         // Unmatched slots cannot be edited in this studio; retain their unmodified decoded form.
         for (const material of materials) originals.set(material,material.clone());
         return;
@@ -187,7 +187,9 @@ export function createViewportInspection(api) {
       if (stamp !== revision) throw new DOMException('Preview changed', 'AbortError');
       if (!result.ok) throw Error(result.error || 'Original material unavailable');
       const tex = result.textures || {}, roles=api.textureRoles(result);
-      const map = tex.DyeingTexture
+      const map = result.eye_preview
+        ? await loadTexture(`/api/eye_texture?game_rel=${encodeURIComponent(info.game_rel)}&original=1`, stamp)
+        : tex.DyeingTexture
         ? await loadTexture(`/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&original=1`, stamp)
         : roles.basecolor ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(roles.basecolor)}&original=1`, stamp) : null;
       const emissiveMap = roles.emissive ? await loadTexture(`/api/texture_png?game_rel=${encodeURIComponent(roles.emissive)}&original=1`, stamp) : null;

@@ -4,6 +4,12 @@
   const reduced = (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)'));
   let active = null;
   let bannerArgs = null;
+  let workflowNavigation = 0;
+  let workflowEditor = 0;
+  function cancelWorkflow() {
+    workflowNavigation++; workflowEditor++;
+    window.AtelierMotion?.workflow?.stop();
+  }
   const origins = new WeakMap();
   const cardFor = path => [...document.querySelectorAll('#grid-area .card')]
     .find(card => card.dataset.libraryPath === path);
@@ -60,14 +66,17 @@
     const host = document.getElementById('library-hero');
     if(!host)return;
     const current=()=>bannerArgs===args&&host.isConnected&&!host.hidden;
-    const match = /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const context = window.AtelierRoster?.describe(path);
+    const identity = window.AtelierCatalogueArt?.describe(path);
+    const match = identity?.hero ? [null, identity.hero.path, identity.skin ? '/' + identity.skin.id : null] :
+      /^(Characters\/\d{4})(\/\d{7})?(?:\/|$)/i.exec(path);
     const story = match ? '/api/catalogue/hero/' + match[1].split('/')[1] + '/story' : null;
     // Prefer the costume's verified nameplate, then the hero's own named nameplate.
-    const skinKey = match?.[2] ? match[1] + match[2] : null;
+    const skinKey = identity?.skin_path || (match?.[2] ? match[1] + match[2] : null);
+    const heroKey = identity?.hero_path || match?.[1];
     const nameplate = window.AtelierCatalogueArt?.bannerUrl(skinKey && (artwork[skinKey]?.banner || context?.skin?.banner) || null);
     const heroNameplate = match && window.AtelierCatalogueArt?.bannerUrl(
-      artwork[match[1]]?.banner || context?.hero?.banner || '/api/catalogue/banner/'+match[1].split('/')[1]);
+      artwork[heroKey]?.banner || context?.hero?.banner || '/api/catalogue/banner/'+match[1].split('/')[1]);
     const plates = [...new Set([nameplate, heroNameplate].filter(Boolean))];
     const bannerSources = [...plates, story].filter(Boolean);
     const src = bannerSources[0];
@@ -77,7 +86,7 @@
     window.dispatchEvent(new CustomEvent('atelier:artwork', {detail:{accent:null,colors:[]}}));
     if (!match) return;
     const heroPath = match[1], skinPath = match[2] ? heroPath + match[2] : null;
-    const skin={...context?.skin,...artwork[skinPath]},hero={...context?.hero,...artwork[heroPath]};
+    const skin={...context?.skin,...artwork[skinKey]},hero={...context?.hero,...artwork[heroKey]};
     // Use the same costume icon / hero avatar as Home and Continue. Clear the old tint while
     // loading, and bind every fallback to this render (including an A → B → A navigation).
     const sources=[...new Set([
@@ -113,13 +122,13 @@
     host.classList.remove('has-art');
     if (preloaded) host.classList.add('has-art');
     const text = document.createElement('div'); text.className = 'library-hero-copy';
-    const eyebrow = document.createElement('span'); eyebrow.textContent = 'CHARACTER LIBRARY';
+    const eyebrow = document.createElement('span'); eyebrow.textContent = /^Characters\//i.test(path) ? 'CHARACTER LIBRARY' : 'CHARACTER ASSETS';
     const title = document.createElement('h2'); title.textContent = label(heroPath);
     const logo=document.createElement('img'); logo.className='hero-emblem'; logo.alt='';
     logo.src='/api/catalogue/hero/'+match[1].split('/')[1]+'/logo'; logo.onerror=()=>logo.remove();
     title.prepend(logo);
     const detail = document.createElement('p');
-    detail.textContent = [skinPath && label(skinPath), path.slice((skinPath || heroPath).length + 1).split('/').join(' / '),
+    detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
     text.append(eyebrow, title, detail); host.append(image, text);
     nextSource();
@@ -127,15 +136,17 @@
     if (preloaded && image.decode) return image.decode().catch(()=>{});
   }
   window.addEventListener('atelier:catalogue-updated',()=>{if(bannerArgs)banner(...bannerArgs);});
+  window.addEventListener('atelier:identities-updated',()=>{if(bannerArgs)banner(...bannerArgs);});
 
   function library(from, to, direction, update) {
+    const generation = ++workflowNavigation;
     const source = cardFor(to);
     const sourceLabel = source?.querySelector('.card-name');
     const banner = document.getElementById('library-hero');
     document.documentElement.dataset.libraryDirection = direction;
     // The banner enters and leaves on its own. Morphing the square card portrait into the wide
     // story art zoomed and stretched two different pictures into each other.
-    return transition(update, name => {
+    const ready = transition(update, name => {
       name(document.querySelector('#grid-area > .grid'), 'atelier-grid');
       name(direction === 'back' ? document.querySelector('#breadcrumbs > :last-child') : sourceLabel, 'atelier-folder-name');
       name(banner, 'atelier-banner');
@@ -147,22 +158,35 @@
       const grid = document.querySelector('#grid-area > .grid');
       animate(grid, [{opacity: 0, transform: `translateX(${direction === 'back' ? -8 : 8}px)`}, {opacity: 1, transform: 'none'}]);
     });
+    ready.then(() => active?.finished.catch(() => {})).then(() => {
+      if (generation === workflowNavigation)
+        window.AtelierMotion?.workflow?.navigation(document.querySelector('.library-location'), direction);
+    }).catch(() => {});
+    return ready;
   }
 
   function openEditor(overlay, path) {
+    const generation = ++workflowEditor;
     const card = cardFor(path), panel = overlay.firstElementChild;
     const box = visible(card) ? card.getBoundingClientRect() : null;
     origins.set(overlay, {path, card, box});
-    if (!box) { overlay.classList.add('active'); return Promise.resolve(); }
-    return transition(() => overlay.classList.add('active'),
+    const reveal = () => {
+      if (generation === workflowEditor && overlay.classList.contains('active'))
+        window.AtelierMotion?.workflow?.editor(panel.querySelector('.mat-head'));
+    };
+    if (!box) { overlay.classList.add('active'); reveal(); return Promise.resolve(); }
+    const ready = transition(() => overlay.classList.add('active'),
       name => name(card, 'atelier-editor'), name => name(panel, 'atelier-editor'), () => {
         if (!box) return;
         const rect = panel.getBoundingClientRect();
         animate(panel, [{opacity: .3, transformOrigin: 'top left', transform: `translate(${box.x - rect.x}px,${box.y - rect.y}px) scale(${box.width / rect.width},${box.height / rect.height})`},
           {opacity: 1, transformOrigin: 'top left', transform: 'none'}], 200);
       });
+    ready.then(() => active?.finished.catch(() => {})).then(reveal).catch(() => {});
+    return ready;
   }
   function closeEditor(overlay) {
+    cancelWorkflow();
     const origin = origins.get(overlay), card = cardFor(origin?.path), panel = overlay.firstElementChild;
     // Close logical state immediately; a disposable snapshot carries the visual return.
     let ghost, rect;
@@ -189,5 +213,5 @@
     animate(el, [{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'scale(1)'}], 120);
   }
   reduced.addEventListener('change', () => { if (reduced.matches) active?.skipTransition(); });
-  window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu});
+  window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu, cancelWorkflow});
 })();

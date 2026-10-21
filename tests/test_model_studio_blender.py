@@ -42,6 +42,37 @@ class BlenderPort(unittest.TestCase):
         self.child='Characters/1029/1029001/Materials/MI_Child'
         self.parent='Characters/1029/1029001/Materials/MI_Parent'
 
+    def test_blender_can_pack_cached_textures_without_adding_project_texture_edits(self):
+        game_rel = 'Meshes/SK_Body'
+        roots = []
+        def manifest(_gr, _mesh, work_base=None, root=None):
+            roots.append(root)
+            target = Path(root)/'Textures/T_Body.png'; target.parent.mkdir(parents=True, exist_ok=True)
+            Image.new('RGB', (8, 8), 'red').save(target)
+            return {'textures': {'Textures/T_Body': {'path': str(target)}}, 'slots': {}, 'warnings': []}
+        def blender(_script, args, _tag):
+            Path(args[1]).write_bytes(b'packed model')
+            return 'BLEND_OK\nMATERIAL_REPORT {}'
+        model = types.SimpleNamespace(lods=[{}], materials=[])
+        with patch.object(meshedit._survey, 'probe', return_value={'status': 'ok', 'warnings': []}), \
+             patch.object(meshedit._survey, 'verdict_text', return_value='Ready'), \
+             patch.object(meshedit._mesh, 'Mesh', return_value=model), \
+             patch.object(meshedit._mesh, 'export_glb', side_effect=lambda _model, _lod, path: Path(path).write_bytes(b'glb')), \
+             patch.object(meshedit._meshmat, 'build_manifest', side_effect=manifest), \
+             patch.object(meshedit, '_run_blender', side_effect=blender), \
+             patch.object(meshedit, '_CACHE', str(self.root/'cache')):
+            result = meshedit.extract_blend(game_rel, base_path='source', project_textures=False)
+        self.assertFalse(result['project_textures'])
+        self.assertTrue(Path(roots[0]).is_relative_to(self.root/'cache'))
+        self.assertFalse(list((self.root/'project').rglob('*.png')))
+        self.assertTrue(Path(result['blend']).is_file())
+        self.assertTrue(json.loads(Path(result['blend']+'.mat.json').read_text())['pack_images'])
+
+    def test_blender_texture_import_choice_requires_a_boolean(self):
+        with patch.object(meshedit._survey, 'probe', return_value={'status': 'ok'}), \
+             patch.object(meshedit._mesh, 'Mesh'), self.assertRaisesRegex(ValueError, 'true or false'):
+            meshedit.extract_blend('Meshes/SK_Body', base_path='source', project_textures='false')
+
     def test_texture_rename_preserves_inline_mips_without_interpreting_pixels_as_headers(self):
         injected=self.root/'encoded.uasset';injected.write_bytes(b'header')
         payload=b'properties'+bytes(range(256))*4+b'inline mips'
@@ -309,6 +340,43 @@ class BlenderPort(unittest.TestCase):
         self.assertAlmostEqual(np.linalg.norm(right[:3,3]-left[:3,3]),.8)
         with self.assertRaisesRegex(ValueError,'No weapon_l'):
             meshport.attachment_transform(types.SimpleNamespace(bones=[bone('root')]),weapon,'left')
+
+    def test_blade_grip_below_wrapper_keeps_its_authored_position_and_rotation(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_r',0,(-40,0,100))])
+        weapon=types.SimpleNamespace(base='SK_Dagger',bones=[bone('WP_Root'),
+            bone('WP_Sword',0,(2,0,0),(1,0,0,0)),bone('Sword01',1,(0,0,24))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'weapon_r')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['WP_Sword'],
+                                   meshport._bones(body)['weapon_r'],atol=1e-10)
+
+    def test_cannon_suffix_and_additional_weapon_families_use_the_authored_left_grip(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_l',0,(40,0,100)),bone('weapon_r',0,(-40,0,100))])
+        for family in ['Cannon','Wand','Trident','Nunchaku']:
+            weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('WP_Root'),
+                bone(family+'Root',0,(2,0,0),(1,0,0,0))])
+            transform,anchor=meshport.attachment_transform(body,weapon)
+            self.assertEqual(anchor,'weapon_l')
+            np.testing.assert_allclose(transform@meshport._bones(weapon)[family+'Root'],
+                                       meshport._bones(body)['weapon_l'],atol=1e-10)
+
+    def test_explicit_alignment_precedes_a_deforming_cannon_joint(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_l',0,(40,0,100))])
+        weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('Root'),bone('Align',0),
+            bone('Hand_l_Cannon1',1,(2,0,0),(1,0,0,0))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'weapon_l')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['Align'],
+                                   meshport._bones(body)['weapon_l'],atol=1e-10)
+
+    def test_hand_mounted_cannon_uses_wrist_instead_of_palm(self):
+        body=types.SimpleNamespace(bones=[bone('root'),bone('hand_l',0,(30,0,100)),bone('weapon_l',1,(12,0,0))])
+        weapon=types.SimpleNamespace(base='SK_WP_CannonL',bones=[bone('Root'),bone('Align',0),
+            bone('Hand_l_Cannon1',1,(2,0,0),(1,0,0,0))])
+        transform,anchor=meshport.attachment_transform(body,weapon)
+        self.assertEqual(anchor,'hand_l')
+        np.testing.assert_allclose(transform@meshport._bones(weapon)['Align'],
+                                   meshport._bones(body)['hand_l'],atol=1e-10)
 
     def test_shared_sword_uses_the_handle_at_the_hand_instead_of_the_floor_origin(self):
         body=types.SimpleNamespace(bones=[bone('root'),bone('weapon_r',0,(-48,7,101)),

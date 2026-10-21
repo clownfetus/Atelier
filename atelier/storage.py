@@ -26,6 +26,7 @@ def _filesystem_path(path, *, force=False):
 
 
 def atomic_json(path, data, **kwargs):
+    path = _filesystem_path(path, force=True)
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".atelier-write-", dir=parent)

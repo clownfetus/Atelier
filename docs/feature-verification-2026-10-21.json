@@ -1,0 +1,209 @@
+{
+  "date": "2026-10-21",
+  "ok": true,
+  "branch": "codex/consolidated-integrations",
+  "base_commit": "9b01a7ba44b414d86ea033fe63820d21bab6427e",
+  "evidence_root": "D:\\AtelierDev\\feature-tests-20261021",
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "win32",
+  "backend": {
+    "suites": 45,
+    "all_exit_codes_zero": true,
+    "unittest_cases_reported": 445,
+    "unittest_skipped": 1,
+    "bespoke_passed": 138,
+    "legacy_native_skipped": 2,
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\backend-verified\\results.json"
+  },
+  "browser": {
+    "checks": 223,
+    "page_errors": [],
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\browser-final\\browser_smoke\\results.json"
+  },
+  "native_suites": [
+    {
+      "name": "native-texture",
+      "exit_code": 0,
+      "seconds": 44.09,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\data\\native-texture\\native-checks\\results.json"
+    },
+    {
+      "name": "native-custom-textures",
+      "exit_code": 0,
+      "seconds": 76.5,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-custom-textures\\results.json"
+    },
+    {
+      "name": "native-material-replacement",
+      "exit_code": 0,
+      "seconds": 46.14,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-material-replacement\\results.json"
+    },
+    {
+      "name": "native-material-dye",
+      "exit_code": 0,
+      "seconds": 43.94,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-material-dye\\results.json"
+    },
+    {
+      "name": "native-bulk",
+      "exit_code": 0,
+      "seconds": 45.83,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-bulk\\results.json"
+    },
+    {
+      "name": "native-added-assets",
+      "exit_code": 0,
+      "seconds": 78.78,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-added-assets\\results.json"
+    },
+    {
+      "name": "native-triage",
+      "exit_code": 0,
+      "seconds": 34.39,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-triage\\results.json"
+    },
+    {
+      "name": "native-blender-optimizer",
+      "exit_code": 0,
+      "seconds": 7.03,
+      "report": "D:\\AtelierDev\\feature-tests-20261021\\native-blender-optimizer\\results.json"
+    }
+  ],
+  "desktop": {
+    "ok": true,
+    "renderer": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+    "viewer_checks": [
+      "Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+      "Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+      "Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+      "Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+      "Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+      "Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+      "Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+      "Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+      "Material chips show dye-region colours when no base tint exists and follow live edits",
+      "Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+      "Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+      "Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+      "Capture cancellation restores the camera and exits turntable rotation"
+    ],
+    "interactions": [
+      "WebView2 mouse opens the styled dropdown",
+      "ArrowDown/Enter select Dark; Escape preserves the choice",
+      "native color input and named palette survive WebView2 reload",
+      "light/dark Settings and workspace screenshots captured with no page errors"
+    ],
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\desktop-data\\desktop-smoke.json"
+  },
+  "real_game_viewer": {
+    "ok": true,
+    "mode": "source",
+    "load_seconds": 163.03,
+    "objects": 2,
+    "materials": 12,
+    "page_errors": [],
+    "checks": [
+      "Native mesh/material/texture routes load a real game skin and enable capture",
+      "Native Model Studio shows one mesh, reveals only selected material controls, opens advanced and settings on demand, and switches meshes without stale selection",
+      "Original and side-by-side comparison load real game materials for both forms, including unchanged unmatched slots",
+      "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+      "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+    ],
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\live-viewer-cold-fixed\\results.json"
+  },
+  "model_workflows": {
+    "ok": true,
+    "checks": [
+      "portable real-game Blender scene has packed connected textures, materials, deformation bones and an unchanged resting surface",
+      "real Blender sculpt imports with the original skeleton and validates every cooked LOD",
+      "mesh mod builds and unpacks with the sculpt, skeleton, material slots and all LODs intact; authored Blender file is preserved",
+      "Skin Swapper publishes the edited mesh and native config together under Project Galacta and both survive container readback",
+      "Restore original replaces the sculpt and marks the model as original",
+      "section visibility changes only the chosen indices in every LOD; unhiding restores byte-identical original files",
+      "game container sizes and modification times remain unchanged; every export is report-local"
+    ],
+    "skips": [],
+    "seconds": 244.2,
+    "mesh": "Characters/1015/1015502/Meshes/SK_1015_1015502",
+    "lods": 4,
+    "rig_bones": 351,
+    "portable_materials": 11,
+    "packed_textures": 52,
+    "sculpt_shift_cm": [
+      1.000234842300415,
+      0.000957489013671875,
+      0.0012359619140625
+    ],
+    "skin_swapper_ok": true,
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\native-model-workflows-verified\\results.json"
+  },
+  "numbered_assets": {
+    "ok": true,
+    "checks": [
+      "native add and library/Mod tray discovery for texture, material and mesh",
+      "renamed mesh retains its skeleton, materials and LODs",
+      "added mesh creates a local GLB preview without Blender or a game index entry",
+      "added texture edits, material edits and unchanged mesh build together",
+      "all three custom package paths and export names survive native container readback; the texture decodes"
+    ],
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\native-numbered-assets\\results.json"
+  },
+  "numbered_textures": {
+    "ok": true,
+    "checks": [
+      "real material loaded; chosen folder/name persist after changing both custom slot images",
+      "native compilation preserves both chosen texture export names, package paths, formats and material import links",
+      "production build_mod publishes a complete native container set with no skipped assets",
+      "unpacked native containers retain the exact folder, export names, Texture2D material links and untouched texture parameters",
+      "both unpacked textures retain their 64x64 resolution, format and decoded pixel hashes",
+      "source project hashes and game container metadata remain unchanged; outputs are report-local"
+    ],
+    "report": "D:\\AtelierDev\\feature-tests-20261021\\native-numbered-textures\\results.json"
+  },
+  "shutdown": {
+    "ok": true,
+    "state": "cancelled",
+    "elapsed_seconds": 3.66,
+    "checks": [
+      "real hidden WebView2 closing event drained the managed job",
+      "owned child cancelled and terminal status persisted before process exit"
+    ]
+  },
+  "safety": {
+    "original_config_and_key_unchanged": true,
+    "game_container_metadata_unchanged": true,
+    "game_file_count": 161,
+    "data_root": "D:\\AtelierDev\\feature-tests-20261021\\data"
+  },
+  "source_secret_pattern_scan": {
+    "files": 18,
+    "findings": []
+  },
+  "source_utf8_lf_sha256": {
+    "DEVELOPMENT.md": "988bb4674f84f7fec1ab0e7c8895d6ced19fd94af548f951b0f8bdb38bdd2ca6",
+    "atelier/added_assets.py": "5fc9cb35be7afc4cbadd93cb57cb6ebfc5976889928483eff17dfecb553ba011",
+    "atelier/handlers/custom_texture.py": "501e5a24b7a32fd05e62365debc81fa73b3f31a19c4769685dcb9951f2a69746",
+    "atelier/handlers/material.py": "3006d72249f1031cbc9b5443cb5d5a82d04e59823a0b8f786e0136308a2abb05",
+    "atelier/handlers/meshgraft.py": "4d26b22dff26b0af87b0b026e521e9621eff0985bb9627f66e3c0f6a828a07ff",
+    "atelier/mesh_optimizer.py": "f4120ae25ff1bd5425a964d595200b31be75426bc70946cb1c63213acba3262f",
+    "atelier/skin_swapper.py": "e318468a79080f8fca427735685f2713c1e3bbeaba70e04e250239c7dcb46967",
+    "atelier/unreal_names.py": "597a64bc54fb2feda5a74a0358a618e8975b61bb6f8c616b87e967a6281071ec",
+    "atelier/vendor/meshoptimizer/README.md": "e9d53546bafffffba61775a1f47928c441dabf42aa6447ba9c9d2683a0ec2472",
+    "atelier/web/routes.py": "3bc1ba383e8f524a1cff4e9c4f87f058b35c2f8f4396a3ea5cc1a68dcdeba8bb",
+    "docs/feature-verification-2026-10-21.md": "ed8a0b187edaef3f218f0d4a85f39cfc9ef05f4aad460df7e8bf64903ea74529",
+    "tests/native_added_assets.py": "45975afcf274d644e964b3393ede9eecea0257c7546dccb129caf5239cb03645",
+    "tests/native_model_workflows.py": "6278a86ec40c2425c9f2ab7eeac773998043943c8b8724b9b1a65358bcc51919",
+    "tests/native_viewer_smoke.py": "923d421cca3f7d6288d136fa980c33db5d290f3a3656991e90f525f5e8ba7793",
+    "tests/test_mesh_optimizer.py": "5758c14b11f36a4b13496b56879db818e96a0c4e316052167da5f43b4723b623",
+    "tests/test_skin_swapper.py": "9f229365859bd02aed8614ee6638b95a7c0e749b928c1f9e7dc703e30ec2119c",
+    "tests/test_unreal_names.py": "94ee804bd05d973f77b8c2bd1fadbe5526fa40b57029d5186dce1fc24113dd9e",
+    "tests/test_viewport_features.py": "2dc88ea97d35b092657b4ba8d53a9f9e411641d65be34b6f51489a9bea8b631c"
+  },
+  "not_exercised": [
+    "in-game rendering",
+    "Galacta Companion App",
+    "new full installer",
+    "Linux"
+  ]
+}

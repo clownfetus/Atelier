@@ -186,6 +186,97 @@ def index_lookup():
     return _LOOKUP
 
 
+_VIEW = None            # (sorted lower keys, sorted entries, basename map), per index
+_VIEW_FOR = None
+_VIEW_LOCK = threading.Lock()
+_CHILDREN = {}          # prefix_lower -> (folders, files), cleared with _VIEW
+
+
+def _view():
+    """Sorted + basename views of the index, built once per index.
+
+    The browser, skin lookups and material/texture name resolution all used to walk the whole
+    ~567k-entry list per call (0.13-0.38s each, measured 2026-10-20, many calls per Model Studio
+    open). Sorting once lets a prefix query bisect straight to its subtree, and the basename map
+    answers "which assets are called T_X" without a scan."""
+    global _VIEW, _VIEW_FOR
+    idx = ensure_index()
+    view = _VIEW
+    if view is not None and _VIEW_FOR is idx:
+        return view
+    with _VIEW_LOCK:
+        if _VIEW is not None and _VIEW_FOR is idx:
+            return _VIEW
+        entries = sorted(((vp.lower(), vp, cont, pfx) for vp, cont, pfx in idx), key=lambda e: e[0])
+        keys = [e[0] for e in entries]
+        names = {}
+        for low, vp, _cont, _pfx in entries:
+            if low.endswith(".uasset"):
+                names.setdefault(low[low.rfind("/") + 1:-7], []).append(vp[:-7])
+        _CHILDREN.clear()
+        _VIEW, _VIEW_FOR = (keys, entries, names), idx
+        return _VIEW
+
+
+def prefix_entries(prefix):
+    """[(virt, container, mount)] whose virtual path starts with `prefix` (case-insensitive),
+    in sorted order. An empty prefix returns the whole index."""
+    import bisect
+    keys, entries, _names = _view()
+    p = (prefix or "").replace("\\", "/").lower()
+    if not p:
+        return [e[1:] for e in entries]
+    lo = bisect.bisect_left(keys, p)
+    hi = bisect.bisect_left(keys, p + "￿", lo)
+    return [e[1:] for e in entries[lo:hi]]
+
+
+def by_basename(name):
+    """game_rels (no extension) of every asset whose basename is `name` (case-insensitive)."""
+    n = (name or "").lower()
+    if n.endswith(".uasset"):
+        n = n[:-7]
+    return list(_view()[2].get(n, ()))
+
+
+def children(rel_path):
+    """({lower: name} folders, {lower: name} .uasset basenames sans ext) directly under rel_path.
+
+    Memoised per index: the browser asks for the same levels over and over (the root alone took
+    ~0.4s per visit) and the answer cannot change until the paks do."""
+    rel = (rel_path or "").strip("/")
+    pfx = (rel.lower() + "/") if rel else ""
+    _view()
+    hit = _CHILDREN.get(pfx)
+    if hit is not None:
+        return hit
+    folders, files = {}, {}
+    n = len(pfx)
+    for virt, _cont, _mount in prefix_entries(pfx):
+        rest = virt[n:]
+        if not rest:
+            continue
+        cut = rest.find("/")
+        if cut >= 0:
+            name = rest[:cut]
+            folders.setdefault(name.lower(), name)
+        elif rest.lower().endswith(".uasset"):
+            name = rest[:-7]
+            files.setdefault(name.lower(), name)
+    _CHILDREN[pfx] = (folders, files)
+    return folders, files
+
+
+def warm_views():
+    """Build the lookup views off the request path (called once the index is ready)."""
+    def _run():
+        try:
+            index_lookup(); _view(); children("")
+        except Exception as e:
+            print(f"  [warn] index view warm-up failed: {e}", file=sys.stderr)
+    threading.Thread(target=_run, name="index-warm", daemon=True).start()
+
+
 def get_content_prefix(game_rel):
     """Return the content mount prefix for a virtual game_rel (used to reconstruct full pak paths).
     Falls back to the primary HQ prefix for assets not in the index."""
@@ -226,6 +317,7 @@ def ensure_index():
                 _FAILED = [dict(f) for f in c.get("failed", [])]
                 _OPT_MIPS = set(c.get("optional_mips") or [])
                 _progress('ready')
+                warm_views()
                 return _INDEX
         except Exception: pass
         utocs = _index_utocs()
@@ -293,6 +385,7 @@ def ensure_index():
             os.makedirs(_CACHE, exist_ok=True)
             json.dump({"key": key, "entries": _INDEX, "failed": [],
                        "optional_mips": sorted(_OPT_MIPS)}, open(_CACHE_FILE, "w"))
+        warm_views()
         return _INDEX
 
 

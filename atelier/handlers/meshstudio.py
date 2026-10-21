@@ -9,14 +9,23 @@ import re
 import struct
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from atelier import config, jobs
 
-MESH_SKIP = re.compile(r"skeleton|physics|collision|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
+MESH_SKIP = re.compile(r"skeleton|physics|collision|ctrlrig|shell|_lobby|lobby_|_vfx|vfxmesh|_lod", re.I)
+_NON_PREVIEW_MESH = re.compile(r"(?:^|_)(?:pa|fa|1p|fpp|fpphands)(?:_|$)", re.I)
 _PROP_PATH = re.compile(r"(?:^|/)(?:emote|mvp|bullet\w*|projectile\w*|turret\w*|effects?|vfx|summons?|minions?|pets?|demon)(?:/|$)", re.I)
+# Capwolf stores its full human transformation mesh beside its shield in Weapons.
+# This is a selectable body form, not equipment to attach over the current body.
+_BODY_FORM_PATH = re.compile(r"/weapons/caption/meshes/", re.I)
 # These ability/body-part rigs live under Weapons but are not held equipment.
 # Keep them selectable; attaching one automatically can dwarf the body and camera.
 _OPTIONAL_WEAPON = re.compile(r"(?:^|_)(?:DevouringSymbiote(?:_Hand)?|SpikedTentacles|Head|Plane\d*)(?:_|$)", re.I)
+# Weapons folders also contain summons, walls, portals and effects. Keep these
+# available for replacement/inspection without putting one into a hand on open.
+_HELD_WEAPON = re.compile(r"weapon|sword|blade|dagger|katana|gun|rifle|pistol|deserteagle|cannon|launcher|hammer|spear|trident|axe|shield|bow|staff|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw|slingshot|(?:^|_)arm$", re.I)
+_WEAPON_PROP = re.compile(r"container|floating|railgun|missile|projectile|bullet|tentacle|spear.?tie|spiderleg|(?:^|_)line(?:_|$)", re.I)
 
 
 def skin_meshes(skin_id):
@@ -29,10 +38,12 @@ def skin_meshes(skin_id):
         if not name.lower().startswith(("sk_", "sm_")) or not name.lower().endswith(".uasset"):
             continue
         name = name[:-7]
-        if MESH_SKIP.search(name):
+        if MESH_SKIP.search(name) or _NON_PREVIEW_MESH.search(name) or '/fpphands/' in path.lower():
             continue
-        weapon = "/weapons/" in path.lower()
-        if not weapon and '/slots/' in path.lower():
+        weapon = "/weapons/" in path.lower() and not _BODY_FORM_PATH.search(path)
+        # Emotes, animation helpers and cue geometry can sit beside Meshes,
+        # outside Weapons. They must not become the character's default body.
+        if not weapon and (re.search(r'/(?:slots?|animations|cues)/', path, re.I) or _PROP_PATH.search(path)):
             continue
         if weapon and (_PROP_PATH.search(path) or re.search(r"(?:^|_)(?:1p|bullet\w*|projectile\w*)(?:_|$)", name, re.I)):
             continue
@@ -41,20 +52,28 @@ def skin_meshes(skin_id):
             continue
         seen.add(gr.casefold())
         result.append({"name": name, "game_rel": gr, "kind": "weapon" if weapon else "body",
-                       **({'auto_equip': not bool(_OPTIONAL_WEAPON.search(name))} if weapon else {})})
-    return sorted(result, key=lambda r: (r["kind"] == "weapon", r["game_rel"].casefold()))
+                       **({'auto_equip': bool(name.lower().startswith('sk_') and _HELD_WEAPON.search(name)
+                                               and not (_OPTIONAL_WEAPON.search(name) or _WEAPON_PROP.search(name)))} if weapon else {})})
+    canonical = f'Characters/{skin_id[:4]}/{skin_id}/Meshes/'.casefold()
+    return sorted(result, key=lambda r: (r["kind"] == "weapon",
+                  not r['game_rel'].casefold().startswith(canonical), r["game_rel"].casefold()))
 
 
 def cooked_slots(game_rel):
     from atelier.handlers.texture import ensure_work_base
-    from atelier.handlers.mesh import Mesh
+    from atelier.handlers.mesh import skeletal_name_table, resolve_materials
+    from atelier.handlers.meshsurvey import find_extras
     from atelier.handlers.meshmat import resolve_mesh_materials
     config.validate_game_rel(game_rel)
-    base = ensure_work_base(game_rel)
+    base = ensure_work_base(game_rel, prefer_exact=True)
     if not base or not os.path.isfile(base + '.uasset'):
         raise ValueError('The original mesh is unavailable; section export cannot be mapped.')
     jobs.checkpoint()
-    mesh = Mesh(base)
+    # Slot identity needs the material header and package imports. Constructing
+    # an editable Mesh scans every geometry buffer and streamed LOD for no gain.
+    _, names = skeletal_name_table(Path(base + '.uasset').read_bytes(), os.path.basename(base))
+    extras = find_extras(Path(base + '.uexp').read_bytes())
+    mesh = SimpleNamespace(materials=resolve_materials(extras['materials'], names))
     slots = resolve_mesh_materials(game_rel, mesh, base)
     return [{**s, "index": i} for i, s in enumerate(slots)]
 
@@ -68,7 +87,7 @@ def embedded_weapon_slots(body, weapons):
     presentation metadata for the portable Blender scene, not a project mod edit.
     """
     import numpy as np
-    weapon_name=re.compile(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe',re.I)
+    weapon_name=re.compile(r'weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe|cannon|launcher|rifle|katana|trident|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw',re.I)
     names={bone['name'].casefold() for model in weapons for bone in model.bones
            if weapon_name.search(bone['name']) and not re.search(r'^root$|^pelvis$|^ik_|^weapon_[lr]$',bone['name'],re.I)}
     if not names:return set()
@@ -190,7 +209,8 @@ def preview_bindings(game_rel, requested):
     """Map each glTF material independently; array order is never an identity guess."""
     if not isinstance(requested, list) or len(requested) > 256:
         raise ValueError('Invalid model material list')
-    slots = cooked_slots(game_rel)
+    from atelier import import_server
+    slots = import_server.mesh_slots(game_rel) or cooked_slots(game_rel)
     out = []
     for item in requested:
         if not isinstance(item, dict) or not isinstance(item.get('key'), str) or not isinstance(item.get('name'), str):
@@ -205,12 +225,23 @@ def preview_bindings(game_rel, requested):
             for i, (r, s) in enumerate(zip(requested, slots))
         ):
             candidates = [slots[item['material_index']]]
+        if len(candidates) > 1 and all(s.get('mi') for s in candidates) and len({s['mi'].casefold() for s in candidates}) == 1:
+            # SharpGLTF merges material definitions shared by multiple cooked
+            # slots. The material is unambiguous, but a single section is not.
+            # Keep its textures/parameters without guessing a visibility target.
+            out.append({'key': item['key'], 'mesh_game_rel': game_rel, 'slot_name': name,
+                        'game_rel': candidates[0]['mi'], 'mapping_via': candidates[0]['via'],
+                        'shared_slots': [{'slot_index': s['index'], 'slot_name': s['slot']} for s in candidates],
+                        'gameplay_tags': sorted({tag for s in candidates for tag in s.get('gameplay_tags', [])}),
+                        'visibility_warning': 'These parts share one preview material. Separate part visibility is unavailable.'})
+            continue
         if len(candidates) != 1:
             out.append({"key": item['key'], "slot_name": name, "mapping_error": 'This section could not be matched uniquely to a cooked mesh slot.'})
             continue
         slot = candidates[0]
         out.append({"key": item['key'], "mesh_game_rel": game_rel, "slot_index": slot['index'],
-                    "slot_name": slot['slot'], "game_rel": slot['mi'], "mapping_via": slot['via']})
+                    "slot_name": slot['slot'], "game_rel": slot['mi'], "mapping_via": slot['via'],
+                    'gameplay_tags': list(slot.get('gameplay_tags', []))})
     return out
 
 
@@ -220,6 +251,25 @@ def material_bindings(skin_id, meshes):
     from atelier.handlers.meshvisibility import hidden_sections
     if not isinstance(meshes, list) or len(meshes) > 32:
         raise ValueError('Invalid model list')
+    for record in meshes:
+        if not isinstance(record, dict):
+            raise ValueError('Invalid model identity')
+        config.validate_game_rel(record.get('game_rel', ''))
+        requested = record.get('slots', [])
+        if not isinstance(requested, list) or len(requested) > 256 or any(
+            not isinstance(item, dict) or not isinstance(item.get('key'), str) or not isinstance(item.get('name'), str)
+            for item in requested
+        ):
+            raise ValueError('Invalid model material identity')
+    from atelier.handlers.texture import prefetch_exact
+    try:
+        from atelier import import_server
+        if not import_server.available():
+            prefetch_exact([record['game_rel'] for record in meshes])
+    except jobs.Cancelled:
+        raise
+    except Exception:
+        pass  # Per-mesh extraction below retains the compatibility fallback.
     candidates = {}
     canon = lambda n: re.sub(r'\d{6,}', '#', n.casefold())
     for path, _ in skin_entries(skin_id):
@@ -251,5 +301,7 @@ def material_bindings(skin_id, meshes):
                     binding['game_rel'] = matches[0]
                 elif matches:
                     binding['material_warning'] = 'This recolour has ambiguous material variants; the mesh material was kept.'
-            binding['hidden'] = any(s.get('slot_index') == binding.get('slot_index') and s.get('slot_name') == binding['slot_name'] for s in saved)
+            sections = binding.get('shared_slots') or [binding]
+            binding['hidden'] = all(any(s.get('slot_index') == section.get('slot_index') and
+                                       s.get('slot_name') == section['slot_name'] for s in saved) for section in sections)
             yield binding

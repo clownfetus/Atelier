@@ -118,6 +118,7 @@
     const skins=document.createElement('div'); skins.className='roster-skins'; skins.setAttribute('role','group'); skins.setAttribute('aria-label','Selected hero costumes');
     const skinCarousel=carousel(skins,'skins');
     function choose(hero, button,record=false) {
+      const changed = selected !== hero.path;
       selected = hero.path;
       if(record){recent=[hero.path,...recent.filter(path=>path!==hero.path)].slice(0,30);write({recent});}
       heroes.querySelectorAll('button').forEach(node=>node.setAttribute('aria-pressed',String(node===button)));
@@ -132,6 +133,7 @@
         tintSkin(tile,skin,hero);
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
+      if (record && changed) window.AtelierMotion?.workflow?.hero(button);
     }
     const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;
     const shown=data.heroes.filter(hero=>filter==='all'||(filter==='edited'?editCount(hero)>0:recent.includes(hero.path)));
@@ -165,7 +167,7 @@
     colourCache.clear();
     if (pending) return;
     pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(result=>{data=result;host()?.replaceChildren();render();}).catch(()=>{}).finally(()=>{pending=null;});
+      .then(result=>{data=result;window.AtelierCatalogueArt?.setIdentities(result);host()?.replaceChildren();render();}).catch(()=>{}).finally(()=>{pending=null;});
   });
   function show(home, onNavigate,opts={}) {
     requested=home; navigate=onNavigate;options=opts;const root=host(); if (!root) return;
@@ -173,7 +175,7 @@
     if (!home) {root.hidden=true;return;}
     if (data) {if(!root.childNodes.length) render();else root.hidden=false;return;}
     if (!pending) pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(result=>{data=result;render();}).catch(()=>{data={heroes:[]};render();}).finally(()=>{pending=null;});
+      .then(result=>{data=result;window.AtelierCatalogueArt?.setIdentities(result);render();}).catch(()=>{data={heroes:[]};render();}).finally(()=>{pending=null;});
   }
   function update(items,inProject) {
     const next=JSON.stringify([inProject,items.map(item=>[item.game_rel,item.modified||item.mtime,item.file_type])]);
@@ -208,6 +210,8 @@
     });
   }
   function describe(path) {
+    const identity=window.AtelierCatalogueArt?.describe(path);
+    if(identity)return identity;
     const parts=path.split('/'), hero=data?.heroes?.find(item=>item.path==='Characters/'+parts[1]);
     return hero ? {hero,skin:hero.skins?.find(item=>item.path==='Characters/'+parts[1]+'/'+parts[2])} : null;
   }

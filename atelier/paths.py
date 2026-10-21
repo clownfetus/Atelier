@@ -39,7 +39,8 @@ def pak_game_path(game_rel):
 
 def skin_entries(skin_id):
     pfx = _skin_prefix(skin_id)
-    return [(p, c) for p, c, _ in ensure_index() if p.lower().startswith(pfx)]
+    from atelier.index import prefix_entries
+    return [(p, c) for p, c, _ in prefix_entries(pfx)]
 
 def filter_subpath(entries, skin_id, subpath):
     """Narrow entries to those whose skin-relative path starts with subpath."""

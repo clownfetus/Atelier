@@ -21,6 +21,12 @@
 #if !FileExists("dist\Atelier\Tools\AtelierAnimation\AtelierAnimation.exe")
   #error Required standing idle decoder missing; run scripts/build_animation_decoder.py
 #endif
+#if !FileExists("dist\Atelier\Tools\AtelierImport\AtelierImport.exe")
+  #error Required persistent import server missing; run scripts/build_import_server.py
+#endif
+#if !FileExists("dist\Atelier\Tools\AtelierImport\CUE4Parse-Natives.dll") || !FileExists("dist\Atelier\Tools\AtelierImport\oo2core_9_win64.dll")
+  #error Required persistent import server native dependencies missing
+#endif
 #if !FileExists("dist\Atelier\Tools\AtelierAnimation\CUE4Parse-Natives.dll") || !FileExists("dist\Atelier\Tools\AtelierAnimation\oo2core_9_win64.dll")
   #error Required animation decoder native dependencies missing
 #endif
@@ -75,7 +81,12 @@ Source: "dist\Atelier\Tools\AtelierMesh\*"; DestDir: "{app}\Tools\AtelierMesh"; 
 Source: "dist\Atelier\Tools\AtelierAnimation\AtelierAnimation.exe"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\AtelierAnimation\CUE4Parse-Natives.dll"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\AtelierAnimation\oo2core_9_win64.dll"; DestDir: "{app}\Tools\AtelierAnimation"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierImport\AtelierImport.exe"; DestDir: "{app}\Tools\AtelierImport"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierImport\CUE4Parse-Natives.dll"; DestDir: "{app}\Tools\AtelierImport"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\AtelierImport\oo2core_9_win64.dll"; DestDir: "{app}\Tools\AtelierImport"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\retoc-rivals-cli.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\build-inputs.json"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
+Source: "dist\Atelier\Tools\shaders\licenses\*"; DestDir: "{app}\Tools\shaders\licenses"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\oo2core_9_win64.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\dxc.exe"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\shaders\dxcompiler.dll"; DestDir: "{app}\Tools\shaders"; Flags: ignoreversion

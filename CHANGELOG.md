@@ -5,6 +5,49 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+### Asset pipeline and layout
+
+- Show character and costume names and artwork wherever their IDs appear in
+  asset folders, including legendary ultimate skins, search results, breadcrumbs,
+  pinned folders and asset pickers. Keep original asset paths available on hover.
+- Add HDR TextureCube import and replacement from Radiance panoramas, six-face
+  strips and HDR cubemap DDS files, including material reflection slots. Preserve
+  all six faces, HDR values and authored DDS mips; use a separate preview image.
+- Add a **Settings → Behavior** option to open models in Blender with packed
+  textures without adding texture files to the project. Existing painted textures
+  are preserved. Keep long costume captions within two aligned lines at Compact size.
+- Keep preview textures loading when Windows reports different spellings of the
+  same cache path during parallel imports.
+- Sign reassembled Shader Studio shaders with the correct DirectX validator and
+  stop the build when validation fails.
+- Keep Capwolf's human transformation as a separate body choice instead of
+  automatically attaching it over the wolf. Its shield remains equipped normally.
+- Reuse one persistent game reader for model, material and texture previews on
+  Windows. Preserve original compressed texture blocks for exact dye-mask regions,
+  and omit unused facial morph data from the viewer while retaining full exports.
+- Open the selected body and equipped weapons first; load other forms and
+  attachments when selected without discarding unsaved preview recolours.
+- Batch model, material and texture extraction, share in-flight image downloads,
+  and read material slots without scanning editable geometry. Original/Compare
+  retains decoded sections whose material could not be mapped.
+- Share Blender texture images without mixing color and data-map color spaces.
+- Read 16-bit skin weights for previews and preserve material gameplay tags in
+  portable Blender exports. Unsupported 16-bit rebuilds stop safely.
+- Follow nested package references and validate extracted PNGs before replacing
+  existing files. Repeated imported bone influences accumulate correctly.
+- Generate lower model detail levels with meshoptimizer while retaining section
+  borders, vertex channels and skinning boundaries.
+- Give Mod tray actions and the Continue card consistent spacing, including
+  narrow panes and both themes.
+
+### Security
+
+- Websites open in your browser can no longer control Atelier while it runs. The local
+  service now refuses requests from other sites and from DNS-rebinding addresses, so a
+  page can no longer reset app data, delete edits or change Settings behind your back.
+- **Settings** accepts only an existing Blender executable as the Blender path, and a
+  saved path to any other program is ignored instead of being launched.
+
 ## 1.1.0 — 19 October 2026
 
 ### Create and edit assets

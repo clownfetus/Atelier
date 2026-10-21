@@ -28,6 +28,7 @@ class AddedAssets(unittest.TestCase):
         self.stack = ExitStack(); self.addCleanup(self.stack.close)
         self.stack.enter_context(C.project_context(str(self.project)))
         self.entries = []
+        self.stack.enter_context(patch('atelier.index.ensure_index', side_effect=lambda: list(self.entries)))
         self.stack.enter_context(patch.object(A, 'ensure_index', side_effect=lambda: self.entries))
         self.stack.enter_context(patch.object(B, 'ensure_index', side_effect=lambda: self.entries))
         self.tool = AssetTool()
@@ -77,7 +78,7 @@ class AddedAssets(unittest.TestCase):
         target = self.add()['game_rel']; before = Path(C.project_base(target) + '.png').read_bytes()
         with self.assertRaisesRegex(ValueError, 'already exists'): self.add()
         self.assertEqual(Path(C.project_base(target) + '.png').read_bytes(), before)
-        self.entries.append(('MyAssets/T_Vanilla.uasset',))
+        self.entries.append(('MyAssets/T_Vanilla.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/'))
         with self.assertRaisesRegex(ValueError, 'already exists in the game'): self.add(name='Vanilla')
         with self.assertRaisesRegex(ValueError, 'supported material'): self.add('material', source=self.source('texture'))
         self.assertEqual(len(B.all_imported()), 1)
@@ -159,7 +160,8 @@ class AddedAssets(unittest.TestCase):
 
     def test_folder_browser_includes_project_folders_and_filters_source_types(self):
         self.add('material', folder='Custom/Materials'); self.add('texture', folder='Custom/Textures')
-        self.entries += [('Characters/Hero/Textures/T_Game.uasset',), ('Characters/Hero/Materials/MI_Game.uasset',)]
+        self.entries += [('Characters/Hero/Textures/T_Game.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/'),
+                         ('Characters/Hero/Materials/MI_Game.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/')]
         self.assertEqual([row['name'] for row in A.browse()['items']], ['Characters', 'Custom'])
         self.assertEqual([row['name'] for row in A.browse('Custom')['items']], ['Materials', 'Textures'])
         self.assertEqual(A.browse('Custom/Materials', 'texture')['items'], [])

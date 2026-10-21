@@ -20,11 +20,12 @@ def run_added_asset_checks(page, context, url, report, checks):
         with tempfile.TemporaryDirectory(prefix='atelier-add-browser-') as temporary, ExitStack() as stack:
             sources = {kind: package(Path(temporary, A.PREFIXES[kind] + 'Source.uasset'), kind) for kind in A.CLASSES}
             paths = {kind: 'Fixtures/' + kind.title() + 's/' + path.stem for kind, path in sources.items()}
-            entries = [(gr + '.uasset',) for gr in paths.values()]
+            entries = [(gr + '.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/') for gr in paths.values()]
             tool = AssetTool(); ensure = T.ensure_work_base
             by_path = {paths[kind]: str(path.with_suffix('')) for kind, path in sources.items()}
             for module in (A, CT, T, M): stack.enter_context(patch.object(module, 'uat', tool))
             for module in (A, B): stack.enter_context(patch.object(module, 'ensure_index', return_value=entries))
+            stack.enter_context(patch('atelier.index.ensure_index', return_value=entries))
             stack.enter_context(patch.object(T, 'decode_to_png', side_effect=decode_png))
             stack.enter_context(patch('atelier.handlers.meshsurvey.probe', side_effect=mesh_probe))
             stack.enter_context(patch.object(T, 'ensure_work_base', side_effect=lambda gr: by_path.get(gr) or ensure(gr)))

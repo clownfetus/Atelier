@@ -58,8 +58,8 @@ def main():
             assert [digest(p) for p in installed]==[digest(p) for p in built['artifacts']]
             unpacked = report/'unpacked'
             utoc = next(p for p in built['artifacts'] if p.endswith('.utoc'))
-            proc = hostos.run_exe([RETOC,'-a','0x'+C.get_aes_key(),'unpack',utoc,
-                                   '--game-paks-dir',C.PAKS,'-o',str(unpacked)],capture_output=True,text=True,timeout=120)
+            proc = hostos.run_exe([RETOC,'unpack',utoc,
+                                   '--game-paks-dir',C.PAKS,'-o',str(unpacked)],env=C.retoc_env(),capture_output=True,text=True,timeout=120)
             assert proc.returncode==0,proc.stderr
             def asset(gr):
                 matches=list(unpacked.rglob(Path(gr).name+'.uasset'))
@@ -103,6 +103,15 @@ def main():
                     assert len(actual)==len(expected),(index,len(actual),len(expected))
                     assert all(abs(a-b)<max(.0001,abs(b)*.00001) for a,b in zip(actual,expected)),index
             result['checks'].append('every edited Niagara export retains LUT sample count, channel count and rebuilt values')
+            blocked = report / 'blocked-output'
+            blocked.mkdir()
+            (blocked / 'Marvel').write_bytes(b'preserve existing data')
+            failed = hostos.run_exe([RETOC,'unpack',utoc,'--game-paks-dir',C.PAKS,'-o',str(blocked)],
+                                   env=C.retoc_env(),capture_output=True,text=True,timeout=120)
+            assert failed.returncode != 0, 'Failed extraction was reported as successful'
+            assert (blocked / 'Marvel').read_bytes() == b'preserve existing data'
+            result['shader_tool_sha256'] = digest(RETOC)
+            result['checks'].append('parallel extraction preserves all assets and reports output failures without overwriting existing files')
             assert fingerprints(project)==source_hashes,'Build changed saved project edits'
         after=fingerprints(Path(C.PROJECTS_ROOT))
         assert all(after.get(p)==h for p,h in before.items()),'An existing project changed'

@@ -7,8 +7,10 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
+from wsgiref.util import setup_testing_defaults
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -59,6 +61,19 @@ class Showcase(unittest.TestCase):
 
 
 class OriginalComparisons(unittest.TestCase):
+    def test_saved_texture_precedes_native_reader_and_original_bypasses_the_edit(self):
+        from atelier import import_server
+        with tempfile.TemporaryDirectory() as workspace:
+            root=Path(workspace);edited=root/'edited.png';edited.write_bytes(png('red'))
+            native=root/'native.png';native.write_bytes(png('blue'))
+            with patch.object(R,'_import_base',return_value=str(edited.with_suffix(''))), \
+                 patch.object(import_server,'available',return_value=True), \
+                 patch.object(import_server,'texture',return_value=str(native)) as read:
+                self.assertEqual(R._texture_png('Characters/Test/Body'),str(edited))
+                read.assert_not_called()
+                self.assertEqual(R._texture_png('Characters/Test/Body',original=True),str(native))
+                read.assert_called_once()
+
     def test_original_texture_ignores_project_png_without_replacing_it(self):
         with tempfile.TemporaryDirectory() as workspace:
             root=Path(workspace); edited=root/'edited.png'; edited.write_bytes(png('red'))
@@ -78,11 +93,85 @@ class OriginalComparisons(unittest.TestCase):
             self.assertTrue(all(call.kwargs.get('original') for call in images.call_args_list))
 
 
+class MaterialLoading(unittest.TestCase):
+    def preview(self, prefetch_error=None, textures=False, concurrent=False):
+        from atelier import config
+        from atelier.handlers import meshstudio, texture
+        project = Path(config.project_dir('Preview batch fixture'))
+        project.mkdir(parents=True, exist_ok=True)
+        bindings = [
+            {'key': 'body::0', 'slot_name': 'Body', 'game_rel': 'Characters/Test/MI_Body'},
+            {'key': 'body::1', 'slot_name': 'Hair', 'game_rel': 'Characters/Test/MI_Hair'},
+            {'key': 'body::2', 'slot_name': 'Unmapped', 'game_rel': None},
+        ]
+        seen = []
+        barrier = threading.Barrier(2) if concurrent else None
+        def prefetch(paths):
+            self.assertEqual(config.get_import_root(), str(project))
+            seen.append(('prefetch', paths))
+            if prefetch_error:
+                raise prefetch_error
+        def read(path, cache_only=False):
+            self.assertTrue(cache_only)
+            self.assertEqual(config.get_import_root(), str(project))
+            seen.append(('read', path))
+            if barrier:
+                barrier.wait(timeout=5)
+            maps = {}
+            if textures:
+                maps = {'BaseColor': 'Characters/Test/T_Diffuse', 'Normal': 'Characters/Test/T_UnusedNormal'}
+                if path.endswith('MI_Body'):
+                    maps['Opacity'] = 'Characters/Test/T_Opacity'
+                else:
+                    maps.update(DyeingTexture='Characters/Test/T_Mask', Emissive='Characters/Test/T_Emissive')
+            return {'colors': [{'name': 'Tint', 'rgba': [1, 0, 0, 1]}], 'textures': maps, 'scalars': []}
+        body = json.dumps({'skin_id': '1029100', 'meshes': [{'game_rel': 'Characters/Test/SK_Body'}]}).encode()
+        env = {}
+        setup_testing_defaults(env)
+        env.update(PATH_INFO='/api/skin_materials', REQUEST_METHOD='POST',
+                   CONTENT_TYPE='application/json', CONTENT_LENGTH=str(len(body)),
+                   HTTP_X_ATELIER_PROJECT='Preview%20batch%20fixture', **{'wsgi.input': BytesIO(body)})
+        statuses = []
+        with patch.object(meshstudio, 'material_bindings', return_value=iter(bindings)), \
+             patch.object(texture, 'prefetch_exact', side_effect=prefetch), \
+             patch.object(R, 'read_material', side_effect=read):
+            response = R.app(env, lambda status, headers, exc_info=None: statuses.append(status))
+            try:
+                result = json.loads(b''.join(response))
+            finally:
+                if hasattr(response, 'close'):
+                    response.close()
+        self.assertTrue(statuses[0].startswith('200'), statuses)
+        self.assertTrue(result['ok'])
+        self.assertEqual(list(result['materials']), ['body::0', 'body::1', 'body::2'])
+        self.assertEqual(result['materials']['body::0']['colors'][0]['rgba'], [1, 0, 0, 1])
+        self.assertEqual(result['materials']['body::2']['colors'], [])
+        self.assertFalse(list(project.iterdir()), 'Preview must not add project edits')
+        return seen
+
+    def test_cold_preview_prefetches_before_reading_parameters_in_the_originating_project(self):
+        seen = self.preview()
+        self.assertEqual(seen[0], ('prefetch', ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair', None]))
+        self.assertCountEqual([row[1] for row in seen[1:]], ['Characters/Test/MI_Body', 'Characters/Test/MI_Hair'])
+
+    def test_conversions_overlap_and_retain_the_request_project(self):
+        self.preview(concurrent=True)
+
+    def test_prefetches_only_viewport_texture_channels_and_shared_dye_inputs_once(self):
+        seen = self.preview(textures=True)
+        self.assertEqual(seen[-1], ('prefetch', ['Characters/Test/T_Diffuse', 'Characters/Test/T_Opacity',
+                                               'Characters/Test/T_Emissive', 'Characters/Test/T_Mask']))
+
+    def test_failed_batch_falls_back_to_individual_material_reads(self):
+        seen = self.preview(OSError('Fixture native extractor unavailable'))
+        self.assertEqual(len([row for row in seen if row[0] == 'read']), 2)
+
+
 class IdleDiscovery(unittest.TestCase):
     mesh='Characters/1029/1029100/Meshes/10291/SK_Test'
 
     def test_candidates_prefer_matching_rig_and_exclude_halfbody_and_aimoffset(self):
-        entries=[(p,'pak') for p in [
+        entries=[(p,'pak','Marvel/Content/Marvel/') for p in [
             'Characters/1029/1029001/Animations/10290/HeroDetails/Lobby_Stand_Idle.uasset',
             'Characters/1029/1029001/Animations/10291/HeroDetails/Lobby_Half_Idle.uasset',
             'Characters/1029/1029001/Animations/10291/HeroDetails/Lobby_Stand_Idle_AO.uasset',
@@ -100,7 +189,7 @@ class IdleDiscovery(unittest.TestCase):
             run.assert_not_called()
 
     def test_flat_mesh_folders_discover_body_idle_without_weapon_or_partial_clips(self):
-        entries=[(p,'pak') for p in [
+        entries=[(p,'pak','Marvel/Content/Marvel/') for p in [
             'Characters/1057/1057001/Animations/HeroDetails/Lobby_Stand_Idle.uasset',
             'Characters/1057/1057001/Animations/HeroDetails/Lobby_Half_Idle.uasset',
             'Characters/1057/1057001/Weapons/Animations/Lobby_Stand_Idle.uasset']]

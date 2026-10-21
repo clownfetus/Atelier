@@ -40,6 +40,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 import threading
 from pathlib import Path
@@ -53,6 +54,7 @@ CUSTOM_ROOT = "Atelier/Custom"
 _OPT = "custom_textures"
 _STORE = os.path.join(".atelier", "custom_textures")
 _FILE_RE = re.compile(r"^[0-9a-f]{20}\.png$")
+_HDR_FILE_RE = re.compile(r"^[0-9a-f]{20}\.dds$")
 _NAME_RE = re.compile(r"^T_[A-Za-z0-9_]{1,60}$")
 MIN_SIDE, MAX_SIDE = 4, 8192
 _lock = threading.Lock()
@@ -145,6 +147,8 @@ def assignments(material_game_rel, project_dir=None):
     for slot, rec in (raw or {}).items() if isinstance(raw, dict) else ():
         if (isinstance(slot, str) and slot and isinstance(rec, dict)
                 and _FILE_RE.fullmatch(str(rec.get("file", ""))) and _NAME_RE.fullmatch(str(rec.get("name", "")))):
+            if rec.get('hdr_file') and (not _HDR_FILE_RE.fullmatch(str(rec['hdr_file'])) or rec.get('texture_class') != 'TextureCube'):
+                continue
             try:
                 package_game_rel(material_game_rel, slot, rec['name'], rec.get('folder'))
             except ValueError:
@@ -161,6 +165,8 @@ def public(material_game_rel, project_dir=None):
         result[slot] = {"name": rec["name"], "file": rec["file"], "source": rec.get("source") or "",
                         "size": rec.get("size") or [], "template": rec.get("template") or "",
                         "folder": path.rsplit('/', 1)[0] if '/' in path else '', "game_rel": path}
+        if rec.get('hdr_file'):
+            result[slot].update(texture_class='TextureCube', hdr=True, faces=6)
     return result
 
 
@@ -184,9 +190,10 @@ def prune(project_dir=None):
         for rec in (opts.get(_OPT) or {}).values() if isinstance(opts.get(_OPT), dict) else ():
             if isinstance(rec, dict):
                 used.add(rec.get("file"))
+                used.add(rec.get('hdr_file'))
     removed = 0
     for name in os.listdir(folder):
-        if _FILE_RE.match(name) and name not in used:
+        if (_FILE_RE.fullmatch(name) or _HDR_FILE_RE.fullmatch(name)) and name not in used:
             try:
                 os.remove(os.path.join(folder, name))
                 removed += 1
@@ -220,10 +227,30 @@ def _normalized_png(data):
     return out.getvalue(), (w, h)
 
 
-def assign(material_game_rel, slot, filename, data, template_game_rel, project_dir=None, *, name=None, folder=None):
+def assign(material_game_rel, slot, filename, data, template_game_rel, project_dir=None, *, name=None, folder=None, texture_class=None):
     """Store the user's image and assign it to one slot of one material. Returns public()."""
     project_dir = project_dir or get_import_root()
-    png, size = _normalized_png(data)
+    hdr_data = None
+    is_hdr = Path(filename).suffix.lower() == '.hdr' or (data[:4] == b'DDS ' and len(data) >= 128
+                                                       and int.from_bytes(data[112:116], 'little') & 0x200)
+    if texture_class == 'TextureCube' and not is_hdr:
+        raise ValueError('TextureCube slots need an HDR .hdr image or a six-face HDR DDS.')
+    if is_hdr:
+        if texture_class == 'Texture2D':
+            raise ValueError('Use a TextureCube slot for a six-face HDR cubemap.')
+        from atelier.handlers import hdr_texture
+        from atelier.handlers.texture import ensure_work_base
+        import tempfile
+        base = ensure_work_base(template_game_rel)
+        if not base: raise ValueError('The cubemap template could not be extracted.')
+        with tempfile.TemporaryDirectory(prefix='hdr-slot-') as scratch:
+            doc = hdr_texture.document(base, Path(scratch)/'template')
+            original, _, _ = hdr_texture.read_cooked(doc, base)
+            cube = hdr_texture.prepare(data, filename, original.format, len(original.mips), Path(scratch)/'prepare')
+            png, size = hdr_texture.preview_png(cube, Path(scratch)/'preview'), (cube.size, cube.size)
+            hdr_data = hdr_texture.write_dds(cube)
+    else:
+        png, size = _normalized_png(data)
     file = hashlib.sha256(png).hexdigest()[:20] + ".png"
     image_folder = store_dir(project_dir)
     target = os.path.join(image_folder, file)
@@ -243,9 +270,14 @@ def assign(material_game_rel, slot, filename, data, template_game_rel, project_d
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, target)
+        hdr_file = hashlib.sha256(hdr_data).hexdigest()[:20]+'.dds' if hdr_data is not None else None
+        if hdr_file:
+            from atelier.storage import _atomic_bytes
+            _atomic_bytes(os.path.join(image_folder, hdr_file), hdr_data)
         slots[slot] = {"name": name, "file": file, "size": list(size),
                        "source": os.path.basename((filename or "").replace("\\", "/"))[:120],
                        "template": template_game_rel,
+                       **({'hdr_file': hdr_file, 'texture_class': 'TextureCube'} if hdr_file else {}),
                        **({'folder': target_gr.rsplit('/', 1)[0] if '/' in target_gr else ''} if folder is not None else {})}
         _write(project_dir, material_game_rel, slots)
         prune(project_dir)
@@ -297,10 +329,8 @@ def rename_package(doc, old_name, new_name, new_package):
         raise RuntimeError(f"the template texture has {len(tops)} top-level exports named "
                            f"{old_name!r}, so it cannot be renamed safely")
     tops[0]["ObjectName"] = new_name
-    names = doc.setdefault("NameMap", [])
-    for n in (new_name, new_package):
-        if n not in names:
-            names.append(n)
+    from atelier.unreal_names import add_names
+    add_names(doc, new_name, new_package)
     folder = doc.get("FolderName")
     if isinstance(folder, str) and folder.startswith("/"):
         doc["FolderName"] = new_package
@@ -311,7 +341,74 @@ def _uat_error(result, fallback):
             or fallback)
 
 
-def _preserve_export_bytes(doc, injected):
+def _duplicate_none_bytes(doc, injected):
+    """Validate UE5's relative format chain before trimming a duplicate None.
+
+    The native JSON reader also reports a legitimate final None as Extras on
+    some injected textures. Follow the game's skip offsets rather than removing
+    everything the JSON reader did not consume.
+    """
+    exports = doc.get('Exports') or []
+    from atelier.handlers.hdr_texture import texture_class
+    if texture_class(doc) == 'TextureCube':
+        return 0  # The cube format chain is validated by the HDR path, not the 2D reader's flags.
+    if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES' or len(exports) != 1:
+        return 0
+    export = exports[0]
+    if 'TextureExport' not in export.get('$type', '') or not export.get('IsTexture2D', True):
+        return 0
+    try:
+        names = doc['NameMap']
+        none = struct.pack('<II', names.index('None'), 0)
+        payload = Path(injected[:-7] + '.uexp').read_bytes()
+        raw = payload[:-4]
+        if payload[-4:] != b'\xc1\x83\x2a\x9e' or export['SerialOffset'] != Path(injected).stat().st_size or export['SerialSize'] != len(raw):
+            raise ValueError('Invalid texture export range')
+        fmt = str(export.get('PixelFormat', '')).removeprefix('PF_')
+        format_index = names.index('PF_' + fmt)
+        marker = struct.pack('<II', format_index, 0)
+        flags = struct.pack('<II', int(export.get('bCooked', True)), int(export.get('bSerializeMipData', True)))
+    except (KeyError, ValueError, OSError) as error:
+        raise RuntimeError('The texture export trailer could not be validated') from error
+
+    def end_of_formats(cursor):
+        for _ in range(16):
+            if not 0 <= cursor <= len(raw) - 8:
+                return None
+            index, number = struct.unpack_from('<II', raw, cursor)
+            cursor += 8
+            if not 0 <= index < len(names) or number:
+                return None
+            if names[index] == 'None':
+                return cursor
+            if not names[index].startswith('PF_') or cursor > len(raw) - 8:
+                return None
+            skip = struct.unpack_from('<q', raw, cursor)[0]
+            if skip < 0 or cursor + skip > len(raw) - 8:
+                return None
+            cursor += skip
+        return None
+
+    ends = []
+    cursor = raw.find(marker, 8, min(len(raw), 65536))
+    while cursor >= 0:
+        if raw[cursor-8:cursor] == flags:
+            end = end_of_formats(cursor)
+            if end is not None:
+                ends.append(end)
+        cursor = raw.find(marker, cursor + 1, min(len(raw), 65536))
+    ends = set(ends)
+    if len(ends) != 1:
+        raise RuntimeError('The cooked texture format chain could not be validated')
+    remaining = raw[ends.pop():]
+    if not remaining:
+        return 0
+    if remaining != none:
+        raise RuntimeError('The texture has unrecognized trailing data; choose another game texture template')
+    return len(none)
+
+
+def _preserve_export_bytes(doc, injected, *, trim_tail=0):
     """Keep UE5 DATA_RESOURCES texture payloads opaque during a package rename.
 
     The native JSON texture reader can lose inline mip bytes and mistake their
@@ -323,6 +420,8 @@ def _preserve_export_bytes(doc, injected):
     """
     if doc.get('ObjectVersionUE5') != 'DATA_RESOURCES':
         return False
+    if trim_tail and (trim_tail != 8 or _duplicate_none_bytes(doc, injected) != trim_tail):
+        raise RuntimeError('The texture export trailer could not be validated')
     header=Path(injected).stat().st_size
     payload=Path(injected[:-7]+'.uexp').read_bytes()
     ranges=[]
@@ -332,7 +431,7 @@ def _preserve_export_bytes(doc, injected):
             raise RuntimeError('The encoded texture export range could not be validated')
         start=offset-header;ranges.append((start,start+size))
         export['$type']='UAssetAPI.ExportTypes.RawExport, UAssetAPI'
-        export['Data']=base64.b64encode(payload[start:start+size]).decode('ascii')
+        export['Data']=base64.b64encode(payload[start:start+size-trim_tail]).decode('ascii')
         export['Extras']=''
     cursor=0
     for start,end in sorted(ranges):
@@ -340,6 +439,37 @@ def _preserve_export_bytes(doc, injected):
         cursor=end
     if cursor!=len(payload)-4 or payload[-4:]!=b'\xc1\x83\x2a\x9e':
         raise RuntimeError('The encoded texture payload could not be preserved completely')
+    return True
+
+
+def repair_export_tail(uasset, scratch):
+    """Repair only a confirmed duplicate None in a privately staged texture.
+
+    Older added-asset copies can carry this eight-byte trailer into every later
+    injection. Keep the project source unchanged; rebuild its staged export.
+    """
+    folder = Path(scratch)
+    folder.mkdir(parents=True, exist_ok=True)
+    source = Path(uasset)
+    result = uat(['to_json', str(source.resolve()), USMAP, str(folder.resolve())])
+    document = folder / (source.stem + '.json')
+    if result.returncode or not document.is_file():
+        raise RuntimeError('Could not validate the texture export: ' + _uat_error(result, 'to_json failed'))
+    doc = json.loads(document.read_text(encoding='utf-8-sig'))
+    trim = _duplicate_none_bytes(doc, str(source))
+    if not trim:
+        return False
+    original = source.with_suffix('.uexp').read_bytes()
+    _preserve_export_bytes(doc, str(source), trim_tail=trim)
+    document.write_text(json.dumps(doc), encoding='utf-8')
+    output = folder / 'repaired' / source.name
+    output.parent.mkdir()
+    result = uat(['from_json', str(document.resolve()), str(output.resolve()), USMAP])
+    expected = original[:-4-trim] + original[-4:]
+    if result.returncode or not output.is_file() or not output.with_suffix('.uexp').is_file() or output.with_suffix('.uexp').read_bytes() != expected:
+        raise RuntimeError('Could not safely repair the texture export trailer')
+    for ext in ('.uasset', '.uexp'):
+        shutil.copyfile(output.with_suffix(ext), source.with_suffix(ext))
     return True
 
 
@@ -353,10 +483,18 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     parts = new_game_rel.split("/")
     injected = os.path.join(scratch, "inject", *parts) + ".uasset"
     os.makedirs(os.path.dirname(injected), exist_ok=True)
-    r = uat(["inject_texture", os.path.abspath(work + ".uasset"), os.path.abspath(png),
-             os.path.abspath(injected), "--usmap", USMAP])
-    if r.returncode or not os.path.isfile(injected):
-        raise RuntimeError("your image could not be encoded: " + _uat_error(r, "inject_texture failed"))
+    from atelier.handlers import hdr_texture
+    if hdr_texture.candidate(work):
+        doc = hdr_texture.document(work, Path(scratch)/'hdr-template')
+        original, _, _ = hdr_texture.read_cooked(doc, work)
+        cube = hdr_texture.prepare(Path(png).read_bytes(), Path(png).name, original.format,
+                                   len(original.mips), Path(scratch)/'hdr-prepare')
+        hdr_texture.inject(work, injected, cube, Path(scratch)/'hdr-inject', doc=doc)
+    else:
+        r = uat(["inject_texture", os.path.abspath(work + ".uasset"), os.path.abspath(png),
+                 os.path.abspath(injected), "--usmap", USMAP])
+        if r.returncode or not os.path.isfile(injected):
+            raise RuntimeError("your image could not be encoded: " + _uat_error(r, "inject_texture failed"))
     json_dir = os.path.join(scratch, "json", *parts[:-1])
     os.makedirs(json_dir, exist_ok=True)
     r = uat(["to_json", os.path.abspath(injected), USMAP, os.path.abspath(json_dir)])
@@ -365,8 +503,9 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
         raise RuntimeError("could not read the encoded texture: " + _uat_error(r, "to_json produced no JSON"))
     with open(jp, encoding="utf-8-sig") as f:
         doc = json.load(f)
+    trim = _duplicate_none_bytes(doc, injected)
     rename_package(doc, os.path.basename(template_game_rel), name, GAME_PREFIX + new_game_rel)
-    opaque=_preserve_export_bytes(doc,injected)
+    opaque=_preserve_export_bytes(doc,injected,trim_tail=trim)
     with open(jp, "w", encoding="utf-8") as f:
         json.dump(doc, f)
     built = os.path.join(scratch, "out", *parts) + ".uasset"
@@ -374,7 +513,9 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     r = uat(["from_json", os.path.abspath(jp), os.path.abspath(built), USMAP])
     if r.returncode or not os.path.isfile(built):
         raise RuntimeError("could not rename the encoded texture: " + _uat_error(r, "from_json produced no uasset"))
-    if opaque and Path(injected[:-7]+'.uexp').read_bytes()!=Path(built[:-7]+'.uexp').read_bytes():
+    original_payload = Path(injected[:-7]+'.uexp').read_bytes() if opaque else b''
+    expected_payload = original_payload[:-4-trim] + original_payload[-4:] if trim else original_payload
+    if opaque and expected_payload!=Path(built[:-7]+'.uexp').read_bytes():
         raise RuntimeError('Renaming the texture altered its mip payload, so it was not shipped')
     # .uasset/.uexp from the rename; the bulk mips exactly as inject_texture wrote them.
     for ext in (".ubulk", ".uptnl"):
@@ -408,6 +549,15 @@ def _verify_rename(scratch, injected, built, name):
     as an ordinary texture edit would (stage_inject does not decode its output either)."""
     folder = os.path.join(scratch, "verify")
     os.makedirs(folder, exist_ok=True)
+    from atelier.handlers import hdr_texture
+    if hdr_texture.candidate(injected[:-7]):
+        before_doc = hdr_texture.document(injected[:-7], Path(folder)/'before')
+        after_doc = hdr_texture.document(built[:-7], Path(folder)/'after')
+        before = hdr_texture.read_cooked(before_doc, injected[:-7])[0]
+        after = hdr_texture.read_cooked(after_doc, built[:-7])[0]
+        if before != after or after_doc['Exports'][0]['ObjectName'] != name:
+            raise RuntimeError('Renaming the HDR cubemap changed its faces, mips or texture class.')
+        return
     before = _decoded(injected, os.path.join(folder, name + ".injected.png"))
     if before is None:
         print(f"  [warn] {name}: the encoded texture could not be decoded, so the rename is unverified",
@@ -441,10 +591,14 @@ def apply(doc, material_game_rel, slots, scratch, project_dir=None):
     staged = []
     for slot in sorted(slots):
         rec, cur = slots[slot], current[slot]
-        if cur["class"] != "Texture2D":
-            raise RuntimeError(f"{slot}: only Texture2D slots can use your own image "
+        if cur["class"] not in ("Texture2D", "TextureCube"):
+            raise RuntimeError(f"{slot}: only Texture2D and TextureCube slots can use your own image "
                                f"(this slot holds a {cur['class'] or 'non-texture'} asset)")
-        png = os.path.join(folder, rec["file"])
+        if cur['class'] == 'TextureCube' and not rec.get('hdr_file'):
+            raise RuntimeError(f'{slot}: TextureCube slots need an HDR image or six-face HDR DDS.')
+        if cur['class'] == 'Texture2D' and rec.get('hdr_file'):
+            raise RuntimeError(f'{slot}: an HDR cubemap cannot be assigned to a Texture2D slot.')
+        png = os.path.join(folder, rec.get('hdr_file') or rec["file"])
         if not os.path.isfile(png):
             raise RuntimeError(f"{slot}: your image {rec.get('source') or rec['file']} is missing "
                                f"from the project — choose it again in the material editor")

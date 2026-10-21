@@ -23,6 +23,7 @@ datas = [
 datas += [(str(script), 'atelier/blender') for script in Path('atelier/blender').glob('*.py')]
 # upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
 datas += [(str(item), 'atelier/models') for item in Path('atelier/models').iterdir() if item.is_file()]
+datas += [(str(item), 'atelier/vendor/meshoptimizer') for item in Path('atelier/vendor/meshoptimizer').iterdir() if item.is_file()]
 binaries = []
 hiddenimports = [
     'io_lib',
@@ -60,6 +61,9 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('bottle')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('webview')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
+tmp_ret = collect_all('wasmtime')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

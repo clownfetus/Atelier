@@ -40,7 +40,7 @@ _CLSID_COMPILER = "73E22D93-E6CE-47F3-B5BF-F0664F39C1B0"
 _IID_COMPILER = "8C210BF3-011F-4422-8D70-6F9ACB8DB617"
 _CLSID_ASSEMBLER = "D728DB68-F903-4F80-94CD-DCCF76EC7151"
 _IID_ASSEMBLER = "091F7A26-1C1F-4948-904B-E6E3A8A771D5"
-_CLSID_VALIDATOR = "8CA3E215-F728-4CF3-8CDF-88D0F92B6E7A"
+_CLSID_VALIDATOR = "8CA3E215-F728-4CF3-8CDD-88AF917587A1"
 _IID_VALIDATOR = "A6E82BD2-1FD7-4826-9811-2857E797F49A"
 
 _dxc = None
@@ -112,19 +112,28 @@ def disassemble(dxbc):
 
 
 def _try_sign(container):
-    """Best-effort: sign the container in place via the DXIL validator. Returns (bytes, signed_bool).
-    This dxil.dll build may not expose the validator (REGDB_E_CLASSNOTREG) — then we return unsigned
-    and the caller flags it for the user to test in-game."""
+    """Sign validated DXIL; retain unsigned fallback only when no validator is available."""
     try:
         utils = _create(_dxc, _CLSID_UTILS, _IID_UTILS)
         val = _create(_dxil, _CLSID_VALIDATOR, _IID_VALIDATOR)
-        sblob, sbuf = _blob(utils, bytes(container))
-        vres = c_void_p()
-        _call(val, 3, c_int32, [c_void_p, c_uint32, POINTER(c_void_p)], sblob, 1, byref(vres))
-        signed = bytes(bytearray(sbuf))
-        return signed, any(signed[4:20])
     except Exception:
         return bytes(container), False
+    sblob, sbuf = _blob(utils, bytes(container))
+    vres = c_void_p()
+    hr = _call(val, 3, c_int32, [c_void_p, c_uint32, POINTER(c_void_p)], sblob, 1, byref(vres))
+    if hr != 0 or not vres.value:
+        raise RuntimeError(f"DXIL validation failed hr={hr & 0xffffffff:#x}")
+    status = c_int32()
+    status_hr = _call(vres, 3, c_int32, [POINTER(c_int32)], byref(status))
+    if status_hr != 0:
+        raise RuntimeError(f"DXIL validation status unavailable hr={status_hr & 0xffffffff:#x}")
+    if status.value != 0:
+        errors = c_void_p()
+        _call(vres, 5, c_int32, [POINTER(c_void_p)], byref(errors))
+        message = _bytes(errors).decode('utf-8', 'replace').strip() if errors.value else ''
+        raise RuntimeError('DXIL validation failed: ' + (message or f'status {status.value:#x}'))
+    signed = bytes(bytearray(sbuf))
+    return signed, any(signed[4:20])
 
 
 def assemble(ir):

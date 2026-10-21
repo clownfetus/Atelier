@@ -1,0 +1,883 @@
+{
+  "date": "2026-10-22",
+  "platform": "Windows x64 source checkout",
+  "git_parent": "734493a5c4e79edae788539957cb7869bcd443c7",
+  "source_sha256": {
+    "CHANGELOG.md": "4a48c9adf90da14f9b647ea7545a224071d4f8ad9d9bf7ddc6ce0b22e98ea1fd",
+    "DEVELOPMENT.md": "fdb492aff0a1a001c70ce458f8b6ff1699c79f9c0de7dab4795f24c0ebab6bc9",
+    "README.md": "f595eb4b02f743d8b3c80acf012ae7abacfa347839425acc4401407b02f0f91f",
+    "atelier/added_assets.py": "f0356134ba2b503d307db772a45d97d02539e8510ddca33b7ef5f4feeba25cb3",
+    "atelier/catalogue.py": "b0242f9494e5da110befe3f07c812e801b2c2df7a75e52478505546288b1f7be",
+    "atelier/handlers/custom_texture.py": "befb3907323f817d6df6afc6ff5986504b1d6aaef2887dba24f4e85a3e0ca696",
+    "atelier/handlers/hdr_texture.py": "a75c3a3967569598f2e52a4f0d06b32c6cfa1355b1d37aebb62770516b172cde",
+    "atelier/handlers/meshedit.py": "8e8b69ed31f82e60acc6499f8a552aaefbf81a91979b510359879df71ff811bb",
+    "atelier/handlers/meshmat.py": "7ecc8b39852e0f39f4b1385662ccf1a28a6a5c9c271ba3fccdc65369629b0c5c",
+    "atelier/handlers/texture.py": "c956abf5dd379952ffd9181aef3cce883dcdd2488c2551a5f0996f75c0ab2ea1",
+    "atelier/identity.py": "d7408f08b4d9baebdcdc3f2c5e33859056d1cb61e4a14cd3b5f67415490c4e6d",
+    "atelier/search.py": "eb9bad04dc81978953756f8df7624e0e972cac04cc5eb12c1e711ee26362729a",
+    "atelier/web/browse.py": "8c6057bbf0c8c79baab33e7534d32dc7a3957c50df66d6456db02eb6ccdeb621",
+    "atelier/web/routes.py": "7f716d0414f763a29ad8a25393e7767e1cae74fe44ac9680dc6c550f716490db",
+    "docs/identity-hdr-blender-verification-2026-10-22.md": "9da3312cc9dba26ee535c55d56e5708d59fa54e1d8bc1374ab4ffbf35ca282cd",
+    "gui/add-asset.css": "61d98a20b66ac53de23b8a8cfb1c4a02f0210af2695ca795c6ac1b58dfb0b225",
+    "gui/add-asset.js": "4cd8cb2303475d5648c502f34fdadd3c32db6f05b45753f33453aa792759e2e7",
+    "gui/app.js": "240f949a9383761025afd1b9fba9d8e2e0baa03f602d1d244417ef3ef353db17",
+    "gui/catalogue-art.js": "1b63c6180a7cc80e9e52703b1d611446a75796d828702c172a27a895cd8fe843",
+    "gui/continuity.js": "f2f2f9197792ade3832013ca63352b4bc366a31bb487f0f99d2c32d2de0971fd",
+    "gui/index.html": "b46bc9b0bce0a41a59f298c1c9cc9e9b0317c8a7c393c7f31aa62a58b09ea52a",
+    "gui/library-pins.js": "44392e59d8670a5838c3f9e43ebbf139d896d62be1cff30a4d237643ed2a6bcc",
+    "gui/roster.js": "f962fa4fa755211c5cd9c9d856d34901ccfb5191caa812cadfca78318faa5c9a",
+    "gui/search.js": "89580dfdf95fe5449d41aa03a72c8835a1bd7a0c7a001dff19a1661a37b8fc42",
+    "gui/style.css": "7f99351840562522e052a1042ff39967458bc7777ac0334dc09e0faf5c84ab0a",
+    "gui/viewport-identity.js": "ca8f81ac2e86c3a27a055f558fd70224e814b7f7e2929cff6035c231071b248c",
+    "gui/viewport.js": "2c790b2b2ca0637eaf8ef51c1c24eadb2b76cb80d90fcec912079f2ea22e41ad",
+    "tests/TextureCubeProbe.cs": "480d59cc14dfa7eb3b0fe8a8c44547561ca4d58f5b9d66a01585a0b126a23c5c",
+    "tests/browser_smoke.py": "457021bd9055f7ca0d366c90a050ec165e164bdc90a6170fa81ee18abe3ddb78",
+    "tests/dom_checks.js": "988db4baa5b8df2fd45cc37d811e5d46349ff258484470f0fcb3ad803b42854c",
+    "tests/krackle_motion_checks.py": "fbe082b79194cdd236fc9f8d616e92cf95cab286a1754aebb499ed70b04d27dc",
+    "tests/native_blender_texture_choice.py": "4a2e29b641d76e6820c92b96c6793a0deb3aa794cc9b59ce5d74cbb108138f35",
+    "tests/native_hdr_textures.py": "a399c2c093c65530f841fc1514645aea007de71d06cee82ce806923d5eee74d7",
+    "tests/native_identity.py": "93db4aae491817099143d46cc86f3ecba6f655504ecbd4d72dc94b5ea773a0a5",
+    "tests/polish_checks.py": "dc60cfa6d5525466681584264388631046a46dce5aa7f74f261fe7c0bd9b52c3",
+    "tests/run_checks.py": "845b6d9d523e3dfa00412b1875d00270d814a9cbef5239bc23514ede2475f646",
+    "tests/shared_identity_checks.py": "b4ec9d80e8f9b51111ca426bf6c3d6c21faf794bb800b70465deacc61ca0c663",
+    "tests/test_catalogue.py": "425d4224662a54105ce13fee54886d84a7dd99fd3bc8715ff549d12b1a34073c",
+    "tests/test_custom_textures.py": "4aa3a74519becde1f205626a9ac878dfe8278ba04ff3ee73ac69de9ed76a05e9",
+    "tests/test_hdr_textures.py": "dc7689d9f4243b6353e76a6478da150d34ec4ca78e61354b36cf288a1477df9f",
+    "tests/test_identity.py": "54e28f2ccb59ffd9656493dfdf581cbd2e16f329e46675c51de41c4c803cbd43",
+    "tests/test_model_studio_blender.py": "1d2a0f49f7761435fd2513f1495bea2d498528d4e72f6aadd22306ba60e4f4a4",
+    "tests/test_search.py": "a7d75a0c0563be26a7a423b1de453d986cd24f204fddca6b20139d59a3dc7ca7",
+    "tests/texture_workflow_checks.py": "aa43835d990f27d1ab4f4d18e4bbc4488a579b492a686955970ff27be342cdbb"
+  },
+  "native_tools_lock_sha256": "1e82d06ae292cc845d51908bf8d8cc34b40dacb8d4b7cd02765edcb692988d98",
+  "backend": {
+    "suites": 24,
+    "unit_tests": 312,
+    "script_checks": 81,
+    "optional_legacy_native_skips": 2,
+    "accepted_runs": [
+      {
+        "suite": "test_identity.py",
+        "exit_code": 0,
+        "seconds": 0.58,
+        "summary": [
+          "Ran 13 tests in 0.281s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_search.py",
+        "exit_code": 0,
+        "seconds": 7.31,
+        "summary": [
+          "Ran 7 tests in 6.657s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_catalogue.py",
+        "exit_code": 0,
+        "seconds": 0.7,
+        "summary": [
+          "Ran 24 tests in 0.348s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_hero_artwork.py",
+        "exit_code": 0,
+        "seconds": 3.62,
+        "summary": [
+          "Ran 10 tests in 3.272s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_added_assets.py",
+        "exit_code": 0,
+        "seconds": 1.83,
+        "summary": [
+          "Ran 13 tests in 1.331s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_custom_textures.py",
+        "exit_code": 0,
+        "seconds": 1.5,
+        "summary": [
+          "Ran 18 tests in 0.803s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-followup"
+      },
+      {
+        "suite": "test_hdr_textures.py",
+        "exit_code": 0,
+        "seconds": 0.97,
+        "summary": [
+          "Ran 15 tests in 0.530s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\hdr-host-final"
+      },
+      {
+        "suite": "test_texture_export_tail.py",
+        "exit_code": 0,
+        "seconds": 0.5,
+        "summary": [
+          "Ran 8 tests in 0.266s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.34,
+        "summary": [
+          "Ran 34 tests in 0.740s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_model_studio_textures.py",
+        "exit_code": 0,
+        "seconds": 0.69,
+        "summary": [
+          "Ran 8 tests in 0.252s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 0.86,
+        "summary": [
+          "Ran 23 tests in 0.277s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 0.92,
+        "summary": [
+          "Ran 7 tests in 0.790s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_material_replacement.py",
+        "exit_code": 0,
+        "seconds": 1.19,
+        "summary": [
+          "Ran 11 tests in 0.569s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_material_original.py",
+        "exit_code": 0,
+        "seconds": 1.0,
+        "summary": [
+          "Ran 8 tests in 0.337s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_frontend_cache.py",
+        "exit_code": 0,
+        "seconds": 0.66,
+        "summary": [
+          "Ran 4 tests in 0.079s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_presentation.py",
+        "exit_code": 0,
+        "seconds": 0.69,
+        "summary": [
+          "Ran 4 tests in 0.017s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_local_api_guard.py",
+        "exit_code": 0,
+        "seconds": 0.97,
+        "summary": [
+          "Ran 17 tests in 0.160s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_native_build_inputs.py",
+        "exit_code": 0,
+        "seconds": 0.66,
+        "summary": [
+          "Ran 15 tests in 0.434s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_phase3.py",
+        "exit_code": 0,
+        "seconds": 4.58,
+        "summary": [
+          "35 passed, 0 failed"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-followup"
+      },
+      {
+        "suite": "test_phase4.py",
+        "exit_code": 0,
+        "seconds": 4.61,
+        "summary": [
+          "  SKIP  The one thing that could go wrong silently: from_json writes .uasset/.uexp only. \u2014 UAssetTool not installed",
+          "  SKIP  DXT5's alpha block is independent, so a uniform zero alpha has to come back exactly zero. \u2014 UAssetTool not installed",
+          "46 passed, 0 failed, 2 skipped"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-followup"
+      },
+      {
+        "suite": "test_project_trash.py",
+        "exit_code": 0,
+        "seconds": 3.16,
+        "summary": [
+          "Ran 14 tests in 2.514s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_reliability.py",
+        "exit_code": 0,
+        "seconds": 1.19,
+        "summary": [
+          "Ran 29 tests in 0.550s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_model_studio_images.py",
+        "exit_code": 0,
+        "seconds": 0.34,
+        "summary": [
+          "Ran 7 tests in 0.040s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\unit-final"
+      },
+      {
+        "suite": "test_jobs_bulk.py",
+        "exit_code": 0,
+        "seconds": 1.7,
+        "summary": [
+          "Ran 23 tests in 0.905s"
+        ],
+        "report": "D:\\AtelierDev\\identity-update-20261021\\hdr-host-final"
+      }
+    ]
+  },
+  "browser": {
+    "check_count": 243,
+    "page_errors": [],
+    "checks": [
+      "UI loads at three desktop sizes without uncaught JavaScript errors",
+      "Configured startup does not wait for remote key/mapping downloads",
+      "Startup shows the library while the release check is pending; the update offer appears once it answers",
+      "Update offer appears above an empty project picker without requiring project creation",
+      "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+      "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+      "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+      "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+      "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+      "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+      "A failed local notes request leaves the library usable without an unhandled error",
+      "Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes",
+      "Showcase keeps its central model area free of coloured burst/dot artwork while retaining the Krackle identity at the edge; the same drawing serves live and exported views",
+      "Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls",
+      "Formation sounds create no audio by default; opt-in drop/pop/splat synthesis follows actual stage transitions and stays silent in Calm, Off, OS reduced motion and hidden documents",
+      "Mod cards use completed applied counts, a matching Showcase capture and local build version/date; copy/save/reveal work, warnings carry skipped counts and failed builds offer no card",
+      "Showcase is session presentation only: reopening returns to Inspect and captures preserve the camera and editable source materials",
+      "Local Latin display lettering loads; panels use 6px roles; Mod tray captions keep Ink text on Paper and repeats use five bubbles then a number",
+      "Unedited textures refuse image drops; an edited texture asks before replacing, Cancel keeps it, and confirmed drops in Full/Calm/Off upload File bytes with the originating project header and the existing refresh; non-images send no request",
+      "The hanging No projects drop opens the original New Project dialog immediately in all dial modes",
+      "Launch energy follows real progress; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline",
+      "Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles",
+      "Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; all 36 category emblems are available",
+      "By default, card emblems are inlined with unique mask ids; each of the 36 categories has its own ink (3:1 on light and dark thumbs and cards, local overrides), bubbles are cut through it, a hovered card's edited corner takes the raised charge at 3:1 on --bg3, and all 36 silhouettes stay inside the 24-unit box",
+      "The category review sheet draws emblems on the Studio card and thumb surfaces with the same fitted ink as the app, in both themes",
+      "Motion migrates system to Full and reduce to Off, preserving the legacy data-motion contract",
+      "Fixed outcome inks follow measured surfaces on all six presets in both themes and custom dark/light palettes; card thumbs take a charge fitted to --bg3 (3:1) on every one",
+      "The root charge is fitted to the resting card body (--bg2), and a hovered card body (--bg3) switches its edited corner to the raised charge: 3:1 resting and hovered on every preset and custom palette in both themes",
+      "Hero artwork and legacy adaptive settings preserve theme inks on cards, selection markers and the readable model loader",
+      "The arbiter refuses simultaneous large stages, shows a micro fallback, and permits each Tier 3 event only once per session",
+      "Calm and Off stop particle drawing; OS reduced motion forces Off and is explained beside the dial",
+      "Hero selection commits immediately, punches real energy bubbles in both themes, and never replays for initial render or an already-selected hero",
+      "Successful forward/back folder navigation gets an ink wake after the content commits; a new failed navigation cancels the previous effect and keeps its error state without an arrival",
+      "Opening the real material editor forms ink along its header edge while its controls and colour values remain available",
+      "A confirmed edited asset lands in the actual Mod tray thumbnail with an ink catch, reusing the existing import/save presentation path",
+      "Calm uses only a brief inset pulse, Off has no effect, and OS reduced motion takes precedence over Full",
+      "Import/export stage ownership suppresses wide workflow formations; background tray effects never float over an active editor or dialog",
+      "Missing or throwing Canvas support leaves the interface usable and releases the shared motion owner",
+      "Dial changes, resize, hidden documents and detached targets remove their canvases and cancel pending drawing",
+      "Home leads with hero costume/edit counts, per-project recent/edited filters, keyboard movement, category chips and a Continue ribbon from actual edit time",
+      "A costume opens Model Studio directly and the no-mesh case opens its folder with an explanation",
+      "Everywhere supports debounced keyboard navigation and asset focus, rejects stale responses, and This folder keeps local filtering",
+      "Empty projects hide Continue and an offline catalogue keeps the folder library usable",
+      "Skin folders use names, character context and artwork in UI, low-quality, plugin and VFX branches; unknown costumes and common folders stay explicit",
+      "Name and ID filters agree; keyboard navigation, breadcrumbs and banners retain the original UI location without enabling character-only editing actions",
+      "Saved pins acquire readable character/skin labels and hero artwork across reload and keep their exact destination",
+      "Custom asset template picking shows identity artwork and names while selecting the unchanged game asset path",
+      "Global folder search shows skin names and artwork with a readable path; selecting a result preserves its numeric game path",
+      "Identity browsing fits desktop and compact widths without script errors or project writes",
+      "The Blender project texture preference persists across reload; off opens with packed textures and no import confirmation, while on retains project texture copies",
+      "A Radiance file with no browser MIME type reaches texture replacement unchanged and returns HDR-specific preview feedback",
+      "TextureCube material slots offer HDR/DDS selection with an explicit six-face and HDR preview explanation",
+      "Deleting an edit offers Undo and restores the byte-identical file through the real project routes",
+      "Clear All uses one Undo batch, hover pauses its ten-second toast and reduced motion omits the row dissolve",
+      "Themed confirmations render literal text, trap Tab, focus Cancel for danger, cancel on Escape/backdrop and restore focus",
+      "Material, custom-texture, curve, effect, level and text reset/leave paths await themed answers and cancelled leave retains drafts",
+      "Blender extraction, inspection override and asset Revert require their themed answers before sending work",
+      "Viewport leave waits for the themed answer and cancelled navigation retains its recolour draft",
+      "First-run setup validates three panels, supports Back and offline fallback, preserves the save payload and keeps Settings as a full form",
+      "Light/dark color pairs pass 4.5:1; shell fits four desktop sizes; local font/logo load",
+      "Folder icons fill 76% of their preview and stay contained at all four thumbnail sizes in both themes",
+      "Theme persists across reloads, follows OS in System mode and stays fixed when explicitly selected",
+      "Keyboard menu navigation/focus return work; folder symbols fill tiles; all rendered symbols are mapped",
+      "Mode and palette changes preserve a live material draft; reduced motion disables effects",
+      "Blocked localStorage does not prevent launch or in-session theme changes",
+      "Settings presets show four swatches; six palettes pass contrast checks; native selects/options and monochrome brand follow the theme",
+      "Dropdown popup selection works with ArrowDown/Enter; Escape dismisses without changing selection",
+      "Native color inputs preserve readable BG/FG, save separate light/dark colors, survive reloads and preset changes, sync windows and correct low contrast",
+      "Multiple named custom palettes persist, restore and delete safely; palette names render as literal text",
+      "Themed tooltips preserve title/accessibility text and Escape; right-aligned menus remain onscreen and return keyboard focus",
+      "First-time configuration includes the same appearance controls without a header selector",
+      "Malformed or unavailable appearance storage falls back safely and allows session changes",
+      "Unsupported customizable selects retain the native control with themed text/options and the correct OS color scheme",
+      "Home roster exposes catalogue heroes and their costumes without importing assets",
+      "Folder direction, portrait/banner and breadcrumb transitions clean up; editors return to their card; HDR/alpha swatches keep real values",
+      "Filmic studio environment and wireframe-to-shaded reveal render real Three.js geometry without changing editable materials; discovered idle starts automatically",
+      "Operation resolves on the same mount with literal text; repeats merge, bump and reset their paused countdown line",
+      "A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance",
+      "Saved sidebar colors/curves, fly/packing snapshots, row removal, rolling counts, real import outcomes and one-time mod-color celebration clean up",
+      "Activity ring uses reported progress or an indeterminate running state and clears at completion; menu motion starts at its anchor",
+      "Artwork and legacy adaptive-accent preferences preserve theme colours on controls",
+      "Compact density and extra palettes persist; forced reduced motion is static and navigation works without View Transitions",
+      "Breadcrumbs retain complete hero, costume and folder names in their own row at compact width",
+      "Folder hover popups follow the pointer even while the first card retains keyboard focus; titles and descriptions restore on dismissal",
+      "Polished character library fits dark/light at 1024\u00d7768 and 1400\u00d7900 without horizontal overflow",
+      "Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+      "Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry",
+      "Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+      "Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+      "Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+      "Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+      "Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+      "Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+      "Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+      "Material chips show dye-region colours when no base tint exists and follow live edits",
+      "Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+      "Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+      "Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+      "Capture cancellation restores the camera and exits turntable rotation",
+      "Closing a loading viewer immediately removes its inline progress and cancels its backend load",
+      "Changing material skins cancels the previous request and keeps exactly one inline progress message",
+      "Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors",
+      "Shared texture slots download and decode one image while all three material assignments finish",
+      "Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark",
+      "Roster uses square hero avatars and text-only skin names; artwork refresh preserves selection and the viewer shows the matching hero logo",
+      "Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows",
+      "Skin side arrows browse an overflowing costume list without changing the selected hero",
+      "Character folder portraits stay transparent; hero and costume banners request story art by the exact character code",
+      "Meshes have one 3D menu action; bulk controls appear inside a loaded compatible editor and hide on close or unsupported data",
+      "Consecutive texture imports preserve grid, thumbnail, banner and existing sidebar nodes without reloading the library",
+      "Asset and edit-list menus restore originals for every editable asset type through the preserve-entry endpoint",
+      "Available high-resolution mips trigger automatic tracked repair and explain paint preservation and backups",
+      "Edited grid assets have a three-pixel contrasting border and an explicit Editing badge",
+      "Completed builds use a green surface, strong status border, heading and controls in both themes",
+      "Model import defaults skeleton, weights and morph preservation on; explicit checkbox choices upload with the target and supported model formats",
+      "At DPR 1, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, selected Mod tray heroes and Continue",
+      "Model Studio keeps badge and HiDPI banner fallbacks, samples banner colour when the icon is transparent, ignores stale loads after switching or closing, and leaves control colours unchanged",
+      "Custom texture location fields preview the exact package, retain rejected input, save with the originating project, and ignore a response after another editor opens",
+      "Completed single-hero Mod cards include that hero\u2019s verified KO emblem; missing optional images never block editing",
+      "Visible stories, hero nameplates and costume nameplates upgrade to 4\u00d7 without navigation; the strip has no outer gaps and right-side artwork keeps its original colour and contrast",
+      "Model Studio exports the selected body through project-scoped jobs, blocks hidden/multiple bodies and duplicate clicks, reports packed counts, keeps Open in Blender clickable in both themes and desktop sizes, and recovers from worker failure; Activity retains the outcomes",
+      "Export motion handles repeated states, terminal mounting, interruption and finished-effect cleanup",
+      "OS/forced reduced motion stop CSS and WAAPI; hidden work pauses and completed one-shots stay settled",
+      "Missing/throwing WAAPI preserves feedback; host/SVG removal and duplicate mounting clean up motion",
+      "Real export hook preserves project headers/payload and distinguishes success, skipped work, partial install, settings and request errors",
+      "Missing or throwing export presentation cannot block successful requests; fallback messages escape asset text",
+      "Overlapping exports keep independent feedback; old operations/projects cannot overwrite current button results",
+      "Export results crossfade back to the static icon in a fixed 20px slot; new operations and reduced motion cancel the reset safely",
+      "Export toasts dispose on explicit removal, click and timeout; light/dark feedback captured",
+      "Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts",
+      "Viewport loader respects OS/forced reduced motion and visibility, with idempotent explicit teardown",
+      "Absent, throwing and partially failing WAAPI keep static artwork and cannot leave duplicate loader loops",
+      "Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses",
+      "Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes",
+      "Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures",
+      "Save/dirty guards protect close/reopen; public export guards retain drafts and focus Save/status without discard prompts",
+      "Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup",
+      "Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes",
+      "Folder motion applies only to generic visible folders, including failed hero portraits; category and asset fallbacks stay unchanged",
+      "Folder flap responds to pointer and retained keyboard focus without changing native click/Enter/Space navigation or focus outlines",
+      "OS/forced reduced motion retains static poses; coarse pointers avoid sticky hover while keyboard focus still opens folders",
+      "Folder artwork fills the existing ~102px slot without clipping or shrinking category glyphs in both desktop themes",
+      "Rapid hover reversals and grid rebuilds settle cleanly without duplicated artwork or surviving transitions",
+      "Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI",
+      "Dialog saves preserve project header and material payload; failed intensity persistence reports warning instead of full success",
+      "Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state",
+      "In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project",
+      "Viewport saves retain failed/newer recolors, retry the correct payload and leave replacement viewport status untouched",
+      "Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback",
+      "Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves",
+      "Any folder can be pinned independently of navigation, including nested/category folders; native card buttons stay intact",
+      "Pins persist across reload, navigate by keyboard, filter on home, and unpin without removing folders or losing focus",
+      "Existing v1 generic Maps pins gain current artwork; stored paths normalize/deduplicate safely, forged labels stay inert and corrupt storage does not block launch",
+      "Pin changes synchronize between windows; blocked storage still supports pinning/navigation/unpinning for the session",
+      "Pinned home links and consistently sized folder cards fit both themes and desktop sizes without blocking export or issuing backend writes",
+      "Bulk review uses real HTTP jobs without project writes; applying saves both curves and preserves alpha",
+      "Changing bulk controls invalidates approval; an external edit rejects the entire stale batch",
+      "Activity cancels a running HTTP export; job records retain outcomes without saving input passwords",
+      "Reloading restores project job history and cancelled/failed outcomes without resubmitting work",
+      "Bulk dialog fits a compact desktop, traps keyboard focus and returns focus on Escape",
+      "Cached original and imported texture previews remain visible after search and grid rebuilds, with the originating project in image URLs",
+      "A completed thumbnail becomes visible through status recovery even when its SSE notification is missed",
+      "Decode failures replace spinners with a clear fallback; Retry preview requests a fresh attempt and restores the image",
+      "Status polling does not cancel a valid slow image response every two seconds",
+      "Leaving a grid aborts thumbnail status requests and ignores late responses without altering the new folder",
+      "A hung imported image request reaches a visible retryable fallback instead of spinning indefinitely",
+      "Initial texture browsing and sidebar rendering remain still",
+      "An external texture save reconstructs only the matching grid/sidebar previews after load, then shows the exact updated pixels",
+      "Replace Texture triggers the same effect for both previews using the originating project",
+      "Rapid saves replace in-flight effects; enabling reduced motion settles immediately and does not replay",
+      "Failed image reads, absent motion controller and unavailable canvas keep usable static previews",
+      "Project changes and grid/sidebar replacement dispose pending and running reconstruction layers",
+      "Bulk updates cap reconstruction at four canvases; hidden pages release effects and do not replay",
+      "One click runs real S-map jobs, imports the matching game S map, retains alpha/D files and lists unmatched maps in Activity",
+      "Shared S maps require an explicit D choice; the chosen pairing is saved in the batch record and its S output appears in Mod tray",
+      "Project switches reject stale pairing dialogs and the processing button disables when no edited D maps remain",
+      "Add asset sits beside Process S maps, browses real game folders and uploads image bytes to a named project texture",
+      "Game material copies and cooked mesh uploads join the Mod tray; duplicate destinations preserve existing edits",
+      "Added folders appear in the asset library and stale project dialogs refuse to write",
+      "Add asset supports Escape/focus return and stays within a 1024\u00d7768 window in both themes",
+      "Category aliases resolve case-insensitively without matching custom folder/skin substrings; weapons retain full-size accessible crossed swords",
+      "All 39 icon types retain large preview slots; the 36 category emblems reach 3:1 in both themes, and 18px home chips share category colors",
+      "Library search matches combined names, IDs and paths; type/status filters and Edit All share the visible texture set",
+      "Natural sorting and adjustable thumbnail size persist across reload; controls fit both themes at 1024px",
+      "Arrow/Home/End navigation uses one active card; Space previews textures without importing, P opens mesh preview, Escape restores focus",
+      "Folder entry and parent navigation preserve keyboard focus; loading/error filters cannot resurrect stale cards",
+      "Nested pins retain hero/skin context across reload and partial metadata; old generic labels migrate, custom labels and v1 paths remain intact",
+      "Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft",
+      "Material dirty drafts guard close/reload; original-read errors stay explicit and stale comparison/open responses cannot replace a newer editor",
+      "Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save",
+      "Material search/select, cancellation and immediate replacement retain donor controls and project identity",
+      "Restore game defaults returns the original parameter schema after replacement",
+      "A confirmation for a closed material cannot replace or reset a subsequently opened editor",
+      "A failed replacement retains unsaved parameters and re-enables the editor",
+      "Stale search and replacement replies cannot overwrite a newer choice or another editor",
+      "Export review lists included/excluded types and paths, keeps credentials private and supports keyboard cancellation",
+      "Material/viewport drafts and saves block export; material guards recheck confirmation/dispatch, retaining drafts and editor focus",
+      "Export uses reviewed project headers/payload, blocks stale reviews and duplicate clicks, and retains full warning results",
+      "Partial installation exposes built files; retry and overwrite revalidate the original project/settings and cancellation restores review",
+      "Destination/network failures preserve edits and a persistent manual retry without submitting unreviewed or automatic builds",
+      "Skin Swapper review shows hero/skin read-only from the mesh, gates Build on live rule checks, sends forms without IDs, and explains a revoked switch",
+      "Duplicate edit clicks deduplicate within a project; the same asset loads independently across projects and stale completion preserves current status",
+      "Cancelling Skin Swapper overwrite then choosing Standard preserves the Standard endpoint and both selected assets on retry",
+      "Skin Swapper retry retains its endpoint, author, skin name and reviewed form",
+      "Empty tray enters once after a confirmed empty response, then stays static on repeat renders; owned effects are disposed before DOM replacement",
+      "Only genuine empty projects get the illustration: filtered results, pending switches and errors do not; confirmed nonempty-to-empty transitions replay once and returning to a seen project does not",
+      "Empty tray retains a 112px host and 96px painted width in both themes, matches its editable SVG, stays decorative and does not replay on theme changes",
+      "Empty SVG handles interruption, duplicate mount, reduced motion, hidden/offscreen state, unavailable/partial WAAPI and mount failure without orphan effects or lost fallback",
+      "The A mark vector, interface PNG and application icons match scripts/brand_mark.py",
+      "Logo entrance runs once independently of pending startup configuration, preserves the original 32px PNG and wordmark position, then releases its effects",
+      "The latest logo stays fully opaque, yields to the Full launch formation, enters once at completion, and discards hidden startup replays",
+      "Logo controller deduplicates entrances, interrupts/reduces/settles safely, preserves host ownership and survives missing, throwing and partially failing WAAPI",
+      "Logo load errors reject readiness safely; destroy settles pending readiness and page teardown restores the original fallback without leaked SVG",
+      "Hidden/reduced-motion startup, absent animation/controller and PNG failures keep the static fallback and never replay on later visibility",
+      "Every spinner renders as the Krackle charge ring and stops under reduced motion",
+      "Caption notifications use micro formations; job results settle after one pop and controller failures keep the original icon",
+      "Activity glyph rings fade into real results for 140ms, cancel on new work, and stay still under reduced motion",
+      "Empty folder, no-match and failure grids keep their text and the static drawing as fallback while Krackle art settles",
+      "Krackle stage loops only while busy, stops drawing once a result settles, honours reduced motion and cleans up",
+      "Hidden Krackle stages stop drawing and resume when their dialog is shown",
+      "Activity shows its running-jobs ring as six Krackle dots with a counting crest",
+      "Mod tray buttons and Continue fit without clipped text or touching dividers at 240, 300 and 420-pixel tray widths in both themes",
+      "A full 54-hero Home keeps complete portrait rows, costumes and categories separated at all four card sizes in both themes; short windows scroll and Heroes still collapses",
+      "At DPR 1, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, selected Mod tray heroes and Continue",
+      "Model Studio keeps badge and HiDPI banner fallbacks, samples banner colour when the icon is transparent, ignores stale loads after switching or closing, and leaves control colours unchanged",
+      "Custom texture location fields preview the exact package, retain rejected input, save with the originating project, and ignore a response after another editor opens",
+      "Completed single-hero Mod cards include that hero\u2019s verified KO emblem; missing optional images never block editing",
+      "Visible stories, hero nameplates and costume nameplates upgrade to 4\u00d7 without navigation; the strip has no outer gaps and right-side artwork keeps its original colour and contrast",
+      "Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (light)",
+      "Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (light)",
+      "Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (dark)",
+      "Synchronous picker/API payload preserved; grey/unloaded/transparent/blocked sampling is safe; stale A-B-A artwork and old Continue callbacks cannot repaint; hero-only edits and recovered artwork work",
+      "Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (dark)",
+      "Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (custom-light)",
+      "Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (custom-light)",
+      "Costume/hero accents match through rapid folder navigation; buttons, inputs, toggles and palette roles stay unchanged; missing/transparent icons, hero fallbacks and failed nameplates work; IDs can come from the edit path (custom-dark)",
+      "Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable (custom-dark)",
+      "Real HTTP project writes stay in their originating project; traversal rejected",
+      "Partial save failure retains the failed draft and captures the project",
+      "Retry saves the retained draft",
+      "Edits made during Save survive; leaving while saving is blocked",
+      "An old texture response cannot overwrite a newer material set",
+      "SSE error does not create duplicate EventSource connections"
+    ]
+  },
+  "identity": {
+    "ok": true,
+    "skin_folders": 63,
+    "common_folders": 1,
+    "game_folder_contexts": 14916,
+    "browser_python_mismatches": [],
+    "loaded_portraits": 61,
+    "page_errors": []
+  },
+  "hdr": {
+    "checks": [
+      "Real FloatRGBA and BC6H TextureCube templates accept Radiance six-face strips and preserve values above one",
+      "Replacing an added HDR cube preserves its source package and every independent face; single-mip export preserves all six faces",
+      "Actual IoStore mod readback preserves TextureCube class, format, face ordering and every authored mip byte",
+      "HDR panorama projection, blanking and texture group overrides preserve cube structure; a real Ultron reflection slot references its new TextureCube with the source material unchanged",
+      "Independent pinned CUE4Parse reads the complete mod as six-slice UTextureCube assets without serialization warnings; every face hash matches",
+      "Game container metadata is unchanged and the test mod installation directory remains empty"
+    ],
+    "assets": [
+      {
+        "path": "AtelierHDRVerification/Float/T_Reflection",
+        "texture_class": "TextureCube",
+        "hdr": true,
+        "faces": 6,
+        "size": [
+          8,
+          8
+        ],
+        "format": "FloatRGBA",
+        "mips": 1,
+        "maximum": 24.0625,
+        "face_means": [
+          4.015625,
+          8.03125,
+          12.03125,
+          16.0625,
+          20.0625,
+          24.0625
+        ]
+      },
+      {
+        "path": "AtelierHDRVerification/BC6H/T_Reflection",
+        "texture_class": "TextureCube",
+        "hdr": true,
+        "faces": 6,
+        "size": [
+          8,
+          8
+        ],
+        "format": "BC6H",
+        "mips": 4,
+        "maximum": 24.0625,
+        "face_means": [
+          4.015625,
+          8.03125,
+          12.03125,
+          16.0625,
+          20.0625,
+          24.0625
+        ]
+      }
+    ],
+    "tools": {
+      "UAssetTool.exe": "d011149a2cef5541dd0795c20c335394b93bd87dc76d8a4617543ce5a5aa7dfe",
+      "texconv.exe": "dcfdec10244e02cf5037fba089c55fb7e1326b1c8181742d77d15fa5cb5eef06"
+    },
+    "engine": {
+      "ok": true,
+      "results": [
+        {
+          "asset": "AtelierHDRVerification/Float/T_Reflection",
+          "texture_class": "UTextureCube",
+          "format": "PF_FloatRGBA",
+          "group": "TEXTUREGROUP_World",
+          "slices": 6,
+          "mips": [
+            {
+              "width": 8,
+              "height": 8,
+              "bytes": 3072,
+              "face_sha256": [
+                "6bd4c1829890f0d9f98d8ba7b782848a28c23eea06b877e5856c8b2e6125f7f1",
+                "60d2b37f982efb946ef1747cbc2a650389f7eb8104229c4e5b7e2585c1e95880",
+                "0bd66ae46afd17b05a8844514775f3e1cb7ccfc538bc67422c7d43d4e887f57f",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "5b552b4aa45c74c9dce259b65358ee451ec2f641df698800682cc1db817c1c96",
+                "284fa8d92b0c046e27d91602b637fdaae907c9a771bacd4fc78ad671dff75867"
+              ],
+              "minimum": 4.015625,
+              "maximum": 24.0625
+            }
+          ]
+        },
+        {
+          "asset": "AtelierHDRVerification/BC6H/T_Reflection",
+          "texture_class": "UTextureCube",
+          "format": "PF_BC6H",
+          "group": "TEXTUREGROUP_UI",
+          "slices": 6,
+          "mips": [
+            {
+              "width": 8,
+              "height": 8,
+              "bytes": 384,
+              "face_sha256": [
+                "14ed344291c282971b16e8373c0653669e95935a51e816cdc20d4a4ddb70ed6f",
+                "7a3a5e5f7cfb729f780a77553ec799a1df61a759898740c979b30569ba2b4476",
+                "7d7418fc1861f5e5dce6d5a474b1f36153a418fecbf98b58fd705c0e71fffc86",
+                "e2921d6c7f444f879165cfb1b996a0c35c8a58b70af9b94a2e5e3b2aa1e9c6aa",
+                "9000de2d20f2c8dbc4922f31b9f46c850baa63d4fd05f5a8ed814da0b7f8fec5",
+                "94380cc16128bb012f519116522abf3547e647177770215929a1a7f7f94a2155"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 4,
+              "height": 4,
+              "bytes": 96,
+              "face_sha256": [
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289",
+                "f23b98ba35f57d96ab7ae52f3026e4ed3afe0566dc8a8b1378ec2b9236a47a79",
+                "c9a4c22483cac74412c8d6917c2c80ae9faf7ce46fc31a1c4767be3bc5cc2b4d",
+                "b44b06e70f63b32dbe20010dc5a5fb18534188303172612a712b5aae75951de2"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 2,
+              "height": 2,
+              "bytes": 96,
+              "face_sha256": [
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289",
+                "f23b98ba35f57d96ab7ae52f3026e4ed3afe0566dc8a8b1378ec2b9236a47a79",
+                "c9a4c22483cac74412c8d6917c2c80ae9faf7ce46fc31a1c4767be3bc5cc2b4d",
+                "b44b06e70f63b32dbe20010dc5a5fb18534188303172612a712b5aae75951de2"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 1,
+              "height": 1,
+              "bytes": 96,
+              "face_sha256": [
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289",
+                "f23b98ba35f57d96ab7ae52f3026e4ed3afe0566dc8a8b1378ec2b9236a47a79",
+                "c9a4c22483cac74412c8d6917c2c80ae9faf7ce46fc31a1c4767be3bc5cc2b4d",
+                "b44b06e70f63b32dbe20010dc5a5fb18534188303172612a712b5aae75951de2"
+              ],
+              "minimum": null,
+              "maximum": null
+            }
+          ]
+        },
+        {
+          "asset": "AtelierHDRVerification/Panorama/T_Panorama",
+          "texture_class": "UTextureCube",
+          "format": "PF_FloatRGBA",
+          "group": "TEXTUREGROUP_World",
+          "slices": 6,
+          "mips": [
+            {
+              "width": 8,
+              "height": 8,
+              "bytes": 3072,
+              "face_sha256": [
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36",
+                "bf509186b446584fa7e6f705a87d9ad26d0f785a8da0b03859eefcca1612be36"
+              ],
+              "minimum": 16.0625,
+              "maximum": 16.0625
+            }
+          ]
+        },
+        {
+          "asset": "AtelierHDRVerification/Slot/T_HDR_Sky",
+          "texture_class": "UTextureCube",
+          "format": "PF_BC6H",
+          "group": "TEXTUREGROUP_World",
+          "slices": 6,
+          "mips": [
+            {
+              "width": 8,
+              "height": 8,
+              "bytes": 384,
+              "face_sha256": [
+                "a6405132d2be553fdc8fb9e0410e8874b44b548679636e8a747da28cd46594db",
+                "14ed344291c282971b16e8373c0653669e95935a51e816cdc20d4a4ddb70ed6f",
+                "8e20e2bec743802cf6257842b22104ebce4743dca2f4eb97c4ee80342adb60c5",
+                "7a3a5e5f7cfb729f780a77553ec799a1df61a759898740c979b30569ba2b4476",
+                "1d5cbb7002fb800edc6ea23d645926c6c3c989498a428032eb4fb4f5fd41d7ad",
+                "7d7418fc1861f5e5dce6d5a474b1f36153a418fecbf98b58fd705c0e71fffc86"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 4,
+              "height": 4,
+              "bytes": 96,
+              "face_sha256": [
+                "fe73210b7c4faeb009e10ac4307ad285113de5c7392d94f2f1aebc50e92561ad",
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "f03ba89805a1bf7471aeef02b78660954752a99f8385b53e4ea003319fc57f9c",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "eb7bdd35f96f73454c66ec30542ffd7774227f2c30c283d489f4c8c2b2d1e226",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 2,
+              "height": 2,
+              "bytes": 96,
+              "face_sha256": [
+                "fe73210b7c4faeb009e10ac4307ad285113de5c7392d94f2f1aebc50e92561ad",
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "f03ba89805a1bf7471aeef02b78660954752a99f8385b53e4ea003319fc57f9c",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "eb7bdd35f96f73454c66ec30542ffd7774227f2c30c283d489f4c8c2b2d1e226",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289"
+              ],
+              "minimum": null,
+              "maximum": null
+            },
+            {
+              "width": 1,
+              "height": 1,
+              "bytes": 96,
+              "face_sha256": [
+                "fe73210b7c4faeb009e10ac4307ad285113de5c7392d94f2f1aebc50e92561ad",
+                "bfad6d62f21e85cacce866c70786c86eef3fbc6354c7b96fd47c301ca1eb51bc",
+                "f03ba89805a1bf7471aeef02b78660954752a99f8385b53e4ea003319fc57f9c",
+                "46ec022f2036c7a3d8a281b8461a0aec4739f857bdb47a283fb01b427aafa8db",
+                "eb7bdd35f96f73454c66ec30542ffd7774227f2c30c283d489f4c8c2b2d1e226",
+                "cc1c36a0232cb91775564f77efe7d409456c743ac3aaa037ce083dfe2d878289"
+              ],
+              "minimum": null,
+              "maximum": null
+            }
+          ]
+        },
+        {
+          "asset": "Characters/1028/1028001/Materials/Lobby/MI_1028001_Equip_01",
+          "texture_class": "UMaterialInstanceConstant",
+          "textures": [
+            {
+              "slot": "CubeMap_Tex",
+              "path": "/Game/Marvel/AtelierHDRVerification/Slot/T_HDR_Sky.T_HDR_Sky",
+              "texture_class": "TextureCube"
+            }
+          ]
+        }
+      ]
+    },
+    "build_inputs": {
+      "sdk": "10.0.402",
+      "assemblies": {
+        "AtelierMesh.exe": "5e47848be9e0d027ee014be50b96c8df85ac05bf06b79eeb593a8028dc708cc5",
+        "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+        "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+        "AssetRipper.TextureDecoder.dll": "d21409e8e4ae1b8c0a9f66ca172a710d5f460833f0051102d19549c4d7d09e80",
+        "Blake3.dll": "5487a86ab58fb7b0242d5a608d0b8fab45a9cdac0f34fcf12b8757df7e850ea8",
+        "BouncyCastle.Cryptography.dll": "e5eeaf6d263c493619982fd3638e6135077311d08c961e1fe128f9107d29ebc6",
+        "CommunityToolkit.HighPerformance.dll": "196607c6d4d704b5ee95c80f8e3cd799595b7d8a08108701894c211b138d2839",
+        "CUE4Parse-Conversion.dll": "fd2b202ee72ca2ff39b8b6bb5c4e8ccdf974816dde35fda3aa9261c1b793c0eb",
+        "CUE4Parse.dll": "df164064e526456fe1a5580a51c5a106eee4b681692f664c4d906910caf3d0df",
+        "FixedMathSharp.dll": "3c0240d67a3daef47ca007b7920a81edb40ac97f01f64cc5e96b45e4e8ba7fee",
+        "Fmod5Sharp.dll": "5fd28433bee00c92c73763ee2ea310142197dabd86f762639e9ac04ed58168ac",
+        "GenericReader.dll": "92810aca50dc68d9e79361aeb96fb72e5f80104a147af39625c2bc5d0ff69d68",
+        "IndexRange.dll": "13b459a9725bf3ae42b26836613221468458952bf59f848b809c03ed60247fb1",
+        "K4os.Compression.LZ4.dll": "e282aadc2353b864fe95cd5fb525a1a093d99a30a5bf2530b7ab831d56179816",
+        "K4os.Compression.LZ4.Streams.dll": "b146cf3c769000cd5e4458cfed5da3c0e838b7b2da6dbe6dad458cd5a0e3ce41",
+        "K4os.Hash.xxHash.dll": "19d73fa58c1f6c12c61f30eaad91881bd06f50caf4b462b061bc1b45d0a577cd",
+        "MemoryPack.Core.dll": "6dc7785eea92dc72b9ea4d9d9b08c585ce87c11ec6b8388d00a179af694cf6be",
+        "NAudio.Core.dll": "fcf493fc47a2f478a65303886b975fbdbf714cbb1f2d79f7fce97e4bb16b01a8",
+        "Newtonsoft.Json.dll": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+        "OffiUtils.dll": "2b45e1e594855cefbc707f9f4517a09263b6cb17b1062012c56d1666750e3f22",
+        "OggVorbisEncoder.dll": "5c3c602bed65fa22915d4d56fe62c3ed584dfaf48fd2c31b49519ed211f77ff1",
+        "Oodle.NET.dll": "0a1eb8b3fd2247f7b958e437585fafaf907514d6041e58ecb58068eaa2e76f7c",
+        "OodleSharp.dll": "c4885b763cfd4f5dc28ac663346f7efb0cc8d9229ca4c97ea3b76f87ea2d7091",
+        "Serilog.dll": "e6b551a75ff7fff20dd0024670d5c42dfb74afa16d54aa0201106dea400a9505",
+        "Serilog.Sinks.Console.dll": "dc88002ddd9f5fd0ffec9a6568ef89954671f60f2c9161593ee78932538c1e3e",
+        "SevenZip.dll": "976dcd9850b04cae4c4980dd47d58758535f00df6b5ab5cb4fb416eb2c93b788",
+        "SharpGLTF.Core.dll": "727ecd06a6c717472dbe0f1d3146c82b0a28ce2209daef49862620a043fc44ce",
+        "SharpGLTF.Toolkit.dll": "77b92cbe7c1d7a18b7262280995a951f566be50f6bb27f0e8a3aa74eae906d8f",
+        "SixLabors.ImageSharp.dll": "609a57965d0a7b5ccfb79d919ea7384e7ec86c03266b0390a19bd5f2104bc353",
+        "SkiaSharp.dll": "17ee1284313749f73a5cf5f309318d831741a8d6d397c998c5fc6485843c28bb",
+        "SubstreamSharp.dll": "2f8928637fdf06b3ce7b6b72ee12a7cb29508c5e0ef4aba8125d046b21be0796",
+        "UE4Config.dll": "79ef7a5b840cb0b337fe195746c08121dbc5e0c7862596ad44ad3d46137475ce",
+        "VGAudio.dll": "e32c17ed422f5e6419050fe4bb43f752ed11c8a7796c45f693865237d8a200a3",
+        "Zlib-ng.NET.dll": "f1746ed5806fe466af60938dfe7543ea524716816575fbb6a22d83cc0fc38673",
+        "ZstdSharp.dll": "b285bb9f59928becb8e048bf2a75e872f6555f8773d7b72386a9f77f447f425c"
+      },
+      "probe_source": "480d59cc14dfa7eb3b0fe8a8c44547561ca4d58f5b9d66a01585a0b126a23c5c"
+    }
+  },
+  "blender": {
+    "ok": true,
+    "mesh": "Characters/1047/1047001/Meshes/SK_1047_1047001",
+    "seconds": 7.11,
+    "project_texture_count_before": 1,
+    "project_texture_count_after": 1,
+    "existing_paint_unchanged": true,
+    "existing_paint_packed": true,
+    "new_project_files": [
+      "Characters\\1047\\1047001\\Meshes\\SK_1047_1047001.blend",
+      "Characters\\1047\\1047001\\Meshes\\SK_1047_1047001.blend.mat.json",
+      "Characters\\1047\\1047001\\Meshes\\SK_1047_1047001.mesh.json"
+    ],
+    "packed_images": 31,
+    "material_manifest_complete": true,
+    "material_issues": []
+  },
+  "blender_first_run_seconds": 53.34,
+  "safety": {
+    "python_parsed": 26,
+    "javascript_parsed": 10,
+    "credential_literal_findings": [],
+    "whitespace_check": "passed",
+    "dependency_consistency": "passed",
+    "external_dependencies_added": false,
+    "mod_installed": false
+  },
+  "evidence": {
+    "D:\\AtelierDev\\identity-update-20261021\\unit-final\\results.json": "c590000bc144f0217b1c1c4eeac1932783cce95fab4ff62d145a0b460e3e50ff",
+    "D:\\AtelierDev\\identity-update-20261021\\unit-followup\\results.json": "140a38a3bf6a821d20d0682d1941200c3e3ac9173873a617c7a8fe88c645abe3",
+    "D:\\AtelierDev\\identity-update-20261021\\hdr-host-final\\results.json": "5822a68def707582531f40fd01922962af78c14f1287db5ec72d58ef4b3a47c6",
+    "D:\\AtelierDev\\identity-update-20261021\\final-route-and-picker-checks\\results.json": "4418bff995b7fb2934cbe0e617a3674fd9f7b074b108f16a2d291a335a4e2d45",
+    "D:\\AtelierDev\\identity-update-20261021\\browser-final-2\\results.json": "d1b96ca22d094912c13159e4a7f1ed361b0d266ebbbb2bb96f4760ba4aebc718",
+    "D:\\AtelierDev\\identity-update-20261021\\browser-final-2\\browser_smoke\\results.json": "fd64de44a77e7d8a804e9776b8c0888508e766813ebcdd8f79e69d953e7d1205",
+    "D:\\AtelierDev\\identity-update-20261021\\identity-native-final\\results.json": "abb94b25fba862c2b0698e96d5cd0a08fb45c9d4d4f715baee3830390df21c88",
+    "D:\\AtelierDev\\identity-update-20261021\\blender-native-1\\results.json": "182ad7a3e7da6a9bb6852ce5ea317c9f3c0f2fe0f7abe598072fa5dbd2e39d84",
+    "D:\\AtelierDev\\identity-update-20261021\\blender-native-final\\results.json": "8449c9367d113c3b65cb656bfe7a7e4a89984d375e8dd0d9c78e0310775b9b3d",
+    "D:\\AtelierDev\\identity-update-20261021\\hdr-native-accepted\\results.json": "0d1e096fb41b55d986206f9f2219b0d64d789dfb4eb4a82e8ef3c8c26c52c362",
+    "D:\\AtelierDev\\identity-update-20261021\\safety-final.json": "1b5dae961d5ad439aef57597a247556966cb7c42a139c7540d72a7a2da855980"
+  },
+  "limitations": [
+    "In-game rendering, a new installer and Linux were not tested.",
+    "HDR Texture2D, EXR, virtual or external cube resources and cube arrays are unsupported.",
+    "Blender materials use the separate tone-mapped cube preview.",
+    "Native shader, animation and import tools retain their previously pinned builds."
+  ]
+}

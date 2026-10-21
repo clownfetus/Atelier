@@ -11,6 +11,48 @@ ROOT=Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which('node'),'Node is unavailable')
 class Frontend(unittest.TestCase):
+    def test_automatic_equipment_stays_with_its_body_form(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('function weaponMatchesBody('),end=source.indexOf('async function loadAutomaticWeapons',start);
+const weapon={},banner={},hulk={},flat={},shared={};
+const objects=[weapon,banner,hulk,flat,shared];
+const meshMeta=[
+ {game_rel:'Characters/1011/1011001/Weapons/10110/HandGun/Meshes/SK_HandGun'},
+ {game_rel:'Characters/1011/1011001/Meshes/10110/SK_10110_1011001'},
+ {game_rel:'Characters/1011/1011001/Meshes/10111/SK_10111_1011001'},
+ {game_rel:'Characters/1011/1011001/Meshes/SK_10110_1011001'},
+ {game_rel:'Characters/1011/1011001/Weapons/Shared/Meshes/SK_Weapon'}];
+const environment={objects,meshMeta};vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+assert.equal(environment.weaponMatchesBody(weapon,banner),true);
+assert.equal(environment.weaponMatchesBody(weapon,hulk),false,'Banner equipment must not attach to Hulk automatically');
+assert.equal(environment.weaponMatchesBody(weapon,flat),true,'Flat mesh layouts retain the authored body identifier');
+assert.equal(environment.weaponMatchesBody(shared,hulk),true,'A shared weapon remains available on ordinary rigs');
+console.log('PASS body-form automatic equipment identity');
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
+    def test_material_group_follows_body_classification_instead_of_its_folder(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(process.argv[1],'utf8');
+const start=source.indexOf('function materialGroup(name)'),end=source.indexOf('function filterMaterials()',start);
+const caption='Characters/1022/1022504/Weapons/Caption/Meshes/SK_WP_1022504_Caption';
+const shield='Characters/1022/1022504/Weapons/Shield/Meshes/SK_WP_1022504_Shield';
+const environment={materialLabel:name=>name,matData:{Body:{mesh_game_rel:caption},Shield:{mesh_game_rel:shield}},
+  meshMeta:[{game_rel:caption},{game_rel:shield}],objects:[{kind:'body'},{kind:'weapon'}]};
+vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
+assert.equal(environment.materialGroup('Body'),'Body');
+assert.equal(environment.materialGroup('Shield'),'Weapon · Shield');
+assert.equal(environment.materialGroup('Unmapped'),'Unmapped');
+console.log('PASS body-form materials are not mislabelled as held weapons');
+'''
+        result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],
+                              capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+
     def test_global_base_tint_precedes_effect_colours(self):
         script=r'''
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
@@ -38,15 +80,17 @@ const source=fs.readFileSync(process.argv[1],'utf8');
 const start=source.indexOf('function syncAttachments()');
 const end=source.indexOf('// One row per top-level mesh',start);
 assert.ok(start>=0 && end>start);
-const body={kind:'body',root:{visible:true}};
-const ability={kind:'weapon',autoEquip:false,root:{visible:false}};
-const sword={kind:'weapon',root:{visible:false}};
-const environment={objects:[body,ability,sword],matsByName:{},embeddedWeaponMaterials:()=>[],
+const body={kind:'body',loaded:true,root:{visible:true}};
+const ability={kind:'weapon',loaded:true,autoEquip:false,root:{visible:false}};
+const sword={kind:'weapon',loaded:true,root:{visible:false}};
+const pending={kind:'weapon',loaded:false,enabled:true,root:{visible:false}};
+const environment={objects:[body,ability,sword,pending],matsByName:{},embeddedWeaponMaterials:()=>[],weaponMatchesBody:()=>true,
  bindWeapon:(_weapon,body)=>({side:'r',body}),updateWeapon:()=>{}};
 vm.createContext(environment);vm.runInContext(source.slice(start,end),environment);
 environment.syncAttachments();
 assert.equal(ability.root.visible,false,'An optional ability rig must not obscure the body on open');
 assert.equal(sword.root.visible,true,'An ordinary held weapon still equips automatically');
+assert.equal(pending.root.visible,false,'An unloaded attachment must not reserve a hand or access an absent rig');
 ability.enabled=true;environment.syncAttachments();
 assert.equal(ability.root.visible,true,'Explicit selection must make the optional effect available');
 assert.equal(sword.root.visible,false,'An explicitly selected rig reserves its hand');
@@ -150,8 +194,8 @@ vm.createContext(environment);vm.runInContext(source.slice(start,end),environmen
             source=r'''
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {attachmentRig,bindWeapon,updateWeapon,pairedWeapon,embeddedWeaponMaterials} from 'ATTACHMENT';
-import {applySurface,textureRoles} from 'SURFACE';
+import {attachmentRig,bindWeapon,updateWeapon,pairedWeapon,embeddedWeaponMaterials,weaponSide} from 'ATTACHMENT';
+import {applySurface,textureRoles,emissiveColorIndex,applyEmissive} from 'SURFACE';
 const near=(actual,expected)=>assert.ok(actual.distanceTo(new THREE.Vector3(...expected))<1e-8,`${actual.toArray()} != ${expected}`);
 function rig(name,reflected=true){
  const scene=new THREE.Group(),root=new THREE.Bone(),socket=new THREE.Bone();root.name='root';socket.name=name;
@@ -160,6 +204,9 @@ function rig(name,reflected=true){
  return {root:scene,rig:attachmentRig({scene,parser:{json:{asset:{generator:reflected?'SharpGLTF 1':'Atelier Python'}}}}),socket};
 }
 const body=rig('weapon_r'),weapon=rig('grip');
+assert.equal(weaponSide('SK_WP_CannonL'),'l');assert.equal(weaponSide('SK_WP_CannonR'),'r');
+assert.equal(weaponSide('SK_WP_LauncherL'),'l');assert.equal(weaponSide('SK_WP_Stick_L_Anim'),'l');
+assert.equal(weaponSide('SK_WP_Railgun'),'r');assert.equal(weaponSide('SK_WP_CannonL','right'),'r');
 // SharpGLTF's visible bind is upright even though raw joint positions are reflected.
 near(new THREE.Vector3().setFromMatrixPosition(body.socket.matrixWorld),[0,1,0]);
 near(new THREE.Vector3().setFromMatrixPosition(body.rig.nodes.get('weapon_r').physical),[0,-1,0]);
@@ -172,6 +219,36 @@ near(new THREE.Vector3(.25,0,0).applyMatrix4(held.root.matrixWorld),[0,-1,0]);
 body.root.position.set(0,2,0);updateWeapon(held,binding);
 near(new THREE.Vector3(.25,0,0).applyMatrix4(held.root.matrixWorld),[0,1,0]);
 assert.equal(bindWeapon(held,body,'left'),null);
+for(const name of ['CannonRoot','WandRoot','TridentRoot','NunchakuRoot']){
+ const familyRoot=new THREE.Group(),wrapper=new THREE.Bone(),joint=new THREE.Bone();
+ wrapper.name='WP_Root';joint.name=name;joint.position.set(.1,0,0);familyRoot.add(wrapper);wrapper.add(joint);
+ const family={name:'SK_'+name,root:familyRoot,rig:attachmentRig({scene:familyRoot})};
+ assert.equal(bindWeapon(family,body,'right').grip.node,joint,`${name} must not attach its generic wrapper`);
+}
+const alignedRoot=new THREE.Group(),align=new THREE.Bone(),cannon=new THREE.Bone();
+align.name='Align';cannon.name='Hand_l_Cannon1';cannon.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI);
+alignedRoot.add(align);align.add(cannon);
+const aligned={name:'SK_CannonL',root:alignedRoot,rig:attachmentRig({scene:alignedRoot})};
+assert.equal(bindWeapon(aligned,body,'right').grip.node,align,'An authored alignment node takes precedence over a deforming cannon joint');
+const wrist=new THREE.Bone();wrist.name='hand_r';wrist.position.set(.2,0,0);body.root.children[0].add(wrist);
+body.rig=attachmentRig({scene:body.root,parser:{json:{asset:{generator:'SharpGLTF'}}}});
+const wristBinding=bindWeapon(aligned,body,'right');
+assert.equal(wristBinding.socket.node,wrist,'A hand-mounted cannon uses the wrist rather than the palm weapon socket');
+// A wrapper root is not necessarily the authored grip. An inverted blade
+// joint below it must align to the socket instead of retaining the half-turn.
+const wrapped=new THREE.Group(),wrapper=new THREE.Bone(),blade=new THREE.Bone();
+wrapper.name='WP_Root';blade.name='WP_Sword';blade.position.set(.02,0,0);
+blade.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI);
+wrapped.add(wrapper);wrapper.add(blade);
+const dagger={name:'SK_Dagger',root:wrapped,rig:attachmentRig({scene:wrapped})};
+const daggerBinding=bindWeapon(dagger,body,'right');
+assert.equal(daggerBinding.grip.node,blade,'The articulated blade is the grip below the wrapper');
+updateWeapon(dagger,daggerBinding);
+const bladePhysical=blade.matrixWorld.clone().multiply(daggerBinding.grip.inverseExported).multiply(daggerBinding.grip.physical);
+const socketPhysical=body.rig.nodes.get('weapon_r').node.matrixWorld.clone()
+ .multiply(body.rig.nodes.get('weapon_r').inverseExported).multiply(body.rig.nodes.get('weapon_r').physical);
+assert.ok(bladePhysical.elements.every((value,i)=>Math.abs(value-socketPhysical.elements[i])<1e-8),
+ 'Grip position and orientation must both match the socket');
 const sharedBody=rig('SwordRoot'),sharedWeapon=rig('SwordRoot');
 binding=bindWeapon(sharedWeapon,sharedBody);assert.equal(binding.kind,'shared');
 sharedBody.root.position.set(3,0,0);updateWeapon(sharedWeapon,binding);
@@ -202,6 +279,20 @@ assert.equal(material.transparent,true);assert.equal(material.opacity,.8);assert
 applySurface(material,{surface:{blend_mode:'BLEND_Masked',opacity:1,mask_clip:.2}});
 assert.equal(material.alphaTest,.2);assert.equal(material.transparent,false);
 assert.deepEqual(textureRoles({textures:{DiffuseMap:'gem',OpacityMask:'hair'}}),{basecolor:'gem',opacity:'hair'});
+const skin={colors:[{name:'BaseGlowColor',rgba:[1,1,1,0]},{name:'EmissiveColor',rgba:[1,.02,.02,0]}],
+ scalars:[{name:'GlowStrength',value:8},{name:'EmissiveStrength',value:0}]};
+assert.equal(emissiveColorIndex(skin.colors),1,'A separate white base glow must not tint the emissive mask');
+assert.equal(emissiveColorIndex(null),-1);
+material.emissiveMap=new THREE.Texture();applyEmissive(material,skin);
+assert.equal(material.emissiveIntensity,0,'Disabled tattoos must not glow');
+assert.deepEqual(material.emissive.toArray(),[1,.02,.02]);
+skin.scalars[1].value=.038;applyEmissive(material,skin);
+assert.equal(material.emissiveIntensity,.038,'Small authored emission must not be raised to a brightness floor');
+skin.scalars[1].value=9;applyEmissive(material,skin,[.1,.2,.3]);
+assert.equal(material.emissiveIntensity,9);assert.deepEqual(material.emissive.toArray(),[.1,.2,.3]);
+skin.scalars[1].value=-1;applyEmissive(material,skin);assert.equal(material.emissiveIntensity,0);
+material.emissiveMap=null;applyEmissive(material,skin);
+assert.deepEqual(material.emissive.toArray(),[0,0,0],'Removing an emissive map must clear its previous glow');
 const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Array(18).fill(0),3));
 geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute([1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],4));
 geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute([1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],4));

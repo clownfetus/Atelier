@@ -10,6 +10,24 @@ import struct
 import statistics
 
 
+def normalized_weights(weights):
+    """Accumulate repeated vertex/bone entries before Blender assigns groups.
+
+    UEFormat's mesh importer accumulates influences. ActorX files can carry the
+    same pair more than once too; replacing each entry silently drops weight.
+    """
+    pairs = {}
+    for weight, point, bone in weights:
+        if weight:
+            pairs.setdefault((point, bone), []).append(weight)
+    values = {key: math.fsum(parts) for key, parts in pairs.items()}
+    totals = {}
+    for (point, bone), weight in values.items():
+        totals.setdefault(point, []).append(weight)
+    totals = {point: math.fsum(parts) for point, parts in totals.items()}
+    return [(weight/totals[point], point, bone) for (point, bone), weight in values.items()]
+
+
 def read_psk(path):
     raw=Path(path).read_bytes()
     if len(raw)>512*1024*1024:raise ValueError('PSK exceeds 512 MB')
@@ -49,6 +67,7 @@ def read_psk(path):
     weights=records('RAWWEIGHTS','<fii',True)
     if any(not math.isfinite(w) or w<0 or not 0<=p<len(points) or not 0<=b<len(bones) for w,p,b in weights):
         raise ValueError('Invalid PSK bone weight')
+    weights=normalized_weights(weights)
     normals=records('VTXNORMS','<3f',True);colors=records('VERTEXCOLOR','<4B',True)
     if normals and (len(normals)!=len(points) or any(not all(map(math.isfinite,n)) for n in normals)):
         raise ValueError('Invalid PSK custom normals')

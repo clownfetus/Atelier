@@ -26,8 +26,11 @@
         const heading=document.createElement('p');heading.className='search-group';heading.textContent=label+' · '+data.totals[group];section.append(heading);
         for(const item of data[group]) {
           const row=document.createElement('button');row.type='button';row.className='search-result';row.setAttribute('role','option');row.tabIndex=-1;row.id='search-result-'+gen+'-'+group+'-'+section.children.length;
-          const name=document.createElement('strong');name.textContent=item.name;
-          const path=document.createElement('span');path.textContent=item.game_rel||item.path;
+          const name=document.createElement('strong');name.textContent=item.display_name || item.name;
+          const art=window.AtelierCatalogueArt?.identityChip(item);if(art)name.prepend(art);
+          const raw=item.game_rel||item.path;row.title=raw;
+          const friendly=window.AtelierCatalogueArt?.pathLabel(raw)||raw;
+          const path=document.createElement('span');path.textContent=friendly===raw&&item.identity_label ? item.identity_label+' · '+raw : friendly;
           row.append(name,path);row.addEventListener('click',()=>{reset();$('search-input').blur();callbacks.open?.(group,item);});section.append(row);
         }
         panel.append(section);

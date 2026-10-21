@@ -185,6 +185,17 @@ def get_aes_key():
         return ""
 
 
+def retoc_env():
+    """Pass the current container read key privately to the source-built shader tool."""
+    env = os.environ.copy()
+    key = get_aes_key()
+    if key:
+        env["ATELIER_RETOC_AES_KEY"] = key
+    else:
+        env.pop("ATELIER_RETOC_AES_KEY", None)
+    return env
+
+
 def normalize_aes_key(key):
     """A 64-hex-char key without the 0x prefix. Raises ValueError on anything else."""
     key = (key or "").strip()

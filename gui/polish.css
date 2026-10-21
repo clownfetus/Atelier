@@ -9,7 +9,7 @@
 #ctx-menu, .studio-tooltip { box-shadow: var(--studio-elevation-menu); }
 .overlay > :first-child { box-shadow: var(--studio-elevation-dialog); }
 .overlay { backdrop-filter: blur(5px); }
-#explorer .library-heading h1, .overlay > :first-child h2, h1,h2,.modal-title,.roster-hero-name,.mod-card-name,.k-event-title { font-family:var(--studio-display); font-stretch:80%; font-variation-settings:'wdth' 80; font-weight:650; }
+#explorer .library-heading h1, .overlay > :first-child h2, h1,h2,.modal-title,.mod-card-name,.k-event-title { font-family:var(--studio-display); font-stretch:80%; font-variation-settings:'wdth' 80; font-weight:650; }
 .library-heading { position:relative; }
 #library-category-line { position:absolute; inset:auto 0 0; width:100%; height:2px; background:currentColor; border:0; margin:0; padding:0; }
 .sb-item::after { content:''; position:absolute; top:0; right:0; width:10px; height:10px; background:var(--acc); clip-path:polygon(0 0,100% 100%,100% 0); pointer-events:none; }

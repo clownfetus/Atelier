@@ -210,9 +210,12 @@ def _try_extras(d, o, limit):
         (ntag,) = struct.unpack_from("<I", d, o)
         if not 0 <= ntag <= 64:
             return None
+        if o + 4 + ntag * 8 > limit:
+            return None
+        tags = [struct.unpack_from('<ii', d, o + 4 + i*8) for i in range(ntag)]
         o += 4 + ntag * 8
         mats.append({"pkg_idx": pkg, "pkg_off": pkg_off,
-                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0]})
+                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0], 'tag_names': tags})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)
@@ -336,6 +339,12 @@ def resolve_materials(mats, names):
         m["slot_name"] = names[m["slot_name_idx"]] if 0 <= m["slot_name_idx"] < len(names) else None
         m["imported_slot_name"] = (names[m["imported_slot_name_idx"]]
                                    if 0 <= m["imported_slot_name_idx"] < len(names) else None)
+        tags = []
+        for index, number in m.get('tag_names', []):
+            if not 0 <= index < len(names) or number < 0:
+                raise ValueError('Invalid material gameplay-tag name')
+            tags.append(names[index] + ('_' + str(number-1) if number else ''))
+        m['gameplay_tags'] = tags
     return mats
 
 
@@ -676,46 +685,63 @@ class Mesh:
         rebuild_lod_buffers) -- a legal re-encoding of the same data, lossy only on the
         thin tail past 8 influences (mean measured at 3.24/vertex)."""
         n = lod["num_verts"]
-        if lod.get("bone_index_16") or lod.get("bone_weight_16"):
-            raise NotImplementedError("16-bit bone index/weight skin buffers not decoded")
+        index_size = 2 if lod.get('bone_index_16') else 1
+        weight_size = 2 if lod.get('bone_weight_16') else 1
+        index_type = '<u2' if index_size == 2 else 'u1'
+        weight_type = '<u2' if weight_size == 2 else 'u1'
+        maximum = 65535.0 if weight_size == 2 else 255.0
         blob = bytes(self._blob(lod))
+        size = lod.get('sw_cnt', n * lod['max_bone_influences'] * (index_size + weight_size)) * lod.get('sw_esz', 1)
+        start = lod['sw_off']
+        if n < 1 or start < 0 or size < 0 or start + size > len(blob):
+            raise ValueError('Invalid skin-weight buffer extent')
         if not lod.get("variable_bones"):
             mi = lod["max_bone_influences"]
             # Fixed does not mean eight influences. Four-influence cooked meshes
             # store four indices followed by four weights (8 bytes per vertex).
             # Reading 16 crossed vertex boundaries and eventually read other
             # buffers as weights, notably on Magik's normal body.
-            size=lod.get('sw_cnt',n*mi*2)*lod.get('sw_esz',1)
-            if not n or size % n or size//n % 2:
+            if size % n or size//n % (index_size + weight_size):
                 raise ValueError('Invalid fixed skin-weight buffer size')
-            width=size//n//2
+            width=size//n//(index_size + weight_size)
             if not 1<=mi<=width<=8:
                 raise NotImplementedError('Unsupported fixed skin-weight stride')
-            raw = np.frombuffer(blob, np.uint8, n * width * 2, lod["sw_off"]).reshape(n, width*2)
+            raw = np.ndarray((n, width), dtype=index_type, buffer=blob, offset=start,
+                             strides=(width*(index_size+weight_size), index_size))
+            weights = np.ndarray((n, width), dtype=weight_type, buffer=blob, offset=start+width*index_size,
+                                 strides=(width*(index_size+weight_size), weight_size))
             idx=np.zeros((n,8),np.uint16);wgt=np.zeros((n,8),np.float32)
-            idx[:,:mi]=raw[:,:mi];wgt[:,:mi]=raw[:,width:width+mi]/255.0
+            idx[:,:mi]=raw[:,:mi];wgt[:,:mi]=weights[:,:mi]/maximum
             return idx, wgt
 
+        # CUE4Parse's FSkinWeightVertexBuffer requires one lookup per vertex.
+        if lod.get('lookup_cnt', n) != n or lod.get('lookup_esz', 4) != 4:
+            raise ValueError('Skin-weight lookup does not match the vertex count')
+        if lod['lookup_off'] < 0 or lod['lookup_off'] + n*4 > len(blob):
+            raise ValueError('Truncated skin-weight lookup')
         lookup = np.frombuffer(blob, "<u4", n, lod["lookup_off"])
-        data = np.frombuffer(blob, np.uint8, lod["sw_cnt"] * lod["sw_esz"], lod["sw_off"])
         offs, cnts = (lookup >> 8).astype(np.int64), (lookup & 0xFF).astype(np.int64)
+        if np.any(cnts > lod['max_bone_influences']) or np.any(offs + cnts*(index_size+weight_size) > size):
+            raise ValueError('Skin-weight lookup exceeds the influence buffer')
 
-        idx = np.zeros((n, 8), np.uint8)
-        wgt = np.zeros((n, 8), np.uint8)
+        idx = np.zeros((n, 8), np.uint16)
+        wgt = np.zeros((n, 8), np.float32)
         for i in range(n):
             c, o = int(cnts[i]), int(offs[i])
             if c == 0:
                 continue
-            bi, bw = data[o:o + c], data[o + c:o + 2 * c]
+            bi = np.frombuffer(blob, index_type, c, start+o)
+            bw = np.frombuffer(blob, weight_type, c, start+o+c*index_size)
             if c > 8:
-                order = np.argsort(-bw.astype(np.int64))[:8]
-                bi, bw = bi[order], bw[order].astype(np.int64)
-                bw = (bw * 255 // max(int(bw.sum()), 1)).astype(np.int64)
-                bw[0] += 255 - int(bw.sum())
-                bw = bw.astype(np.uint8)
+                order = np.argsort(-bw.astype(np.int64), kind='stable')[:8]
+                bi, bw = bi[order], bw[order].astype(np.float32)
+                total = float(bw.sum())
+                bw = bw/total if total else bw
                 c = 8
+            else:
+                bw = bw.astype(np.float32)/maximum
             idx[i, :c], wgt[i, :c] = bi, bw
-        return idx, wgt.astype(np.float32) / 255.0
+        return idx, wgt
 
     def section_bonemap(self, sec):
         c, = struct.unpack_from("<I", self.uexp, sec["bm"])
@@ -735,6 +761,8 @@ class Mesh:
         (export SerialSize + package BulkDataStartOffset shift; only valid because
         SkeletalMesh is confirmed the LAST export, so nothing else needs to move)."""
         lod = self.lods[lod_index]
+        if lod.get('bone_index_16') or lod.get('bone_weight_16'):
+            raise NotImplementedError('16-bit skin weights can be previewed but cannot yet be rebuilt safely')
         orig_sections = lod["sections"]
         if len(sections_in) != len(orig_sections):
             raise ValueError("section count must match the original (BoneMaps/section "

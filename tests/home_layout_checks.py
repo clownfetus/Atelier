@@ -58,6 +58,27 @@ def run_home_layout_checks(page, context, url, report, checks):
                 tab.locator('#grid-area .card').first.scroll_into_view_if_needed()
                 assert tab.locator('#grid-area .card').first.is_visible()
                 tab.screenshot(path=str(report / f'home-layout-{theme}-{width}.png'))
+        # Check the two compact surfaces shown in the reported spacing defects.
+        tab.set_viewport_size({'width':1024, 'height':768})
+        for theme in ('light', 'dark'):
+            tab.evaluate("theme=>document.documentElement.dataset.theme=theme", theme)
+            for width in (240, 300, 420):
+                tab.evaluate("width=>{document.getElementById('sidebar').style.width=width+'px';document.getElementById('explorer').scrollTop=0}", width)
+                result = tab.evaluate("""() => {
+                    const tray=document.getElementById('sidebar'), header=document.getElementById('sidebar-header'),
+                      tools=document.querySelector('.mod-tray-tools'),ribbon=document.getElementById('continue-ribbon');
+                    const buttons=[...document.querySelectorAll('.mod-tray-actions .btn')];
+                    const fits=element=>{const r=element.getBoundingClientRect(),p=element.parentElement.getBoundingClientRect();
+                      return r.left>=p.left && r.right<=p.right+1 && element.scrollWidth<=element.clientWidth+1;};
+                    const r=ribbon.getBoundingClientRect(),before=ribbon.previousElementSibling.previousElementSibling.getBoundingClientRect();
+                    return {toolbarGap:tools.getBoundingClientRect().top+parseFloat(getComputedStyle(tools).paddingTop)-header.getBoundingClientRect().bottom>=12,
+                      buttons:buttons.every(fits),height:Math.abs(buttons[0].offsetHeight-buttons[1].offsetHeight)<1,
+                      ribbonGap:r.top-before.bottom>=12,children:[...ribbon.children].every(fits),
+                      tray:tray.scrollWidth<=tray.clientWidth+1};
+                }""")
+                assert all(result.values()), (theme, width, result)
+                tab.screenshot(path=str(report/f'compact-surfaces-{theme}-{width}.png'))
+        checks.append('Mod tray buttons and Continue fit without clipped text or touching dividers at 240, 300 and 420-pixel tray widths in both themes')
         tab.locator('.roster-toggle').click()
         assert tab.locator('.roster-content').is_hidden()
         assert not errors, errors

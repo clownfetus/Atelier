@@ -29,6 +29,24 @@ Windows manifest whose source commit/version differs from the checkout.
 
 ## Windows review package
 
+Windows builds now require `Tools/AtelierImport/AtelierImport.exe` and its two
+native DLLs. This service reuses the initialized CUE4Parse game reader for model,
+material and texture previews. It uses private inherited pipes, without opening
+an additional HTTP port. Its caches remain under the selected app data directory.
+
+Build it with .NET SDK 10 against the exact assemblies already in AtelierMesh:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/build_import_server.py --tools 'D:\AtelierTools'
+```
+
+The command creates a fresh `AtelierImport` folder; it refuses to overwrite an
+existing one. Use `--output` to build a revision in another folder and `--dotnet`
+for a portable SDK. Builds do not read game data, keys or mappings. Tools staging
+and the installer require the service and both native dependencies on Windows;
+the older decoder remains the compatibility path for older external tool sets
+and Linux, where this service has not been verified.
+
 The portable review package contains `Atelier.exe` and its required `_internal`
 directory. It excludes native modding tools, local configuration, projects, game
 files, AES keys and mappings. It is unsigned and does not run an installer or

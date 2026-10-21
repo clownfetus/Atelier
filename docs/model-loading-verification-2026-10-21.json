@@ -1,0 +1,602 @@
+{
+  "date": "2026-10-21",
+  "branch": "codex/consolidated-integrations",
+  "base_commit": "f80fda7b220f4700febc4cacae2782e9a0ae8807",
+  "character": "Black Widow",
+  "skin_id": "1033001",
+  "selected_mesh": "Characters/1033/1033001/Meshes/SK_1033_1033001_Lobby",
+  "scope": "Focused integrations; the RivalsPorting persistent import server was not added.",
+  "performance": {
+    "before": {
+      "mode": "source",
+      "first_model_seconds": 24.12,
+      "checks": [],
+      "page_errors": [],
+      "error": "Page.wait_for_function: Timeout 240000ms exceeded.",
+      "initial_request_counts": {
+        "/api/model_gltf": 15,
+        "/api/skin_materials": 1,
+        "/api/texture_png": 47
+      },
+      "initial_native_requests": [
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+          "started_seconds": 1.063,
+          "finished_seconds": 21.547
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001",
+          "started_seconds": 21.688,
+          "finished_seconds": 35.188
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_PA",
+          "started_seconds": 35.282,
+          "finished_seconds": 37.922
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+          "started_seconds": 37.922,
+          "finished_seconds": 41.219
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSM_WP_1033001_Stick_L",
+          "started_seconds": 41.282,
+          "finished_seconds": 44.297
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+          "started_seconds": 44.36,
+          "finished_seconds": 47.75
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSM_WP_1033001_Stick_R",
+          "started_seconds": 47.813,
+          "finished_seconds": 50.938
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FElectricRifle%2FMeshes%2FSK_WP_1033001_ElectricRifle",
+          "started_seconds": 51.0,
+          "finished_seconds": 55.172
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FElectricRifle_FPP%2FMeshes%2FSK_WP_1033001_ElectricRifle_FPP",
+          "started_seconds": 55.235,
+          "finished_seconds": 59.266
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FFPPhands%2FMeshes%2FSK_1033_1033001_FPP",
+          "started_seconds": 59.329,
+          "finished_seconds": 63.61
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FHook%2FMeshes%2FSK_EQPT_1033001_Hook",
+          "started_seconds": 63.704,
+          "finished_seconds": 66.954
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FMag%2FMeshes%2FSK_WP_1033001_Mag",
+          "started_seconds": 67.016,
+          "finished_seconds": 70.141
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FSpiderTentacles%2FMeshse%2FSK_EQPT_1033001_SpiderTentacles",
+          "started_seconds": 70.204,
+          "finished_seconds": 73.594
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L_Anim",
+          "started_seconds": 73.657,
+          "finished_seconds": 77.047
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R_Anim",
+          "started_seconds": 77.094,
+          "finished_seconds": 80.579
+        },
+        {
+          "route": "/api/skin_materials",
+          "query": "",
+          "started_seconds": 80.704,
+          "finished_seconds": 218.985
+        }
+      ],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\before-report\\results.json"
+    },
+    "cold": {
+      "mode": "source",
+      "first_model_seconds": 17.83,
+      "load_seconds": 75.02,
+      "materials": 13,
+      "material_groups": 12,
+      "objects": 12,
+      "checks": [
+        "Native mesh/material/texture routes load a real game skin and enable capture",
+        "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+        "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+      ],
+      "page_errors": [],
+      "initial_request_counts": {
+        "/api/model_gltf": 3,
+        "/api/skin_materials": 1,
+        "/api/texture_png": 15
+      },
+      "initial_native_requests": [
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+          "started_seconds": 0.734,
+          "finished_seconds": 15.453
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+          "started_seconds": 15.578,
+          "finished_seconds": 19.078
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+          "started_seconds": 19.078,
+          "finished_seconds": 22.453
+        },
+        {
+          "route": "/api/skin_materials",
+          "query": "",
+          "started_seconds": 22.531,
+          "finished_seconds": 68.344
+        }
+      ],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\after-final-report\\results.json"
+    },
+    "cached_final_revision": {
+      "mode": "source",
+      "first_model_seconds": 4.48,
+      "load_seconds": 9.01,
+      "second_model_seconds": 6.09,
+      "materials": 13,
+      "material_groups": 12,
+      "objects": 12,
+      "checks": [
+        "Native mesh/material/texture routes load a real game skin and enable capture",
+        "Native Model Studio shows one mesh, reveals only selected material controls, opens advanced and settings on demand, and switches meshes without stale selection",
+        "Original and side-by-side comparison load real game materials for both forms, including unchanged unmatched slots",
+        "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+        "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+      ],
+      "page_errors": [],
+      "initial_request_counts": {
+        "/api/model_gltf": 3,
+        "/api/skin_materials": 1,
+        "/api/texture_png": 15
+      },
+      "initial_native_requests": [
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FMeshes%2FSK_1033_1033001_Lobby",
+          "started_seconds": 0.812,
+          "finished_seconds": 1.312
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_L%2FMeshes%2FSK_WP_1033001_Stick_L",
+          "started_seconds": 1.453,
+          "finished_seconds": 1.468
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033001%2FWeapons%2FStick_R%2FMeshes%2FSK_WP_1033001_Stick_R",
+          "started_seconds": 1.484,
+          "finished_seconds": 1.5
+        },
+        {
+          "route": "/api/skin_materials",
+          "query": "",
+          "started_seconds": 1.593,
+          "finished_seconds": 4.484
+        }
+      ],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\warm-verified-report\\results.json"
+    },
+    "notes": [
+      "Cold preview caches were empty; game index/startup and OS filesystem cache are distinct.",
+      "The former viewer timed out 240 seconds after its first model appeared (approximately 264 seconds after opening).",
+      "Cold timing precedes the final unmapped-slot comparison and menu fixes; the final revision passed all native checks with cached inputs.",
+      "Cached-final feature requests after initial readiness include on-demand selection of the other form and Original/Compare."
+    ]
+  },
+  "header_comparison": [
+    {
+      "game_rel": "Characters/1033/1033001/Meshes/SK_1033_1033001_Lobby",
+      "slots": 12,
+      "old_seconds": 4.859,
+      "header_seconds": 0.212,
+      "exact_match": true
+    },
+    {
+      "game_rel": "Characters/1033/1033001/Weapons/Stick_L/Meshes/SK_WP_1033001_Stick_L",
+      "slots": 1,
+      "old_seconds": 0.226,
+      "header_seconds": 0.011,
+      "exact_match": true
+    },
+    {
+      "game_rel": "Characters/1033/1033001/Weapons/Stick_R/Meshes/SK_WP_1033001_Stick_R",
+      "slots": 1,
+      "old_seconds": 0.222,
+      "header_seconds": 0.016,
+      "exact_match": true
+    }
+  ],
+  "backend": {
+    "suite_count": 45,
+    "reported_unittest_cases": 450,
+    "additional_checks": 138,
+    "skips": [
+      "One bpy-dependent case",
+      "Two legacy native-tool cases in the isolated runner"
+    ],
+    "suites": [
+      {
+        "suite": "test_added_assets.py",
+        "exit_code": 0,
+        "seconds": 1.78
+      },
+      {
+        "suite": "test_app_port.py",
+        "exit_code": 0,
+        "seconds": 1.42
+      },
+      {
+        "suite": "test_blender_import.py",
+        "exit_code": 0,
+        "seconds": 0.2
+      },
+      {
+        "suite": "test_catalogue.py",
+        "exit_code": 0,
+        "seconds": 0.59
+      },
+      {
+        "suite": "test_changelog.py",
+        "exit_code": 0,
+        "seconds": 0.73
+      },
+      {
+        "suite": "test_custom_textures.py",
+        "exit_code": 0,
+        "seconds": 1.41
+      },
+      {
+        "suite": "test_frontend_cache.py",
+        "exit_code": 0,
+        "seconds": 0.8
+      },
+      {
+        "suite": "test_hero_artwork.py",
+        "exit_code": 0,
+        "seconds": 3.42
+      },
+      {
+        "suite": "test_jobs_bulk.py",
+        "exit_code": 0,
+        "seconds": 1.42
+      },
+      {
+        "suite": "test_krackle_inks.py",
+        "exit_code": 0,
+        "seconds": 0.36
+      },
+      {
+        "suite": "test_local_api_guard.py",
+        "exit_code": 0,
+        "seconds": 0.89
+      },
+      {
+        "suite": "test_material_original.py",
+        "exit_code": 0,
+        "seconds": 0.84
+      },
+      {
+        "suite": "test_material_replacement.py",
+        "exit_code": 0,
+        "seconds": 1.11
+      },
+      {
+        "suite": "test_mesh_optimizer.py",
+        "exit_code": 0,
+        "seconds": 0.83
+      },
+      {
+        "suite": "test_mesh_replacement.py",
+        "exit_code": 0,
+        "seconds": 0.64
+      },
+      {
+        "suite": "test_mod_cards.py",
+        "exit_code": 0,
+        "seconds": 0.16
+      },
+      {
+        "suite": "test_model_gltf.py",
+        "exit_code": 0,
+        "seconds": 0.67
+      },
+      {
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 0.75
+      },
+      {
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.25
+      },
+      {
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 0.67
+      },
+      {
+        "suite": "test_model_studio_images.py",
+        "exit_code": 0,
+        "seconds": 0.33
+      },
+      {
+        "suite": "test_model_studio_textures.py",
+        "exit_code": 0,
+        "seconds": 0.64
+      },
+      {
+        "suite": "test_morphs.py",
+        "exit_code": 0,
+        "seconds": 0.64
+      },
+      {
+        "suite": "test_native_prereqs.py",
+        "exit_code": 0,
+        "seconds": 0.2
+      },
+      {
+        "suite": "test_packaging.py",
+        "exit_code": 0,
+        "seconds": 0.56
+      },
+      {
+        "suite": "test_patch_override.py",
+        "exit_code": 0,
+        "seconds": 0.33
+      },
+      {
+        "suite": "test_phase1.py",
+        "exit_code": 0,
+        "seconds": 6.62
+      },
+      {
+        "suite": "test_phase2.py",
+        "exit_code": 0,
+        "seconds": 0.88
+      },
+      {
+        "suite": "test_phase3.py",
+        "exit_code": 0,
+        "seconds": 4.58
+      },
+      {
+        "suite": "test_phase4.py",
+        "exit_code": 0,
+        "seconds": 4.49
+      },
+      {
+        "suite": "test_presentation.py",
+        "exit_code": 0,
+        "seconds": 0.62
+      },
+      {
+        "suite": "test_project_recovery.py",
+        "exit_code": 0,
+        "seconds": 0.78
+      },
+      {
+        "suite": "test_project_trash.py",
+        "exit_code": 0,
+        "seconds": 2.72
+      },
+      {
+        "suite": "test_reliability.py",
+        "exit_code": 0,
+        "seconds": 1.09
+      },
+      {
+        "suite": "test_s_maps.py",
+        "exit_code": 0,
+        "seconds": 1.06
+      },
+      {
+        "suite": "test_search.py",
+        "exit_code": 0,
+        "seconds": 6.19
+      },
+      {
+        "suite": "test_setup_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 0.3
+      },
+      {
+        "suite": "test_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 1.64
+      },
+      {
+        "suite": "test_thumbnails.py",
+        "exit_code": 0,
+        "seconds": 1.25
+      },
+      {
+        "suite": "test_triage_exports.py",
+        "exit_code": 0,
+        "seconds": 1.3
+      },
+      {
+        "suite": "test_unreal_names.py",
+        "exit_code": 0,
+        "seconds": 0.11
+      },
+      {
+        "suite": "test_update_lifetime.py",
+        "exit_code": 0,
+        "seconds": 0.92
+      },
+      {
+        "suite": "test_upstream_integrations.py",
+        "exit_code": 0,
+        "seconds": 0.81
+      },
+      {
+        "suite": "test_viewport_cancel.py",
+        "exit_code": 0,
+        "seconds": 1.58
+      },
+      {
+        "suite": "test_viewport_features.py",
+        "exit_code": 0,
+        "seconds": 1.0
+      }
+    ],
+    "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\backend-final\\results.json"
+  },
+  "browser": {
+    "browser-final": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Related material parts share one clean group; the part picker preserves per-part drafts and restores the correct saved values",
+        "Hidden forms decode only when selected; their materials append without losing recolour drafts, and switching back reuses decoded geometry",
+        "Studio opens with one mesh and no editing controls; selection, hex colour, saved/current swatches, material revert, search, model switching and menu Escape work",
+        "Inspection toolbar fits both themes at three sizes; wide geometry stays framed in all camera presets",
+        "Studio adapts to narrow and short windows with reachable settings and no horizontal overflow",
+        "Solo restores prior visibility; all-hidden state offers recovery and updates triangle counts",
+        "Lighting, keyboard controls, wireframe, Original/Edited, wipe and dye overlays leave editable materials intact",
+        "Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor",
+        "Linear color and replacement-texture blends settle at exact target values; orientation axes follow camera presets",
+        "Material chips show dye-region colours when no base tint exists and follow live edits",
+        "Optional bloom changes real rendered pixels and releases all targets when disabled; solid and transparent backdrops export correctly",
+        "Forced reduced motion settles camera, color and texture presentation immediately without altering editable parameter data",
+        "Poster PNG and animated WebP download through the real encoder and restore camera position and controls",
+        "Capture cancellation restores the camera and exits turntable rotation",
+        "Closing a loading viewer immediately removes its inline progress and cancels its backend load",
+        "Changing material skins cancels the previous request and keeps exactly one inline progress message",
+        "Pending texture downloads abort on close; the next model opens without stale materials, spinners or page errors",
+        "Shared texture slots download and decode one image while all three material assignments finish",
+        "Costume marks sample their own artwork; control backgrounds, text and borders keep the theme with readable contrast in light and dark",
+        "Roster uses square hero avatars and text-only skin names; artwork refresh preserves selection and the viewer shows the matching hero logo",
+        "Roster wall arrows and Home/End move focus across heroes, scroll vertically under reduced motion and fit compact windows",
+        "Skin side arrows browse an overflowing costume list without changing the selected hero",
+        "Viewport SVG hides fast-load artwork for 150ms, cancels delayed assembly immediately, keeps empty/error immediate, and shares the busy beat without duplicate loops/remounts",
+        "Viewport loader respects OS/forced reduced motion and visibility, with idempotent explicit teardown",
+        "Absent, throwing and partially failing WAAPI keep static artwork and cannot leave duplicate loader loops",
+        "Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses",
+        "Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes",
+        "Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures",
+        "Save/dirty guards protect close/reopen; public export guards retain drafts and focus Save/status without discard prompts",
+        "Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup",
+        "Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes",
+        "Material colors, dye regions and scalars are grouped; saved/game-original comparisons are read-only and per-row restore changes only the draft",
+        "Material dirty drafts guard close/reload; original-read errors stay explicit and stale comparison/open responses cannot replace a newer editor",
+        "Save completion advances only the submitted baseline; newer drafts remain dirty and viewport saved swatches revert exactly to the last successful save",
+        "Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI",
+        "Dialog saves preserve project header and material payload; failed intensity persistence reports warning instead of full success",
+        "Failed and rejected saves retain dialog drafts and allow retry without replaying stale outcome state",
+        "In-flight dialog saves deduplicate, retain newer edits and cannot close or overwrite a later dialog/project",
+        "Viewport saves retain failed/newer recolors, retry the correct payload and leave replacement viewport status untouched",
+        "Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback",
+        "Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves"
+      ],
+      "count": 52,
+      "page_errors": [],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\browser-final\\results.json"
+    },
+    "browser-export-final": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Model Studio exports the selected body through project-scoped jobs, blocks hidden/multiple bodies and duplicate clicks, reports packed counts, keeps Open in Blender clickable in both themes and desktop sizes, and recovers from worker failure; Activity retains the outcomes"
+      ],
+      "count": 12,
+      "page_errors": [],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\browser-export-final\\results.json"
+    },
+    "browser-showcase": {
+      "checks": [
+        "UI loads at three desktop sizes without uncaught JavaScript errors",
+        "Configured startup does not wait for remote key/mapping downloads",
+        "Startup shows the library while the release check is pending; the update offer appears once it answers",
+        "Update offer appears above an empty project picker without requiring project creation",
+        "Local changelog loading does not delay the library; skipped releases and safe formatting appear with trapped keyboard focus",
+        "Scrollable release notes fit both themes at desktop, small-window and narrow-window sizes",
+        "Dismissal is saved to app settings, survives reload, and the app menu reopens the changelog with Escape restoring focus",
+        "A delayed update offer waits for the changelog to close, keeping a single focused dialog",
+        "The changelog waits for an existing update dialog and backdrop dismissal acknowledges the installed version",
+        "First-run setup keeps priority and does not acknowledge notes the user has not seen",
+        "A failed local notes request leaves the library usable without an unhandled error",
+        "Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes",
+        "Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls",
+        "Formation sounds create no audio by default; opt-in drop/pop/splat synthesis follows actual stage transitions and stays silent in Calm, Off, OS reduced motion and hidden documents",
+        "Mod cards use completed applied counts, a matching Showcase capture and local build version/date; copy/save/reveal work, warnings carry skipped counts and failed builds offer no card",
+        "Showcase is session presentation only: reopening returns to Inspect and captures preserve the camera and editable source materials"
+      ],
+      "count": 16,
+      "page_errors": [],
+      "evidence_path": "D:\\AtelierDev\\viewer-performance-20261021\\browser-showcase\\results.json"
+    }
+  },
+  "safety": {
+    "project_staged_uassets": 0,
+    "test_mods_files": 0,
+    "game_mod_installation_performed": false,
+    "native_checks_use_isolated_projects": true,
+    "dependency_consistency": "pass",
+    "changed_source_secret_patterns": "pass",
+    "preview_cancellation_and_project_context": "pass",
+    "atomic_publication_and_input_validation": "pass"
+  },
+  "limitations": [
+    "One-character performance observations, not a general benchmark",
+    "Uncached native geometry and patch-container fallbacks still take time",
+    "No new installer, in-game or Linux verification in this loading follow-up"
+  ],
+  "evidence_root": "D:\\AtelierDev\\viewer-performance-20261021"
+}

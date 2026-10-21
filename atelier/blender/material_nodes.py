@@ -11,6 +11,25 @@ import re
 
 import bpy
 
+_images = {}
+
+
+def load_image(path, colorspace):
+    """Reuse an image by full path and colour space, including shared data maps.
+
+    RivalsPorting caches imported textures rather than rebuilding each slot.
+    A colour texture and a data texture must keep separate Blender datablocks.
+    The cache belongs to this background export process, never another project.
+    """
+    key = (os.path.normcase(os.path.realpath(path)), colorspace)
+    if key not in _images:
+        image = bpy.data.images.load(path, check_existing=True)
+        if image.users and image.colorspace_settings.name != colorspace:
+            image = image.copy()
+        image.colorspace_settings.name = colorspace
+        _images[key] = image
+    return _images[key]
+
 
 def _input(group, name, kind, default=None):
     socket=group.interface.new_socket(name=name,in_out='INPUT',socket_type=kind)
@@ -19,9 +38,7 @@ def _input(group, name, kind, default=None):
 
 
 def image_node(material,path,colorspace,x,y,label):
-    image=bpy.data.images.load(path,check_existing=True)
-    if image.users and image.colorspace_settings.name!=colorspace:image=image.copy()
-    image.colorspace_settings.name=colorspace
+    image=load_image(path,colorspace)
     node=material.node_tree.nodes.new('ShaderNodeTexImage');node.image=image;node.label=label;node.location=(x,y)
     return node
 
@@ -185,6 +202,7 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
     auxiliary=[name for name in textures if name not in used]
     material['atelier_material']=record.get('mi') or ''
     material['atelier_parent']=surface.get('parent','')
+    material['atelier_gameplay_tags']=json.dumps(record.get('gameplay_tags', []))
     material['atelier_auxiliary_parameters']=json.dumps(auxiliary)
     # Keep internal nodes readable in columns, and expose all source values in
     # one named group instead of disconnected image nodes scattered around a BSDF.

@@ -96,6 +96,34 @@ class Cancellation(unittest.TestCase):
         with preview.scope('B','slot-waiter'):
             jobs.checkpoint()
 
+    def test_cancel_reaches_parallel_material_workers_before_queued_reads_start(self):
+        from atelier.handlers import meshstudio, texture
+        entered = threading.Event()
+        reads, result = [], []
+        lock = threading.Lock()
+        def read(gr, **_):
+            with lock:
+                reads.append(gr)
+                if len(reads)==4:
+                    entered.set()
+            while True:
+                jobs.checkpoint()
+                time.sleep(.01)
+        bindings=[{'key':str(n),'game_rel':f'Characters/Test/MI_{n}'} for n in range(8)]
+        with patch.object(meshstudio,'material_bindings',return_value=iter(bindings)), \
+             patch.object(texture,'prefetch_exact'), patch.object(R,'read_material',side_effect=read):
+            worker=threading.Thread(target=lambda:result.append(self.post('/api/skin_materials',
+                {'skin_id':'1029001','meshes':[{'game_rel':'Characters/Test/SK_Body'}]},'parallel-cancel')))
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(3),'Four material workers must overlap')
+            finally:
+                self.post('/api/viewport_cancel',{'id':'parallel-cancel'})
+                worker.join(3)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(result,[(409,{'ok':False,'cancelled':True})])
+            self.assertEqual(len(reads),4,'Queued conversions must stop at their cancellation checkpoint')
+
     def test_cancelled_conversion_does_not_publish_partial_material_json(self):
         from atelier.handlers import material as M, texture as TX
         root=Path(data.name)/'conversion'; root.mkdir()
