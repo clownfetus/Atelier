@@ -71,6 +71,12 @@ The installer script verifies release SHA-256 digests and extracts files without
 
 This machine additionally has the official Microsoft DXC 1.9.2609.5 tools, and AtelierMesh from the developer's [0.3.4 release bundle](https://github.com/clownfetus/Atelier/releases/tag/0.3.4). Native smoke checks verify the commands Atelier actually calls. Do not replace these tools based on version numbers alone.
 
+The [native-tool input lock and build instructions](tools-src/README.md) now pin
+the exact compatible seed, CUE4Parse DLLs, .NET SDK/runtime and package archives.
+Use that recipe for AtelierAnimation and AtelierImport builds. The original
+shader retoc fork source remains unavailable; its tested legacy binary is pinned
+explicitly, with no claim that generic upstream retoc reproduces it.
+
 For a fresh directory, use Atelier's Setup/Settings to select the game Paks folder, current mapping, Blender executable and a **development test-mods directory**. Keep native tools, AES keys, mappings, extracted game assets and local configuration out of Git. The source checkout contains none of those dependencies.
 
 ## Automated checks

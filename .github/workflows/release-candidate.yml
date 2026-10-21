@@ -36,8 +36,23 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.402'
+      - name: Verify exact native inputs and rebuild the standing idle decoder
+        shell: pwsh
+        run: |
+          python scripts/verify_native_inputs.py --tools Tools --report reports/native-tools/verified-inputs.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/build_animation_decoder.py --tools Tools --output "$env:RUNNER_TEMP/AtelierAnimation-built"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($name in @('AtelierAnimation.exe', 'CUE4Parse-Natives.dll', 'oo2core_9_win64.dll')) {
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierAnimation-built/$name" -Destination "Tools/AtelierAnimation/$name" -Force
+          }
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierAnimation-built/build-inputs.json" -Destination reports/native-tools/animation-build-inputs.json
       - name: Build the persistent import server against the pinned mesh libraries
-        run: python scripts/build_import_server.py --tools Tools
+        shell: pwsh
+        run: |
+          python scripts/build_import_server.py --tools Tools
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item -LiteralPath Tools/AtelierImport/build-inputs.json -Destination reports/native-tools/import-build-inputs.json
       - name: Stage the Skin Swapper template from encrypted release inputs
         shell: pwsh
         env:

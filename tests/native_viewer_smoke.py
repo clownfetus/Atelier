@@ -82,11 +82,24 @@ def main():
             def asset_response(response):
                 from urllib.parse import urlsplit
                 path=urlsplit(response.url).path
-                if response.status>=400 and path in ('/api/model_gltf','/api/skin_materials','/api/texture_png','/api/dye_texture'):
+                if path=='/api/idle_animation':
+                    try:
+                        payload=response.json()
+                        if payload.get('ok'):return
+                        message=payload.get('error','Native idle decoding failed')
+                    except Exception:message='Idle response body unavailable'
+                    result['asset_errors'].append(dict(url=response.url,status=response.status,error=message))
+                elif response.status>=400 and path in ('/api/model_gltf','/api/skin_materials','/api/texture_png','/api/dye_texture'):
                     try:message=response.text()[:1200]
                     except Exception:message='Response body unavailable'
                     result['asset_errors'].append(dict(url=response.url,status=response.status,error=message))
             page.on('response',asset_response)
+            def wait_for_idle():
+                deadline=time.monotonic()+240
+                while page.locator('#viewport-play').get_attribute('aria-pressed')!='true':
+                    assert not result['asset_errors'],result['asset_errors']
+                    if time.monotonic()>=deadline:raise TimeoutError('Real standing idle did not start')
+                    page.wait_for_timeout(150)
             page.on('console',lambda message:result['page_errors'].append(message.text)
                 if message.type=='error' and 'Shader Error' in message.text else None)
             if args.viewport_script:
@@ -148,7 +161,7 @@ def main():
                     weapon=args.expected_weapon_rel.rsplit('/',1)[-1]
                     assert any(part['visible'] and part['name']=='Weapon · '+weapon for part in result['initial_parts'])
                 result['checks'].append('One body opens without decoding the alternate human form, and the real held weapon remains equipped')
-            page.wait_for_function('document.getElementById("viewport-play").getAttribute("aria-pressed")==="true"',timeout=240000)
+            wait_for_idle()
             if args.design_checks:
                 page.set_viewport_size({'width':1582,'height':995})
                 if page.locator('#viewport-expand').get_attribute('aria-pressed')!='true':page.locator('#viewport-expand').click()
@@ -229,7 +242,7 @@ def main():
             options=page.locator('#viewport-animation option').evaluate_all('(options)=>options.filter(o=>o.value).map(o=>({value:o.value,label:o.label}))')
             result['idles']=options
             assert options,'No real standing idle was discovered'
-            page.wait_for_function('document.getElementById("viewport-play").getAttribute("aria-pressed")==="true"',timeout=240000)
+            wait_for_idle()
             page.wait_for_timeout(500);page.screenshot(path=str(report/'native-viewer-idle.png'))
             page.locator('#viewport-play').click()
             assert page.locator('#viewport-play').get_attribute('aria-pressed')=='false'

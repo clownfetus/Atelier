@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 import json
+import ntpath
 import os
 from pathlib import Path
 import subprocess
@@ -236,6 +237,34 @@ class PersistentImports(unittest.TestCase):
     def test_crashed_child_is_replaced_without_reusing_its_response_queue(self):
         pid=S.stats()['pid'];self.children[-1].kill();self.children[-1].wait()
         self.assertNotEqual(S.stats()['pid'],pid)
+
+    def test_windows_cache_paths_accept_equivalent_prefixes_and_preserve_io_spelling(self):
+        for base, target in (
+            (r'D:\cache\textures', r'\\?\D:\cache\textures\Characters\T_A.png'),
+            (r'\\?\D:\cache\textures', r'D:\cache\textures\Characters\T_A.png'),
+            (r'\\server\share\textures', r'\\?\UNC\server\share\textures\Characters\T_A.png'),
+            (r'\\?\UNC\server\share\textures', r'\\server\share\textures\Characters\T_A.png'),
+        ):
+            with self.subTest(base=base), patch.object(config.os, 'path', ntpath):
+                with patch.object(ntpath, 'realpath', side_effect=[base, target]):
+                    self.assertEqual(str(S._target(self.root, 'textures', 'Characters/T_A', '.png')), target)
+                ordinary = ntpath.join(config._path_comparison_key(base), 'Characters', 'T_A.png')
+                with patch.object(ntpath, 'realpath', side_effect=[ordinary, target]):
+                    self.assertTrue(S._same_path(ordinary, target))
+
+    def test_windows_cache_prefix_normalization_keeps_escape_checks(self):
+        base = r'D:\cache\textures'
+        for outside in (r'\\?\E:\cache\textures\Characters\T_A.png',
+                        r'\\?\D:\outside\Characters\T_A.png',
+                        r'\\?\D:\cache\textures-other\Characters\T_A.png',
+                        r'\\?\GLOBALROOT\Device\HarddiskVolume1\Characters\T_A.png',
+                        r'\\?\UNC\server\other\textures\Characters\T_A.png'):
+            with self.subTest(outside=outside), patch.object(config.os, 'path', ntpath):
+                with patch.object(ntpath, 'realpath', side_effect=[base, outside]):
+                    with self.assertRaisesRegex(ValueError, 'outside the cache'):
+                        S._target(self.root, 'textures', 'Characters/T_A', '.png')
+                with patch.object(ntpath, 'realpath', side_effect=[base, outside]):
+                    self.assertFalse(S._same_path(base, outside))
 
 
 if __name__=='__main__':

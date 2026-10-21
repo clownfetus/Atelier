@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "seed": {
+    "url": "https://github.com/clownfetus/Atelier/releases/download/0.4.0/windows-tools.zip",
+    "api_url": "https://api.github.com/repos/clownfetus/Atelier/releases/assets/646582462",
+    "sha256": "c5c00386c037aa9ff632e7e383082ae4441fb45c77f712b53ba256ed5165a2ca"
+  },
+  "dotnet": {
+    "sdk": "10.0.402",
+    "runtime": "10.0.13",
+    "sdk_archive": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-x64.zip",
+      "sha512": "ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd"
+    },
+    "packages": [
+      {
+        "name": "microsoft.net.illink.tasks",
+        "version": "10.0.13",
+        "sha512": "d17dd7dd51bf5be5263bd1224bcf0a94443cc29a517b46dcb6f7396faaaef2d141c5115f83f341c2b88d791ecb3186b403335a721a6fb669171c4e96c88e7326"
+      },
+      {
+        "name": "microsoft.netcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "e79b2ea110087fa7558ce74f847c481250dad86068a95648ef46c6e33abe7f6a4741b195eb20efcedb17762b78a7173711aefd5f429fa3bf0a9dc8edf4d6ae21"
+      },
+      {
+        "name": "microsoft.aspnetcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "fc258066d71180f2c746c1e6da9eed07f2c66712dde787db5f51fa5ce248e17175dd3ae44347925c25bbd321c4f6947a86c65c97a6bedd71e8e76472b6479ead"
+      },
+      {
+        "name": "microsoft.windowsdesktop.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "83cbf3dab59e48d62298535852a5d4cbbc9590a24e432732f64b0db79f75db68affb2ed8e4aad1fcfc284824205cedca0496dfe2e11d2b42ee0abf0e695c1073"
+      }
+    ]
+  },
+  "mesh": {
+    "cue4parse": {
+      "repository": "https://github.com/FabianFG/CUE4Parse",
+      "informational_version": "1.2.2+ea85cf20d8df53556f399c5fabc2befb46b65d0d",
+      "source_revision": "ea85cf20d8df53556f399c5fabc2befb46b65d0d",
+      "note": "Revision embedded in both managed assemblies; exact DLLs are the build inputs, not a claim that rebuilding that revision reproduces the developer bundle."
+    },
+    "files": {
+      "AtelierMesh.exe": "5e47848be9e0d027ee014be50b96c8df85ac05bf06b79eeb593a8028dc708cc5",
+      "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    },
+    "assemblies": {
+      "AssetRipper.TextureDecoder.dll": "d21409e8e4ae1b8c0a9f66ca172a710d5f460833f0051102d19549c4d7d09e80",
+      "Blake3.dll": "5487a86ab58fb7b0242d5a608d0b8fab45a9cdac0f34fcf12b8757df7e850ea8",
+      "BouncyCastle.Cryptography.dll": "e5eeaf6d263c493619982fd3638e6135077311d08c961e1fe128f9107d29ebc6",
+      "CommunityToolkit.HighPerformance.dll": "196607c6d4d704b5ee95c80f8e3cd799595b7d8a08108701894c211b138d2839",
+      "CUE4Parse-Conversion.dll": "fd2b202ee72ca2ff39b8b6bb5c4e8ccdf974816dde35fda3aa9261c1b793c0eb",
+      "CUE4Parse.dll": "df164064e526456fe1a5580a51c5a106eee4b681692f664c4d906910caf3d0df",
+      "FixedMathSharp.dll": "3c0240d67a3daef47ca007b7920a81edb40ac97f01f64cc5e96b45e4e8ba7fee",
+      "Fmod5Sharp.dll": "5fd28433bee00c92c73763ee2ea310142197dabd86f762639e9ac04ed58168ac",
+      "GenericReader.dll": "92810aca50dc68d9e79361aeb96fb72e5f80104a147af39625c2bc5d0ff69d68",
+      "IndexRange.dll": "13b459a9725bf3ae42b26836613221468458952bf59f848b809c03ed60247fb1",
+      "K4os.Compression.LZ4.dll": "e282aadc2353b864fe95cd5fb525a1a093d99a30a5bf2530b7ab831d56179816",
+      "K4os.Compression.LZ4.Streams.dll": "b146cf3c769000cd5e4458cfed5da3c0e838b7b2da6dbe6dad458cd5a0e3ce41",
+      "K4os.Hash.xxHash.dll": "19d73fa58c1f6c12c61f30eaad91881bd06f50caf4b462b061bc1b45d0a577cd",
+      "MemoryPack.Core.dll": "6dc7785eea92dc72b9ea4d9d9b08c585ce87c11ec6b8388d00a179af694cf6be",
+      "NAudio.Core.dll": "fcf493fc47a2f478a65303886b975fbdbf714cbb1f2d79f7fce97e4bb16b01a8",
+      "Newtonsoft.Json.dll": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "OffiUtils.dll": "2b45e1e594855cefbc707f9f4517a09263b6cb17b1062012c56d1666750e3f22",
+      "OggVorbisEncoder.dll": "5c3c602bed65fa22915d4d56fe62c3ed584dfaf48fd2c31b49519ed211f77ff1",
+      "Oodle.NET.dll": "0a1eb8b3fd2247f7b958e437585fafaf907514d6041e58ecb58068eaa2e76f7c",
+      "OodleSharp.dll": "c4885b763cfd4f5dc28ac663346f7efb0cc8d9229ca4c97ea3b76f87ea2d7091",
+      "Serilog.dll": "e6b551a75ff7fff20dd0024670d5c42dfb74afa16d54aa0201106dea400a9505",
+      "Serilog.Sinks.Console.dll": "dc88002ddd9f5fd0ffec9a6568ef89954671f60f2c9161593ee78932538c1e3e",
+      "SevenZip.dll": "976dcd9850b04cae4c4980dd47d58758535f00df6b5ab5cb4fb416eb2c93b788",
+      "SharpGLTF.Core.dll": "727ecd06a6c717472dbe0f1d3146c82b0a28ce2209daef49862620a043fc44ce",
+      "SharpGLTF.Toolkit.dll": "77b92cbe7c1d7a18b7262280995a951f566be50f6bb27f0e8a3aa74eae906d8f",
+      "SixLabors.ImageSharp.dll": "609a57965d0a7b5ccfb79d919ea7384e7ec86c03266b0390a19bd5f2104bc353",
+      "SkiaSharp.dll": "17ee1284313749f73a5cf5f309318d831741a8d6d397c998c5fc6485843c28bb",
+      "SubstreamSharp.dll": "2f8928637fdf06b3ce7b6b72ee12a7cb29508c5e0ef4aba8125d046b21be0796",
+      "UE4Config.dll": "79ef7a5b840cb0b337fe195746c08121dbc5e0c7862596ad44ad3d46137475ce",
+      "VGAudio.dll": "e32c17ed422f5e6419050fe4bb43f752ed11c8a7796c45f693865237d8a200a3",
+      "Zlib-ng.NET.dll": "f1746ed5806fe466af60938dfe7543ea524716816575fbb6a22d83cc0fc38673",
+      "ZstdSharp.dll": "b285bb9f59928becb8e048bf2a75e872f6555f8773d7b72386a9f77f447f425c"
+    }
+  },
+  "managed": {
+    "AtelierAnimation": {
+      "project": "AtelierAnimation/AtelierAnimation.csproj",
+      "sources": {
+        "global.json": "81ae2087dbfb46027fd94748351fb4b1ab24145fbb52544a2822bf128e2e48f1",
+        "Directory.Build.props": "2928c2ab47bda7cf3b8f2f4b655cbc68fa09f0ff68ed9cd0584d0c294158926c",
+        "AtelierAnimation/Program.cs": "0978a39c7b0d5b61d6d3aa22dc9e3d25c6dd3b2a7147fe11026128999e023ba7",
+        "AtelierAnimation/AtelierAnimation.csproj": "991aeaa168bd23880ca0f52c24931f4ef557b4c24ac52fab3b4f45b4292c735e",
+        "AtelierAnimation/packages.lock.json": "75a78e032e1b0ef2c45d4b3e116e347e263fc4675a97f7407a6f8d68dc771877"
+      }
+    },
+    "AtelierImport": {
+      "project": "AtelierImport/AtelierImport.csproj",
+      "sources": {
+        "global.json": "81ae2087dbfb46027fd94748351fb4b1ab24145fbb52544a2822bf128e2e48f1",
+        "Directory.Build.props": "2928c2ab47bda7cf3b8f2f4b655cbc68fa09f0ff68ed9cd0584d0c294158926c",
+        "AtelierImport/Program.cs": "a1bbc3100f75d183c5562d4320ced88e36aea54ea25ecdf680519e87eebc0ef6",
+        "AtelierImport/AtelierImport.csproj": "51a4539755585094e5b582c95728b906bd3470c694be1ea1c699dece9b040722",
+        "AtelierImport/packages.lock.json": "75a78e032e1b0ef2c45d4b3e116e347e263fc4675a97f7407a6f8d68dc771877"
+      }
+    }
+  },
+  "shader": {
+    "version": "retoc-rivals-cli 3.4.1",
+    "source": {
+      "status": "unavailable",
+      "repository": null,
+      "revision": null,
+      "cargo_lock_sha256": null,
+      "build_recipe": null,
+      "note": "Original custom shader fork was not found. Public natimerry/repak-rivals v3.4.1 and current master do not contain its shader commands; they cannot reproduce this binary.",
+      "related_upstream": {
+        "repository": "https://github.com/natimerry/repak-rivals",
+        "revision": "c45019606900d5fd3c103b282814392295203272",
+        "retoc_submodule_revision": "5ba40fbbe995cd1803ec5fe23cbae96f8cc283bd",
+        "relationship": "same reported version only; custom fork ancestry unverified"
+      },
+      "compiler_evidence": {
+        "rustc_source_revision": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+        "evidence": "Embedded /rustc/... source paths; flags, target, native linker and Cargo.lock remain unknown."
+      }
+    },
+    "original_binary_artifact": {
+      "url": "https://github.com/clownfetus/Atelier/releases/download/0.3.3/AtelierSetup.exe",
+      "sha256": "6ab75b4efee71abf80c4966fbaa62fd3f0454f49ea558a1eba1264f53a47a313"
+    },
+    "commands": [
+      "dump-shaders",
+      "extract-shader",
+      "patch-shader",
+      "patch-shaders",
+      "list-chunks",
+      "map-shaders",
+      "surgical-patch",
+      "pack"
+    ],
+    "files": {
+      "retoc-rivals-cli.exe": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+      "dxc.exe": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2",
+      "dxcompiler.dll": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59",
+      "dxil.dll": "64be2368211d257a038a7d4ea6bb3e24c878eb8d588c7b8414fccf759b69c2ac"
+    },
+    "test_validator": {
+      "file": "dxv.exe",
+      "sha256": "74528e8e86cdafcb9ecaa26f21a9ad9de9102b0d84213b67435de798b5a807f9",
+      "note": "Optional independent native-test input only; not shipped in the legacy seed or needed by Atelier."
+    }
+  },
+  "recipe": {
+    "scripts/build_animation_decoder.py": "5714c485f41bc9fe87ee8dbbb7b8afec56553a1e079ecddeb9092e05367e5df8",
+    "scripts/build_import_server.py": "60888fd230b7baa0a286971c7e98ca25484358cf31303f1a34d56ed7f6ecac7b",
+    "scripts/dotnet_bundle.py": "0196bdeea1b9258237b246ba581124e1a6080d2899c4eb037284969f5846c05f",
+    "scripts/native_inputs.py": "21d95e55df44a7deb29624b2af0999d8b3f0971cec0e6cdddeaa56f433527ccf",
+    "scripts/pinned_dotnet.py": "cc8e9abc4ce0119f3e616e31f384d945af7d08457be600e98094c308996777e8"
+  }
+}

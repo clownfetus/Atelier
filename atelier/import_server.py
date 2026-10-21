@@ -78,11 +78,25 @@ def _asset(game_rel):
 
 def _target(root, kind, asset, suffix):
     config.validate_game_rel(asset)
-    base = (Path(root) / kind).resolve()
-    target = (base / (asset+suffix)).resolve()
-    if not target.is_relative_to(base):
+    base = os.path.realpath(os.path.join(root, kind))
+    target = os.path.realpath(os.path.join(base, asset+suffix))
+    # During parallel directory creation Windows realpath can retain \\?\ on
+    # only one operand. Compare ordinary drive/UNC spellings; retain the resolved
+    # path for I/O and continue to reject different drives, shares and devices.
+    base_key = config._path_comparison_key(base)
+    target_key = config._path_comparison_key(target)
+    try:
+        contained = os.path.commonpath([base_key, target_key]) == base_key
+    except ValueError:
+        contained = False
+    if not contained:
         raise ValueError('Import cache path is outside the cache.')
-    return target
+    return Path(target)
+
+
+def _same_path(left, right):
+    return (config._path_comparison_key(os.path.realpath(left))
+            == config._path_comparison_key(os.path.realpath(right)))
 
 
 class _Worker:
@@ -227,7 +241,7 @@ def mesh(game_rel):
     with key_lock('native-mesh', source[0], asset):
         if not valid() or not metadata.is_file():
             reply = _request('mesh', {'asset': asset}, source)
-            if Path(reply.get('path', '')).resolve() != target or not valid():
+            if not _same_path(reply.get('path', ''), target) or not valid():
                 raise ImportError('The import server did not publish a valid requested mesh.')
     return str(target)
 
@@ -281,7 +295,7 @@ def texture(game_rel):
         if not target.is_file():
             data = _request('texture', {'asset': asset}, source)
             expected = _target(source[1], 'blocks', asset, '.bin') if data.get('encoding') == 'blocks' else target
-            if Path(data.get('path', '')).resolve() != expected:
+            if not _same_path(data.get('path', ''), expected):
                 raise ImportError('The import server returned an unexpected texture path.')
             if data.get('encoding') == 'blocks':
                 _decode_blocks(data, expected, target)

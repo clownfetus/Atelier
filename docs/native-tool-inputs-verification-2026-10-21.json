@@ -1,0 +1,1062 @@
+{
+  "date": "2026-10-21",
+  "git_parent": "053fd7645004d711e38ef315e14966e00bc9df35",
+  "source_sha256": {
+    "atelier/import_server.py": "d845a6c0bcf49f0703b5c039b109052df740bad4c20e7aebb88e03cd16af4010",
+    "atelier/handlers/dxc_ir.py": "2d522b7de9482b2155c6fad5318491556ecf3b4b8490296d2893cea2567ab843",
+    "tests/native_viewer_smoke.py": "ccacc2cb61cc7eb56378e07d9bf172dfe74899cd027a7ab41497558d199cce2f",
+    "tests/native_animation_smoke.py": "9dedb0fb164c7579dead60a3430f8a5a9178c3fbf79996af1b1aee541c3e5162",
+    "tests/native_shader_smoke.py": "5d870d94301dc94d9c75b86f2128dcaf346e00e37c35c3469d867e19375c2649",
+    "tests/test_native_build_inputs.py": "ed7b55173058dd4a5692cdfb4163163c4239f7f3b8a539ba5d609ea19336c7e5",
+    "tests/test_dxc_ir.py": "c9a562ccf1111f8190c78aab826a4a7b18fb37879d10e3778a236217f2286297",
+    "tests/test_import_server.py": "828dd8e1dab8e56f986e4f3cd4d6b555609c741d036b53d6c60abf9f6c3aa6db",
+    "scripts/fetch_native_inputs.py": "772aa4bcbbd688e6d19975db66f5a5c26dcba2e6c74b71cb98580f5a84effe72",
+    "scripts/verify_native_inputs.py": "4dc9e30c6bc12a6cb45ab391c18575f64cb1c9ddf889e6d3361a9bd929282f31",
+    "tools-src/native-tools.lock.json": "14645eb18210a40e8f2e760af1461f458a414dd1ea91c7cf57d2c5d70cf30eca",
+    ".github/workflows/release-candidate.yml": "9fe48f44848227ae0975c92d3b0a6cf8185c59f29812828d405b324f0e44e4a8"
+  },
+  "lock_sha256": "14645eb18210a40e8f2e760af1461f458a414dd1ea91c7cf57d2c5d70cf30eca",
+  "shader_source_status": "unavailable",
+  "shader_rebuildable": false,
+  "sdk": {
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-x64.zip",
+    "archive_sha512": "ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd",
+    "verified": true,
+    "extracted_files": 5577,
+    "sdk": "10.0.402"
+  },
+  "reproducibility": {
+    "equal": true,
+    "official_sdk_archive_verified": true,
+    "animation_manifests_identical": true,
+    "tested_binaries_unchanged": true,
+    "files": {
+      "final-locked-animation-a\\AtelierAnimation.exe": "a3dea66d1aa295d9fc1047611995586a67798dffa7ba01d15350d63737b8f127",
+      "final-locked-animation-b\\AtelierAnimation.exe": "a3dea66d1aa295d9fc1047611995586a67798dffa7ba01d15350d63737b8f127",
+      "final-locked-import\\AtelierImport.exe": "14c109cc18d4d9a2e9a1fa28dff826ceaaf6278d9581f934c9e4325cce666c13"
+    }
+  },
+  "animation_build": {
+    "schema": 1,
+    "tool": "AtelierAnimation",
+    "lock_sha256": "14645eb18210a40e8f2e760af1461f458a414dd1ea91c7cf57d2c5d70cf30eca",
+    "sdk": "10.0.402",
+    "runtime": "10.0.13",
+    "rid": "win-x64",
+    "sdk_archive": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-x64.zip",
+      "sha512": "ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd"
+    },
+    "recipe": {
+      "scripts/build_animation_decoder.py": "5714c485f41bc9fe87ee8dbbb7b8afec56553a1e079ecddeb9092e05367e5df8",
+      "scripts/build_import_server.py": "60888fd230b7baa0a286971c7e98ca25484358cf31303f1a34d56ed7f6ecac7b",
+      "scripts/dotnet_bundle.py": "0196bdeea1b9258237b246ba581124e1a6080d2899c4eb037284969f5846c05f",
+      "scripts/native_inputs.py": "21d95e55df44a7deb29624b2af0999d8b3f0971cec0e6cdddeaa56f433527ccf",
+      "scripts/pinned_dotnet.py": "cc8e9abc4ce0119f3e616e31f384d945af7d08457be600e98094c308996777e8"
+    },
+    "configuration": "Release",
+    "self_contained": true,
+    "single_file": true,
+    "sources": {
+      "global.json": "81ae2087dbfb46027fd94748351fb4b1ab24145fbb52544a2822bf128e2e48f1",
+      "Directory.Build.props": "2928c2ab47bda7cf3b8f2f4b655cbc68fa09f0ff68ed9cd0584d0c294158926c",
+      "AtelierAnimation/Program.cs": "0978a39c7b0d5b61d6d3aa22dc9e3d25c6dd3b2a7147fe11026128999e023ba7",
+      "AtelierAnimation/AtelierAnimation.csproj": "991aeaa168bd23880ca0f52c24931f4ef557b4c24ac52fab3b4f45b4292c735e",
+      "AtelierAnimation/packages.lock.json": "75a78e032e1b0ef2c45d4b3e116e347e263fc4675a97f7407a6f8d68dc771877"
+    },
+    "mesh": {
+      "AtelierMesh.exe": "5e47848be9e0d027ee014be50b96c8df85ac05bf06b79eeb593a8028dc708cc5",
+      "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    },
+    "assemblies": {
+      "AssetRipper.TextureDecoder.dll": "d21409e8e4ae1b8c0a9f66ca172a710d5f460833f0051102d19549c4d7d09e80",
+      "Blake3.dll": "5487a86ab58fb7b0242d5a608d0b8fab45a9cdac0f34fcf12b8757df7e850ea8",
+      "BouncyCastle.Cryptography.dll": "e5eeaf6d263c493619982fd3638e6135077311d08c961e1fe128f9107d29ebc6",
+      "CommunityToolkit.HighPerformance.dll": "196607c6d4d704b5ee95c80f8e3cd799595b7d8a08108701894c211b138d2839",
+      "CUE4Parse-Conversion.dll": "fd2b202ee72ca2ff39b8b6bb5c4e8ccdf974816dde35fda3aa9261c1b793c0eb",
+      "CUE4Parse.dll": "df164064e526456fe1a5580a51c5a106eee4b681692f664c4d906910caf3d0df",
+      "FixedMathSharp.dll": "3c0240d67a3daef47ca007b7920a81edb40ac97f01f64cc5e96b45e4e8ba7fee",
+      "Fmod5Sharp.dll": "5fd28433bee00c92c73763ee2ea310142197dabd86f762639e9ac04ed58168ac",
+      "GenericReader.dll": "92810aca50dc68d9e79361aeb96fb72e5f80104a147af39625c2bc5d0ff69d68",
+      "IndexRange.dll": "13b459a9725bf3ae42b26836613221468458952bf59f848b809c03ed60247fb1",
+      "K4os.Compression.LZ4.dll": "e282aadc2353b864fe95cd5fb525a1a093d99a30a5bf2530b7ab831d56179816",
+      "K4os.Compression.LZ4.Streams.dll": "b146cf3c769000cd5e4458cfed5da3c0e838b7b2da6dbe6dad458cd5a0e3ce41",
+      "K4os.Hash.xxHash.dll": "19d73fa58c1f6c12c61f30eaad91881bd06f50caf4b462b061bc1b45d0a577cd",
+      "MemoryPack.Core.dll": "6dc7785eea92dc72b9ea4d9d9b08c585ce87c11ec6b8388d00a179af694cf6be",
+      "NAudio.Core.dll": "fcf493fc47a2f478a65303886b975fbdbf714cbb1f2d79f7fce97e4bb16b01a8",
+      "Newtonsoft.Json.dll": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "OffiUtils.dll": "2b45e1e594855cefbc707f9f4517a09263b6cb17b1062012c56d1666750e3f22",
+      "OggVorbisEncoder.dll": "5c3c602bed65fa22915d4d56fe62c3ed584dfaf48fd2c31b49519ed211f77ff1",
+      "Oodle.NET.dll": "0a1eb8b3fd2247f7b958e437585fafaf907514d6041e58ecb58068eaa2e76f7c",
+      "OodleSharp.dll": "c4885b763cfd4f5dc28ac663346f7efb0cc8d9229ca4c97ea3b76f87ea2d7091",
+      "Serilog.dll": "e6b551a75ff7fff20dd0024670d5c42dfb74afa16d54aa0201106dea400a9505",
+      "Serilog.Sinks.Console.dll": "dc88002ddd9f5fd0ffec9a6568ef89954671f60f2c9161593ee78932538c1e3e",
+      "SevenZip.dll": "976dcd9850b04cae4c4980dd47d58758535f00df6b5ab5cb4fb416eb2c93b788",
+      "SharpGLTF.Core.dll": "727ecd06a6c717472dbe0f1d3146c82b0a28ce2209daef49862620a043fc44ce",
+      "SharpGLTF.Toolkit.dll": "77b92cbe7c1d7a18b7262280995a951f566be50f6bb27f0e8a3aa74eae906d8f",
+      "SixLabors.ImageSharp.dll": "609a57965d0a7b5ccfb79d919ea7384e7ec86c03266b0390a19bd5f2104bc353",
+      "SkiaSharp.dll": "17ee1284313749f73a5cf5f309318d831741a8d6d397c998c5fc6485843c28bb",
+      "SubstreamSharp.dll": "2f8928637fdf06b3ce7b6b72ee12a7cb29508c5e0ef4aba8125d046b21be0796",
+      "UE4Config.dll": "79ef7a5b840cb0b337fe195746c08121dbc5e0c7862596ad44ad3d46137475ce",
+      "VGAudio.dll": "e32c17ed422f5e6419050fe4bb43f752ed11c8a7796c45f693865237d8a200a3",
+      "Zlib-ng.NET.dll": "f1746ed5806fe466af60938dfe7543ea524716816575fbb6a22d83cc0fc38673",
+      "ZstdSharp.dll": "b285bb9f59928becb8e048bf2a75e872f6555f8773d7b72386a9f77f447f425c"
+    },
+    "packages": [
+      {
+        "name": "microsoft.net.illink.tasks",
+        "version": "10.0.13",
+        "sha512": "d17dd7dd51bf5be5263bd1224bcf0a94443cc29a517b46dcb6f7396faaaef2d141c5115f83f341c2b88d791ecb3186b403335a721a6fb669171c4e96c88e7326"
+      },
+      {
+        "name": "microsoft.netcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "e79b2ea110087fa7558ce74f847c481250dad86068a95648ef46c6e33abe7f6a4741b195eb20efcedb17762b78a7173711aefd5f429fa3bf0a9dc8edf4d6ae21"
+      },
+      {
+        "name": "microsoft.aspnetcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "fc258066d71180f2c746c1e6da9eed07f2c66712dde787db5f51fa5ce248e17175dd3ae44347925c25bbd321c4f6947a86c65c97a6bedd71e8e76472b6479ead"
+      },
+      {
+        "name": "microsoft.windowsdesktop.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "83cbf3dab59e48d62298535852a5d4cbbc9590a24e432732f64b0db79f75db68affb2ed8e4aad1fcfc284824205cedca0496dfe2e11d2b42ee0abf0e695c1073"
+      }
+    ],
+    "outputs": {
+      "AtelierAnimation.exe": "a3dea66d1aa295d9fc1047611995586a67798dffa7ba01d15350d63737b8f127",
+      "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    }
+  },
+  "import_build": {
+    "schema": 1,
+    "tool": "AtelierImport",
+    "lock_sha256": "14645eb18210a40e8f2e760af1461f458a414dd1ea91c7cf57d2c5d70cf30eca",
+    "sdk": "10.0.402",
+    "runtime": "10.0.13",
+    "rid": "win-x64",
+    "sdk_archive": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.402/dotnet-sdk-10.0.402-win-x64.zip",
+      "sha512": "ae4fd528cb7e9f6af6aaf7de36715a69f761f183744f1bb3025d19f5a92447090ec561410e46266c1d10a63781ed6f3de771760bc76c876d87daabc367b898cd"
+    },
+    "recipe": {
+      "scripts/build_animation_decoder.py": "5714c485f41bc9fe87ee8dbbb7b8afec56553a1e079ecddeb9092e05367e5df8",
+      "scripts/build_import_server.py": "60888fd230b7baa0a286971c7e98ca25484358cf31303f1a34d56ed7f6ecac7b",
+      "scripts/dotnet_bundle.py": "0196bdeea1b9258237b246ba581124e1a6080d2899c4eb037284969f5846c05f",
+      "scripts/native_inputs.py": "21d95e55df44a7deb29624b2af0999d8b3f0971cec0e6cdddeaa56f433527ccf",
+      "scripts/pinned_dotnet.py": "cc8e9abc4ce0119f3e616e31f384d945af7d08457be600e98094c308996777e8"
+    },
+    "configuration": "Release",
+    "self_contained": true,
+    "single_file": true,
+    "sources": {
+      "global.json": "81ae2087dbfb46027fd94748351fb4b1ab24145fbb52544a2822bf128e2e48f1",
+      "Directory.Build.props": "2928c2ab47bda7cf3b8f2f4b655cbc68fa09f0ff68ed9cd0584d0c294158926c",
+      "AtelierImport/Program.cs": "a1bbc3100f75d183c5562d4320ced88e36aea54ea25ecdf680519e87eebc0ef6",
+      "AtelierImport/AtelierImport.csproj": "51a4539755585094e5b582c95728b906bd3470c694be1ea1c699dece9b040722",
+      "AtelierImport/packages.lock.json": "75a78e032e1b0ef2c45d4b3e116e347e263fc4675a97f7407a6f8d68dc771877"
+    },
+    "mesh": {
+      "AtelierMesh.exe": "5e47848be9e0d027ee014be50b96c8df85ac05bf06b79eeb593a8028dc708cc5",
+      "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    },
+    "assemblies": {
+      "AssetRipper.TextureDecoder.dll": "d21409e8e4ae1b8c0a9f66ca172a710d5f460833f0051102d19549c4d7d09e80",
+      "Blake3.dll": "5487a86ab58fb7b0242d5a608d0b8fab45a9cdac0f34fcf12b8757df7e850ea8",
+      "BouncyCastle.Cryptography.dll": "e5eeaf6d263c493619982fd3638e6135077311d08c961e1fe128f9107d29ebc6",
+      "CommunityToolkit.HighPerformance.dll": "196607c6d4d704b5ee95c80f8e3cd799595b7d8a08108701894c211b138d2839",
+      "CUE4Parse-Conversion.dll": "fd2b202ee72ca2ff39b8b6bb5c4e8ccdf974816dde35fda3aa9261c1b793c0eb",
+      "CUE4Parse.dll": "df164064e526456fe1a5580a51c5a106eee4b681692f664c4d906910caf3d0df",
+      "FixedMathSharp.dll": "3c0240d67a3daef47ca007b7920a81edb40ac97f01f64cc5e96b45e4e8ba7fee",
+      "Fmod5Sharp.dll": "5fd28433bee00c92c73763ee2ea310142197dabd86f762639e9ac04ed58168ac",
+      "GenericReader.dll": "92810aca50dc68d9e79361aeb96fb72e5f80104a147af39625c2bc5d0ff69d68",
+      "IndexRange.dll": "13b459a9725bf3ae42b26836613221468458952bf59f848b809c03ed60247fb1",
+      "K4os.Compression.LZ4.dll": "e282aadc2353b864fe95cd5fb525a1a093d99a30a5bf2530b7ab831d56179816",
+      "K4os.Compression.LZ4.Streams.dll": "b146cf3c769000cd5e4458cfed5da3c0e838b7b2da6dbe6dad458cd5a0e3ce41",
+      "K4os.Hash.xxHash.dll": "19d73fa58c1f6c12c61f30eaad91881bd06f50caf4b462b061bc1b45d0a577cd",
+      "MemoryPack.Core.dll": "6dc7785eea92dc72b9ea4d9d9b08c585ce87c11ec6b8388d00a179af694cf6be",
+      "NAudio.Core.dll": "fcf493fc47a2f478a65303886b975fbdbf714cbb1f2d79f7fce97e4bb16b01a8",
+      "Newtonsoft.Json.dll": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "OffiUtils.dll": "2b45e1e594855cefbc707f9f4517a09263b6cb17b1062012c56d1666750e3f22",
+      "OggVorbisEncoder.dll": "5c3c602bed65fa22915d4d56fe62c3ed584dfaf48fd2c31b49519ed211f77ff1",
+      "Oodle.NET.dll": "0a1eb8b3fd2247f7b958e437585fafaf907514d6041e58ecb58068eaa2e76f7c",
+      "OodleSharp.dll": "c4885b763cfd4f5dc28ac663346f7efb0cc8d9229ca4c97ea3b76f87ea2d7091",
+      "Serilog.dll": "e6b551a75ff7fff20dd0024670d5c42dfb74afa16d54aa0201106dea400a9505",
+      "Serilog.Sinks.Console.dll": "dc88002ddd9f5fd0ffec9a6568ef89954671f60f2c9161593ee78932538c1e3e",
+      "SevenZip.dll": "976dcd9850b04cae4c4980dd47d58758535f00df6b5ab5cb4fb416eb2c93b788",
+      "SharpGLTF.Core.dll": "727ecd06a6c717472dbe0f1d3146c82b0a28ce2209daef49862620a043fc44ce",
+      "SharpGLTF.Toolkit.dll": "77b92cbe7c1d7a18b7262280995a951f566be50f6bb27f0e8a3aa74eae906d8f",
+      "SixLabors.ImageSharp.dll": "609a57965d0a7b5ccfb79d919ea7384e7ec86c03266b0390a19bd5f2104bc353",
+      "SkiaSharp.dll": "17ee1284313749f73a5cf5f309318d831741a8d6d397c998c5fc6485843c28bb",
+      "SubstreamSharp.dll": "2f8928637fdf06b3ce7b6b72ee12a7cb29508c5e0ef4aba8125d046b21be0796",
+      "UE4Config.dll": "79ef7a5b840cb0b337fe195746c08121dbc5e0c7862596ad44ad3d46137475ce",
+      "VGAudio.dll": "e32c17ed422f5e6419050fe4bb43f752ed11c8a7796c45f693865237d8a200a3",
+      "Zlib-ng.NET.dll": "f1746ed5806fe466af60938dfe7543ea524716816575fbb6a22d83cc0fc38673",
+      "ZstdSharp.dll": "b285bb9f59928becb8e048bf2a75e872f6555f8773d7b72386a9f77f447f425c"
+    },
+    "packages": [
+      {
+        "name": "microsoft.net.illink.tasks",
+        "version": "10.0.13",
+        "sha512": "d17dd7dd51bf5be5263bd1224bcf0a94443cc29a517b46dcb6f7396faaaef2d141c5115f83f341c2b88d791ecb3186b403335a721a6fb669171c4e96c88e7326"
+      },
+      {
+        "name": "microsoft.netcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "e79b2ea110087fa7558ce74f847c481250dad86068a95648ef46c6e33abe7f6a4741b195eb20efcedb17762b78a7173711aefd5f429fa3bf0a9dc8edf4d6ae21"
+      },
+      {
+        "name": "microsoft.aspnetcore.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "fc258066d71180f2c746c1e6da9eed07f2c66712dde787db5f51fa5ce248e17175dd3ae44347925c25bbd321c4f6947a86c65c97a6bedd71e8e76472b6479ead"
+      },
+      {
+        "name": "microsoft.windowsdesktop.app.runtime.win-x64",
+        "version": "10.0.13",
+        "sha512": "83cbf3dab59e48d62298535852a5d4cbbc9590a24e432732f64b0db79f75db68affb2ed8e4aad1fcfc284824205cedca0496dfe2e11d2b42ee0abf0e695c1073"
+      }
+    ],
+    "outputs": {
+      "AtelierImport.exe": "14c109cc18d4d9a2e9a1fa28dff826ceaaf6278d9581f934c9e4325cce666c13",
+      "CUE4Parse-Natives.dll": "b363f3bb51a7bbfcee15aa84dd45da41be273a9605efa2fee76661cb3790dc1b",
+      "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+    }
+  },
+  "animation_native": {
+    "mesh": "Characters/1033/1033504/Meshes/SK_1033_1033504_Lobby",
+    "animation": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+    "rebuilt_sha256": "a3dea66d1aa295d9fc1047611995586a67798dffa7ba01d15350d63737b8f127",
+    "checks": [
+      "Rebuilt decoder matches every baseline animation track and metadata field exactly",
+      "All bone tracks have finite, aligned samples and normalized rotations with real motion",
+      "Decoder output uses the expected glTF local coordinate schema"
+    ],
+    "runs": [
+      {
+        "name": "baseline",
+        "seconds": 6.031,
+        "returncode": 0
+      },
+      {
+        "name": "rebuilt",
+        "seconds": 5.031,
+        "returncode": 0
+      }
+    ],
+    "tracks": 655,
+    "frames": 340,
+    "animated_bones": 372,
+    "duration": 11.3,
+    "ok": true
+  },
+  "shader_native": {
+    "tool": {
+      "files": {
+        "retoc-rivals-cli.exe": "f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d",
+        "oo2core_9_win64.dll": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+        "dxc.exe": "aa7965b3763d9c710baaa5a28cedcc633449962a75d1391d161a85304a41b3e2",
+        "dxcompiler.dll": "0689e2fee0a1c9df8662a59680469f24e2a3ad7ce6bbbcc9284f7a83172bfc59",
+        "dxil.dll": "64be2368211d257a038a7d4ea6bb3e24c878eb8d588c7b8414fccf759b69c2ac"
+      },
+      "version": "retoc-rivals-cli 3.4.1",
+      "commands": [
+        "dump-shaders",
+        "extract-shader",
+        "patch-shader",
+        "patch-shaders",
+        "list-chunks",
+        "map-shaders",
+        "surgical-patch",
+        "pack"
+      ],
+      "source_status": "unavailable",
+      "rebuildable": false
+    },
+    "checks": [
+      "Original containers indexed: 1142373 shaders in 2 libraries",
+      "One real shader extracted and disassembled by the pinned DXC",
+      "Application DXC COM path disassembles, reassembles and signs the real shader IR",
+      "Independent Microsoft DXV validation succeeds for the reassembled shader",
+      "patch-shader and pack preserve the assembled shader exactly on mod-only readback",
+      "An unedited shader stays byte-identical after the library rebuild",
+      "An out-of-range shader index fails without publishing an output",
+      "Original game containers remain unchanged; no mod was installed"
+    ],
+    "commands": [
+      {
+        "command": "extract-shader",
+        "returncode": 0,
+        "seconds": 0.578
+      },
+      {
+        "command": "-dumpbin",
+        "returncode": 0,
+        "seconds": 0.125
+      },
+      {
+        "command": "-dumpbin",
+        "returncode": 0,
+        "seconds": 0.094
+      },
+      {
+        "command": "D:\\AtelierDev\\native-build-inputs-20261021\\shader-signed-verified\\reassembled.dxbc",
+        "returncode": 0,
+        "seconds": 0.094
+      },
+      {
+        "command": "patch-shader",
+        "returncode": 0,
+        "seconds": 1.547
+      },
+      {
+        "command": "pack",
+        "returncode": 0,
+        "seconds": 4.015
+      },
+      {
+        "command": "extract-shader",
+        "returncode": 0,
+        "seconds": 0.094
+      },
+      {
+        "command": "extract-shader",
+        "returncode": 0,
+        "seconds": 0.578
+      },
+      {
+        "command": "extract-shader",
+        "returncode": 0,
+        "seconds": 0.094
+      },
+      {
+        "command": "extract-shader",
+        "returncode": 1,
+        "seconds": 0.563
+      }
+    ],
+    "index_reused_from": "D:\\AtelierDev\\native-build-inputs-20261021\\shader-native",
+    "libraries": {
+      "ShaderArchive-Global-PCD3D_SM6-PCD3D_SM6": 8455,
+      "ShaderArchive-Marvel_Chunk0-PCD3D_SM6-PCD3D_SM6": 1133918
+    },
+    "index_sha256": {
+      "ShaderArchive-Global-PCD3D_SM6-PCD3D_SM6": "a4817810ec93bedde5c7bf18ae855641a2c0c1fa20b5a325ba612535544c59b5",
+      "ShaderArchive-Marvel_Chunk0-PCD3D_SM6-PCD3D_SM6": "2de204792feb31652ab25e091b176c125179d0a2e918b741a10efbd8b1217f13"
+    },
+    "selection": {
+      "library": "ShaderArchive-Global-PCD3D_SM6-PCD3D_SM6",
+      "index": 20,
+      "untouched_index": 0
+    },
+    "validator": {
+      "sha256": "74528e8e86cdafcb9ecaa26f21a9ad9de9102b0d84213b67435de798b5a807f9",
+      "success": true
+    },
+    "dxil": {
+      "original_sha256": "f2bfbee5168e5060a196cf909cad49dc1a029d631df817d4d09b329e2fda6062",
+      "reassembled_sha256": "0468ef285e691dc9db10544c2daefe25566fd9d2e5679513ebfd255dc0580574",
+      "signed": true,
+      "bytes_changed": true
+    },
+    "mod_files": {
+      "stage_9999999_P.pak": "d0e92f1433ce0979c42004e6b557f72b3e422d78e7d6ea5a5cf4edab4e57cdd5",
+      "stage_9999999_P.ucas": "d6988aea8a45df243b33d1fc6b002b1c6998d2e2832a160fd0b82174d7fa804f",
+      "stage_9999999_P.utoc": "a0123eceef54fb13ba6fd54f5e284fe510bb4d15ec91daccc3d32314f646a354"
+    },
+    "ok": true,
+    "game_containers": {
+      "pakchunkShaderAsset-Windows.utoc": {
+        "size": 9124990,
+        "mtime_ns": 1791542118803893500,
+        "sha256": "4dd051be85545a227e3355f836902def3f2c7669d1bfa271ec68143394fb64b9"
+      },
+      "global.utoc": {
+        "size": 4783,
+        "mtime_ns": 1792074383787454400,
+        "sha256": "aba98adc17f16c84a0d7a8f99b99f7d4858efd8156f035206f0c50b66d939fa2"
+      },
+      "pakchunkShaderAsset-Windows.ucas": {
+        "size": 7028426960,
+        "mtime_ns": 1791542118803393600,
+        "sha256": null
+      },
+      "global.ucas": {
+        "size": 7228736,
+        "mtime_ns": 1792074345428514800,
+        "sha256": null
+      }
+    }
+  },
+  "full_shader_index": {
+    "ShaderArchive-Global-PCD3D_SM6-PCD3D_SM6": 8455,
+    "ShaderArchive-Marvel_Chunk0-PCD3D_SM6-PCD3D_SM6": 1133918
+  },
+  "desktop": {
+    "a": {
+      "mode": "source",
+      "checks": [
+        "Native mesh/material/texture routes load a real game skin and enable capture",
+        "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+        "One persistent native game reader serves geometry, material and image imports",
+        "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+      ],
+      "page_errors": [],
+      "asset_errors": [],
+      "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+      "requests": [
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FMeshes%2FSK_1033_1033504",
+          "started_seconds": 0.719,
+          "finished_seconds": 11.64
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_L%2FMeshes%2FSK_Black_1033504_Stick_L",
+          "started_seconds": 11.75,
+          "finished_seconds": 12.281
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_R%2FMeshes%2FSK_Black_1033504_Stick_R",
+          "started_seconds": 12.281,
+          "finished_seconds": 12.734
+        },
+        {
+          "route": "/api/skin_materials",
+          "query": "",
+          "started_seconds": 12.812,
+          "finished_seconds": 13.937
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Body_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Head_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Equip_01_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Hair_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Hair_M&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Equip_04_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_L%2FTexture%2FT_1033504_Weapon_01_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Environment%2FMaterialLibrary%2FTextures%2FOther%2FT_Env_White&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        }
+      ],
+      "first_model_seconds": 12.28,
+      "materials": 16,
+      "material_groups": 6,
+      "objects": 10,
+      "load_seconds": 21.11,
+      "import_server_first": {
+        "pid": 24248,
+        "initializations": 1,
+        "requests": 22,
+        "files": 893376,
+        "private_bytes": 927059968,
+        "managed_bytes": 885920464
+      },
+      "idles": [
+        {
+          "value": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+          "label": "Lobby_Stand_Idle \u00b7 1033504"
+        },
+        {
+          "value": "Characters/1033/1033001/Animations/HeroDetails/Lobby_Stand_Idle",
+          "label": "Lobby_Stand_Idle \u00b7 1033001"
+        }
+      ],
+      "import_server_final": {
+        "pid": 24248,
+        "initializations": 1,
+        "requests": 23,
+        "files": 893376,
+        "private_bytes": 920350720,
+        "managed_bytes": 885977312
+      },
+      "import_process_exited": true
+    },
+    "b": {
+      "mode": "source",
+      "checks": [
+        "Native mesh/material/texture routes load a real game skin and enable capture",
+        "Native standing-idle decoder discovers, decodes and plays a real game animation; Pause and Rest pose work",
+        "One persistent native game reader serves geometry, material and image imports",
+        "Real skinned geometry renders both themes, accepts bloom and closes without page or shader errors"
+      ],
+      "page_errors": [],
+      "asset_errors": [],
+      "source_root": "C:\\Users\\thiag\\OneDrive\\Documents(1)\\GitHub\\Atelier",
+      "requests": [
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FMeshes%2FSK_1033_1033504",
+          "started_seconds": 0.781,
+          "finished_seconds": 11.625
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_L%2FMeshes%2FSK_Black_1033504_Stick_L",
+          "started_seconds": 11.734,
+          "finished_seconds": 12.297
+        },
+        {
+          "route": "/api/model_gltf",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_R%2FMeshes%2FSK_Black_1033504_Stick_R",
+          "started_seconds": 12.297,
+          "finished_seconds": 12.765
+        },
+        {
+          "route": "/api/skin_materials",
+          "query": "",
+          "started_seconds": 12.828,
+          "finished_seconds": 13.937
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Body_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.875
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Head_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.937,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Equip_01_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.875
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Hair_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.859
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Hair_M&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.875
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FTexture%2FT_1033504_Equip_04_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.875
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Characters%2F1033%2F1033504%2FWeapons%2FStick_L%2FTexture%2FT_1033504_Weapon_01_D&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.875
+        },
+        {
+          "route": "/api/texture_png",
+          "query": "game_rel=Environment%2FMaterialLibrary%2FTextures%2FOther%2FT_Env_White&v=b87605de3567d4061a8e658fae1d6398c028bd4a1d4091520ff29798756e9078",
+          "started_seconds": 13.953,
+          "finished_seconds": 14.875
+        }
+      ],
+      "first_model_seconds": 12.3,
+      "materials": 16,
+      "material_groups": 6,
+      "objects": 10,
+      "load_seconds": 20.75,
+      "import_server_first": {
+        "pid": 19672,
+        "initializations": 1,
+        "requests": 22,
+        "files": 893376,
+        "private_bytes": 927346688,
+        "managed_bytes": 885655920
+      },
+      "idles": [
+        {
+          "value": "Characters/1033/1033504/Animations/HeroDetails/Lobby_Stand_Idle",
+          "label": "Lobby_Stand_Idle \u00b7 1033504"
+        },
+        {
+          "value": "Characters/1033/1033001/Animations/HeroDetails/Lobby_Stand_Idle",
+          "label": "Lobby_Stand_Idle \u00b7 1033001"
+        }
+      ],
+      "import_server_final": {
+        "pid": 19672,
+        "initializations": 1,
+        "requests": 23,
+        "files": 893376,
+        "private_bytes": 920363008,
+        "managed_bytes": 885704640
+      },
+      "import_process_exited": true
+    }
+  },
+  "backend": {
+    "suites": 48,
+    "reported_unittest_cases": 492,
+    "results": [
+      {
+        "suite": "test_added_assets.py",
+        "exit_code": 0,
+        "seconds": 1.69,
+        "summary": [
+          "Ran 13 tests in 1.228s"
+        ]
+      },
+      {
+        "suite": "test_app_port.py",
+        "exit_code": 0,
+        "seconds": 1.3,
+        "summary": [
+          "Ran 5 tests in 1.207s"
+        ]
+      },
+      {
+        "suite": "test_blender_import.py",
+        "exit_code": 0,
+        "seconds": 0.17,
+        "summary": [
+          "Ran 1 test in 0.000s"
+        ]
+      },
+      {
+        "suite": "test_catalogue.py",
+        "exit_code": 0,
+        "seconds": 0.58,
+        "summary": [
+          "Ran 24 tests in 0.282s"
+        ]
+      },
+      {
+        "suite": "test_changelog.py",
+        "exit_code": 0,
+        "seconds": 0.67,
+        "summary": [
+          "Ran 10 tests in 0.064s"
+        ]
+      },
+      {
+        "suite": "test_custom_textures.py",
+        "exit_code": 0,
+        "seconds": 1.3,
+        "summary": [
+          "Ran 16 tests in 0.671s"
+        ]
+      },
+      {
+        "suite": "test_dxc_ir.py",
+        "exit_code": 0,
+        "seconds": 0.17,
+        "summary": [
+          "Ran 5 tests in 0.003s"
+        ]
+      },
+      {
+        "suite": "test_frontend_cache.py",
+        "exit_code": 0,
+        "seconds": 0.72,
+        "summary": [
+          "Ran 4 tests in 0.083s"
+        ]
+      },
+      {
+        "suite": "test_hero_artwork.py",
+        "exit_code": 0,
+        "seconds": 2.91,
+        "summary": [
+          "Ran 10 tests in 2.604s"
+        ]
+      },
+      {
+        "suite": "test_import_server.py",
+        "exit_code": 0,
+        "seconds": 1.91,
+        "summary": [
+          "Ran 18 tests in 1.663s"
+        ]
+      },
+      {
+        "suite": "test_jobs_bulk.py",
+        "exit_code": 0,
+        "seconds": 1.45,
+        "summary": [
+          "Ran 23 tests in 0.835s"
+        ]
+      },
+      {
+        "suite": "test_krackle_inks.py",
+        "exit_code": 0,
+        "seconds": 0.39,
+        "summary": [
+          "Ran 1 test in 0.308s"
+        ]
+      },
+      {
+        "suite": "test_local_api_guard.py",
+        "exit_code": 0,
+        "seconds": 0.99,
+        "summary": [
+          "Ran 17 tests in 0.204s"
+        ]
+      },
+      {
+        "suite": "test_material_original.py",
+        "exit_code": 0,
+        "seconds": 0.84,
+        "summary": [
+          "Ran 8 tests in 0.244s"
+        ]
+      },
+      {
+        "suite": "test_material_replacement.py",
+        "exit_code": 0,
+        "seconds": 1.17,
+        "summary": [
+          "Ran 11 tests in 0.556s"
+        ]
+      },
+      {
+        "suite": "test_mesh_optimizer.py",
+        "exit_code": 0,
+        "seconds": 1.03,
+        "summary": [
+          "Ran 6 tests in 0.806s"
+        ]
+      },
+      {
+        "suite": "test_mesh_replacement.py",
+        "exit_code": 0,
+        "seconds": 0.67,
+        "summary": [
+          "Ran 6 tests in 0.126s"
+        ]
+      },
+      {
+        "suite": "test_mod_cards.py",
+        "exit_code": 0,
+        "seconds": 0.14,
+        "summary": [
+          "Ran 1 test in 0.053s"
+        ]
+      },
+      {
+        "suite": "test_model_gltf.py",
+        "exit_code": 0,
+        "seconds": 0.7,
+        "summary": [
+          "Ran 12 tests in 0.092s"
+        ]
+      },
+      {
+        "suite": "test_model_studio.py",
+        "exit_code": 0,
+        "seconds": 0.81,
+        "summary": [
+          "Ran 18 tests in 0.222s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_blender.py",
+        "exit_code": 0,
+        "seconds": 1.17,
+        "summary": [
+          "Ran 28 tests in 0.611s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_frontend.py",
+        "exit_code": 0,
+        "seconds": 0.81,
+        "summary": [
+          "Ran 6 tests in 0.696s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_images.py",
+        "exit_code": 0,
+        "seconds": 0.31,
+        "summary": [
+          "Ran 7 tests in 0.033s"
+        ]
+      },
+      {
+        "suite": "test_model_studio_textures.py",
+        "exit_code": 0,
+        "seconds": 0.62,
+        "summary": [
+          "Ran 8 tests in 0.207s"
+        ]
+      },
+      {
+        "suite": "test_morphs.py",
+        "exit_code": 0,
+        "seconds": 0.64,
+        "summary": [
+          "Ran 11 tests in 0.344s"
+        ]
+      },
+      {
+        "suite": "test_native_build_inputs.py",
+        "exit_code": 0,
+        "seconds": 0.55,
+        "summary": [
+          "Ran 15 tests in 0.368s"
+        ]
+      },
+      {
+        "suite": "test_native_prereqs.py",
+        "exit_code": 0,
+        "seconds": 0.2,
+        "summary": [
+          "Ran 4 tests in 0.017s"
+        ]
+      },
+      {
+        "suite": "test_packaging.py",
+        "exit_code": 0,
+        "seconds": 0.62,
+        "summary": [
+          "Ran 14 tests in 0.421s"
+        ]
+      },
+      {
+        "suite": "test_patch_override.py",
+        "exit_code": 0,
+        "seconds": 0.31,
+        "summary": [
+          "11 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase1.py",
+        "exit_code": 0,
+        "seconds": 6.69,
+        "summary": [
+          "28 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase2.py",
+        "exit_code": 0,
+        "seconds": 0.88,
+        "summary": [
+          "18 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase3.py",
+        "exit_code": 0,
+        "seconds": 4.5,
+        "summary": [
+          "35 passed, 0 failed"
+        ]
+      },
+      {
+        "suite": "test_phase4.py",
+        "exit_code": 0,
+        "seconds": 4.5,
+        "summary": [
+          "  SKIP  The one thing that could go wrong silently: from_json writes .uasset/.uexp only. \u2014 UAssetTool not installed",
+          "  SKIP  DXT5's alpha block is independent, so a uniform zero alpha has to come back exactly zero. \u2014 UAssetTool not installed",
+          "46 passed, 0 failed, 2 skipped"
+        ]
+      },
+      {
+        "suite": "test_presentation.py",
+        "exit_code": 0,
+        "seconds": 0.7,
+        "summary": [
+          "Ran 4 tests in 0.024s"
+        ]
+      },
+      {
+        "suite": "test_project_recovery.py",
+        "exit_code": 0,
+        "seconds": 0.75,
+        "summary": [
+          "Ran 8 tests in 0.290s"
+        ]
+      },
+      {
+        "suite": "test_project_trash.py",
+        "exit_code": 0,
+        "seconds": 2.84,
+        "summary": [
+          "Ran 14 tests in 2.220s"
+        ]
+      },
+      {
+        "suite": "test_reliability.py",
+        "exit_code": 0,
+        "seconds": 1.06,
+        "summary": [
+          "Ran 28 tests in 0.444s"
+        ]
+      },
+      {
+        "suite": "test_s_maps.py",
+        "exit_code": 0,
+        "seconds": 1.0,
+        "summary": [
+          "Ran 9 tests in 0.318s"
+        ]
+      },
+      {
+        "suite": "test_search.py",
+        "exit_code": 0,
+        "seconds": 6.26,
+        "summary": [
+          "Ran 6 tests in 5.640s"
+        ]
+      },
+      {
+        "suite": "test_setup_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 0.27,
+        "summary": [
+          "Ran 4 tests in 0.066s"
+        ]
+      },
+      {
+        "suite": "test_skin_swapper.py",
+        "exit_code": 0,
+        "seconds": 1.55,
+        "summary": [
+          "Ran 53 tests in 0.829s"
+        ]
+      },
+      {
+        "suite": "test_thumbnails.py",
+        "exit_code": 0,
+        "seconds": 1.12,
+        "summary": [
+          "Ran 11 tests in 0.443s"
+        ]
+      },
+      {
+        "suite": "test_triage_exports.py",
+        "exit_code": 0,
+        "seconds": 1.08,
+        "summary": [
+          "Ran 21 tests in 0.754s"
+        ]
+      },
+      {
+        "suite": "test_unreal_names.py",
+        "exit_code": 0,
+        "seconds": 0.14,
+        "summary": [
+          "Ran 2 tests in 0.000s"
+        ]
+      },
+      {
+        "suite": "test_update_lifetime.py",
+        "exit_code": 0,
+        "seconds": 0.8,
+        "summary": [
+          "Ran 1 test in 0.035s"
+        ]
+      },
+      {
+        "suite": "test_upstream_integrations.py",
+        "exit_code": 0,
+        "seconds": 0.61,
+        "summary": [
+          "Ran 12 tests in 0.162s"
+        ]
+      },
+      {
+        "suite": "test_viewport_cancel.py",
+        "exit_code": 0,
+        "seconds": 1.33,
+        "summary": [
+          "Ran 4 tests in 0.712s"
+        ]
+      },
+      {
+        "suite": "test_viewport_features.py",
+        "exit_code": 0,
+        "seconds": 0.8,
+        "summary": [
+          "Ran 13 tests in 0.102s"
+        ]
+      }
+    ]
+  },
+  "source_required_guard": {
+    "expected_exit": 1,
+    "actual_exit": 1,
+    "correctly_rejects_missing_shader_source": true
+  },
+  "known_limitations": [
+    "Original custom shader fork source/Cargo.lock/build flags remain unavailable.",
+    "A concurrent full-index retry exhausted native memory; final signed checks reuse the earlier successful full index.",
+    "In-game loading, Linux and a new full installer were not tested."
+  ],
+  "safety": {
+    "no_game_mod_installed": true,
+    "game_containers_not_written": true,
+    "existing_user_projects_not_written": true,
+    "private_game_key_not_committed": true
+  },
+  "evidence_root": "D:\\AtelierDev\\native-build-inputs-20261021",
+  "safety_checks": {
+    "credential_scan_files": 28,
+    "raw_private_key_absent": true,
+    "token_scan_passed": true,
+    "python_parse_files": 214,
+    "dependency_check_passed": true
+  },
+  "backend_lock_followup": [
+    {
+      "suite": "test_native_build_inputs.py",
+      "exit_code": 0,
+      "seconds": 0.61,
+      "summary": [
+        "Ran 15 tests in 0.415s"
+      ]
+    }
+  ]
+}
