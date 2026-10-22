@@ -193,6 +193,13 @@ window.__uvTest = {
   snapshot:()=>JSON.stringify({uv:Array.from(__uvMesh.geometry.getAttribute('uv').array),index:Array.from(__uvMesh.geometry.index.array),edited}),
   gpu:()=>renderer.info.memory.textures,
   transformed:value=>{__uvMesh.material[0].map.repeat.x=value?2:1;},
+  holdExport(){
+    const native=HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob=function(callback,...args){
+      window.__uvPendingCanvas=this;
+      window.__releaseUVExport=()=>{HTMLCanvasElement.prototype.toBlob=native;native.call(this,callback,...args);};
+    };
+  },
   delaySource(){const native=materialFetch;materialFetch=async(url,options)=>{
     const response=await native(url,options);if(url.includes('T_Normal'))await new Promise(resolve=>window.__releaseUVSource=resolve);return response;};},
 };
@@ -252,6 +259,28 @@ window.__uvTest = {
                 self.assertEqual(downloaded.size,(48,96),'Every source exports at its own exact non-square dimensions')
             pick(1); page.wait_for_function("!document.getElementById('viewport-uv-export').disabled")
             self.assertIn('Geometry section 1',page.inner_text('#viewport-uv-mesh'))
+            held_downloads=[]
+            page.on('download',lambda download:held_downloads.append(download))
+            page.evaluate('__uvTest.holdExport()')
+            page.click('#viewport-uv-export')
+            page.wait_for_function("typeof window.__releaseUVExport==='function'")
+            page.select_option('#viewport-uv-channel','1')
+            self.assertTrue(page.is_disabled('#viewport-uv-export'),'Changing UV channels must not allow concurrent full-resolution exports')
+            page.select_option('#viewport-uv-source','1')
+            page.wait_for_function("document.getElementById('viewport-uv-resolution').textContent.includes('48 × 96')")
+            self.assertTrue(page.is_disabled('#viewport-uv-export'),'Changing sources must retain the pending export guard')
+            page.click('#viewport-uv-toggle');page.click('#viewport-uv-toggle');pick()
+            page.wait_for_function("document.getElementById('viewport-uv-resolution').textContent.includes('96 × 48')")
+            self.assertTrue(page.is_disabled('#viewport-uv-export'),'Closing and reopening must not allocate another export canvas')
+            page.select_option('#viewport-uv-source','2')
+            self.assertIn('TextureCube',page.inner_text('#viewport-uv-status'))
+            page.evaluate('__releaseUVExport()')
+            page.wait_for_function('__uvPendingCanvas.width===1')
+            self.assertEqual(page.input_value('#viewport-uv-source'),'2','Reopening a cached inspector must not reset a subsequent source choice')
+            self.assertTrue(page.is_disabled('#viewport-uv-export'),'A stale completion must not enable an unsupported source')
+            self.assertFalse(held_downloads,'A stale export must not download a layout for a previous selection')
+            page.select_option('#viewport-uv-source','0')
+            page.wait_for_function("!document.getElementById('viewport-uv-export').disabled")
             page.evaluate('__uvTest.transformed(true)');pick(0)
             page.wait_for_function("document.getElementById('viewport-uv-status').textContent.includes('Transformed')")
             self.assertTrue(page.is_disabled('#viewport-uv-export'))
