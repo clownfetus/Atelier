@@ -29,8 +29,8 @@ jobs:
           & ./.venv-build/Scripts/python.exe -m pip install -r requirements-dev.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "ATELIER_VERSION=$((Get-Content version -Raw).Trim())" >> $env:GITHUB_ENV
-      - run: python tests/run_checks.py --report-dir reports/backend
       - run: python -m playwright install chromium
+      - run: python tests/run_checks.py --report-dir reports/backend
       - run: python tests/browser_smoke.py --report-dir reports/browser
       - run: python scripts/release_inputs.py
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
@@ -160,7 +160,9 @@ jobs:
       - name: Install native Linux GUI build dependencies
         run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core
       - run: python3 -m venv --system-site-packages .venv
-      - run: .venv/bin/python -m pip install -r requirements-build.txt
+      - run: .venv/bin/python -m pip install -r requirements-build.txt -r requirements-dev.txt
+      # UV geometry/export regressions exercise a real browser in the backend suite.
+      - run: .venv/bin/python -m playwright install --with-deps chromium
       - run: .venv/bin/python tests/run_checks.py --report-dir reports/backend
       - run: .venv/bin/python scripts/release_inputs.py
       - name: Stage the Skin Swapper template from encrypted release inputs

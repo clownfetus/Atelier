@@ -1,9 +1,30 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.1**.
+**1.1.2**.
 
 ## Unreleased
+
+## 1.1.2 — 22 October 2026
+
+### Connected ink and appearance
+
+- Give loading, saving, exports and configuration discovery one connected ink
+  system. Fluid SVG ribbons travel from clear sources into their destination
+  controls and native panel borders, with a catch and rebound when work finishes.
+- Follow the active hero and costume colours. Navigation, editor openings, the
+  Mod tray, model loaders and texture updates each have a purposeful gesture.
+  Replay the examples in **Settings → Try Krackle**. Calm, Off and system reduced
+  motion remain available.
+- Keep failures and incomplete saves distinct from success. Preserve newer
+  curve, level and text edits made during saving, and ignore old loading responses
+  after closing and reopening the same file.
+- Refresh the Windows installer with Paper and Ink artwork, a connected A-mark
+  illustration, clearer text and native Windows controls.
+- Correct hero artwork, discover new heroes and costumes from the published
+  catalogue, and reuse cached costume art for matching library previews.
+
+### Model and material tools
 
 - Add optional **Assembly View** beside Inspect and Showcase: select a model
   surface to inspect its geometry, verified material and connected texture slots.
@@ -11,6 +32,12 @@ The app, installers and update checker identify each release by its full number,
   texture, UV and Blender workflows, retain camera context across editor visits,
   and load small texture previews only when needed. Unverified assignments and
   unavailable VFX references are explained explicitly.
+
+- Add **UV X-Ray** to Inspect: pick a model surface, view its UV0 wireframe over
+  the selected texture, inspect the clicked UV coordinate and export a transparent
+  wireframe PNG. Keep the model geometry, texture and project edits unchanged.
+
+### VFX and batch editing
 
 - Add **VFX Motionboard** to the Niagara editor: synchronized editable LUT tracks,
   playback and scrubbing, original/edited comparison, per-point and per-track
