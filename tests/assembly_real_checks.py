@@ -78,6 +78,9 @@ def main():
     paks = Path(config['paks'])
     game_before = {p.name:(p.stat().st_size,p.stat().st_mtime_ns) for p in paks.iterdir() if p.is_file()}
     result = {'ok':False,'skin':args.skin,'checks':[],'surfaces':[],'page_errors':[],'asset_errors':[]}
+    result['source_sha256']={path:hashlib.sha256((ROOT/path).read_bytes()).hexdigest() for path in (
+        'gui/viewport.js','gui/viewport-inspection.js','gui/viewport-uv.js','gui/assembly.js',
+        'gui/assembly.css','gui/assembly-data.js','gui/app.js','atelier/web/routes.py')}
     def passed(message):
         result['checks'].append(message)
         (report/'results.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
@@ -145,6 +148,13 @@ def main():
                 result['surfaces'].append({'material':candidate['material'],'mesh':candidate['mesh'],'cooked_slot':candidate['slot'],
                     'face_index':candidate['faceIndex'],'texture_slots':expected})
             passed(f'Real mouse clicks select {len(result["surfaces"])} exact Magik sections; material paths match native cooked-slot metadata and all texture cards match their bindings')
+            page.get_by_role('button',name='Highlight sections using this material',exact=True).click()
+            current=page.evaluate('__assemblyReal.state()')
+            expected_keys={key for key,info in current['data'].items() if info.get('mapping_via')=='imports' and not info.get('mapping_error') and not info.get('material_set_override')
+                and info.get('game_rel','').lower()==chosen['material'].lower()}
+            assert set(current['related']['keys'])==expected_keys
+            assert set(page.locator('.assembly-section.is-related').evaluate_all('rows=>rows.map(row=>row.dataset.material)'))==expected_keys
+            passed('Clicking the native material swatch highlights precisely the sections assigned to its full package reference')
             base=next(source for source in chosen['slots'] if source.get('role')=='basecolor' and not source.get('inferred'))
             card=page.locator('.assembly-texture-card').filter(has_text='Diffuse').first
             if not card.count():card=page.locator('.assembly-texture-card').first
@@ -233,9 +243,12 @@ def main():
             passed('UV inspection identifies the same real selected material and returns without resetting camera or resource selection')
             page.set_viewport_size({'width':1024,'height':768})
             page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            page.wait_for_function('[...document.querySelectorAll("#viewport-uv-toggle,.assembly-primary")].every(button=>button.getBoundingClientRect().right<=innerWidth)')
             assert page.locator('.assembly-section').count()>=10
             assert page.locator('#assembly-sections').evaluate('list=>list.scrollHeight>list.clientHeight')
-            assert page.locator('.assembly-geometry-actions button').evaluate_all('buttons=>buttons.every(button=>{const r=button.getBoundingClientRect(),parent=button.closest("#assembly-geometry-selection").getBoundingClientRect();return r.top>=parent.top&&r.bottom<=parent.bottom&&r.bottom<innerHeight;})')
+            bounds=page.locator('.assembly-geometry-actions button').evaluate_all('buttons=>buttons.map(button=>{const r=button.getBoundingClientRect(),parent=button.closest("#assembly-geometry-selection").getBoundingClientRect();return {label:button.textContent,top:r.top,bottom:r.bottom,parentTop:parent.top,parentBottom:parent.bottom};})')
+            (report/'compact-actions.json').write_text(json.dumps(bounds,indent=2),encoding='utf-8')
+            assert all(b['top']>=b['parentTop'] and b['bottom']<=b['parentBottom'] and b['bottom']<768 for b in bounds),bounds
             page.screenshot(path=str(report/'magik-assembly-compact.png'))
             passed('With twelve real surfaces, geometry actions remain visible at 1024×768 while the surface list scrolls independently')
             assert not result['page_errors'],result['page_errors']

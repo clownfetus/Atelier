@@ -105,6 +105,23 @@ raycasting and HTTP fixtures. They exercise texture relationships, custom slot
 handoffs, camera retention, uncertainty, panels, themes and reduced motion.
 Native Blender execution and in-game appearance remain separate validation.
 
+For real-character validation, start `tests/dev_server.py` with configured,
+isolated `ATELIER_DATA_DIR`, a fresh active test project and `test-mods` as its
+mods destination, then run:
+
+```powershell
+.\.venv\Scripts\python.exe tests/assembly_real_checks.py --url 'http://127.0.0.1:8892' `
+  --data-dir '<isolated-data-directory>' --report-dir '<new-report-directory>'
+```
+
+The default character is Magik `1029304`. Native game requests are unmocked;
+read-only observation hooks expose the selected triangle, camera and decode count.
+The check saves a material colour and authored normal image into the test project,
+verifies exact import-table links, exercises editor returns and UV inspection,
+and checks compact geometry actions. It records screenshots and source hashes,
+and verifies that game container timestamps and the empty mods destination stay
+unchanged. See [the real-character verification](docs/assembly-verification-2026-10-22.md).
+
 ### Named asset additions
 
 `atelier/added_assets.py` prepares and verifies new texture, material-instance

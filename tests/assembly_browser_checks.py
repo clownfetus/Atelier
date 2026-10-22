@@ -158,6 +158,8 @@ def run_assembly_checks(context, url, report, checks):
         tab.screenshot(path=str(report/'assembly-light-1024.png'))
         assert tab.locator('#viewport-box').evaluate('el=>el.scrollWidth<=el.clientWidth+2')
         assert tab.locator('#viewport-body').evaluate('el=>el.scrollWidth<=el.clientWidth+2')
+        assert tab.locator('.assembly-geometry-actions button').evaluate_all('buttons=>buttons.every(button=>{const r=button.getBoundingClientRect(),panel=button.closest("#assembly-geometry-selection").getBoundingClientRect();return r.top>=panel.top&&r.bottom<=panel.bottom;})'), 'Compact geometry actions must remain visible'
+        assert tab.locator('#assembly-geometry').evaluate('el=>el.getBoundingClientRect().width<190'), 'Compact panel widths must override theme defaults'
         tab.locator('#viewport-showcase').click()
         assert tab.locator('#viewport-stage').evaluate('el=>el.classList.contains("vp-showcase")')
         tab.locator('#viewport-inspect').click(); assert not tab.locator('#viewport-box').evaluate('el=>el.classList.contains("is-assembly")')

@@ -45,7 +45,7 @@
 #viewport-box .assembly-section.is-related { border-left-color:var(--acc); }
 #viewport-box .assembly-section[aria-pressed=true] { background:var(--vp-selected); border-color:var(--acc); color:var(--md-sys-color-on-primary-container); }
 .assembly-section.is-hidden > span:nth-child(2) { text-decoration:line-through; }
-#assembly-geometry-selection { flex:0 1 auto;max-height:55%;overflow:auto;margin:12px 2px 0;padding-top:12px;border-top:1px solid var(--border); }
+#assembly-geometry-selection { flex:0 0 auto;max-height:65%;overflow:auto;margin:12px 2px 0;padding-top:12px;border-top:1px solid var(--border); }
 .assembly-geometry-properties { margin-bottom:12px; }
 .assembly-geometry-properties > summary { font-size:11px;cursor:pointer;color:var(--muted);padding:5px 0; }
 #assembly-geometry-selection:empty { display:none; }
@@ -150,7 +150,7 @@
 .assembly-textures-collapsed #assembly-textures-collapse svg { transform:rotate(180deg); }
 :root[data-krackle=off] #assembly-links,:root[data-motion=reduce] #assembly-links { display:none; }
 @media (max-width:1400px) {
-  #viewport-box.is-assembly { --assembly-geometry-width:190px; --assembly-material-width:292px; }
+  #viewport-box.is-assembly,:root[data-theme] #viewport-box.is-assembly { --assembly-geometry-width:190px; --assembly-material-width:292px; }
   .is-assembly #viewport-tools { right:10px; }
   .is-assembly #viewport-inspect-tools { left:10px; }
   .is-assembly #viewport-wipe span { display:none; }
@@ -162,7 +162,7 @@
   #viewport-head #viewport-modes { margin-inline:0 4px; }
   #viewport-head #viewport-modes button { min-width:60px; padding-inline:7px; }
   #viewport-unsaved { display:none; }
-  #viewport-box.is-assembly { --assembly-geometry-width:166px; --assembly-material-width:270px; }
+  #viewport-box.is-assembly,:root[data-theme] #viewport-box.is-assembly { --assembly-geometry-width:166px; --assembly-material-width:270px; }
   .is-assembly #viewport-model-menu > summary > svg { display:none; }
   .is-assembly #viewport-tools > .vp-menu > summary { padding:5px 7px; }
   .is-assembly #viewport-model-label { max-width:65px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
