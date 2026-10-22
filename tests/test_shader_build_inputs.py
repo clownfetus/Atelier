@@ -1,5 +1,6 @@
 """Source-build provenance, poisoned-cache rejection and private shader credentials."""
 import hashlib
+import io
 import json
 import os
 import stat
@@ -23,7 +24,7 @@ class ShaderBuildInputs(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='atelier-shader-check-')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
 
     def test_source_lock_identifies_the_complete_cargo_graph_and_reconstruction(self):
         lock = B.load_shader_lock()
@@ -61,6 +62,40 @@ class ShaderBuildInputs(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Cached.*SHA-256 mismatch'):
                 B.archive_input(dict(url='https://example.invalid/compiler.zip', sha256=expected), cache)
             network.assert_not_called()
+
+    def test_cold_cache_download_publishes_only_the_verified_archive(self):
+        payload = b'fresh pinned compiler fixture'
+        cache = self.root / 'cold-cache'
+        pin = dict(url='https://example.invalid/compiler.zip', sha256=hashlib.sha256(payload).hexdigest())
+        with patch.object(B.urllib.request, 'urlopen', return_value=io.BytesIO(payload)) as network:
+            path = B.archive_input(pin, cache)
+            self.assertEqual(path.read_bytes(), payload)
+            self.assertEqual(list(cache.iterdir()), [path])
+            self.assertEqual(path.name, pin['sha256'] + '.zip')
+            # A subsequent build must use the validated cache without downloading.
+            self.assertEqual(B.archive_input(pin, cache), path)
+            network.assert_called_once()
+
+    def test_cold_cache_wrong_hash_leaves_no_published_or_partial_file(self):
+        cache = self.root / 'bad-download'
+        pin = dict(url='https://example.invalid/compiler.zip', sha256=hashlib.sha256(b'expected').hexdigest())
+        with patch.object(B.urllib.request, 'urlopen', return_value=io.BytesIO(b'wrong bytes')):
+            with self.assertRaisesRegex(ValueError, 'Downloaded.*SHA-256 mismatch'):
+                B.archive_input(pin, cache)
+        self.assertEqual(list(cache.iterdir()), [])
+
+    def test_interrupted_cold_cache_stream_leaves_no_partial_file(self):
+        class Interrupted(io.BytesIO):
+            def read(self, count=-1):
+                if self.tell():
+                    raise OSError('fixture interrupted download')
+                return super().read(3)
+        cache = self.root / 'interrupted-download'
+        pin = dict(url='https://example.invalid/compiler.zip', sha256='0' * 64)
+        with patch.object(B.urllib.request, 'urlopen', return_value=Interrupted(b'partial bytes')):
+            with self.assertRaisesRegex(OSError, 'interrupted download'):
+                B.archive_input(pin, cache)
+        self.assertEqual(list(cache.iterdir()), [])
 
     def test_zip_paths_cannot_escape_the_private_build(self):
         for index, name in enumerate(['../escape', '/absolute', 'C:/absolute', 'dir/../../escape', 'dir\\..\\escape']):

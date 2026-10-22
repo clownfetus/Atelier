@@ -1,12 +1,20 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.0**.
+**1.1.1**.
 
 ## Unreleased
 
+## 1.1.1 — 22 October 2026
+
 ### Asset pipeline and layout
 
+- Send models into an open Blender session with the bundled Atelier Live Bridge
+  extension. Portable Blender export remains available.
+- Preserve geometry modifiers and winding when preparing replacement meshes,
+  and reject unassigned faces before a detail-level rebuild can drop them.
+- Refresh corrected costume names in existing reference entries as well as new
+  ones, publishing the reference update atomically.
 - Show character and costume names and artwork wherever their IDs appear in
   asset folders, including legendary ultimate skins, search results, breadcrumbs,
   pinned folders and asset pickers. Keep original asset paths available on hover.
@@ -39,6 +47,15 @@ The app, installers and update checker identify each release by its full number,
   borders, vertex channels and skinning boundaries.
 - Give Mod tray actions and the Continue card consistent spacing, including
   narrow panes and both themes.
+- Correct character preview materials, including tattoos, hair, eyebrows and
+  eyes, and use authored weapon grips. Keep alternate body forms separate.
+- Fix the eight-byte T_Visor texture serialization mismatch and preserve cooked
+  texture data when renaming assets. Older added textures are repaired in private
+  export staging; unrecognized trailing data stops the export with an explanation.
+- Rebuild the Windows shader tool from pinned upstream source and package its
+  build record and licenses. Pin the animation and persistent import tool inputs.
+- Add Krackle feedback to real navigation, editor and Mod tray actions, clearer
+  search filters, and updated Showcase composition. Motion preferences still apply.
 
 ### Security
 

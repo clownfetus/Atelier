@@ -90,7 +90,7 @@ def run_model_studio_export_browser_checks(page, context, url, report, checks):
                     tab.screenshot(path=str(report / f'model-blender-complete-{theme}-{width}.png'))
             tab.get_by_role('button', name='Open in Blender', exact=True).click()
             tab.wait_for_timeout(100)
-            assert opens == [({'game_rel': calls[0]['game_rel']}, 'Smoke A')]
+            assert opens == [({'game_rel': calls[0]['game_rel']}, 'Smoke A')] * 2
             tab.screenshot(path=str(report / 'model-blender-complete.png'))
             failure[0] = True
             models()
@@ -103,6 +103,27 @@ def run_model_studio_export_browser_checks(page, context, url, report, checks):
             tab.wait_for_selector('#viewport-status button')
             assert button.is_enabled() and len(calls) == 3
         assert headers == ['Smoke A'] * 3, headers
+        # The resident receiver is a separate job path; a missing extension must
+        # leave both actions usable and must not fall back to a hidden export.
+        live_calls = []
+        def live_worker(game_rel, weapons):
+            live_calls.append((game_rel, weapons))
+            return {'ok': True, 'meshes': 1, 'warnings': []}
+        models()
+        help_link = tab.locator('.vp-blender-help a')
+        assert help_link.get_attribute('href') == '/api/blender_extension'
+        assert 'Install from Disk' in tab.locator('.vp-blender-help').text_content()
+        with patch.object(meshport, 'send_to_blender', side_effect=live_worker):
+            tab.locator('#viewport-blender-send').click()
+            tab.wait_for_function("document.getElementById('viewport-status').textContent.includes('Sent 1 mesh(es)')")
+            assert live_calls == [('Characters/1029/1029001/Meshes/Body', [])]
+        models()
+        with patch.object(meshport, 'send_to_blender', side_effect=RuntimeError('Blender live-send add-on is not running')):
+            tab.locator('#viewport-blender-send').click()
+            tab.wait_for_function("document.getElementById('viewport-status').textContent.includes('add-on is not running')")
+            assert button.is_enabled() and tab.locator('#viewport-blender-send').is_enabled()
+            assert len(calls) == 3
+        checks.append('Live Blender send uses its own acknowledged job, exposes explicit extension setup, and missing receivers leave portable export available without a hidden fallback')
         tab.evaluate('AtelierViewport.close()')
         tab.locator('#job-activity').click()
         tab.wait_for_function("document.querySelectorAll('.job-row').length>=3")

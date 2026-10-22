@@ -53,7 +53,7 @@
     "src/shader_commands.rs": "a36ab82ce9c5ebd27f6fe35976519be3575864d41f2fed99bd8aee030da6f69e"
   },
   "recipe": {
-    "scripts/build_shader_tool.py": "420cd9a3fcc6dbf8911541ef889fad6ac57c936d3047888e54085524e126a424",
+    "scripts/build_shader_tool.py": "05e1268ae4533d32523324841048498f47ff21d022e06b16f17400587404fc36",
     "scripts/native_inputs.py": "1e4eb596b819f5c988201429670b786f7a7e0a8af93e5b4f887e777db2057095"
   }
 }

@@ -45,7 +45,7 @@ def archive_input(pin, cache):
     suffix = '.zip' if pin['url'].endswith('.zip') else '.tar'
     path = cache / (pin['sha256'] + suffix)
     if not path.exists():
-        with tempfile.NamedTempFile(dir=cache, delete=False) as stream:
+        with tempfile.NamedTemporaryFile(dir=cache, delete=False) as stream:
             temporary = Path(stream.name)
             try:
                 request = urllib.request.Request(pin['url'], headers={'User-Agent': 'Atelier-source-build'})

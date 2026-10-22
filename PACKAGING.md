@@ -1,17 +1,18 @@
 # Preparing a public release
 
-For 1.1.0, dispatch `.github/workflows/release-candidate.yml` against the
+For 1.1.1, dispatch `.github/workflows/release-candidate.yml` against the
 consolidated `main` commit (or push a `codex/release-*` candidate branch).
 It builds the Windows installer and Linux AppImage, verifies upgrade from the
-pinned 1.0.0 installer on disposable Windows runners, checks the actual Linux
+pinned 1.1.0 installer on disposable Windows runners, checks the actual Linux
 GTK/WebKit window and tool refresh, then assembles the matching source archive,
-checksums and `VERIFICATION.json`. Every gate must pass before the
-`Atelier-1.1.0-release` artifact exists.
+checksums and `VERIFICATION.json`. The bundle also includes the matching Windows
+portable ZIP, screenshots, release notes and Discord paste. Every gate must pass
+before the `Atelier-1.1.1-release` artifact exists.
 
 Windows build inputs and Inno Setup are pinned in `requirements-build.txt` and
 `scripts/windows_toolchain.json`; bootstrap with `scripts/bootstrap_windows.ps1`.
 The native tools seed and previous release are pinned in
-`tests/fixtures/installer/release-1.1.0-inputs.json`. The Galacta template pair is
+`tests/fixtures/installer/release-1.1.1-inputs.json`. The Galacta template pair is
 provided through the two `GALACTA_TEMPLATE_*_B64` encrypted repository inputs.
 It is bundled only inside Atelier and is never added to Git or source archives.
 
@@ -22,10 +23,12 @@ settings, paths, user tools, mappings and browser preferences. The normal stable
 AppId remains unchanged so existing installations are found.
 
 The workflow does not publish a release. Review the passing workflow and exact
-hashes, prepare a draft with the release assets and `docs/release-1.1.0.md`, then
+hashes, prepare a draft with the release assets and `docs/release-1.1.1.md`, then
 publish the tested commit when ready. `scripts/release_bundle.py` rejects an
 installer or Linux artifact whose hash disagrees with its test report, and a
-Windows manifest whose source commit/version differs from the checkout.
+Windows manifest whose source commit/version differs from the checkout. Portable
+files must match that manifest. Screenshot hashes and version must match
+`images/screenshots.json`; stale or missing release copy stops bundle assembly.
 
 ## Windows review package
 

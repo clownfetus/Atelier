@@ -366,11 +366,14 @@ class Reliability(unittest.TestCase):
         def extract(game_rel):
             work.with_suffix(".uasset").write_bytes(b"x")
             return str(work)
+        # Stop at the image decoder boundary. Its pooled native-tool path is
+        # deliberately outside this recovery test and differs by platform.
         with patch.object(T, "ensure_work_base", side_effect=extract) as ensure, \
-                patch.object(T, "uat", side_effect=RuntimeError("stop after resolving the base")):
+                patch.object(T, "decode_png", side_effect=RuntimeError("stop after resolving the base")) as decode:
             with self.assertRaisesRegex(RuntimeError, "stop after"):
                 T.stage_inject(str(self.cache / "stage"), "UI/T_A")
         ensure.assert_called_once_with("UI/T_A")
+        self.assertEqual(decode.call_args.args[1], str(work))
 
     def test_overlapping_build_is_rejected_without_touching_output(self):
         with T._build_lock:

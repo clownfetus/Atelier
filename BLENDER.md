@@ -1,5 +1,56 @@
 # Blender mesh editing — format spec, hard-won gotchas, and remaining work
 
+## Send to Blender or export a portable scene
+
+Model Studio → **Model → Send to Blender (live)** adds the visible body and held
+weapons to an already open Blender scene. Install **Atelier Live Bridge** once:
+open **Set up live Blender** beside the action, download the bundled ZIP, then
+in Blender 4.2 or newer choose **Preferences → Add-ons → Install from Disk**.
+Use the top-right drop-down for **Install from Disk**, select the ZIP, enable the
+extension, and keep Blender open. Blender also accepts the ZIP by drag-and-drop;
+see its [extension installation guide](https://docs.blender.org/manual/en/4.2/editors/preferences/extensions.html). Installation is
+explicit; Atelier never installs or executes an arbitrary add-on for you.
+Use one enabled Blender session at a time. Save your Blender file after sending.
+When updating Atelier, download its bundled extension again and install that ZIP
+to keep both sides compatible; a local ZIP install has no automatic update feed.
+
+**Export portable .blend** creates a standalone scene with packed textures and
+opens it in Blender. It does not require the extension. The mesh card's existing
+editing workflow remains the route for round-tripping geometry into a game mod.
+Live-send does not save a `.blend`, overwrite project paint, or install a mod.
+It reports completion only after Blender acknowledges the import; material
+warnings appear in Activity. Game animation, physics and full shader behavior
+are not recreated by either export route.
+
+For **Edit in Blender**, right-click an installed `SK_*` mesh. This creates a
+project `.blend` for the mod rebuild workflow; **Open in Blender** reopens it.
+Choose **Menu → Settings → Behavior → Add model textures to the project when
+opening in Blender** before extracting. With the switch on (the default), linked
+project textures can be painted and included in the mod. Save painted images in
+Blender with **Image → Save All Images** as well as saving the `.blend`. With the
+switch off, textures are packed into the `.blend`; newly decoded images do not
+become project texture edits. Existing painted project files are preserved.
+Portable scenes and live send pack their images independently of this switch.
+HDR cubemaps appear in Blender as tone-mapped previews, not HDR reflection nodes.
+
+Blender 4.2 is the extension's declared minimum. The 1.1.1 generated-geometry
+import, acknowledgement and saved-scene probe ran on Blender 5.1.2; this is not
+an in-game rendering check. Linux model workflows additionally need Wine and
+remain outside that Windows verification. See [Linux setup](LINUX.md).
+
+The extension ships inside both packaged platforms and is downloadable from the
+same local interface in source builds. Its `build-inputs.json` records the
+application version and SHA-256 of each packaged source and license. Developers
+can also run `python scripts/build_blender_bridge.py` to create the same ZIP.
+
+![Model Studio's live Blender setup and portable export controls](images/blender-live-setup.png)
+The bridge uses a per-user local spool, an expiring receiver identity, confined
+staged GLB/material files, and no network server or arbitrary Python requests.
+
+Replacement imports apply visible geometry modifiers before joining objects,
+correct mirrored winding, and stop on invalid scales or missing material slots
+instead of silently losing faces. Original source files remain untouched.
+
 Pipeline for editing Marvel Rivals SkeletalMesh geometry in Blender and packing the result
 as a playable mod. Vertices may be added, removed, moved, subdivided or sculpted; the
 skeleton and material set stay exactly as cooked.
@@ -809,10 +860,11 @@ ballooned past 3 GB of RAM and stalled, and larger batches of character meshes e
 gigabytes at a time.
 
 ### 5.7 Auto-LOD quality
-Lower LODs are Blender `DECIMATE` (COLLAPSE, triangulated) at each LOD's original triangle
-ratio (LOD1 ≈ 0.53, LOD2 ≈ 0.295 for this mesh). It is not the cooker's simplifier; silhouette
-quality at distance may differ from vanilla. If decimation removes every face of a material
-the build fails with a clear message naming it, since an empty section is a crash (§3.2).
+The current rebuild path uses the bundled meshoptimizer simplifier for each
+section at the destination LOD’s target triangle ratio. Retained vertex channels,
+section boundaries and skinning remain aligned. It is not the game cooker’s
+simplifier; inspect silhouette quality at distance. Missing or empty destination
+sections stop the build instead of producing an invalid mesh (§3.2).
 
 ### 5.8 Ergonomics
 - **Armature-free `.blend`**: the armature exists only so the exporter emits skinning
@@ -845,18 +897,21 @@ The resulting `.blend` appears in the project sidebar as a `mesh` item with **Op
 
 **What extract now produces.** Beside the `.blend`, a `<blend>.mat.json` manifest recording each
 slot's MI, its texture parameters with their resolved PBR role, and the staged file for each.
-Every texture the mesh's materials sample is decoded into the **active project folder** at
+With **Add model textures to the project when opening in Blender** on, each
+texture the mesh’s materials sample is decoded into the **active project folder** at
 `project_base(game_rel) + ".png"` — the same path `stage_inject` ships and the viewport's
 watchdog live-reloads, so no new injection mechanism and no sidecar mapping exist: the image's
 own file path is its identity. Existing project files are never overwritten (§3.19 degenerate
-husks excepted).
+husks excepted). With the switch off, decoding uses private staging and the
+images are packed; existing project images are still preferred and preserved.
 
 **Wiring in the .blend.** Per material, an image node per texture parameter: BaseColor→Base Color
 (sRGB), Normal→Normal Map with the green channel flipped for UE's DirectX convention (display
 only), ORM→G/B into Roughness/Metallic, Emissive→Emission Color, everything else loaded
 unconnected (MR's ColorID/dyeing masks are real editable textures with no guessable shader role).
 Material **names are never touched** — they remain the key `glb_to_sections` matches sections on
-(§3.9). Images are linked, never packed. `blend_to_glb.py` exports with
+(§3.9). Images are linked for the default project-painting workflow and packed when
+project texture copies are disabled. Portable and live scenes also pack images. `blend_to_glb.py` exports with
 `export_image_format="NONE"` so the per-LOD round-trip glbs stay geometry-only.
 
 **Building.** `build_mod()` takes `mesh_items`; `stage_mesh()` (split out of `build_from_blend`)

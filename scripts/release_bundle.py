@@ -1,6 +1,8 @@
 """Assemble a release only from artifacts that passed every platform gate."""
 import argparse,hashlib,json,os,shutil,subprocess,zipfile
 from pathlib import Path
+import release_screenshots
+from verify_portable import verify as verify_portable
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -33,41 +35,68 @@ def main():
     version=(ROOT/'version').read_text().strip()
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     manifest=load(one(art/'windows-installer','installer-manifest.json'))
+    inputs=load(ROOT/'tests/fixtures/installer'/f'release-{version}-inputs.json')
     if manifest['source_commit']!=commit or manifest['application_version']!=version:
         raise RuntimeError('Windows payload came from another source commit/version')
     installer=one(art/'windows-installer','AtelierSetup.exe')
     if sha(installer)!=manifest['installer_sha256'] or installer.stat().st_size!=manifest['installer_bytes']:
         raise RuntimeError('Windows installer does not match the verified manifest')
     linux=one(art/'linux-appimage',f'Atelier-{version}-x86_64.AppImage')
+    portable=one(art/'windows-portable',f'Atelier-Windows-{version}.zip')
+    portable_files=verify_portable(portable,manifest)
+    screenshot_receipt=release_screenshots.verify(ROOT,version)
+    copy_paths={'RELEASE_NOTES.md':ROOT/'docs'/f'release-{version}.md',
+                'DISCORD.md':ROOT/'docs'/f'discord-{version}.md'}
+    for name,path in copy_paths.items():
+        copy=path.read_text(encoding='utf-8')
+        if version not in copy or not copy.strip():raise RuntimeError('Release copy is missing its version: '+name)
+        if name=='DISCORD.md' and len(copy)>2000:raise RuntimeError('Discord paste exceeds 2000 characters')
     checks={
         'windows_backend':backend(one(art/'windows-backend-report','backend/results.json')),
         'windows_browser':browser(one(art/'windows-backend-report','browser/results.json')),
         'windows_frozen':browser(one(art/'windows-backend-report','frozen/results.json')),
         'linux_backend':backend(one(art/'linux-reports','backend/results.json')),
     }
+    executable=next((item for item in manifest['files'] if item['path']=='Atelier.exe'),None)
+    if not executable or checks['windows_frozen'].get('exe_sha256')!=executable['sha256']:
+        raise RuntimeError('Frozen application report does not match the installer executable')
     for os_name in ['windows-2022','windows-2025']:
         data=load(one(art/f'installer-report-{os_name}','results.json'))
         if not data.get('ok') or data.get('page_errors') or data['installer_sha256']!=sha(installer):
             raise RuntimeError(f'Installer gate failed: {os_name}')
+        if data.get('previous_installer_sha256')!=inputs['previous_windows_sha256']:
+            raise RuntimeError(f'Windows upgrade gate did not use the pinned previous release: {os_name}')
         checks[f'installer_{os_name}']=data
     data=load(one(art/'linux-reports','appimage-smoke/results.json'))
     if not data.get('ok') or data['appimage_sha256']!=sha(linux):raise RuntimeError('Linux desktop gate failed')
-    inputs=load(ROOT/'tests/fixtures/installer'/f'release-{version}-inputs.json')
     if data.get('previous_appimage_sha256')!=inputs['linux_seed_sha256']:
         raise RuntimeError('Linux upgrade gate did not use the pinned previous release')
     checks['linux_appimage']=data
+    input_paths=['version','CHANGELOG.md','gui','atelier','main.py','window.py','io_lib.py','Atelier.spec',
+                 'Atelier.iss','requirements.txt','requirements-build.txt','requirements-dev.txt',
+                 'scripts','tools-src','linux','images',
+                 f'docs/release-{version}.md',f'docs/discord-{version}.md',
+                 f'tests/fixtures/installer/release-{version}-inputs.json']
+    changed=subprocess.check_output(['git','status','--porcelain','--untracked-files=all','--',*input_paths],cwd=ROOT,text=True)
+    if changed.strip():raise RuntimeError('Release inputs differ from committed HEAD; commit before packaging')
     out.mkdir(parents=True)
-    for path in [installer,linux]:shutil.copy2(path,out/path.name)
+    for path in [installer,linux,portable]:shutil.copy2(path,out/path.name)
+    for name,path in copy_paths.items():shutil.copy2(path,out/name)
+    screenshots=out/f'Atelier-{version}-screenshots.zip'
+    release_screenshots.archive(ROOT,version,screenshots)
     source=out/f'Atelier-{version}-source.zip'
     subprocess.run(['git','archive','--format=zip','--prefix=Atelier-source/','--output',str(source),commit],cwd=ROOT,check=True)
     with zipfile.ZipFile(source) as archive:
         if archive.testzip():raise RuntimeError('Source archive failed integrity verification')
-    files=[{'name':p.name,'bytes':p.stat().st_size,'sha256':sha(p)} for p in [out/installer.name,out/linux.name,source]]
+    assets=[out/installer.name,out/linux.name,out/portable.name,source,screenshots,
+            *[out/name for name in copy_paths]]
+    files=[{'name':p.name,'bytes':p.stat().st_size,'sha256':sha(p)} for p in assets]
     info={'version':version,'source_commit':commit,'workflow_url':f"https://github.com/{os.environ.get('GITHUB_REPOSITORY','clownfetus/Atelier')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','local')}",
-          'files':files,'checks':checks,'game_appearance_verified':False,
+          'files':files,'checks':checks,'portable_files_verified':portable_files,
+          'screenshots':screenshot_receipt,'game_appearance_verified':False,
           'linux_wine_workflows_verified':False,'release_state_at_build':'candidate'}
     verification=out/'VERIFICATION.json';verification.write_text(json.dumps(info,indent=2)+'\n',encoding='utf-8')
-    (out/'SHA256SUMS.txt').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in [out/installer.name,out/linux.name,source,verification]),encoding='utf-8')
+    (out/'SHA256SUMS.txt').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in [*assets,verification]),encoding='utf-8')
     print(json.dumps({'version':version,'source_commit':commit,'files':files,'passed_gates':list(checks)},indent=2))
 
 if __name__=='__main__':main()

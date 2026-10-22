@@ -33,7 +33,7 @@ class NativeInputChecks(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='atelier-native-input-test-')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.tools = self.root / 'Tools'
         mesh = self.tools / 'AtelierMesh'
         mesh.mkdir(parents=True)

@@ -62,7 +62,7 @@ class PersistentImports(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory(prefix='atelier-pipe-case-')
         self.addCleanup(self.scratch.cleanup)
-        self.root = Path(self.scratch.name)
+        self.root = Path(self.scratch.name).resolve()
         self.events = self.root/'events'
         self.release = self.root/'release'
         tools = self.root/'Tools'

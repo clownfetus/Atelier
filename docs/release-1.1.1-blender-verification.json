@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "blender": "5.1.2",
+  "checks": [
+    {
+      "name": "visible bevel geometry and mirrored outward winding retained",
+      "faces": 26
+    },
+    {
+      "name": "singular replacement scale rejected"
+    },
+    {
+      "name": "packaged extension imports staged GLB into existing scene and acknowledges",
+      "meshes": 1
+    },
+    {
+      "name": "saved and reopened Blender scene preserves original and received meshes"
+    }
+  ],
+  "version": "1.1.1",
+  "generated_geometry": true,
+  "game_appearance_verified": false,
+  "source_files": {
+    "atelier/blender/import_geometry.py": "04dc0fd4113dc6b6bd9c54bf6b50ee7659228dfbdd6596da365596b92287ad44",
+    "atelier/blender/replacement_to_blend.py": "08bfd6da72cf7a06f1c40b8eec27d87d4c3fe2656c37dbd6dc71a46170272d20",
+    "atelier/blender/atelier_live_bridge/__init__.py": "cbfae4db5a5a1a1eeec82c5be57fd9136c94f0848880ecc7428f1bd88531fcd7",
+    "atelier/blender/atelier_live_bridge/tracking.py": "698aba081ec60b435928a970c710acdda9592003cd61c3a749c20bbcd59f2b65",
+    "atelier/blender/atelier_live_bridge/safety.py": "bca60ab876a134bfc36d759cd9c843a296b48305e8c08ac6747cf9a0426bbd29",
+    "atelier/blender/material_nodes.py": "9de34347ef649ee29a2c919ed0136c3206d796aa05b95d370e8f0b58598df3a6",
+    "atelier/blender_bridge.py": "93cf2044469f280f11ff13e5c6e448bf8c428715b3b196ba85cb6fae32e6008e",
+    "atelier/blender_extension.py": "4eb8ea6cd6611bb96d16bdaa5f376466c074b1f741c941baecef4b72c7fd0c87",
+    "atelier/handlers/meshport.py": "63280b83efb38da9608c0d48edc068be453d416c671b05b07e61028a89f4bbc0"
+  },
+  "extension_sha256": "fe1464ff11b4ec328a73ccf6dc3344a1473d8873e1aedcf4c10db96399ff60a3"
+}

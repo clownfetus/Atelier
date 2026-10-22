@@ -7,6 +7,8 @@ shader mapping; all graph construction here uses Atelier's bundled Python.
 """
 import json
 import os
+import shutil
+import time
 from pathlib import Path
 import re
 import tempfile
@@ -15,7 +17,7 @@ import numpy as np
 
 from atelier import config, jobs
 from atelier.storage import publish_files
-from atelier.handlers import mesh, meshedit, meshstudio, meshreplace
+from atelier.handlers import mesh, meshedit, meshstudio, meshreplace, meshmat
 
 
 def destination(game_rel):
@@ -113,3 +115,123 @@ def export(game_rel, weapons=None):
     return {'ok':True,'blend':str(target),'meshes':len(report['meshes']), 'textures':len(report['images']),
             'materials':sum(len(r.get('materials',[])) for r in reports),'warnings':list(dict.fromkeys(warnings)),
             'material_report':report}
+
+
+def _live_selection(game_rel, weapons):
+    if weapons is None: weapons=[]
+    if not isinstance(weapons,list) or len(weapons)>16:
+        raise ValueError('Invalid weapon selection')
+    skin=re.search(r'Characters/\d{4}/(\d{7})/',game_rel,re.I)
+    allowed={row['game_rel'] for row in meshstudio.skin_meshes(skin[1])
+             if row['kind']=='weapon'} if skin else set()
+    result=[];seen=set()
+    for record in weapons:
+        if (not isinstance(record,dict) or record.get('game_rel') not in allowed or
+                record.get('hand','auto') not in ('auto','left','right','both')):
+            raise ValueError('Choose a weapon belonging to this skin')
+        pair=(record['game_rel'],record.get('hand','auto'))
+        if pair not in seen:
+            seen.add(pair);result.append({'game_rel':pair[0],'hand':pair[1]})
+    return result
+
+
+def _live_edited_source(game_rel, original, work, index):
+    """Never let the mesh rebuilder write beside a live artist project."""
+    edited=Path(config.project_base(game_rel)+'.blend')
+    if not edited.is_file() or meshreplace.is_original(game_rel):
+        return original
+    isolated=work/('edited-source-'+str(index))/edited.name
+    isolated.parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(edited,isolated)
+    graft=Path(str(edited)+'.graft.json')
+    if graft.is_file():shutil.copy2(graft,str(isolated)+'.graft.json')
+    # The existing game-build pipeline checks all LODs on edited meshes.
+    # The portable-export repair candidate narrows this to LOD0 separately.
+    staged=meshedit.stage_mesh(game_rel,str(work/('edited-'+str(index))),
+                               blend_path=str(isolated),base_path=original)
+    return staged['uasset'][:-7]
+
+
+def send_to_blender(game_rel, weapons=None):
+    """Stage GLB + material metadata for the resident Blender add-on.
+
+    Unlike export(), this does not start headless Blender, create a .blend, or
+    change Mod tray entries. The running add-on imports directly and ACKs.
+    """
+    from atelier import blender_bridge
+    from contextlib import nullcontext
+    config.validate_game_rel(game_rel)
+    selected=_live_selection(game_rel,weapons)
+    root=blender_bridge.bridge_root()
+    blender_bridge.receiver_status(root)  # no costly extraction without receiver
+    job_id=blender_bridge.new_job_id()
+    stage=root/'staging'/job_id
+    stage.mkdir(parents=True,exist_ok=False)
+    submitted=False
+    warnings=[]
+    started=time.perf_counter()
+    try:
+        cache=meshmat.resolution_cache() if hasattr(meshmat,'resolution_cache') else nullcontext()
+        with cache:
+            records=[{'game_rel':game_rel,'body':True},*selected]
+            sources={};models={}
+            for index,record in enumerate(records):
+                gr=record['game_rel']
+                if gr in models:continue
+                jobs.checkpoint()
+                jobs.progress('Reading live Blender mesh · '+os.path.basename(gr))
+                source=meshstudio.complete_mesh_source(gr)
+                sources[gr]=_live_edited_source(gr,source,stage,index)
+                models[gr]=mesh.Mesh(sources[gr])
+            body=models[game_rel]
+            weapons_models=[models[gr] for gr in dict.fromkeys(r['game_rel'] for r in selected)]
+            duplicates=meshstudio.embedded_weapon_slots(body,weapons_models) if weapons_models else set()
+            prepared={}
+            for index,(gr,model) in enumerate(models.items()):
+                jobs.checkpoint()
+                jobs.progress('Preparing live Blender materials · '+os.path.basename(gr))
+                glb=stage/(str(index)+'.glb')
+                mat_path=stage/(str(index)+'.materials.json')
+                try:
+                    manifest=meshmat.build_manifest(gr,model,work_base=sources[gr],
+                                                    root=str(stage/'textures'))
+                except jobs.Cancelled:
+                    raise
+                except Exception as error:
+                    issue=os.path.basename(gr)+': material preparation failed: '+str(error)
+                    manifest={'mesh':gr,'slots':{},'warnings':[issue],'incomplete':[issue]}
+                warnings.extend(manifest.get('warnings',[]))
+                if gr==game_rel:
+                    for slot_id in duplicates:
+                        slot=manifest['slots'].get(model.materials[slot_id]['slot_name'])
+                        if slot is not None:
+                            slot['hidden']=True
+                            slot['presentation_only_hidden']=True
+                mat_path.write_text(json.dumps(manifest),encoding='utf-8')
+                mesh.export_glb(model,0,str(glb))
+                prepared[gr]={'glb':str(glb),'materials':str(mat_path)}
+            parts=[]
+            for record in records:
+                gr=record['game_rel']
+                hands=['right','left'] if record.get('hand')=='both' else [record.get('hand','auto')]
+                for hand in hands:
+                    transform,anchor=(np.eye(4),'body') if record.get('body') else attachment_transform(body,models[gr],hand)
+                    parts.append({'game_rel':gr,'name':os.path.basename(gr)+((' · '+hand) if len(hands)>1 else ''),
+                                  **prepared[gr],'transform':transform.tolist(),'anchor':anchor})
+            jobs.checkpoint()
+            jobs.progress('Sending model to running Blender…')
+            blender_bridge.receiver_status(root)
+            receiver=blender_bridge.submit(root,job_id,parts)
+            submitted=True
+            ack=blender_bridge.await_receipt(root,job_id,receiver=receiver,checkpoint=jobs.checkpoint)
+            warnings.extend(ack.get('warnings',[]))
+            return {'ok':True,'meshes':ack.get('meshes',0),'live':True,
+                    'warnings':list(dict.fromkeys(warnings)),
+                    'seconds':round(time.perf_counter()-started,3),
+                    'note':'Save your Blender file to keep these imported edits.'}
+    finally:
+        if submitted:(root/'requests'/(job_id+'.json')).unlink(missing_ok=True)
+        # Once claimed, Blender owns staging until its import ends. Cancellation
+        # must not remove files while the receiver is reading them.
+        if not (root/'requests'/(job_id+'.processing')).exists():
+            shutil.rmtree(stage,ignore_errors=True)

@@ -5,6 +5,9 @@ Start server.py with isolated ATELIER_DATA_DIR, then pass its loopback URL.
 import argparse,json,time,hashlib,subprocess
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from release_screenshots import source_hashes
+
+ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
@@ -35,6 +38,9 @@ def main():
         for value in ['dark','light']:
             theme(value);shot('studio-'+value+'.png')
         theme('dark')
+        page.evaluate("pushNav({path:'UI/Textures/HeroGallery/HeroDetail/Skin/BattleCustom'})")
+        page.wait_for_function("nav.path.endsWith('/BattleCustom') && _gridStatus==='ready' && document.querySelectorAll('#grid-area .artwork-card').length>0",timeout=120000)
+        page.wait_for_timeout(2000);shot('asset-library.png')
         page.evaluate("openMaterialEditor({name:'MI_1015502_Equip_01',game_rel:'Characters/1015/1015502/Materials/MI_1015502_Equip_01'})")
         page.wait_for_function("matEditor && document.querySelector('#mat-body .mat-parameter-group')",timeout=120000)
         page.wait_for_timeout(2000);shot('material-editor.png')
@@ -47,6 +53,10 @@ def main():
         if page.locator('#viewport-expand').get_attribute('aria-pressed')!='true':
             page.locator('#viewport-expand').click()
         shot('model-studio.png')
+        page.locator('#viewport-model-menu > summary').click()
+        page.locator('.vp-blender-help > summary').click()
+        page.wait_for_timeout(300);shot('blender-live-setup.png')
+        page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-showcase').click();page.wait_for_timeout(1200);shot('showcase.png')
         page.locator('#viewport-inspect').click()
         page.locator('#viewport-close').click()
@@ -55,12 +65,16 @@ def main():
         page.locator('#setup-overlay .setup-body').evaluate('el=>el.scrollTop=0')
         assert page.locator('#setup-aes').evaluate("el=>el.getBoundingClientRect().top >= el.closest('.setup-body').getBoundingClientRect().bottom"), 'Keep credential fields outside the captured viewport'
         page.wait_for_timeout(600);shot('appearance-settings.png')
+        page.locator('#settings-blender-project-textures').scroll_into_view_if_needed()
+        assert page.locator('#setup-aes').evaluate("el=>{const a=el.getBoundingClientRect(),b=el.closest('.setup-body').getBoundingClientRect();return a.bottom<=b.top||a.top>=b.bottom;}"), 'Keep credential fields outside the captured viewport'
+        page.wait_for_timeout(300);shot('blender-settings.png')
         assert not errors,errors
         forbidden=[u for u in requests if any(x in u for x in ['/api/material_save','/api/material_replace','/api/material_reset','/api/export','/api/install_mod'])]
         assert not forbidden,forbidden
         browser.close()
-    result={'version':Path('version').read_text().strip(),'viewport':[1400,900],'data':'Isolated configured game data; no edits saved and no mods installed','page_errors':errors,'files':[{'path':name,'sha256':hashlib.sha256((args.output/name).read_bytes()).hexdigest()} for name in files]}
+    result={'version':(ROOT/'version').read_text().strip(),'viewport':[1400,900],'data':'Isolated configured game data; no edits saved and no mods installed','page_errors':errors,'source_files':source_hashes(ROOT),'files':[{'path':name,'sha256':hashlib.sha256((args.output/name).read_bytes()).hexdigest()} for name in files]}
+    result['source_hash_format']='SHA-256; text line endings normalized to LF'
     (args.output/'screenshots.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
-    print(json.dumps(result,indent=2))
+    print(json.dumps({key:value for key,value in result.items() if key!='source_files'},indent=2))
 
 if __name__=='__main__':main()

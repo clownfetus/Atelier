@@ -1413,6 +1413,10 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
     preserve_parts=set(preserve_parts or [])
     if preserve_parts-known:raise ValueError('The saved untouched-part slots changed; import the replacement again')
     preserved=original_sections(mesh,lod_index,preserve_parts)
+    if None in by_mat:
+        raise ValueError('The exported model contains geometry without an assigned material. '
+                         'It would be omitted from the rebuilt mesh. Assign every face to '
+                         'an existing target material slot before importing/building.')
     stray = sorted(n for n in by_mat if n is not None and n not in known)
     if stray:
         raise ValueError(
