@@ -5,6 +5,21 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Add **VFX Motionboard** to the Niagara editor: synchronized editable LUT tracks,
+  playback and scrubbing, original/edited comparison, per-point and per-track
+  restores, local track organisation and 2D particle proxy arrangements. Existing
+  gradient controls, bulk editing and the Niagara export format remain available.
+- Preserve untouched Niagara LUTs during saves/exports and validate edited export
+  dimensions. Proxy inputs use precise named bindings or explicit manual choices;
+  inferred categories do not claim Unreal rendering or simulation accuracy.
+
+- Add **Bulk edit materials** to material folders and **Bulk materials** inside
+  the material editor. Select all or clear the selection, then review and save
+  opacity, named scalar, colour, parent or full material changes for up to 1,000
+  assets at once. Missing scalar overrides are reported as unchanged.
+- Preserve batch parent changes during export, reject recursive parent chains,
+  and keep reviewed material saves and their option changes recoverable together.
+
 ## 1.1.1 — 22 October 2026
 
 ### Asset pipeline and layout

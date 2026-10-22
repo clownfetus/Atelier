@@ -208,7 +208,7 @@ def api_bulk_preview():
     from atelier import bulk
     body = request.json or {}
     if body.get("background"):
-        return _submit_job("bulk-preview", "Review VFX / curve edits",
+        return _submit_job("bulk-preview", "Review batch edits",
                            lambda job: bulk.preview(body.get("items"), body.get("edit")))
     return bulk.preview(body.get("items"), body.get("edit"))
 
@@ -218,7 +218,7 @@ def api_bulk_apply():
     from atelier import bulk
     body = request.json or {}
     if body.get("background"):
-        return _submit_job("bulk-save", "Save VFX / curve edits",
+        return _submit_job("bulk-save", "Save batch edits",
                            lambda job: bulk.apply(body.get("preview_id")))
     return bulk.apply(body.get("preview_id"))
 
@@ -2118,12 +2118,15 @@ def api_material_sources():
     from atelier.catalogue import catalogue
     response.content_type = "application/json"
     query = (request.query.getunicode("q") or "").strip().casefold()
+    parents = request.query.get("parents") == "true"
     if len(query) < 2:
         return {"ok": True, "materials": [], "more": False}
     words = query.split()
     matches = {}
     for path, _container, mount in ensure_index():
-        if mount.rstrip("/") != "Marvel/Content/Marvel" or not path.lower().endswith(".uasset") or not is_material(path):
+        if mount.rstrip("/") != "Marvel/Content/Marvel" or not path.lower().endswith(".uasset"):
+            continue
+        if not (is_material(path) or parents and os.path.basename(path).upper().startswith("M_")):
             continue
         parts = path.split("/")
         label = ""

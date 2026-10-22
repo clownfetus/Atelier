@@ -63,6 +63,8 @@ def main():
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
     parser.add_argument('--idle', type=Path, help='Optional real decoded standing-idle JSON for playback verification')
     parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
+    parser.add_argument('--material-bulk-only', action='store_true', help='Run material-folder selection and reviewed batch saves')
+    parser.add_argument('--motionboard-only', action='store_true', help='Run the VFX Motionboard timeline, proxy and persistence checks')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
@@ -381,6 +383,26 @@ def main():
                     browser.close()
                     return
 
+                if args.material_bulk_only:
+                    from material_bulk_browser_checks import run_material_bulk_checks
+                    run_material_bulk_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.motionboard_only:
+                    from motionboard_browser_checks import run_motionboard_checks
+                    run_motionboard_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.appearance_only:
                     from appearance_checks import run_appearance_checks
                     run_appearance_checks(page, context, url, report, checks)
@@ -433,6 +455,10 @@ def main():
                 run_library_pins_checks(page, context, url, report, checks)
                 from jobs_bulk_browser_checks import run_job_bulk_checks
                 run_job_bulk_checks(page, context, url, report, checks)
+                from material_bulk_browser_checks import run_material_bulk_checks
+                run_material_bulk_checks(page, context, url, report, checks)
+                from motionboard_browser_checks import run_motionboard_checks
+                run_motionboard_checks(page, context, url, report, checks)
                 from thumbnail_checks import run_thumbnail_checks
                 run_thumbnail_checks(page, context, url, report, checks)
                 from texture_reconstruction_checks import run_texture_reconstruction_checks

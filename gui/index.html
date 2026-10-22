@@ -27,6 +27,7 @@
 <link rel="stylesheet" href="/static/thumbnails.css">
 <link rel="stylesheet" href="/static/library-tools.css">
 <link rel="stylesheet" href="/static/material-workflow.css">
+<link rel="stylesheet" href="/static/vfx-motionboard.css">
 <link rel="stylesheet" href="/static/export-review.css">
 <link rel="stylesheet" href="/static/job-tools.css">
 <link rel="stylesheet" href="/static/s-maps.css">
@@ -81,6 +82,7 @@
       <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
       <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
       <button class="btn" id="library-clear" type="button" hidden>Clear filters</button>
+      <button class="btn" id="bulk-material-open" type="button" hidden>Bulk edit materials</button>
       </div>
       <div class="library-view-group" role="group" aria-label="Library display">
       <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
@@ -891,6 +893,8 @@
 <script src="/static/motion/foley.js"></script>
 <script src="/static/mod-card-data.js"></script>
 <script src="/static/mod-cards.js"></script>
+<script src="/static/vfx-motionboard-data.js"></script>
+<script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
