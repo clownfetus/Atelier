@@ -561,10 +561,20 @@ def _viewport_material_payload(gr, params):
     from atelier.handlers.material_preview import eye_material
     params = _preview_surface(params)
     texs = params.get('textures', {}) or {}
-    roles, texture_urls = {}, {}
+    roles, texture_urls, texture_sources = {}, {}, []
     custom = _custom_tex.assignments(gr) if gr else {}
+    versions = {g: _tex_version(g) for g in texs.values()}
     for name, path in texs.items():
         role = texture_role(name)
+        assignment = custom.get(name)
+        source_path = _custom_tex.package_game_rel(gr, name, assignment['name'], assignment.get('folder')) if assignment else path
+        source_url = '/api/material_custom_texture/preview?' + urlencode({
+            'game_rel': gr, 'slot': name, 'v': assignment['file']}) if assignment else '/api/texture_png?' + urlencode({
+                'game_rel': path, 'v': versions[path]})
+        texture_sources.append({'slot': name, 'game_rel': source_path, 'role': role,
+                                'preview_role': role if role and role not in roles else None,
+                                'texture_class': assignment.get('texture_class', 'Texture2D') if assignment else (params.get('texture_classes') or {}).get(name),
+                                'url': source_url, 'custom': bool(assignment)})
         if role and role not in roles:
             roles[role] = path
             if name in custom:
@@ -572,9 +582,9 @@ def _viewport_material_payload(gr, params):
                     'game_rel': gr, 'slot': name, 'v': custom[name]['file']})
     dyeable = 'DyeingTexture' in texs
     eye = eye_material(params)
-    versions = {g: _tex_version(g) for g in texs.values()}
     eye_version = hashlib.sha256(json.dumps([versions, params.get('colors'), params.get('scalars'), custom], sort_keys=True).encode()).hexdigest() if eye else '0'
     return {'game_rel': gr, 'token': token(gr) if gr else None, **params, 'texture_roles': roles, 'texture_urls': texture_urls,
+            'texture_sources': texture_sources,
             'tex_ver': versions, 'dyeable': dyeable,
             'dye_ver': _dye_version(gr, texs) if dyeable else '0', 'eye_preview': eye, 'eye_ver': eye_version}
 
