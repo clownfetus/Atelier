@@ -62,6 +62,7 @@
   }
 
   function banner(path, labels = {}, artwork = {}) {
+    window.AtelierCatalogueArt?.corner(path);
     const args=[path,labels,artwork];bannerArgs=args;
     const host = document.getElementById('library-hero');
     if(!host)return;
@@ -127,10 +128,16 @@
     const logo=document.createElement('img'); logo.className='hero-emblem'; logo.alt='';
     logo.src='/api/catalogue/hero/'+match[1].split('/')[1]+'/logo'; logo.onerror=()=>logo.remove();
     title.prepend(logo);
+    const signature = document.createElement('img'); signature.className = 'library-hero-signature';
+    signature.alt = ''; signature.setAttribute('aria-hidden', 'true'); signature.draggable = false;
+    signature.decoding = 'async';
+    signature.onload = () => { if (current() && signature.isConnected) signature.classList.add('loaded'); };
+    signature.onerror = () => signature.remove();
+    signature.src = '/api/catalogue/hero/'+match[1].split('/')[1]+'/signature';
     const detail = document.createElement('p');
     detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
-    text.append(eyebrow, title, detail); host.append(image, text);
+    text.append(eyebrow, title, signature, detail); host.append(image, text);
     nextSource();
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});

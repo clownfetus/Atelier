@@ -3,9 +3,9 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
   padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--bg);
 }
-.library-filter-group,.library-view-group { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; min-width:0; }
+.library-filter-group,.library-view-group { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; min-width:0; }
 .library-view-group { padding-left:16px; border-left:1px solid var(--border); }
-.library-controls label { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font: var(--studio-type-detail); }
+.library-controls label { display: inline-flex; align-items: baseline; gap: 6px; color: var(--muted); font: var(--studio-type-detail); white-space: nowrap; }
 .library-controls select { min-height: 32px; max-width: 158px; padding: 4px 8px; background: transparent; color: var(--text); border: 1px solid transparent; border-radius: var(--studio-shape-small); font: var(--studio-type-detail); }
 .library-controls select:hover { background:var(--bg2); border-color:var(--border); }
 .library-controls select[data-active=true] { background:var(--md-sys-color-primary-container); color:var(--md-sys-color-on-primary-container); }

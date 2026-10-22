@@ -150,11 +150,18 @@
     const panel = el('section', undefined, 'modal job-modal'); panel.tabIndex = -1;
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'job-title');
     const title = el('h2', 'Activity'); title.id = 'job-title';
+    const header = el('div', undefined, 'job-header');
+    const dismiss = el('button', undefined, 'sb-clear'); dismiss.id = 'job-close'; dismiss.type = 'button';
+    dismiss.setAttribute('aria-label', 'Close activity'); dismiss.title = 'Close activity';
+    const icon = el('i'); icon.dataset.lucide = 'x'; icon.setAttribute('size', '16');
+    dismiss.append(icon); header.append(title, dismiss);
     body = el('div', undefined, 'job-body');
     const close = el('button', 'Close', 'btn');
     const hide = () => { overlay.classList.remove('active'); activityButton.focus(); };
+    dismiss.addEventListener('click', hide);
     close.addEventListener('click', hide);
-    panel.append(title, body, close); overlay.append(panel); document.body.append(overlay);
+    panel.append(header, body, close); overlay.append(panel); document.body.append(overlay);
+    window.lucide?.createIcons({nodes: [dismiss]});
     activityButton.addEventListener('click', async () => {
       overlay.classList.add('active'); panel.focus();
       try { await refresh(); } catch (error) { body.replaceChildren(el('p', error.message, 'warning')); }

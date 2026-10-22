@@ -120,6 +120,29 @@
     return url && url.startsWith('/api/catalogue/banner/') ?
       url + (url.includes('?') ? '&' : '?') + 'sharp=1' : url;
   }
+  let cornerGeneration = 0;
+  function corner(path) {
+    const host = document.getElementById('library-corner-art'); if (!host) return;
+    const generation = ++cornerGeneration, identity = describe(path), ids = resolveIds(path), cid = heroId(path);
+    host.replaceChildren(); host.hidden = true; delete host.dataset.kind;
+    if (!cid) return;
+    const image = new Image(); image.alt = ''; image.decoding = 'async'; image.draggable = false;
+    const spray = identity?.skin?.spray || (ids?.skin_id && '/api/catalogue/spray/'+ids.skin_id);
+    const sources = [spray, '/api/catalogue/hero/'+cid+'/prestige'].filter(Boolean);
+    const current = () => generation === cornerGeneration;
+    const next = () => {
+      if (!current()) return;
+      host.hidden = true;
+      if (sources.length) image.src = sources.shift(); else image.remove();
+    };
+    image.onerror = next;
+    image.onload = () => {
+      if (!current()) return;
+      host.dataset.kind = image.getAttribute('src').includes('/spray/') ? 'spray' : 'prestige';
+      host.hidden = false;
+    };
+    host.append(image); next();
+  }
   const banners = new WeakMap();
   function watchBanner(image) {
     const source = image.getAttribute('src');
@@ -171,5 +194,5 @@
     }
   }
   window.AtelierCatalogueArt = Object.freeze({heroId, heroChip, identityChip, resolveIds, describe,
-    pathLabel, setIdentities, load, bannerUrl, tray});
+    pathLabel, setIdentities, load, bannerUrl, corner, tray});
 })();

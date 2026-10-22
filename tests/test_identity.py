@@ -111,6 +111,30 @@ class Identities(unittest.TestCase):
         self.assertEqual(result['rel_path'], original['rel_path'])
         self.assertEqual(result['thumbnail'], '/api/catalogue/thumbnail/1029')
 
+    def test_show_skin_textures_reuse_only_verified_matching_costume_art(self):
+        for prefix in ('UI/Textures/Show/Skin', 'Marvel_LQ/UI/Textures/Show/Skin',
+                       '/Game/Marvel/UI/Textures/Show/Skin'):
+            for extension in ('', '.uasset'):
+                original = {'type': 'asset', 'file_type': 'texture', 'name': 'img_skin_1029304',
+                            'game_rel': prefix+'/img_skin_1029304'+extension, 'imported': False}
+                with self.subTest(path=original['game_rel']):
+                    result = self.catalogue.decorate(original)
+                    self.assertEqual(result['thumbnail'], '/api/catalogue/thumbnail/1029304')
+                    self.assertEqual({key: result[key] for key in original}, original)
+                    self.assertNotIn('thumbnail', original)
+        for path, extra in (
+            ('UI/Textures/Show/Skin/img_skin_1029304', {'imported': True}),
+            ('UI/Textures/Show/Skin/img_skin_1029304', {'file_type': 'material'}),
+            ('UI/Textures/Show/Skin/img_skin_1029305', {}),  # No costume art.
+            ('UI/Textures/Show/Skin/img_skin_1029999', {}),  # Hero fallback.
+            ('UI/Textures/Show/Skin/img_skin_1029304_icon', {}),
+            ('UI/Textures/Show/Skin/img_skin_10293040', {}),
+            ('UI/Textures/Other/Skin/img_skin_1029304', {}),
+        ):
+            with self.subTest(path=path, extra=extra):
+                self.assertNotIn('thumbnail', self.catalogue.decorate({
+                    'type': 'asset', 'file_type': 'texture', 'game_rel': path, **extra}))
+
     def test_browser_metadata_contains_only_local_artwork_routes(self):
         result = self.catalogue.identity_entries()
         self.assertEqual(result['1029304']['name'], 'Infernal Idol')

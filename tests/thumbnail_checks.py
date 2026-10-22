@@ -15,7 +15,8 @@ def run_thumbnail_checks(page, context, url, report, checks):
 
     def image(route):
         query = parse_qs(urlparse(route.request.url).query)
-        if not query.get('game_rel', [''])[0].startswith('ThumbFixture/'):
+        game_rel = query.get('game_rel', [''])[0]
+        if not game_rel.startswith('ThumbFixture/') and game_rel != skin_path:
             route.fallback()
             return
         state['reads'] += 1
@@ -68,6 +69,16 @@ def run_thumbnail_checks(page, context, url, report, checks):
     def texture(name, imported=False):
         return dict(type='asset', file_type='texture', game_rel=f'ThumbFixture/{name}', name=name, imported=imported)
 
+    skin_path = 'UI/Textures/Show/Skin/img_skin_1036300'
+    skin_art = dict(type='asset', file_type='texture', name='img_skin_1036300', game_rel=skin_path,
+                    thumbnail='/api/catalogue/thumbnail/1036300', imported=False)
+    artwork_state = {'missing': False}
+    tab.route('**/api/catalogue/thumbnail/1036300*', lambda r: r.fulfill(
+        status=404 if artwork_state['missing'] else 200, content_type='image/svg+xml',
+        body='' if artwork_state['missing'] else IMAGE))
+    tab.route('**/api/preview?*', lambda r: r.fulfill(content_type='image/svg+xml', body=IMAGE)
+              if parse_qs(urlparse(r.request.url).query).get('game_rel') == [skin_path] else r.fallback())
+
     try:
         tab.goto(url)
         tab.wait_for_function("typeof buildGrid === 'function' && window.atelierProject?.()")
@@ -82,6 +93,43 @@ def run_thumbnail_checks(page, context, url, report, checks):
         assert all(query['_project'] == ['Smoke A'] for kind, query in requests if kind == 'image')
         checks.append('Cached original and imported texture previews remain visible after search and grid rebuilds, with the originating project in image URLs')
 
+        requests.clear()
+        render([skin_art, texture('Unmatched')])
+        ready(2)
+        assert tab.locator('img[data-game-rel="'+skin_path+'"]').get_attribute('src') == skin_art['thumbnail']
+        assert all(body.get('game_rel') != [skin_path] for kind, body in requests if kind == 'image')
+        assert all(skin_path not in body.get('game_rels', []) for kind, body in requests if kind != 'image')
+        assert any(body.get('game_rels') == ['ThumbFixture/Unmatched'] for kind, body in requests if kind == 'prefetch')
+        tab.evaluate("path => handleSSE({game_rel:path,thumb_failed:true})", skin_path)
+        ready(2)
+        tab.evaluate("() => previewLibraryCard(_makeCard(allItems[0]), document.activeElement)")
+        assert tab.locator('#library-preview img').get_attribute('src') == skin_art['thumbnail']
+        tab.locator('#library-preview-close').click()
+        checks.append('Matched skin UI portraits use catalogue artwork in the grid and Quick preview, and only unmatched textures enter the decode queue')
+
+        tab.evaluate("""path => {
+          updateImportedCard(path, {token:'skin-edited'});
+          refreshEditedTexture(path, 'skin-edited', false);
+        }""", skin_path)
+        tab.wait_for_function("path => document.querySelector('img[data-game-rel=\"'+path+'\"]').src.includes('/api/preview?')", arg=skin_path)
+        assert tab.evaluate("!allItems[0].thumbnail && !document.querySelector('#grid-area .card')._libraryCard.thumbnail")
+        tab.evaluate("() => previewLibraryCard(_makeCard(allItems[0]), document.activeElement)")
+        assert '/api/preview?' in tab.locator('#library-preview img').get_attribute('src')
+        tab.locator('#library-preview-close').click()
+        checks.append('Editing a skin UI portrait switches the visible card and Quick preview to the project image')
+
+        artwork_state['missing'] = True
+        requests.clear()
+        render([{**skin_art, 'thumbnail': skin_art['thumbnail']+'?unavailable=1'}])
+        tab.locator('.thumbnail-fallback-label').wait_for()
+        assert not requests, 'Missing catalogue artwork unexpectedly queued texture decoding'
+        artwork_state['missing'] = False
+        tab.locator('#grid-area .card').click(button='right')
+        tab.get_by_role('button', name='Retry preview', exact=True).click()
+        ready(1)
+        assert not requests, 'Retrying catalogue artwork unexpectedly queued texture decoding'
+        checks.append('Unavailable cached skin artwork has a retryable fallback without starting texture extraction')
+
         state.update(mode='queued', statuses=0)
         render([texture('Missed_N')])
         ready(1)
@@ -95,7 +143,7 @@ def run_thumbnail_checks(page, context, url, report, checks):
         assert tab.locator('#grid-area script').count() == 0
         state['mode'] = 'cached'
         tab.locator('#grid-area .card').click(button='right')
-        tab.get_by_text('Retry preview', exact=True).click()
+        tab.get_by_role('button', name='Retry preview', exact=True).click()
         ready(1)
         assert any(kind == 'prefetch' and body.get('retry') for kind, body in requests)
         checks.append('Decode failures replace spinners with a clear fallback; Retry preview requests a fresh attempt and restores the image')

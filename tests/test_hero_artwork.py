@@ -19,7 +19,9 @@ def page(kind, ids):
                        f'{"Magik" if cid == "1029" else "Thor"}%20{suffix.replace(" ", "%20")}.png" '
                        f'alt="{"Magik" if cid == "1029" else "Thor"} {suffix}">' for cid in ids).encode()
     folder, filename = {'avatar':('hero-icons-avatars', 'img_squarehead_{}0010_avatar'),
-        'logo':('hero-logos', 'img_herologo_{}_logo'), 'story':('hero-story-images', 'img_herostory_{}01_hover')}[kind]
+        'logo':('hero-logos', 'img_herologo_{}_logo'), 'story':('hero-story-images', 'img_herostory_{}01_hover'),
+        'prestige':('hero-prestige-images', 'img_prestige_{}0010_hero'),
+        'signature':('hero-signatures', 'img_story_herosign_{}_sign')}[kind]
     return ''.join(f'<img src="{PREFIX}{folder}/{filename.format(cid)}.png">' for cid in ids).encode()
 
 
@@ -74,16 +76,20 @@ class Artwork(unittest.TestCase):
         with patch('atelier.hero_artwork.fetch', side_effect=fetch):
             first = HeroArtwork(self.root)
             first.update({'magik': '1029', 'thor': '1035'})
+            self.assertIsNotNone(first.image('1029', 'prestige'))
+            self.assertIsNotNone(first.image('1029', 'signature'))
             self.assertIsNotNone(first.image('1029', 'avatar'))
             self.assertIsNotNone(first.image('1029', 'logo'))
             ids.append('1035')
             second = HeroArtwork(self.root)
             second.update({'magik': '1029', 'thor': '1035'})
+            self.assertIsNotNone(second.image('1035', 'prestige'))
+            self.assertIsNotNone(second.image('1035', 'signature'))
         for kind, url in PAGES.items():
             self.assertEqual(Counter(calls)[url], 2, kind)
             self.assertIsNotNone(second.image('1035', kind), kind)
         self.assertIsNone(second.status()['error'])
-        self.assertEqual(len([url for url in calls if url not in PAGES.values()]), 10)
+        self.assertEqual(len([url for url in calls if url not in PAGES.values()]), 14)
         self.assertEqual(second.status()['avatars'], 2)
         self.assertEqual(second.status()['logos'], 2)
         self.assertIsNotNone(second.image('1035','avatar'))
@@ -97,6 +103,45 @@ class Artwork(unittest.TestCase):
         for order in (urls,urls[::-1]):
             result=parse_assets(''.join(f'<img src="{url}" alt="Wrong hero">' for url in order),'story',{'deadpool story':'1111'})
             self.assertEqual(result,{'1057':urls[1],'1029':urls[2]})
+
+    def test_signatures_use_verified_numeric_hero_ids_and_cache_on_demand(self):
+        base = PREFIX+'hero-signatures/'
+        url = base+'img_story_herosign_1036_sign.png'
+        html = f'<img src="{base}Spider-Man%20Signature.png"><img src="{url}"><img src="{base}img_story_herosign_9999_sign.png">'
+        self.assertEqual(parse_assets(html, 'signature', {'spiderman': '1029'}), {'1036': url})
+        self.assertEqual(parse_assets(html.replace('rivalskins.com/', 'rivalskins.com.evil/'), 'signature', {}), {})
+        artwork = HeroArtwork(self.root)
+        artwork.entries = {'1036': {'signature': url}}
+        with patch('atelier.hero_artwork.fetch', return_value=(self.raw, {})) as get:
+            image = artwork.image('1036', 'signature')
+            self.assertTrue(image.is_file())
+            self.assertEqual(artwork.image('1036', 'signature'), image)
+            get.assert_called_once_with(url)
+        artwork.entries['1029'] = {'signature': base+'img_story_herosign_1029_sign.png'}
+        with patch('atelier.hero_artwork.fetch', side_effect=OSError('offline')) as get:
+            self.assertEqual(artwork.image('1036', 'signature'), image)
+            self.assertIsNone(artwork.image('1029', 'signature'))
+            self.assertIsNone(artwork.image('1029', 'signature'))
+            get.assert_called_once()
+
+    def test_prestige_uses_explicit_ids_and_downloads_only_when_requested(self):
+        base = PREFIX+'hero-prestige-images/'
+        urls = [base+'spider-man_prestige.png', base+'img_prestige_10360010_hero.png',
+                base+'img_prestige_10110013_hero.png', base+'img_prestige_99990010_hero.png']
+        parsed = parse_assets(''.join(f'<img src="{url}">' for url in urls), 'prestige', {})
+        self.assertEqual(parsed, {'1036': urls[1], '1011': urls[2]})
+        artwork = HeroArtwork(self.root)
+        artwork.entries = {'1036': {'prestige': urls[1]}}
+        with patch('atelier.hero_artwork.fetch', return_value=(self.raw, {})) as get:
+            first = artwork.image('1036', 'prestige')
+            self.assertTrue(first.is_file())
+            self.assertEqual(artwork.image('1036', 'prestige'), first)
+            get.assert_called_once_with(urls[1])
+        offline = HeroArtwork(self.root)
+        offline.entries = artwork.entries
+        with patch('atelier.hero_artwork.fetch', side_effect=OSError('offline')) as get:
+            self.assertEqual(offline.image('1036', 'prestige'), first)
+            get.assert_not_called()
 
     def test_hood_uses_published_portrait_instead_of_silhouette_in_either_page_order(self):
         urls=[f'{PREFIX}hero-icons-avatars/img_squarehead_10660010_avatar.png',

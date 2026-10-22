@@ -1,4 +1,11 @@
 #library-hero[hidden] { display: none; }
+.library-content { position: relative; isolation: isolate; display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.library-content #grid-area { position: relative; z-index: 1; min-width: 0; min-height: 0; }
+#library-corner-art { position: absolute; right: -28px; bottom: -40px; width: min(46%, 440px); height: min(100%, 480px); opacity: .22; mask-image: linear-gradient(135deg, transparent 8%, #000 52%); pointer-events: none; user-select: none; }
+#library-corner-art[data-kind=spray] { right: -12px; bottom: -24px; width: min(40%, 360px); height: min(88%, 400px); opacity: .18; }
+#library-corner-art[hidden] { display: none; }
+#library-corner-art img { width: 100%; height: 100%; object-fit: contain; object-position: right bottom; }
+:root[data-theme=light] #library-corner-art { opacity: .12; }
 #library-hero {
   position: relative; isolation: isolate; overflow: hidden; flex: 0 0 auto;
   min-height: 156px; margin: 0;
@@ -22,11 +29,14 @@
 }
 .library-hero-copy { position: relative; z-index: 2; width: fit-content; max-width: 48%; padding: 22px 24px; }
 .library-hero-copy > span { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); }
-.library-hero-copy h2 { display:flex; align-items:center; gap:10px; margin: 8px 0; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
+.library-hero-copy h2 { display:flex; align-items:center; gap:10px; margin: 8px 0 2px; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
+.library-hero-signature { display: block; width: 132px; height: 36px; max-width: 100%; margin: -2px 0 8px; object-fit: contain; object-position: left center; visibility: hidden; opacity: .45; filter: var(--studio-brand-filter); pointer-events: none; user-select: none; }
+.library-hero-signature.loaded { visibility: visible; }
 .library-hero-copy p { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 /* Both kinds of banner bleed to the header edges; the surface behind the copy keeps it readable. */
 .library-hero-art.nameplate { width: 84%; }
 @media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 14px 20px; } .library-hero-copy h2 { font-size: 24px; } }
+@media (max-height: 800px) { .library-hero-signature { width: 112px; height: 30px; margin-bottom: 6px; } }
 
 /* Only the grid container moves. Shared elements have their own named snapshots. */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }

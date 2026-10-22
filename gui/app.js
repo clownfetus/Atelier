@@ -374,6 +374,7 @@ function _makeCard(item) {
     label:     item.name,
     iconCls:   assetIconCls(ft),
     imported:  item.imported,
+    thumbnail: item.imported ? null : item.thumbnail,
     token:     item.token,
     swatches:  item.swatches,
     game_rel:  item.game_rel,
@@ -671,11 +672,13 @@ function updateImportedCard(gameRel, record) {
   const item = allItems.find(row => row.game_rel === gameRel);
   if (!item || !record) return;
   Object.assign(item, {imported:true, token:record.token});
+  delete item.thumbnail;
   const area = document.getElementById('grid-area'), grid = area.querySelector('.grid');
   if (!grid) return;
   const button = [...grid.querySelectorAll('.card')].find(node => node._libraryCard?.game_rel === gameRel);
   if (button) {
     Object.assign(button._libraryCard, {imported:true, token:record.token});
+    delete button._libraryCard.thumbnail;
     if (!button.classList.contains('imported')) _playEditDissolve(button);
     button.classList.add('imported');
     if (!button.querySelector('.card-editing-badge')) {
