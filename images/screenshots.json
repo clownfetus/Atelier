@@ -237,7 +237,7 @@
     "gui/motion/material-save.js": "7519bca78d1015080a8e58a845610ec4816188c31dafe37b23e98a1a6a3831d6",
     "gui/motion/material-save.svg": "1c457afdb395ed7fc58b8f08933ec952e2e36ac295e91ca91c58d44efc4de1aa",
     "gui/motion/moment.js": "91dafbf8b418467c964018e1378ae9e939a135b46a5b9c85f00c53308b09609d",
-    "gui/motion/motion-preview.js": "f2140229699b4d74fcd5293d13b1c8d1c77aa266fffd2d2c6b42fddff5f12310",
+    "gui/motion/motion-preview.js": "961ba5251e6480b2fe1ccfdd6a6ecb3337be76c01a7305f1c2af2948497f546d",
     "gui/motion/README.md": "e1c979f650819cef1e0a5864f4476a328f3369c73a8cd6b386a88aec067074dd",
     "gui/motion/showcase-art.js": "8d207a190e46947d3f1c31e711b837ad429125a2bc81572c9e2352d29482211b",
     "gui/motion/surface-adapters.js": "8fed9340c5f026758cd8fbff92e87c7db44625ef72e3e0cff92d5cb95b978e46",
@@ -305,11 +305,11 @@
   "files": [
     {
       "path": "studio-dark.png",
-      "sha256": "b0f35b97370e8b6f7322bde2791943366fee21b21fd8b74bb9d4d90d8cfd417a"
+      "sha256": "a5c10843effe8cad3e32cd2a64d906c86ccb824d974a92b5ea5959608c02bb34"
     },
     {
       "path": "studio-light.png",
-      "sha256": "236d26ddcb7232e8451ffd115dfc62d7ad4a6ae2fe5f33db72ac9b15e1e33679"
+      "sha256": "e2f80c09b25f03bc80738d4dc540022c946650ccdecce0bb0b0b3935f3d702ad"
     },
     {
       "path": "asset-library.png",
@@ -325,23 +325,23 @@
     },
     {
       "path": "model-studio.png",
-      "sha256": "6d30bcb9c30419d14b616439235c6a0934326d601f9581f8129c6dca1631b289"
+      "sha256": "0dccf0ff8ce43f8328f9e5be588c8500c79f977943f68ad883181072a17d3622"
     },
     {
       "path": "blender-live-setup.png",
-      "sha256": "d99c436b16b9c86c98e7ce360bb2b98e9cf5e02245cf594c73f83c74d0f50d38"
+      "sha256": "77aef30ce31b695aefa7383f91884bd03a62fa17f4416366f76de43ef306f32b"
     },
     {
       "path": "showcase.png",
-      "sha256": "7d22587523bebdf475a1cb65fc54354c7bcc7d050d86a01654df7529ca409444"
+      "sha256": "cb983b7f7af23950ede6cb5286833a5336ea9f24b96ba6e404cbc9b0edf6d788"
     },
     {
       "path": "assembly-view.png",
-      "sha256": "20242778345b9b71dd7d8443c88ba8308c9381ccec65eca8150006f5c59c0fc0"
+      "sha256": "421149b653433e0efed709de0cb91f5044d90ced191c9e4610bf17ac080eda4a"
     },
     {
       "path": "uv-xray.png",
-      "sha256": "47ceebedaf0c5568559571464a0b797c97e13f8ebfb676abff1c1881b7ed208f"
+      "sha256": "c0e550269adec319244c907d4d299257cb07fe7c545a4f29c737b76025520f52"
     },
     {
       "path": "vfx-motionboard.png",
@@ -349,11 +349,11 @@
     },
     {
       "path": "appearance-settings.png",
-      "sha256": "3f7ed31ae46acc466a2e9b376a603e335812e408158b4ef1655749f5e3335d05"
+      "sha256": "572cc82f24b28f92ce4f5c940fb9b101fb095ef2844e7a09d12604c5d8872986"
     },
     {
       "path": "krackle-examples.png",
-      "sha256": "82408b10b8da42d10ef0bdfda06e86eb0dad65e03b8c6e179e163399eb93031a"
+      "sha256": "c8624d089ad1d11ec75eb930da7e375856a7fdab625f79176a111009467c1b1c"
     },
     {
       "path": "blender-settings.png",

@@ -23,7 +23,7 @@
   const handoffTitle = document.createElement('span'); handoffTitle.className = 'k-motion-handoff-title';
   handoffTitle.textContent = 'Replay ink handoff';
   const handoffSurfaces = [];
-  for (const [label, icon] of [['Edit', 'file-box'], ['Mod tray', 'package']]) {
+  for (const [label, icon] of [['Edit', 'pencil'], ['Mod tray', 'package']]) {
     const item = document.createElement('span'); item.className = 'k-motion-handoff-item';
     const surface = document.createElement('span'); surface.className = 'k-motion-sample-art';
     surface.setAttribute('aria-hidden', 'true');

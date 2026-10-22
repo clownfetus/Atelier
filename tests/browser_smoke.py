@@ -609,6 +609,8 @@ def main():
                     assert stats[-1]['geometries'] <= stats[0]['geometries'], stats
                     assert stats[-1]['textures'] <= stats[0]['textures'], stats
                     checks.append('Real decoded GLB renders; three reopen/close cycles stop animation and release geometry')
+                from assembly_browser_checks import run_assembly_checks
+                run_assembly_checks(context, url, report, checks)
                 assert not errors, errors
 
                 # Capture the original frontend against the same deterministic fixture data.

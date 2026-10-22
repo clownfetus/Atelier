@@ -20,7 +20,9 @@ are not staged into the candidate.
   binds each capture to the version and source hashes.
 - The release workflow installs Chromium before backend checks on both platforms
   because the UV regression includes a real browser. The minimal DOM fixture now
-  supports the custom events emitted when project assets change.
+  supports the custom events emitted when project assets change. The default
+  browser suite includes the existing Assembly checks and verifies Showcase's
+  current SVG border flow. The Krackle handoff preview uses the mapped Edit icon.
 
 ## Evidence and publication
 
@@ -31,7 +33,9 @@ appearance inspection. The [Assembly](assembly-verification-2026-10-22.md) and
 checks. Those records are not substitutes for testing the new packaged release.
 
 The 1.1.2 source passed all 60 backend check files on Windows, including 647
-reported unit tests and the UV browser regression. The complete screenshot set
+reported unit tests and the UV browser regression. All 300 existing full-suite
+browser checks passed with no page errors, followed by the seven Assembly
+interaction checks; those are now included in the default suite. The complete screenshot set
 contains 14 current interface captures, including Assembly, UV X-Ray,
 Motionboard and the Krackle examples.
 
