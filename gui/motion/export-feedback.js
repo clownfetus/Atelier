@@ -41,26 +41,6 @@
     return Math.round(value * 100) / 100 + 'px';
   }
 
-  function crestFrames(peak) {
-    return [
-      { transform: 'scale(1)', offset: 0 },
-      { transform: 'scale(' + peak + ')', offset: 0.1 },
-      { transform: 'scale(' + (1 + (peak - 1) * 0.35) + ')', offset: 0.3 },
-      { transform: 'scale(1)', offset: 0.55 },
-      { transform: 'scale(1)', offset: 1 }
-    ];
-  }
-
-  function holeFrames() {
-    return [
-      { transform: 'scale(0)', offset: 0 },
-      { transform: 'scale(1)', offset: 0.1 },
-      { transform: 'scale(0.55)', offset: 0.3 },
-      { transform: 'scale(0)', offset: 0.5 },
-      { transform: 'scale(0)', offset: 1 }
-    ];
-  }
-
   function orbitFrames(orbit) {
     var frames = [];
     var rest = Math.atan2((orbit.rest[1] - orbit.cy) / orbit.ry, (orbit.rest[0] - orbit.cx) / orbit.rx);
@@ -110,6 +90,18 @@
     host.setAttribute('data-am-state', currentState);
     host.setAttribute('data-am-reduced', String(isReducedMotion()));
     host.innerHTML = SVG_MARKUP;
+
+    function repaintEnergy() {
+      if (destroyed) return;
+      var palette = window.AtelierMotion.energy?.resolve(host);
+      var artwork = host.querySelector('svg');
+      if (!artwork || !palette) return;
+      artwork.style.setProperty('--am-local-charge', palette.charge);
+      artwork.style.setProperty('--am-local-rift', palette.rift);
+    }
+    repaintEnergy();
+    window.addEventListener('atelier:energy', repaintEnergy);
+    window.addEventListener('atelier:inks', repaintEnergy);
 
     function q(selector) { return host.querySelector(selector); }
     function qa(selector) { return Array.prototype.slice.call(host.querySelectorAll(selector)); }
@@ -195,25 +187,34 @@
         return;
       }
 
-      // The charge travels clockwise: each dot swells and shows a bubble as it passes.
+      // Pack opposing dots inward in three folds; the pause reads as held work.
       for (var k = 0; k < dots.length; k++) {
-        var timing = {
-          duration: BUSY_DURATION_MS,
-          delay: (k * BUSY_DURATION_MS) / dots.length,
-          iterations: Infinity,
-          easing: 'linear'
-        };
-        trackAnimation(dots[k], crestFrames(1.62), timing);
-        trackAnimation(dotHoles[k], holeFrames(), timing);
+        var d = centreOffset(dots[k], 12, 12);
+        var packed = 'translate(' + px(-d[0] * 0.48) + ', ' + px(-d[1] * 0.48) + ')';
+        var timing = {duration: BUSY_DURATION_MS, delay: (k % 3) * 70,
+          iterations: Infinity, easing: 'linear'};
+        trackAnimation(dots[k], [
+          {transform: 'translate(0px, 0px) scale(1)', offset: 0, easing: EASE_STANDARD},
+          {transform: packed + ' scale(.76)', offset: .32},
+          {transform: packed + ' scale(.76)', offset: .5, easing: EASE_SWAY},
+          {transform: 'translate(0px, 0px) scale(1)', offset: .78},
+          {transform: 'translate(0px, 0px) scale(1)', offset: 1}
+        ], timing);
+        trackAnimation(dotHoles[k], [
+          {transform: 'scale(0)', offset: 0},
+          {transform: packed + ' scale(.65)', offset: .32},
+          {transform: packed + ' scale(.65)', offset: .5},
+          {transform: 'scale(0)', offset: .78}, {transform: 'scale(0)', offset: 1}
+        ], timing);
       }
     }
 
     function playSuccess() {
       trackAnimation(burst, [
-        { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
-        { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
-        { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
-        { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
+        { transform: 'translate(-2px, 3px) scale(.3)', opacity: 0, offset: 0, easing: EASE_STANDARD },
+        { transform: 'translate(1px, -1px) scale(.92)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+        { transform: 'translate(0px, .5px) scale(1.02, .96)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
+        { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 1 }
       ], { duration: POP_DURATION_MS, easing: 'linear' });
       trackAnimation(burstHole, [
         { transform: 'scale(0)', offset: 0 },
@@ -299,7 +300,7 @@
       if (fromState === 'busy' || fromState === 'idle') {
         trackAnimation(fromState === 'busy' ? busyGroup : idleGroup, [
           { opacity: 1, transform: 'scale(1)' },
-          { opacity: 0, transform: 'scale(0.7)' }
+          { opacity: 0, transform: targetState === 'success' ? 'translateY(-4px) scale(.35)' : 'scale(.7)' }
         ], { duration: 140, easing: EASE_STANDARD, fill: 'forwards' });
       }
 
@@ -325,7 +326,7 @@
       } else if (currentState === 'busy') {
         startBusyLoop();
         if(host.closest('#install-btn')&&!isReducedMotion()&&!isDocumentHidden()&&window.AtelierMotionPolicy?.allows(2)) {
-          trackAnimation(fallingDrop,[{transform:'translateY(-32px) scale(.7)',opacity:1},{transform:'translateY(0) scale(1)',opacity:1,offset:.94},{transform:'scale(1.3,.5)',opacity:0}],{duration:420,easing:EASE_FALL});
+          trackAnimation(fallingDrop,[{transform:'translateY(-4px) scale(.7)',opacity:1},{transform:'translateY(0) scale(1)',opacity:1,offset:.94},{transform:'scale(1.3,.5)',opacity:0}],{duration:420,easing:EASE_FALL});
           trackAnimation(busyGroup,[{opacity:0},{opacity:1}],{duration:120,delay:420,fill:'backwards'});
         }
       } else {
@@ -373,6 +374,8 @@
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
+        window.removeEventListener('atelier:energy', repaintEnergy);
+        window.removeEventListener('atelier:inks', repaintEnergy);
         cancelActiveAnimations();
         if (mql) {
           if (typeof mql.removeEventListener === 'function') {

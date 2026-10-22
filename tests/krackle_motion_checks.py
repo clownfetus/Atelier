@@ -1,5 +1,8 @@
 """Krackle animations added across the app, using the real frontend and local fixtures only."""
 import subprocess
+from io import BytesIO
+
+from PIL import Image, ImageChops
 import sys
 from pathlib import Path
 
@@ -20,23 +23,63 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.wait_for_selector('#grid-area .card')
         tab.emulate_media(reduced_motion='no-preference')
 
-        # Every .spinner is the CSS charge ring: six dots, a crest that counts round in steps.
+        # Native 20px spinners carry opaque connected ink; pressure follows the conduit, not a rotation.
         spinner = tab.evaluate("""() => {
-          const s = document.createElement('div'); s.className = 'spinner'; document.body.append(s);
+          const s = window.fluidSpinner = document.createElement('div'); s.className = 'spinner';
+          s.style.cssText='position:fixed;left:24px;top:130px;background:#14161b;--krackle-energy:#e0a552;z-index:9999';
+          document.body.append(s);
           const after = getComputedStyle(s, '::after'), before = getComputedStyle(s, '::before');
-          const result = {name: after.animationName, timing: after.animationTimingFunction, duration: after.animationDuration,
-            mask: (after.maskImage || after.webkitMaskImage || '').startsWith('url('),
-            ring: (before.maskImage || before.webkitMaskImage || '').startsWith('url('), border: getComputedStyle(s).borderTopWidth};
-          s.remove(); return result;
+          const mask = decodeURIComponent(before.maskImage || before.webkitMaskImage || '');
+          return {name:after.animationName,timing:after.animationTimingFunction,duration:after.animationDuration,
+            pressure:(after.maskImage || after.webkitMaskImage || '').startsWith('url('),
+            connected:mask.includes('M5 5C5 9 10 7 10 11C10 15 16 12 16 18'),
+            holes:mask.includes('<mask') && mask.includes("fill='black'"),
+            opaque:before.opacity,border:getComputedStyle(s).borderTopWidth,width:s.getBoundingClientRect().width,
+            stationary:before.transform==='none' && before.animationName==='none'};
         }""")
-        assert spinner['name'] == 'krackle-charge' and 'steps' in spinner['timing'], spinner
-        assert spinner['duration'] == '1.04s', spinner
-        assert spinner['mask'] and spinner['ring'] and spinner['border'] == '0px', spinner
+        assert spinner['name'] == 'krackle-fluid-charge' and 'steps' not in spinner['timing'], spinner
+        assert spinner['duration'] == '1.04s' and spinner['width'] == 20, spinner
+        assert spinner['pressure'] and spinner['connected'] and spinner['holes'], spinner
+        assert spinner['opaque'] == '1' and spinner['stationary'] and spinner['border'] == '0px', spinner
+        samples = []
+        for phase in (220, 660):
+            tab.evaluate('phase=>{for(const a of fluidSpinner.getAnimations()){a.pause();a.currentTime=phase;}}', phase)
+            pixels = Image.open(BytesIO(tab.locator('.spinner').last.screenshot())).convert('RGB')
+            assert pixels.size == (20, 20), pixels.size
+            ink = {(x, y) for y in range(20) for x in range(20)
+                   if max(abs(pixels.getpixel((x, y))[c] - (20, 22, 27)[c]) for c in range(3)) > 28}
+            count = len(ink)
+            largest = 0
+            while ink:
+                todo = [ink.pop()]
+                size = 0
+                while todo:
+                    x, y = todo.pop()
+                    size += 1
+                    for dx, dy in ((-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1)):
+                        point = (x+dx, y+dy)
+                        if point in ink:
+                            ink.remove(point)
+                            todo.append(point)
+                largest = max(largest, size)
+            assert count >= 60 and largest >= count * .9, (phase, count, largest)
+            pixels.save(report / f'fluid-spinner-{phase}.png')
+            samples.append(pixels)
+        assert ImageChops.difference(*samples).getbbox(), 'Pressure did not travel through the stationary fluid carrier'
+        tab.evaluate('for(const a of fluidSpinner.getAnimations())a.play()')
+        for mode in ('calm', 'off'):
+            tab.evaluate("mode=>{window.spinnerOldMode=document.documentElement.dataset.krackle;document.documentElement.dataset.krackle=mode;}", mode)
+            assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationName") == 'none'
+            assert tab.evaluate("getComputedStyle(fluidSpinner,'::before').opacity") == '1'
+            tab.evaluate('document.documentElement.dataset.krackle=spinnerOldMode')
+        tab.evaluate("document.documentElement.setAttribute('data-krackle-hidden','')")
+        assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationPlayState") == 'paused'
+        tab.evaluate("document.documentElement.removeAttribute('data-krackle-hidden')")
         tab.emulate_media(reduced_motion='reduce')
-        assert tab.evaluate("""() => { const s = document.createElement('div'); s.className = 'spinner'; document.body.append(s);
-          const name = getComputedStyle(s, '::after').animationName; s.remove(); return name; }""") == 'none'
+        assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationName") == 'none'
         tab.emulate_media(reduced_motion='no-preference')
-        checks.append('Every spinner renders as the Krackle charge ring and stops under reduced motion')
+        tab.evaluate('fluidSpinner.remove()')
+        checks.append('Native20px spinners render one opaque masked reservoir/conduit/receiver with travelling pressure; Calm/Off/reduced keep the connected pose and hidden pauses it')
 
         # Job toasts resolve from the charge ring into a Krackle result that pops once, then holds still.
         # The export-feedback set owns operation toasts; without it, app.js falls back to a Krackle glyph.

@@ -62,6 +62,7 @@
   }
 
   function banner(path, labels = {}, artwork = {}) {
+    window.AtelierCatalogueArt?.corner(path);
     const args=[path,labels,artwork];bannerArgs=args;
     const host = document.getElementById('library-hero');
     if(!host)return;
@@ -95,13 +96,17 @@
       hero.avatar||'/api/catalogue/hero/'+match[1].split('/')[1]+'/avatar',
       hero.thumbnail||'/api/catalogue/thumbnail/'+match[1].split('/')[1],story,
     ].filter(Boolean))];
+    let identityColoured = false;
     const tint=(index=0)=>{
       if(!current()||index>=sources.length)return;
       const source=new Image();
       source.onload=()=>{
         if(!current())return;
         const colour=window.AtelierPolish?.accent(source);
-        if(colour){host.style.setProperty('--library-art-colour',colour);host.classList.add('has-art-colour');}
+        if(colour){
+          host.style.setProperty('--library-art-colour',colour);host.classList.add('has-art-colour');
+          identityColoured = true; window.AtelierPolish?.artwork(source);
+        }
         else tint(index+1);
       };
       source.onerror=()=>tint(index+1);source.src=sources[index];
@@ -113,7 +118,10 @@
     const showNameplate = on => { image.classList.toggle('nameplate', on); host.classList.toggle('has-nameplate', on); };
     let sourceIndex = 0;
     const nextSource = () => { showNameplate(sourceIndex < plates.length); image.src = bannerSources[sourceIndex++]; };
-    image.onload = () => { if(current()&&image.isConnected){host.classList.add('has-art'); window.AtelierPolish?.artwork(image);} };
+    image.onload = () => { if(current()&&image.isConnected){
+      host.classList.add('has-art');
+      if (!identityColoured) window.AtelierPolish?.artwork(image);
+    } };
     image.onerror = () => {
       if(!current())return;
       if (sourceIndex < bannerSources.length) { nextSource(); return; }
@@ -127,10 +135,16 @@
     const logo=document.createElement('img'); logo.className='hero-emblem'; logo.alt='';
     logo.src='/api/catalogue/hero/'+match[1].split('/')[1]+'/logo'; logo.onerror=()=>logo.remove();
     title.prepend(logo);
+    const signature = document.createElement('img'); signature.className = 'library-hero-signature';
+    signature.alt = ''; signature.setAttribute('aria-hidden', 'true'); signature.draggable = false;
+    signature.decoding = 'async';
+    signature.onload = () => { if (current() && signature.isConnected) signature.classList.add('loaded'); };
+    signature.onerror = () => signature.remove();
+    signature.src = '/api/catalogue/hero/'+match[1].split('/')[1]+'/signature';
     const detail = document.createElement('p');
     detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
-    text.append(eyebrow, title, detail); host.append(image, text);
+    text.append(eyebrow, title, signature, detail); host.append(image, text);
     nextSource();
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});
@@ -211,6 +225,7 @@
     const bounds = el.getBoundingClientRect();
     el.style.transformOrigin = `${Math.max(0, Math.min(bounds.width, x - bounds.x))}px ${Math.max(0, Math.min(bounds.height, y - bounds.y))}px`;
     animate(el, [{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'scale(1)'}], 120);
+    window.AtelierMotion?.workflow?.menu(el);
   }
   reduced.addEventListener('change', () => { if (reduced.matches) active?.skipTransition(); });
   window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu, cancelWorkflow});

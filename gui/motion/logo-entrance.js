@@ -1,6 +1,6 @@
-/* Adapted from the supplied Gemini logo entrance. Original PNG remains caller-owned.
- * Krackle: as the mark stamps into place, a ring of six charge bubbles pops out from
- * behind it and fades at the edge of the 32px slot. The mark itself is never redrawn.
+/* Original PNG remains caller-owned. The mark presses into the surface like an
+ * ink stamp. Two rows of compressed ink beads sit at its edges, then soak away.
+ * The mark itself is never redrawn.
  * Image readiness covers both the SVG image and its cache probe; failures never own
  * the fallback. Caller must handle ready and destroy before removing its host. */
 (function (global) {
@@ -241,6 +241,7 @@
     }
 
     function isReducedMotionEffective() {
+      if (global.AtelierMotionPolicy?.allows(2) === false) return true;
       if (reducedMotionMode === 'reduce') {
         return true;
       }
@@ -286,15 +287,15 @@
       // Never touches Animation.finished; any failure settles the whole entrance.
       for (var i = 0; i < nodes.bubbles.length; i++) {
         if (gen !== animationGeneration) return;
-        var angle = -Math.PI / 2 + i * Math.PI / 3 + 0.35;
-        var near = 9.5, far = 14.5;
+        var x = (i % 3 - 1) * 7;
+        var y = i < 3 ? -12 : 12;
         var splashAnim = nodes.bubbles[i].animate(
           [
-            { transform: 'translate(0px, 0px) scale(0.3)', opacity: 0, easing: ENTRANCE_EASING },
-            { transform: 'translate(' + (Math.cos(angle) * near).toFixed(2) + 'px, ' + (Math.sin(angle) * near).toFixed(2) + 'px) scale(1)', opacity: 1, offset: 0.45, easing: global.AtelierMotion.ease.fall },
-            { transform: 'translate(' + (Math.cos(angle) * far).toFixed(2) + 'px, ' + (Math.sin(angle) * far).toFixed(2) + 'px) scale(0)', opacity: 0 }
+            { transform: 'translate(' + x + 'px,' + y + 'px) scale(.2)', opacity: 0, easing: ENTRANCE_EASING },
+            { transform: 'translate(' + x + 'px,' + y + 'px) scale(1.4,.6)', opacity: .8, offset: 0.36, easing: global.AtelierMotion.ease.sway },
+            { transform: 'translate(' + x + 'px,' + y + 'px) scale(.6,.3)', opacity: 0 }
           ],
-          { duration: ENTRANCE_DURATION_MS - 80, delay: i * 16, easing: 'linear', fill: 'none' }
+          { duration: ENTRANCE_DURATION_MS - 100, delay: 70 + (i % 3) * 8, easing: 'linear', fill: 'none' }
         );
         if (!splashAnim || typeof splashAnim.cancel !== 'function') throw new Error('Splash unavailable');
         splashAnimations.push(splashAnim);
@@ -363,13 +364,19 @@
           [
             {
               opacity: 1,
-              transform: 'translateY(1px) scale(1.04, 0.94)',
-              easing: ENTRANCE_EASING
+              transform: 'translateY(-2px) scale(.97,1.02)',
+              easing: global.AtelierMotion.ease.fall
             },
             {
               opacity: 1,
-              transform: 'scale(0.98, 1.02)',
-              offset: 0.45,
+              transform: 'translateY(1px) scale(1.04,.95)',
+              offset: 0.32,
+              easing: global.AtelierMotion.ease.rise
+            },
+            {
+              opacity: 1,
+              transform: 'translateY(0) scale(.995,1.005)',
+              offset: 0.7,
               easing: global.AtelierMotion.ease.sway
             },
             {

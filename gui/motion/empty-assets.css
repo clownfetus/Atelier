@@ -48,7 +48,7 @@
 [data-atelier-motion="empty-assets"] .am-empty-assets-svg__well { fill: currentColor; opacity: 0.38; }
 [data-atelier-motion="empty-assets"] .am-empty-assets-svg__guide-dot { fill: currentColor; opacity: 0.55; }
 [data-atelier-motion="empty-assets"] .am-empty-assets-svg__charge,
-[data-atelier-motion="empty-assets"] .am-empty-assets-svg__drop { fill: var(--krackle-charge, var(--acc, #37639d)); }
+[data-atelier-motion="empty-assets"] .am-empty-assets-svg__drop { fill: var(--krackle-energy, var(--acc, #37639d)); }
 [data-atelier-motion="empty-assets"] .am-empty-assets-svg__hole { fill: var(--bg2, #eef0f3); }
 :root[data-theme="dark"] [data-atelier-motion="empty-assets"] .am-empty-assets-svg__hole { fill: #121216; }
 [data-atelier-motion="empty-assets"] .am-empty-assets-svg__speck { fill: var(--krackle-glint, #fbf6ea); opacity: 0.85; }

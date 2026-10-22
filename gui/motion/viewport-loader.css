@@ -9,8 +9,8 @@
 [data-atelier-motion="viewport-loader"] {
   --am-viewport-loader-size: 72px;
   --am-viewport-loader-fg: var(--studio-preview-on-surface, #e5e2e4);
-  --am-viewport-loader-accent: var(--krackle-charge, #2a9fd6);
-  --am-viewport-loader-rift: var(--krackle-rift, #8a6cff);
+  --am-viewport-loader-accent: var(--krackle-energy, var(--krackle-charge, #2a9fd6));
+  --am-viewport-loader-rift: var(--krackle-energy-rift, var(--krackle-rift, #8a6cff));
   --am-viewport-loader-empty: #9aa8be;
   --am-viewport-loader-error: var(--krackle-fault, #e0407a);
   --am-viewport-loader-badge-bg: #121216;
@@ -31,7 +31,7 @@
   width: 100%;
   height: 100%;
   display: block;
-  overflow: visible;
+  overflow: hidden;
   fill: currentColor;
 }
 
@@ -154,3 +154,31 @@
 
 .am-viewport-loader-fallback { display: inline-flex; color: var(--studio-preview-on-surface); }
 .am-viewport-loader-slot[data-am-state="error"] > .am-viewport-loader-fallback { color: #ffb4ab; }
+
+/* Give the production model loader room to read as a complete formation. */
+#viewport-loading-slot { width: 112px; height: 112px; }
+#viewport-loading-slot [data-atelier-motion="viewport-loader"] { --am-viewport-loader-size: 112px; }
+#viewport-loading-slot .am-viewport-loader-fallback svg { width: 112px; height: 112px; }
+
+/* Fit decorative energy to the preview without changing semantic outcomes. */
+[data-atelier-motion="viewport-loader"]:is([data-am-state="idle"], [data-am-state="ready"], [data-am-state="loading"]) .am-viewport-loader-loading {
+  color: var(--am-local-charge, var(--am-viewport-loader-accent));
+}
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-rift {
+  fill: var(--am-local-rift, var(--am-viewport-loader-rift));
+}
+
+/* Continuous fluid loading: upper inlet → frame sides → lower catch plate. */
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-fluid { display:none; fill:currentColor; transform-box:view-box; transform-origin:6px 7.5px; }
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-fluid { display:block; }
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-sphere,
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-loose,
+[data-atelier-motion="viewport-loader"][data-am-state="loading"] .am-viewport-loader-dot-hole { display:none; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-conduit,
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-flow {
+  fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;
+}
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-conduit { stroke-width:4.4; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-flow { stroke-width:6.1;stroke-dasharray:26 74;stroke-dashoffset:26; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-source { transform-box:view-box;transform-origin:6px 7.5px; }
+[data-atelier-motion="viewport-loader"] .am-viewport-loader-receiver { transform-box:view-box;transform-origin:24px 40.5px; }

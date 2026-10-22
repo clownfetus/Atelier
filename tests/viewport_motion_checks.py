@@ -334,14 +334,14 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                   return {width:rect.width, height:rect.height, dot:Math.min(...dots), dots:dots.length,
                     viewBox:svg.viewBox.baseVal.width};
                 }""")
-                assert dimensions['width'] == 72 and dimensions['height'] == 72, dimensions
+                assert dimensions['width'] == 112 and dimensions['height'] == 112, dimensions
                 assert dimensions['dots'] == 12 and dimensions['dot'] * dimensions['width'] / dimensions['viewBox'] >= 2.5, dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
                 assert motion_page.locator('#viewport-inspect-tools').is_hidden()
                 assert motion_page.locator('#viewport-tools').is_hidden()
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         close_preview()
-        checks.append('Viewport loader remains 72px with readable comic-sized dots in both themes at compact and standard desktop sizes')
+        checks.append('Viewport loader remains 112px with readable comic-sized dots in both themes at compact and standard desktop sizes')
         assert not errors, errors
     finally:
         motion_page.close()

@@ -35,7 +35,7 @@
 .roster-section .roster-strip { min-height:0; max-height:none; }
 .roster-carousel,.roster-filters,.roster-heading { flex-shrink:0; }
 #explorer:has(> #hero-roster:not([hidden])) { overflow-y:auto; }
-#explorer:has(> #hero-roster:not([hidden]):not(.roster-collapsed)) > #grid-area { flex:0 1 auto; min-height:132px; max-height:40%; }
+#explorer:has(> #hero-roster:not([hidden]):not(.roster-collapsed)) > .library-content { flex:0 1 auto; min-height:132px; max-height:40%; }
 .roster-portrait { width:100%; height:auto; min-height:146px; text-align:left; display:flex; flex-direction:column; }
 .roster-art { height:calc(var(--card-w,156px) * .64); width:100%; flex-shrink:0; overflow:hidden; background:color-mix(in srgb,var(--roster-accent,var(--acc)) 22%,var(--bg2)); }
 .roster-art img { display:block; height:100%; width:100%; object-fit:contain; }

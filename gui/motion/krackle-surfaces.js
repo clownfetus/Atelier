@@ -24,7 +24,7 @@
       var on = overlay.classList.contains('active');
       try {
         if (on && !stage) {
-          stage = window.AtelierMotion.krackleStage.mount(host, {state: 'idle', size: 132, kind:'edit-import'});
+          stage = window.AtelierMotion.krackleStage.mount(host, {state: 'idle', size: 184, kind:'edit-import'});
           box.dataset.krackleStage = 'true';
         }
         if (stage) stage.setState(on ? 'busy' : 'idle');

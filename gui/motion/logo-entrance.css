@@ -88,12 +88,12 @@
   transform: none !important;
 }
 
-/* Krackle splash behind the mark: charge bubbles, hidden unless the entrance plays. */
+/* Ink beads squeeze at the stamp edges, hidden unless the entrance plays. */
 [data-atelier-motion="logo-entrance"] .am-logo-entrance-bubble {
   opacity: 0;
   transform-box: fill-box;
   transform-origin: center;
 }
-[data-atelier-motion="logo-entrance"] .am-logo-entrance-energy { fill: var(--krackle-charge, var(--acc, #37639d)); }
+[data-atelier-motion="logo-entrance"] .am-logo-entrance-energy { fill: var(--krackle-energy, var(--acc, #37639d)); }
 [data-atelier-motion="logo-entrance"] .am-logo-entrance-hole { fill: var(--bg2, #eef0f3); }
 :root[data-theme="dark"] [data-atelier-motion="logo-entrance"] .am-logo-entrance-hole { fill: #121216; }
