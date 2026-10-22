@@ -110,7 +110,7 @@
       "status": "verified",
       "kind": "reconstructed from pinned upstream; original custom fork remains unavailable",
       "build_lock": "AtelierShader/build.lock.json",
-      "build_lock_sha256": "ea14a3ae057822975189a440773a3d7582c78f70adfe3ae9562275a0aa01795a",
+      "build_lock_sha256": "568c4c1bb36eeb996822592a84d4dfed0123a2a6a90c911ff460baa7f727f559",
       "repository": "https://github.com/clownfetus/Atelier",
       "build_recipe": "scripts/build_shader_tool.py",
       "upstream_repository": "https://github.com/natimerry/retoc-rivals",

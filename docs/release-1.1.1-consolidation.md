@@ -67,7 +67,7 @@ AppImage is identified by its own SHA-256 in the release verification.
 
 ## Patch release gate
 
-Local preparation passed all **56 backend suites**: **601 unit tests** and
+Local preparation passed all **56 backend suites**: **604 unit tests** and
 **138 script checks**, with two optional native checks skipped in disposable
 fixtures. The final release-integrity suite includes 16 checks for complete bundles,
 mixed builds, stale screenshots, failed platform results and changed source copy.
@@ -78,6 +78,11 @@ Hosted Linux validation exposed an outdated native-tool mock in the missing-cach
 texture recovery test. It now stops at the image decoder boundary and asserts
 that the recovered work copy reaches that decoder. The fixture needs neither
 Wine nor an installed native tool; packaged native-tool checks remain separate.
+
+A clean hosted Windows build also caught a typo in the shader archive downloader
+that an existing cache bypassed. The downloader and its pinned recipe hashes are
+corrected. Regression checks now cover an empty cache, verified cache reuse, a
+wrong download hash and an interrupted stream without leaving partial files.
 
 Version, bundled changelog, release copy and fresh screenshots use **1.1.1**.
 The previous installers are pinned to the published **1.1.0** assets using their
