@@ -477,7 +477,7 @@ def api_skin_materials():
     skin_id = body.get("skin_id", "")
     want    = set(str(n).lower() for n in (body.get("names") or []))
     response.content_type = "application/json"
-    if not skin_id:
+    if not skin_id and not body.get('meshes'):
         return json.dumps({"ok": False, "error": "missing skin_id"})
     if body.get('meshes'):
         from atelier.handlers.meshstudio import material_bindings
@@ -574,7 +574,8 @@ def _viewport_material_payload(gr, params):
         texture_sources.append({'slot': name, 'game_rel': source_path, 'role': role,
                                 'preview_role': role if role and role not in roles else None,
                                 'texture_class': assignment.get('texture_class', 'Texture2D') if assignment else (params.get('texture_classes') or {}).get(name),
-                                'url': source_url, 'custom': bool(assignment)})
+                                'url': source_url, 'custom': bool(assignment),
+                                'inferred': name in params.get('eye_defaults', [])})
         if role and role not in roles:
             roles[role] = path
             if name in custom:
@@ -587,6 +588,35 @@ def _viewport_material_payload(gr, params):
             'texture_sources': texture_sources,
             'tex_ver': versions, 'dyeable': dyeable,
             'dye_ver': _dye_version(gr, texs) if dyeable else '0', 'eye_preview': eye, 'eye_ver': eye_version}
+
+
+@app.post('/api/assembly_references')
+def api_assembly_references():
+    from atelier.handlers.assembly import references
+    body = request.json or {}
+    response.content_type = 'application/json'
+    return json.dumps(references(body.get('mesh_game_rel', ''), body.get('material_game_rel', '')))
+
+
+@app.get('/api/assembly_thumbnail')
+def api_assembly_thumbnail():
+    from io import BytesIO
+    from PIL import Image
+    gr = request.query.get('game_rel', '')
+    _c.validate_game_rel(gr)
+    slot = request.query.getunicode('slot') or ''
+    path = _custom_tex.image_path(gr, slot) if slot else _texture_png(gr)
+    if not path or not os.path.isfile(path):
+        response.status = 404
+        return ''
+    with Image.open(path) as source:
+        source.thumbnail((160, 160), Image.Resampling.LANCZOS)
+        image = source.convert('RGBA')
+        output = BytesIO()
+        image.save(output, 'PNG')
+    response.content_type = 'image/png'
+    response.set_header('Cache-Control', 'no-store')
+    return output.getvalue()
 
 
 @app.post('/api/mesh_visibility')
