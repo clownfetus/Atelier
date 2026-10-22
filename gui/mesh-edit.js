@@ -3,10 +3,11 @@
   'use strict';
   let overlay,panel,title,description,status,choose,cancel,preview,input,item,busy=false,opener;
   let targets,bodyList,weaponList,weaponStatus,fitRow,targetGeneration=0,targetRequest;
+  let returnContext = {};
   const skinOf=path=>/^Characters\/\d{4}\/(\d{7})(?:\/|$)/i.exec(path||'')?.[1];
   const importControls={};
   const el=(...args)=>AtelierJobDialogs.el(...args);
-  function hide(){targetGeneration++;targetRequest?.abort();if(busy){overlay.classList.remove('active');return;}overlay.classList.remove('active');if(opener?.isConnected)opener.focus();}
+  function hide(){if(busy&&returnContext.preserveViewport){status.textContent='Wait for the replacement to finish, or cancel it before returning to Assembly.';return;}targetGeneration++;targetRequest?.abort();if(busy){overlay.classList.remove('active');return;}overlay.classList.remove('active');if(opener?.isConnected)opener.focus();}
   function selectTarget(target){
     if(busy)return;
     item={...target};title.textContent='Replace '+(target.name||'model');description.textContent=target.game_rel;
@@ -89,7 +90,7 @@
     input.addEventListener('change',()=>{if(input.files.length)replace([...input.files]);});
     const close=el('button','Close','btn');close.addEventListener('click',hide);
     cancel=el('button','Cancel replacement','btn');cancel.hidden=true;cancel.addEventListener('click',()=>AtelierJobs.cancelCurrent('mesh-replace'));
-    preview=el('button','View in 3D','btn');preview.addEventListener('click',()=>{hide();AtelierViewport.openMesh(item.game_rel,item.name);});
+    preview=el('button','View in 3D','btn');preview.addEventListener('click',()=>{hide();if(!returnContext.preserveViewport)AtelierViewport.openMesh(item.game_rel,item.name);});
     const actions=el('div',undefined,'mesh-edit-actions');actions.append(close,cancel,preview,choose);
     const content=el('div',undefined,'mesh-edit-content');content.append(targets,help,rigHelp,coverage,repairRow,unitsRow,options,placement,textures,companions);
     const footer=el('div',undefined,'mesh-edit-footer');footer.append(status,actions);
@@ -97,13 +98,14 @@
     AtelierJobDialogs.trap(overlay,panel,hide);
     window.addEventListener('atelier-job',event=>{const job=event.detail;if(busy&&job.kind==='mesh-replace')status.textContent=job.stage;});
   }
-  async function open(target){
+  async function open(target, context={}){
     if(!overlay)init();
     if(busy){overlay.classList.add('active');panel.focus();return;}
     if(AtelierViewport?.hasPendingEdits()){AtelierViewport.focusPendingEdits();toast('Save or revert the current recolours before replacing a model.','warning');return;}
-    await AtelierViewport?.close();
+    if(!context.preserveViewport)await AtelierViewport?.close();
     if(document.querySelector('#viewport-overlay.active'))return;
     if(!target?.game_rel)return;
+    returnContext=context;
     opener=document.activeElement;selectTarget({...target,kind:/\/Weapons\//i.test(target.game_rel)?'weapon':'body'});
     for(const [key,control] of Object.entries(importControls)){
       if(control.tagName==='SELECT')control.value=control.dataset.default||'auto';
@@ -112,14 +114,14 @@
     }
     overlay.classList.add('active');panel.focus();panel.querySelector('.mesh-edit-content').scrollTop=0;loadTargets(item);
   }
-  async function add(target){
+  async function add(target, context={}){
     if(!target?.game_rel)return;
     const project=atelierProject();
     try{
       const result=await atelierFetch('/api/mesh_add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:target.game_rel})}).then(r=>r.json());
       if(!result.ok)throw Error(result.error||'Could not add the model');
       if(project!==atelierProject())return;
-      refreshSidebarEntry(target.game_rel,target.name,'');renderGrid();open(target);
+      refreshSidebarEntry(target.game_rel,target.name,'');renderGrid();await open(target,context);
     }catch(error){toast(error.message,'warning');}
   }
   async function replace(files){
@@ -132,7 +134,7 @@
       const result=await AtelierJobs.run('/api/mesh_replace',{method:'POST',body:form,project});
       if(!result.ok)throw Error(result.error||(result.cancelled?'Replacement cancelled; existing edits were kept.':'Replacement failed'));
       const info=result.validation;status.textContent=`Model saved · ${info.lods} LODs checked · ${info.retained_weight_vertices} vertices kept their weights · ${info.transferred_weight_vertices} received transferred weights.${info.repaired_weight_vertices ? ' Incompatible weights were fitted to their original game sections.' : ''}${info.preserved_parts?.length ? ' Kept '+info.preserved_parts.length+' untouched part(s).' : ''}${info.morph_targets ? ' '+info.morph_targets+' original morph targets retained.' : ''}${info.material_bundle ? ' '+info.material_bundle.textures+' textures connected. '+info.material_bundle.notes.join(' ') : ''}${info.warnings?.length ? ' '+info.warnings.join('. ')+'.' : ''}`;
-      if(project===atelierProject()){refreshSidebarEntry(target.game_rel,target.name,'');renderGrid();}
+      if(project===atelierProject()){refreshSidebarEntry(target.game_rel,target.name,'');renderGrid();returnContext.onChanged?.(target.game_rel);}
     }catch(error){status.textContent=error.message;}
     finally{busy=false;choose.disabled=preview.disabled=false;for(const control of [...Object.values(importControls),...targets.querySelectorAll('button')])control.disabled=false;cancel.hidden=true;input.value='';}
   }

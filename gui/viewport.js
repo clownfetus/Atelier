@@ -11,6 +11,8 @@ import { createViewportAnimation } from './viewport-animation.js';
 import { createViewportFloor } from './viewport-effects.js';
 import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, applyEmissive } from './viewport-materials.js';
 import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials, weaponSide } from './viewport-attachments.js';
+import { createAssemblyView } from './assembly.js';
+import { verifiedBinding } from './assembly-data.js';
 
 const $ = id => document.getElementById(id);
 // The server says why a model is unavailable in the JSON body; three.js only reports the status
@@ -41,6 +43,9 @@ const visibilityBusy = new Set();
 let meshSlots = [];
 let heroId = '';
 let selectedMaterial = null;
+let assembly, workspaceMode = 'inspect', connectedEditorPending = false, assemblyRefreshTimer = 0;
+let preserveAnimationCamera = false;
+try { if (localStorage.getItem('atelier.assembly') === '1') workspaceMode = 'assembly'; } catch (_) {}
 
 function updateHeroLogo(id = heroId) {
   heroId = id;
@@ -223,7 +228,7 @@ function init() {
 
   modelRoot = new THREE.Group();
   scene.add(modelRoot);
-  animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible && object.kind !== 'weapon'), fetch:sceneFetch, frame:frameCamera, notify:note, changed:()=>inspection?.refresh()});
+  animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible && object.kind !== 'weapon'), fetch:sceneFetch, frame:()=>{if(!preserveAnimationCamera)frameCamera();}, notify:note, changed:()=>inspection?.refresh()});
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
     materials:() => ({data:matData, byName:matsByName, edited}),
@@ -232,10 +237,28 @@ function init() {
     tintOriginal, textureRoles, applySurface, pickMaterial, label:materialLabel, notify:note, resize:onResize,
     ready:()=>!modelLoading && !materialTask && !animation.loading() && !saving && !visibilityBusy.size, refreshEdits:refreshFoot,
     pauseAnimation:()=>animation.pause(), resumeAnimation:state=>animation.resume(state)});
+  assembly = createAssemblyView({
+    state:()=>({data:matData, edited, selected:selectedMaterial, objects, metadata:meshMeta, project:viewportProject, loading:modelLoading || !!materialTask}),
+    camera, label:materialLabel, swatch:materialChipColor, fetch:projectFetch, url:projectUrl,
+    sectionControl:name=>matData[name] ? sectionEye(name) : null,
+    projectAssets:()=>window.AtelierAssetEditors?.projectAssets() || [],
+    choose:(name,surface)=>{inspection.selectSurface(surface);pickMaterial(name,false,surface);},
+    highlight:value=>inspection.setRelated(value),
+    resize:()=>{inspection.preserveFraming();requestAnimationFrame(onResize);},
+    uv:surface=>inspection.inspectSurface(surface),
+    editMaterial:(name,slot)=>pickMaterial(name,true,null,slot),
+    editTexture:source=>editAssemblyTexture(source),
+    replaceTexture:source=>replaceAssemblyTexture(source),
+    blender:gameRel=>{if(!hasPendingEdits())window.meshBlendExtract?.(gameRel,gameRel.split('/').pop());else focusPendingEdits();},
+    replaceMesh:editAssemblyMesh,
+    effect:effect=>openConnectedEditor('vfx-overlay',()=>window.openVfxEditor?.(effect), false),
+  });
+  for (const mode of ['inspect','assembly','showcase']) $('viewport-'+mode).addEventListener('click',()=>setWorkspaceMode(mode));
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
   $('viewport-mesh-edit').addEventListener('click',async()=>{
     const index=objects.findIndex(object=>object.root.visible);
+    if(index>=0 && assembly?.active()){editAssemblyMesh(meshMeta[index].game_rel);return;}
     if(index>=0 && await canLeave())window.AtelierMeshEdit?.add(meshMeta[index]);
   });
   $('viewport-mat-reset').addEventListener('click', revertEdits);
@@ -262,6 +285,17 @@ function init() {
   window.addEventListener('resize', onResize);
   new ResizeObserver(onResize).observe($('viewport-stage'));
   inited = true;
+}
+
+function setWorkspaceMode(mode) {
+  if (inspection?.capturing()) return;
+  workspaceMode = mode;
+  inspection?.setShowcase(mode === 'showcase');
+  assembly?.setActive(mode === 'assembly');
+  for (const value of ['inspect','assembly','showcase']) $('viewport-'+value).setAttribute('aria-pressed',String(value === mode));
+  $('viewport-workspace-label').textContent = mode === 'assembly' ? 'Assembly View' : 'Model Studio';
+  try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
+  requestAnimationFrame(onResize);
 }
 
 // Only one transient menu is open; Escape returns focus before it can leave the workspace.
@@ -372,6 +406,7 @@ function setViewportLoaderState(state) {
 }
 
 function clearModel() {
+  connectedEditorPending = false; clearTimeout(assemblyRefreshTimer);
   modelLoading=false;
   if (modelLoad) {
     const load=modelLoad;modelLoad=null;
@@ -404,6 +439,8 @@ function clearModel() {
   trimTextureCache();
   inspection?.reset();
   refreshFoot();
+  assembly?.reset();
+  setWorkspaceMode(workspaceMode === 'assembly' ? 'assembly' : 'inspect');
 }
 
 // The studio exports the selected body and visible held weapons as one portable
@@ -814,8 +851,12 @@ function tintOriginal(material, data) {
   applyEmissive(material, data);
 }
 
-function pickMaterial(name, openEditor = true) {
-  if (!matData[name]) { selectedMaterial=null;buildPanel();note('This part has no editable material parameters.', 'warning');return; }
+function pickMaterial(name, openEditor = true, surface = null, textureSlot = null) {
+  if (surface) assembly?.surfacePicked(surface);
+  if (!matData[name]) {
+    selectedMaterial=assembly?.active() && matsByName[name] ? name : null;
+    buildPanel();note('This part has no editable material parameters.', 'warning');return;
+  }
   selectedMaterial = name;
   $('viewport-material-search').value = '';
   buildPanel();
@@ -824,25 +865,134 @@ function pickMaterial(name, openEditor = true) {
   if (!openEditor) return;
   const info = matData[name];
   if (!info?.game_rel) { note('Material parameters are unavailable for this section.', 'warning'); return; }
+  if (assembly?.active() && !verifiedBinding(info)) { note('This material assignment is unverified. Inspect mode retains the preview controls.', 'warning'); return; }
   if (hasPendingEdits()) { note('Save or revert your studio changes before opening the full editor.', 'warning'); $('viewport-mat-save').focus(); return; }
   if (typeof window.openMaterialEditor !== 'function') { $('viewport-material-editor').querySelector('input')?.focus(); return; }
+  openConnectedEditor('material-overlay',()=>window.AtelierAssetEditors?.material({name:info.game_rel.split('/').pop(),game_rel:info.game_rel},textureSlot)
+    || window.openMaterialEditor({name,game_rel:info.game_rel}));
+}
+
+// Keep one scene alive while the established editor owns its ordinary modal.
+// Returning refreshes material metadata while retaining camera, part and rig pose.
+async function openConnectedEditor(overlayId, openEditor, refresh = true) {
+  if (connectedEditorPending) return;
+  if (modelLoading) {note('Wait for the model to finish loading before opening an editor.','info');return;}
+  if (inspection?.capturing()) {note('Wait for the capture to finish before opening an editor.','info');return;}
+  if (hasPendingEdits()) { note('Save or revert your studio changes before opening another editor.','warning');focusPendingEdits();return; }
   const gen = generation, project = viewportProject;
-  cancelMaterialLoad();
+  connectedEditorPending = true;
+  const playing = animation.pause();
+  // Discard residual orbit inertia at the exact pose handed to the editor.
+  // Otherwise the first resumed frames continue a drag made before the handoff.
+  const position = camera.position.clone(), target = controls.target.clone(), damping = controls.enableDamping;
+  controls.enableDamping = false; controls.update();
+  camera.position.copy(position); controls.target.copy(target); controls.update();
+  controls.enableDamping = damping;
+  inspection.preserveFraming(); cancelMaterialLoad();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }
+  let returned = false, opened = false;
   materialReturnObserver?.disconnect();
-  const resume = () => {
-    if ($('material-overlay').classList.contains('active')) return;
+  const resume = async () => {
+    const overlay = $(overlayId);
+    if (returned || overlay?.classList.contains('active') || !opened) return;
+    returned = true; connectedEditorPending = false;
     materialReturnObserver?.disconnect(); materialReturnObserver = null;
     if (gen !== generation || project !== (window.atelierProject?.() || '')) return;
     $('viewport-overlay').classList.add('active'); requestAnimationFrame(onResize);
     if (!raf) animate();
-    loadMaterials(chromaSkin || meshSkin); $('viewport-canvas').focus();
+    try {
+      if (typeof refresh === 'function') await refresh();
+      else if (refresh) {assembly?.invalidateReferences();await loadMaterials(chromaSkin || meshSkin);}
+    } catch(error) {if(gen===generation)note(error.message || 'The preview could not refresh.','warning');}
+    finally {
+      if (gen === generation) {animation.resume(playing);inspection.selectSurface(assembly?.selectedSurface());assembly?.sync();$('viewport-canvas').focus();}
+    }
   };
   materialReturnObserver = new MutationObserver(resume);
-  materialReturnObserver.observe($('material-overlay'), {attributes:true, attributeFilter:['class']});
-  Promise.resolve(window.openMaterialEditor({name, game_rel:info.game_rel})).then(resume);
+  materialReturnObserver.observe(document.body, {subtree:true,attributes:true,attributeFilter:['class']});
+  try { await openEditor(); }
+  catch (error) { note(error.message || 'The editor could not be opened.','warning'); }
+  finally { opened = true; resume(); }
 }
+
+function editAssemblyMesh(gameRel) {
+  const changed = new Set();
+  return openConnectedEditor('mesh-edit-overlay',()=>window.AtelierMeshEdit?.add(
+    {game_rel:gameRel,name:gameRel.split('/').pop()}, {preserveViewport:true,onChanged:path=>changed.add(path)}),
+    ()=>changed.size ? refreshAssemblyMeshes(changed) : undefined);
+}
+
+async function refreshAssemblyMeshes(changed) {
+  const gen = generation, selection = matData[selectedMaterial];
+  const replacements = [];
+  modelLoading = true;inspection.setLoading(true);refreshBlenderBtn();
+  preserveAnimationCamera = true;
+  try {
+    // Decode first so a failed replacement leaves the current scene inspectable.
+    for (const [index, object] of objects.entries()) if (object.loaded && changed.has(meshMeta[index]?.game_rel)) {
+      const gltf = await loader.loadAsync('/api/model_gltf?game_rel='+encodeURIComponent(meshMeta[index].game_rel));
+      if(gen!==generation){disposeTree(gltf.scene);return;}
+      replacements.push({object,meta:meshMeta[index],gltf});
+    }
+    if(!replacements.length)return;
+    animation.reset();inspection.clearMaterials();clearLiveDyes();
+    for(const {object,meta,gltf} of replacements) {
+      const old=object.root, materials=new Set();
+      old.traverse(mesh=>{if(mesh.isMesh)for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])materials.add(material);});
+      for(const [key,list] of Object.entries(matsByName)) {
+        matsByName[key]=list.filter(material=>!materials.has(material));
+        if(!matsByName[key].length){delete matsByName[key];delete matData[key];baselineMaps.delete(key);}
+      }
+      meshSlots=meshSlots.filter(record=>record.game_rel!==meta.game_rel);
+      collectMats(gltf.scene,meta,gltf.parser);
+      gltf.scene.visible=old.visible;modelRoot.remove(old);
+      if(object.paired){modelRoot.remove(object.paired.root);disposeTree(object.paired.root);object.paired=null;}
+      object.root=gltf.scene;object.animations=gltf.animations;object.rig=attachmentRig(gltf);object.binding=null;
+      modelRoot.add(gltf.scene);disposeTree(old);
+      replacements.find(record=>record.gltf===gltf).installed=true;
+    }
+    replacements.length=0;
+    for(const object of objects) if(object.loaded)animation.register({scene:object.root,animations:object.animations});
+    syncAttachments();assembly?.invalidateReferences();await loadMaterials(chromaSkin || meshSkin);
+    if(gen!==generation)return;
+    if(selection && Number.isInteger(selection.slot_index)) {
+      const match=Object.keys(matData).find(key=>matData[key].mesh_game_rel===selection.mesh_game_rel && matData[key].slot_index===selection.slot_index);
+      selectedMaterial=match || null;
+    }
+    const body=objects.findIndex(object=>object.root.visible && object.kind!=='weapon');
+    if(body>=0)await animation.discover(meshMeta[body].game_rel);
+    if(gen===generation){buildObjectPanel();buildPanel();note('Replacement loaded · camera preserved','success');}
+  } finally {
+    for(const {gltf,installed} of replacements)if(!installed)disposeTree(gltf.scene);
+    preserveAnimationCamera=false;
+    if(gen===generation){modelLoading=false;inspection.setLoading(!!materialTask);refreshBlenderBtn();buildObjectPanel();assembly?.sync();}
+  }
+}
+
+async function editAssemblyTexture(source) {
+  if (hasPendingEdits()) { focusPendingEdits();return; }
+  const gen = generation, project = viewportProject;
+  await window.AtelierAssetEditors?.texture(source.game_rel);
+  if (gen === generation && project === viewportProject) assembly?.sync();
+}
+
+function replaceAssemblyTexture(source) {
+  if (hasPendingEdits()) { focusPendingEdits();return; }
+  window.AtelierAssetEditors?.replaceTexture(source.game_rel);
+}
+
+window.addEventListener('atelier:asset-updated', event => {
+  if (!assembly?.active() || !inited || event.detail?.project !== viewportProject || connectedEditorPending) return;
+  const path = event.detail.game_rel;
+  if (!Object.values(matData).some(info=>Object.values(info.textures || {}).some(texture=>texture.toLowerCase() === path?.toLowerCase()))) return;
+  clearTimeout(assemblyRefreshTimer);
+  assemblyRefreshTimer = setTimeout(()=>{
+    if (!$('viewport-overlay').classList.contains('active')) return;
+    if (hasPendingEdits()) {note('A connected texture changed. Save or revert studio colours before refreshing.','info');return;}
+    loadMaterials(chromaSkin || meshSkin);
+  },300);
+});
 
 // ── materials: fetch params, tint mesh parts, build the recolor panel ─────────
 // Runs fully in the background: the mesh is already up and orbitable (viewport-loading is long
@@ -913,7 +1063,7 @@ function loadMaterials(skinId, additions=null) {
 }
 
 async function loadMaterialSet(skinId, load, additions=null) {
-  if (!skinId) return;
+  if (!skinId && !meshSlots.length) return;
   currentSkin = skinId;
   window.AtelierViewportIdentity?.show(skinId,heroId);
   const gen = generation;
@@ -1052,7 +1202,7 @@ function buildPanel() {
     if (mesh.isMesh) for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) visible.add(material.name);
   });
   const names = Object.keys(matData).filter(name => !objects.length || visible.has(name)).sort((a,b)=>materialGroup(a).localeCompare(materialGroup(b)) || materialLabel(a).localeCompare(materialLabel(b)));
-  if (!names.includes(selectedMaterial)) selectedMaterial = null;
+  if (!names.includes(selectedMaterial) && !(assembly?.active() && visible.has(selectedMaterial))) selectedMaterial = null;
   const groups = new Map();
   for (const name of names) {const group=materialGroup(name);if(!groups.has(group))groups.set(group,[]);groups.get(group).push(name);}
   for (const [label,group] of groups) {
@@ -1092,6 +1242,7 @@ function buildPanel() {
   updateSidebarVisibility();
   refreshFoot();
   window.AtelierIcons?.createIcons({nodes:[list]});
+  assembly?.sync();
 }
 
 function sectionEye(name) {
@@ -1382,6 +1533,7 @@ function refreshFoot() {
   const revert = $('viewport-material-editor').querySelector('.vp-revert-material'); if (revert) revert.disabled = saving || !edited[selectedMaterial];
   const hint = $('viewport-unsaved'); hint.classList.toggle('is-dirty',!!n);
   hint.textContent = n ? `${n} unsaved colour${n === 1 ? '' : 's'}` : 'All changes saved';
+  assembly?.sync();
 }
 
 async function saveEdits() {

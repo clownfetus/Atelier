@@ -272,7 +272,7 @@ def material_bindings(skin_id, meshes):
         pass  # Per-mesh extraction below retains the compatibility fallback.
     candidates = {}
     canon = lambda n: re.sub(r'\d{6,}', '#', n.casefold())
-    for path, _ in skin_entries(skin_id):
+    for path, _ in skin_entries(skin_id) if skin_id else []:
         name = os.path.basename(path)
         if name.lower().startswith('mi_') and name.lower().endswith('.uasset'):
             candidates.setdefault(canon(name[:-7]), []).append(path[:-7])
@@ -299,6 +299,7 @@ def material_bindings(skin_id, meshes):
                 matches = candidates.get(canon(os.path.basename(material)), [])
                 if len(matches) == 1:
                     binding['game_rel'] = matches[0]
+                    binding['material_set_override'] = True
                 elif matches:
                     binding['material_warning'] = 'This recolour has ambiguous material variants; the mesh material was kept.'
             sections = binding.get('shared_slots') or [binding]

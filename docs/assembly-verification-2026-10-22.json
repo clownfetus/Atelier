@@ -1,0 +1,90 @@
+{
+  "ok": true,
+  "skin": "1029304",
+  "checks": [
+    "Real mouse clicks select 3 exact Magik sections; material paths match native cooked-slot metadata and all texture cards match their bindings",
+    "Clicking the native material swatch highlights precisely the sections assigned to its full package reference",
+    "Texture selection highlights only materials with the same complete package reference; native thumbnails load successfully",
+    "Full native texture preview closes back to the same selected surface, texture and camera",
+    "Material editor inspection preserves the orbited camera, exact clicked triangle, texture selection and loaded geometry",
+    "Saving a real material through the established editor updates Assembly and retains the complete editing context",
+    "The real material slot editor publishes a custom texture only to the isolated project; Assembly follows its new package and retains the selected slot",
+    "UV inspection identifies the same real selected material and returns without resetting camera or resource selection",
+    "With twelve real surfaces, geometry actions remain visible at 1024\u00d7768 while the surface list scrolls independently",
+    "No browser errors, failed core asset requests, game container changes or installed mods"
+  ],
+  "surfaces": [
+    {
+      "material": "Characters/1029/1029304/Materials/10290/MI_1029304_10290_Weapon",
+      "mesh": "Characters/1029/1029304/Weapons/Weapon/Meshes/SK_WP_1029304_Weapon",
+      "cooked_slot": 0,
+      "face_index": 3749,
+      "texture_slots": {
+        "CubeMap_Tex": "Characters/1029/1029304/Texture/10290/T_Common_GemRefraction",
+        "CubeMap_Mask": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_M",
+        "BaseColor": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_D",
+        "ORM": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_ORM",
+        "Normal": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_N",
+        "Emissive": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_E",
+        "SpecularTexture": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Weapon_S"
+      }
+    },
+    {
+      "material": "Characters/1029/1029304/Materials/10290/MI_1029304_10290_Hair_03",
+      "mesh": "Characters/1029/1029304/Meshes/10290/SK_10290_1029304",
+      "cooked_slot": 1,
+      "face_index": 17483,
+      "texture_slots": {
+        "BaseColor": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Hair02_D",
+        "OpacityMask": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Hair02_M",
+        "ORM": "Characters/Common/Textures/T_Common_LinearBlack",
+        "Normal": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Hair02_N",
+        "SpecularShift": "Characters/Common/Textures/T_Highlight",
+        "ShadowColor(UV1)": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Hair02_AO"
+      }
+    },
+    {
+      "material": "Characters/1029/1029304/Materials/10290/MI_1029304_10290_Body",
+      "mesh": "Characters/1029/1029304/Meshes/10290/SK_10290_1029304",
+      "cooked_slot": 4,
+      "face_index": 14264,
+      "texture_slots": {
+        "BaseColor": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Body_D",
+        "ORM": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Body_ORM",
+        "Normal": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Body_N",
+        "SpecularTexture": "Characters/1029/1029304/Texture/10290/T_1029304_10290_Body_S"
+      }
+    }
+  ],
+  "page_errors": [],
+  "asset_errors": [],
+  "source_sha256": {
+    "gui/viewport.js": "ff77cab2a5fd5850c7eb6badb02de17dd7286ca6dec7b260c5b00bc18db20efe",
+    "gui/viewport-inspection.js": "c23efa10609db35ea7ba461d460cc92558fd8053858e606597e340f26228fac4",
+    "gui/viewport-uv.js": "7cda202197c72f69651eb64eb2b57e6417d94aeb1cf7e6190339b7f0d5cdb0a3",
+    "gui/assembly.js": "2f87336eeda3717c046c3bfc983273abd24eb81e360eb707f17f801c3f6210b4",
+    "gui/assembly.css": "f1c756c7eb249e19bfd5dce5745d97bbcfbc5759b9c18675213d01b48fdb00b8",
+    "gui/assembly-data.js": "f9700fc29f9af919a9ba155ff845596badec7e8c6375851c9d75d5a2f1792845",
+    "gui/app.js": "b80dec938e71b0c76902c7e613c8b69bb5a9d16104a939143c0dcd09d435b942",
+    "atelier/web/routes.py": "5641a339074da7cac4747885696ddb56ddf187cad187b3bba837748edea0dd51"
+  },
+  "final": {
+    "selected": "Characters/1029/1029304/Meshes/10290/SK_10290_1029304::4",
+    "surface": {
+      "object": "62047ee8-351e-40f9-bfcb-decb854228ed",
+      "mesh": "SK_10290_1029304_4",
+      "faceIndex": 14264,
+      "materialIndex": 0
+    },
+    "loads": 2,
+    "camera": [
+      0.11949376227267172,
+      1.4510428123413825,
+      3.194823939642153
+    ],
+    "custom_slot": "Normal",
+    "custom_path": "Atelier/Custom/4ac25a35a5/T_Assembly_native_normal",
+    "saved_parameter": "BaseTint",
+    "project_files": 10
+  }
+}

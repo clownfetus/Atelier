@@ -81,6 +81,47 @@ For a fresh directory, use Atelier's Setup/Settings to select the game Paks fold
 
 ## Automated checks
 
+### Assembly View
+
+`gui/assembly-data.js` keeps package-path relationships separate from display
+labels. Only import-table material bindings enable connected editing; legacy
+name matches and selected recolour counterparts stay visibly unverified.
+`texture_sources` preserves custom slot URLs and identifies derived eye defaults.
+The optional workspace borrows Model Studio’s renderer, colour controls, UV
+inspector and animation controller, and uses the existing asset editors for saves.
+
+`/api/assembly_thumbnail` limits card images to 160px. The client loads visible
+cards with two readers, aborts obsolete requests and retains at most 48 previews.
+`/api/assembly_references` reads direct VFX package imports on explicit request;
+it does not scan the library for filename matches or index reverse dependencies.
+
+```powershell
+.\.venv\Scripts\python.exe tests/test_assembly.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --assembly-only --report-dir '<report-directory>'
+```
+
+The focused browser checks use labelled synthetic geometry with real Three.js
+raycasting and HTTP fixtures. They exercise texture relationships, custom slot
+handoffs, camera retention, uncertainty, panels, themes and reduced motion.
+Native Blender execution and in-game appearance remain separate validation.
+
+For real-character validation, start `tests/dev_server.py` with configured,
+isolated `ATELIER_DATA_DIR`, a fresh active test project and `test-mods` as its
+mods destination, then run:
+
+```powershell
+.\.venv\Scripts\python.exe tests/assembly_real_checks.py --url 'http://127.0.0.1:8892' `
+  --data-dir '<isolated-data-directory>' --report-dir '<new-report-directory>'
+```
+
+The default character is Magik `1029304`. Native game requests are unmocked;
+read-only observation hooks expose the selected triangle, camera and decode count.
+The check saves a material colour and authored normal image into the test project,
+verifies exact import-table links, exercises editor returns and UV inspection,
+and checks compact geometry actions. It records screenshots and source hashes,
+and verifies that game container timestamps and the empty mods destination stay
+unchanged. See [the real-character verification](docs/assembly-verification-2026-10-22.md).
+
 ### Named asset additions
 
 `atelier/added_assets.py` prepares and verifies new texture, material-instance
@@ -129,6 +170,107 @@ target identity, donor parent/package references, textures, parameters, static
 switches and the opaque cooked shader payload. Readback without base-game
 containers labels external imports `Export_N/Object`; their package identities
 and reference indices remain verifiable. In-game appearance is not established.
+
+### VFX Motionboard
+
+The existing Niagara editor mounts `gui/vfx-motionboard.js` over
+`vfxEditor.groups`. Its timeline, point inspector and legacy gradient/numeric
+controls call the same `vfxVal`, `vfxStop`, `vfxAlpha` and `vfxInten` operations.
+`vfx-motionboard-data.js` shares uniform LUT sampling and conservative binding
+interpretation between the tracks and the bounded Canvas 2D particle proxy.
+Standalone RichCurve assets and MPCs keep their existing editors and formats.
+
+The playhead is normalized LUT input, synchronized across tracks. Preview duration,
+60 fps stepping, speed and looping do not establish Niagara seconds or actual
+particle age. Editing stops have fixed uniform positions; editing a value uses
+the existing linear LUT rebuilder and retains each native sample/channel count.
+Original comparison reads complete unmodified LUT samples, independently of saved
+edits. Unchanged curves are never resampled just by opening or saving the editor.
+Resetting a saved track removes its override; with no overrides export copies the
+original cooked package and companions unchanged.
+
+`read_vfx` adds `original_stops`, `original_samples`, source exports, optional input
+domain, precise binding evidence and unsupported/unmatched-edit counts. Groups
+merge only identical full LUTs with matching dimensions/domains. Old sidecars still
+match by shared export indices. The saved format remains
+`{vfx_edits:[{export_indices,stops,sample_count,channels}]}`. Save and export validate
+finite native-float values and actual export dimensions, preserve unrelated
+sidecar metadata, and retain unavailable older edits with an explicit export
+error rather than silently dropping them. Labels use a source/mapping-sensitive
+`vfx_labels3` cache that distinguishes `ResolvedDataInterfaces` names from owner
+fallbacks and retains every binding of a clone group.
+
+Burst, trail, smoke and continuous arrangements are explicit artistic proxies.
+Only one unambiguous supported named binding is assigned automatically per input.
+Unknown/mixed bindings require manual preview choices; sample-based colour,
+emission and opacity categories remain labelled as inferred. Size and density use
+one comparison scale; opacity/negative size/rates are clamped and HDR normalized
+only for display. There is no emitter execution, shader reconstruction, collision,
+texture rendering or arbitrary binary rewriting.
+
+Hide/isolate/order/filter and proxy settings live only in a bounded local view
+cache. They cannot make a project dirty or change export. Playback stops scheduling
+frames while hidden, covered by another dialog or in a background document;
+closing disconnects observers/listeners and disposes the view. Save replies remain
+project/editor-bound and preserve newer drafts. Unsaved VFX and in-flight saves
+block export; whole-effect reset loads pristine data before removing saved edits.
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_motionboard.py --suite test_phase3.py --suite test_jobs_bulk.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --motionboard-only --report-dir _work/motionboard/browser
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_motionboard.py --report-dir _work/motionboard/native-new
+```
+
+The focused native check builds a new report project and never installs a mod.
+Scalar and RGBA edits to 8 exports passed IoStore readback; all 122 other supported
+exports retained their full original samples. Individual restoration returned
+exact original LUTs, and full restoration staged the byte-identical original
+package. Browser fixtures cover direct/legacy editing, comparison, compact/light/
+dark layouts, playback/stepping, persistence, save failure/races, bulk handoff and
+render suspension. In-game appearance remains unverified.
+
+### Bulk material editing
+
+**Bulk edit materials** appears when the filtered current folder contains
+material instances. It selects those materials without importing them for review;
+nested folders and other asset types are excluded. **Bulk materials** inside a
+loaded material editor also offers the selected edited materials. Select all,
+Clear selection and Ctrl/Cmd+A in the asset list support batches of up to 1,000.
+Unsaved editor or viewer changes must be resolved before opening a batch.
+
+Set opacity updates existing `Opacity` and `OpacityMultiplier` scalar overrides.
+Set scalar matches an existing full parameter name without case sensitivity.
+Missing overrides are listed as unchanged, rather than invented. Multiplication
+and RGB replacement preserve unselected channels and numeric precision, including
+UAssetAPI's signed-zero strings. RGB edits retain alpha.
+
+Change parent accepts verified main-content `M_` or `MI_` assets. It keeps target
+parameters and textures, appends isolated imports and their load-order dependencies,
+and rejects cycles across proposed and saved project parents. The
+`_atelier_material_parent` marker records the override. Export rebuilds current
+game data, reapplies the parent, checks the chain again and omits the marker from
+the compiled package. Replace material uses the existing vanilla donor workflow
+and clears only affected custom texture, dye and intensity options.
+
+Reviews expire after 15 minutes and share the existing recoverable batch writer.
+Changed targets, canonical/legacy copies, parent dependencies and relevant project
+options invalidate the review before publication. Old reviews have a bounded
+snapshot budget; native tools, game packages and user projects are not changed by
+the isolated checks.
+
+```powershell
+.\.venv\Scripts\python.exe tests/run_checks.py --suite test_material_bulk.py --suite test_jobs_bulk.py --suite test_material_replacement.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --material-bulk-only --report-dir _work/material-bulk/browser
+$env:ATELIER_DATA_DIR = 'D:\AtelierDev\phase-0-1'
+.\.venv\Scripts\python.exe tests/native_material_bulk.py --report-dir _work/material-bulk/native-new
+```
+
+The native check uses a new project under its report directory and never installs
+a mod. Two real material targets passed reparenting and a shared scalar edit,
+then full donor replacement, with IoStore build/readback verifying target identity,
+parent and texture paths, parameters, load-order dependencies and cooked shader
+payload. This does not establish in-game appearance.
 
 ### Interface polish and continuity
 

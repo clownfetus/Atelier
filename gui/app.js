@@ -393,6 +393,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
   const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
   allItems = [];
+  if (_gridRenderedPath !== path) document.getElementById('bulk-material-open').hidden = true;
   _gridThumbs?.destroy();
   _gridThumbs = null;
   renderHomePins();
@@ -495,6 +496,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
   let filtered = AtelierLibraryTools.filter(cards, q);
+  document.getElementById('bulk-material-open').hidden = !filtered.some(card => card.file_type === 'material' && card.game_rel);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
   const countLabel = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
   if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('library-count'), countLabel);
@@ -1155,6 +1157,7 @@ function _seedScalars(arr) {
 async function openMaterialEditor(item) {
   window.AtelierRoster?.rememberEditor(item.game_rel,'material',_activeProjectName);
   if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
+  _syncBulkEditorAction();
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
   matEditor = null;
@@ -1175,9 +1178,11 @@ async function openMaterialEditor(item) {
   matEditor = { game_rel: item.game_rel, name: item.name,
                 colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved",
                 textures: res.textures || {}, textureClasses: res.texture_classes || {},
-                custom: res.custom_textures || {}, materialSource: res.material_source || "" };
+                custom: res.custom_textures || {}, materialSource: res.material_source || "",
+                materialParent: res.material_parent || "" };
   _matRemember(matEditor, res.original);
   renderMatEditor();
+  _syncBulkEditorAction('material');
   loadSidebar();
   await loadMaterialDye(item, current, project);
 }
@@ -1637,9 +1642,10 @@ function bodyMaterialBusy(busy) {
 
 function materialReplacementHtml(m, expanded) {
   return `<details id="mat-replacement" class="mat-parameter-group" data-mat-group="Replacement" ${expanded.get("Replacement") ? "open" : ""}>
-    <summary>Replace material<span>${m.materialSource ? "Using another material" : "Game material"}</span></summary>
+    <summary>Replace material<span>${m.materialSource ? "Using another material" : m.materialParent ? "Custom parent" : "Game material"}</span></summary>
     <div class="mat-replacement-body">
-      <p>${m.materialSource ? `Source: <code>${_matEscape(m.materialSource)}</code>` : "This asset uses its original game material."}</p>
+      <p>${m.materialSource ? `Source: <code>${_matEscape(m.materialSource)}</code>` : m.materialParent ? "This asset keeps its own material with a different parent." : "This asset uses its original game material."}</p>
+      ${m.materialParent ? `<p>Parent override: <code>${_matEscape(m.materialParent)}</code></p>` : ""}
       <p>Use a material from any character, including its parent, textures and shader settings. This is saved immediately and included in export.</p>
       <label for="mat-source-search">Find a material by character, skin, name or path</label>
       <div class="mat-source-search"><input id="mat-source-search" type="search" placeholder="e.g. galaxy, 1031, MI_Body" oninput="matSearchSources(this.value)">
@@ -1710,6 +1716,7 @@ async function replaceMaterialFromSource() {
     editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars);
     editor.textures = res.textures || {}; editor.textureClasses = res.texture_classes || {};
     editor.custom = res.custom_textures || {}; editor.materialSource = res.material_source || "";
+    editor.materialParent = res.material_parent || "";
     editor.sourceDraft = editor.materialSource; editor.compareMode = "saved";
     editor.dyeable = false; editor.dyeOff = false;
     _matRemember(editor);
@@ -1842,7 +1849,7 @@ async function resetMaterial() {
   if (!(await _confirmAction("Restore this material's original game values? This replaces the project's saved material parameters and discards the current draft."
                + (ownTextures ? ` Your ${ownTextures === 1 ? "image is" : "images are"} also removed from its texture slots.` : ""), 'Restore game values?', 'Restore'))) return;
   if (matEditor !== editor || project !== _activeProjectName || _materialSaving.has(editor)) return;
-  const structural = !!editor.materialSource;
+  const structural = !!(editor.materialSource || editor.materialParent);
   const submitted = JSON.stringify(materialSaveSnapshot(editor));
   const current = () => matEditor === editor && project === _activeProjectName;
   _materialSaving.add(editor); _matRefreshDirty();
@@ -1862,6 +1869,7 @@ async function resetMaterial() {
       _materialReferences.set(editor, { saved: original, original });
       editor.custom = res.custom_textures || {};
       editor.materialSource = "";
+      editor.materialParent = "";
       editor.dyeable = false; editor.dyeOff = false;
       if (res.textures) { editor.textures = res.textures; editor.textureClasses = res.texture_classes || {}; }
       renderMatEditor();
@@ -1887,6 +1895,7 @@ async function closeMaterialEditor(force = false) {
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   matEditor = null;
+  _syncBulkEditorAction();
   return true;
 }
 
@@ -1894,7 +1903,9 @@ async function closeMaterialEditor(force = false) {
 // drops a draft. Editors without per-field dirty flags compare their edits with the state last
 // loaded, saved or reset.
 const _editSnapshot = state => JSON.stringify(state);
-const _vfxSnapshot = v => _editSnapshot({ groups: v.groups, scalars: v.scalars, vectors: v.vectors });
+const _vfxSnapshot = v => _editSnapshot({ groups: v.groups.map(g => ({export_indices:g.export_indices,
+  stops:g.stops, channels:g.channels, sample_count:g.sample_count, inten:g.inten, restore_original:!!g.restore_original})),
+  scalars: v.scalars, vectors: v.vectors });
 async function _discardUnsaved(dirty, what) { return !dirty || await _confirmAction(`Discard unsaved ${what}?`); }
 function _curveDirty() { return !!curveEditor && Object.values(curveEditor.dirty || {}).some(Boolean); }
 function _vfxDirty() { return !!vfxEditor && _vfxSnapshot(vfxEditor) !== vfxEditor.baseline; }
@@ -1909,7 +1920,7 @@ function _otherEditorsDirty() {
 window.addEventListener("beforeunload", event => {
   if (materialDirtyCount() || (matEditor && _materialSaving.has(matEditor))) {
     event.preventDefault(); event.returnValue = "Material parameters have unsaved changes.";
-  } else if (_otherEditorsDirty()) {
+  } else if (_otherEditorsDirty() || vfxEditor && _vfxSaving.has(vfxEditor)) {
     event.preventDefault(); event.returnValue = "An editor has unsaved changes.";
   }
 });
@@ -2084,6 +2095,8 @@ document.getElementById("curve-overlay").addEventListener("click", e => {
 
 // ── Niagara VFX editor (color-curve group recolor) ────────────────────────────
 let vfxEditor = null;
+let _vfxOpenRevision = 0;
+const _vfxSaving = new WeakSet();
 
 // A curve group has no parameter name to key its stored intensity by. Its export indices are read
 // from the vanilla asset before any saved edit is overlaid, so the lowest one is stable across
@@ -2110,9 +2123,15 @@ function _vfxGradCss(g) {
 }
 
 async function openVfxEditor(item) {
+  if (vfxEditor && _vfxSaving.has(vfxEditor)) return;
+  if (!(await _discardUnsaved(_vfxDirty(), 'VFX edits'))) return;
   window.AtelierRoster?.rememberEditor(item.game_rel,'vfx',_activeProjectName);
+  const revision = ++_vfxOpenRevision, project = _activeProjectName;
+  const current = () => revision === _vfxOpenRevision && project === _activeProjectName;
+  window.AtelierMotionboard?.destroy(); vfxEditor = null;
   _syncBulkEditorAction();
   const ov = document.getElementById("vfx-overlay");
+  ov.classList.remove('has-motionboard');
   document.getElementById("vfx-title").textContent = item.name;
   document.getElementById("vfx-sub").textContent = item.game_rel || "";
   document.getElementById("vfx-status").textContent = "";
@@ -2120,15 +2139,17 @@ async function openVfxEditor(item) {
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
   let res;
-  try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
-  catch (e) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
-  if (!res.ok) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read VFX"}</div>`; return; }
+  try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`, {project}); }
+  catch (e) { if (current()) document.getElementById("vfx-body").textContent = 'Error: ' + e.message; return; }
+  if (!current()) return;
+  if (!res.ok) { document.getElementById("vfx-body").textContent = res.error || 'Failed to read VFX'; return; }
   vfxEditor = { game_rel: item.game_rel, name: item.name, kind: res.kind || "niagara",
                 scalars: (res.scalars || []).map(x => ({ ...x })),
                 vectors: (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) })),
-                groups: (res.groups || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) })) };
+                groups: (res.groups || []).map(g => ({ ...g, stops:g.stops.map(s=>s.slice()), inten: _vfxInten(g, res.inten) })),
+                unsupportedExports: res.unsupported_exports || [], unmatchedEdits: res.unmatched_edits || 0 };
+  _rememberVfxSaved(vfxEditor);
   renderVfxEditor();
-  vfxEditor.baseline = _vfxSnapshot(vfxEditor);
   _syncBulkEditorAction('vfx');
   loadSidebar();
 }
@@ -2235,13 +2256,15 @@ function _vfxSpark(g) {                                    // SVG line preview f
 
 function renderVfxEditor() {
   const v = vfxEditor; if (!v) return;
+  window.AtelierMotionboard?.destroy();
+  document.getElementById('vfx-overlay').classList.toggle('has-motionboard', v.kind !== 'mpc' && !!v.groups.length && !!window.AtelierMotionboard);
   if (v.kind === "mpc") { document.getElementById("vfx-body").innerHTML = renderMpcEditor(); return; }
   if (!v.groups.length) { document.getElementById("vfx-body").innerHTML = `<div class="mat-empty">This VFX exposes no editable curves.</div>`; return; }
   let h = "";
   v.groups.forEach((g, gi) => {
-    const owners = g.label ? g.label : `${g.export_indices.length} emitter${g.export_indices.length !== 1 ? "s" : ""}`;
+    const owners = _matEscape(g.label || `${g.export_indices.length} exports`);
     const extra  = g.export_indices.length > 1 ? ` ×${g.export_indices.length}` : "";
-    h += `<div class="mat-section">${g.kind} curve — ${owners}${extra}${g.is_hdr ? " · HDR" : ""}</div>`;
+    h += `<section class="vfx-control-group" data-vfx-group="${gi}"><div class="mat-section">${_matEscape(g.kind)} curve — ${owners}${extra}${g.is_hdr ? " · HDR" : ""}</div>`;
     if (g.channels === 4) {                               // color / emission: gradient + swatches + alpha
       h += `<div class="curve-preview" id="vgrad${gi}"></div>`;
       if (g.is_hdr) {
@@ -2253,8 +2276,8 @@ function renderVfxEditor() {
       g.stops.forEach((s, si) => {
         const a = s.length > 3 ? s[3] : 1;
         h += `<div class="vfx-stop">
-          <input type="color" value="${_vStopHex(s, g.inten)}" oninput="vfxStop(${gi},${si},this.value)">
-          <input class="vfx-alpha" type="number" min="0" max="1" step="0.05" value="${+(+a).toFixed(2)}" title="alpha (opacity)" oninput="vfxAlpha(${gi},${si},this.value)">
+          <input type="color" data-vfx-color="${si}" aria-label="Stop ${si+1} RGB" value="${_vStopHex(s, g.inten)}" oninput="vfxStop(${gi},${si},this.value)">
+          <input class="vfx-alpha" data-vfx-stop="${si}" data-vfx-channel="3" type="number" min="0" max="1" step="0.05" value="${+(+a).toFixed(2)}" title="alpha (opacity)" aria-label="Stop ${si+1} alpha" oninput="vfxAlpha(${gi},${si},this.value)">
         </div>`;
       });
       h += `</div>`;
@@ -2264,51 +2287,100 @@ function renderVfxEditor() {
       g.stops.forEach((s, si) => {
         h += `<div class="vfx-val">`;
         for (let c = 0; c < g.channels; c++)
-          h += `<input type="number" step="any" value="${s[c]}" oninput="vfxVal(${gi},${si},${c},this.value)">`;
+          h += `<input type="number" step="any" data-vfx-stop="${si}" data-vfx-channel="${c}" aria-label="Stop ${si+1} component ${c+1}" value="${s[c]}" oninput="vfxVal(${gi},${si},${c},this.value)">`;
         h += `</div>`;
       });
       h += `</div>`;
     }
+    h += '</section>';
   });
-  document.getElementById("vfx-body").innerHTML = h;
+  const body = document.getElementById('vfx-body'), controls = document.createElement('div');
+  controls.innerHTML = h; body.replaceChildren();
+  if (window.AtelierMotionboard) AtelierMotionboard.mount(body, v, {
+    setValue:vfxVal, restore:restoreVfxTrack, savedGroup:i=>v.savedGroups[i], isDirty:()=>_vfxDirty(),
+  }, controls); else body.append(controls);
   v.groups.forEach((g, gi) => {
     if (g.channels === 4) { const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g); }
   });
 }
 
+function _rememberVfxSaved(v) {
+  v.baseline = _vfxSnapshot(v);
+  v.savedGroups = JSON.parse(v.baseline).groups;
+}
+function _refreshVfxGroup(gi) {
+  const g = vfxEditor?.groups[gi]; if (!g) return;
+  const gradient = document.getElementById('vgrad'+gi); if (gradient) gradient.style.background = _vfxGradCss(g);
+  const spark = document.getElementById('vspark'+gi); if (spark) spark.innerHTML = _vfxSpark(g);
+  document.querySelectorAll(`[data-vfx-group="${gi}"] input`).forEach(input => {
+    if (input === document.activeElement) return;
+    if (input.dataset.vfxColor != null) input.value = _vStopHex(g.stops[Number(input.dataset.vfxColor)], g.inten);
+    else if (input.dataset.vfxStop != null) input.value = g.stops[Number(input.dataset.vfxStop)][Number(input.dataset.vfxChannel)];
+  });
+  for (const id of ['vint'+gi, 'vinn'+gi]) { const node=document.getElementById(id); if(node && node!==document.activeElement) node.value=g.inten; }
+  window.AtelierMotionboard?.sync(gi);
+  const status=document.getElementById('vfx-status');
+  if (!_vfxDirty() && status.textContent.startsWith('Submitted edits saved; newer')) status.textContent='Saved changes restored.';
+}
+function restoreVfxTrack(gi, mode, point, channel) {
+  const v=vfxEditor, g=v?.groups[gi]; if (!g) return;
+  const saved=v.savedGroups[gi], reference=mode==='original' ? g.original_stops : saved.stops;
+  if (!reference) return;
+  if (point != null) {
+    const time=g.stops.length===1 ? 0 : point/(g.stops.length-1);
+    vfxVal(gi,point,channel,AtelierMotionboardData.sample(mode==='original' ? g.original_samples || reference : reference,time)[channel]);
+  } else {
+    g.stops=reference.map(stop=>stop.slice());
+    g.inten=mode==='original' ? _vfxInten(g) : saved.inten;
+    if (mode==='original' && g.has_saved_edit || mode==='saved' && saved.restore_original) g.restore_original=true;
+    else delete g.restore_original;
+    renderVfxEditor();
+  }
+}
+
 function vfxVal(gi, si, ci, val) {
   const g = vfxEditor.groups[gi], x = parseFloat(val);
-  if (isNaN(x)) return;
+  if (!Number.isFinite(x) || Math.abs(x)>3.4028234663852886e38) return;
+  delete g.restore_original;
   g.stops[si][ci] = x;
-  const el = document.getElementById("vspark" + gi); if (el) el.innerHTML = _vfxSpark(g);
+  _refreshVfxGroup(gi);
 }
 
 function vfxStop(gi, si, hex) {
   const g = vfxEditor.groups[gi], n = Math.max(g.inten, 1e-6), s = g.stops[si];
+  delete g.restore_original;
   s[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   s[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   s[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
-  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+  _refreshVfxGroup(gi);
 }
 function vfxAlpha(gi, si, v) {
   const g = vfxEditor.groups[gi], s = g.stops[si], a = parseFloat(v);
-  if (isNaN(a)) return;
+  if (!Number.isFinite(a)) return;
+  delete g.restore_original;
   while (s.length < 4) s.push(1);
   s[3] = Math.min(1, Math.max(0, a));
-  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+  _refreshVfxGroup(gi);
 }
 function vfxInten(gi, val, fromRange) {
   const g = vfxEditor.groups[gi], o = Math.max(g.inten, 1e-6), nv = parseFloat(val) || 0, k = nv / o;
+  if (!Number.isFinite(nv) || g.stops.some(s=>s.slice(0,3).some(x=>!Number.isFinite(x*k) || Math.abs(x*k)>3.4028234663852886e38))) return;
+  delete g.restore_original;
   g.stops.forEach(s => { s[0] *= k; s[1] *= k; s[2] *= k; });
   g.inten = nv;
   const other = document.getElementById((fromRange ? "vinn" : "vint") + gi); if (other) other.value = val;
-  const el = document.getElementById("vgrad" + gi); if (el) el.style.background = _vfxGradCss(g);
+  _refreshVfxGroup(gi);
 }
 
 async function saveVfx() {
-  const v = vfxEditor; if (!v) return;
+  const v = vfxEditor; if (!v || _vfxSaving.has(v)) return;
+  const project = _activeProjectName, submitted = _vfxSnapshot(v);
+  const current = () => vfxEditor === v && project === _activeProjectName;
+  _vfxSaving.add(v);
+  document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = true;
   document.getElementById("vfx-status").textContent = "Saving…";
-  const groups = v.groups.map(g => ({ export_indices: g.export_indices, stops: g.stops,
+  const editedGroups = v.groups.filter(g => !g.restore_original && (!window.AtelierMotionboardData || AtelierMotionboardData.modified(g)));
+  const groups = editedGroups.map(g => ({ export_indices: g.export_indices, stops: g.stops,
                                       sample_count: g.sample_count, channels: g.channels }));
   // an MPC has no curve groups — it saves named scalars/vectors instead
   const scalars = {}, vectors = {};
@@ -2317,31 +2389,64 @@ async function saveVfx() {
   // Both payload shapes carry colours, and only one of them is populated for a given asset, so the
   // two intensity maps can share one store — an MPC keys by parameter name, a curve by export index.
   const inten = { ..._intenMap(v.vectors, p => p.name, p => _derivedInten(p.rgba)),
-                  ..._intenMap(v.groups,  _vfxKey,       g => _vfxInten(g)) };
+                  ..._intenMap(editedGroups,  _vfxKey,       g => _vfxInten(g)) };
   try {
-    const res = await api("/api/vfx_save", { method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await api("/api/vfx_save", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors, inten }) });
-    if (res.ok) { toast(`Saved: ${v.name}`, "success"); _warnIntenLost(res, inten); loadSidebar(); closeVfxEditor(true); }
-    else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
-  } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+    if (res.ok) {
+      toast(`Saved: ${v.name}`, 'success'); _warnIntenLost(res, inten);
+      if (project === _activeProjectName) loadSidebar();
+      if (current()) {
+        const saved=JSON.parse(submitted);
+        saved.groups.forEach((group,i)=>{
+          const intent=group.restore_original, live=v.groups[i];
+          group.restore_original=false;
+          const actual=(res.groups || []).find(g=>g.export_indices?.some(index=>live.export_indices.includes(index)));
+          if (actual) live.has_saved_edit=!!actual.has_saved_edit;
+          if (live.restore_original && (actual && !actual.has_saved_edit || intent && window.AtelierMotionboardData?.equal(live.stops,group.stops))) delete live.restore_original;
+        });
+        v.baseline=JSON.stringify(saved); v.savedGroups=saved.groups;
+        const newer = _vfxSnapshot(v) !== v.baseline;
+        if (newer) { document.getElementById('vfx-status').textContent = 'Submitted edits saved; newer changes remain unsaved.'; window.AtelierMotionboard?.sync(); }
+        else closeVfxEditor(true);
+      }
+    } else if (current()) document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
+  } catch (e) { if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+  finally {
+    _vfxSaving.delete(v);
+    document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
+  }
 }
 async function resetVfx() {
-  const v = vfxEditor; if (!v) return;
+  const v = vfxEditor; if (!v || _vfxSaving.has(v)) return;
+  const project = _activeProjectName;
   if (!(await _confirmAction("Restore this effect's original game values? This deletes the project's saved VFX edits and discards the current draft.", 'Restore effect?', 'Restore'))) return;
+  if (vfxEditor !== v || project !== _activeProjectName || _vfxSaving.has(v)) return;
+  const current = () => vfxEditor === v && project === _activeProjectName;
+  _vfxSaving.add(v); document.getElementById('vfx-body').inert = true;
+  document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = true;
   document.getElementById("vfx-status").textContent = "Resetting…";
   try {
-    const res = await api("/api/vfx_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await api("/api/vfx_reset", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel }) });
+    if (!current()) return;
     if (res.ok) { v.groups  = (res.groups  || []).map(g => ({ ...g, inten: _vfxInten(g, res.inten) }));
                   v.scalars = (res.scalars || []).map(x => ({ ...x }));
                   v.vectors = (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) }));
-                  renderVfxEditor(); v.baseline = _vfxSnapshot(v); _syncBulkEditorAction('vfx');
+                  v.unsupportedExports=res.unsupported_exports || []; v.unmatchedEdits=res.unmatched_edits || 0;
+                  _rememberVfxSaved(v); renderVfxEditor(); _syncBulkEditorAction('vfx'); loadSidebar();
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
-  } catch (e) { document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+  } catch (e) { if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+  finally {
+    _vfxSaving.delete(v); document.getElementById('vfx-body').inert = false;
+    document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
+  }
 }
 async function closeVfxEditor(force = false) {
+  if (force !== true && vfxEditor && _vfxSaving.has(vfxEditor)) { document.getElementById('vfx-status').textContent = 'Wait for this save or reset to finish before closing.'; return false; }
   if (force !== true && _vfxDirty() && !(await _discardUnsaved(true, "VFX edits"))) return false;
+  ++_vfxOpenRevision; window.AtelierMotionboard?.destroy();
   const overlay = document.getElementById('vfx-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -2356,6 +2461,14 @@ document.getElementById("vfx-close").addEventListener("click", closeVfxEditor);
 document.getElementById("vfx-overlay").addEventListener("click", e => {
   if (e.target.id === "vfx-overlay") closeVfxEditor();
 });
+{
+  const overlay=document.getElementById('vfx-overlay'), panel=overlay.querySelector('.mat-modal');
+  panel.tabIndex=-1; panel.setAttribute('role','dialog'); panel.setAttribute('aria-modal','true'); panel.setAttribute('aria-labelledby','vfx-title');
+  window.AtelierJobDialogs?.trap(overlay,panel,closeVfxEditor);
+  overlay.addEventListener('keydown',event=>{
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase()==='s') { event.preventDefault(); event.stopPropagation(); saveVfx(); }
+  });
+}
 
 // ── import all ────────────────────────────────────────────────────────────────
 function _shownTextures() {
@@ -2449,24 +2562,46 @@ document.getElementById('import-cancel').addEventListener('click', async () => {
 
 let _bulkEditorKind = null, _bulkEditorSavedState = null;
 function _bulkEditorState() {
-  return JSON.stringify(_bulkEditorKind === 'curve' ? curveEditor?.channels
+  return JSON.stringify(_bulkEditorKind === 'material' ? matEditor && materialSaveSnapshot(matEditor) : _bulkEditorKind === 'curve' ? curveEditor?.channels
     : vfxEditor && [vfxEditor.groups, vfxEditor.scalars, vfxEditor.vectors]);
 }
 function _syncBulkEditorAction(kind = null) {
   const button = document.getElementById('bulk-edit-open');
-  const compatible = kind === 'curve' ? !!curveEditor : kind === 'vfx' && vfxEditor &&
+  const compatible = kind === 'material' ? !!matEditor : kind === 'curve' ? !!curveEditor : kind === 'vfx' && vfxEditor &&
     (vfxEditor.groups.length || vfxEditor.scalars.length || vfxEditor.vectors.length);
   _bulkEditorKind = compatible && document.getElementById(kind+'-overlay').classList.contains('active') ? kind : null;
   button.hidden = !_bulkEditorKind;
   if (_bulkEditorKind) {
-    document.getElementById(kind+'-reset').before(button);
+    button.textContent = kind === 'material' ? 'Bulk materials' : 'Bulk VFX / curves';
+    document.getElementById((kind === 'material' ? 'mat' : kind)+'-reset').before(button);
     _bulkEditorSavedState = _bulkEditorState();
   }
 }
+function _bulkEditsReady() {
+  if (materialDirtyCount() || matEditor && _materialSaving.has(matEditor) || _otherEditorsDirty() || window.AtelierViewport?.hasPendingEdits?.()) {
+    toast('Save or discard unsaved changes before bulk editing.', 'warning'); return false;
+  }
+  return true;
+}
+function _bulkMaterialSelection() {
+  const eligible = item => item.file_type === 'material' && item.game_rel;
+  return {edited: Object.values(sidebarData).filter(item => item.selected && eligible(item)),
+    folder: AtelierLibraryTools.filter(allItems.map(_makeCard), _libraryQuery().toLowerCase()).filter(eligible)};
+}
+document.getElementById('bulk-material-open').addEventListener('click', () => {
+  if (!_bulkEditsReady() || _gridStatus !== 'ready') return;
+  window.AtelierBulkEdit.open(_bulkMaterialSelection(), _activeProjectName, {kind:'material', source:'folder'});
+});
 document.getElementById('bulk-edit-open').addEventListener('click', () => {
-  if (!_bulkEditorKind) return;
-  if (_bulkEditorState() !== _bulkEditorSavedState) {
+  if (!_bulkEditorKind || !_bulkEditsReady()) return;
+  if (_bulkEditorKind === 'curve' && _bulkEditorState() !== _bulkEditorSavedState) {
     toast('Save or reset this file’s changes before bulk editing.', 'warning'); return;
+  }
+  if (_bulkEditorKind === 'material') {
+    const selection = _bulkMaterialSelection();
+    if (!selection.edited.some(item => item.game_rel === matEditor.game_rel))
+      selection.edited.unshift({name:matEditor.name, game_rel:matEditor.game_rel, file_type:'material'});
+    window.AtelierBulkEdit.open(selection, _activeProjectName, {kind:'material'}); return;
   }
   const eligible = item => ['curve','vfx'].includes(item.file_type) && item.game_rel;
   const query = _libraryQuery().toLowerCase();
@@ -2479,8 +2614,9 @@ document.getElementById('bulk-edit-open').addEventListener('click', () => {
 window.addEventListener('atelier-bulk-saved', event => {
   if (event.detail.project === _activeProjectName) {
     loadSidebar(); renderGrid();
-    if (_bulkEditorKind === 'curve' && curveEditor) openCurveEditor(curveEditor);
-    else if (_bulkEditorKind === 'vfx' && vfxEditor) openVfxEditor(vfxEditor);
+    if (_bulkEditorKind === 'material' && matEditor && !materialDirtyCount() && !_materialSaving.has(matEditor)) openMaterialEditor(matEditor);
+    else if (_bulkEditorKind === 'curve' && curveEditor && !_curveDirty()) openCurveEditor(curveEditor);
+    else if (_bulkEditorKind === 'vfx' && vfxEditor && !_vfxDirty()) openVfxEditor(vfxEditor);
   }
 });
 document.getElementById('add-asset-open').addEventListener('click', () => {
@@ -2545,6 +2681,7 @@ window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource 
 
 function refreshEditedTexture(gameRel, tok, animate = true) {
   if (!gameRel) return;
+  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {detail:{game_rel:gameRel,project:_activeProjectName}}));
   const images = new Set(document.querySelectorAll(
     `#grid-area img[data-game-rel="${CSS.escape(gameRel)}"]`));
   if (tok) {
@@ -2745,6 +2882,7 @@ async function performClearMany(items) {
 }
 
 function renderSidebar() {
+  window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail:{project:_activeProjectName}}));
   window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
   const list = document.getElementById("sidebar-list");
   document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
@@ -3032,6 +3170,15 @@ function _exportReviewCurrent(snapshot, password) {
 }
 
 function _blockExportForDrafts(snapshot = null) {
+  if (vfxEditor && (_vfxDirty() || _vfxSaving.has(vfxEditor))) {
+    _exportReviewChecking=false;
+    if (snapshot) window.AtelierExportReview?.cancelCheck(snapshot);
+    document.getElementById('export-review-overlay')?.classList.remove('active');
+    document.getElementById('vfx-overlay').classList.add('active');
+    const status=document.getElementById('vfx-status'); status.tabIndex=-1;
+    status.textContent=_vfxSaving.has(vfxEditor) ? 'Wait for the VFX save to finish before exporting.' : 'Save or restore unsaved VFX changes before exporting.';
+    status.focus(); updateInstallBtn(); return true;
+  }
   const saving = !!matEditor && _materialSaving.has(matEditor);
   const materialPending = saving || materialDirtyCount() > 0;
   const viewportPending = window.AtelierViewport?.hasPendingEdits?.();
@@ -3884,6 +4031,42 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
   }
 }
 
+// Assembly uses the established editor/import/replacement operations. These
+// adapters add navigation context only; asset publication stays with each editor.
+window.AtelierAssetEditors = Object.freeze({
+  projectAssets:()=>Object.values(sidebarData),
+  async material(item, slot) {
+    await openMaterialEditor(item);
+    if (!slot || matEditor?.game_rel !== item.game_rel) return;
+    const index = _matTextureSlots(matEditor).indexOf(slot);
+    const row = document.getElementById('mattex'+index);
+    if (!row) return;
+    const group = row.closest('details'); if (group) group.open = true;
+    row.scrollIntoView({block:'center'}); row.querySelector('button')?.focus();
+  },
+  async texture(gameRel) {
+    const imported = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    if (imported) { handleImportedFileAction(imported); return; }
+    await editAsset({game_rel:gameRel,name:gameRel.split('/').pop(),file_type:'texture'});
+    if (!_openAfterImport) {
+      const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+      if (record) handleImportedFileAction(record);
+    }
+  },
+  replaceTexture(gameRel) {
+    const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    if (!record) { toast('Edit this texture to add it to the project before replacing it.','info'); return; }
+    const project = _activeProjectName, input = document.createElement('input');
+    input.type='file'; input.accept='.png,.jpg,.jpeg,.tga,.bmp,.dds,.hdr,.webp,.tif,.tiff';
+    input.addEventListener('change',async()=>{
+      const file = input.files[0];
+      if (!file || project !== _activeProjectName) return;
+      await replaceTextureFromFile(file,gameRel,project);
+    },{once:true});
+    input.click();
+  },
+});
+
 // File bytes, never native file paths: WebView2 exposes ordinary File objects. Like Replace with
 // Image, a drop only replaces an edited texture; it overwrites that edit in place, and a stray drop
 // is easy to make, so it asks first.
@@ -4553,7 +4736,7 @@ document.getElementById("project-chip").addEventListener("click", openProjectPic
 
 async function _selectProject(name) {
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
-                     "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay"];
+                     "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay", "bulk-overlay"];
   if (editorIds.some(id => document.getElementById(id)?.classList.contains("active"))) {
     toast("Close the active editor before switching projects.", "info");
     return;

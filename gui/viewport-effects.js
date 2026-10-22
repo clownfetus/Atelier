@@ -170,16 +170,22 @@ export function createViewportEffects({renderer,scene,camera,modelRoot,grid,redu
   }
   function withMaterials(convert,draw) {
     const restore=[],floorVisible=grid.visible;grid.visible=false;
-    const shown=m=>m.userData?.heldDuplicate?invisible:m.visible?convert(m):m;
-    modelRoot.traverse(mesh=>{if(mesh.isMesh){restore.push([mesh,mesh.material]);mesh.material=Array.isArray(mesh.material)?mesh.material.map(shown):shown(mesh.material);}});
+    const shown=(m,mesh)=>m.userData?.heldDuplicate?invisible:m.visible?convert(m,mesh):m;
+    modelRoot.traverse(mesh=>{if(mesh.isMesh){restore.push([mesh,mesh.material]);mesh.material=Array.isArray(mesh.material)?mesh.material.map(m=>shown(m,mesh)):shown(mesh.material,mesh);}});
     try{draw();}finally{for(const [mesh,material]of restore)mesh.material=material;grid.visible=floorVisible;}
   }
-  function drawOutline(name) {
-    if(!name)return;
+  function drawOutline(selection) {
+    if(!selection)return;
+    const names = selection.names || (selection instanceof Set ? selection : new Set([selection]));
+    const section=selection.section, geometry=section?.object?.geometry;
+    const range=geometry ? {...geometry.drawRange} : null;
     outline.uniforms.accent.value.set(getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#98b7e2');
     renderer.getSize(outline.uniforms.resolution.value);
     const clear=renderer.autoClear;renderer.autoClear=false;
-    try{withMaterials(m=>m.name===name?outline:invisible,()=>renderer.render(scene,camera));}finally{renderer.autoClear=clear;}
+    try {
+      if(geometry)geometry.setDrawRange(section.start,section.end-section.start);
+      withMaterials((m,mesh)=>names.has(m.name)&&(!section||mesh===section.object)?outline:invisible,()=>renderer.render(scene,camera));
+    } finally {renderer.autoClear=clear;if(geometry)geometry.setDrawRange(range.start,range.count);}
   }
   // One scan variant per source keeps its side and alpha cut-out, so hair cards stay cards.
   function scanFor(source) {
