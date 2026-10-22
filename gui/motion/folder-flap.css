@@ -27,27 +27,27 @@
   opacity: 1;
   transform-box: view-box;
   transform-origin: 48px 80px;
-  transition: transform 150ms var(--studio-easing, cubic-bezier(0.2, 0, 0, 1));
+  transition: transform 180ms cubic-bezier(.4,0,.6,1);
 }
 
 /* Open pose, shared by keyboard focus and fine-pointer hover. */
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-front {
-  transform: skewX(-9deg) scaleY(0.86);
-  transition: transform 220ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+  transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
+  transition: transform 260ms cubic-bezier(.22,.8,.32,1.12);
 }
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
-  transform: translateY(-1px);
-  transition-duration: 180ms;
+  transform: translateY(-2px) rotate(1deg);
+  transition-duration: 240ms;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-front {
-    transform: skewX(-9deg) scaleY(0.86);
-    transition: transform 220ms var(--krackle-pop, cubic-bezier(0.34, 1.56, 0.64, 1));
+    transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
+    transition: transform 260ms cubic-bezier(.22,.8,.32,1.12);
   }
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
-    transform: translateY(-1px);
-    transition-duration: 180ms;
+    transform: translateY(-2px) rotate(1deg);
+    transition-duration: 240ms;
   }
 }
 
@@ -60,6 +60,7 @@
   }
 }
 
+:root:not([data-krackle="full"]) .card[data-atelier-motion="folder-flap"] .am-folder-flap *,
 .card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap,
 .card[data-atelier-motion="folder-flap"][data-am-reduced="true"] .am-folder-flap * {
   animation: none !important;

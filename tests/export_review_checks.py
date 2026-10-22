@@ -142,9 +142,27 @@ def run_export_review_checks(page, context, url, report, checks):
         assert len(pending) == 1
         assert review.locator('#install-btn').is_disabled()
         assert overlay.locator('progress').get_attribute('value') is None
+        overlay.locator('.am-working-border').wait_for()
+        assert overlay.locator('.am-working-dot').count() == 0
+        assert overlay.locator('.am-working-border').evaluate("el=>getComputedStyle(el).backgroundImage.includes('data:image/svg+xml')")
+        assert overlay.locator('.am-krackle-stage-canvas').evaluate('el=>el.style.width') == '216px'
+        review.wait_for_function("""() => {
+          const c=document.querySelector('.export-review-stage canvas');
+          if(!c)return false;
+          return c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3 && v>100);
+        }""")
+        review.wait_for_timeout(900)
+        review.screenshot(path=str(report / 'working-export-busy.png'))
+        review.set_viewport_size({'width': 1024, 'height': 640})
+        assert overlay.locator('.am-krackle-stage-canvas').bounding_box()['height'] == 164
+        action_box = overlay.locator('.export-review-actions').bounding_box()
+        assert action_box['y'] >= 0 and action_box['y'] + action_box['height'] <= 640
+        review.screenshot(path=str(report / 'working-export-compact.png'))
+        review.set_viewport_size({'width': 1400, 'height': 900})
         review.keyboard.press('Escape')
         overlay.wait_for(state='hidden')
         assert not overlay.is_visible()
+        overlay.locator('.am-working-border').wait_for(state='detached')
         review.locator('#export-last-result').click()
         assert overlay.locator('progress').is_visible()
         review.evaluate('doInstallMod()')
@@ -160,6 +178,7 @@ def run_export_review_checks(page, context, url, report, checks):
                                    'installed_dir': 'D:/Fixture/mods', 'applied': ['mat MI_Body'],
                                    'skipped': ['Missing optional texture']})
         review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'warning'")
+        overlay.locator('.am-working-border').wait_for(state='detached')
         assert 'Missing optional texture' in overlay.inner_text()
         assert 'mat MI_Body' in overlay.inner_text()
         assert 'D:/Fixture/exported/Review.pak' in overlay.inner_text()

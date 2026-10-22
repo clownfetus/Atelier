@@ -146,6 +146,7 @@
     var mql = null;
 
     function isReducedMotionActive() {
+      if (global.AtelierMotionPolicy?.allows(2) === false) return true;
       if (reducedMotionMode === 'reduce') {
         return true;
       }
@@ -224,42 +225,47 @@
         var fall = window.AtelierMotion.ease.fall;
         var rise = window.AtelierMotion.ease.rise;
         var sway = window.AtelierMotion.ease.sway;
-        // The tray stamps up into place.
+        // The tray takes the weight of the first drop, then settles.
         started.push(nodes.gTray.animate(
           [
-            { transform: 'translateY(4px) scale(0.96)', opacity: 0.35, easing: easing },
-            { transform: 'translateY(-1px) scale(1.01)', opacity: 1, offset: 0.6, easing: sway },
+            { transform: 'translateY(3px) scale(0.98)', opacity: 0.35, easing: easing },
+            { transform: 'translateY(0) scale(1)', opacity: 1, offset: 0.45, easing: fall },
+            { transform: 'translateY(1.5px) scale(1.025,.975)', opacity: 1, offset: 0.7, easing: sway },
             { transform: 'translateY(0) scale(1)', opacity: 1 }
           ],
-          { duration: 300, easing: 'linear', fill: 'both' }
+          { duration: 440, easing: 'linear', fill: 'both' }
         ));
         // The registration dots fade in like a print plate.
         started.push(nodes.gGuides.animate(
           [{ opacity: 0 }, { opacity: 1 }],
           { duration: 260, easing: easing, fill: 'both' }
         ));
-        // Loose bubbles drop into the tray one after another and bounce.
+        // Each bead starts at the hanging reservoir, then lands in its own tray
+        // position. The source and destination are part of the same illustration.
         for (var b = 0; b < nodes.bubbles.length; b++) {
+          var bead = nodes.bubbles[b].querySelector('circle');
+          var sourceX = 56 - Number(bead.getAttribute('cx'));
+          var sourceY = 33 - Number(bead.getAttribute('cy'));
           started.push(nodes.bubbles[b].animate(
             [
-              { transform: 'translateY(-26px)', opacity: 0, offset: 0, easing: fall },
-              { transform: 'translateY(0)', opacity: 1, offset: 0.5, easing: rise },
-              { transform: 'translateY(-5px)', offset: 0.7, easing: fall },
-              { transform: 'translateY(0)', offset: 0.86, easing: rise },
-              { transform: 'translateY(-1.2px)', offset: 0.93, easing: fall },
-              { transform: 'translateY(0)', opacity: 1, offset: 1 }
+              { transform: 'translate(' + sourceX + 'px,' + sourceY + 'px) scale(.6,.85)', opacity: 0, offset: 0, easing: fall },
+              { transform: 'translateY(1px) scale(1.24,.76)', opacity: 1, offset: 0.52, easing: rise },
+              { transform: 'translateY(-3px) scale(.96,1.04)', offset: 0.74, easing: fall },
+              { transform: 'translateY(0) scale(1.04,.96)', offset: 0.88, easing: sway },
+              { transform: 'translateY(0) scale(1)', opacity: 1, offset: 1 }
             ],
             { duration: 420, delay: 40 + b * 55, easing: 'linear', fill: 'both' }
           ));
         }
-        // The drop swings in on its thread and hangs, waiting for the first edit.
+        // The reservoir stretches while feeding the tray, then retains its last drop.
         started.push(nodes.drop.animate(
           [
-            { transform: 'translateY(-10px) scaleY(1.25)', opacity: 0, easing: easing },
-            { transform: 'translateY(1.5px) scaleY(0.92)', opacity: 1, offset: 0.6, easing: sway },
+            { transform: 'translateY(-3px) scale(.85,1.15)', opacity: 0, easing: easing },
+            { transform: 'translateY(1px) scale(.92,1.08)', opacity: 1, offset: 0.45, easing: sway },
+            { transform: 'translateY(0) scale(1.06,.94)', opacity: 1, offset: 0.7, easing: sway },
             { transform: 'translateY(0) scaleY(1)', opacity: 1 }
           ],
-          { duration: 360, delay: 120, easing: 'linear', fill: 'both' }
+          { duration: 440, easing: 'linear', fill: 'both' }
         ));
 
         activeAnimations = started;

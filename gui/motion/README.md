@@ -35,30 +35,68 @@ never take over that stage.
 
 | Set | Production use | Slot / behavior |
 | --- | --- | --- |
-| Export feedback | Export button and notifications | 20px / 24px, charge ring, starburst, cracked ring, splat |
-| Viewport loader | Existing 3D loading overlay | 72px, twelve-dot ring around a boiling ball; resting bubbles; KO splat |
+| Export feedback | Export button and notifications | 28px / 40px, charge ring, starburst, cracked ring, splat |
+| Viewport loader | Existing 3D loading overlay | 112px, twelve-dot ring around a boiling ball; resting bubbles; KO splat |
 | Folder flap | Generic folder cards | 76% of thumbnail, Krackle folder whose front panel tips open |
-| Material save | Save-result notifications | 24px, swatch, charge ring, same result shapes |
+| Material save | Editor save indicators and result notifications | 44px while saving (36px in Model Studio), 40px results |
 | Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance with a bubble splash |
 | Empty assets | Confirmed empty Edited Assets sidebar | 112px tray of bubbles, brief entrance then still |
 | Texture reconstruction | Edited texture previews in the grid and sidebar | New pixels arrive through swelling halftone dots |
 | Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
 | Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
 | Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
-| Krackle stage | Export review and edit import dialogs | 132-156px canvas particle formations |
+| Krackle stage | Export review and edit import dialogs | 184-216px canvas particle formations; smaller in short windows |
+| Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
+| Workflow accents | Pin/unpin, context menus, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
+| Connected surfaces | Primary actions, build selections, Settings, Activity, projects and tool panels | Surface-bound seams receive ink from actual initiating controls |
 | `krackle.css` | Every `.spinner`, progress bars, the Activity ring, import segments, edited rows | CSS only |
 
-`workflow-krackle.js` adds finite ink formations to committed everyday actions:
-selecting a different hero, arriving in a folder, opening a material/curve/VFX
-editor and an imported or saved asset landing in the Mod tray. They use the
-existing Charge/Paper roles with transparent punched bubbles. They do not alter
-artwork, swatches, selection, requests or saved state. Re-selecting the same hero,
-filtering, typing and failed navigation do not replay an arrival. Wide formations
-share `moment.js` ownership with import/export; workspace effects cannot float
-over an active dialog. At most three canvases run, for 480–560ms, with bounded
-pixel density and cleanup on hide, scroll, resize, palette/dial changes, removal
-and page exit. Missing Canvas/WAAPI support keeps the ordinary UI.
+`workflow-krackle.js` gives committed actions a finite SVG gesture inside their
+own rounded bounds. A 3–6px edge mask and content cutouts protect labels, controls,
+portraits, textures, swatches and model canvases. Hero crowns, folder zippers,
+editor latches, tray docks, pin clasps/releases, menu hinges, project handoffs,
+workspace rails, action strikes, panel unfolds and selection stitches each have
+their own direction and receiving point. Filled receiver seals have true holes.
+Local gestures take 500–820ms, and at most three run together. Wide gestures share
+`moment.js` with import/export. Repeated selections, failed navigation, typing
+and background panels never start an arrival.
+
+`workflow.transfer(source, destination, kind)` joins two actual, visible DOM
+edges with a filled SVG stream. A visible reservoir charges at the source before
+the ink stretches along a curved path. The receiving edge compresses, rebounds
+once and sends a connected ink seam along its border after the stream arrives.
+The source, stream and reaction share one clock and the same contextual pigment;
+the actual surface, artwork and controls stay fixed. Transfers finish in about
+1.1–1.4 seconds, including the receiving gesture.
+It skips missing, overlapping or hidden endpoints. Pointer and keyboard origins
+can supply the source of menus, navigation, editors and selections. Imports use
+the real asset card frame and matching Mod tray row; packing joins a selected
+tray entry to Export. Connections protect intervening content and cancel when
+either endpoint moves, disappears, or loses visibility. Scroll, resize, policy
+changes and teardown remove owned effects; palette changes repaint live ink.
+Calm keeps a brief local pulse and Off stays still.
+
+`workflow-surfaces.js` opens panel seams after a genuine user gesture. Pending
+entrances cancel on dismissal, hiding and policy changes. Operations and control
+responses remain immediate; motion never controls request completion.
+
+`krackle-context.js` supplies `AtelierMotion.energy.resolve(host)` and the
+decorative `--krackle-energy` / `--krackle-energy-rift` pigments. Costume icons
+take precedence over unrelated banner colours; Model Studio owns its current
+costume context, and leaving it restores the library context. Missing art uses
+the chosen theme accent. Pigments retain their hue and are fitted for readable
+contrast against the actual surface, including translucent and color-mix paint.
+Theme controls, ownership markers and semantic result inks retain their roles.
+
+`motion-preview.js` adds **Try Krackle** beside the Motion dial in Settings.
+**Replay ink handoff** connects two real sample surfaces from Edit to Mod tray.
+Its twelve gesture buttons use the production formations directly, without
+starting jobs or writing project state. Calm previews the same local pulse;
+Off and system reduced motion show still artwork and disable replay. Samples
+never play automatically, and rapid replay replaces the previous sample.
+Opening a dialog cancels workspace formations, including Calm pulses; closing
+Settings cancels its preview without replaying it when reopened.
 
 Run `tests/browser_smoke.py --workflow-motion-only --report-dir <folder>` for the
 selection/navigation/editor/tray integration, reduced-motion, ownership and
@@ -214,16 +252,18 @@ bubbles drop to the floor and bounce. Error squeezes and bursts into a dripping
 splat, then three dazed bubbles circle above it and slow to a stop; the existing
 message and controls appear immediately.
 
-The user requested clearly visible animation sizes. The loader occupies **72px**
-(a 48-unit viewBox with approximately 48px outer framing on screen), compared to
-the supplied 44px demo. Export feedback is **20px** in the button and **24px** in
-toasts. Fixed dimensions prevent layout movement during state changes.
+The production loader occupies **112px**. Export feedback is **28px** in the
+button and **40px** in toasts. The standalone components keep their original
+72px and 20px defaults; production slots supply the larger sizes. Fixed dimensions
+prevent layout movement during state changes.
 
 `AtelierMotion.viewportLoader.mount(emptyHost, {state, reducedMotion})` returns the
 same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape. It extends
 the existing namespace without replacing export feedback. States are `idle`,
 `loading`, `ready`, `empty` and `error`; replay only repeats loading assembly.
-The 220ms assembly transitions into the 1040ms charge loop. Mounting is immediate,
+The 220ms assembly transitions into a 1040ms fluid loop: an upper inlet feeds
+two connected frame sides into a lower catch plate. Existing rim lobes remain
+attached to that frame; loose bubbles stay hidden while loading. Mounting is immediate,
 and all loading artwork stays hidden during the show-delay. Ready cancels that
 delay immediately; empty/error results and reduced-motion stills do not wait. These are
 indeterminate decoration, not a percentage or model progress measurement.
@@ -307,9 +347,12 @@ own colour.
 `AtelierMotion.materialSave.mount(emptyHost, {state, reducedMotion})` returns the
 same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape as the other
 components. States are `idle`, `saving`, `success`, `warning`, `error`. The icon
-occupies **24px**, with about **22px** painted width. Success pops in 420ms, warning
-drops its chunk in 620ms and error splats in about 1.4s. Saving has an optional 1040ms loop, but actual
-save hooks retain their existing `Saving…` text and use only completion toasts.
+defaults to **24px**; production notifications use **40px**. An upper reservoir
+feeds a continuous S-shaped ribbon into a lower seal. Success catches at that
+same receiver, compresses, rebounds and spreads into the settled result;
+warning drops its chunk in 620ms and error splats in about 1.4s. Saving uses a
+1040ms fluid loop beside the existing `Saving…` text: **44px** in editors and **36px**
+in Model Studio. Only actual responses produce result notifications.
 
 Direct terminal mounts animate once; identical states do not replay. Finite
 effects and their finish callbacks are released. OS/forced reduced motion and
@@ -319,7 +362,7 @@ artwork. State validation excludes inherited object properties. Duplicate mounts
 destroy the prior instance; callers explicitly destroy before removing hosts.
 
 `material-save-ui.js` provides the save-only `AtelierMaterialSaveFeedback.toast`.
-It creates a 24px static fallback beside the motion host, inserts dynamic messages
+It creates a 40px static fallback beside the motion host, inserts dynamic messages
 with `textContent`, and returns the exact toast element. Its `remove()`, click and
 timeout paths share idempotent disposal. Hover pauses expiry. Failed mounting
 leaves the fallback visible; cleanup errors cannot prevent removal. The existing
@@ -444,30 +487,83 @@ keeps the original outline drawing.
 from the Krackle prototype, ported to plain Canvas 2D without p5.js. `mount(host,
 {state, size, reducedMotion})` accepts `idle`, `busy`, `success`, `warning` and
 `error`. A fresh busy starts as a drop of ink that splashes into a puddle and is
-drawn out into a charging ring of comic-sized dots; results pop into a starburst
-with a ripple, crack the ring so its chunk falls, or squeeze and burst into a
+drawn into a charging formation fed from its upper inlet; results settle into a
+starburst, crack the ring so its chunk falls, or squeeze and burst into a
 knocked-out splat with three dazed bubbles. Ink merging uses a blur-and-threshold
 canvas filter where available and falls back to separate haloed bubbles when
 unsupported or slow (WebKitGTK). Settled results stop the frame loop
 (`data-am-sleeping="true"`), and an IntersectionObserver stops a stage whose
 dialog is hidden. Hidden documents pause; reduced motion jumps to each formation.
 `mount` throws without canvas, so callers keep their static progress UI. The export
-review shows a 156px stage while checking and building, then the result formation
+review shows a 216px stage while checking and building, then the result formation
 (cancelled exports hide it) under a heading that names the outcome ("Mod exported
 with warnings"); long reports scroll inside the dialog so the heading and actions
-stay visible. The edit import dialog shows a 132px stage while open.
+stay visible. The edit import dialog shows a 184px stage while open. Short windows
+use 164px and 144px respectively so actions remain reachable.
+
+`working-panels.js` observes real `aria-busy` and controller states, plus explicit
+request leases from editor saves/loads. An animated SVG paints the native border
+band as a border-box background. The native border keeps its dimensions but becomes
+transparent while the SVG supplies its paint. A precise even-odd clip leaves the
+entire interior transparent; existing background layers, clipping, scrolling,
+corner radii, per-side widths and colors are retained. The border never paints
+inside content. A measured SVG conduit connects the save glyph, footer gutter
+and button only where there is clear space. There are no floating dots, random
+positions or additional JavaScript frame loops.
+
+Each border has a measured source, continuous channel, moving ribbon and receiver.
+Loading feeds the frame from the active heading or inlet; saving carries ink to
+the save control. The two-beat cycle uses the shared 1040ms clock. Native geometry
+determines the path. Ordinary renders retain the SVG source; resizing and pigment
+changes rebuild with the current phase. The border, nearby busy glyph and stage
+share the current hero/skin pigment.
+
+`working.begin(panel, {kind, anchor, current})` returns an idempotent
+`finish(outcome = 'cancel', {destination, anchor} = {})`. Actual request owners
+pass `success`, `warning` or `error`; removing an automatic busy marker never
+invents success. The final active lease releases a finite receiving reaction:
+catch, compression, rebound and border spread. Stale requests and hidden results
+settle silently. A successful material/curve/VFX save hands its receipt to the
+mod-tray border before closing the editor; newer edits and partial persistence
+receive a warning. Model geometry appears as soon as it is ready while the
+surrounding frame receives the completion.
+
+Configuration discovery connects the actual panel edges through a scanner and
+configuration latch. `configDiscovery.begin(setupOverlay)` follows the real
+setup-status request and hands its result to the native frame after the loading
+cover disappears. Closing/reopening Settings invalidates old discoveries. The
+local conduit is measured again on resize; status text remains outside the ink.
+
+Concurrent leases share one border, and an old project's completion cannot stop
+a later request or decorate its replacement editor. Only foreground panels animate,
+with at most four active frames. Calm/Off, OS reduction, hidden panels, removal and
+teardown remove the animated image and restore the native border and background.
+Only work still active resumes. Missing SVG animation leaves the ordinary border
+and status UI intact. Save indicators use the existing SVG controller.
+
+`tests/browser_smoke.py --working-panels-only --report-dir <folder>` holds actual
+loading/save/export requests and verifies actual moving border pixels, unchanged
+interior pixels, asymmetric corner/width geometry, background restoration,
+failure/retry, concurrent work, visibility, policy changes and SVG fallback.
+`fluid_work_checks.py` additionally holds configuration responses and checks
+measured connections, cancellation races, true outcomes, and raster continuity
+of the save and model loaders at their production sizes.
 
 `krackle.css` restyles existing feedback rather than adding new effects: every
-`.spinner` becomes the six-dot charge ring, whose crest counts round dot by dot;
-the update download bar is energy with drifting bubbles and an ink-blob leading
+`.spinner` becomes a connected reservoir, conduit and catch plate whose pressure
+travels on the shared beat while its carrier stays still;
+the update download bar is energy with a registered screen and an ink-blob leading
 edge; indeterminate `<progress>` runs dots along the bar; the Activity ring is six
 dots that fill clockwise with progress; import results are one dot per asset; the
-first-export colour moment throws the skin's colours as bubbles; edited sidebar
+first-export colour moment carries the skin's hues from the completed glyph
+through a rounded pour into a joined seal along its button's bottom edge.
+Each flat ink is fitted to the button for readable contrast; the receiving seal
+compresses and rebounds after arrival. Edited sidebar
 rows keep their accent corner with a single bubble. Every loop stops under OS or
 Atelier reduced motion (`[data-motion=reduce]`).
 
 Typing, dialog backdrops and material inspection stay plain. Full allows a brief
-primary-button pop and a bubble theme wave; Calm/Off skip both. Category
+primary-button edge strike and a scalloped theme wash; Calm/Off skip both. Category
 emblems are Krackle energy marks (see below). Swatch interiors and dye /
 texture previews keep their exact content; HDR energy stays outside the swatch.
 
@@ -478,7 +574,8 @@ stale.
 
 Wave 2 adds a 300 ms deletion drain to the existing inert sidebar snapshots.
 Snapshots contain no live asset identifiers, are noninteractive and never delay
-the delete request or rendering. Loose bubbles stay within a 48 px micro host;
+the delete request or rendering. Three ink lobes merge into the removed
+thumbnail's baseline within a 48 px host;
 OS/Atelier reduced motion skips the drain. Detached snapshots and their effects
 are disposed after completion. Undo itself is ordinary focusable UI, with the
 existing hover-paused toast timer.

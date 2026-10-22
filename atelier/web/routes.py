@@ -267,10 +267,13 @@ from atelier.hero_artwork import hero_artwork
 @app.get('/api/catalogue/status')
 def catalogue_status():
     catalogue.start_update()
-    with catalogue.lock:
-        hero_artwork.start_update(dict(catalogue.data.get('entries', {})))
-    response.content_type = 'application/json'
     status = catalogue.status()
+    with catalogue.lock:
+        entries = dict(catalogue.data.get('entries', {}))
+    # Discover names first so new heroes receive their artwork in the same launch.
+    if not status['updating']:
+        hero_artwork.start_update(entries)
+    response.content_type = 'application/json'
     status['hero_artwork'] = hero_artwork.status()
     status['updating'] = status['updating'] or status['hero_artwork']['updating']
     return json.dumps(status)
@@ -303,6 +306,16 @@ def catalogue_banner(key):
 @app.get('/api/catalogue/badge/<key>')
 def catalogue_badge(key):
     return catalogue_thumbnail(key, kind='badge')
+
+
+@app.get('/api/catalogue/proficiency/<key>')
+def catalogue_proficiency(key):
+    return catalogue_thumbnail(key, kind='proficiency')
+
+
+@app.get('/api/catalogue/spray/<key>')
+def catalogue_spray(key):
+    return catalogue_thumbnail(key, kind='spray')
 
 
 @app.get('/api/catalogue/thumbnail/<key>')

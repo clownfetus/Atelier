@@ -1,0 +1,36 @@
+/* The native status remains readable; only its old spinner is replaced. */
+#setup-loading.am-config-discovery-active > .spinner { display: none; }
+.am-config-art { display: block; position: relative; width:100%; height:88px; flex: 0 0 88px; pointer-events: none; color: var(--krackle-energy,var(--acc)); }
+.am-config-svg { display:block;position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(196px,80%);height:88px;overflow:visible; }
+.am-config-source { position: absolute; left:0;top:40px;width:4px;height:8px; pointer-events: none; }
+.am-config-ink,.am-config-latch { fill: currentColor; }
+.am-config-scan { fill: none; stroke: var(--krackle-energy-rift,var(--acc)); stroke-width: 5; stroke-linecap: round; }
+.am-config-channel,.am-config-flow { fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 7; }
+.am-config-channel { opacity:1;stroke-width:5; }
+.am-config-flow { stroke-dasharray: 1 1; stroke-dashoffset: .38; opacity: .6; }
+.am-config-scanner { transform-box: view-box; transform-origin: 58px 44px; }
+.am-config-receiver { transform-box: view-box; transform-origin: 181px 44px; }
+.am-config-latch { opacity: .2; transform-box: fill-box; transform-origin: right center; transform: scaleX(.2); }
+[data-am-config-running=true] .am-config-scanner { animation: config-charge 1.9s cubic-bezier(.35,0,.2,1) infinite; }
+[data-am-config-running=true] .am-config-scan { animation: config-scan 1.9s cubic-bezier(.4,0,.2,1) infinite; }
+[data-am-config-running=true] .am-config-flow { animation: config-pour 1.9s cubic-bezier(.4,0,.2,1) infinite; }
+[data-am-config-running=true] .am-config-receiver { animation: config-receive 1.9s cubic-bezier(.3,0,.2,1) infinite; }
+[data-am-config-state=success] .am-config-receiver { color: var(--krackle-success); }
+[data-am-config-state=warning] .am-config-receiver { color: var(--krackle-warn); }
+[data-am-config-state=error] .am-config-receiver { color: var(--krackle-fault); }
+[data-am-config-state=success] .am-config-latch { opacity: 1; transform: none; }
+@keyframes config-charge { 0%,100% { opacity:.92; } 25%,68% { opacity:1; } }
+@keyframes config-scan { 0%,100% { transform: translateX(0); opacity:.7; } 28% { transform: translateX(11px); opacity:1; } 50%,72% { transform: translateX(0); opacity:.7; } }
+@keyframes config-pour { 0%,22% { stroke-dashoffset:1; opacity:0; stroke-width:5; } 32% { opacity:1; } 64% { stroke-dashoffset:0; stroke-width:8; opacity:1; } 82%,100% { stroke-dashoffset:-1; stroke-width:5; opacity:0; } }
+@keyframes config-receive { 0%,55%,100% { transform:none; } 68% { transform:scale(.92,1.12); } 82% { transform:scale(1.03,.97); } }
+@media (prefers-reduced-motion:reduce) { .am-config-art * { animation:none !important; } }
+:root:not([data-krackle=full]) .am-config-art * { animation:none !important; }
+
+/* Measured conduits meet the native panel border, scanner and receiver exactly. */
+.am-config-conduits { position:absolute;inset:0;display:block;width:100%;height:100%;overflow:visible;pointer-events:none; }
+.am-config-edge-channel,.am-config-edge-flow { fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round; }
+.am-config-edge-channel { stroke-width:5; }
+.am-config-edge-flow { stroke-width:8;stroke-dasharray:.3 .7;stroke-dashoffset:.3; }
+[data-am-config-running=true] .am-config-edge-flow { animation:config-edge-pour var(--krackle-beat,1040ms) linear infinite; }
+[data-am-config-running=true] [data-role=outlet-flow] { animation-delay:calc(var(--krackle-beat,1040ms) * -.5); }
+@keyframes config-edge-pour { from { stroke-dashoffset:.3; } to { stroke-dashoffset:-.7; } }

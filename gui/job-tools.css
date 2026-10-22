@@ -1,7 +1,10 @@
 .job-activity-button { flex: 0 0 auto; min-height: 36px; margin-left: 12px; }
 .modal.job-modal, .modal.bulk-modal { width: min(800px, calc(100vw - 40px)); max-width: min(800px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; }
 .modal.bulk-modal { gap: 12px; }
+#job-overlay .job-modal { overflow: hidden; }
+.job-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; }
 .job-body, .bulk-body { display: grid; gap: 12px; margin: 16px 0; }
+.job-body { min-height: 0; overflow-y: auto; }
 .job-body p, .bulk-body p { margin: 4px 0; line-height: 1.5; }
 .job-row { border: 1px solid var(--border); padding: 14px; border-radius: 6px; }
 .job-state { float: right; font-size: 12px; color: var(--muted); text-transform: capitalize; }

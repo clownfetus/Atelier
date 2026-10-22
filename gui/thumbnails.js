@@ -3,7 +3,8 @@
   function create({project, request, makeFallback}) {
     const entries = new Map(), requests = new Set(), requeued = new Set();
     let destroyed = false, timer = null, checking = false, deadline = 0;
-    const remaining = () => [...entries.values()].filter(e => !e.loaded && !e.failed);
+    const usesArtwork = entry => entry.card.thumbnail && !entry.card.imported;
+    const remaining = () => [...entries.values()].filter(e => !usesArtwork(e) && !e.loaded && !e.failed);
 
     function fail(entry, message = 'Preview unavailable — right-click to retry') {
       if (destroyed || entry.loaded) return;
@@ -33,9 +34,13 @@
         entry.spin.hidden = false;
         entry.thumb.dataset.previewState = 'loading';
       }
-      const query = new URLSearchParams({game_rel: entry.card.game_rel, _project: project});
-      if (fresh) query.set('_t', String(Date.now()));
-      entry.img.src = `/api/thumb?${query}`;
+      if (usesArtwork(entry)) {
+        entry.img.src = entry.card.thumbnail;
+      } else {
+        const query = new URLSearchParams({game_rel: entry.card.game_rel, _project: project});
+        if (fresh) query.set('_t', String(Date.now()));
+        entry.img.src = `/api/thumb?${query}`;
+      }
     }
 
     function attach(card, img, thumb) {
@@ -63,7 +68,7 @@
         if (destroyed) return;
         clearTimeout(entry.imageTimer); entry.reading = false;
         entry.loaded = false;
-        if (entry.cacheAttempt || entry.failed) fail(entry);
+        if (usesArtwork(entry) || entry.cacheAttempt || entry.failed) fail(entry);
         // A cache miss while queued is recovered by ready/status, not treated as failure yet.
       };
       load(entry);
@@ -145,7 +150,7 @@
     function handleEvent(data) {
       if (destroyed) return;
       const entry = entries.get(data.game_rel);
-      if (!entry) return;
+      if (!entry || usesArtwork(entry)) return;
       if (data.thumb_ready) {
         load(entry, true);
       } else if (data.thumb_failed) fail(entry, data.error || undefined);

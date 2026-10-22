@@ -326,9 +326,10 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         save = start_save()
         for theme in ('light', 'dark'):
             material_page.locator('#settings-theme').evaluate('(el,value)=>{el.value=value;el.dispatchEvent(new Event("change"));}', theme)
-            # Production keeps pending feedback in the existing footer; only completed
-            # saves use the new notification artwork. Do not invent a busy toast here.
+            # The large busy glyph stays in the existing footer, beside the authoritative text.
             assert material_page.locator('#mat-status').inner_text() == 'Saving…'
+            material_page.locator('#material-overlay .am-working-save').wait_for()
+            assert material_page.locator('#material-overlay .am-working-save .am-material-save-svg').bounding_box()['width'] == 44
             assert material_page.locator('#material-overlay').evaluate('el=>el.classList.contains("active")')
             material_page.screenshot(path=str(report / f'material-save-saving-{theme}.png'), animations='disabled')
         save.fulfill(json={'ok': True, 'inten_saved': True})
@@ -337,9 +338,9 @@ def run_material_save_motion_checks(page, context, url, report, checks):
             material_page.locator('#settings-theme').evaluate('(el,value)=>{el.value=value;el.dispatchEvent(new Event("change"));}', theme)
             svg = state_toasts('success').locator('svg')
             box = svg.bounding_box()
-            assert box['width'] == 24 and box['height'] == 24, box
+            assert box['width'] == 40 and box['height'] == 40, box
             material_page.screenshot(path=str(report / f'material-save-success-{theme}.png'), animations='disabled')
-        checks.append('Save toasts clean up on removal/click/timeout and retain a readable 24px footprint in both themes during real fixture saves')
+        checks.append('Save toasts clean up on removal/click/timeout and use 40px results beside 44px pending-save feedback in both themes')
         assert not errors, errors
     finally:
         material_page.unroute_all(behavior='ignoreErrors')
