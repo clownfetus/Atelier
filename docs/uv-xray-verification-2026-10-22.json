@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "mesh": "Characters/1033/1033001/Meshes/SK_1033_1033001_Lobby",
+  "project_texture": "Characters/1033/1033001/Texture/T_1033001_Body_D",
+  "checks": [
+    "Native real-game GLB and material identity; two visible cooked material slots picked by real mouse clicks",
+    "Project texture API bytes match the existing project PNG SHA-256",
+    "All Three UV/index data match independently parsed native GLB accessors",
+    "Exported PNG edge alignment checked against raw GLB UVs; exact project-image resolution and transparent white-line pixels",
+    "No extra Three GPU textures; UVs, indices, drafts, project files and game containers unchanged",
+    "Showcase closes and disables UV inspection; Inspect restores availability; no page errors"
+  ],
+  "sections": [
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Body",
+      "slot": 5,
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Body_D",
+      "triangles": 24468,
+      "clicked_uv": {
+        "u": 0.4121573869081968,
+        "v": 0.47787190249492567
+      },
+      "export_size": [
+        2048,
+        2048
+      ],
+      "edge_alignment_fraction": 1.0,
+      "incorrect_vertical_mirror_fraction": 0.6154977930358019,
+      "export_sha256": "a5798eb768130d48e705b8d2a8a6fb7232766a53bdfaccfbb74725068aa8410c"
+    },
+    {
+      "material": "Characters/1033/1033001/Materials/Lobby/MI_1033001_Equip_02",
+      "slot": 3,
+      "texture": "Characters/1033/1033001/Texture/T_1033001_Equip_02_D",
+      "triangles": 23213,
+      "clicked_uv": {
+        "u": 0.8709583640045647,
+        "v": 0.3207225925970895
+      },
+      "export_size": [
+        2048,
+        2048
+      ],
+      "edge_alignment_fraction": 1.0,
+      "incorrect_vertical_mirror_fraction": 0.55734504636408,
+      "export_sha256": "0b7db7be37dc9a8de73f59b63945d8125f7b1b317e0721944dde62e2312c0129"
+    }
+  ],
+  "page_errors": []
+}
