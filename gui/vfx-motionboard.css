@@ -1,0 +1,110 @@
+/* Material 3 workspace surfaces; Krackle belongs to the particle silhouette, not every control. */
+#vfx-overlay.has-motionboard .mat-modal { width: calc(100vw - 40px); max-width: 1500px; height: calc(100vh - 40px); max-height: none; }
+#vfx-overlay.has-motionboard .mat-head, #vfx-overlay.has-motionboard .mat-foot { flex-shrink: 0; }
+#vfx-overlay.has-motionboard .mat-head { padding: 12px 18px; }
+#vfx-overlay.has-motionboard .mat-head h2 { font-size: 18px; }
+#vfx-overlay.has-motionboard .mat-body { flex: 1; min-height: 0; max-height: none; padding: 0; overflow: hidden; }
+#vfx-overlay.has-motionboard .mat-foot { padding: 10px 18px; gap: 8px; }
+.motionboard { --mb-playhead: 0%; --mb-label-width: 190px; height: 100%; min-height: 0; display: flex; flex-direction: column; color: var(--text); background: var(--bg); font: var(--studio-type-detail); }
+.motionboard button, .motionboard input, .motionboard select { font: inherit; color: var(--text); }
+.motionboard button, .motionboard select, .motionboard input[type=number], .motionboard input[type=search] { min-height: 32px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg2); padding: 5px 8px; }
+.motionboard button { cursor: pointer; }
+.motionboard button:hover:not(:disabled) { background: var(--bg3); border-color: var(--acc); }
+.motionboard button[aria-pressed=true] { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-color: var(--acc); }
+.motionboard button:disabled { opacity: .45; cursor: default; }
+.motionboard :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.motionboard [hidden] { display: none !important; }
+.mb-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 6px 14px; background: var(--md-sys-color-surface-container-low); border-bottom: 1px solid var(--border); }
+.mb-identity { display: flex; align-items: center; gap: 16px; }
+.mb-kicker { font: var(--studio-type-label); font-weight: 650; }
+#mb-dirty { color: var(--muted); }
+.mb-compare { display: flex; gap: 4px; }
+.mb-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(170px, 1fr) minmax(220px, .92fr); gap: 1px; background: var(--border); }
+.mb-stage-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg2); }
+.mb-stage-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 12px; }
+.mb-stage-heading > span { font-weight: 600; }
+.mb-stage-heading label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.mb-stage { flex: 1; min-height: 110px; position: relative; overflow: hidden; background: var(--md-sys-color-surface-container-lowest); }
+#mb-canvas { width: 100%; height: 100%; display: block; position: absolute; inset: 0; }
+.mb-stage-badge { position: absolute; top: 12px; right: 12px; font-size: 9px; letter-spacing: .08em; color: var(--muted); pointer-events: none; }
+#mb-preview-caption { position: absolute; bottom: 10px; left: 14px; right: 14px; color: var(--muted); font-size: 10px; pointer-events: none; }
+.motionboard .mb-preview-note { font-size: 11px; margin: 0; padding: 7px 12px; line-height: 1.4; }
+.mb-inspector { grid-column: 2; grid-row: 1 / 3; min-height: 0; min-width: 0; overflow: auto; background: var(--md-sys-color-surface-container-low); padding: 14px 12px; }
+.mb-inspector-heading { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+.mb-inspector-heading .mb-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.mb-inspector h3 { font: var(--studio-type-label); font-weight: 650; margin: 5px 0; overflow-wrap: anywhere; }
+.mb-binding-badge { color: var(--muted); font-size: 11px; }
+.mb-point-navigation { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; }
+.mb-point-navigation label { display: flex; align-items: center; gap: 6px; }
+#mb-point { width: 62px; }
+#mb-point-time { color: var(--muted); font: 11px var(--studio-mono); }
+.mb-field { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 6px; margin: 6px 0; }
+.mb-field input, .mb-field select { width: 100%; min-width: 0; }
+.mb-reference-values { font: 11px var(--studio-mono); line-height: 1.6; color: var(--muted); margin: 8px 0; overflow-wrap: anywhere; }
+.mb-reset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.mb-reset-actions button { font-size: 11px; }
+.motionboard .mb-edit-note { color: var(--studio-warning); font-size: 11px; margin: 7px 0; }
+.mb-edit-note:empty { display: none; }
+.mb-details { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
+.mb-details summary { cursor: pointer; font-weight: 600; padding: 3px 0; }
+.mb-details .mb-field { display: block; margin: 10px 0; }
+.mb-details .mb-field select { margin-top: 4px; }
+.motionboard .mb-details p { font-size: 11px; line-height: 1.5; margin: 8px 0; overflow-wrap: anywhere; }
+.mb-all-controls { display: flex; gap: 6px; align-items: center; margin: 10px 0; }
+#mb-legacy-controls .mat-section { white-space: normal; line-height: 1.5; }
+#mb-legacy-controls .mat-row { flex-wrap: wrap; }
+#mb-legacy-controls .mat-row label { flex-basis: 100%; }
+#mb-legacy-controls .vfx-vals { gap: 5px; }
+#mb-legacy-controls .vfx-val input { min-height: 28px; width: 65px; }
+#mb-legacy-controls .vfx-alpha { width: 42px; min-height: 26px; }
+.mb-timeline-panel { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--md-sys-color-surface-container-low); }
+.mb-transport { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.mb-transport label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.mb-play-buttons { display: flex; gap: 3px; }
+#mb-back, #mb-forward { width: 28px; padding: 0; font-size: 20px; }
+#mb-play { min-width: 58px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+#mb-duration { width: 52px; }
+#mb-clock { margin-left: auto; font: 11px var(--studio-mono); white-space: nowrap; }
+.mb-track-toolbar { display: flex; gap: 6px; padding: 7px 10px; }
+#mb-track-search { flex: 1; min-width: 80px; }
+#mb-track-filter { width: 112px; }
+.mb-ruler { display: grid; grid-template-columns: var(--mb-label-width) minmax(0, 1fr); align-items: start; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.mb-ruler > label { padding: 8px 10px; color: var(--muted); font-size: 11px; }
+.mb-ruler-scale { padding: 0 10px 3px; min-width: 0; }
+#mb-scrub { display: block; width: 100%; height: 20px; margin: 0; accent-color: var(--acc); }
+.mb-ruler-scale > div { display: flex; justify-content: space-between; font: 9px var(--studio-mono); color: var(--muted); }
+.mb-tracks { flex: 1; min-height: 0; overflow: auto; }
+.mb-tracks[data-empty=true]::after { content: 'No matching tracks. Show all to restore the timeline.'; display: block; padding: 20px; color: var(--muted); }
+.mb-track { display: grid; grid-template-columns: var(--mb-label-width) minmax(200px, 1fr); min-height: 70px; border-bottom: 1px solid var(--border); }
+.mb-track-heading { padding: 5px 8px; border-right: 1px solid var(--border); min-width: 0; }
+.motionboard .mb-track-select { min-height: 20px; display: block; width: 100%; border: 0; border-radius: 0; background: transparent; font-size: 11px; line-height: 1.35; padding: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-track-kind { display: block; color: var(--muted); font-size: 9px; margin: 2px 0 4px; }
+.mb-track-actions { display: flex; gap: 3px; }
+.motionboard .mb-track-actions button { min-height: 22px; width: 26px; padding: 0; font-size: 11px; }
+.mb-plot-area { min-width: 0; position: relative; background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--border) calc(25% - 1px) 25%); }
+.mb-plot-area svg { display: block; width: 100%; height: 64px; overflow: visible; touch-action: none; cursor: crosshair; }
+.mb-value-line, .mb-reference-line { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.mb-reference-line { stroke-dasharray: 4 4; opacity: .6; }
+.mb-zero { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.mb-key { fill: var(--bg2); stroke: var(--acc); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: ns-resize; }
+.mb-key-selected { fill: var(--acc); stroke: var(--text); stroke-width: 2; }
+.mb-playhead { pointer-events: none; position: absolute; top: 0; bottom: 0; left: calc(1% + var(--mb-playhead) * .98); width: 1px; background: var(--acc); }
+.mb-playhead::before { content: ''; position: absolute; top: 0; left: -3px; border-left: 3px solid transparent; border-right: 3px solid transparent; border-top: 5px solid var(--acc); }
+.mb-plot-range { position: absolute; right: 7px; top: 12px; font: 9px var(--studio-mono); color: var(--muted); pointer-events: none; background: var(--bg2); }
+.mb-track-value { position: absolute; right: 7px; bottom: 3px; font: 9px var(--studio-mono); color: var(--muted); pointer-events: none; }
+.mb-selected .mb-track-heading { background: var(--md-sys-color-primary-container); }
+.mb-selected .mb-track-select { color: var(--md-sys-color-on-primary-container); font-weight: 650; }
+.mb-track-hidden .mb-plot-area { visibility: hidden; }
+.mb-track-hidden .mb-track-select { opacity: .55; }
+.motionboard .mb-timeline-note { flex-shrink: 0; font-size: 10px; line-height: 1.4; padding: 6px 10px; margin: 0; color: var(--muted); border-top: 1px solid var(--border); }
+@media (max-width: 1150px) {
+  .mb-workspace { grid-template-columns: minmax(0, 1fr) 260px; }
+  .motionboard { --mb-label-width: 162px; }
+  .mb-transport { gap: 7px; }
+  #mb-clock { font-size: 10px; }
+}
+@media (max-height: 800px) {
+  .mb-workspace { grid-template-rows: minmax(150px, .9fr) minmax(230px, 1fr); }
+  .mb-preview-note { max-height: 42px; overflow: auto; }
+  .mb-inspector { padding-top: 10px; }
+}
