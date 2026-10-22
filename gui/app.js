@@ -2678,6 +2678,7 @@ window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource 
 
 function refreshEditedTexture(gameRel, tok, animate = true) {
   if (!gameRel) return;
+  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {detail:{game_rel:gameRel,project:_activeProjectName}}));
   const images = new Set(document.querySelectorAll(
     `#grid-area img[data-game-rel="${CSS.escape(gameRel)}"]`));
   if (tok) {
@@ -2878,6 +2879,7 @@ async function performClearMany(items) {
 }
 
 function renderSidebar() {
+  window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail:{project:_activeProjectName}}));
   window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
   const list = document.getElementById("sidebar-list");
   document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
@@ -4025,6 +4027,42 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
     t.resolve(`Error: ${err.message}`, "error");
   }
 }
+
+// Assembly uses the established editor/import/replacement operations. These
+// adapters add navigation context only; asset publication stays with each editor.
+window.AtelierAssetEditors = Object.freeze({
+  projectAssets:()=>Object.values(sidebarData),
+  async material(item, slot) {
+    await openMaterialEditor(item);
+    if (!slot || matEditor?.game_rel !== item.game_rel) return;
+    const index = _matTextureSlots(matEditor).indexOf(slot);
+    const row = document.getElementById('mattex'+index);
+    if (!row) return;
+    const group = row.closest('details'); if (group) group.open = true;
+    row.scrollIntoView({block:'center'}); row.querySelector('button')?.focus();
+  },
+  async texture(gameRel) {
+    const imported = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    if (imported) { handleImportedFileAction(imported); return; }
+    await editAsset({game_rel:gameRel,name:gameRel.split('/').pop(),file_type:'texture'});
+    if (!_openAfterImport) {
+      const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+      if (record) handleImportedFileAction(record);
+    }
+  },
+  replaceTexture(gameRel) {
+    const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    if (!record) { toast('Edit this texture to add it to the project before replacing it.','info'); return; }
+    const project = _activeProjectName, input = document.createElement('input');
+    input.type='file'; input.accept='.png,.jpg,.jpeg,.tga,.bmp,.dds,.hdr,.webp,.tif,.tiff';
+    input.addEventListener('change',async()=>{
+      const file = input.files[0];
+      if (!file || project !== _activeProjectName) return;
+      await replaceTextureFromFile(file,gameRel,project);
+    },{once:true});
+    input.click();
+  },
+});
 
 // File bytes, never native file paths: WebView2 exposes ordinary File objects. Like Replace with
 // Image, a drop only replaces an edited texture; it overwrites that edit in place, and a stray drop

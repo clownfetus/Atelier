@@ -15,6 +15,7 @@ export function createViewportInspection(api) {
   const originalTextures = new Set();
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
   let down = null, opener = null, assetsLoading = false;
+  let related = null;
   // The inspector module, CPU wireframe and source image are requested only on opening UV X-Ray.
   let uvInspector = null, uvSurface = null, uvOpen = false, uvRequest = 0;
   async function openUV() {
@@ -69,7 +70,6 @@ export function createViewportInspection(api) {
     updateRegions();refresh();
     $('viewport-comparison').hidden=comparison!=='wipe' || showcaseMode;
   }
-  $('viewport-showcase').addEventListener('click',()=>setShowcase(true));$('viewport-inspect').addEventListener('click',()=>setShowcase(false));
   // The reveal is one last Krackle sweep (viewport-effects.js) that leaves the loaded appearance behind it.
   let revealStart = null, reveal = 1;
   const scanAllowed=()=>!document.hidden && !reducedMotion.matches && window.AtelierMotionPolicy?.allows(2)!==false;
@@ -348,15 +348,15 @@ export function createViewportInspection(api) {
     if (comparison !== 'wipe' || showcase) {
       renderPass(!showcase && comparison === 'original', showcase,comic,canonical);
       if (!captured && scanAllowed() && (assetsLoading || reveal < 1)) effects.drawLoading(bounds(), assetsLoading ? null : reveal);
-      else if (!showcase) effects.drawOutline(hovered);
+      else if (!showcase) effects.drawOutline(related || hovered);
       return;
     }
     const size = renderer.getSize(new THREE.Vector2());
     const divider = Math.round(size.x * Number($('viewport-wipe-range').value) / 100);
     renderer.setScissorTest(true);
     try {
-      renderer.setScissor(0, 0, divider, size.y); renderPass(true); effects.drawOutline(hovered);
-      renderer.setScissor(divider, 0, size.x - divider, size.y); renderPass(false); effects.drawOutline(hovered);
+      renderer.setScissor(0, 0, divider, size.y); renderPass(true); effects.drawOutline(related || hovered);
+      renderer.setScissor(divider, 0, size.x - divider, size.y); renderPass(false); effects.drawOutline(related || hovered);
     } finally { renderer.setScissorTest(false); }
     if (scanAllowed() && (assetsLoading || reveal<1)) effects.drawLoading(bounds(),assetsLoading?null:reveal);
   }
@@ -390,7 +390,7 @@ export function createViewportInspection(api) {
   renderer.domElement.addEventListener('pointerup', event => {
     if (!capture && down?.button === 0 && Math.hypot(event.clientX-down.x, event.clientY-down.y) < 5) {
       const hit = pick(event);
-      if (hit) { uvSurface = hit; api.pickMaterial(hit.name, false); if (uvOpen) uvInspector?.select(hit); }
+      if (hit) { uvSurface = hit; api.pickMaterial(hit.name, false, hit); if (uvOpen) uvInspector?.select(hit); }
     }
     down = null;
   });
@@ -496,6 +496,7 @@ export function createViewportInspection(api) {
     $('viewport-capture-menu').open = false; $('viewport-capture-cancel').hidden = false;
     $('viewport-tools').inert = true; $('viewport-inspect-tools').inert = true;
     $('viewport-materials').inert = true;
+    for (const id of ['assembly-geometry','assembly-textures','viewport-modes']) if ($(id)) $(id).inert = true;
     $('viewport-playback').inert = true; $('viewport-capture-menu').inert = true;
     $('viewport-fit').disabled = true; api.refreshEdits?.();
     const blenderDisabled = $('viewport-blender-btn').disabled;
@@ -549,6 +550,7 @@ export function createViewportInspection(api) {
       $('viewport-tools').inert = false; $('viewport-inspect-tools').inert = false;
       $('viewport-materials').inert = false;
       $('viewport-playback').inert = false; $('viewport-capture-menu').inert = false;
+      for (const id of ['assembly-geometry','assembly-textures','viewport-modes']) if ($(id)) $(id).inert = false;
       $('viewport-blender-btn').disabled = blenderDisabled;
       if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
       $('viewport-expand').disabled = false;
@@ -571,6 +573,7 @@ export function createViewportInspection(api) {
     originalPromise = regionPromise = null; regions = false; updateRegions(); setComparison('edited'); clearHover();
   }
   function reset() {
+    related = null;
     if (uvOpen) openUV();
     setShowcase(false);showcaseColors=null;
     setLoading(false);
@@ -606,7 +609,10 @@ export function createViewportInspection(api) {
     renderer.domElement.setAttribute('aria-busy',String(assetsLoading));
     $('viewport-stage').classList.toggle('vp-assets-loading',assetsLoading);
   }
-  return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,cardPoster,
+  return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,cardPoster,setShowcase,
+    preserveFraming:()=>{fitOnResize=false;}, setRelated:value=>{related=value;},
+    selectSurface:surface=>{uvSurface=surface;if(uvOpen)uvInspector?.select(surface);},
+    inspectSurface:surface=>{uvSurface=surface;if(!uvOpen)openUV();else uvInspector?.select(surface);},
     retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading,showcase:showcaseMode,grid:grid.visible}),
     resized:() => { if (fitOnResize && !capture && !cameraMove) frame(true);drawShowcase(); }, capturing:() => !!capture};
 }

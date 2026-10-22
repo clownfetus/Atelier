@@ -87,6 +87,7 @@ def main():
     parser.add_argument('--shared-identity-only', action='store_true', help='Check named ID folders, search, pins and template picking in every content branch')
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
+    parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -201,6 +202,15 @@ def main():
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks:
                         print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.assembly_only:
+                    from assembly_browser_checks import run_assembly_checks
+                    run_assembly_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
                     browser.close()
                     return
 

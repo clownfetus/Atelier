@@ -81,6 +81,30 @@ For a fresh directory, use Atelier's Setup/Settings to select the game Paks fold
 
 ## Automated checks
 
+### Assembly View
+
+`gui/assembly-data.js` keeps package-path relationships separate from display
+labels. Only import-table material bindings enable connected editing; legacy
+name matches and selected recolour counterparts stay visibly unverified.
+`texture_sources` preserves custom slot URLs and identifies derived eye defaults.
+The optional workspace borrows Model Studio’s renderer, colour controls, UV
+inspector and animation controller, and uses the existing asset editors for saves.
+
+`/api/assembly_thumbnail` limits card images to 160px. The client loads visible
+cards with two readers, aborts obsolete requests and retains at most 48 previews.
+`/api/assembly_references` reads direct VFX package imports on explicit request;
+it does not scan the library for filename matches or index reverse dependencies.
+
+```powershell
+.\.venv\Scripts\python.exe tests/test_assembly.py
+.\.venv\Scripts\python.exe tests/browser_smoke.py --assembly-only --report-dir '<report-directory>'
+```
+
+The focused browser checks use labelled synthetic geometry with real Three.js
+raycasting and HTTP fixtures. They exercise texture relationships, custom slot
+handoffs, camera retention, uncertainty, panels, themes and reduced motion.
+Native Blender execution and in-game appearance remain separate validation.
+
 ### Named asset additions
 
 `atelier/added_assets.py` prepares and verifies new texture, material-instance

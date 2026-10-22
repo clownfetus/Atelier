@@ -21,6 +21,7 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | `gui/library-tools.js` / `.css` | Folder-local filtering, view preferences, keyboard movement and read-only previews |
 | `gui/viewport-inspection.js` / `viewport.css` | Model inspection, camera framing, texture comparison, picking and capture |
 | `gui/viewport-animation.js` | Real standing-idle playback, pause and rest pose |
+| `gui/assembly.js` / `assembly.css` / `assembly-data.js` | Connected Assembly workspace, exact section selection and reference relationships |
 | `gui/library-pins.js` / `.css` | Persistent home shortcuts and contextual nested-folder labels |
 | `gui/export-review.js` / `.css` | Export review, progress and latest session result; app.js owns requests |
 | `gui/motion/` | Krackle animation sets, shared Krackle CSS and their optional presentation adapters |
@@ -156,6 +157,21 @@ remain distinct when matching recolour material sets, and switching meshes reset
 idle discovery/playback for the selected rig. Colour inputs invert the preview's
 ACES curve so the chosen hex survives selection and save; untouched HDR values
 and per-parameter saved restores keep their exact source floats.
+
+Assembly is an optional, remembered workspace beside Inspect and Showcase. Its
+geometry rail, central stage, texture shelf and material inspector form one
+resizable layout. It inherits the application’s semantic palette roles. Preview
+sections retain primitive and geometry-group identity; material and texture
+relationships use complete package paths. Name-based or recolour counterparts
+remain explicitly unverified. Derived eye shader defaults are identified and
+excluded from connected texture slots. Material colours and full editors keep
+their established save paths. Editor handoffs retain the scene, camera and
+selected surface; model replacements refresh changed meshes and restore the
+verified cooked material slot when available. Finite dotted links and selected
+surface outlines reinforce relationships; reduced motion suppresses the links.
+Texture cards lazily request 160px previews with two readers and a 48-image cache.
+VFX inspection is explicit and limited to outgoing package references; no reverse
+dependency discovery or filename-based effect association is claimed.
 
 `polish.js` exposes disposable `mount`, `setState` and `destroy` handles through
 `AtelierMotion.polish`. Toasts resolve on the same operation mount; repeated

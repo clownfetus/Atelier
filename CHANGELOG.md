@@ -5,6 +5,13 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Add optional **Assembly View** beside Inspect and Showcase: select a model
+  surface to inspect its geometry, verified material and connected texture slots.
+  Texture and material selections highlight their actual users. Reuse material,
+  texture, UV and Blender workflows, retain camera context across editor visits,
+  and load small texture previews only when needed. Unverified assignments and
+  unavailable VFX references are explained explicitly.
+
 - Add **VFX Motionboard** to the Niagara editor: synchronized editable LUT tracks,
   playback and scrubbing, original/edited comparison, per-point and per-track
   restores, local track organisation and 2D particle proxy arrangements. Existing
