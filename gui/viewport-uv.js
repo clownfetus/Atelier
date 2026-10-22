@@ -127,6 +127,13 @@ export function createUVInspector(api) {
   const sourceSelect = $('viewport-uv-source'), channelSelect = $('viewport-uv-channel');
   const dimensions = () => ({width:image?.naturalWidth || image?.width || 0, height:image?.naturalHeight || image?.height || 0});
   const selectedSource = () => sources[Number(sourceSelect.value)];
+  function exportSizeSupported() {
+    const {width,height} = dimensions();
+    return width > 0 && height > 0 && width <= 16384 && height <= 16384 && width*height <= 67108864;
+  }
+  function refreshExport() {
+    $('viewport-uv-export').disabled = exporting || !layout || !exportSizeSupported();
+  }
   function sourceMap(source) {
     // Dye/eye maps are generated composites, not the source image identified by a texture slot.
     if (source?.role === 'basecolor' && (info?.dyeable || info?.eye_preview)) return null;
@@ -146,7 +153,7 @@ export function createUVInspector(api) {
     $('viewport-uv-sheet').hidden = true;
   }
   function clear() {
-    revision++; controller?.abort(); controller = null; surface = info = layout = null; sources = []; exporting = false;
+    revision++; controller?.abort(); controller = null; surface = info = layout = null; sources = [];
     cancelAnimationFrame(previewFrame); releaseImage();
     sourceSelect.replaceChildren(); channelSelect.replaceChildren();
     for (const id of ['viewport-uv-source-path','viewport-uv-point','viewport-uv-resolution','viewport-uv-status','viewport-uv-mapping-note']) $(id).textContent = '';
@@ -193,15 +200,15 @@ export function createUVInspector(api) {
     if (issue) status(issue,true);
     else {
       status(`${layout.triangles.toLocaleString()} triangle${layout.triangles === 1 ? '' : 's'} · Mesh UV layout. Cooked shader mapping unavailable.`);
-      $('viewport-uv-export').disabled = exporting || !width || !height || width > 16384 || height > 16384 || width*height > 67108864;
-      if ($('viewport-uv-export').disabled && !exporting) status('This source exceeds the v1 export limit (16,384 px per side / 64 megapixels). Its resolution will not be reduced.',true);
+      refreshExport();
+      if (!exportSizeSupported()) status('This source exceeds the v1 export limit (16,384 px per side / 64 megapixels). Its resolution will not be reduced.',true);
     }
     $('viewport-uv-mapping-note').textContent = `${texture && channel !== texture.channel ? `UV${channel} is selected for inspection; the viewport texture uses UV${texture.channel}. ` : ''}This is the decoded mesh UV layout. Cooked shader UV transformations are unavailable and are not reconstructed.`;
     render();
   }
   async function loadSource() {
     const stamp = ++revision; controller?.abort(); controller = new AbortController();
-    releaseImage(); layout = null; exporting = false; $('viewport-uv-export').disabled = true;
+    releaseImage(); layout = null; $('viewport-uv-export').disabled = true;
     $('viewport-uv-point').textContent = ''; $('viewport-uv-resolution').textContent = '';
     const source = selectedSource();
     if (!surface) return;
@@ -271,10 +278,14 @@ export function createUVInspector(api) {
       setTimeout(() => URL.revokeObjectURL(url),1000);
       status(`Exported ${width} × ${height} transparent PNG.`);
     } catch (error) { if (stamp === revision) status(error.message,true); }
-    finally { canvas.width = canvas.height = 1; if (stamp === revision) { exporting = false; $('viewport-uv-export').disabled = !layout; } }
+    finally {
+      // Encoding cannot be cancelled. Retain the guard across selection/close until this
+      // full-resolution canvas is released, then use the current selection's eligibility.
+      canvas.width = canvas.height = 1; exporting = false; refreshExport();
+    }
   }
   sourceSelect.addEventListener('change',loadSource);
-  channelSelect.addEventListener('change',() => { if (image) { revision++; exporting = false; } updateLayout(); });
+  channelSelect.addEventListener('change',() => { if (image) revision++; updateLayout(); });
   $('viewport-uv-zoom').addEventListener('change',render);
   $('viewport-uv-opacity').addEventListener('input',event => {
     wireCanvas.style.opacity = String(Number(event.target.value)/100); $('viewport-uv-opacity-value').value = `${event.target.value}%`;

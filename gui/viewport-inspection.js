@@ -25,9 +25,11 @@ export function createViewportInspection(api) {
     $('viewport-uv-panel').hidden = !uvOpen; $('viewport-mat-section').hidden = uvOpen;
     if (!uvOpen) { uvInspector?.clear(); return; }
     try {
-      const {createUVInspector} = await import('./viewport-uv.js');
-      if (request !== uvRequest || !uvOpen) return;
-      uvInspector ||= createUVInspector({host:$('viewport-uv-panel'), fetch:api.fetch, materials:api.materials, label:api.label});
+      if (!uvInspector) {
+        const {createUVInspector} = await import('./viewport-uv.js');
+        if (request !== uvRequest || !uvOpen) return;
+        uvInspector = createUVInspector({host:$('viewport-uv-panel'), fetch:api.fetch, materials:api.materials, label:api.label});
+      }
       uvInspector.select(uvSurface);
     } catch (error) {
       if (request === uvRequest) $('viewport-uv-panel').textContent = `UV X-Ray unavailable: ${error.message}`;
