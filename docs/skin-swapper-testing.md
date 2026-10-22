@@ -4,8 +4,10 @@ This guide is for the Project Galacta team. It sets up Atelier from source and b
 Skin Swapper mod you can load in the Companion App. Each of your integration conditions is
 listed with how Atelier meets it and how you can check it.
 
-Skin Swapper export is on `main` (PR #15, merge commit `e416af4`). It is not in a published
-release yet. The newest installer, 0.4.1, does not include it.
+Skin Swapper export is included in current Atelier releases. For normal use,
+follow the [Skin Swapper walkthrough](../README.md#skin-swapper-mods). This guide
+keeps the Galacta integration test in a separate data directory; it does not
+replace an installed Atelier or modify its projects.
 
 ## What you need
 
@@ -22,10 +24,11 @@ release yet. The newest installer, 0.4.1, does not include it.
 ```powershell
 git clone https://github.com/clownfetus/Atelier.git
 cd Atelier
-.\scripts\Setup-SkinSwapperTest.ps1 -Template 'D:\Galacta\template' -DataDir 'D:\AtelierGalactaTest' -Launch
+.\scripts\Setup-SkinSwapperTest.ps1 -Template 'D:\Galacta\template' -DataDir 'D:\AtelierGalactaTest' -ToolsFrom 'C:\Path\To\Atelier' -Launch
 ```
 
-`-Template` is the folder holding the two template files. `-DataDir` is where this test copy
+`-ToolsFrom` is the installed Atelier folder containing `Atelier.exe` and `Tools`;
+replace the example with your current installation path. `-Template` is the folder holding the two template files. `-DataDir` is where this test copy
 of Atelier keeps its settings, projects, exports, logs and tools. Put it on the same drive as
 the game: the 3D viewer hardlinks the game's containers so that installed mods stay out of
 its reads, and hardlinks only work within one drive.
@@ -33,10 +36,10 @@ its reads, and hardlinks only work within one drive.
 The script:
 
 1. creates `.venv` with Python 3.12 and installs `requirements.txt`;
-2. installs Atelier's native tools into `<DataDir>\Tools`. It downloads the 0.4.1 release
-   installer, checks its SHA-256 and unpacks the tools from it without running it. To skip
-   the 150 MB download, add `-ToolsFrom 'C:\Path\To\Atelier'`, naming an existing Atelier
-   0.4.x install folder;
+2. copies native tools from the current installation supplied with `-ToolsFrom`.
+   Without that option, the script falls back to its hash-pinned historical 0.4.1
+   installer and extracts it without running it. Use current installed tools for
+   testing current model workflows;
 3. copies your template into `<DataDir>\Tools\Galacta` and prints both SHA-256 hashes, so
    you can confirm they are your files;
 4. asks Atelier whether Skin Swapper export is available. It should print
@@ -54,8 +57,8 @@ To start Atelier again later:
 
 ## First run
 
-1. In **Initial Configuration**, choose the Marvel Rivals install folder. Atelier fetches the
-   current USMAP mapping and AES key; paste the key yourself if fetching fails.
+1. Follow **Find the game → Unlock the paks → Make it yours**. Choose the Marvel
+   Rivals install folder; provide the current mapping and AES key if automatic retrieval fails.
 2. Create a project when asked, for example `GalactaTest`.
 3. Open **Menu → Settings**:
    - Set the **Blender** path.
@@ -64,18 +67,18 @@ To start Atelier again later:
 
 ## Build a test mod
 
-1. **Pick a skin.** From the home screen, open the hero and skin, then the skin's `Meshes`
-   folder. Mesh paths look like `Characters/1024/1024503/Meshes/SK_1024_1024503`.
+1. **Pick a skin.** From Home, open a hero. Costume artwork opens Model Studio; use the
+   costume’s folder action to browse its assets, then open `Meshes`. Mesh paths look like `Characters/1024/1024503/Meshes/SK_1024_1024503`.
 2. **Make an edited mesh.** Either way works:
    - Right-click the mesh and choose **Add to edit list**. In the **Replace** dialog that opens,
      pick your BLEND, FBX, GLB or PSK model. The defaults keep the game's skeleton, weights and
      morph targets. Later, right-click the mesh and choose **Replace model…** to swap it again.
    - Right-click the mesh, choose **Edit in Blender**, change the mesh, and save the `.blend`.
 
-   The mesh then appears under **Edited Assets** on the right.
+   The mesh then appears under **Mod tray** on the right.
 3. **Name the mod.** Under **Mod filename**, type the name. It becomes the Galacta folder name,
    so use letters, digits and underscores only, for example `RedeemedRedux`.
-4. **Choose the format.** Click **Export Mod**, then **Skin Swapper mod (Project Galacta)**. The
+4. **Choose the format.** Click **Build mod**, then **Skin Swapper mod (Project Galacta)**. The
    review shows:
    - the hero and skin, read-only;
    - the Galacta folder the mod will use;

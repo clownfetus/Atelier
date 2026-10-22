@@ -144,7 +144,7 @@ console.log('PASS display copies rebuild for late maps and surface variants');
         script=r'''
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(process.argv[1],'utf8');
-const start=source.indexOf('async function editInBlender()');
+const start=source.indexOf('let blenderExportPending = false;');
 const end=source.indexOf('// Sidebar shows',start);
 assert.ok(start>=0 && end>start);
 const objects=[
@@ -155,7 +155,7 @@ const objects=[
 ];
 const meshMeta=['HiddenBody','SelectedBody','VisibleWeapon','HiddenWeapon'].map(name=>({game_rel:'Fixture/'+name}));
 const requests=[],notes=[];
-const environment={objects,meshMeta,generation:1,viewportProject:'Originating project',
+const environment={objects,meshMeta,generation:1,modelLoading:false,viewportProject:'Originating project',
  canLeave:async()=>true,note:(message)=>notes.push(message),refreshBlenderBtn:()=>{},$:()=>({disabled:false}),
  window:{AtelierJobs:{run:async(path,request)=>{
   requests.push({path,project:request.project,payload:JSON.parse(request.body)});

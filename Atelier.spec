@@ -9,11 +9,14 @@ from stage_tools import UNUSED_PACKAGES
 from update_catalogue_seed import validate_seed
 
 validate_seed(Path(SPECPATH) / 'gui' / 'catalogue.json')
+from build_blender_bridge import package as package_blender_bridge
+bridge_zip = package_blender_bridge(Path(SPECPATH) / 'build' / 'Atelier-Live-Bridge.zip')
 
 datas = [
     ('gui', 'gui'),
     ('version', '.'),
     ('CHANGELOG.md', '.'),
+    (str(bridge_zip), 'extensions'),
     # Blender runs these as standalone --python scripts, so they must exist as real .py files on
     # disk — being importable from the PYZ is not enough. meshedit._SCRIPTS resolves them next to
     # the package, which is <_MEIPASS>/atelier/blender when frozen. Without this the whole .blend
@@ -21,6 +24,8 @@ datas = [
 ]
 # Do not collect developer __pycache__ files beside the standalone scripts.
 datas += [(str(script), 'atelier/blender') for script in Path('atelier/blender').glob('*.py')]
+datas += [(str(script), 'atelier/blender/atelier_live_bridge')
+          for script in Path('atelier/blender/atelier_live_bridge').iterdir() if script.is_file()]
 # upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
 datas += [(str(item), 'atelier/models') for item in Path('atelier/models').iterdir() if item.is_file()]
 datas += [(str(item), 'atelier/vendor/meshoptimizer') for item in Path('atelier/vendor/meshoptimizer').iterdir() if item.is_file()]
@@ -31,6 +36,8 @@ hiddenimports = [
     'atelier.tools',
     'atelier.jobs',
     'atelier.bulk',
+    'atelier.blender_bridge',
+    'atelier.blender_extension',
     'atelier.properties',
     'atelier.index',
     'atelier.paths',

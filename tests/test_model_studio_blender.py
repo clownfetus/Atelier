@@ -125,6 +125,16 @@ class BlenderPort(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'slots changed'):
                 mesh.glb_to_sections(model,0,str(path),preserve_parts=['Missing_slot'])
 
+    def test_unassigned_material_faces_are_rejected_instead_of_dropped(self):
+        from test_blender_import import FakeMesh
+        model=FakeMesh();model.lods[0]['col_off']=None
+        path=self.root/'unassigned.glb';mesh.export_glb(model,0,str(path))
+        document,binary=mesh.load_glb(str(path))
+        document['meshes'][0]['primitives'][0].pop('material',None)
+        with patch.object(mesh,'load_glb',return_value=(document,binary)):
+            with self.assertRaisesRegex(ValueError,'without an assigned material'):
+                mesh.glb_to_sections(model,0,str(path))
+
     def test_import_repairs_known_bones_that_cannot_reach_the_target_section(self):
         from test_blender_import import FakeMesh
         model=FakeMesh(sections=1);model.lods[0]['col_off']=None

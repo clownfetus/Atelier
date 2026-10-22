@@ -9,6 +9,12 @@ The app, installers and update checker identify each release by its full number,
 
 ### Asset pipeline and layout
 
+- Send models into an open Blender session with the bundled Atelier Live Bridge
+  extension. Portable Blender export remains available.
+- Preserve geometry modifiers and winding when preparing replacement meshes,
+  and reject unassigned faces before a detail-level rebuild can drop them.
+- Refresh corrected costume names in existing reference entries as well as new
+  ones, publishing the reference update atomically.
 - Show character and costume names and artwork wherever their IDs appear in
   asset folders, including legendary ultimate skins, search results, breadcrumbs,
   pinned folders and asset pickers. Keep original asset paths available on hover.

@@ -78,6 +78,10 @@ def main():
         subprocess.run([str(appimage), '--appimage-extract'], cwd=extract, check=True,
                        stdout=subprocess.DEVNULL, timeout=120)
         payload = extract / 'squashfs-root/usr/Atelier'
+        sys.path.insert(0, str(source))
+        from atelier.blender_extension import archive_bytes
+        assert (payload / '_internal/extensions/Atelier-Live-Bridge.zip').read_bytes() == archive_bytes(source)
+        result['checks'].append({'name': 'bundled Blender extension matches exact source and provenance'})
         sys.path.insert(0, str(source / 'scripts'))
         from stage_tools import audit, validate_tools
         # Build-time staging audits the raw payload before release licenses are added.

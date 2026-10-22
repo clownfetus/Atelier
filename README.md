@@ -6,6 +6,7 @@ before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
 · [What's new in 1.1.1](docs/release-1.1.1.md)
+· [Tutorials](#tutorials)
 · [Development guide](DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
@@ -13,6 +14,8 @@ before building it. Available for Windows and Linux.
 
 ## What's new in 1.1.1
 
+- **Send models to Blender.** Use the bundled Atelier Live Bridge extension with an
+  open Blender session, or export a portable `.blend`. [Setup guide](BLENDER.md).
 - **Find more folders by name.** Character and costume names and artwork follow
   recognized IDs across the library, search, breadcrumbs, pins and asset pickers.
 - **Use HDR cubemaps.** Import Radiance panoramas, six-face strips or HDR DDS
@@ -23,6 +26,8 @@ before building it. Available for Windows and Linux.
   and load the selected body and weapons before optional forms and attachments.
 - **Preview and export more reliably.** Character materials, masks, weapon grips,
   alternate forms and the T_Visor texture export error have dedicated fixes.
+  Replacement preparation preserves geometry modifiers and winding and catches
+  unassigned faces before rebuilding lower detail levels.
 
 See the [patch notes](docs/release-1.1.1.md) for details and verification limits.
 
@@ -59,7 +64,8 @@ See the [patch notes](docs/release-1.1.1.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-The app and download files use **1.1.1**. See the [release notes](docs/release-1.1.1.md)
+These instructions describe **1.1.1**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.1.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -104,10 +110,13 @@ comparison, and a before/after wipe. Switch to **Showcase** for cel lighting and
 a skin-colour dot backdrop. Returning to **Inspect** restores the editable
 materials; presentation does not save material changes.
 
-**Export to Blender** saves the selected body and visible held weapons together
+**Send to Blender (live)** imports the selected body and visible held weapons
+into an open Blender scene after the bundled extension is installed.
+**Export portable .blend** saves them together
 in a portable `.blend`, with connected materials, packed images and deformation
-bones. Blender must be configured in Settings. Game physics and animation controls
-are not recreated. The per-mesh **Edit in Blender** action remains available for
+bones, then opens the saved scene. Set Blender’s executable path in Settings for
+portable export and per-mesh editing. Live send uses the already running Blender
+instance with its extension enabled. Game physics and animation controls are not recreated. The per-mesh **Edit in Blender** action remains available for
 replacement round trips.
 
 For **Edit in Blender**, turn off **Menu → Settings → Behavior → Add model
@@ -149,8 +158,8 @@ Use the new package path when referencing the asset from a material or mesh.
 
 ### HDR cubemaps
 
-Choose a game **TextureCube** as the template in **Add asset**, or import an
-existing HDR cubemap and use **Replace texture**. Supply a Radiance `.hdr` as a
+Choose a game **TextureCube** as the template in **Add asset**, or import a supported
+game TextureCube into the project, then use **Replace with Image** from that asset’s context menu. Supply a Radiance `.hdr` as a
 2:1 panorama or a horizontal/vertical strip of six square faces. Six-face HDR
 `.dds` files are also supported, including their authored mips. Face strips use
 the order **+X, −X, +Y, −Y, +Z, −Z**.
@@ -233,8 +242,7 @@ palette to reuse it. Appearance is also available during first-run configuration
 2. Run the installer, then launch Atelier.
 3. Follow **Find the game → Unlock the paks → Make it yours**. Select your
    Marvel Rivals folder and provide a current USMAP mapping and AES key if
-   automatic retrieval is unavailable. The
-   [Help section](#help) has links if automatic retrieval is unavailable.
+   automatic retrieval is unavailable. The [Help section](#help) has the fallback links.
 4. In **Menu → Settings**, choose your mods folder to enable **Copy to ~mods/**.
 
 The Windows desktop window uses Microsoft Edge WebView2. **Edit in Blender** and
@@ -243,7 +251,8 @@ executable path in Settings.
 
 ### Linux
 
-Download an `.AppImage` from a [release with a Linux build](https://github.com/clownfetus/Atelier/releases),
+Download `Atelier-<version>-x86_64.AppImage` from a
+[release with a Linux build](https://github.com/clownfetus/Atelier/releases),
 mark it executable, and launch it. See [LINUX.md](LINUX.md) for platform setup.
 Download a new AppImage when updating; the in-app installer update flow is Windows-only.
 
@@ -262,6 +271,17 @@ Commits and merged pull requests do not update installed copies. Maintainers
 must build and publish a higher-version release with the installer attached.
 Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 
+## Tutorials
+
+- [First project and building a mod](#basic-workflow)
+- [Add textures, meshes and materials at custom paths](#add-an-asset-at-a-custom-path)
+- [Import HDR cubemaps](#hdr-cubemaps)
+- [Process S maps](#process-s-maps)
+- [Replace a material](#replace-a-material)
+- [Live Blender setup, portable scenes and mesh editing](BLENDER.md#send-to-blender-or-export-a-portable-scene)
+- [Linux installation and updates](LINUX.md#install-and-update)
+- [Skin Swapper export](#skin-swapper-mods) and [isolated integration testing](docs/skin-swapper-testing.md)
+
 ## Basic workflow
 
 On first run, Find the game and Unlock the paks validate your installation before
@@ -270,8 +290,9 @@ fallbacks. Menu → Settings keeps the full configuration form.
 
 1. Create or open a project. The project button beside the Atelier logo shows
    the open project and its edit count; click it to switch projects.
-2. Browse to the assets you want to change. Edit material parameters or
-   right-click a texture to replace it with an external image.
+2. Browse to the assets you want to change. Edit material parameters, or use
+   **Edit this asset** on a texture to add it to the project. Right-click the
+   imported texture and choose **Replace with Image** to supply your image.
 3. Select the assets to include under **Mod tray** and enter a mod filename.
    Enable **Copy to ~mods/** to install into your configured mods folder. Optional
    **Password Protect** uses the protection password from Settings.
@@ -359,18 +380,17 @@ must be extracted in full; `Atelier.exe` needs its adjacent `_internal` director
 
 To make a Windows release discoverable by existing installations:
 
-1. Build the intended source with a higher numeric version, such as `0.4.0`.
+1. Build the intended source with a higher numeric version, such as `1.1.1`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
    using the [installer checks](DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`0.4.0` or `v0.4.0`) and attaching the installer named **AtelierSetup.exe**.
+   (`1.1.1` or `v1.1.1`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the
    installed version; replacing an EXE under the same version will not trigger it.
 
-Drafts and prereleases are not the stable update channel. The Windows installer
-verification workflow checks candidate installers; it does not build or publish
-a release automatically.
+Drafts and prereleases are not the stable update channel. The release-candidate workflow builds and verifies Windows and Linux packages;
+it does not publish a release automatically.
 
 ## Collaborators
 

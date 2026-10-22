@@ -53,6 +53,10 @@ def main():
         if page.locator('#viewport-expand').get_attribute('aria-pressed')!='true':
             page.locator('#viewport-expand').click()
         shot('model-studio.png')
+        page.locator('#viewport-model-menu > summary').click()
+        page.locator('.vp-blender-help > summary').click()
+        page.wait_for_timeout(300);shot('blender-live-setup.png')
+        page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-showcase').click();page.wait_for_timeout(1200);shot('showcase.png')
         page.locator('#viewport-inspect').click()
         page.locator('#viewport-close').click()

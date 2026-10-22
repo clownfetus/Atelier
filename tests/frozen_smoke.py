@@ -205,6 +205,15 @@ def main():
                 raise AssertionError('Invalid material path was not rejected with HTTP 400')
             assert rejected.get('ok') is False and rejected.get('error'), rejected
             result['checks'].append('Frozen Python backend includes original-material comparison and rejects traversal')
+            # The ZIP must actually ship, and the local download must serve the
+            # exact extension built from this candidate's source.
+            import sys
+            source_root = Path(__file__).resolve().parents[1]
+            sys.path.insert(0, str(source_root))
+            from atelier.blender_extension import archive_bytes
+            with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/blender_extension', timeout=10) as reply:
+                assert reply.read() == archive_bytes(source_root)
+            result['checks'].append('Packaged Blender extension download matches the exact source archive and provenance')
             source_notes = Path(__file__).resolve().parents[1] / 'CHANGELOG.md'
             assert source_notes.read_bytes() == (exe.parent / '_internal/CHANGELOG.md').read_bytes()
             with urllib.request.urlopen(f'http://127.0.0.1:{args.app_port}/api/changelog', timeout=10) as reply:

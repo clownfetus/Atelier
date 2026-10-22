@@ -255,6 +255,7 @@ function init() {
     $('viewport-model-menu').open = false;
   });
   $('viewport-blender-btn').addEventListener('click', editInBlender);
+  $('viewport-blender-send').addEventListener('click', sendToBlenderLive);
   $('viewport-show-all').addEventListener('click', showAllObjects);
   $('viewport-show-hidden').addEventListener('click', showAllObjects);
 
@@ -407,30 +408,94 @@ function clearModel() {
 
 // The studio exports the selected body and visible held weapons as one portable
 // Blender scene. The mesh card's editing route keeps its per-mesh round trip.
+
+let blenderExportPending = false;
 function refreshBlenderBtn() {
-  const btn = $('viewport-blender-btn');
-  if (btn) btn.disabled = modelLoading || !objects.some(object=>object.loaded!==false && object.kind!=='weapon');
+  for (const id of ['viewport-blender-btn','viewport-blender-send']) {
+    const btn = $(id);
+    if (btn) btn.disabled = blenderExportPending || modelLoading || !objects.some(object=>object.loaded!==false && object.kind!=='weapon');
+  }
+}
+async function blenderSelection() {
+  const bodies = objects.filter(object=>object.loaded!==false && object.root.visible && object.kind !== 'weapon');
+  if (bodies.length !== 1) {
+    note(bodies.length?'Choose one body form from Model before sending or exporting to Blender.':'Show one body form from Model before sending or exporting to Blender.','info');
+    return null;
+  }
+  const gen = generation, project = viewportProject;
+  const target = meshMeta[objects.indexOf(bodies[0])];
+  if (!target || !(await canLeave()) || blenderExportPending ||
+      gen !== generation || project !== viewportProject) return null;
+  const weapons = objects.flatMap((object,index) => object.loaded!==false && object.kind === 'weapon' && object.root.visible
+    ? [{game_rel:meshMeta[index].game_rel,hand:object.hand || 'auto'}] : []);
+  return {target,weapons,gen,project};
+}
+async function sendToBlenderLive() {
+  if (blenderExportPending) return;
+  const selection = await blenderSelection();
+  if (!selection || blenderExportPending) return;
+  const {target,weapons,gen,project}=selection;
+  const current=()=>gen===generation && project===viewportProject;
+  blenderExportPending=true;refreshBlenderBtn();
+  note('Sending model to the running Blender session…','info');
+  try {
+    const result=await window.AtelierJobs.run('/api/model_blender_send',{
+      method:'POST',project,headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({game_rel:target.game_rel,weapons})
+    });
+    if(!result.ok)throw Error(result.error || 'Blender live import failed');
+    if(!current())return;
+    note('Sent '+result.meshes+' mesh(es) into Blender. Save the Blender project to keep the edits.'+
+      (result.warnings?.length ? ' '+result.warnings.length+' warning(s); see Activity.' : ''),
+      result.warnings?.length?'warning':'success');
+  } catch(error) {if(current())note(error.message,'warning');}
+  finally {blenderExportPending=false;refreshBlenderBtn();}
 }
 async function editInBlender() {
-  const bodies=objects.filter(object=>object.root.visible && object.kind!=='weapon');
-  if(bodies.length!==1){note(bodies.length?'Choose one body form from Model before exporting to Blender.':'Show one body form from Model before exporting to Blender.','info');return;}
-  const target = meshMeta[objects.indexOf(bodies[0])];
-  if (!target) return;
-  if (!(await canLeave())) return;
-  const weapons=objects.flatMap((object,index)=>object.kind==='weapon' && object.root.visible ? [{game_rel:meshMeta[index].game_rel,hand:object.hand || 'auto'}] : []);
-  const gen=generation,project=viewportProject;
-  const button=$('viewport-blender-btn');button.disabled=true;
-  note('Preparing model, materials and textures for Blender…','info');
+  if (blenderExportPending) return;
+  const selection=await blenderSelection();
+  if(!selection || blenderExportPending)return;
+  const {target,weapons,gen,project}=selection;
+  const current=()=>gen===generation && project===viewportProject;
+  blenderExportPending=true;refreshBlenderBtn();
+  note('Preparing model, materials and textures for a portable Blender scene…','info');
+  async function openSaved() {
+    const response=await projectFetch('/api/model_blender_open',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({game_rel:target.game_rel})
+    },project);
+    const payload=await response.json();
+    if(!response.ok || !payload.ok)throw Error(payload.error || 'Blender could not be opened');
+  }
   try {
-    const result=await window.AtelierJobs.run('/api/model_blender_export',{method:'POST',project,headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:target.game_rel,weapons})});
-    if(!result.ok)throw Error(result.error || 'Blender export failed');
-    if(gen!==generation || project!==viewportProject)return;
-    note(`Blender scene saved · ${result.meshes} meshes · ${result.materials} materials · ${result.textures} packed textures`,result.warnings?.length?'warning':'success');
-    const open=document.createElement('button');open.type='button';open.textContent='Open in Blender';
-    open.addEventListener('click',()=>projectFetch('/api/model_blender_open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game_rel:target.game_rel})},project));
-    $('viewport-status').append(' ',open);
-  } catch(error) {if(gen===generation)note(error.message,'warning');}
-  finally {if(gen===generation)refreshBlenderBtn();}
+    const result=await window.AtelierJobs.run('/api/model_blender_export',{
+      method:'POST',project,headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({game_rel:target.game_rel,weapons})
+    });
+    if(!result.ok)throw Error(result.error||'Export failed; existing edits remain intact');
+    let launchError=null;
+    try {await openSaved();}catch(error){launchError=error;}
+    if(!current())return;
+    note(launchError ? 'Scene saved, but Blender did not open: '+launchError.message :
+      `Blender launched · ${result.meshes} meshes · ${result.materials} materials · ${result.textures} packed textures`,
+      launchError||result.warnings?.length?'warning':'success');
+    const label=document.createElement('span');label.textContent=' Saved at: '+result.blend;
+    const button=document.createElement('button');button.type='button';
+    button.textContent='Open in Blender';
+    button.addEventListener('click',async()=>{
+      try {await openSaved();}catch(error){if(current())note(error.message,'warning');}
+    });
+    $('viewport-status').append(label,' ',button);
+    if(result.material_issues?.length){
+      const details=document.createElement('details');
+      const heading=document.createElement('summary');
+      heading.textContent='Unresolved material/texture inputs';
+      const body=document.createElement('pre');
+      body.textContent=result.material_issues.join('\n');
+      details.append(heading,body);$('viewport-status').append(details);
+    }
+  }catch(error){if(current())note(error.message,'warning');}
+  finally{blenderExportPending=false;refreshBlenderBtn();}
 }
 
 // Sidebar shows the Objects panel and/or Materials panel independently, and hides itself entirely

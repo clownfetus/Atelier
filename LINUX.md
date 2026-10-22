@@ -1,193 +1,135 @@
 # Running Atelier on Linux
 
-The 1.0.0 candidate builds on Ubuntu 24.04. Its release workflow verifies native
-UAssetTool and Rivals retoc commands, the actual GTK/WebKit setup window, served
-frontend hashes, graceful close, and upgrade from the actual 0.4.1 AppImage. The checks verify
-bundled-tool refresh, existing configuration fields, user files and projects,
-then relaunch the upgraded app. Exact results and artifact hashes are recorded in the
-release's `VERIFICATION.json`.
+## Install and update
 
-Wine-dependent 3D and model-replacement paths require separate runtime
-verification. Both `AtelierMesh.exe` and `AtelierAnimation.exe` use Wine; the
-latter provides standing-idle decoding. See [the 1.0 release notes](docs/release-1.0.0.md).
-
-Atelier started as a Windows app; this document covers both running it from source on Linux for
-development, and building a packaged Linux copy with `linux/build_appimage.sh` (the Linux
-counterpart to `BUILD.bat`; the output is a single-file AppImage).
-
-The approach is deliberately minimal: the Windows asset tools in `Tools/` are kept as-is, and only
-the things they cannot cover were ported. Where a **native Linux build** of a tool is dropped in
-beside its `.exe` it is preferred automatically (`hostos.native_tool`); Wine is the fallback for
-tools that have no native build.
-
-## What had to change, and why
-
-| Area | Windows | Linux |
-|---|---|---|
-| `Tools/*.exe` (UAssetTool, retoc, AtelierMesh, …) | run directly | native build beside the `.exe` if present, else Wine — `atelier/hostos.py` |
-| Oodle decompression (`io_lib`) | `oo2core_9_win64.dll` | `Tools/libooz.so`, built by `linux/build_ooz.sh` |
-| AES-256-ECB (`io_lib`) | CNG (bcrypt) | the `cryptography` package |
-| Folder/file pickers | PowerShell + WinForms | `zenity` |
-| "Show in Explorer" | `explorer /select,` | `org.freedesktop.FileManager1.ShowItems`, else `xdg-open` |
-| Launch toast | WinRT toast | `notify-send` |
-| Paks auto-detect | `C:/Program Files*/Steam` | `~/.local/share/Steam`, `~/.steam/*`, Flatpak, Snap |
-| Blender auto-detect | `Program Files/Blender Foundation/*` | `PATH`, `/usr/bin`, Flatpak, `/opt/blender-*` |
-
-`io_lib` is the one place Wine genuinely cannot help: it decodes pak chunks **in-process** via
-`ctypes`, and a Linux Python process cannot load a Windows DLL. Oodle has no redistributable Linux
-build, so `linux/build_ooz.sh` builds [powzix/ooz](https://github.com/powzix/ooz) — an open-source
-decoder for the Kraken/Mermaid/Selkie/Leviathan codecs UE5 containers actually use. It is
-decode-only, which is all that is needed: `container_merge` writes uncompressed blocks. If you have
-a real `liboo2corelinux64.so.9`, drop it in `Tools/` (or point `ATELIER_OODLE` at it) and it wins.
-
-## Setup
-
-1. **System packages** (Arch; adapt for your distro):
+1. Download `Atelier-<version>-x86_64.AppImage` from an
+   [official release](https://github.com/clownfetus/Atelier/releases).
+2. Install your distribution’s WebKitGTK 4.1 runtime and `zenity` for file/folder
+   pickers. Install Wine if you need model or animation decoding, and Blender
+   for Blender workflows.
+3. Mark the downloaded file executable and open it. For example, once you have
+   downloaded the 1.1.1 asset:
 
    ```sh
-   sudo pacman -S wine zenity webkit2gtk-4.1 python-gobject gcc git
-   sudo pacman -S blender          # only for mesh editing
+   chmod +x Atelier-1.1.1-x86_64.AppImage
+   ./Atelier-1.1.1-x86_64.AppImage
    ```
 
-   `webkit2gtk-4.1` + `python-gobject` are what pywebview renders the UI with. They are only
-   needed for `window.py`; `server.py` runs headless without them.
+4. Follow **Find the game → Unlock the paks → Make it yours**. Choose the game
+   installation and supply a current mapping and AES key if automatic retrieval
+   is unavailable. Set the mods folder and Blender executable in **Menu → Settings**.
 
-2. **Python environment.** pywebview needs the system PyGObject, so the venv must see it:
+To update, close Atelier, download the newer AppImage, mark it executable and
+launch it. Linux does not run the Windows installer. Keep the previous AppImage
+until the replacement opens successfully. Projects, settings, mappings and keys
+live in `~/.local/share/Atelier` by default, independently of the downloaded file.
+Do not delete that data directory when replacing the AppImage. If you use
+`XDG_DATA_HOME` or `ATELIER_HOME`, keep the same value across launches.
 
-   ```sh
-   python -m venv --system-site-packages .venv
-   .venv/bin/pip install bottle watchdog pillow numpy scipy cryptography pywebview
-   ```
-
-3. **Build the Oodle decoder:**
-
-   ```sh
-   ./linux/build_ooz.sh        # writes Tools/libooz.so
-   ```
-
-4. **Provide `Tools/`.** It is gitignored and not in the repo. Copy it from a Windows checkout or
-   an installed Atelier. `Tools/Mappings/*.usmap` and `Tools/AES_KEY.txt` are game-derived and are
-   never shipped — the app fetches both itself on first run (Setup → Download).
-
-5. **Run:**
-
-   ```sh
-   .venv/bin/python window.py    # full app
-   .venv/bin/python server.py    # headless, http://localhost:8767
-   ```
-
-## Building a packaged copy
+The AppImage needs FUSE 2 to mount normally. If FUSE is unavailable, use the
+same downloaded filename with `--appimage-extract-and-run`:
 
 ```sh
-linux/build_appimage.sh            # uses the version already in ./version
-linux/build_appimage.sh 0.3.4      # or pass one explicitly, same N.N.N format BUILD.bat expects
+./Atelier-1.1.1-x86_64.AppImage --appimage-extract-and-run
 ```
 
-This runs `PyInstaller` against the same `Atelier.spec` Windows uses (no Linux-specific spec
-needed — PyInstaller freezes the GTK/WebKit webview backend the same way it freezes any other
-extension module), then stages `dist/Atelier/Tools/` with `scripts/stage_tools.py --platform linux`,
-the same script `BUILD.bat` runs with `--platform windows`. It copies only what its manifest lists:
+## Desktop dependencies and feature support
 
-- **Always shipped, build fails if missing** — the native `UAssetTool`, `liboo2corelinux64.so.9`
-  (UAssetTool decompresses nothing without it), `shaders/retoc-rivals-cli` with its Oodle,
-  `AtelierMesh/` (run under Wine) and the `MarvelRivalsCharacterIDs.md` seed. `libooz.so` ships
-  when present.
-- **Never shipped, because they are never listed** — `Tools/Mappings/`, `Tools/AES_KEY.txt`, any
-  `_cache/`, and the Windows-only `UAssetGUI.exe`/DXC (their features call `hostos.unsupported()`
-  on Linux) and `.exe` twins of the native tools.
-
-It then audits the whole dist. Only the bootloader, `_internal/` and `Tools/` may sit at the top
-level, so data from a test run of `dist/Atelier/Atelier` (`assets/`, `_cache/`, `mr_config.json`)
-fails the build instead of shipping.
-
-Output: `dist/Atelier-<version>-x86_64.AppImage` (the intermediate `dist/Atelier/` folder is also runnable directly).
-The prereqs are the same four setup steps above — the script checks each one (venv exists and
-was built `--system-site-packages`, PyInstaller installed, `Tools/` present, every required tool in it)
-and fails with a specific message rather than guessing.
-
-### AppImage
+The AppImage does not bundle WebKitGTK, Wine, Blender or zenity. Package names
+vary by distribution. On Arch, the usual desktop dependencies are:
 
 ```sh
-linux/build_appimage.sh   # -> dist/Atelier-<version>-x86_64.AppImage
+sudo pacman -S webkit2gtk-4.1 python-gobject zenity fuse2
+sudo pacman -S wine blender     # for model/Blender workflows
 ```
 
-The script downloads `appimagetool` into `linux/_appimagetool/` on first use (needs
-network) and wraps `dist/Atelier`. Because an AppImage mounts read-only while Atelier writes its
-config, cache, projects and downloaded mappings beside the executable, `AppRun` stages a writable
-copy of the bootloader and `Tools/` in `~/.local/share/Atelier` (override with `ATELIER_HOME`) and
-links the large read-only `_internal/` back into the image. All user data lives in that directory,
-so deleting it resets the app; upgrading the AppImage refreshes the staged tools without touching
-Mappings, the AES key or your projects.
+| Feature | Linux requirement or limit |
+| --- | --- |
+| Desktop window | GTK/WebKitGTK 4.1 runtime |
+| Folder and file pickers | `zenity` |
+| Asset reading, textures and packing | Bundled native UAssetTool, retoc and Linux Oodle inputs |
+| Model and standing-idle decoding | Wine for bundled `AtelierMesh.exe` and `AtelierAnimation.exe` |
+| Portable `.blend` and per-mesh editing | Native Blender executable configured in Settings; model decoding still requires Wine |
+| **Send to Blender (live)** | Running Blender with the bundled Atelier Live Bridge enabled; see [Blender setup](BLENDER.md#send-to-blender-or-export-a-portable-scene) |
+| Reveal files and desktop notifications | Desktop file manager / `xdg-open`, D-Bus and optional `notify-send` |
+| DXIL shader editing | Unsupported on Linux |
+| Level/world editing through UAssetGUI | Unsupported on Linux |
+| Updating | Download and launch a newer AppImage |
 
-The AppImage does **not** bundle WebKitGTK, Wine or zenity — install those from the table below.
-Running it needs FUSE 2 (Arch: `sudo pacman -S fuse2`); without it, run
-`./Atelier-*.AppImage --appimage-extract-and-run`.
+The release-candidate workflow builds on Ubuntu 24.04 and checks native tool
+launches, the GTK/WebKit window, packaged frontend files, bundled extension
+contents and upgrade from the pinned **1.1.0 AppImage**, including retained user
+files and projects. The final release’s `VERIFICATION.json` records which gates
+passed and the exact artifact hashes. Wine-dependent 3D, live Blender and model
+replacement workflows need separate Linux runtime verification; the desktop
+gate does not establish those results. In-game rendering remains unverified.
 
-**What a machine running the packaged build needs installed**, separate from what *building* it
-needs:
+HDR cubemap inputs and limits are described in the [HDR guide](README.md#hdr-cubemaps).
+Blender uses tone-mapped cubemap previews. Windows source verification of HDR
+readback does not establish Linux game rendering or Wine compatibility.
 
-| Dependency | Why | If missing |
-|---|---|---|
-| `webkit2gtk-4.1` + `python-gobject` (system, not pip) | pywebview's GTK backend, which is what got frozen in | window fails to open; `server.py`-only use is unaffected since headless mode never touches it |
-| `zenity` | folder/file pickers (Setup's paks path, texture import/export) | pickers raise a clear "zenity is not installed" error when opened; nothing else is affected |
-| **Wine** (`wine64` or `wine`) | `AtelierMesh.exe` and `AtelierAnimation.exe` provide mesh and idle-animation decoding; UAssetTool and retoc have native builds | 3D decoding and dependent model workflows need Wine; ordinary native asset tools remain separate |
-| `notify-send`, `xdg-open` / `gio`, `dbus-send` | desktop notifications and "show in file manager" | best-effort; their absence is swallowed silently (notify) or falls back to just opening the folder (reveal) |
+## Run from source
 
-Wine-dependent 3D and model workflows remain unverified on Linux. Install the
-dependencies for the features you use; a normal desktop setup includes:
+Source setup is for development. The AppImage above already contains Python and
+the application dependencies.
+
+1. Install Python 3.12, Git and development packages for your distribution. The
+   GTK desktop also needs system PyGObject and WebKitGTK 4.1. For example, the
+   Ubuntu 24.04 build uses `python3-venv`, `python3-gi` and `gir1.2-webkit2-4.1`.
+2. Create an environment that can see the system GTK bindings, then install the
+   repository’s pinned dependencies:
+
+   ```sh
+   python3 -m venv --system-site-packages .venv
+   .venv/bin/python -m pip install -r requirements.txt
+   ```
+
+3. Provide the matching native `Tools/` from an official Linux payload. A
+   Windows-only tools directory does not provide the native Linux executables
+   and libraries. Keys, mappings, caches and user configuration are separate
+   runtime data and do not belong in a source archive.
+4. Use an isolated data directory for development:
+
+   ```sh
+   ATELIER_DATA_DIR="$HOME/AtelierDevData" .venv/bin/python window.py
+   # Or serve the interface locally without the desktop shell:
+   ATELIER_DATA_DIR="$HOME/AtelierDevData" .venv/bin/python server.py
+   ```
+
+The server prints its loopback address. Set tool/game paths in the isolated
+configuration. See [DEVELOPMENT.md](DEVELOPMENT.md) for the broader development
+workflow. Optional `linux/build_ooz.sh` builds the fallback decoder into
+`Tools/libooz.so`; a supplied `liboo2corelinux64.so.9` takes precedence.
+
+## Build an AppImage
+
+Install the build dependencies in the same environment and stage the required
+native inputs before building:
 
 ```sh
-sudo pacman -S wine zenity webkit2gtk-4.1 python-gobject   # Arch; adapt for your distro
+.venv/bin/python -m pip install -r requirements-build.txt
+bash linux/build_appimage.sh       # version comes from ./version
 ```
 
-## Status
+The script builds the Python application, generates the bundled Blender
+extension, stages only allowlisted tools and creates
+`dist/Atelier-<version>-x86_64.AppImage`. Missing required native tools or the
+Skin Swapper template pair stop staging. For the full verified release process,
+including pinned seed inputs, use [PACKAGING.md](PACKAGING.md).
 
-Working natively, no Wine involved:
-
-- pak indexing and the whole asset browser, including character/skin names
-- everything in `io_lib`: container parsing, AES, Oodle decode, `container_merge`
-
-Working natively where a Linux build of the tool is installed beside its `.exe` (UAssetTool and
-retoc both have one):
-
-- texture import/export, mod packing and install, repatch — including extraction from a **patch
-  container**, verified end to end with no Wine in the path
-
-Falling back to Wine only for bundled tools with no native build.
-
-Not ported (raises `hostos.UnsupportedOnLinux` with a clear message):
-
-- **DXIL shader editing** (`atelier/handlers/dxc_ir.py`) — reached through DXC's COM API in our own
-  process, so Wine does not apply.
-- **Level/world editing** (`atelier/handlers/world.py`) — UAssetGUI is a WinForms app whose CLI
-  still initialises the GUI stack, and the hang-recovery path uses `taskkill`.
-- **In-app updater** — releases ship an Inno Setup `.exe`. Update the checkout with git instead.
-
-Untested on Linux: the **3D viewport**. `AtelierMesh.exe` is a self-contained .NET build, so it may
-well run under Wine as-is; nobody has tried it yet.
-
-## Still to verify on Windows
-
-The Linux port changed code that **Windows also runs**, and all of it has so far only been exercised
-on Linux. None of these are known to be broken; they are untested, and the list exists so the gap is
-visible rather than assumed away. Each is cheap to check on a Windows box with the game installed.
-
-| What | Why it is in doubt | How to check |
-|---|---|---|
-| `texture.uat_filter()` patterns-**file** fallback | Switches from inline `--filter` args to a `.txt` past ~8 KB, specifically because full virtual paths blow Windows' ~32 KB command-line cap. The cap does not exist on Linux, so the branch that matters most has never run where it matters. | Import ~500 assets at once. It must succeed and write `_cache/_uat_filter.txt`, not fail on the argument list. |
-| `hostos._prepare_dotnet_bundle()` | Mirrors `.so` files into a single-file .NET app's extracted bundle and pins `DOTNET_BUNDLE_EXTRACT_BASE_DIR`. It is meant to be **inert on Windows**; nothing has confirmed it does not misfire or slow startup there. | Run any UAssetTool operation. `_cache/netbundle` must not be created and no extra `--help` probe should run. |
-| `hostos._resolve()` / `native_tool()` | Every bundled-tool call now goes through this. On Windows it must return the `.exe` unchanged, with arguments untouched by `to_host_path()`'s `Z:\` rewriting. | Any export. Paths with spaces and `[brackets]` are the interesting case. |
-| The patch-decryption material reports | The bug that started this (Lumi/diz, a.wonders — see `TODO.md`) was reported on Windows. On this Linux install **every container reports `enc_guid=0`**, so the second-AES-key hypothesis (TRIAGE #2) does not reproduce here at all. Either it is Windows-specific, or the real cause was the resolution bug TRIAGE #35 fixed. | Reproduce a broken material on Windows against a current install, and check whether it still breaks. |
-
-`tests/test_patch_override.py` covers the resolution layer on staged files and is platform-neutral,
-so it is worth running on Windows too — but it deliberately does **not** re-verify that the
-extractor pulls the patch chunk rather than the base chunk. That needs a real install.
+The build downloads `appimagetool` on first use. The AppImage’s launcher stages
+its writable bootloader and bundled tools into the user data directory and
+links `_internal` to the mounted payload. A version change refreshes bundled
+tools while preserving user-authored files, mappings, keys and projects.
 
 ## Environment variables
 
 | Variable | Effect |
-|---|---|
-| `ATELIER_WINE` | wine binary to use (default: `wine64`, then `wine`, from `PATH`) |
-| `ATELIER_OODLE` | path to a real `liboo2corelinux64.so`, preferred over `Tools/libooz.so` |
-| `ATELIER_BLENDER` | path to the Blender executable, wins over auto-detection |
-| `ATELIER_DEBUG` | opens webview devtools |
+| --- | --- |
+| `ATELIER_HOME` | AppImage user data directory |
+| `XDG_DATA_HOME` | Default data root when `ATELIER_HOME` is unset |
+| `ATELIER_DATA_DIR` | Separate source-development/test data directory |
+| `ATELIER_WINE` | Wine executable; otherwise `wine64`, then `wine` on `PATH` |
+| `ATELIER_OODLE` | Explicit native Oodle library path |
+| `ATELIER_BLENDER` | Blender executable override |
+| `ATELIER_DEBUG` | Open webview developer tools |

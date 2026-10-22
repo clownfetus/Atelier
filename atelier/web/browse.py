@@ -4,6 +4,7 @@ from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_b
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
+from atelier.skin_name_fixes import correct_skin_name, merge_reference
 
 def _imported_exists(game_rel, ext):
     """A project copy exists at the unique subfolder path, or at the legacy flat path (back-compat)."""
@@ -70,11 +71,11 @@ def _parse_char_md_text(text):
             if name and name.upper() != "NAME":
                 chars.setdefault(cur, {"name": name, "skins": {}})
                 if m.group(3):
-                    chars[cur]["skins"][m.group(3)] = (m.group(4) or "").strip()
+                    chars[cur]["skins"][m.group(3)] = correct_skin_name(m.group(3), (m.group(4) or "").strip())
             continue
         m2 = re.match(r'\|\s*\|\s*\|\s*(\d{7})\s*\|\s*([^|]*?)\s*\|', line)
         if m2 and cur and cur in chars:
-            chars[cur]["skins"][m2.group(1)] = m2.group(2).strip()
+            chars[cur]["skins"][m2.group(1)] = correct_skin_name(m2.group(1), m2.group(2).strip())
     return chars
 
 def _parse_char_md():
@@ -96,26 +97,31 @@ def _fetch_char_data():
     except Exception:
         return
     new_data = _parse_char_md_text(text)
-    added = 0
-    for cid, info in new_data.items():
-        if cid not in _CHAR_DATA:
-            _CHAR_DATA[cid] = info
-            added += 1 + len(info["skins"])
-        else:
-            for sid, sname in info["skins"].items():
-                if sid not in _CHAR_DATA[cid]["skins"]:
-                    _CHAR_DATA[cid]["skins"][sid] = sname
-                    added += 1
-    if added:
+    if not new_data:
+        return  # do not publish an empty/broken catalogue
+    merged, changed = merge_reference(_CHAR_DATA, new_data)
+    if changed:
+        # Publish a complete consistent snapshot; existing names can be renamed.
+        # Persist the merged table so missing/offline entries survive a restart.
+        _CHAR_DATA = merged
         # write updated file back so next launch starts with fresh data
         try:
             path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(text)
+            tmp = path + '.atlas-update.tmp'
+            try:
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    for cid, row in sorted(merged.items()):
+                        f.write(f"| {cid} | {row['name'].replace('|', ' ')} | | |\n")
+                        for sid, label in sorted(row['skins'].items()):
+                            f.write(f"| | | {sid} | {label.replace('|', ' ')} |\n")
+                os.replace(tmp, path)
+            finally:
+                try: os.unlink(tmp)
+                except FileNotFoundError: pass
         except Exception:
             pass
         if _update_callback:
-            _update_callback({"toast": f"Character IDs updated — {added} new entries added", "toast_type": "success"})
+            _update_callback({"toast": f"Character names updated — {changed} entries added or corrected", "toast_type": "success"})
 
 def _try_fetch_once():
     global _fetch_attempted

@@ -2877,6 +2877,30 @@ def api_model_blender_export():
     return _submit_job('blender-export','Export model to Blender',lambda job:export(body.get('game_rel',''),body.get('weapons',[])))
 
 
+@app.post('/api/model_blender_send')
+def api_model_blender_send():
+    from atelier.handlers.meshport import send_to_blender
+    body = request.json or {}
+    return _submit_job('blender-send', 'Send model to running Blender',
+                       lambda job: send_to_blender(body.get('game_rel', ''), body.get('weapons', [])))
+
+
+@app.get('/api/blender_extension')
+def api_blender_extension():
+    """Download only the bundled extension; installation remains explicit in Blender."""
+    import sys
+    from pathlib import Path
+    if getattr(sys, 'frozen', False):
+        archive = Path(sys._MEIPASS) / 'extensions' / 'Atelier-Live-Bridge.zip'
+        payload = archive.read_bytes()
+    else:
+        from atelier.blender_extension import archive_bytes
+        payload = archive_bytes()
+    response.content_type = 'application/zip'
+    response.set_header('Content-Disposition', 'attachment; filename="Atelier-Live-Bridge.zip"')
+    return payload
+
+
 @app.post('/api/model_blender_open')
 def api_model_blender_open():
     from atelier.handlers.meshport import destination

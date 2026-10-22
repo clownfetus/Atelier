@@ -3,9 +3,15 @@
 Prepared on 22 October 2026 from `main` merge `4256fa0`, which merged PR #26.
 Its tree (`3d81d8a1f54ffc4e9a36e48ff940e18ed3e7e0c8`) is identical to the
 reviewed integration head `4359a16`; the merge dropped no files or changes.
+The additional fork branch `fix/live-blender-and-catalogue-upstream` at `66737b4`
+also contributes live Blender transfer, geometry preservation and reference-name
+updates that were absent from main. Those changes are included in this patch.
 
 ## Remaining branches and saved work
 
+- The 19-commit live Blender fork branch is merged with the newer HDR, identity,
+  material and loading fixes retained. Its Blender extension is bundled with
+  setup instructions; portable export remains available.
 - The staged 18-file UI worktree at `3d28c77` exactly matches integrated commit
   `734493a` for those files. Thirteen files also match final main byte for byte.
   The other five contain the later shared identities, HDR and Blender preference
@@ -32,6 +38,12 @@ records the earlier worktree archives and source-by-source decisions.
 
 ## Existing native evidence retained
 
+- [New Blender 5.1.2 verification](release-1.1.1-blender-verification.json): a
+  generated scene retains 26 bevel faces and outward winding after a mirrored
+  transform; singular scale is rejected. The packaged extension imports into an
+  existing scene, acknowledges the request, and preserves both meshes after save
+  and reopen. The receipt records extension and source hashes. This uses generated
+  geometry and does not establish in-game rendering.
 - [Shared identities, HDR and optional Blender texture copies](identity-hdr-blender-verification-2026-10-22.md):
   14,916 recognized folder contexts agree between Python and the browser; four
   HDR cubemaps and one material pass native and independent readback; a reopened
@@ -55,11 +67,11 @@ AppImage is identified by its own SHA-256 in the release verification.
 
 ## Patch release gate
 
-Local preparation passed all **54 backend suites**: **583 unit tests** and
+Local preparation passed all **56 backend suites**: **601 unit tests** and
 **138 script checks**, with two optional native checks skipped in disposable
 fixtures. The final release-integrity suite includes 16 checks for complete bundles,
 mixed builds, stale screenshots, failed platform results and changed source copy.
-Nine fresh real-interface screenshots at 1400 × 900 have no page errors; their
+Ten fresh real-interface screenshots at 1400 × 900 have no page errors; their
 receipt binds each image to the version and exact interface source hashes.
 
 Hosted Linux validation exposed an outdated native-tool mock in the missing-cache

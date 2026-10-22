@@ -89,19 +89,20 @@ meshes=[obj for obj in bpy.data.objects if obj not in before and obj not in widg
         and not obj.hide_render and obj.visible_get() and len(obj.data.polygons)]
 if not meshes:raise ValueError('The selected file contains no mesh geometry')
 bpy.ops.object.select_all(action='DESELECT')
+sys.path.insert(0, os.path.dirname(__file__))
+from import_geometry import bake_geometry
+geometry_reports = []
 for obj in meshes:
-    transform=obj.matrix_world.copy()
-    if obj.data.users>1:obj.data=obj.data.copy()
-    obj.parent=None
-    obj.data.transform(transform,shape_keys=True);obj.matrix_world=Matrix.Identity(4)
-    for modifier in list(obj.modifiers):obj.modifiers.remove(modifier)
-    obj.hide_set(False);obj.hide_viewport=False;obj.hide_select=False
+    geometry_reports.append(bake_geometry(obj))
 bpy.context.view_layer.update()
 bpy.ops.object.select_all(action='DESELECT')
 for obj in meshes:obj.select_set(True)
 bpy.context.view_layer.objects.active=meshes[0]
 if len(meshes)>1:bpy.ops.object.join()
 replacement=meshes[0]
+expected_faces = sum(row['output_faces'] for row in geometry_reports)
+if len(replacement.data.polygons) != expected_faces:
+    raise ValueError('Joining the imported objects lost geometry; the replacement was not saved')
 alignment={'fitted':False}
 points=np.array([tuple(v.co) for v in replacement.data.vertices],dtype=np.float64)
 sample=points[::max(1,len(points)//256)]
@@ -241,5 +242,5 @@ bpy.context.view_layer.objects.active=replacement;replacement.select_set(True)
 bpy.ops.wm.save_as_mainfile(filepath=destination)
 with open(report,'w',encoding='utf-8') as stream:json.dump({'vertices':len(replacement.data.vertices),'faces':len(replacement.data.polygons),
     'retained_weight_vertices':retained,'transferred_weight_vertices':transferred,'default_skeleton':options['keep_skeleton'],
-    'materials':list(stock_names),'preserved_parts':preserved_parts,'source_scale':scale_info,'alignment':alignment,'source_channels':source_channels},stream)
+    'materials':list(stock_names),'preserved_parts':preserved_parts,'source_scale':scale_info,'alignment':alignment,'source_channels':source_channels,'geometry_import':geometry_reports},stream)
 print('REPLACEMENT_OK',destination)

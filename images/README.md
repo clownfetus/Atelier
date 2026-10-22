@@ -12,6 +12,7 @@ no compositing, simulated UI, cropping or image generation.
 | `material-editor.png` | Installed material parameters and comparisons |
 | `material-replacement.png` | The material replacement controls |
 | `model-studio.png` | Magik in the real Model Studio Inspect view |
+| `blender-live-setup.png` | Model menu with live send, extension setup and portable export |
 | `showcase.png` | The same model with Showcase presentation |
 | `appearance-settings.png` | Appearance palettes and motion preferences |
 | `blender-settings.png` | The option to keep Blender textures out of the project |

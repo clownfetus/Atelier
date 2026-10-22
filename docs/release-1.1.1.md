@@ -1,10 +1,16 @@
 # Atelier 1.1.1
 
-This patch brings together the work since 1.1.0: faster repeated model imports,
-preview and texture export fixes, HDR cubemaps, and clearer names across the library.
+This patch brings together the work since 1.1.0: live Blender transfer, faster
+repeated model imports, preview and texture export fixes, HDR cubemaps, and
+clearer names across the library.
 
 ## What changed
 
+- **Send models to Blender.** Use **Set up live Blender** to install the bundled
+  Atelier Live Bridge extension, then **Send to Blender (live)** to send
+  a model into an open Blender session. **Export portable .blend** is also
+  available. See the [Blender guide](https://github.com/clownfetus/Atelier/blob/1.1.1/BLENDER.md)
+  for extension setup and supported workflows.
 - **Find assets by their names.** Character and costume names and artwork now
   follow recognized IDs through UI, VFX and other asset folders, including
   legendary ultimate skins. Search, breadcrumbs, pins and asset pickers agree.
@@ -24,6 +30,8 @@ preview and texture export fixes, HDR cubemaps, and clearer names across the lib
   tattoo and hair masks, weapon grips, Capwolf's alternate body, texture cache
   paths and the T_Visor serialization error. Asset renames retain cooked texture
   data. Lower mesh detail levels preserve section and skinning boundaries.
+  Replacement preparation keeps geometry modifiers and winding; unassigned
+  faces are rejected before a detail-level rebuild can silently drop them.
 - **Updated library and editing feedback.** Cleaner filters, readable compact
   costume captions, consistent Mod tray and Continue spacing, refreshed Showcase
   composition and Krackle feedback that follows actual work and motion settings.
