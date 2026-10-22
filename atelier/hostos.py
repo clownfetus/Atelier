@@ -401,8 +401,10 @@ def focus_window(title):
 # ── Windows implementations (unchanged behaviour, moved here) ─────────────────
 
 def _ps(ps, timeout, env=None):
+    # Hide the PowerShell console while leaving its file/folder dialog visible.
     r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                       capture_output=True, encoding="utf-8", timeout=timeout, env=env)
+                       capture_output=True, encoding="utf-8", timeout=timeout, env=env,
+                       creationflags=CNW)
     return (r.stdout or "").strip()
 
 
