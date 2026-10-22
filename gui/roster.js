@@ -95,7 +95,13 @@
     const img = document.createElement('img'); img.alt=''; img.loading='lazy'; img.decoding='async';
     const sources=[...new Set([item.avatar,item.thumbnail].filter(Boolean))];
     const next=()=>{if(sources.length)img.src=sources.shift();else img.hidden=true;};
-    img.addEventListener('load',()=>{const colour=window.AtelierPolish?.accent(img);if(colour&&img.isConnected)img.parentElement?.style.setProperty('--roster-accent',colour);});
+    img.addEventListener('load',()=>{
+      const colour=window.AtelierPolish?.accent(img);
+      if(colour&&img.isConnected) {
+        img.parentElement?.style.setProperty('--roster-accent',colour);
+        if (requested && !host()?.hidden && img.closest('.roster-portrait')?.getAttribute('aria-pressed') === 'true') window.AtelierPolish?.artwork(img);
+      }
+    });
     img.addEventListener('error',next);next();return img;
   }
   function render() {
@@ -133,7 +139,10 @@
         tintSkin(tile,skin,hero);
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
-      if (record && changed) window.AtelierMotion?.workflow?.hero(button);
+      if (record && changed) {
+        window.AtelierPolish?.artwork(button.querySelector('img'));
+        window.AtelierMotion?.workflow?.hero(button);
+      }
     }
     const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;
     const shown=data.heroes.filter(hero=>filter==='all'||(filter==='edited'?editCount(hero)>0:recent.includes(hero.path)));
@@ -173,7 +182,12 @@
     requested=home; navigate=onNavigate;options=opts;const root=host(); if (!root) return;
     renderContinue();
     if (!home) {root.hidden=true;return;}
-    if (data) {if(!root.childNodes.length) render();else root.hidden=false;return;}
+    if (data) {
+      if(!root.childNodes.length) render();else root.hidden=false;
+      const portrait = root.querySelector('.roster-portrait[aria-pressed=true] img');
+      if (portrait?.complete && portrait.naturalWidth) window.AtelierPolish?.artwork(portrait);
+      return;
+    }
     if (!pending) pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
       .then(result=>{data=result;window.AtelierCatalogueArt?.setIdentities(result);render();}).catch(()=>{data={heroes:[]};render();}).finally(()=>{pending=null;});
   }

@@ -109,6 +109,8 @@ the existing density; Compact reduces control and row padding. Preferences use
 synchronize across its windows. **Hero and skin colours are decoration only.**
 Never use them for buttons, toggles, focus outlines, selection states or body
 text. The chosen theme owns those roles and Krackle status/ownership inks.
+Decorative motion follows the active hero or costume through `--krackle-energy`;
+missing artwork restores the theme accent. Result colours retain their meaning.
 Legacy `atelier.adaptiveAccent` values no longer recolour theme roles.
 
 Native launch colors are mirrored into `_webview/window-theme.json`, independently
@@ -186,9 +188,19 @@ viewport loader samples the current artwork and lightens its accent for contrast
 
 ### Krackle
 
-Job feedback, ownership markers, empty states and occasional brand moments use **Krackle**, after Jack Kirby's krackle (credited here only; the product calls it Krackle). Energy defines the silhouette, bubbles give it texture and movement, and at small sizes the silhouette survives with minimal texture. Krackle never draws outlines, gradients or symbols: busy is a ring of dots a charge travels around, success a starburst, completed-with-warnings a cracked ring whose chunk falls out, failure a splat. The shapes give outcomes personality; adjacent text ("Mod exported", "Mod exported with warnings", "Export failed"; "Succeeded with warnings" in Activity) carries the meaning.
+Loading, saving and export use prominent formations: 112px in the model loader,
+184px during import and 216px during export. Editor saves show a 44px charge beside
+their status text (36px in Model Studio); result notifications use 40px. In Full,
+the panel border itself carries a coordinated SVG charge: loading gathers into a
+crest, saving presses a seal, and export packs then releases. Its curves and thickness match
+the native border, with no floating overlay elements. It stops on completion,
+failure, closure or lost visibility and restores the ordinary border. Background
+panels, Calm and Off have no moving borders; overlapping operations share one frame.
 
-- Concentrate it: substantial jobs (export, import, saves, loading, Activity), restrained ownership markers, empty states, category emblems and showcase moments (logo entrance, first export). Chrome keeps Material Sharp glyphs.
+Job feedback, ownership markers, empty states and occasional brand moments use **Krackle**, after Jack Kirby's krackle (credited here only; the product calls it Krackle). Solid ink defines each silhouette, with holes composed inside it. Loading and saving have an identifiable reservoir, a continuous fluid channel and a receiving seal. Actual panel borders carry that same ink; confirmed completion catches, compresses, rebounds and spreads along the receiving edge. Configuration discovery connects the panel edges through its scanner and latch. Activity's compact counted ring remains a job indicator. Success, warning and failure retain distinct settled silhouettes and adjacent text that carries their meaning.
+
+- Every gesture has a source, a path and a receiving point. Imports connect the asset card frame to its Mod tray row; packing connects the selection to Export. A source reservoir visibly charges, then a thick, tapered SVG stream follows a measured curve. At arrival, the receiving ink compresses, rebounds once and spreads along its own border. Artwork and controls remain fixed. Missing or hidden sources skip the transfer. Local gestures stay in the owning surface's edge band, with filled seals and punched holes. Calm retains brief local pulses; Off stays static. Chrome keeps Material Sharp glyphs.
+- Text, control glyphs, inputs, source previews, swatches and model canvases are cut out of decorative ink. At most three finite workflow gestures run; wide formations share the existing stage owner. Menus unfold a hinge, editors close a latch, pins clasp, and selections stitch. Loading gathers into a reservoir, saving presses a stamp, and export packs and releases; no unrelated particle scatter accompanies these actions.
 - Keep edited artwork trustworthy: never texture a colour swatch, a dye preview or the material-inspection viewport. A comic viewport mode would be an explicit showcase mode.
 - Compose, don't scatter: bubbles gather into deliberate dark masses on the shadow side, with clean energy elsewhere and a clear silhouette edge. Bubbles sit at least one dot step inside the shape, so thin bands such as the ring keep only a sparse centreline. Success is mostly clean; failure carries one substantial mass. Highlights are crisp Paper specks, never a soft glow.
 - Outcome colours are fixed per measured surface (`--krackle-*` in `gui/motion/krackle.css`); bubbles use Ink, except Paper holes in light-surface success. Paper glints are not counted as inks. Semantic UI colours remain separate.
@@ -196,6 +208,13 @@ Job feedback, ownership markers, empty states and occasional brand moments use *
 - Reduced motion (OS or Atelier's setting) shows the final pose of every state.
 
 Artwork is generated by `scripts/krackle_art.py`; see the [motion README](gui/motion/README.md).
+
+The Windows installer uses native scalable controls with paired Paper and Ink
+artwork. Its A mark feeds one continuous channel into a Krackle seal. The wizard
+follows the system light/dark appearance, keeps installation progress native,
+and leaves installation, upgrade and data-preservation behavior unchanged.
+`scripts/installer_art.py --check` verifies the deterministic high-resolution
+plates and transparent header mark.
 
 ## Symbols and brand assets
 
@@ -365,11 +384,10 @@ The tray and arrow use square corners, with crisp outcome strokes and restrained
 tonal fills to match the Sharp category family.
 See [motion integration](gui/motion/README.md) for ownership, provenance and checks.
 
-The 3D loading overlay uses a larger 72px SVG frame: a short edge assembly followed
-by a calm 1200ms loop. The fixed dark preview surface keeps bright, readable
-linework in both interface themes. Empty/error poses settle to static symbols;
+The 3D loading overlay uses a 112px SVG formation: a short assembly followed
+by a charging ring around a boiling mass of bubbles. The fixed preview surface
+keeps the energy and punched holes readable in both interface themes. Empty/error poses settle;
 geometry readiness hides the overlay immediately, independently of texture loading.
-The frame uses right-angle brackets and sharp wireframe joins.
 
 Generic folder tiles crossfade between official Sharp closed/open folder outlines
 on hover or keyboard focus (180ms open, 150ms close), with a 1px open-pose lift.

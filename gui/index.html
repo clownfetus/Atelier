@@ -45,6 +45,8 @@
 <link rel="stylesheet" href="/static/motion/logo-entrance.css">
 <link rel="stylesheet" href="/static/motion/texture-reconstruction.css">
 <link rel="stylesheet" href="/static/motion/krackle-stage.css">
+<link rel="stylesheet" href="/static/motion/working-panels.css">
+<link rel="stylesheet" href="/static/motion/config-discovery.css">
 </head>
 <body>
 
@@ -574,7 +576,7 @@
         </button>
       </div>
     </div>
-    <div id="setup-loading">
+    <div id="setup-loading" role="status" aria-live="polite" aria-busy="false">
       <div class="spinner" style="width:28px;height:28px"></div>
       <span>Detecting configuration…</span>
     </div>
@@ -857,6 +859,7 @@
 </template>
 
 <script src="/static/motion/timing.js"></script>
+<script src="/static/motion/krackle-context.js"></script>
 <script src="/static/motion/moment.js"></script>
 <script src="/static/motion/export-feedback.js"></script>
 <script src="/static/motion/export-feedback-ui.js"></script>
@@ -871,7 +874,10 @@
 <script src="/static/motion/krackle-glyph.js"></script>
 <script src="/static/motion/empty-state.js"></script>
 <script src="/static/motion/krackle-stage.js"></script>
+<script src="/static/motion/working-panels.js"></script>
+<script src="/static/motion/config-discovery.js"></script>
 <script src="/static/motion/workflow-krackle.js"></script>
+<script src="/static/motion/motion-preview.js"></script>
 <script src="/static/motion/krackle-surfaces.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>
@@ -895,6 +901,7 @@
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>
+<script src="/static/motion/workflow-surfaces.js"></script>
 <script src="/static/motion/showcase-art.js"></script>
 <script src="/static/motion/foley.js"></script>
 <script src="/static/mod-card-data.js"></script>

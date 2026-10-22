@@ -94,6 +94,20 @@ async function api(path, opts = {}) {
   }
 }
 
+// Presentation follows the originating editor/request, including a close or project switch.
+function panelWorking(panel, options) {
+  try {
+    const finish = window.AtelierMotion?.working?.begin(panel, options);
+    return (...args) => { try { finish?.(...args); } catch (_) { /* Presentation is optional. */ } };
+  } catch (_) { return () => {}; }
+}
+function editorWorking(overlayId, current, kind = 'saving') {
+  const overlay = document.getElementById(overlayId), panel = overlay?.querySelector('.modal');
+  return panelWorking(panel, {kind, current: () => current() && overlay.classList.contains('active'),
+    anchor: panel?.querySelector(kind === 'saving' ? '[id$="-save"]' : 'h2')});
+}
+const savedTray = () => ({destination: document.getElementById('sidebar'), anchor: document.getElementById('sidebar-header')});
+
 async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Continue', tone = 'danger') {
   const project = _activeProjectName;
   const editors = [matEditor, curveEditor, vfxEditor, worldEditor, textEditor];
@@ -398,6 +412,10 @@ async function renderGrid(focusPath = null, direction = 'forward') {
   _gridThumbs = null;
   renderHomePins();
   const area = document.getElementById("grid-area");
+  const current = () => requestId === _gridRequest && project === _activeProjectName;
+  const stopWorking = panelWorking(document.getElementById('explorer'), {
+    kind: 'loading', current, anchor: document.getElementById('breadcrumbs')
+  });
   window.AtelierTextureReconstruction?.disposeWithin(area);
   // Retain the old grid until the response can be committed in one transition.
   area.setAttribute('aria-busy', 'true');
@@ -440,6 +458,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       renderBreadcrumbs();
       _gridRenderedPath = path;
       area.setAttribute('aria-busy', 'false');
+      stopWorking('success');
       window.AtelierPolish?.startupDone();
       return bannerReady;
     };
@@ -455,12 +474,13 @@ async function renderGrid(focusPath = null, direction = 'forward') {
     const failure = document.createElement("div"); failure.id = "empty-state";
     failure.textContent = e.message; area.replaceChildren(failure);
     area.setAttribute('aria-busy', 'false');
+    stopWorking('error');
     window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
     renderBreadcrumbs();
     _mountEmptyArt(failure, "error");
     document.getElementById("library-count").textContent = "Could not load assets";
     window.AtelierPolish?.startupDone();
-  }
+  } finally { stopWorking(); }
 }
 
 // Krackle art for the grid's empty, no-match and failed states. The text and any
@@ -1170,11 +1190,12 @@ async function openMaterialEditor(item) {
   document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
+  const stopWorking = editorWorking('material-overlay', current, 'loading');
   let res;
   try { res = await api(`/api/material_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
-  catch (e) { if (current()) document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${_matEscape(e.message)}</div>`; return; }
-  if (!current()) return;
-  if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${_matEscape(res.error || "failed to read material")}</div>`; return; }
+  catch (e) { if (current()) document.getElementById("mat-body").innerHTML = `<div class="mat-empty">Error: ${_matEscape(e.message)}</div>`; stopWorking('error'); return; }
+  if (!current()) { stopWorking(); return; }
+  if (!res.ok) { document.getElementById("mat-body").innerHTML = `<div class="mat-empty">${_matEscape(res.error || "failed to read material")}</div>`; stopWorking('error'); return; }
   matEditor = { game_rel: item.game_rel, name: item.name,
                 colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars), compareMode: "saved",
                 textures: res.textures || {}, textureClasses: res.texture_classes || {},
@@ -1182,6 +1203,7 @@ async function openMaterialEditor(item) {
                 materialParent: res.material_parent || "" };
   _matRemember(matEditor, res.original);
   renderMatEditor();
+  stopWorking('success');
   _syncBulkEditorAction('material');
   loadSidebar();
   await loadMaterialDye(item, current, project);
@@ -1806,6 +1828,7 @@ async function saveMaterial() {
   _materialSaving.add(editor);
   _matRefreshDirty();
   document.getElementById("mat-status").textContent = "Saving…";
+  const stopWorking = editorWorking('material-overlay', isCurrent);
   let res;
   try {
     res = await api("/api/material_save", {
@@ -1819,6 +1842,7 @@ async function saveMaterial() {
       const newerEdits = isCurrent() && JSON.stringify(materialSaveSnapshot(editor)) !== body;
       const n = Object.keys(submitted.inten).length;
       const intenLost = n > 0 && res.inten_saved !== true;
+      stopWorking(intenLost || newerEdits ? 'warning' : 'success', !newerEdits ? savedTray() : undefined);
       const status = "Submitted changes saved; newer edits remain unsaved.";
       let message = newerEdits ? `${name}: ${status}` : `Saved: ${name}`;
       if (intenLost) message += `\nColour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
@@ -1835,11 +1859,12 @@ async function saveMaterial() {
         else closeMaterialEditor(true);
       }
     } else {
+      stopWorking('error');
       const message = "Error: " + (res?.error || "save failed");
       if (isCurrent()) document.getElementById("mat-status").textContent = message;
       notify(`${name} — ${message}`, "error", 6000);
     }
-  } finally { _materialSaving.delete(editor); if (isCurrent()) { renderMatEditor(); dyeRefresh(0); } }
+  } finally { stopWorking(); _materialSaving.delete(editor); if (isCurrent()) { renderMatEditor(); dyeRefresh(0); } }
 }
 
 async function resetMaterial() {
@@ -1942,6 +1967,7 @@ document.getElementById("material-overlay").addEventListener("click", e => {
 
 // ── curve editor (CurveLinearColor R/G/B/A key values) ────────────────────────
 let curveEditor = null;
+let _curveOpenRevision = 0;
 const CURVE_CH = ["R", "G", "B", "A"];
 
 function _c01(v) { return Math.min(1, Math.max(0, v)); }
@@ -1973,6 +1999,9 @@ function _resampleStops(channels) {
 }
 
 async function openCurveEditor(item) {
+  const revision = ++_curveOpenRevision, project = _activeProjectName;
+  const current = () => revision === _curveOpenRevision && project === _activeProjectName;
+  curveEditor = null;
   window.AtelierRoster?.rememberEditor(item.game_rel,'curve',_activeProjectName);
   _syncBulkEditorAction();
   const ov = document.getElementById("curve-overlay");
@@ -1982,10 +2011,14 @@ async function openCurveEditor(item) {
   document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
+  if (!current()) return;
+  const stopWorking = editorWorking('curve-overlay', current, 'loading');
   let res;
-  try { res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`); }
-  catch (e) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">Error: ${e.message}</div>`; return; }
-  if (!res.ok) { document.getElementById("curve-body").innerHTML = `<div class="mat-empty">${res.error || "failed to read curve"}</div>`; return; }
+  try { res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`, {project}); }
+  catch (e) { if (current()) document.getElementById("curve-body").textContent = 'Error: ' + e.message; return; }
+  finally { stopWorking(res?.ok ? 'success' : 'error'); }
+  if (!current()) return;
+  if (!res.ok) { document.getElementById("curve-body").textContent = res.error || "Failed to read curve"; return; }
   curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
   renderCurveEditor();
   _syncBulkEditorAction('curve');
@@ -2055,12 +2088,25 @@ async function saveCurve() {
   for (const ch of Object.keys(c.dirty)) if (c.dirty[ch]) edits[ch] = c.channels[ch];   // full key list per changed channel
   if (!Object.keys(edits).length) { document.getElementById("curve-status").textContent = "No changes to save."; return; }
   document.getElementById("curve-status").textContent = "Saving…";
+  const project = _activeProjectName, submitted = _editSnapshot(c.channels);
+  const current = () => curveEditor === c && project === _activeProjectName;
+  const stopWorking = editorWorking('curve-overlay', current);
   try {
-    const res = await api("/api/curve_save", { method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await api("/api/curve_save", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: c.game_rel, edits }) });
-    if (res.ok) { toast(`Saved: ${c.name}`, "success"); loadSidebar(); closeCurveEditor(true); }
-    else document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed");
-  } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
+    if (!current()) return;
+    if (res.ok) {
+      const saved = JSON.parse(submitted);
+      for (const ch of Object.keys(edits)) if (_editSnapshot(c.channels[ch]) === _editSnapshot(saved[ch])) delete c.dirty[ch];
+      const newer = _curveDirty();
+      stopWorking(newer ? 'warning' : 'success', newer ? undefined : savedTray());
+      toast(`Saved: ${c.name}`, "success"); loadSidebar();
+      if (newer) document.getElementById("curve-status").textContent = "Submitted edits saved; newer changes remain unsaved.";
+      else closeCurveEditor(true);
+    }
+    else { stopWorking('error'); document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed"); }
+  } catch (e) { stopWorking('error'); if (current()) document.getElementById("curve-status").textContent = "Error: " + e.message; }
+  finally { stopWorking?.(); }
 }
 
 async function resetCurve() {
@@ -2078,6 +2124,7 @@ async function resetCurve() {
 
 async function closeCurveEditor(force = false) {
   if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
+  ++_curveOpenRevision;
   const overlay = document.getElementById('curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
@@ -2138,9 +2185,11 @@ async function openVfxEditor(item) {
   document.getElementById("vfx-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
+  const stopWorking = editorWorking('vfx-overlay', current, 'loading');
   let res;
   try { res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`, {project}); }
   catch (e) { if (current()) document.getElementById("vfx-body").textContent = 'Error: ' + e.message; return; }
+  finally { stopWorking(res?.ok ? 'success' : 'error'); }
   if (!current()) return;
   if (!res.ok) { document.getElementById("vfx-body").textContent = res.error || 'Failed to read VFX'; return; }
   vfxEditor = { game_rel: item.game_rel, name: item.name, kind: res.kind || "niagara",
@@ -2390,6 +2439,7 @@ async function saveVfx() {
   // two intensity maps can share one store — an MPC keys by parameter name, a curve by export index.
   const inten = { ..._intenMap(v.vectors, p => p.name, p => _derivedInten(p.rgba)),
                   ..._intenMap(editedGroups,  _vfxKey,       g => _vfxInten(g)) };
+  const stopWorking = editorWorking('vfx-overlay', current);
   try {
     const res = await api("/api/vfx_save", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel, groups, scalars, vectors, inten }) });
@@ -2407,12 +2457,14 @@ async function saveVfx() {
         });
         v.baseline=JSON.stringify(saved); v.savedGroups=saved.groups;
         const newer = _vfxSnapshot(v) !== v.baseline;
+        stopWorking(newer || Object.keys(inten).length && res.inten_saved !== true ? 'warning' : 'success', !newer ? savedTray() : undefined);
         if (newer) { document.getElementById('vfx-status').textContent = 'Submitted edits saved; newer changes remain unsaved.'; window.AtelierMotionboard?.sync(); }
         else closeVfxEditor(true);
       }
-    } else if (current()) document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed");
-  } catch (e) { if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
+    } else { stopWorking('error'); if (current()) document.getElementById("vfx-status").textContent = "Error: " + (res.error || "save failed"); }
+  } catch (e) { stopWorking('error'); if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
   finally {
+    stopWorking?.();
     _vfxSaving.delete(v);
     document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
   }
@@ -2970,6 +3022,7 @@ function renderSidebar() {
       item.selected = !item.selected;
       renderSidebar();
       saveSelection();
+      window.AtelierMotion?.workflow?.selection?.(document.getElementById('sel-count'));
     });
     el.addEventListener("click", e => {
       // ctrl/cmd or shift marks for a bulk action; a plain click still opens the asset, and
@@ -2993,6 +3046,7 @@ function toggleSelectAll() {
   all.forEach(i => { i.selected = selectAll; });
   renderSidebar();
   saveSelection();
+  window.AtelierMotion?.workflow?.selection?.(document.getElementById('sel-count'));
 }
 
 // Persist the OFF set to the active project. Debounced: toggling several assets in a row is one
@@ -3495,20 +3549,38 @@ async function _fetchUsmapPath() {
   } catch (_) { return null; }
 }
 
-function _setSetupLoading(on) {
-  document.getElementById("setup-loading").classList.toggle("active", on);
+let _setupLoadingFinish = null, _setupLoadingRevision = 0;
+function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevision) {
+  if (!on && revision !== _setupLoadingRevision) return;
+  const loading = document.getElementById('setup-loading');
+  if (on) {
+    _setupLoadingFinish?.dispose?.();
+    ++_setupLoadingRevision;
+    loading.classList.add('active');
+    loading.setAttribute('aria-busy', 'true');
+    try { _setupLoadingFinish = window.AtelierMotion?.configDiscovery?.begin(document.getElementById('setup-overlay')); }
+    catch (_) { _setupLoadingFinish = null; }
+  } else {
+    try { _setupLoadingFinish?.(outcome); } catch (_) { /* Keep setup usable without presentation. */ }
+    _setupLoadingFinish = null;
+    loading.classList.remove('active');
+    loading.setAttribute('aria-busy', 'false');
+  }
+  return _setupLoadingRevision;
 }
 
 async function checkSetup() {
   document.getElementById("setup-overlay").classList.add("active");
-  _setSetupLoading(true);
+  const revision = _setSetupLoading(true);
   try {
     const statusRes = await api("/api/setup_status");
+    if (revision !== _setupLoadingRevision) return false;
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
     _protectionPassword = statusRes.password_prefill || "";
     document.getElementById("toggle-copy").checked = _modsFolderSet;
     if (statusRes.configured) {
+      _setSetupLoading(false, 'success', revision);
       document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
@@ -3518,7 +3590,7 @@ async function checkSetup() {
     document.getElementById("setup-aes").value   = statusRes.aes_prefill || "";
     document.getElementById("setup-usmap").value = statusRes.usmap_prefill || "";
     window.AtelierSetup?.detected(statusRes.paks_prefill || '');
-    _setSetupLoading(false);
+    _setSetupLoading(false, statusRes.error ? 'error' : statusRes.paks_prefill ? 'success' : 'warning', revision);
     for (const [kind, fetchValue] of [['aes', _fetchAesKeyValue], ['usmap', _fetchUsmapPath]]) {
       const field = document.getElementById('setup-' + kind), initial = field.value;
       window.AtelierSetup?.retrieval(kind, 'pending');
@@ -3532,7 +3604,7 @@ async function checkSetup() {
     await validateSetup();
     return true;
   } catch (e) {
-    _setSetupLoading(false);
+    _setSetupLoading(false, 'error', revision);
     return false;
   }
 }
@@ -3556,11 +3628,14 @@ async function openPaths() {
   _pathsMode = true;
   _applySetupMode();
   document.getElementById("setup-overlay").classList.add("active");
-  _setSetupLoading(true);
+  const revision = _setSetupLoading(true);
+  let outcome = 'error';
   try {
     const [statusRes, aes, usmapPath] = await Promise.all([
       api("/api/setup_status"), _fetchAesKeyValue(), _fetchUsmapPath(),
     ]);
+    if (revision !== _setupLoadingRevision || !document.getElementById('setup-overlay').classList.contains('active')) return;
+    outcome = statusRes.error ? 'error' : statusRes.paks_prefill ? 'success' : 'warning';
     _modsFolderSet      = !!(statusRes.mods_prefill);
     _modsFolderPath     = statusRes.mods_prefill || "";
     _protectionPassword = statusRes.password_prefill || "";
@@ -3571,7 +3646,8 @@ async function openPaths() {
     document.getElementById("setup-password").value = statusRes.password_prefill || "";
     document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
   } catch (e) {}
-  _setSetupLoading(false);
+  _setSetupLoading(false, outcome, revision);
+  if (revision !== _setupLoadingRevision || !document.getElementById('setup-overlay').classList.contains('active')) return;
   loadContentMounts();      // fire-and-forget: informational, never blocks the panel
   await validateSetup();
   updateInstallBtn();
@@ -3602,10 +3678,12 @@ async function loadContentMounts() {
 }
 
 document.getElementById("setup-cancel").addEventListener("click", () => {
+  _setSetupLoading(false); ++_setupLoadingRevision;
   document.getElementById("setup-overlay").classList.remove("active");
   _pathsMode = false;
 });
 document.getElementById("setup-close").addEventListener("click", () => {
+  _setSetupLoading(false); ++_setupLoadingRevision;
   document.getElementById("setup-overlay").classList.remove("active");
   _pathsMode = false;
 });
@@ -3851,6 +3929,8 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
   btn.innerHTML = "Saving…";
+  const revision = _setupLoadingRevision;
+  const stopWorking = editorWorking('setup-overlay', () => revision === _setupLoadingRevision);
   try {
     const res = await api("/api/save_paks", {
       method: "POST",
@@ -3858,6 +3938,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
+      stopWorking('success', {destination: document.getElementById('explorer'), anchor: document.getElementById('breadcrumbs')});
       const wasPaths   = _pathsMode;
       const wasModsSet = _modsFolderSet;
       _pathsMode = false;
@@ -3886,13 +3967,15 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       }
       window.AtelierChangelog?.ready();
     } else {
+      stopWorking('error');
       toast(`Error: ${res.error}`, "warning");
       _resetSaveBtn();
     }
   } catch (e) {
+    stopWorking('error');
     toast(`Error: ${e.message}`, "warning");
     _resetSaveBtn();
-  }
+  } finally { stopWorking(); }
 });
 
 // ── sidebar resize ────────────────────────────────────────────────────────────
@@ -4735,6 +4818,7 @@ async function openProjectPicker() {
 document.getElementById("project-chip").addEventListener("click", openProjectPicker);
 
 async function _selectProject(name) {
+  const previousProject = _activeProjectName;
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
                      "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay", "bulk-overlay"];
   if (editorIds.some(id => document.getElementById(id)?.classList.contains("active"))) {
@@ -4767,6 +4851,8 @@ async function _selectProject(name) {
     await renderGrid();
     await loadSidebar();
   }
+  if (previousProject && previousProject !== name && _activeProjectName === name)
+    window.AtelierMotion?.workflow?.project(document.getElementById('project-chip'));
 }
 
 function _showProjNameModal(ctx) {
@@ -5230,6 +5316,7 @@ function renderShaderProps(p) {
 
 // ── World / level editor (lights · fog · grade · component visibility) ─────────
 let worldEditor = null;
+let _worldOpenRevision = 0;
 
 function _wHx(n) { return ("0" + Math.round(Math.min(255, Math.max(0, n))).toString(16)).slice(-2); }
 function _rgb255Hex(c) { c = c || [255, 255, 255]; return "#" + _wHx(c[0]) + _wHx(c[1]) + _wHx(c[2]); }
@@ -5238,6 +5325,9 @@ function _rgb01Hex(c) { c = c || [1, 1, 1]; return "#" + _wHx(c[0] * 255) + _wHx
 function _hex01(h) { return [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; }
 
 async function openWorldEditor(item) {
+  const revision = ++_worldOpenRevision, project = _activeProjectName;
+  const current = () => revision === _worldOpenRevision && project === _activeProjectName;
+  worldEditor = null;
   window.AtelierRoster?.rememberEditor(item.game_rel,'world',_activeProjectName);
   const ov = document.getElementById("world-overlay");
   document.getElementById("world-title").textContent = item.name;
@@ -5246,10 +5336,13 @@ async function openWorldEditor(item) {
   document.getElementById("world-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
+  const stopWorking = editorWorking('world-overlay', current, 'loading');
   let res;
-  try { res = await api("/api/world_params?game_rel=" + encodeURIComponent(item.game_rel)); }
-  catch (e) { document.getElementById("world-body").innerHTML = '<div class="mat-empty">Error: ' + e.message + '</div>'; return; }
-  if (!res.ok) { document.getElementById("world-body").innerHTML = '<div class="mat-empty">' + (res.error || "failed to read level") + '</div>'; return; }
+  try { res = await api("/api/world_params?game_rel=" + encodeURIComponent(item.game_rel), {project}); }
+  catch (e) { if (current()) document.getElementById("world-body").textContent = 'Error: ' + e.message; return; }
+  finally { stopWorking(res?.ok ? 'success' : 'error'); }
+  if (!current()) return;
+  if (!res.ok) { document.getElementById("world-body").textContent = res.error || "Failed to read level"; return; }
   const e = res.edits || {};
   worldEditor = { game_rel: item.game_rel, name: item.name, model: res,
                   edits: { lights: e.lights || {}, fog: e.fog || {}, grade: e.grade || {}, visibility: e.visibility || {} } };
@@ -5351,24 +5444,33 @@ function _wireWorldInputs() {
 
 async function closeWorldEditor(force = false) {
   if (force !== true && _worldDirty() && !(await _discardUnsaved(true, "level edits"))) return false;
+  ++_worldOpenRevision;
   document.getElementById("world-overlay").classList.remove("active");
+  worldEditor = null;
   return true;
 }
 document.getElementById("world-close").addEventListener("click", closeWorldEditor);
 
 document.getElementById("world-save").addEventListener("click", async () => {
   if (!worldEditor) return;
+  const editor = worldEditor, project = _activeProjectName, submitted = _editSnapshot(editor.edits);
+  const current = () => worldEditor === editor && project === _activeProjectName;
+  const stopWorking = editorWorking('world-overlay', current);
   const st = document.getElementById("world-status"); st.textContent = "Saving…";
   try {
-    const res = await api("/api/world_save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: worldEditor.game_rel, edits: worldEditor.edits }) });
-    if (!res.ok) { st.textContent = res.error || "save failed"; return; }
-    worldEditor.baseline = _editSnapshot(worldEditor.edits);
-    st.textContent = "Saved — included at export.";
-    toast("Saved " + worldEditor.name, "success");
-    refreshSidebarEntry(worldEditor.game_rel, worldEditor.name, "");
+    const res = await api("/api/world_save", { project, method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: editor.game_rel, edits: JSON.parse(submitted) }) });
+    if (!current()) return;
+    if (!res.ok) { stopWorking('error'); st.textContent = res.error || "save failed"; return; }
+    const newer = _editSnapshot(editor.edits) !== submitted;
+    stopWorking(newer ? 'warning' : 'success');
+    editor.baseline = submitted;
+    st.textContent = newer ? "Submitted edits saved; newer changes remain unsaved." : "Saved — included at export.";
+    toast("Saved " + editor.name, "success");
+    refreshSidebarEntry(editor.game_rel, editor.name, "");
     await renderGrid();
-  } catch (e) { st.textContent = "Error: " + e.message; }
+  } catch (e) { stopWorking('error'); if (current()) st.textContent = "Error: " + e.message; }
+  finally { stopWorking?.(); }
 });
 
 document.getElementById("world-reset").addEventListener("click", async () => {
@@ -5391,10 +5493,14 @@ document.getElementById("world-reset").addEventListener("click", async () => {
 
 // ── Text / StringTable editor ─────────────────────────────────────────────────
 let textEditor = null;
+let _textOpenRevision = 0;
 
 function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 async function openTextEditor(item) {
+  const revision = ++_textOpenRevision, project = _activeProjectName;
+  const current = () => revision === _textOpenRevision && project === _activeProjectName;
+  textEditor = null;
   window.AtelierRoster?.rememberEditor(item.game_rel,'text',_activeProjectName);
   const ov = document.getElementById("text-overlay");
   document.getElementById("text-title").textContent = item.name;
@@ -5404,10 +5510,13 @@ async function openTextEditor(item) {
   document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
+  const stopWorking = editorWorking('text-overlay', current, 'loading');
   let res;
-  try { res = await api("/api/text_params?game_rel=" + encodeURIComponent(item.game_rel)); }
-  catch (e) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">Error: ' + e.message + '</div>'; return; }
-  if (!res.ok) { document.getElementById("text-body").innerHTML = '<div class="mat-empty">' + (res.error || "failed to read StringTable") + '</div>'; return; }
+  try { res = await api("/api/text_params?game_rel=" + encodeURIComponent(item.game_rel), {project}); }
+  catch (e) { if (current()) document.getElementById("text-body").textContent = 'Error: ' + e.message; return; }
+  finally { stopWorking(res?.ok ? 'success' : 'error'); }
+  if (!current()) return;
+  if (!res.ok) { document.getElementById("text-body").textContent = res.error || "Failed to read StringTable"; return; }
   textEditor = { game_rel: item.game_rel, name: item.name, entries: res.entries || [], edits: Object.assign({}, res.edits || {}) };
   textEditor.baseline = _editSnapshot(textEditor.edits);
   renderTextEditor("");
@@ -5441,25 +5550,34 @@ document.getElementById("text-search").addEventListener("input", (e) => { if (te
 
 async function closeTextEditor(force = false) {
   if (force !== true && _textDirty() && !(await _discardUnsaved(true, "text edits"))) return false;
+  ++_textOpenRevision;
   document.getElementById("text-overlay").classList.remove("active");
+  textEditor = null;
   return true;
 }
 document.getElementById("text-close").addEventListener("click", closeTextEditor);
 
 document.getElementById("text-save").addEventListener("click", async () => {
   if (!textEditor) return;
+  const editor = textEditor, project = _activeProjectName, submitted = _editSnapshot(editor.edits);
+  const current = () => textEditor === editor && project === _activeProjectName;
+  const stopWorking = editorWorking('text-overlay', current);
   const st = document.getElementById("text-status"); st.textContent = "Saving…";
   try {
-    const res = await api("/api/text_save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_rel: textEditor.game_rel, edits: textEditor.edits }) });
-    if (!res.ok) { st.textContent = res.error || "save failed"; return; }
-    textEditor.baseline = _editSnapshot(textEditor.edits);
-    const n = Object.keys(textEditor.edits).length;
-    st.textContent = n ? (n + " string(s) edited — included at export.") : "No changes.";
-    toast("Saved " + textEditor.name, "success");
-    refreshSidebarEntry(textEditor.game_rel, textEditor.name, "");
+    const res = await api("/api/text_save", { project, method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_rel: editor.game_rel, edits: JSON.parse(submitted) }) });
+    if (!current()) return;
+    if (!res.ok) { stopWorking('error'); st.textContent = res.error || "save failed"; return; }
+    const newer = _editSnapshot(editor.edits) !== submitted;
+    stopWorking(newer ? 'warning' : 'success');
+    editor.baseline = submitted;
+    const n = Object.keys(JSON.parse(submitted)).length;
+    st.textContent = newer ? "Submitted edits saved; newer changes remain unsaved." : n ? (n + " string(s) edited — included at export.") : "No changes.";
+    toast("Saved " + editor.name, "success");
+    refreshSidebarEntry(editor.game_rel, editor.name, "");
     await renderGrid();
-  } catch (e) { st.textContent = "Error: " + e.message; }
+  } catch (e) { stopWorking('error'); if (current()) st.textContent = "Error: " + e.message; }
+  finally { stopWorking?.(); }
 });
 
 document.getElementById("text-reset").addEventListener("click", async () => {

@@ -54,6 +54,18 @@
     host.setAttribute('data-am-reduced', String(reduced()));
     host.innerHTML = SVG_MARKUP;
     var svg = host.querySelector('svg');
+    function repaintEnergy() {
+      if (destroyed) return;
+      var palette = window.AtelierMotion.energy?.resolve(host);
+      var artwork = host.querySelector('svg');
+      if (!artwork || !palette) return;
+      artwork.style.setProperty('--am-local-charge', palette.charge);
+      artwork.style.setProperty('--am-local-rift', palette.rift);
+    }
+    repaintEnergy();
+    window.addEventListener('atelier:energy', repaintEnergy);
+    window.addEventListener('atelier:inks', repaintEnergy);
+
     function q(sel) { return host.querySelector(sel); }
     function qa(sel) { return Array.prototype.slice.call(host.querySelectorAll(sel)); }
     var parts = {
@@ -101,6 +113,7 @@
 
     function play(previousState) {
       cancel();
+      if (parts.busy) parts.busy.style.color = 'var(--am-local-charge, var(--krackle-energy, var(--krackle-charge)))';
       host.setAttribute('data-am-reduced', String(reduced()));
       if (destroyed || reduced() || hidden()) return;
       if (previousState === 'busy' && state !== 'busy') {
@@ -110,15 +123,22 @@
         ], { duration: 140, easing: EASE_STANDARD, fill: 'forwards' });
       }
       if (state === 'busy') {
+        // Compact paired charge: the glyph gathers in place without spinning.
         for (var k = 0; k < parts.dots.length; k++) {
-          var timing = {duration: BUSY_DURATION_MS, delay: (k * BUSY_DURATION_MS) / parts.dots.length, iterations: Infinity, easing: 'linear'};
+          var d = centre(parts.dots[k]);
+          var inward = 'translate(' + px(-d[0] * .2) + ', ' + px(-d[1] * .2) + ')';
+          var timing = {duration: BUSY_DURATION_MS, delay: (k % 3) * 65, iterations: Infinity, easing: EASE_STANDARD};
           run(parts.dots[k], [
-            { transform: 'scale(1)', offset: 0 }, { transform: 'scale(1.62)', offset: 0.1 },
-            { transform: 'scale(1.22)', offset: 0.3 }, { transform: 'scale(1)', offset: 0.55 }, { transform: 'scale(1)', offset: 1 }
+            {transform: 'translate(0px, 0px) scale(1)', offset: 0},
+            {transform: inward + ' scale(1.12)', offset: .3},
+            {transform: inward + ' scale(.9)', offset: .48},
+            {transform: 'translate(0px, 0px) scale(1)', offset: .76},
+            {transform: 'translate(0px, 0px) scale(1)', offset: 1}
           ], timing);
           run(parts.holes[k], [
-            { transform: 'scale(0)', offset: 0 }, { transform: 'scale(1)', offset: 0.1 },
-            { transform: 'scale(0.55)', offset: 0.3 }, { transform: 'scale(0)', offset: 0.5 }, { transform: 'scale(0)', offset: 1 }
+            {transform: 'scale(0)', offset: 0}, {transform: inward + ' scale(.8)', offset: .3},
+            {transform: inward + ' scale(.3)', offset: .48}, {transform: 'scale(0)', offset: .76},
+            {transform: 'scale(0)', offset: 1}
           ], timing);
         }
       } else if (state === 'info') {
@@ -132,7 +152,7 @@
       } else if (state === 'success') {
         run(parts.burst, [
           { transform: 'scale(0.2) rotate(-28deg)', opacity: 0, offset: 0, easing: EASE_STANDARD },
-          { transform: 'scale(1.24) rotate(5deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
+          { transform: 'scale(1.04, .92) rotate(2deg)', opacity: 1, offset: 0.38, easing: EASE_SWAY },
           { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
           { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
         ], { duration: 380, easing: 'linear' });
@@ -221,6 +241,8 @@
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
+        window.removeEventListener('atelier:energy', repaintEnergy);
+        window.removeEventListener('atelier:inks', repaintEnergy);
         cancel();
         if (mql && typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onEnvironment);
         document.removeEventListener('visibilitychange', onEnvironment);

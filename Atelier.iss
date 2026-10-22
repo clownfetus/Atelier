@@ -50,7 +50,21 @@ OutputDir=dist
 OutputBaseFilename=AtelierSetup
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern
+; Native controls retain keyboard, screen-reader, high-contrast and DPI support.
+; Generated plates share the app's A silhouette and connected Krackle ink system.
+WizardStyle=modern dynamic windows11 hidebevels
+WizardSizePercent=125,125
+DisableWelcomePage=no
+WizardBackColor=#eee5cf
+WizardBackColorDynamicDark=#121216
+WizardImageFile=gui\brand\installer\wizard-light.png
+WizardImageFileDynamicDark=gui\brand\installer\wizard-dark.png
+WizardImageBackColor=#eee5cf
+WizardImageBackColorDynamicDark=#121216
+WizardSmallImageFile=gui\brand\installer\wizard-mark.png
+WizardSmallImageFileDynamicDark=gui\brand\installer\wizard-mark.png
+WizardSmallImageBackColor=#eee5cf
+WizardSmallImageBackColorDynamicDark=#121216
 PrivilegesRequired=lowest
 CloseApplications=yes
 UninstallDisplayIcon={app}\{#AppExeName}
@@ -60,6 +74,28 @@ ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[LangOptions]
+DialogFontName=Segoe UI
+DialogFontSize=10
+WelcomeFontName=Segoe UI
+WelcomeFontSize=20
+
+[Messages]
+WelcomeLabel1=Welcome to Atelier
+WelcomeLabel2=Your workspace for Marvel Rivals mods.%n%nCreate textures, shape materials, and bring your ideas into the game.%n%nSetup will install Atelier {#AppVersion} and its editing tools for your Windows account.
+WizardSelectDir=Give Atelier a home
+SelectDirDesc=Choose where to install your workspace.
+WizardSelectTasks=Make yourself at home
+SelectTasksDesc=Choose your shortcuts.
+WizardReady=Ready to install Atelier
+ReadyLabel1=Your workspace is ready to be installed. Review the details below, then choose Install.
+WizardInstalling=Setting up your workspace
+InstallingLabel=Installing Atelier and its editing tools. Your workspace will be ready shortly.
+FinishedHeadingLabel=Atelier is ready
+FinishedLabelNoIcons=Your workspace is installed.%n%nOpen Atelier to find your game and start creating.
+FinishedLabel=Your workspace is installed.%n%nOpen Atelier to find your game and start creating.
+BeveledLabel=Atelier  /  {#AppVersion}
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked

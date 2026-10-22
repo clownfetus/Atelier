@@ -253,7 +253,7 @@ function init() {
     replaceMesh:editAssemblyMesh,
     effect:effect=>openConnectedEditor('vfx-overlay',()=>window.openVfxEditor?.(effect), false),
   });
-  for (const mode of ['inspect','assembly','showcase']) $('viewport-'+mode).addEventListener('click',()=>setWorkspaceMode(mode));
+  for (const mode of ['inspect','assembly','showcase']) $('viewport-'+mode).addEventListener('click',()=>setWorkspaceMode(mode, true));
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
   $('viewport-mesh-edit').addEventListener('click',async()=>{
@@ -287,8 +287,9 @@ function init() {
   inited = true;
 }
 
-function setWorkspaceMode(mode) {
+function setWorkspaceMode(mode, animate = false) {
   if (inspection?.capturing()) return;
+  const changed = workspaceMode !== mode;
   workspaceMode = mode;
   inspection?.setShowcase(mode === 'showcase');
   assembly?.setActive(mode === 'assembly');
@@ -296,6 +297,7 @@ function setWorkspaceMode(mode) {
   $('viewport-workspace-label').textContent = mode === 'assembly' ? 'Assembly View' : 'Model Studio';
   try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
   requestAnimationFrame(onResize);
+  if (animate && changed) window.AtelierMotion?.workflow?.workspace($('viewport-modes'), mode);
 }
 
 // Only one transient menu is open; Escape returns focus before it can leave the workspace.
@@ -359,6 +361,7 @@ function disposeTree(obj) {
 
 // The loader is optional presentation. Its errors must never block model decoding.
 let viewportLoaderMotion = null;
+let viewportLoadingBorder = null;
 
 function destroyViewportLoader() {
   const motion = viewportLoaderMotion;
@@ -384,6 +387,14 @@ function setViewportLoaderFallback(state) {
 }
 
 function startViewportLoader() {
+  viewportLoadingBorder?.();
+  const gen = generation, project = viewportProject;
+  try {
+    viewportLoadingBorder = window.AtelierMotion?.working?.begin($('viewport-box'), {
+      kind: 'loading', anchor: $('viewport-loading-motion-host'),
+      current: () => gen === generation && project === viewportProject && $('viewport-overlay').classList.contains('active')
+    });
+  } catch (_) { viewportLoadingBorder = null; }
   setViewportLoaderFallback('loading');
   const host = $('viewport-loading-motion-host');
   if (!host || !window.AtelierMotion?.viewportLoader) return;
@@ -397,6 +408,10 @@ function startViewportLoader() {
 }
 
 function setViewportLoaderState(state) {
+  if (state !== 'loading') {
+    try { viewportLoadingBorder?.(state === 'ready' ? 'success' : state === 'empty' ? 'warning' : 'error'); } catch (_) {}
+    viewportLoadingBorder = null;
+  }
   setViewportLoaderFallback(state);
   try { viewportLoaderMotion?.setState(state); }
   catch (e) {
@@ -406,6 +421,8 @@ function setViewportLoaderState(state) {
 }
 
 function clearModel() {
+  try { viewportLoadingBorder?.(); } catch (_) {}
+  viewportLoadingBorder = null;
   connectedEditorPending = false; clearTimeout(assemblyRefreshTimer);
   modelLoading=false;
   if (modelLoad) {
@@ -1545,31 +1562,43 @@ async function saveEdits() {
   const targets = Object.fromEntries(names.map(name => [name, matData[name]]));
   const savedPaths=new Set();
   saving = true; refreshFoot();
+  let stopWorking;
+  try {
+    stopWorking = window.AtelierMotion?.working?.begin($('viewport-box'), {
+      kind: 'saving', anchor: $('viewport-mat-save'),
+      current: () => gen === generation && edited === draft && project === viewportProject
+    });
+  } catch (_) { /* Optional presentation never blocks saving. */ }
   let ok = 0;
   const failed = [];
-  for (const name of names) {
-    const d = targets[name];
-    if(savedPaths.has(d.game_rel))continue;
-    try {
-      const r = await projectFetch('/api/material_save', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
-      }, project).then(r => r.json());
-      if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
-      window.AtelierRoster?.rememberEditor(d.game_rel,'studio',project);
-      ok++;savedPaths.add(d.game_rel);
-      for(const key of names.filter(key=>targets[key].game_rel===d.game_rel)) {
-        const target=targets[key];
-        target.colors=r.colors || target.colors.map(col=>({...col,rgba:submitted[key][col.name]?.slice() || col.rgba}));
-        if (gen === generation && edited === draft) {
-          for (const [param, rgba] of Object.entries(submitted[key])) {
-            // A newer edit made during the request is still unsaved.
-            if (JSON.stringify(edited[key]?.[param]) === JSON.stringify(rgba)) delete edited[key][param];
+  try {
+    for (const name of names) {
+      const d = targets[name];
+      if(savedPaths.has(d.game_rel))continue;
+      try {
+        const r = await projectFetch('/api/material_save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ game_rel: d.game_rel, colors: submitted[name], scalars: {} }),
+        }, project).then(r => r.json());
+        if (!r || !r.ok) throw new Error(r?.error || 'Save failed');
+        window.AtelierRoster?.rememberEditor(d.game_rel,'studio',project);
+        ok++;savedPaths.add(d.game_rel);
+        for(const key of names.filter(key=>targets[key].game_rel===d.game_rel)) {
+          const target=targets[key];
+          target.colors=r.colors || target.colors.map(col=>({...col,rgba:submitted[key][col.name]?.slice() || col.rgba}));
+          if (gen === generation && edited === draft) {
+            for (const [param, rgba] of Object.entries(submitted[key])) {
+              // A newer edit made during the request is still unsaved.
+              if (JSON.stringify(edited[key]?.[param]) === JSON.stringify(rgba)) delete edited[key][param];
+            }
+            if (!Object.keys(edited[key] || {}).length) delete edited[key];
           }
-          if (!Object.keys(edited[key] || {}).length) delete edited[key];
         }
-      }
-    } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
+      } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
+    }
+  } finally {
+    const newer = gen === generation && edited === draft && Object.values(edited).some(params => Object.keys(params).length);
+    try { stopWorking?.(failed.length && !ok ? 'error' : failed.length || newer ? 'warning' : 'success'); } catch (_) {}
   }
   const ownsView = gen === generation && edited === draft && project === viewportProject;
   const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);

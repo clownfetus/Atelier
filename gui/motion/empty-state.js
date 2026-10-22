@@ -22,12 +22,11 @@
 
   function bounce(height) {
     return [
-      { transform: 'translateY(' + -height + 'px)', opacity: 0, offset: 0, easing: EASE_FALL },
-      { transform: 'translateY(0px)', opacity: 1, offset: 0.5, easing: EASE_RISE },
-      { transform: 'translateY(' + -height * 0.22 + 'px)', opacity: 1, offset: 0.7, easing: EASE_FALL },
-      { transform: 'translateY(0px)', opacity: 1, offset: 0.86, easing: EASE_RISE },
-      { transform: 'translateY(' + -height * 0.06 + 'px)', opacity: 1, offset: 0.93, easing: EASE_FALL },
-      { transform: 'translateY(0px)', opacity: 1, offset: 1 }
+      { transform: 'translateY(' + -height + 'px) scale(.88,1.12)', opacity: 0, offset: 0, easing: EASE_FALL },
+      { transform: 'translateY(1px) scale(1.22,.78)', opacity: 1, offset: 0.52, easing: EASE_RISE },
+      { transform: 'translateY(' + -height * 0.16 + 'px) scale(.96,1.04)', opacity: 1, offset: 0.74, easing: EASE_FALL },
+      { transform: 'translateY(0px) scale(1.04,.96)', opacity: 1, offset: 0.88, easing: EASE_SWAY },
+      { transform: 'translateY(0px) scale(1)', opacity: 1, offset: 1 }
     ];
   }
 
@@ -42,6 +41,7 @@
     var destroyed = false;
     var active = [];
     var mql = null;
+    var observer = null;
     try { mql = (window.AtelierMotionPolicy && window.AtelierMotionPolicy.query()) || window.matchMedia('(prefers-reduced-motion: reduce)'); } catch (_) {}
 
     host.setAttribute('data-atelier-motion', 'empty-state');
@@ -71,20 +71,21 @@
 
     function enter() {
       cancel();
-      if (destroyed || reducedPref === 'reduce' || (mql && mql.matches) || document.hidden || !host.isConnected) return;
+      if (destroyed || reducedPref === 'reduce' || (mql && mql.matches) || window.AtelierMotionPolicy?.allows(2) === false || document.hidden || !host.isConnected || !host.getClientRects().length) return;
       try {
         var bubbles = group.querySelectorAll('.am-empty-state-bubble');
         if (kind === 'empty') {
           run(group.querySelector('.am-empty-state-tray'), [
-            { transform: 'translateY(3px) scale(0.95)', opacity: 0.4, easing: EASE_STANDARD },
-            { transform: 'translateY(-0.6px) scale(1.01)', opacity: 1, offset: 0.6, easing: EASE_SWAY },
+            { transform: 'translateY(3px) scale(0.98)', opacity: 0.4, easing: EASE_STANDARD },
+            { transform: 'translateY(0) scale(1)', opacity: 1, offset: 0.5, easing: EASE_FALL },
+            { transform: 'translateY(1px) scale(1.025,.975)', opacity: 1, offset: 0.76, easing: EASE_SWAY },
             { transform: 'translateY(0) scale(1)', opacity: 1 }
-          ], { duration: 280, easing: 'linear' });
+          ], { duration: 420, easing: 'linear' });
         }
         if (kind === 'error') {
           run(group.querySelector('.am-empty-state-splat'), [
-            { transform: 'scale(0.5)', opacity: 0, offset: 0, easing: EASE_SWAY }, { transform: 'scale(0.26)', opacity: 1, offset: 0.22, easing: EASE_STANDARD },
-            { transform: 'scale(1.18)', opacity: 1, offset: 0.48, easing: EASE_SWAY }, { transform: 'scale(0.96)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
+            { transform: 'translateY(-8px) scale(.8,1.15)', opacity: 0, offset: 0, easing: EASE_FALL },
+            { transform: 'translateY(1px) scale(1.12,.86)', opacity: 1, offset: 0.48, easing: EASE_RISE }, { transform: 'scale(.98,1.02)', opacity: 1, offset: 0.72, easing: EASE_STANDARD },
             { transform: 'scale(1)', opacity: 1, offset: 1 }
           ], { duration: 520, easing: 'linear' });
           Array.prototype.forEach.call(group.querySelectorAll('.am-empty-state-sat'), function (sat, i) {
@@ -107,12 +108,29 @@
       }
     }
 
+    function stopWhenUnavailable() {
+      if (document.hidden || (mql && mql.matches) || window.AtelierMotionPolicy?.allows(2) === false) cancel();
+    }
+    mql?.addEventListener?.('change', stopWhenUnavailable);
+    document.addEventListener('visibilitychange', stopWhenUnavailable);
+    window.addEventListener('pagehide', cancel);
+    if (typeof IntersectionObserver === 'function') {
+      observer = new IntersectionObserver(function (entries) {
+        if (entries.some(function (entry) { return !entry.isIntersecting; })) cancel();
+      });
+      observer.observe(host);
+    }
+
     var handle = {
       replay: enter,
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
         cancel();
+        observer?.disconnect();
+        mql?.removeEventListener?.('change', stopWhenUnavailable);
+        document.removeEventListener('visibilitychange', stopWhenUnavailable);
+        window.removeEventListener('pagehide', cancel);
         if (svg && svg.parentNode === host) host.removeChild(svg);
         host.removeAttribute('data-atelier-motion');
         host.removeAttribute('data-am-kind');
