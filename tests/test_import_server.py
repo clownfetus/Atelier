@@ -66,8 +66,8 @@ class PersistentImports(unittest.TestCase):
         self.events = self.root/'events'
         self.release = self.root/'release'
         tools = self.root/'Tools'
-        (tools/'AtelierImport').mkdir(parents=True)
-        (tools/'AtelierImport/AtelierImport.exe').write_bytes(b'fixture')
+        (tools/'AtelierNative').mkdir(parents=True)
+        (tools/'AtelierNative/AtelierNative.exe').write_bytes(b'fixture')
         paks = self.root/'Paks';paks.mkdir()
         (paks/'pakchunkFixture.utoc').write_bytes(b'index')
         self.mapping = self.root/'mapping.usmap';self.mapping.write_bytes(b'mapping')

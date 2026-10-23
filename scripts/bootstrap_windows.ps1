@@ -8,18 +8,18 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (!$Python) {
     $launcher = Get-Command py -ErrorAction SilentlyContinue
-    if ($launcher) { $Python = (& $launcher.Source -3.12 -c 'import sys; print(sys.executable)') }
+    if ($launcher) { $Python = (& $launcher.Source -3.15 -c 'import sys; print(sys.executable)') }
     elseif (Get-Command python -ErrorAction SilentlyContinue) { $Python = (Get-Command python).Source }
 }
-if (!$Python -or !(Test-Path -LiteralPath $Python)) { throw 'Pass -Python with the path to a Windows x64 Python 3.12 interpreter.' }
-& $Python -c 'import sys; assert sys.version_info[:2] == (3,12) and sys.maxsize > 2**32, "Use Python 3.12 x64"'
-if ($LASTEXITCODE -ne 0) { throw 'Python must be version 3.12 x64.' }
-$venvPython = Join-Path $projectRoot '.venv-build\Scripts\python.exe'
+if (!$Python -or !(Test-Path -LiteralPath $Python)) { throw 'Pass -Python with the path to a Windows x64 Python 3.15 interpreter.' }
+& $Python -c 'import sys; assert sys.version_info[:2] == (3,15) and sys.maxsize > 2**32, "Use Python 3.15 x64"'
+if ($LASTEXITCODE -ne 0) { throw 'Python must be version 3.15 x64.' }
+$venvPython = Join-Path $projectRoot '.venv\Scripts\python.exe'
 if (!(Test-Path -LiteralPath $venvPython)) {
-    & $Python -m venv (Join-Path $projectRoot '.venv-build')
-    if ($LASTEXITCODE -ne 0) { throw 'Could not create the isolated build environment.' }
+    & $Python -m venv (Join-Path $projectRoot '.venv')
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create the build environment.' }
 }
-& $venvPython -m pip install --disable-pip-version-check -r (Join-Path $projectRoot 'requirements-build.txt')
+& $venvPython -m pip install --disable-pip-version-check -r (Join-Path $projectRoot 'requirements-dev.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Installing the pinned requirements failed.' }
 & $venvPython -m pip check
 if ($LASTEXITCODE -ne 0) { throw 'Build environment dependencies conflict.' }
@@ -69,6 +69,14 @@ if ($LASTEXITCODE -ne 0 -and $InstallWebView2) {
 }
 & $venvPython -c 'import sys; sys.path.insert(0,sys.argv[1]); from atelier_runtime_check import launch_issue; issue=launch_issue(); print(issue or "Desktop runtime prerequisites ready."); sys.exit(1 if issue else 0)' $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'Resolve the desktop runtime message above; use -InstallWebView2 to provision the signed Evergreen bootstrapper.' }
+# Native tools are built from source (scripts/toolchain.py): .NET 10 SDK for the C# tools, and
+# CMake+MSVC or WSL (MinGW) for the two small C/C++ libraries.
+if (!(Get-Command dotnet -ErrorAction SilentlyContinue) -or !((& dotnet --list-sdks) -match '^10\.')) {
+    throw 'Install the .NET 10 SDK (https://dotnet.microsoft.com/download) to build Atelier''s native tools.'
+}
+if (!(Get-Command cl -ErrorAction SilentlyContinue) -and !(Get-Command wsl -ErrorAction SilentlyContinue)) {
+    throw 'Install Visual Studio Build Tools (C++) or WSL with build-essential, cmake and mingw-w64.'
+}
 Write-Host "Build environment ready. In this shell run:"
 Write-Host "`$env:ISCC = '$env:ISCC'"
-Write-Host '.\.venv-build\Scripts\python.exe -m PyInstaller --noconfirm --clean Atelier.spec'
+Write-Host '.\BUILD.bat'

@@ -27,6 +27,38 @@ The app, installers and update checker identify each release by its full number,
 - Preserve batch parent changes during export, reject recursive parent chains,
   and keep reviewed material saves and their option changes recoverable together.
 
+### Fixes
+
+- **Exported textures no longer look brighter or glarey in game.** Exports no longer drop the
+  mip chain for character, weapon and world textures (only UI textures, where it prevents
+  blur), and the mips Atelier builds now match the game's own: they were averaged in the wrong
+  colour space and came out darker at every distance step.
+- **Exports with BC7 textures finish in seconds.** A 1366×1366 BC7 texture with mips took about
+  44 seconds and now takes about 2, so multi-texture builds no longer appear to hang.
+- **Textures added at a custom path no longer crash the game** ("ObjectSerializationError …
+  Serial size mismatch"). Atelier now also refuses to ship any renamed texture whose size differs
+  from a normal edit of the same image (after the trailer repair 1.1.1 introduced).
+- A missing tool now says which tool is missing and how to restore it, instead of
+  "[WinError 2] The system cannot find the file specified".
+- The Linux AppImage starts on newer distributions again (it uses the system's GTK and WebKit
+  together), runs mesh previews and idle animations natively instead of through Wine, and is
+  built on an older base so it runs on Fedora, Debian 13 and current Ubuntu.
+
+### Tools
+
+- **Settings > Tools** shows each bundled tool's version and can update the game-patch-sensitive
+  ones (the container tool) between Atelier releases, repair missing or damaged tools, and roll
+  back an update. Every download is hash-checked and must still offer the commands Atelier uses
+  before it replaces anything.
+- The three model helpers (mesh export, idle animations, persistent imports) are one tool,
+  built from source with the exact library version they shipped with, so previews are
+  byte-for-byte unchanged and the installer is smaller.
+- Container unpacking and packing use the current upstream retoc (3.10.2, was 3.4.1);
+  UAssetTool is built from the current upstream source with Atelier's texture fixes.
+- Every bundled tool, including the shader tool rebuilt from source in 1.1.1, is listed with its
+  exact source and hashes in one lockfile (`toolchain/tools.lock.json`), built by one script.
+- Atelier now runs on Python 3.15.
+
 ## 1.1.1 — 22 October 2026
 
 ### Asset pipeline and layout

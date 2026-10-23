@@ -3,7 +3,7 @@
 No game install required, and no Windows tools: every UAssetTool call these paths make is either
 avoided (the index / browse / overlay work is pure Python) or replaced with a stub that asserts the
 ARGUMENTS, which is the part Atelier is responsible for. What a real UAssetTool does with those
-arguments, and whether the result looks right on a real skin, is the in-app check PHASES.md asks for
+arguments, and whether the result looks right on a real skin, is the in-app check docs/PHASES.md asks for
 and can only be done on a machine with the paks.
 
 Covered here:

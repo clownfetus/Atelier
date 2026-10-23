@@ -44,17 +44,16 @@ def native_tool_warnings(tools):
     required = [
         ("UAssetTool.exe", "Asset extraction and mod builds"),
         ("UAssetGUI.exe", "World editing"),
-        ("AtelierMesh/AtelierMesh.exe", "3D mesh previews"),
-        ("AtelierImport/AtelierImport.exe", "Persistent model, material and texture imports"),
-        ("AtelierImport/CUE4Parse-Natives.dll", "Persistent import native decoding"),
-        ("AtelierImport/oo2core_9_win64.dll", "Persistent import Oodle decompression"),
-        ("AtelierMesh/CUE4Parse-Natives.dll", "Mesh native decoding"),
-        ("AtelierMesh/oo2core_9_win64.dll", "Mesh Oodle decompression; obtain a licensed compatible DLL"),
-        ("shaders/retoc-rivals-cli.exe", "World, text and shader tools (Atelier's custom retoc is required)"),
-        ("shaders/oo2core_9_win64.dll", "Oodle decompression; obtain a licensed compatible DLL"),
+        ("AtelierNative/AtelierNative.exe", "3D previews, idle animations and persistent imports"),
+        ("AtelierNative/CUE4Parse-Natives.dll", "Animation decompression for 3D previews"),
+        ("AtelierNative/oo2core_9_win64.dll", "Oodle decompression for 3D previews"),
+        ("retoc/retoc-rivals-cli.exe", "Container unpack/pack for worlds, text and repatching"),
+        ("shaders/retoc-rivals-cli.exe", "Shader tools (Atelier's shader-capable retoc)"),
+        ("shaders/oo2core_9_win64.dll", "Oodle decompression"),
         ("shaders/dxc.exe", "Shader compilation"),
         ("shaders/dxcompiler.dll", "Shader disassembly"),
         ("shaders/dxil.dll", "Shader validation"),
+        ("texconv.exe", "Fast BC7 texture encoding"),
     ]
-    return [("warning", f"{feature}: missing {os.path.join(tools, relative)}. See PACKAGING.md in the matching source archive for tool setup.")
+    return [("warning", f"{feature}: missing {os.path.join(tools, relative)}. Reinstall Atelier, or run scripts/toolchain.py install from a source checkout.")
             for relative, feature in required if not os.path.isfile(os.path.join(tools, relative))]

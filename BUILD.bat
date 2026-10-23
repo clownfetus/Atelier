@@ -1,38 +1,11 @@
 @echo off
-timeout 3
-set /p VERSION=Version (e.g. 0.1.3):
-if "%VERSION%"=="" (echo Version cannot be empty & exit /b 1)
-
-set "V1=" & set "V2=" & set "V3=" & set "V4="
-for /f "tokens=1,2,3,4 delims=." %%a in ("%VERSION%") do (
-    set "V1=%%a" & set "V2=%%b" & set "V3=%%c" & set "V4=%%d"
+rem Builds the Windows installer: dist\AtelierSetup.exe. All logic lives in scripts\build.py;
+rem this only picks the repository's .venv so the pinned Python is used.
+rem   BUILD.bat                 build the version in .\version
+rem   BUILD.bat --version 1.2.0 set the version first
+if not exist "%~dp0.venv\Scripts\python.exe" (
+  echo No .venv found. Create it with Python 3.15 and install requirements-build.txt; see docs\DEVELOPMENT.md
+  exit /b 1
 )
-if not "%V4%"=="" goto :badversion
-if "%V1%"=="" goto :badversion
-if "%V2%"=="" goto :badversion
-if "%V3%"=="" goto :badversion
-if not "%V1:~2%"=="" goto :badversion
-if not "%V2:~2%"=="" goto :badversion
-if not "%V3:~2%"=="" goto :badversion
-echo %V1%%V2%%V3%| findstr /r "^[0-9][0-9]*$" >nul
-if errorlevel 1 goto :badversion
-goto :versionok
-
-:badversion
-echo Invalid version "%VERSION%" - expected format N.N.N with 1-2 digit numbers (e.g. 1.2.3 or 12.34.5)
-exit /b 1
-
-:versionok
-echo %VERSION%> version
-rmdir /s /q build dist 2>nul
-python -m PyInstaller --noconfirm --clean Atelier.spec
-if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-rem Tools are staged from an explicit allowlist (scripts\stage_tools.py), never copied wholesale:
-rem a missing UAssetTool/Oodle/AtelierMesh fails here, and Mappings, the AES key, caches and the
-rem Linux builds sitting in the dev Tools\ folder are simply never picked up.
-python scripts\stage_tools.py --platform windows
-if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-python scripts\release_manifest.py
-if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" Atelier.iss /DAppVersion=%VERSION%
-if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
+"%~dp0.venv\Scripts\python.exe" "%~dp0scripts\build.py" --platform windows %*
+exit /b %ERRORLEVEL%

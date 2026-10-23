@@ -1029,12 +1029,12 @@ def stage_inject(stage, game_rel, opts=None):
 
     opts (from project_meta.get_asset_opts) may carry:
       blank      - ship a fully transparent texture instead of the edited PNG (#22)
-      no_mips    - single inline mip instead of the full chain (#20); on unless stored False
+      no_mips    - single inline mip instead of the full chain (#20); defaults on for UI only
       lod_group  - retarget the texture's LODGroup (#20)
       lq_twin    - also stage the Marvel_LQ copy, when this install has that mount (#21)
     """
     from atelier.project_meta import effective_asset_opts
-    opts = effective_asset_opts(opts)
+    opts = effective_asset_opts(opts, game_rel)
     # Prefer the unique subfolder path; fall back to a legacy flat png if that's where it already lives.
     import_base = project_base(game_rel)
     if not os.path.exists(import_base + ".png") and os.path.exists(project_base_legacy(game_rel) + ".png"):

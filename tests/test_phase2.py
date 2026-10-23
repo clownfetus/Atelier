@@ -5,7 +5,7 @@ AES-encrypted (fake_paks.write_encrypted), because that is the only way to get t
 it: AES-ECB with the wrong key does not fail, it returns garbage, and only the parse downstream
 notices.
 
-The three repros from PHASES.md, in order:
+The three repros from docs/PHASES.md, in order:
   1. wrong key -> empty tree -> correct key -> tree repopulates, with NO cache wipe
   2. a paks folder under a path containing [Steam] is found, and every check agrees it is
   3. a mod named "[WIP] Test" can still be locked, repatched and globbed for
@@ -145,7 +145,7 @@ def t_cache_hit_still_works_for_an_unchanged_key():
 
 
 def t_failure_records_the_container_identity():
-    """PHASES.md Phase 5 note: record WHICH container failed and which key it wants, now, so the
+    """docs/PHASES.md Phase 5 note: record WHICH container failed and which key it wants, now, so the
     multi-key work is reading a log instead of re-deriving the problem."""
     with sandbox() as sb:
         guid = b"\x42" * 16

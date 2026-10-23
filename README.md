@@ -7,7 +7,7 @@ before building it. Available for Windows and Linux.
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
 · [What's new in 1.1.1](docs/release-1.1.1.md)
 · [Tutorials](#tutorials)
-· [Development guide](DEVELOPMENT.md)
+· [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
 ![Atelier 1.1.1 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
@@ -15,7 +15,7 @@ before building it. Available for Windows and Linux.
 ## What's new in 1.1.1
 
 - **Send models to Blender.** Use the bundled Atelier Live Bridge extension with an
-  open Blender session, or export a portable `.blend`. [Setup guide](BLENDER.md).
+  open Blender session, or export a portable `.blend`. [Setup guide](docs/BLENDER.md).
 - **Find more folders by name.** Character and costume names and artwork follow
   recognized IDs across the library, search, breadcrumbs, pins and asset pickers.
 - **Use HDR cubemaps.** Import Radiance panoramas, six-face strips or HDR DDS
@@ -253,7 +253,7 @@ executable path in Settings.
 
 Download `Atelier-<version>-x86_64.AppImage` from a
 [release with a Linux build](https://github.com/clownfetus/Atelier/releases),
-mark it executable, and launch it. See [LINUX.md](LINUX.md) for platform setup.
+mark it executable, and launch it. See [LINUX.md](docs/LINUX.md) for platform setup.
 Download a new AppImage when updating; the in-app installer update flow is Windows-only.
 
 ## Updates
@@ -269,7 +269,7 @@ the installer is designed to retain projects, exports and settings.
 
 Commits and merged pull requests do not update installed copies. Maintainers
 must build and publish a higher-version release with the installer attached.
-Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
+Source checkouts are updated through Git; see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Tutorials
 
@@ -278,8 +278,8 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 - [Import HDR cubemaps](#hdr-cubemaps)
 - [Process S maps](#process-s-maps)
 - [Replace a material](#replace-a-material)
-- [Live Blender setup, portable scenes and mesh editing](BLENDER.md#send-to-blender-or-export-a-portable-scene)
-- [Linux installation and updates](LINUX.md#install-and-update)
+- [Live Blender setup, portable scenes and mesh editing](docs/BLENDER.md#send-to-blender-or-export-a-portable-scene)
+- [Linux installation and updates](docs/LINUX.md#install-and-update)
 - [Skin Swapper export](#skin-swapper-mods) and [isolated integration testing](docs/skin-swapper-testing.md)
 
 ## Basic workflow
@@ -373,9 +373,9 @@ a file is safe.
 
 ## Development and release builds
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for isolated source setup and verification,
-[CONTRIBUTION_NOTES.md](CONTRIBUTION_NOTES.md) for the feature/review map, and
-[PACKAGING.md](PACKAGING.md) for portable review packages. A portable review ZIP
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for isolated source setup and verification,
+[CONTRIBUTION_NOTES.md](docs/CONTRIBUTION_NOTES.md) for the feature/review map, and
+[PACKAGING.md](docs/PACKAGING.md) for portable review packages. A portable review ZIP
 must be extracted in full; `Atelier.exe` needs its adjacent `_internal` directory.
 
 To make a Windows release discoverable by existing installations:
@@ -383,7 +383,7 @@ To make a Windows release discoverable by existing installations:
 1. Build the intended source with a higher numeric version, such as `1.1.1`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
-   using the [installer checks](DEVELOPMENT.md#disposable-windows-installer-verification).
+   using the [installer checks](docs/DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
    (`1.1.1` or `v1.1.1`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the

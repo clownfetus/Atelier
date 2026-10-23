@@ -47,6 +47,9 @@ sandbox.window = sandbox;
 sandbox.localStorage = { _d:{}, getItem(k){return this._d[k] ?? null;}, setItem(k,v){this._d[k]=String(v);} };
 sandbox.lucide = { createIcons(){} };
 sandbox.EventSource = class { constructor(){} addEventListener(){} close(){} };
+// app.js announces project changes with window.dispatchEvent(new CustomEvent(...)).
+sandbox.CustomEvent = class { constructor(type, init){ this.type = type; this.detail = init?.detail; } };
+sandbox.dispatchEvent = () => true;
 sandbox.fetch = async () => ({ ok:false, json: async()=>({}), blob: async()=>({}) });
 sandbox.URL = { createObjectURL: () => "blob:x", revokeObjectURL(){} };
 sandbox.CSS = { escape: s => s };

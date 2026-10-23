@@ -7,6 +7,20 @@ import os
 import datetime
 if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
     os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
+    # The Linux build uses the system's GTK, GLib and WebKit as one set (packaging/Atelier.spec
+    # leaves them out of the bundle): WebKit always comes from the system, and pairing it with a
+    # bundled, older GTK stack is what kept the 1.0 AppImage from starting on newer distros
+    # ("Could not locate webkit_get_major_version"). PyInstaller's GTK runtime hooks still point
+    # these variables into the bundle, so drop those entries before GTK reads them.
+    _bundle = getattr(sys, "_MEIPASS", "")
+    for _var in ("GI_TYPELIB_PATH", "GIO_MODULE_DIR", "GSETTINGS_SCHEMA_DIR", "GDK_PIXBUF_MODULE_FILE",
+                 "GDK_PIXBUF_MODULEDIR", "GTK_DATA_PREFIX", "GTK_EXE_PREFIX", "GTK_PATH", "XDG_DATA_DIRS"):
+        _kept = [p for p in os.environ.get(_var, "").split(os.pathsep) if p and not p.startswith(_bundle)]
+        if _kept:
+            os.environ[_var] = os.pathsep.join(_kept)
+        else:
+            os.environ.pop(_var, None)
 
 from atelier import hostos
 from atelier.window_theme import WindowTheme

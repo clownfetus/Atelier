@@ -333,7 +333,10 @@ def add(file_type, folder, name, source='', files=()):
                     result = uat(['inject_texture', str(template), str(image), str(output), '--usmap', config.USMAP])
                     if result.returncode != 0 or not output.is_file():
                         raise ValueError('Could not encode this image: ' + (result.stderr or result.stdout or 'injection failed')[-500:])
+            # Repair both the same way, so the size check below compares like with like.
             custom_texture.repair_export_tail(str(encoded), str(work / 'texture-tail'))
+            if not is_cube:
+                custom_texture.repair_export_tail(str(baseline), str(work / 'baseline-tail'))
             custom_texture._verify_rename(str(work), str(baseline), str(encoded), compiled.stem)
             compiled = encoded
         verified = _read_package(str(compiled.with_suffix('')), str(work / 'readback'))

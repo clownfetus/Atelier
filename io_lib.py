@@ -35,7 +35,7 @@ def _load_oodle():
         # shaders/ is where the installer ships it (beside retoc). retoc-rivals-cli/ is the old
         # layout: it is no longer shipped and the installer deletes it, so it is a last resort only.
         cands = [os.path.join(_TOOLS, *rel, "oo2core_9_win64.dll")
-                 for rel in (("shaders",), ("AtelierMesh",), (), ("retoc-rivals-cli",))]
+                 for rel in (("shaders",), ("AtelierNative",), (), ("AtelierMesh",), ("retoc-rivals-cli",))]
         dll = next((c for c in cands if os.path.exists(c)), None)
         if not dll:
             raise RuntimeError("No Oodle DLL (oo2core_9_win64.dll) in " + os.path.join(_TOOLS, "shaders")

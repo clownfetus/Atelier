@@ -102,19 +102,25 @@ def main():
         result['checks'].append({'name': 'payload audit and exact source files', 'files': len(matches)})
         # Linux intentionally omits DXC and disables shader editing. Check the
         # native retoc commands used by text extraction and repatching instead.
-        for tool, required in (('UAssetTool', ('extract',)), ('shaders/retoc-rivals-cli', ('pack', 'unpack'))):
+        # AtelierNative now runs natively here too (no Wine): mesh export, idles, imports.
+        for tool, required in (('UAssetTool', ('extract',)), ('retoc/retoc-rivals-cli', ('pack', 'unpack')),
+                               ('AtelierNative/AtelierNative', ('mesh', 'serve'))):
             completed = subprocess.run([str(payload / 'Tools' / tool), '--help'], cwd=payload / 'Tools',
                                        capture_output=True, text=True, timeout=60)
             (report / (Path(tool).name + '-help.txt')).write_text(completed.stdout + completed.stderr)
             if completed.returncode or not all(word in completed.stdout + completed.stderr for word in required):
                 raise RuntimeError(f'Native tool failed to launch: {tool}: {completed.stdout} {completed.stderr}')
         for command in ('pack', 'unpack'):
-            completed = subprocess.run([str(payload / 'Tools/shaders/retoc-rivals-cli'), command, '--help'],
+            completed = subprocess.run([str(payload / 'Tools/retoc/retoc-rivals-cli'), command, '--help'],
                                        capture_output=True, text=True, timeout=30)
             (report / f'retoc-{command}-help.txt').write_text(completed.stdout + completed.stderr)
             if completed.returncode or '--game-paks-dir' not in completed.stdout + completed.stderr:
                 raise RuntimeError(f'Native retoc lacks the Rivals {command} interface')
-        result['checks'].append({'name': 'native UAssetTool and Rivals retoc launch'})
+        version = subprocess.run([str(payload / 'Tools/AtelierNative/AtelierNative'), 'version'],
+                                 capture_output=True, text=True, timeout=60)
+        if 'natives ok' not in version.stdout:
+            raise RuntimeError(f'AtelierNative cannot load CUE4Parse-Natives: {version.stdout} {version.stderr}')
+        result['checks'].append({'name': 'native UAssetTool, Rivals retoc and AtelierNative launch'})
         previous_extract = report / 'previous-extracted'
         previous_extract.mkdir()
         subprocess.run([str(previous), '--appimage-extract'], cwd=previous_extract, check=True,

@@ -341,7 +341,7 @@ def ensure_index():
                 print(f"  [warn] {os.path.basename(utoc)}: {e}", file=sys.stderr)
                 # enc_guid identifies WHICH key a container wants. Recording it on every failure means
                 # a patch pak shipped under a second key shows up as a distinct non-zero guid in the
-                # warning list instead of having to be re-derived from scratch (PHASES.md #2).
+                # warning list instead of having to be re-derived from scratch (docs/PHASES.md #2).
                 failed.append({"container": os.path.basename(utoc), "error": str(e),
                                "encrypted": bool(t.encrypted) if t is not None else None,
                                "enc_guid":  t.enc_guid.hex() if t is not None else ""})

@@ -288,16 +288,19 @@ class ToolStaging(unittest.TestCase):
                 path.write_bytes(b"native fixture")
 
     def test_empty_required_binary_fails(self):
-        (self.source / ST.REQUIRED[0]).write_bytes(b"")
+        (self.source / "UAssetTool.exe").write_bytes(b"")
         with self.assertRaisesRegex(RuntimeError, "UAssetTool.exe"):
             ST.stage_tools(self.source, self.destination)
 
     def test_copy_failure_cleans_only_new_staging_tree(self):
-        original_copy = ST.shutil.copytree
+        original_copy = ST.shutil.copy2
+        calls = []
         def partial(*args, **kwargs):
             original_copy(*args, **kwargs)
-            raise OSError("disk full")
-        with patch.object(ST.shutil, "copytree", side_effect=partial):
+            calls.append(args)
+            if len(calls) == 3:          # fail part-way, after some files have landed
+                raise OSError("disk full")
+        with patch.object(ST.shutil, "copy2", side_effect=partial):
             with self.assertRaisesRegex(OSError, "disk full"):
                 ST.stage_tools(self.source, self.destination)
         self.assertFalse(self.destination.exists())
@@ -321,30 +324,29 @@ class ToolStaging(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("UAssetTool.exe", result.stderr)
         batch = (ROOT / "BUILD.bat").read_text()
-        self.assertIn('python scripts\\stage_tools.py --platform windows\nif %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%', batch)
+        self.assertIn(r'scripts\build.py" --platform windows %*', batch)
+        self.assertIn("exit /b %ERRORLEVEL%", batch)
 
-    @unittest.skipUnless(os.name == "nt", "BUILD.bat runs on Windows")
-    def test_actual_batch_stops_before_compiler_when_tool_staging_fails(self):
-        # BUILD.bat deletes build/dist, so execute it only inside this newly
-        # created, resolved fixture workspace, never in the source checkout.
-        import shutil
-        fixture = (self.root / "batch-fixture").resolve()
-        self.assertTrue(fixture.is_relative_to(self.root.resolve()))
-        fixture.mkdir()
-        shutil.copy2(ROOT / "BUILD.bat", fixture / "BUILD.bat")
-        shutil.copytree(ROOT / "scripts", fixture / "scripts")
-        # Replace only PyInstaller's module boundary; run the actual Python
-        # staging helper and the actual batch error gate.
-        (fixture / "PyInstaller.py").write_text(
-            'from pathlib import Path\nPath("dist/Atelier").mkdir(parents=True)\n')
-        env = dict(os.environ, PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""))
-        result = subprocess.run(["cmd.exe", "/d", "/c", "BUILD.bat"], cwd=fixture,
-                                input="0.3.5\n", capture_output=True, text=True, env=env, timeout=30)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Required Windows tools missing", result.stderr)
-        self.assertNotIn("ISCC", result.stderr)
-        self.assertFalse((fixture / "dist/Atelier/Tools").exists())
-
+    def test_build_stops_before_the_installer_when_tool_staging_fails(self):
+        """scripts/build.py runs every step with check=True: a failed stage_tools ends the build
+        before Inno Setup, so no installer can ship without its tools (TRIAGE #39)."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import build as B
+        ran = []
+        def fake_run(*cmd, **kw):
+            ran.append(" ".join(map(str, cmd)))
+            if "stage_tools.py" in ran[-1]:
+                raise subprocess.CalledProcessError(1, cmd)
+        with patch.object(B, "run", fake_run), patch.object(B, "PYTHON_VERSION", sys.version_info[:2]), \
+             patch.object(B.sys, "prefix", "venv"), patch.object(B.sys, "base_prefix", "base"), \
+             patch.object(B, "find_iscc", side_effect=AssertionError("installer must not be built")), \
+             patch.object(B.shutil, "rmtree"), patch.object(B.Path, "write_text"), \
+             patch.object(B.Path, "chmod"), patch.object(sys, "argv", ["build.py", "--platform", B.HOST]):
+            with self.assertRaises(subprocess.CalledProcessError):
+                B.main()
+        self.assertTrue(any("toolchain.py install" in r for r in ran), ran)
+        self.assertTrue(any("PyInstaller" in r for r in ran), ran)
+        self.assertFalse(any("ISCC" in r or "build_appimage" in r for r in ran), ran)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,7 @@
-"""Compare a source-built idle decoder with the installed decoder on a real clip.
+"""Compare `AtelierNative animation` with a reference decoder on a real clip.
+
+--baseline is a previous standalone AtelierAnimation.exe (same CUE4Parse commit); both must
+produce identical tracks.
 
 Use an isolated application data directory with its own empty test-mods folder.
 Neither decoder writes to game files or projects. The report holds extracted data.
@@ -35,15 +38,13 @@ def main():
     from atelier import config
     from atelier.handlers.animation import idle_candidates
     from atelier.paths import pak_game_path
-    from atelier.tools import vanilla_paks, _aes_hex
-    paks, problem = vanilla_paks()
-    if problem:
-        raise SystemExit('A vanilla-only game mirror is required for decoder parity checks.')
+    from atelier.tools import NATIVE, _aes_hex
+    paks = config.PAKS
     candidates = idle_candidates(args.mesh_rel)
     if not candidates:
         raise SystemExit('No standing idle found for the requested mesh.')
     animation = candidates[0]['game_rel']
-    rebuilt = Path(config.TOOLS) / 'AtelierAnimation/AtelierAnimation.exe'
+    rebuilt = Path(NATIVE)
     baseline = args.baseline.resolve(strict=True)
     with rebuilt.open('rb') as stream:
         rebuilt_sha = hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -51,9 +52,9 @@ def main():
     key = _aes_hex()
     try:
         decoded = []
-        for name, executable in [('baseline', baseline), ('rebuilt', rebuilt)]:
+        for name, executable, verb in [('baseline', baseline, []), ('rebuilt', rebuilt, ['animation'])]:
             target = report / (name + '.json')
-            command = [str(executable), '--paks', str(Path(paks).resolve()), '--aes', key,
+            command = [str(executable), *verb, '--paks', str(Path(paks).resolve()), '--aes', key,
                 '--usmap', config.USMAP, '--mesh', pak_game_path(args.mesh_rel),
                 '--animation', pak_game_path(animation), '--out', str(target)]
             started = time.monotonic()
@@ -70,8 +71,8 @@ def main():
                 message = re.sub(r'(?i)(?:0x)?[a-f0-9]{64}', '<redacted>', message)
                 raise RuntimeError(name + ': ' + message[-1500:])
             decoded.append(json.loads(target.read_text(encoding='utf-8')))
-        assert decoded[0] == decoded[1], 'Rebuilt animation tracks differ from the installed decoder'
-        result['checks'].append('Rebuilt decoder matches every baseline animation track and metadata field exactly')
+        assert decoded[0] == decoded[1], 'AtelierNative animation tracks differ from the reference decoder'
+        result['checks'].append('AtelierNative matches every reference animation track and metadata field exactly')
         clip = decoded[1]
         assert clip['version'] == 2 and clip['space'] == 'atelier-gltf-local'
         assert 0 < clip['duration'] <= 120

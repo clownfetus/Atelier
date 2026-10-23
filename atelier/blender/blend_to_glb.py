@@ -107,7 +107,7 @@ print("MATERIALS " + "|".join(used))
 # per-vertex data for all of them (checked directly against the .blend: every material's
 # average differed from white and matched the vanilla mask values before this split; only
 # material index 0 survived export). MR reads vertex colour as mask data (mostly (0,0,0) --
-# see BLENDER.md S3.14), which several materials use to drive things like an outline, so this
+# see docs/BLENDER.md S3.14), which several materials use to drive things like an outline, so this
 # silently shipped a wrong mask -- reading as "full on" -- for every section except the first,
 # invisible until someone actually edited a non-first material and looked closely at it.
 # Separating into one single-material object per material sidesteps the bug entirely (each

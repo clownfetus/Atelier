@@ -50,12 +50,10 @@ def main():
             parser.error(f"Unknown test script: {suite}")
         with tempfile.TemporaryDirectory(prefix="atelier-check-") as scratch:
             checkout = Path(scratch)
-            for name in ("atelier", "gui", "tests", "scripts"):
+            for name in ("atelier", "gui", "tests", "scripts", "toolchain", "native", "packaging"):
                 shutil.copytree(ROOT / name, checkout / name,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            shutil.copytree(ROOT / "tools-src", checkout / "tools-src",
-                            ignore=shutil.ignore_patterns("bin", "obj", "__pycache__", "*.pyc"))
-            for name in ("io_lib.py", "main.py", "version", "CHANGELOG.md", "BUILD.bat", "Atelier.iss", ".gitignore", "icon.ico", "icon.png"):
+            for name in ("io_lib.py", "main.py", "version", "CHANGELOG.md", "BUILD.bat", ".gitignore", "icon.ico", "icon.png"):
                 shutil.copy2(ROOT / name, checkout / name)
             if suite in ("browser_smoke.py", "surfaces_checks.py"):
                 shutil.copytree(ROOT / "docs" / "review", checkout / "docs" / "review")

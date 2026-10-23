@@ -104,7 +104,7 @@ def main():
     report = output / f'package-{short}'
     report.mkdir(parents=True, exist_ok=False)
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
-               '--distpath', str(dist), '--workpath', str(work / 'work'), 'Atelier.spec']
+               '--distpath', str(dist), '--workpath', str(work / 'work'), 'packaging/Atelier.spec']
     with (report / 'build.log').open('w', encoding='utf-8') as log:
         subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
     bundle = dist / 'Atelier'
@@ -145,9 +145,9 @@ Extract the whole ZIP into a new writable folder. Keep Atelier.exe beside _inter
 Do not copy the EXE alone. Windows x64 and Microsoft Edge WebView2 are required.
 Do not run two Atelier instances on the same port or against the same data folder.
 
-Native modding tools (UAssetTool, AtelierMesh, retoc/Oodle, DXC and Blender), game
+Native modding tools (UAssetTool, AtelierNative, retoc/Oodle, DXC and Blender), game
 files, AES keys and mappings are intentionally excluded. Configure external tools
-and game paths through Setup/Settings. Review DEVELOPMENT.md in the matching source
+and game paths through Setup/Settings. Review docs/DEVELOPMENT.md in the matching source
 archive for the verified tool installer and isolated-data setup. Preserve existing
 projects and back up the original installation before testing an upgrade.
 

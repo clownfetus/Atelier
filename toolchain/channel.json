@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "tools": [
+    {
+      "name": "retoc",
+      "version": "3.10.2",
+      "assets": {
+        "windows": {
+          "url": "https://github.com/natimerry/repak-rivals/releases/download/v3.10.2/retoc-rivals-cli-x86_64-pc-windows-msvc.zip",
+          "sha256": "0ef81287ca42fd8436a1c6cb243120ceef03a36ea2e3fefd8d437c188592cf05",
+          "extract": {
+            "retoc-rivals-cli.exe": {
+              "to": "retoc/retoc-rivals-cli.exe",
+              "sha256": "4a1b0124628647b5ff75c6d7427df09310bb899fa3374b66ae1e31d7982207ac"
+            }
+          }
+        },
+        "linux": {
+          "url": "https://github.com/natimerry/repak-rivals/releases/download/v3.10.2/retoc-rivals-cli-x86_64-unknown-linux-gnu.tar.xz",
+          "sha256": "dd3795d49f325b586042bfa69386caf18f04ea8c5143e68c5e4bce1526fc5358",
+          "extract": {
+            "retoc-rivals-cli-x86_64-unknown-linux-gnu/retoc-rivals-cli": {
+              "to": "retoc/retoc-rivals-cli",
+              "sha256": "abaef8832c7a13913002bf8e37f883cba5d325e0348a8eeebceb5a28c7b0a01f",
+              "executable": true
+            }
+          }
+        }
+      },
+      "probe": {
+        "args": [
+          "--help"
+        ],
+        "expect": [
+          "unpack",
+          "pack"
+        ]
+      }
+    }
+  ]
+}

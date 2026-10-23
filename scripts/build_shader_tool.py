@@ -1,6 +1,7 @@
 """Build Atelier's shader fork from verified upstream, compiler and Cargo inputs.
 
-Windows x64 only. Installs no system tools and never overwrites an existing output.
+Called by scripts/toolchain.py (lock entry "retoc-shaders", builder "atelier-shader");
+also runnable on its own. Windows x64 only. Installs no system tools and never overwrites an existing output.
 Only downloaded archives are cached; extracted compilers and Cargo caches are private
 to each build, so an altered global package cache cannot become a build input.
 """
@@ -21,10 +22,29 @@ import tomllib
 import urllib.request
 import zipfile
 
-from native_inputs import ROOT, digest, verify_files
-
-SOURCE = ROOT / 'tools-src/AtelierShader'
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / 'native/AtelierShader'
 LOCK = SOURCE / 'build.lock.json'
+COMMANDS = ('dump-shaders', 'extract-shader', 'patch-shader', 'pack', 'unpack', 'info')
+
+
+def digest(path, algorithm='sha256'):
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream, algorithm).hexdigest()
+
+
+def verify_files(root, entries):
+    root = Path(root).resolve(strict=True)
+    verified = {}
+    for name, expected in entries.items():
+        path = (root / name).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ValueError(f'Missing or unsafe pinned input: {name}')
+        actual = digest(path)
+        if actual != expected:
+            raise ValueError(f'Pinned input SHA-256 mismatch: {name}')
+        verified[name] = actual
+    return verified
 
 
 def load_shader_lock(raw=None):
@@ -348,9 +368,52 @@ def build(tools, output, cache, log_path):
     return record
 
 
+def provenance_matches(folder, lock_bytes=None):
+    """True when <folder>/build-inputs.json records this checkout's build lock and every output
+    it lists is intact -- the installed tool is exactly what a rebuild would produce."""
+    folder = Path(folder)
+    try:
+        manifest = json.loads((folder / 'build-inputs.json').read_text(encoding='utf-8'))
+        lock_bytes = lock_bytes if lock_bytes is not None else LOCK.read_bytes()
+        build_lock = json.loads(lock_bytes)
+        if manifest.get('tool') != 'AtelierShader' or manifest.get('build_lock_sha256') != hashlib.sha256(lock_bytes).hexdigest():
+            return False
+        if any(manifest.get(name) != build_lock[name] for name in
+               ('sources', 'recipe', 'upstream', 'compiler', 'git_dependencies', 'native_files')):
+            return False
+        verify_files(folder, manifest['outputs'])
+        return True
+    except (OSError, ValueError, KeyError):
+        return False
+
+
+def verify_installed(tools):
+    """Check an installed Tools/shaders: source-build provenance, then the version and commands
+    the app relies on. Raises ValueError; returns a summary for test reports."""
+    folder = Path(tools).resolve() / 'shaders'
+    load_shader_lock()
+    if not provenance_matches(folder):
+        raise ValueError('Shader executable has no matching source-build provenance; run scripts/toolchain.py install')
+    executable = folder / 'retoc-rivals-cli.exe'
+    flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if hasattr(subprocess, 'CREATE_NO_WINDOW') else {}
+    version = subprocess.run([str(executable), '--version'], cwd=folder, capture_output=True, text=True, timeout=15, **flags)
+    help_result = subprocess.run([str(executable), '--help'], cwd=folder, capture_output=True, text=True, timeout=15, **flags)
+    toolchain_lock = json.loads((ROOT / 'toolchain/tools.lock.json').read_text(encoding='utf-8'))
+    expected = 'retoc-rivals-cli ' + next(t for t in toolchain_lock['tools'] if t['name'] == 'retoc-shaders')['version']
+    if version.returncode or version.stdout.strip() != expected:
+        raise ValueError('Shader executable has an unexpected version')
+    if help_result.returncode or any(not re.search(r'^\s+' + re.escape(command) + r'\s', help_result.stdout, re.M)
+                                     for command in COMMANDS):
+        raise ValueError('Shader executable is missing required custom commands')
+    manifest = json.loads((folder / 'build-inputs.json').read_text(encoding='utf-8'))
+    return dict(files={name: digest(folder / name) for name in ('retoc-rivals-cli.exe', 'oo2core_9_win64.dll') if (folder / name).is_file()},
+                version=version.stdout.strip(), commands=list(COMMANDS), source_status='verified', rebuildable=True,
+                build_lock_sha256=manifest['build_lock_sha256'], upstream=manifest['upstream'])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tools', type=Path, required=True, help='Verified seed Tools with the pinned Oodle DLL')
+    parser.add_argument('--tools', type=Path, required=True, help='Tools folder holding the pinned shaders/oo2core_9_win64.dll (scripts/toolchain.py fetch places it)')
     parser.add_argument('--output', type=Path, required=True, help='Fresh directory; no existing install is overwritten')
     parser.add_argument('--cache', type=Path, required=True, help='Download archive cache, verified before each use')
     parser.add_argument('--log', type=Path, required=True, help='Build log outside the release payload')

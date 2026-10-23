@@ -3543,6 +3543,8 @@ function _applySetupMode() {
   document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-mounts-row").style.display      = paths ? "" : "none";
   document.getElementById("setup-mounts-section").style.display  = paths ? "" : "none";
+  document.getElementById("setup-tools-section").style.display   = paths ? "" : "none";
+  document.getElementById("setup-tools-row").style.display       = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
   document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
@@ -3570,6 +3572,7 @@ async function openPaths() {
   } catch (e) {}
   _setSetupLoading(false);
   loadContentMounts();      // fire-and-forget: informational, never blocks the panel
+  loadToolStatus(true);     // likewise: a slow or offline channel must not hold the panel up
   await validateSetup();
   updateInstallBtn();
 }
@@ -3597,6 +3600,42 @@ async function loadContentMounts() {
     el.innerHTML = (rows || "<div>No content mounts were read.</div>") + lq;
   } catch (e) { el.textContent = "Could not read the asset index."; }
 }
+
+// ── native tools (Settings > Tools) ──────────────────────────────────────────
+const TOOL_STATE_TEXT = { ok: "", missing: "missing", modified: "changed on disk" };
+function _escTool(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
+async function loadToolStatus(check = false) {
+  const el = document.getElementById("setup-tools");
+  if (!el) return;
+  if (check) el.textContent = "Checking the tool channel…";
+  try {
+    const res = await api("/api/tools_status" + (check ? "?check=1" : ""));
+    const rows = (res.tools || []).map(t => {
+      const state = TOOL_STATE_TEXT[t.state] ? ` <span class="bad">${TOOL_STATE_TEXT[t.state]}</span>` : "";
+      const next = t.available ? ` <span class="good">→ ${_escTool(t.available)} available</span>` : "";
+      return `<div><b>${_escTool(t.name)}</b> ${_escTool(t.version)}${state}${next}</div>`;
+    }).join("");
+    const offline = res.channel_error ? `<div class="bad" style="margin-top:6px">Could not reach the update channel: ${_escTool(res.channel_error)}</div>` : "";
+    el.innerHTML = (rows || "<div>This install predates tool records; reinstall Atelier to enable tool updates.</div>") + offline;
+    document.getElementById("tools-update").disabled = !(res.tools || []).some(t => t.available);
+  } catch (e) { el.textContent = "Could not read the installed tools."; }
+}
+
+async function _toolAction(path, busy) {
+  const el = document.getElementById("setup-tools");
+  el.textContent = busy;
+  try {
+    const res = await api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const did = [...(res.updated || []), ...(res.repaired || [])];
+    if (res.ok) toast(did.length ? `Tools updated: ${did.join(", ")}` : "Tools are up to date", "success");
+    else toast((res.problems || [res.error]).filter(Boolean).join("; ") || "Tool update failed", "error");
+  } catch (e) { toast("Tool update failed: " + e.message, "error"); }
+  loadToolStatus(false);
+}
+document.getElementById("tools-check").addEventListener("click", () => loadToolStatus(true));
+document.getElementById("tools-update").addEventListener("click", () => _toolAction("/api/tools_update", "Downloading and verifying…"));
+document.getElementById("tools-repair").addEventListener("click", () => _toolAction("/api/tools_repair", "Checking every tool…"));
 
 document.getElementById("setup-cancel").addEventListener("click", () => {
   document.getElementById("setup-overlay").classList.remove("active");
@@ -4178,16 +4217,17 @@ function _ctxItemsSidebar(item) {
 // group, #21 duplicate into Marvel_LQ, #22 remove a texture) plus the dye-off toggle live on the
 // ASSET, not on the app: two projects can ship the same texture differently, so these are stored
 // per project (see project_meta.asset_opts) and shown wherever the asset is.
-// Sidebar opts are stored differences from the defaults: no_mips is on unless stored false.
-const TEXOPT_LABELS = { blank: "blank", no_mips: "keeps mips", lod_group: "group", dye_off: "no dye",
+// Sidebar opts are stored differences from each asset's defaults (no_mips defaults on for UI
+// textures only), so a stored no_mips is always a deviation worth showing either way.
+const TEXOPT_LABELS = { blank: "blank", no_mips: "mips", lod_group: "group", dye_off: "no dye",
                         lq_twin: "LQ", custom_textures: "own textures" };
 
 function _sbOptBadge(item) {
   const o = item.opts || {};
-  const on = Object.keys(TEXOPT_LABELS).filter(k => k === "no_mips" ? o[k] === false : o[k]);
+  const on = Object.keys(TEXOPT_LABELS).filter(k => k === "no_mips" ? typeof o[k] === "boolean" : o[k]);
   if (!on.length) return "";
-  const label = on.map(k => k === "lod_group"
-    ? String(o.lod_group).replace("TEXTUREGROUP_", "")
+  const label = on.map(k => k === "lod_group" ? String(o.lod_group).replace("TEXTUREGROUP_", "")
+    : k === "no_mips" ? (o.no_mips ? "no mips" : "keeps mips")
     : TEXOPT_LABELS[k]).join(" · ");
   return `<span class="sb-opt" title="Export options: ${label}">${label}</span>`;
 }

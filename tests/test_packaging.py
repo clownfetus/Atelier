@@ -4,6 +4,7 @@ Static checks over Atelier.iss and scripts/stage_tools.py, plus the staging scri
 fake Tools/ tree. No PyInstaller, Inno Setup or real tools needed.
 """
 from pathlib import Path
+import os
 import re
 import subprocess
 import sys
@@ -15,10 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import stage_tools as ST  # noqa: E402
 
-ISS = (ROOT / "Atelier.iss").read_text(encoding="utf-8")
+ISS = (ROOT / "packaging" / "Atelier.iss").read_text(encoding="utf-8")
 
 # Folders the installer owns outright. Anything else under {app} may hold user data.
-OWNED = {r"{app}\_internal", r"{app}\Tools\AtelierMesh", r"{app}\Tools\retoc-rivals-cli"}
+# AtelierNative and retoc are wholly installer/toolchain output; the others are retired layouts.
+OWNED = {r"{app}\_internal", r"{app}\Tools\AtelierNative", r"{app}\Tools\retoc",
+         r"{app}\Tools\AtelierMesh", r"{app}\Tools\AtelierAnimation", r"{app}\Tools\AtelierImport",
+         r"{app}\Tools\retoc-rivals-cli"}
 
 
 def section(name):
@@ -85,13 +89,20 @@ class InstallerShipsTools(unittest.TestCase):
 
     def test_tools_the_code_loads_are_in_the_manifest(self):
         win = {rel for rel, _ in ST.MANIFEST["windows"]}
-        for rel in ("UAssetTool.exe", "UAssetGUI.exe", "AtelierMesh/AtelierMesh.exe",
-                    "shaders/retoc-rivals-cli.exe", "shaders/oo2core_9_win64.dll",
-                    "shaders/dxcompiler.dll", "shaders/dxil.dll", "shaders/dxc.exe"):
+        sys.path.insert(0, str(ROOT))
+        from atelier import tools as TL
+        for rel in ("UAssetTool.exe", "UAssetGUI.exe", "AtelierNative/AtelierNative.exe",
+                    "AtelierNative/CUE4Parse-Natives.dll", "AtelierNative/oo2core_9_win64.dll",
+                    "retoc/retoc-rivals-cli.exe", "shaders/retoc-rivals-cli.exe",
+                    "shaders/oo2core_9_win64.dll", "shaders/dxcompiler.dll", "shaders/dxil.dll",
+                    "shaders/dxc.exe", "texconv.exe"):
             self.assertIn(rel, win)
+        for constant in (TL.NATIVE, TL.RETOC, TL.SHADER_RETOC, TL.UAT, TL.TEXCONV):
+            rel = os.path.relpath(constant, TL.TOOLS).replace(os.sep, "/")
+            self.assertIn(rel, win, f"{rel} is loaded by atelier.tools but not shipped")
         lin = {rel for rel, _ in ST.MANIFEST["linux"]}
-        for rel in ("UAssetTool", "liboo2corelinux64.so.9", "shaders/retoc-rivals-cli",
-                    "AtelierMesh/AtelierMesh.exe"):
+        for rel in ("UAssetTool", "liboo2corelinux64.so.9", "retoc/retoc-rivals-cli",
+                    "AtelierNative/AtelierNative", "AtelierNative/CUE4Parse-Natives.so"):
             self.assertIn(rel, lin)
 
     def test_io_lib_loads_oodle_from_a_shipped_folder(self):
@@ -127,7 +138,7 @@ class StageTools(unittest.TestCase):
         (tools / "AES_KEY.txt").write_text("00")
         (tools / "shaders" / "_cache").mkdir(parents=True, exist_ok=True)
         (tools / "shaders" / "_cache" / "s1.bin").write_bytes(b"x")
-        (tools / "AtelierMesh" / "_cache").mkdir(parents=True, exist_ok=True)
+        (tools / "AtelierNative" / "_cache").mkdir(parents=True, exist_ok=True)
         dist = root / "dist" / "Atelier"
         (dist / "_internal").mkdir(parents=True)
         (dist / ("Atelier.exe" if platform == "windows" else "Atelier")).write_bytes(b"x")
@@ -144,7 +155,7 @@ class StageTools(unittest.TestCase):
                 root = Path(tmp)
                 # Linux has extensionless executables; create them explicitly.
                 for rel, _ in ST.MANIFEST[platform]:
-                    if "." not in Path(rel).name and rel != "AtelierMesh":
+                    if "." not in Path(rel).name:
                         (root / "Tools" / rel).parent.mkdir(parents=True, exist_ok=True)
                         (root / "Tools" / rel).write_bytes(b"x")
                 tools, dist = self._tree(root, platform)

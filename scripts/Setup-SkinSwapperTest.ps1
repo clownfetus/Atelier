@@ -47,45 +47,24 @@ $root = Split-Path -Parent $PSScriptRoot
 $DataDir = [IO.Path]::GetFullPath($DataDir)
 $tools = Join-Path $DataDir 'Tools'
 
-# Hash-pinned inputs: the 0.4.1 release installer (SHA256SUMS.txt on the release) and the Inno
-# unpacker Install-AtelierTools.ps1 already uses.
-$installerUrl = 'https://github.com/clownfetus/Atelier/releases/download/0.4.1/AtelierSetup.exe'
-$installerSha = 'dd8d18228093922b460e2b2db6689c9cfff5fa7fa58137d7b0b03335525ded45'
-$unpackerUrl = 'https://github.com/jrathlev/InnoUnpacker-Windows-GUI/releases/download/ui_2_2_13/innounp-2.zip'
-$unpackerSha = 'f2f037fdbc63de31248efae9ccb294398d160dc0cbad5f36d14c2f159e17bbf5'
-$required = 'UAssetTool.exe', 'UAssetGUI.exe', 'AtelierMesh\AtelierMesh.exe',
-            'AtelierAnimation\AtelierAnimation.exe', 'shaders\retoc-rivals-cli.exe',
-            'shaders\oo2core_9_win64.dll'
+$required = 'UAssetTool.exe', 'UAssetGUI.exe', 'AtelierNative\AtelierNative.exe', 'retoc\retoc-rivals-cli.exe',
+            'shaders\retoc-rivals-cli.exe', 'shaders\oo2core_9_win64.dll'
 
 function Step([string]$Text) { Write-Host "`n== $Text" -ForegroundColor Cyan }
 function Missing-Tools { $required | Where-Object { !(Test-Path -LiteralPath (Join-Path $tools $_)) } }
-
-function Get-Verified([string]$Url, [string]$Name, [string]$Sha256) {
-    $downloads = Join-Path $DataDir 'downloads'
-    New-Item -ItemType Directory -Force -Path $downloads | Out-Null
-    $target = Join-Path $downloads $Name
-    if (!(Test-Path -LiteralPath $target)) {
-        Write-Host "Downloading $Name"
-        Invoke-WebRequest -Uri $Url -OutFile $target -UseBasicParsing
-    }
-    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLower() -ne $Sha256) {
-        throw "Checksum mismatch for $target. Delete it and run this script again."
-    }
-    return $target
-}
 
 if (!(Test-Path -LiteralPath (Join-Path $root 'atelier\skin_swapper.py'))) {
     throw "This checkout has no Skin Swapper export. Use main from https://github.com/clownfetus/Atelier."
 }
 
-Step 'Python 3.12 environment'
+Step 'Python 3.15 environment'
 $python = Join-Path $root '.venv\Scripts\python.exe'
 if (!(Test-Path -LiteralPath $python)) {
     if (!(Get-Command py -ErrorAction SilentlyContinue)) {
-        throw 'The Python launcher (py) was not found. Install 64-bit Python 3.12 from python.org.'
+        throw 'The Python launcher (py) was not found. Install 64-bit Python 3.15 from python.org.'
     }
-    & py -3.12 -m venv (Join-Path $root '.venv')
-    if ($LASTEXITCODE -ne 0) { throw 'Creating .venv failed. Atelier needs 64-bit Python 3.12 (py -3.12).' }
+    & py -3.15 -m venv (Join-Path $root '.venv')
+    if ($LASTEXITCODE -ne 0) { throw 'Creating .venv failed. Atelier needs 64-bit Python 3.15 (py -3.15).' }
 }
 & $python -m pip install --disable-pip-version-check --quiet -r (Join-Path $root 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Installing requirements.txt failed; see the pip output above.' }
@@ -95,26 +74,17 @@ Step 'Native tools'
 New-Item -ItemType Directory -Force -Path $tools | Out-Null
 if (Missing-Tools) {
     if ($ToolsFrom) {
+        # An installed Atelier (1.2+) already has the whole verified tool set.
         $source = Join-Path ([IO.Path]::GetFullPath($ToolsFrom)) 'Tools'
-        if (!(Test-Path -LiteralPath (Join-Path $source 'UAssetTool.exe'))) {
-            throw "No Atelier tools in $source. Pass the folder that holds Atelier.exe."
+        if (!(Test-Path -LiteralPath (Join-Path $source 'tools.json'))) {
+            throw "No Atelier 1.2+ tools in $source. Pass the folder that holds Atelier.exe."
         }
+        Get-ChildItem -LiteralPath $source | Where-Object { $_.Name -notin 'Mappings', 'AES_KEY.txt', 'Galacta' } |
+            Copy-Item -Destination $tools -Recurse -Force
     } else {
-        $setup = Get-Verified $installerUrl 'AtelierSetup-0.4.1.exe' $installerSha
-        $zip = Get-Verified $unpackerUrl 'innounp-2.zip' $unpackerSha
-        $unpacker = Join-Path $DataDir 'downloads\innounp'
-        Expand-Archive -LiteralPath $zip -DestinationPath $unpacker -Force
-        $exe = Get-ChildItem -LiteralPath $unpacker -Recurse -Filter 'innounp.exe' | Select-Object -First 1
-        if (!$exe) { throw 'innounp-2.zip did not contain innounp.exe' }
-        $unpacked = Join-Path $DataDir 'downloads\atelier-0.4.1'
-        # Unpack files only: the installer is never executed.
-        & $exe.FullName -x -y "-d$unpacked" $setup '{app}\Tools\*' *> (Join-Path $DataDir 'downloads\tools-extraction.log')
-        if ($LASTEXITCODE -ne 0) { throw 'Unpacking the installer failed; see downloads\tools-extraction.log' }
-        $source = Join-Path $unpacked '{app}\Tools'
-    }
-    foreach ($item in 'UAssetTool.exe', 'UAssetGUI.exe', 'AtelierMesh', 'AtelierAnimation', 'AtelierImport', 'shaders', 'MarvelRivalsCharacterIDs.md') {
-        $from = Join-Path $source $item
-        if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $tools -Recurse -Force }
+        # Fetch and build every tool from toolchain/tools.lock.json (hash-pinned).
+        & $python (Join-Path $root 'scripts\toolchain.py') install --dest $tools
+        if ($LASTEXITCODE -ne 0) { throw 'Native tool setup failed; see the output above.' }
     }
     $missing = Missing-Tools
     if ($missing) { throw "Tools still missing after setup: $($missing -join ', ')" }
@@ -144,8 +114,8 @@ if ($status.available) {
 
 Write-Host "`nSetup complete. Data folder: $DataDir"
 Write-Host 'Start Atelier any time with:'
-Write-Host "  .\Start-AtelierDev.ps1 -Mode Desktop -DataDir '$DataDir'"
+Write-Host "  .\scripts\Start-AtelierDev.ps1 -Mode Desktop -DataDir '$DataDir'"
 Write-Host 'Then follow docs\skin-swapper-testing.md from "First run".'
 if ($Launch) {
-    & (Join-Path $root 'Start-AtelierDev.ps1') -Mode Desktop -DataDir $DataDir
+    & (Join-Path $root 'scripts\Start-AtelierDev.ps1') -Mode Desktop -DataDir $DataDir
 }

@@ -3,6 +3,17 @@ from io import BytesIO
 from PIL import Image
 
 
+def has_border_of_at_least(locator, px):
+    """Whether an element's top border is at least `px` CSS px wide, judged against a reference
+    border of exactly `px` drawn on the same page: WebView2 at fractional display scaling snaps
+    and scales computed border widths (a 3px border reads 2.4px at 125%), so absolute numbers lie."""
+    width, reference = locator.evaluate('''(el,px)=>{const p=document.createElement('div');
+        p.style.border=px+'px solid red';document.body.append(p);
+        const r=parseFloat(getComputedStyle(p).borderTopWidth);p.remove();
+        return [parseFloat(getComputedStyle(el).borderTopWidth),r]}''', px)
+    return width >= reference
+
+
 def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False):
     tab=page if reuse_page else context.new_page()
     art=BytesIO();Image.new('RGBA',(64,64),(210,40,50,128)).save(art,'PNG')
@@ -96,7 +107,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         checks.append('Available high-resolution mips trigger automatic tracked repair and explain paint preservation and backups')
         tab.evaluate("buildGrid([_makeCard({type:'asset',file_type:'texture',name:'T_Painted',label:'Painted texture',game_rel:'Fixture/T_Painted',imported:true,token:'kept'})])")
         assert tab.locator('.card.imported .card-editing-badge').inner_text()=='Editing'
-        assert tab.locator('.card.imported').evaluate('el=>parseFloat(getComputedStyle(el).borderTopWidth)')>=3
+        assert has_border_of_at_least(tab.locator('.card.imported'),3)
         tab.screenshot(path=str(report/'editing-card-border.png'))
         checks.append('Edited grid assets have a three-pixel contrasting border and an explicit Editing badge')
         tab.evaluate("""() => {
@@ -108,7 +119,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
             tab.locator('#settings-theme').select_option(theme,force=True)
             tab.wait_for_function("theme=>document.documentElement.dataset.theme===theme && getComputedStyle(document.querySelector('.export-review-modal .btn')).color===getComputedStyle(document.querySelector('.export-review-modal h2')).color",arg=theme)
             assert tab.locator('.export-review-modal').get_attribute('data-state')=='success'
-            assert tab.locator('.export-review-modal').evaluate("el=>parseFloat(getComputedStyle(el).borderTopWidth)")>=2
+            assert has_border_of_at_least(tab.locator('.export-review-modal'),2)
             assert tab.locator('.export-review-modal').evaluate("el=>getComputedStyle(el).borderTopColor===getComputedStyle(el.querySelector('h2')).color")
             tab.screenshot(path=str(report/f'completed-build-green-{theme}.png'))
         tab.keyboard.press('Escape')

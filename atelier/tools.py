@@ -1,5 +1,5 @@
-import os, sys, json, time, queue, subprocess, threading, atexit
-from atelier.config import TOOLS, CNW, ROOT, PAKS, USMAP, _CACHE, get_aes_key
+import os, re, sys, json, time, queue, subprocess, threading, atexit
+from atelier.config import TOOLS, ROOT, PAKS, USMAP, get_aes_key
 from atelier import hostos
 
 UAT = os.path.join(TOOLS, "UAssetTool.exe")
@@ -17,8 +17,47 @@ except ValueError:
     pass
 tex_semaphore = threading.BoundedSemaphore(_TEX_CONCURRENCY)
 
-# AtelierMesh: CUE4Parse-based mesh -> glTF (.glb) decoder for the 3D viewport.
-ATELIER_MESH = os.path.join(TOOLS, "AtelierMesh", "AtelierMesh.exe")
+# AtelierNative: Atelier's own CUE4Parse-based helper (native/AtelierNative). One executable for
+# mesh -> glTF export, standing-idle decoding and the persistent import server. It opens only the
+# game's own top-level containers, so installed mods (~mods, the Galacta loader) never shadow a
+# vanilla package -- the hardlinked "vanilla_paks" mirror that used to guarantee this is gone.
+NATIVE = os.path.join(TOOLS, "AtelierNative", "AtelierNative.exe")
+# Upstream retoc-rivals-cli: the container tool the in-app updater may replace after a game patch.
+RETOC = os.path.join(TOOLS, "retoc", "retoc-rivals-cli.exe")
+# Atelier's build of the same upstream retoc (native/AtelierShader, Windows): adds the shader
+# commands, keeps extracted paths inside the output folder and fails when any asset fails to write.
+SHADER_RETOC = os.path.join(TOOLS, "shaders", "retoc-rivals-cli.exe")
+# texconv compresses BC7 ~24x faster than UAssetTool's built-in encoder (Windows only). Atelier's
+# UAssetTool build reads this variable; every UAssetTool process inherits it from here.
+TEXCONV = os.path.join(TOOLS, "texconv.exe")
+if hostos.IS_WINDOWS and os.path.isfile(TEXCONV):
+    os.environ.setdefault("UASSETTOOL_TEXCONV", TEXCONV)
+
+
+def _version(text):
+    return tuple(int(part) for part in re.findall(r"\d+", str(text).split("-")[0])[:3])
+
+
+def container_retoc():
+    """The retoc to use for container work (unpack/pack, including untrusted mod containers).
+
+    Atelier's hardened build when present, since it refuses archive paths that escape the output
+    folder and reports failed writes; upstream only once the updater has installed a NEWER upstream
+    than that build is based on (a game patch needed it), or where the hardened build does not
+    exist (Linux, older installs)."""
+    upstream = hostos.native_tool(RETOC) or (RETOC if os.path.isfile(RETOC) else None)
+    if not os.path.isfile(SHADER_RETOC):
+        return RETOC if upstream else SHADER_RETOC
+    if not upstream:
+        return SHADER_RETOC
+    try:
+        with open(os.path.join(TOOLS, "tools.json"), encoding="utf-8") as stream:
+            record = json.load(stream).get("tools", {})
+        newer = _version(record["retoc"]["version"]) > _version(record["retoc-shaders"]["version"])
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        newer = False
+    return RETOC if newer else SHADER_RETOC
+
 
 def _aes_hex():
     """The current key in the 0x-prefixed form the .exe tools want. Reads through
@@ -27,88 +66,18 @@ def _aes_hex():
     k = get_aes_key()
     return "0x" + k if k else ""
 
-_VANILLA_PAKS = os.path.join(_CACHE, "vanilla_paks")
-
-def _drive(path):
-    return os.path.splitdrive(os.path.abspath(path))[0].upper()
-
-def vanilla_paks():
-    """(folder, problem): a hardlink mirror of PAKS's TOP-LEVEL files only, or PAKS itself and why.
-
-    AtelierMesh's CUE4Parse provider scans the directory it's given recursively, so pointing it at
-    PAKS directly also picks up whatever lives in PAKS/~mods (or any other subfolder the "Copy to
-    mods folder" setting points at) -- installed mods then win pack-stacking and the 3D viewport
-    shows modded content, unlike the file browser and the Blender export path, which both resolve
-    assets through index.ensure_index()'s non-recursive `glob(PAKS + "/*.utoc")` and so only ever
-    see vanilla containers. Mirroring PAKS's top level with hardlinks (instant, no extra disk use,
-    same-volume only) keeps the viewport in sync with everything else without needing to touch
-    AtelierMesh itself.
-
-    When hardlinking isn't possible -- most often because Atelier's data folder and the game are on
-    different drives -- this falls back to the real PAKS dir, mods included, and `problem` says why
-    in words a user can act on. It is None when the mirror is in use."""
-    try:
-        wanted = {f: os.path.join(PAKS, f) for f in os.listdir(PAKS)
-                  if os.path.isfile(os.path.join(PAKS, f))}
-    except OSError as e:
-        return PAKS, f"Atelier could not read the game's Paks folder ({e.strerror or e})"
-    try:
-        os.makedirs(_VANILLA_PAKS, exist_ok=True)
-        have = set(os.listdir(_VANILLA_PAKS))
-    except OSError as e:
-        return PAKS, f"Atelier could not use its cache folder ({e.strerror or e})"
-    for stale in have - wanted.keys():
-        try: os.remove(os.path.join(_VANILLA_PAKS, stale))
-        except OSError: pass
-    for name, src in wanted.items():
-        link = os.path.join(_VANILLA_PAKS, name)
-        try:
-            if os.path.exists(link):
-                s_src, s_link = os.stat(src), os.stat(link)
-                if s_src.st_size == s_link.st_size and int(s_src.st_mtime) == int(s_link.st_mtime):
-                    continue
-                os.remove(link)
-            os.link(src, link)
-        except OSError as e:
-            # Cross-volume, no permission, etc. -- better vanilla-or-mods than a broken mirror.
-            cache, game = _drive(_VANILLA_PAKS), _drive(PAKS)
-            if cache and game and cache != game:
-                return PAKS, f"Atelier's data folder is on {cache} and the game is on {game}"
-            return PAKS, f"Atelier could not link the game's files into its cache ({e.strerror or e})"
-    return _VANILLA_PAKS, None
-
-def _vanilla_paks_dir():
-    return vanilla_paks()[0]
-
-def _mod_folders(paks):
-    """Subfolders of the game's Paks folder (relative names) that hold mod containers."""
-    found = []
-    for dirpath, _dirs, files in os.walk(paks):
-        if dirpath != paks and any(f.lower().endswith((".utoc", ".pak")) for f in files):
-            found.append(os.path.relpath(dirpath, paks).replace("\\", "/"))
-    return sorted(found)
-
 def atelier_mesh(asset, out_dir):
     """Decode an MR mesh (content-mount path, no ext) to glTF (.glb) under out_dir.
 
-    The result also carries `paks`, the folder the decoder read, and `mods_note`: None when it saw
-    only the game's own containers, otherwise a sentence saying why installed mods were visible to
-    it -- a mod that overrides the mesh is then a likely reason for a failed decode."""
-    paks, problem = vanilla_paks()
-    mods = _mod_folders(PAKS) if problem else []
-    note = None
-    if mods:
-        shown = ", ".join(mods[:3]) + (f" and {len(mods) - 3} more" if len(mods) > 3 else "")
-        note = f"{problem}, so Atelier could not keep installed mods out of this decode and also read {shown}"
-    print(f"[atelier_mesh] {asset}: paks={paks} "
-          + (f"(installed mods visible: {note})" if note else "(game files only)"),
-          file=sys.stderr, flush=True)
+    The result carries `paks` (the folder the decoder read) and `mods_note` (always None now:
+    AtelierNative reads only the game's own containers, so installed mods cannot leak in)."""
+    print(f"[atelier_mesh] {asset}: paks={PAKS} (game files only)", file=sys.stderr, flush=True)
     r = hostos.run_exe(
-        [ATELIER_MESH, "--paks", os.path.abspath(paks), "--aes", _aes_hex(),
+        [NATIVE, "mesh", "--paks", os.path.abspath(PAKS), "--aes", _aes_hex(),
          "--usmap", USMAP, "--asset", asset, "--out", os.path.abspath(out_dir)],
         capture_output=True, text=True, cwd=ROOT)
     try:
-        r.paks, r.mods_note = paks, note
+        r.paks, r.mods_note = PAKS, None
     except AttributeError:
         pass
     return r
@@ -127,7 +96,7 @@ except ValueError:
 # of three legitimate injections were killed by it before this existed, and the user saw
 # "inject failed: UAssetTool timed out after 300s" on work that was simply large.
 #
-# PHASES.md's own pivot signal for #6 says to raise the limit rather than revert it and to write
+# docs/PHASES.md's own pivot signal for #6 says to raise the limit rather than revert it and to write
 # down the real duration, which is what this is. The point of the cap is to catch a WEDGED tool
 # (the export hang: unbounded readline behind a global lock, never finishes, only a restart
 # clears it), and 30 minutes still does that while leaving room for a 4096 texture.
@@ -387,6 +356,15 @@ def uat_pooled(req, timeout=None):
         _pool_unsupported.add(action)
         return None
     return d
+
+
+def stop_workers():
+    """Stop every persistent UAssetTool process (they restart on the next request). Windows cannot
+    replace an executable that is running, so the tool updater calls this before swapping it."""
+    for w in _pool_all:
+        w.kill()
+    _kill_worker()
+    _pool_unsupported.clear()
 
 
 @atexit.register

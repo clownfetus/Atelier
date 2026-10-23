@@ -1,6 +1,6 @@
 """Opt-in real-tool texture round trip. Reads game paks; writes only isolated app data.
 
-Requires ATELIER_DATA_DIR configured by DEVELOPMENT.md. Never installs into the game's mods.
+Requires ATELIER_DATA_DIR configured by docs/DEVELOPMENT.md. Never installs into the game's mods.
 """
 import hashlib
 import json
@@ -36,15 +36,16 @@ def main():
     capabilities = {}
     for label, relative, required in (
         ('retoc-shaders', 'shaders/retoc-rivals-cli.exe', ['dump-shaders', 'extract-shader', 'unpack', 'pack']),
-        ('retoc-containers', 'retoc-rivals-cli/retoc-rivals-cli.exe', ['unpack', 'pack']),
+        ('retoc-containers', 'retoc/retoc-rivals-cli.exe', ['unpack', 'pack']),
         ('dxc', 'shaders/dxc.exe', []),
     ):
         exe = Path(C.TOOLS) / relative
         result = subprocess.run([str(exe), '--help'], capture_output=True, text=True, timeout=45)
         assert all(cmd in result.stdout for cmd in required), f'{label}: missing required commands'
         capabilities[label] = {'path': str(exe), 'sha256': digest(exe), 'commands_checked': required}
-    for relative in ('AtelierMesh/AtelierMesh.exe', 'AtelierMesh/CUE4Parse-Natives.dll',
-                     'retoc-rivals-cli/oo2core_9_win64.dll', 'UAssetTool.exe', 'texconv.exe'):
+    for relative in ('AtelierNative/AtelierNative.exe', 'AtelierNative/CUE4Parse-Natives.dll',
+                     'AtelierNative/oo2core_9_win64.dll', 'shaders/oo2core_9_win64.dll',
+                     'UAssetTool.exe', 'texconv.exe'):
         path = Path(C.TOOLS) / relative
         assert path.is_file(), relative
         capabilities[relative] = {'path': str(path), 'sha256': digest(path)}
