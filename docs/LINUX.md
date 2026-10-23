@@ -7,11 +7,11 @@
 2. Install your distribution's WebKitGTK 4.1 runtime and `zenity` for file/folder
    pickers. Install Blender for Blender workflows.
 3. Mark the downloaded file executable and open it. For example, once you have
-   downloaded the 1.1.1 asset:
+   downloaded the 1.1.2 asset:
 
    ```sh
-   chmod +x Atelier-1.1.1-x86_64.AppImage
-   ./Atelier-1.1.1-x86_64.AppImage
+   chmod +x Atelier-1.1.2-x86_64.AppImage
+   ./Atelier-1.1.2-x86_64.AppImage
    ```
 
 4. Follow **Find the game → Unlock the paks → Make it yours**. Choose the game
@@ -29,7 +29,7 @@ The AppImage needs FUSE 2 to mount normally. If FUSE is unavailable, use the
 same downloaded filename with `--appimage-extract-and-run`:
 
 ```sh
-./Atelier-1.1.1-x86_64.AppImage --appimage-extract-and-run
+./Atelier-1.1.2-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ## Desktop dependencies and feature support

@@ -3,7 +3,9 @@
 The app, installers and update checker identify each release by its full number, such as
 **1.1.1**.
 
-## Unreleased
+## 1.1.2 — 22 October 2026
+
+### Editors
 
 - Add optional **Assembly View** beside Inspect and Showcase: select a model
   surface to inspect its geometry, verified material and connected texture slots.
@@ -53,8 +55,10 @@ The app, installers and update checker identify each release by its full number,
 - The three model helpers (mesh export, idle animations, persistent imports) are one tool,
   built from source with the exact library version they shipped with, so previews are
   byte-for-byte unchanged and the installer is smaller.
-- Container unpacking and packing use the current upstream retoc (3.10.2, was 3.4.1);
-  UAssetTool is built from the current upstream source with Atelier's texture fixes.
+- Container unpacking and packing use retoc 3.10.2 (was 3.4.1). On Windows this is Atelier's
+  source-built copy, which keeps every extracted file inside its output folder and fails when an
+  asset cannot be written; UAssetTool is built from the current upstream source with Atelier's
+  texture fixes.
 - Every bundled tool, including the shader tool rebuilt from source in 1.1.1, is listed with its
   exact source and hashes in one lockfile (`toolchain/tools.lock.json`), built by one script.
 - Atelier now runs on Python 3.15.

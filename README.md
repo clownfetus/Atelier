@@ -1,35 +1,37 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.1** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.2** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.1](docs/release-1.1.1.md)
+· [What's new in 1.1.2](docs/release-1.1.2.md)
 · [Tutorials](#tutorials)
 · [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.1.1 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier 1.1.2 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.1
+## What's new in 1.1.2
+
+- **Textures match the game's brightness.** Exports keep their mip chain and build mips the way
+  the game does, so textures no longer look brighter or glarey at a distance.
+- **BC7 exports finish in seconds,** and textures added at a custom path no longer crash the game.
+- **Assembly View** shows a model surface's material and connected texture slots.
+- **VFX Motionboard** edits Niagara LUT tracks on a timeline with playback and comparison.
+- **Bulk edit materials** changes up to 1,000 materials at once.
+- **Settings → Tools** shows tool versions and updates, repairs or rolls back the container tool.
+- **Linux AppImage** runs on newer distributions, with native model previews and animations.
+
+See the [patch notes](docs/release-1.1.2.md) for details and verification limits.
+
+## Included from 1.1.1
 
 - **Send models to Blender.** Use the bundled Atelier Live Bridge extension with an
   open Blender session, or export a portable `.blend`. [Setup guide](docs/BLENDER.md).
-- **Find more folders by name.** Character and costume names and artwork follow
-  recognized IDs across the library, search, breadcrumbs, pins and asset pickers.
-- **Use HDR cubemaps.** Import Radiance panoramas, six-face strips or HDR DDS
-  cubemaps, including material reflection slots, with all six faces retained.
-- **Keep Blender projects smaller.** Pack model textures into the `.blend`
-  without adding them to the project; existing painted textures are preserved.
-- **Prepare models faster on Windows.** Reuse the game reader, batch extraction
-  and load the selected body and weapons before optional forms and attachments.
-- **Preview and export more reliably.** Character materials, masks, weapon grips,
-  alternate forms and the T_Visor texture export error have dedicated fixes.
-  Replacement preparation preserves geometry modifiers and winding and catches
-  unassigned faces before rebuilding lower detail levels.
-
-See the [patch notes](docs/release-1.1.1.md) for details and verification limits.
+- **Find more folders by name** across the library, search, breadcrumbs, pins and asset pickers.
+- **Use HDR cubemaps,** including material reflection slots, with all six faces retained.
+- **Prepare models faster on Windows** and preview and export characters more reliably.
 
 ## Included from 1.1
 
@@ -64,8 +66,8 @@ See the [patch notes](docs/release-1.1.1.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-These instructions describe **1.1.1**. Check the release title when downloading;
-a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.1.md)
+These instructions describe **1.1.2**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.2.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -380,12 +382,12 @@ must be extracted in full; `Atelier.exe` needs its adjacent `_internal` director
 
 To make a Windows release discoverable by existing installations:
 
-1. Build the intended source with a higher numeric version, such as `1.1.1`.
+1. Build the intended source with a higher numeric version, such as `1.1.2`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
    using the [installer checks](docs/DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`1.1.1` or `v1.1.1`) and attaching the installer named **AtelierSetup.exe**.
+   (`1.1.2` or `v1.1.2`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the
    installed version; replacing an EXE under the same version will not trigger it.
 
