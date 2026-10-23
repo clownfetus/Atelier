@@ -116,10 +116,10 @@ def main():
             (report / f'retoc-{command}-help.txt').write_text(completed.stdout + completed.stderr)
             if completed.returncode or '--game-paks-dir' not in completed.stdout + completed.stderr:
                 raise RuntimeError(f'Native retoc lacks the Rivals {command} interface')
-        version = subprocess.run([str(payload / 'Tools/AtelierNative/AtelierNative'), 'version'],
-                                 capture_output=True, text=True, timeout=60)
-        if 'natives ok' not in version.stdout:
-            raise RuntimeError(f'AtelierNative cannot load CUE4Parse-Natives: {version.stdout} {version.stderr}')
+        native = subprocess.run([str(payload / 'Tools/AtelierNative/AtelierNative'), 'version'],
+                                capture_output=True, text=True, timeout=60)
+        if 'natives ok' not in native.stdout:
+            raise RuntimeError(f'AtelierNative cannot load CUE4Parse-Natives: {native.stdout} {native.stderr}')
         result['checks'].append({'name': 'native UAssetTool, Rivals retoc and AtelierNative launch'})
         previous_extract = report / 'previous-extracted'
         previous_extract.mkdir()
