@@ -23,6 +23,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install -r requirements-dev.txt
+      # tests/test_uv_xray.py drives a headless Chromium.
+      - run: python -m playwright install --with-deps chromium
       - run: python tests/run_checks.py --report-dir reports/backend
       - run: node --check gui/app.js && node --check gui/viewport.js
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

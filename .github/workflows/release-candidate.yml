@@ -35,8 +35,8 @@ jobs:
           "ISCC=$env:ISCC" >> $env:GITHUB_ENV
           "$PWD/.venv/Scripts" >> $env:GITHUB_PATH
           "ATELIER_VERSION=$((Get-Content version -Raw).Trim())" >> $env:GITHUB_ENV
-      - run: python tests/run_checks.py --report-dir reports/backend
       - run: python -m playwright install chromium
+      - run: python tests/run_checks.py --report-dir reports/backend
       - run: python tests/browser_smoke.py --report-dir reports/browser
       - name: Stage the Skin Swapper template from encrypted release inputs
         shell: pwsh
@@ -133,6 +133,7 @@ jobs:
           sudo apt-get install -y cmake pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-webkit2-4.1 \
             libwebkit2gtk-4.1-0 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core libfuse2t64
       - run: python -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
+      - run: .venv/bin/python -m playwright install --with-deps chromium
       - run: .venv/bin/python tests/run_checks.py --report-dir reports/backend
       - name: Stage the Skin Swapper template from encrypted release inputs
         shell: bash
