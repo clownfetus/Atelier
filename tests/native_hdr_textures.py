@@ -25,14 +25,15 @@ def sha(path):
 
 
 def engine_probe(report, tools, dotnet, paks, usmap, aes, assets, material_slots=None):
-    from dotnet_bundle import extract_assemblies
-    from native_inputs import load_lock, verify_mesh, verify_files
-    lock = load_lock(); verified = verify_mesh(tools, lock)
+    """Build tests/TextureCubeProbe.cs against the same pinned CUE4Parse source AtelierNative is
+    built from (toolchain/tools.lock.json), so the reader is independent of Atelier's own code."""
+    import toolchain
+    lock = toolchain.load_lock()
+    source = lock['sources']['cue4parse']
+    checkout = toolchain.checkout(source, 'cue4parse')
     work = report/'engine-probe'; work.mkdir()
-    assemblies = work/'assemblies'; extract_assemblies(tools/'AtelierMesh/AtelierMesh.exe', assemblies)
-    verified.update(verify_files(assemblies, lock['mesh']['assemblies']))
-    version = subprocess.run([dotnet, '--version'], capture_output=True, text=True, cwd=ROOT/'tools-src', check=True).stdout.strip()
-    assert version == lock['dotnet']['sdk'], 'The engine probe requires the pinned SDK'
+    version = subprocess.run([dotnet, '--version'], capture_output=True, text=True, check=True).stdout.strip()
+    assert version.startswith('10.'), 'The engine probe requires the .NET 10 SDK'
     project = ET.Element('Project', Sdk='Microsoft.NET.Sdk')
     props = ET.SubElement(project, 'PropertyGroup')
     for key, value in {'OutputType':'Exe', 'TargetFramework':'net10.0', 'ImplicitUsings':'enable', 'Nullable':'enable',
@@ -40,15 +41,16 @@ def engine_probe(report, tools, dotnet, paks, usmap, aes, assets, material_slots
         ET.SubElement(props, key).text = value
     items = ET.SubElement(project, 'ItemGroup')
     ET.SubElement(items, 'Compile', Include=str(ROOT/'tests/TextureCubeProbe.cs'))
-    ET.SubElement(items, 'Reference', Include=str(assemblies/'*.dll'),
-                  Exclude=';'.join(str(assemblies/name) for name in ('System.*','Microsoft.*','mscorlib.dll','netstandard.dll','WindowsBase.dll','AtelierMesh.dll')))
-    source = work/'CubeProbe.csproj'; ET.ElementTree(project).write(source, encoding='utf-8', xml_declaration=True)
-    result = subprocess.run([dotnet, 'build', str(source), '-c', 'Release', '-o', str(work/'bin'), '--nologo'],
-                            capture_output=True, text=True, timeout=180, cwd=ROOT/'tools-src')
+    ET.SubElement(items, 'ProjectReference', Include=str(checkout/'CUE4Parse/CUE4Parse.csproj'))
+    project_file = work/'CubeProbe.csproj'; ET.ElementTree(project).write(project_file, encoding='utf-8', xml_declaration=True)
+    result = subprocess.run([dotnet, 'build', str(project_file), '-c', 'Release', '-o', str(work/'bin'), '--nologo'],
+                            capture_output=True, text=True, timeout=600, cwd=work)
     (work/'build.log').write_text(result.stdout+result.stderr, encoding='utf-8')
     assert result.returncode == 0, 'Independent cube reader failed to build; see engine-probe/build.log'
+    natives = {}
     for name in ('CUE4Parse-Natives.dll', 'oo2core_9_win64.dll'):
-        shutil.copy2(tools/'AtelierMesh'/name, work/'bin'/name)
+        shutil.copy2(tools/'AtelierNative'/name, work/'bin'/name)
+        natives[name] = sha(work/'bin'/name)
     result = subprocess.run([dotnet, str(work/'bin/CubeProbe.dll')],
                             input=json.dumps({'paks': str(paks), 'usmap': usmap, 'aes': aes, 'assets': assets,
                                               **({'material_slots': material_slots} if material_slots else {})}),
@@ -59,7 +61,8 @@ def engine_probe(report, tools, dotnet, paks, usmap, aes, assets, material_slots
     data = json.loads(result.stdout.strip())
     assert result.returncode == 0 and data.get('ok'), 'Independent CUE4Parse cube readback failed: '+str(data)
     assert 'read incorrectly' not in errors.lower() and 'bytes remaining' not in errors.lower(), errors
-    return data, {'sdk': version, 'assemblies': verified, 'probe_source': sha(ROOT/'tests/TextureCubeProbe.cs')}
+    return data, {'sdk': version, 'cue4parse': source['commit'], 'natives': natives,
+                  'probe_source': sha(ROOT/'tests/TextureCubeProbe.cs')}
 
 
 def main():

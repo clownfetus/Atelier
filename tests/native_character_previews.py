@@ -135,8 +135,8 @@ def main():
     sources = ['gui/viewport.js', 'gui/viewport-attachments.js', 'gui/viewport-inspection.js',
                'atelier/handlers/meshstudio.py', 'atelier/handlers/material_preview.py',
                'atelier/handlers/material.py', 'atelier/handlers/meshport.py', 'atelier/import_server.py',
-               'atelier/web/routes.py', 'atelier/storage.py', 'tools-src/AtelierImport/Program.cs',
-               'tools-src/native-tools.lock.json', 'tests/native_character_previews.py']
+               'atelier/web/routes.py', 'atelier/storage.py', 'native/AtelierNative/ImportServer.cs',
+               'toolchain/tools.lock.json', 'tests/native_character_previews.py']
     results = {'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in sources},
                'all_parts': args.all_parts, 'characters': [], 'unavailable': [], 'page_errors': [], 'asset_errors': []}
     with sync_playwright() as playwright:

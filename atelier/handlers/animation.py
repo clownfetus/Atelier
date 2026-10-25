@@ -47,8 +47,10 @@ def decode_idle(mesh_rel, animation_rel):
     config.validate_game_rel(animation_rel)
     if animation_rel not in {item['game_rel'] for item in idle_candidates(mesh_rel)}:
         raise ValueError("Choose a standing idle listed for this character")
-    tool = Path(config.TOOLS) / 'AtelierAnimation' / 'AtelierAnimation.exe'
-    if not tool.is_file():
+    from atelier.tools import NATIVE
+    installed = hostos.installed_tool(NATIVE)
+    tool = Path(installed or NATIVE)
+    if not installed:
         raise RuntimeError("Standing idle decoder is missing from this build.")
     mapping_stamp = os.path.getmtime(config.USMAP) if os.path.isfile(config.USMAP) else 0
     identity = f"v2:{mesh_rel}:{animation_rel}:{tool.stat().st_mtime_ns}:{mapping_stamp}"
@@ -57,11 +59,11 @@ def decode_idle(mesh_rel, animation_rel):
         if target.is_file():
             return json.loads(target.read_text(encoding='utf-8'))
         target.parent.mkdir(parents=True, exist_ok=True)
-        from atelier.tools import _vanilla_paks_dir, _aes_hex
+        from atelier.tools import _aes_hex
         handle, temporary = tempfile.mkstemp(prefix='.idle-', suffix='.json', dir=target.parent)
         os.close(handle)
         try:
-            result = hostos.run_exe([str(tool), '--paks', os.path.abspath(_vanilla_paks_dir()),
+            result = hostos.run_exe([str(tool), 'animation', '--paks', os.path.abspath(config.PAKS),
                 '--aes', _aes_hex(), '--usmap', config.USMAP, '--mesh', pak_game_path(mesh_rel),
                 '--animation', pak_game_path(animation_rel), '--out', temporary],
                 capture_output=True, text=True, cwd=str(tool.parent), timeout=240)

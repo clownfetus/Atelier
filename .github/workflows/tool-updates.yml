@@ -1,0 +1,55 @@
+name: Propose tool updates
+# Daily: when an updatable tool (toolchain/tools.lock.json "updatable": true) has a newer upstream
+# release, re-pin it (hashes recomputed from the downloaded release), regenerate the in-app update
+# channel, prove the new build still offers every command Atelier calls, and open a pull request.
+# Nothing reaches users until a maintainer merges it: the app reads toolchain/channel.json from main.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+env:
+  PYTHON_VERSION: '3.15'
+jobs:
+  propose:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Re-pin outdated tools and verify them
+        id: bump
+        shell: bash
+        run: |
+          python scripts/toolchain.py outdated | tee outdated.txt
+          changes=$(grep -- ' -> ' outdated.txt || true)
+          if [ -z "$changes" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          while read -r name have arrow latest; do
+            python scripts/toolchain.py bump "${name%:}" "$latest"
+          done <<< "$changes"
+          python scripts/toolchain.py channel
+          python scripts/toolchain.py fetch --dest "$RUNNER_TEMP/tools"
+          python scripts/toolchain.py verify --dest "$RUNNER_TEMP/tools" --only $(echo "$changes" | cut -d: -f1)
+          {
+            echo "changed=true"
+            echo "summary<<EOF"; echo "$changes"; echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Open a pull request
+        if: steps.bump.outputs.changed == 'true'
+        shell: bash
+        run: |
+          branch="tool-updates/$(date +%Y%m%d)"
+          git config user.name "atelier-bot"
+          git config user.email "atelier-bot@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add toolchain/tools.lock.json toolchain/channel.json
+          git commit -m "Update pinned tools" -m "${{ steps.bump.outputs.summary }}"
+          git push --force origin "$branch"
+          gh pr create --head "$branch" --title "Update pinned tools" --body "$(printf 'Upstream released newer builds of updatable tools:\n\n```\n%s\n```\n\nHashes were recomputed from the release downloads and each new build passed its command probe on Windows. Before merging, run the native suites (tests/native_*.py) against a real game install: merging publishes this to every Atelier through Settings > Tools.' "${{ steps.bump.outputs.summary }}")" || echo "A pull request for $branch already exists"

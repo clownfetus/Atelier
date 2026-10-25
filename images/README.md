@@ -1,6 +1,6 @@
-# Atelier 1.1.2 screenshots
+# Atelier 1.1.3 screenshots
 
-Captured on 22 October 2026 from the consolidated 1.1.2 source using the actual
+Captured on 22 October 2026 from the consolidated 1.1.3 source using the actual
 Bottle-served interface in Microsoft Edge at 1400 × 900. Captures are unedited:
 no compositing, simulated UI, cropping or image generation.
 

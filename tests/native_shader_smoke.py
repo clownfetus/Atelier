@@ -18,7 +18,15 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 sys.path.insert(0, str(ROOT))
-from native_inputs import digest, load_lock, verify_shaders
+from build_shader_tool import digest, verify_installed as verify_shaders
+
+# The pre-reconstruction 3.4.1 binary (source never published) that --baseline-report compares
+# against, and the optional independent DXIL validator. Test inputs only; neither ships.
+LEGACY_FILES = {
+    'retoc-rivals-cli.exe': 'f6a9b08183c778cad9a8b2872046c7d8a52baa59eea0998610da041f1f89e77d',
+    'oo2core_9_win64.dll': '6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457',
+}
+VALIDATOR_SHA256 = '74528e8e86cdafcb9ecaa26f21a9ad9de9102b0d84213b67435de798b5a807f9'
 
 
 def main():
@@ -117,7 +125,7 @@ def main():
             baseline = args.baseline_report.resolve(strict=True)
             previous = json.loads((baseline / 'results.json').read_text(encoding='utf-8'))
             assert previous.get('ok') and previous['game_containers'] == before
-            assert previous['tool']['files'] == load_lock()['shader']['legacy']['files']
+            assert {k: previous['tool']['files'].get(k) for k in LEGACY_FILES} == LEGACY_FILES
             assert libraries == previous['libraries']
             actual = {path.parent.name: digest(path) for path in (baseline / 'index').glob('*/index.json')}
             assert actual == record['index_sha256'], 'Reconstructed index differs from the legacy baseline'
@@ -158,7 +166,7 @@ def main():
         run(dxc, '-dumpbin', report / 'reassembled.dxbc')
         if args.validator:
             validator = args.validator.resolve(strict=True)
-            expected = load_lock()['shader']['test_validator']['sha256']
+            expected = VALIDATOR_SHA256
             assert digest(validator) == expected, 'Independent DXIL validator hash differs from the pin'
             validation = run(validator, str(report / 'reassembled.dxbc'))
             record['validator'] = dict(sha256=expected, success='Validation succeeded' in validation)

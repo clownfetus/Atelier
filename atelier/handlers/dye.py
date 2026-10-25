@@ -475,7 +475,7 @@ def region_overlay(game_rel, size=1024, out_path=None, numbers=True):
 #
 # THERE IS NO MATERIAL PARAMETER FOR THIS. The dyeing MIs expose BaseTint, UseDyeingGBChannel and
 # the Region N sets, and nothing that switches the system off (checked against real MIs:
-# MI_1050103_Body_01 and MI_10600_1060300_Equip_01). PHASES.md's pivot signal for exactly this
+# MI_1050103_Body_01 and MI_10600_1060300_Equip_01). docs/PHASES.md's pivot signal for exactly this
 # case says to ship the workaround as a one-click action, and that workaround is already circulating
 # in #setup-and-guide (leagueofthearcane): replace the ColorID mask with an image whose ALPHA IS
 # ZERO. Alpha is the region index — 0 means "undyed" and the shader leaves those texels alone — so

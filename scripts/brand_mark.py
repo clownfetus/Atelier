@@ -7,7 +7,7 @@ it, so the vector, the interface raster and the application icons cannot drift:
     python scripts/brand_mark.py          # rewrite the files
     python scripts/brand_mark.py --check  # fail if anything is out of date
 
-Krackle rules (DESIGN_SYSTEM.md): energy defines the silhouette and bubbles give it
+Krackle rules (docs/DESIGN_SYSTEM.md): energy defines the silhouette and bubbles give it
 texture. The A is one solid silhouette of energy; its counter is the largest bubble,
 and one composed mass of bubbles gathers in the right foot (the shadow side), thinning
 into satellites up the leg. Bubbles are true holes, so the surface shows through

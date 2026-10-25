@@ -41,11 +41,11 @@ class AssetError(ImportError):
 
 
 def tool_path():
-    return Path(config.TOOLS) / 'AtelierImport' / 'AtelierImport.exe'
+    return Path(config.TOOLS) / 'AtelierNative' / 'AtelierNative.exe'
 
 
 def available():
-    return hostos.IS_WINDOWS and tool_path().is_file()
+    return bool(hostos.installed_tool(tool_path())) and (hostos.IS_WINDOWS or bool(hostos.native_tool(tool_path())))
 
 
 def source_version():
@@ -53,7 +53,7 @@ def source_version():
 
 
 def _source():
-    tool = tool_path()
+    tool = Path(hostos.installed_tool(tool_path()) or tool_path())
     paks = Path(config.PAKS).resolve()
     key = config.get_aes_key().removeprefix('0x')
     if not key:
@@ -108,7 +108,7 @@ class _Worker:
         # Bound managed memory; provider indices stay resident while transient
         # meshes/images are collected. Native allocations remain outside this cap.
         env = dict(os.environ, DOTNET_GCHeapHardLimit='60000000')
-        self.process = hostos.popen_exe([str(tool_path())], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        self.process = hostos.popen_exe([str(tool_path()), 'serve'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, encoding='utf-8', cwd=str(tool_path().parent), env=env)
         def output():
             try:

@@ -130,7 +130,7 @@ AES_KEY_FILE = os.path.join(TOOLS, "AES_KEY.txt")  # written ONLY by set_aes_key
 def _unblock_bundled_tools():
     """Strip the Mark-of-the-Web (:Zone.Identifier ADS) from bundled tools so .NET/Oodle will load
     them. Windows tags every file extracted from a downloaded .zip as 'came from another computer';
-    .NET then refuses to load those assemblies (UAssetTool / AtelierMesh / retoc bootstrap errors)
+    .NET then refuses to load those assemblies (UAssetTool / AtelierNative / retoc bootstrap errors)
     and SmartScreen warns harder. Run FIRST — before MR_TOOLS / io_lib / any native DLL load."""
     if os.name != "nt":
         return
@@ -167,7 +167,7 @@ def _auto_fetch_aes():
         with urllib.request.urlopen(req, timeout=10) as r:
             data = _json.loads(r.read().decode("utf-8", "replace"))
         # Only mainKey is read. Per-container keys published alongside it (enc_guid -> key) are a
-        # separate piece of work — see PHASES.md #2.
+        # separate piece of work — see docs/PHASES.md #2.
         if set_aes_key(str(data.get("mainKey", "")).strip()):
             print("  [aes] key rotated — updated from the depot, re-indexing", file=sys.stderr)
     except Exception:

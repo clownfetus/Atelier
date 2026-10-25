@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "comment": "Every native tool Atelier ships, where it comes from, and the hashes it must match. scripts/toolchain.py fetches, builds and verifies against this file; nothing in Tools/ is committed. 'updatable' tools follow game patches and may be replaced in the field by the verified in-app updater (toolchain/channel.json).",
+  "sources": {
+    "cue4parse": {
+      "repo": "https://github.com/FabianFG/CUE4Parse",
+      "commit": "ea85cf20d8df53556f399c5fabc2befb46b65d0d",
+      "submodules": [
+        "CUE4Parse-Natives/ACL/external/acl"
+      ],
+      "license": "Apache-2.0",
+      "note": "The exact commit inside the AtelierMesh/AtelierAnimation binaries shipped through 1.1.0 (assembly version 1.2.2+ea85cf20d8)."
+    },
+    "uassettool": {
+      "repo": "https://github.com/X-zant/UAssetToolRivals",
+      "commit": "deb6f32fef1fbc8d6b6cfd37588627d62ddb3bcf",
+      "patches": "toolchain/patches/UAssetToolRivals",
+      "license": "GPL-3.0"
+    },
+    "ooz": {
+      "repo": "https://github.com/powzix/ooz",
+      "commit": "05038060aa68f9187ae9923b2388ca8db40e58d1",
+      "license": "GPL-3.0"
+    },
+    "retoc-rivals": {
+      "repo": "https://github.com/natimerry/retoc-rivals",
+      "commit": "e6c985eac480275348976dcc6e8729c1de1bef40",
+      "license": "MIT OR Apache-2.0",
+      "note": "Fetched as a hash-pinned archive by scripts/build_shader_tool.py; exact inputs (with repak-rivals, Rust and llvm-mingw) are in native/AtelierShader/build.lock.json."
+    }
+  },
+  "tools": [
+    {
+      "name": "AtelierNative",
+      "kind": "build",
+      "builder": "atelier-native",
+      "platforms": [
+        "windows",
+        "linux"
+      ],
+      "description": "Mesh export, idle animations, persistent imports (native/AtelierNative, CUE4Parse pinned above)",
+      "files": {
+        "windows": [
+          "AtelierNative/AtelierNative.exe",
+          "AtelierNative/CUE4Parse-Natives.dll"
+        ],
+        "linux": [
+          "AtelierNative/AtelierNative",
+          "AtelierNative/CUE4Parse-Natives.so"
+        ]
+      },
+      "probe": {
+        "args": [
+          "version"
+        ],
+        "expect": [
+          "AtelierNative",
+          "natives ok"
+        ]
+      },
+      "license": "GPL-3.0 (Atelier) with CUE4Parse under Apache-2.0",
+      "source": "native/AtelierNative in this repository; CUE4Parse at the commit above"
+    },
+    {
+      "name": "UAssetTool",
+      "kind": "build",
+      "builder": "uassettool",
+      "platforms": [
+        "windows",
+        "linux"
+      ],
+      "description": "Asset JSON, texture inject/extract, IoStore mod builds (UAssetToolRivals + Atelier patches)",
+      "files": {
+        "windows": [
+          "UAssetTool.exe"
+        ],
+        "linux": [
+          "UAssetTool"
+        ]
+      },
+      "probe": {
+        "args": [
+          "version"
+        ],
+        "expect": [
+          "UAssetTool v"
+        ]
+      },
+      "license": "GPL-3.0 (UAssetToolRivals; bundles UAssetAPI, MIT)",
+      "source": "https://github.com/X-zant/UAssetToolRivals at the commit above, plus toolchain/patches/UAssetToolRivals"
+    },
+    {
+      "name": "retoc",
+      "kind": "release",
+      "updatable": true,
+      "upstream": {
+        "github": "natimerry/repak-rivals",
+        "tag_prefix": "v",
+        "asset_pattern": {
+          "windows": "retoc-rivals-cli-x86_64-pc-windows-msvc.zip",
+          "linux": "retoc-rivals-cli-x86_64-unknown-linux-gnu.tar.xz"
+        }
+      },
+      "version": "3.10.2",
+      "description": "IoStore container unpack/pack (upstream retoc-rivals-cli; follows game patches)",
+      "license": "MIT OR Apache-2.0",
+      "assets": {
+        "windows": {
+          "url": "https://github.com/natimerry/repak-rivals/releases/download/v3.10.2/retoc-rivals-cli-x86_64-pc-windows-msvc.zip",
+          "sha256": "0ef81287ca42fd8436a1c6cb243120ceef03a36ea2e3fefd8d437c188592cf05",
+          "extract": {
+            "retoc-rivals-cli.exe": {
+              "to": "retoc/retoc-rivals-cli.exe",
+              "sha256": "4a1b0124628647b5ff75c6d7427df09310bb899fa3374b66ae1e31d7982207ac"
+            }
+          }
+        },
+        "linux": {
+          "url": "https://github.com/natimerry/repak-rivals/releases/download/v3.10.2/retoc-rivals-cli-x86_64-unknown-linux-gnu.tar.xz",
+          "sha256": "dd3795d49f325b586042bfa69386caf18f04ea8c5143e68c5e4bce1526fc5358",
+          "extract": {
+            "retoc-rivals-cli-x86_64-unknown-linux-gnu/retoc-rivals-cli": {
+              "to": "retoc/retoc-rivals-cli",
+              "sha256": "abaef8832c7a13913002bf8e37f883cba5d325e0348a8eeebceb5a28c7b0a01f",
+              "executable": true
+            }
+          }
+        }
+      },
+      "probe": {
+        "args": [
+          "--help"
+        ],
+        "expect": [
+          "unpack",
+          "pack"
+        ]
+      },
+      "source": "https://github.com/natimerry/repak-rivals"
+    },
+    {
+      "name": "retoc-shaders",
+      "kind": "build",
+      "builder": "atelier-shader",
+      "platforms": [
+        "windows"
+      ],
+      "version": "3.10.2-atelier.1",
+      "description": "Shader-capable retoc (dump/extract/patch shader libraries): native/AtelierShader's commands on pinned upstream retoc-rivals, built with a pinned Rust/llvm-mingw toolchain",
+      "files": {
+        "windows": [
+          "shaders/retoc-rivals-cli.exe",
+          "shaders/build-inputs.json",
+          "shaders/licenses/repak-MIT.txt",
+          "shaders/licenses/repak-APACHE.txt",
+          "shaders/licenses/retoc-MIT.txt"
+        ]
+      },
+      "reproducible": {
+        "shaders/retoc-rivals-cli.exe": "3eaf66d4e48b13d00e63c46e5703e709556af709dc51b54c1d09c8b4b9c49165"
+      },
+      "probe": {
+        "args": [
+          "--help"
+        ],
+        "expect": [
+          "dump-shaders",
+          "extract-shader",
+          "patch-shader",
+          "pack",
+          "unpack",
+          "info"
+        ]
+      },
+      "license": "MIT OR Apache-2.0 (retoc-rivals, repak-rivals, Atelier shader commands)",
+      "source": "native/AtelierShader on natimerry/retoc-rivals@e6c985e (inputs: native/AtelierShader/build.lock.json)"
+    },
+    {
+      "name": "dxc",
+      "kind": "release",
+      "platforms": [
+        "windows"
+      ],
+      "version": "1.9.2602",
+      "description": "DirectX shader compiler for shader patching",
+      "license": "University of Illinois/NCSA (LLVM)",
+      "assets": {
+        "windows": {
+          "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+          "sha256": "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e",
+          "extract": {
+            "bin/x64/dxc.exe": {
+              "to": "shaders/dxc.exe",
+              "sha256": "b9cff94181248e080804b385da8964b6319fd07760721baa9053a891cf7a727f"
+            },
+            "bin/x64/dxcompiler.dll": {
+              "to": "shaders/dxcompiler.dll",
+              "sha256": "b86a738ece4c05dbe2d9bbb29668a2ccb28a0740773c9b027cdc61e8d07b4d75"
+            },
+            "bin/x64/dxil.dll": {
+              "to": "shaders/dxil.dll",
+              "sha256": "058f2f52a680c38b223a5615b7df969def21f77e577562e5099d971dede992de"
+            }
+          }
+        }
+      },
+      "probe": {
+        "args": [
+          "--version"
+        ],
+        "expect": [
+          "dxcompiler"
+        ]
+      },
+      "source": "https://github.com/microsoft/DirectXShaderCompiler"
+    },
+    {
+      "name": "texconv",
+      "kind": "release",
+      "platforms": [
+        "windows"
+      ],
+      "version": "may2026",
+      "description": "DirectXTex texture converter (fast BC7 encoding for UAssetTool, mesh images)",
+      "license": "MIT",
+      "assets": {
+        "windows": {
+          "url": "https://github.com/microsoft/DirectXTex/releases/download/may2026/texconv.exe",
+          "sha256": "dcfdec10244e02cf5037fba089c55fb7e1326b1c8181742d77d15fa5cb5eef06",
+          "to": "texconv.exe"
+        }
+      },
+      "source": "https://github.com/microsoft/DirectXTex"
+    },
+    {
+      "name": "UAssetGUI",
+      "kind": "release",
+      "platforms": [
+        "windows"
+      ],
+      "version": "1.1.0",
+      "description": "Level (World) round-trips",
+      "license": "MIT",
+      "assets": {
+        "windows": {
+          "url": "https://github.com/atenfyr/UAssetGUI/releases/download/v1.1.0/UAssetGUI.exe",
+          "sha256": "b7d75c0893f1a60e565853ae638bc21f2416cd12c2d9d854e297abb87ceb3263",
+          "to": "UAssetGUI.exe"
+        }
+      },
+      "source": "https://github.com/atenfyr/UAssetGUI"
+    },
+    {
+      "name": "oodle",
+      "kind": "release",
+      "version": "repak-rivals@40e42b9",
+      "description": "Oodle decompression, as redistributed by repak-rivals; copied beside every tool that loads it",
+      "assets": {
+        "windows": {
+          "url": "https://raw.githubusercontent.com/natimerry/repak-rivals/40e42b9130f52038a10d261f9f032e4dc661d1a2/oo2core_9_win64.dll",
+          "sha256": "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457",
+          "to": [
+            "shaders/oo2core_9_win64.dll",
+            "AtelierNative/oo2core_9_win64.dll"
+          ]
+        },
+        "linux": {
+          "url": "https://raw.githubusercontent.com/natimerry/repak-rivals/40e42b9130f52038a10d261f9f032e4dc661d1a2/liboo2corelinux64.so.9",
+          "sha256": "ed7e98f70be1254a80644efd3ae442ff61f854a2fe9debb0b978b95289884e9c",
+          "to": [
+            "liboo2corelinux64.so.9",
+            "AtelierNative/liboo2corelinux64.so.9"
+          ]
+        }
+      },
+      "license": "Proprietary (Epic Games / RAD); redistributed as repak-rivals ships it",
+      "source": "https://github.com/natimerry/repak-rivals"
+    },
+    {
+      "name": "libooz",
+      "kind": "build",
+      "builder": "ooz",
+      "platforms": [
+        "linux"
+      ],
+      "optional": true,
+      "description": "Open-source Oodle decoder fallback for io_lib on Linux",
+      "files": {
+        "linux": [
+          "libooz.so"
+        ]
+      },
+      "license": "GPL-3.0",
+      "source": "https://github.com/powzix/ooz at the commit above"
+    },
+    {
+      "name": "character-ids",
+      "kind": "release",
+      "version": "568aa23",
+      "description": "Seed of the character/skin name catalogue (the app refreshes it at runtime)",
+      "assets": {
+        "any": {
+          "url": "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/568aa2378c6d750ba79fa5ecea2205698e76571b/MarvelRivalsCharacterIDs.md",
+          "sha256": "6ec76627a396285aff194fa6234c35c747582d12fe7cb6cc6dfa68eb2f90dc5b",
+          "to": "MarvelRivalsCharacterIDs.md"
+        }
+      },
+      "license": "Data; no licence stated upstream",
+      "source": "https://github.com/donutman07/MarvelRivalsCharacterIDs"
+    }
+  ]
+}

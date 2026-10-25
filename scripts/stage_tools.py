@@ -13,7 +13,8 @@ wholesale and then pruned: that is how a release once went out with no UAssetToo
     (running dist/Atelier/Atelier.exe to test it writes assets/, _cache/ and mr_config.json there),
     and no game-derived or user file may appear anywhere in it.
 
-Atelier.iss lists the same Windows files explicitly; tests/test_packaging.py keeps the two in sync.
+The file list comes from toolchain/tools.lock.json. Atelier.iss lists the same Windows files
+explicitly; tests/test_packaging.py keeps the two in sync.
 """
 import argparse
 import os
@@ -23,66 +24,35 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# (path relative to Tools/, required). A directory entry is copied whole, minus _IGNORE.
-# Oodle is the one easiest to lose: every pak read needs it, and each consumer loads its own copy
-# (io_lib + retoc from shaders/, AtelierMesh from its own folder, UAssetTool on Linux from beside it).
-MANIFEST = {
-    "windows": [
-        ("UAssetTool.exe", True),                    # tools.UAT: extract/inject/pack, everything
-        ("UAssetGUI.exe", True),                     # world.UAG: level round-trip
-        ("AtelierMesh", True),                       # tools.ATELIER_MESH: 3D viewport decoder
-        ("AtelierMesh/AtelierMesh.exe", True),
-        ("AtelierMesh/CUE4Parse-Natives.dll", True),
-        ("AtelierMesh/oo2core_9_win64.dll", True),
-        ("AtelierAnimation/AtelierAnimation.exe", True),
-        ("AtelierAnimation/CUE4Parse-Natives.dll", True),
-        ("AtelierAnimation/oo2core_9_win64.dll", True),
-        ("AtelierImport/AtelierImport.exe", True),
-        ("AtelierImport/CUE4Parse-Natives.dll", True),
-        ("AtelierImport/oo2core_9_win64.dll", True),
-        ("shaders/retoc-rivals-cli.exe", True),      # world.RETOC + plugin/text extracts
-        ("shaders/build-inputs.json", True),         # exact source-build provenance
-        ("shaders/licenses/repak-MIT.txt", True),
-        ("shaders/licenses/repak-APACHE.txt", True),
-        ("shaders/licenses/retoc-MIT.txt", True),
-        ("shaders/oo2core_9_win64.dll", True),       # Oodle for retoc and io_lib
-        ("shaders/dxc.exe", True),                   # shaders.DXC
-        ("shaders/dxcompiler.dll", True),            # dxc_ir
-        ("shaders/dxil.dll", True),                  # dxc_ir validator
-        ("MarvelRivalsCharacterIDs.md", True),       # seed; the app rewrites it (installer: onlyifdoesntexist)
-        ("Galacta/GAL_ConfigTemplate.uasset", False),  # skin_swapper: Galacta's template, never in git
-        ("Galacta/GAL_ConfigTemplate.uexp", False),
-    ],
-    # Native builds where they exist (hostos.native_tool prefers them over Wine); AtelierMesh runs
-    # under Wine. UAssetGUI and DXC are omitted: hostos.unsupported() refuses those features here.
-    "linux": [
-        ("UAssetTool", True),
-        ("liboo2corelinux64.so.9", True),            # UAssetTool decompresses nothing without it
-        ("libooz.so", False),                        # io_lib fallback when no real Oodle is present
-        ("AtelierMesh", True),
-        ("AtelierMesh/AtelierMesh.exe", True),
-        ("shaders/retoc-rivals-cli", True),
-        ("AtelierAnimation/AtelierAnimation.exe", True),
-        ("AtelierAnimation/CUE4Parse-Natives.dll", True),
-        ("AtelierAnimation/oo2core_9_win64.dll", True),
-        ("shaders/liboo2corelinux64.so.9", True),
-        ("MarvelRivalsCharacterIDs.md", True),
-        ("Galacta/GAL_ConfigTemplate.uasset", False),
-        ("Galacta/GAL_ConfigTemplate.uexp", False),
-    ],
-}
+# Which files ship is decided by toolchain/tools.lock.json, the same file scripts/toolchain.py
+# fetches and builds from -- one list, so a tool can no longer be built but not staged (or the
+# reverse). Each entry: (path relative to Tools/, required).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain as _toolchain  # noqa: E402
+
+
+def _manifest(platform):
+    lock = _toolchain.load_lock()
+    entries = []
+    for entry in lock["tools"]:
+        if _toolchain.applies(entry, platform):
+            entries += [(rel, not entry.get("optional", False))
+                        for rel in _toolchain.expected_files(entry, platform)]
+    entries = list(dict(reversed(entries)).items())[::-1]   # one entry per path, first wins
+    return entries + [("Galacta/GAL_ConfigTemplate.uasset", False), ("Galacta/GAL_ConfigTemplate.uexp", False)]
+
+
+MANIFEST = {"windows": _manifest("windows"), "linux": _manifest("linux")}
 # Project Galacta's Skin Swapper template (atelier/skin_swapper.py). Galacta allows it inside Atelier
 # but not elsewhere, and this repository is public, so it is never committed: release builds stage it
 # from a private Tools/Galacta/ or from CI secrets. It is optional, but the pair ships whole or not at
 # all, and these two files are the only cooked packages the dist audit accepts.
 GALACTA_TEMPLATE = ("Galacta/GAL_ConfigTemplate.uasset", "Galacta/GAL_ConfigTemplate.uexp")
-EXECUTABLES = {"linux": ["UAssetTool", "shaders/retoc-rivals-cli"], "windows": []}
-DIRECTORIES = {"AtelierMesh"}
+EXECUTABLES = {"linux": [rel for rel, _ in MANIFEST["linux"] if "." not in Path(rel).name], "windows": []}
+DIRECTORIES = set()
 # Retain the Windows helper API used by verification scripts and older callers.
-# Both APIs use the same allowlist, including all required native dependencies.
-REQUIRED = tuple(rel for rel, required in MANIFEST["windows"] if required and rel not in DIRECTORIES)
-LINUX_ONLY = {"UAssetTool", "liboo2corelinux64.so.9", "libooz.so",
-              "shaders/retoc-rivals-cli", "shaders/liboo2corelinux64.so.9"}
+REQUIRED = tuple(rel for rel, required in MANIFEST["windows"] if required)
+LINUX_ONLY = {rel for rel, _ in MANIFEST["linux"]} - {rel for rel, _ in MANIFEST["windows"]}
 
 # Python packages the app never imports, kept out of _internal. PyInstaller follows OPTIONAL imports
 # (scipy's array-API layer tries torch; scipy.stats tries matplotlib), and the Linux venv sees the
@@ -151,6 +121,9 @@ def stage_tools(source, destination, platform="windows"):
         validate_tools(destination, platform)
         for rel in EXECUTABLES[platform]:
             os.chmod(destination / rel, 0o755)
+        # Which version of each tool shipped; the in-app updater compares against it.
+        _toolchain.write_record(_toolchain.load_lock(), platform, destination)
+        _toolchain.write_notices(_toolchain.load_lock(), platform, destination)
     except Exception:
         # This resolved, separate target was created by this call. Never delete
         # an existing build, source tools, or a path inferred from native input.

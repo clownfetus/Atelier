@@ -673,14 +673,14 @@ class Mesh:
         range indices; SoA gives exact 255 sums and every index within its section's
         BoneMap). Only the first `max_bone_influences` columns are meaningful.
 
-        bVariableBonesPerVertex meshes (44% of the game's body meshes -- see BLENDER.md
+        bVariableBonesPerVertex meshes (44% of the game's body meshes -- see docs/BLENDER.md
         S5.3b) pack a different layout: MeshWeightData is one flat byte array, and a
         per-vertex LookupData[N] (uint32) gives each vertex's (byte_offset << 8 | count)
         into it -- BoneIndex[count] then BoneWeight[count], same SoA convention as the
         fixed layout, just variable-length per vertex instead of a constant stride of 16.
         Counts above 8 (observed up to 12 on this game's meshes) are capped to the 8
         heaviest influences and renormalised to sum 255: the glTF round-trip already caps
-        at 8 (export_all_influences/export_influence_nb=8, see BLENDER.md S3.7) and the
+        at 8 (export_all_influences/export_influence_nb=8, see docs/BLENDER.md S3.7) and the
         writer always emits a fixed-8 buffer regardless of source format (see
         rebuild_lod_buffers) -- a legal re-encoding of the same data, lossy only on the
         thin tail past 8 influences (mean measured at 3.24/vertex)."""
@@ -1497,7 +1497,7 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
         has_col = lod["col_off"] is not None
         if has_col and not C:
             # The vanilla mesh carries a vertex-colour buffer (MR uses it as mask data, mostly
-            # (0,0,0) -- see BLENDER.md S3.14), but this section's primitive(s) exported no
+            # (0,0,0) -- see docs/BLENDER.md S3.14), but this section's primitive(s) exported no
             # COLOR_0 at all. That is never expected -- blend_to_glb.py separates the mesh by
             # material before export specifically so every material gets real COLOR_0 (S3.25);
             # a primitive with none at all past that means the Color Attribute itself is gone

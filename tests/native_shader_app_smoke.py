@@ -13,7 +13,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'scripts'))
-from native_inputs import digest, verify_shaders
+from build_shader_tool import digest, verify_installed as verify_shaders
 
 
 def main():

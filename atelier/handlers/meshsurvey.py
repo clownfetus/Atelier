@@ -46,7 +46,7 @@ the streamed blob's byte layout (index width and count, vertex count, UV channel
 precision, tangent precision, skin-weight widths, colour presence). So the tail -- the only
 part whose composition cannot be derived -- is read as a small slice at a computed offset
 instead of loading a 15 MB .ubulk per asset. Verified on the reference mesh: the computed
-LOD0 tail offset yields exactly the 200,140 bytes documented in BLENDER.md 2.4.
+LOD0 tail offset yields exactly the 200,140 bytes documented in docs/BLENDER.md 2.4.
 """
 import json
 import os
@@ -292,7 +292,7 @@ def _try_lod(d, o, limit):
     """Validate a LOD record starting at `o`, or return None.
 
     Acceptance requires the section chain to be exact: BaseVertexIndex and BaseIndex are
-    running sums over the sections in order (BLENDER.md 2.2). That invariant is strong
+    running sums over the sections in order (docs/BLENDER.md 2.2). That invariant is strong
     enough to locate LOD boundaries without knowing every trailing field, which is what
     lets the walk survive the unidentified bytes after SerializeAvailabilityInfo.
     """
@@ -362,7 +362,7 @@ def _tail_candidates(a):
     loading a 15 MB .ubulk per asset. Mirrors SerializeStreamedData's buffer order.
 
     Verified against the reference mesh: LOD0 lands at 9,666,367 of a 9,866,507-byte blob,
-    leaving exactly the 200,140-byte tail BLENDER.md 2.4 measured by hand.
+    leaving exactly the 200,140-byte tail docs/BLENDER.md 2.4 measured by hand.
 
     Two candidates, because the colour buffer is CONDITIONAL. SerializeStreamedData writes
     it only `if (bHasVertexColors)` -- when a mesh has no vertex colours the buffer is

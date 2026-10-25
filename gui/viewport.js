@@ -1,4 +1,4 @@
-// 3D viewport — loads a skin's meshes (decoded to glTF by AtelierMesh/CUE4Parse), renders them
+// 3D viewport — loads a skin's meshes (decoded to glTF by AtelierNative/CUE4Parse), renders them
 // in rest pose with three.js, and tints each part from its MI material params with live recolor.
 // glTF labels are matched to cooked mesh slots through their import table. Body and weapon
 // sections keep separate identities even when their labels or material assets are shared.

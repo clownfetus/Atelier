@@ -1,0 +1,229 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Atelier <atelier@users.noreply.github.com>
+Date: Wed, 21 Oct 2026 16:34:31 -0400
+Subject: [PATCH] Generate mips with the engine's linear-light box filter;
+ encode BC7 faster
+
+Mips were bicubic-resized in sRGB space, which darkens every level (measured on
+Marvel Rivals character textures: -0.4 at mip 1 growing to -4.3 by mip 5). Each
+level is now a 2x2 box average of the previous one, in linear light for sRGB
+textures and with straight (non-premultiplied) alpha; this reproduces the game's
+own mips with ~0 bias.
+
+BC7 at BestQuality took ~25s per 1366x1366 level, making exports look hung. BC7
+now uses texconv when UASSETTOOL_TEXCONV names it (24x faster end to end), with
+every mip padded to whole 4x4 blocks first (texconv's GPU encoder mishandles
+partial blocks); otherwise BCnEncoder's Balanced mode (2x faster, +0.1-0.2 RMS).
+Encoding runs in parallel.
+---
+ src/UAssetTool/Texture/TextureInjector.cs | 165 ++++++++++++++++++++--
+ 1 file changed, 153 insertions(+), 12 deletions(-)
+
+diff --git a/src/UAssetTool/Texture/TextureInjector.cs b/src/UAssetTool/Texture/TextureInjector.cs
+index 2a55f39..ce4524c 100644
+--- a/src/UAssetTool/Texture/TextureInjector.cs
++++ b/src/UAssetTool/Texture/TextureInjector.cs
+@@ -91,7 +91,8 @@ public class TextureInjector
+ 
+             // Full mip chain DOWN TO 1x1 (cooked UE convention; the engine derives mip count from
+             // dimensions and reads the whole chain — a truncated chain causes access violations).
+-            var mipImages = generateMips ? GenerateFullMipChain(image) : new List<Image<Rgba32>> { image.Clone() };
++            bool srgb = IsSrgb(tex);
++            var mipImages = generateMips ? GenerateFullMipChain(image, srgb) : new List<Image<Rgba32>> { image.Clone() };
+             var compressed = CompressMipmaps(mipImages, fmt);
+             foreach (var mi in mipImages) mi.Dispose();
+             Console.WriteLine($"  Generated {compressed.Count} mip(s): {string.Join(", ", compressed.Select(c => $"{c.Width}x{c.Height}"))}");
+@@ -325,22 +326,80 @@ public class TextureInjector
+     
+     /// <summary>
+     /// Generate the FULL mipmap chain down to 1x1 (cooked UE convention), e.g. 4096 -> 13 mips.
++    ///
++    /// Each level is a 2x2 box average of the previous one, the engine's default (SimpleAverage)
++    /// mip filter. For sRGB textures the average is taken in linear light, as the engine does:
++    /// averaging the encoded sRGB values instead darkens every mip (measured on Marvel Rivals
++    /// character textures: -0.4 levels at mip 1 growing to -4.3 by mip 5, while the linear filter
++    /// reproduces the game's own mips with ~0 bias). Alpha is averaged straight, never
++    /// premultiplied: Rivals uses the alpha channel of many textures as a data mask.
+     /// </summary>
+-    private static List<Image<Rgba32>> GenerateFullMipChain(Image<Rgba32> source)
++    private static List<Image<Rgba32>> GenerateFullMipChain(Image<Rgba32> source, bool srgb)
+     {
+         var mips = new List<Image<Rgba32>> { source.Clone() };
+-        int width = source.Width, height = source.Height;
+-        while (width > 1 || height > 1)
+-        {
+-            width = Math.Max(1, width / 2);
+-            height = Math.Max(1, height / 2);
+-            var mip = source.Clone();
+-            mip.Mutate(x => x.Resize(width, height));
+-            mips.Add(mip);
+-        }
++        while (mips[^1].Width > 1 || mips[^1].Height > 1)
++            mips.Add(HalveBox(mips[^1], srgb));
+         return mips;
+     }
+ 
++    private static readonly float[] SrgbToLinearLut = Enumerable.Range(0, 256).Select(i =>
++    {
++        double c = i / 255.0;
++        return (float)(c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4));
++    }).ToArray();
++
++    private static byte LinearToSrgbByte(float linear)
++    {
++        double l = Math.Clamp(linear, 0f, 1f);
++        double c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.Pow(l, 1.0 / 2.4) - 0.055;
++        return (byte)Math.Clamp((int)Math.Round(c * 255.0), 0, 255);
++    }
++
++    private static Image<Rgba32> HalveBox(Image<Rgba32> source, bool srgb)
++    {
++        int w = source.Width, h = source.Height;
++        int w2 = Math.Max(1, w / 2), h2 = Math.Max(1, h / 2);
++        var src = new Rgba32[w * h];
++        source.CopyPixelDataTo(src);
++        var dst = new Rgba32[w2 * h2];
++        System.Threading.Tasks.Parallel.For(0, h2, y =>
++        {
++            int y0 = Math.Min(2 * y, h - 1), y1 = Math.Min(2 * y + 1, h - 1);
++            for (int x = 0; x < w2; x++)
++            {
++                int x0 = Math.Min(2 * x, w - 1), x1 = Math.Min(2 * x + 1, w - 1);
++                Rgba32 a = src[y0 * w + x0], b = src[y0 * w + x1], c = src[y1 * w + x0], d = src[y1 * w + x1];
++                byte alpha = (byte)((a.A + b.A + c.A + d.A + 2) / 4);
++                if (srgb)
++                {
++                    var lut = SrgbToLinearLut;
++                    dst[y * w2 + x] = new Rgba32(
++                        LinearToSrgbByte((lut[a.R] + lut[b.R] + lut[c.R] + lut[d.R]) * 0.25f),
++                        LinearToSrgbByte((lut[a.G] + lut[b.G] + lut[c.G] + lut[d.G]) * 0.25f),
++                        LinearToSrgbByte((lut[a.B] + lut[b.B] + lut[c.B] + lut[d.B]) * 0.25f), alpha);
++                }
++                else
++                {
++                    dst[y * w2 + x] = new Rgba32((byte)((a.R + b.R + c.R + d.R + 2) / 4),
++                        (byte)((a.G + b.G + c.G + d.G + 2) / 4), (byte)((a.B + b.B + c.B + d.B + 2) / 4), alpha);
++                }
++            }
++        });
++        return Image.LoadPixelData<Rgba32>(dst, w2, h2);
++    }
++
++    /// <summary>
++    /// Whether the texture samples as sRGB. UTexture::SRGB defaults to true and is only serialized
++    /// when it differs from the default, so an absent property means sRGB.
++    /// </summary>
++    private static bool IsSrgb(TextureExport tex)
++    {
++        foreach (var prop in tex.Data)
++            if (prop is UAssetAPI.PropertyTypes.Objects.BoolPropertyData b && b.Name?.Value?.Value == "SRGB")
++                return b.Value;
++        return true;
++    }
++
+     /// <summary>
+     /// Compress mipmaps to the target BC format.
+     /// </summary>
+@@ -369,12 +428,21 @@ public class TextureInjector
+                 result.Add(new CompressedMip(mip.Width, mip.Height, data));
+             }
+         }
++        else if (format == TextureCompressionFormat.BC7 && TexconvCompress(mips) is { } external)
++        {
++            result.AddRange(external);
++        }
+         else
+         {
+             // Use BCnEncoder for BC compression
+             var encoder = new BcEncoder();
+             encoder.OutputOptions.GenerateMipMaps = false; // We already have mips
+-            encoder.OutputOptions.Quality = CompressionQuality.BestQuality;
++            // BC7 at BestQuality costs ~25s per 1366x1366 level (measured), which made multi-texture
++            // exports look hung. Balanced measured 2x faster for +0.1-0.2 RMS; the other formats
++            // are already ~1s, so they keep BestQuality.
++            encoder.OutputOptions.Quality = format == TextureCompressionFormat.BC7
++                ? CompressionQuality.Balanced : CompressionQuality.BestQuality;
++            encoder.Options.IsParallel = true;
+             encoder.OutputOptions.Format = GetBCnFormat(format);
+             
+             foreach (var mip in mips)
+@@ -389,6 +457,79 @@ public class TextureInjector
+         return result;
+     }
+     
++    /// <summary>
++    /// Compress BC7 mips with DirectXTex texconv when UASSETTOOL_TEXCONV points at it (Windows):
++    /// ~10x faster than BCnEncoder (GPU when available), measured with no colour shift. The pixels
++    /// are compressed as-is (BC7_UNORM, no colour-space conversion): the texture's SRGB flag is a
++    /// sampling property and does not change the stored blocks. Returns null to fall back.
++    /// </summary>
++    private static List<CompressedMip>? TexconvCompress(List<Image<Rgba32>> mips)
++    {
++        var texconv = Environment.GetEnvironmentVariable("UASSETTOOL_TEXCONV");
++        if (string.IsNullOrEmpty(texconv) || !File.Exists(texconv)) return null;
++        var work = Path.Combine(Path.GetTempPath(), "uat-texconv-" + Guid.NewGuid().ToString("N"));
++        Directory.CreateDirectory(work);
++        try
++        {
++            var inputs = new List<string>();
++            for (int i = 0; i < mips.Count; i++)
++            {
++                // texconv's GPU encoder mishandles partial blocks (a 3x3 mip read back as flat
++                // grey), and every full chain ends in 2x2/1x1 mips. Pad to whole 4x4 blocks by
++                // repeating edge pixels -- the same blocks the built-in encoder stores.
++                var png = Path.Combine(work, $"mip{i:D2}.png");
++                using (var padded = PadToBlocks(mips[i])) padded.SaveAsPng(png);
++                inputs.Add(png);
++            }
++            var psi = new System.Diagnostics.ProcessStartInfo(texconv)
++            {
++                UseShellExecute = false, CreateNoWindow = true,
++                RedirectStandardOutput = true, RedirectStandardError = true,
++            };
++            foreach (var a in new[] { "-nologo", "-y", "-f", "BC7_UNORM", "-m", "1", "-o", work }) psi.ArgumentList.Add(a);
++            foreach (var png in inputs) psi.ArgumentList.Add(png);
++            using var proc = System.Diagnostics.Process.Start(psi)!;
++            proc.StandardOutput.ReadToEnd(); proc.StandardError.ReadToEnd();
++            if (!proc.WaitForExit(600_000) || proc.ExitCode != 0) return null;
++            var output = new List<CompressedMip>();
++            for (int i = 0; i < mips.Count; i++)
++            {
++                var dds = File.ReadAllBytes(Path.ChangeExtension(inputs[i], ".dds"));
++                int w = mips[i].Width, h = mips[i].Height;
++                int size = Math.Max(1, (w + 3) / 4) * Math.Max(1, (h + 3) / 4) * 16;
++                // DDS magic + 124-byte header, plus the 20-byte DX10 header that BC7 always carries.
++                const int offset = 4 + 124 + 20;
++                if (dds.Length < offset + size || BitConverter.ToUInt32(dds, 0) != 0x20534444) return null;
++                output.Add(new CompressedMip(w, h, dds.AsSpan(offset, size).ToArray()));
++            }
++            Console.WriteLine($"  Compressed {mips.Count} BC7 mip(s) with texconv");
++            return output;
++        }
++        catch (Exception e)
++        {
++            Console.WriteLine($"  texconv unavailable ({e.Message}); using the built-in encoder");
++            return null;
++        }
++        finally
++        {
++            try { Directory.Delete(work, true); } catch { }
++        }
++    }
++
++    private static Image<Rgba32> PadToBlocks(Image<Rgba32> source)
++    {
++        int w = source.Width, h = source.Height;
++        int pw = (w + 3) / 4 * 4, ph = (h + 3) / 4 * 4;
++        if (pw == w && ph == h) return source.Clone();
++        var src = new Rgba32[w * h];
++        source.CopyPixelDataTo(src);
++        var dst = new Rgba32[pw * ph];
++        for (int y = 0; y < ph; y++)
++            for (int x = 0; x < pw; x++)
++                dst[y * pw + x] = src[Math.Min(y, h - 1) * w + Math.Min(x, w - 1)];
++        return Image.LoadPixelData<Rgba32>(dst, pw, ph);
++    }
++
+     /// <summary>
+     /// Get BCnEncoder format from our enum.
+     /// </summary>

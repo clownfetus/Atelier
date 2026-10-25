@@ -73,6 +73,28 @@ def native_tool(exe_path):
     return cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None
 
 
+def installed_tool(exe_path):
+    """The file that actually runs for a bundled tool, or None when it is not installed: the
+    .exe on Windows, the native build beside it on Linux, else the .exe for Wine."""
+    nat = native_tool(exe_path)
+    if nat:
+        return nat
+    return str(exe_path) if os.path.isfile(str(exe_path)) else None
+
+
+class MissingToolError(FileNotFoundError):
+    """A bundled tool is not installed. Says which one and how to get it back, instead of the
+    bare "[WinError 2] The system cannot find the file specified" that reached users when an
+    installer shipped without UAssetTool. A FileNotFoundError, so every caller that already
+    handled a missing executable (OSError) keeps doing so."""
+
+    def __init__(self, path):
+        self.path = str(path)
+        name = os.path.basename(self.path)
+        super().__init__(f"{name} is missing from Atelier's tools ({os.path.dirname(self.path)}). "
+                         "Open Settings > Tools and choose Repair, or reinstall Atelier.")
+
+
 def _resolve(args):
     r"""(argv, via_wine) for a bundled-tool command line.
 
@@ -80,11 +102,15 @@ def _resolve(args):
     exists for Wine, and handing those paths to a Linux binary would point it at nothing.
     """
     if IS_WINDOWS:
+        if os.path.isabs(str(args[0])) and not os.path.isfile(str(args[0])):
+            raise MissingToolError(args[0])
         return list(args), False
     argv = list(args)
     nat  = native_tool(argv[0])
     if nat:
         return [nat] + argv[1:], False
+    if os.path.isabs(str(argv[0])) and not os.path.isfile(str(argv[0])):
+        raise MissingToolError(argv[0][:-4] if str(argv[0]).lower().endswith(".exe") else argv[0])
     wine = _wine()
     if not wine:
         raise RuntimeError(

@@ -521,7 +521,7 @@ def build_texture(scratch, template_game_rel, png, new_game_rel):
     for ext in (".ubulk", ".uptnl"):
         if os.path.isfile(injected[:-7] + ext):
             shutil.copyfile(injected[:-7] + ext, built[:-7] + ext)
-    _verify_rename(scratch, injected, built, name)
+    _verify_rename(scratch, injected, built, name, trimmed=trim)
     return [built[:-7] + ext for ext in (".uasset", ".uexp", ".ubulk", ".uptnl")
             if os.path.isfile(built[:-7] + ext)]
 
@@ -537,7 +537,19 @@ def _decoded(uasset, out_png):
         return img.size, hashlib.sha256(img.tobytes()).hexdigest()
 
 
-def _verify_rename(scratch, injected, built, name):
+def _export_serial_size(uasset, folder):
+    """The texture export's declared SerialSize (what the engine will read), or None if unreadable."""
+    os.makedirs(folder, exist_ok=True)
+    uat(["to_json", os.path.abspath(uasset), USMAP, os.path.abspath(folder)])
+    path = os.path.join(folder, Path(uasset).stem + ".json")
+    try:
+        with open(path, encoding="utf-8-sig") as stream:
+            return json.load(stream)["Exports"][0].get("SerialSize")
+    except (OSError, ValueError, KeyError, IndexError):
+        return None
+
+
+def _verify_rename(scratch, injected, built, name, trimmed=0):
     """Refuse a renamed texture that no longer decodes to what was injected.
 
     The rename rewrites the package header (two names are added) and re-emits the .uexp, while the
@@ -568,6 +580,20 @@ def _verify_rename(scratch, injected, built, name):
         got = f"{after[0][0]}×{after[0][1]}" if after else "nothing"
         raise RuntimeError(f"renaming the encoded texture changed it (decoded {got} instead of "
                            f"{before[0][0]}×{before[0][1]}), so it was not shipped")
+    # Pixels are not enough: UAssetTool before 1.5.8 decoded such a package fine, yet wrote 8
+    # stray bytes after the texture data of a renamed package, and the game crashed loading it
+    # ("ObjectSerializationError ... Serial size mismatch: Expected read size N+8, Actual read
+    # size N"). Renaming changes names, never the texture payload, so the export's declared size
+    # must equal that of the same image injected into the untouched template, less any duplicate
+    # None trailer the rename deliberately dropped (`trimmed`, from _duplicate_none_bytes).
+    expected = _export_serial_size(injected, os.path.join(folder, "size-injected"))
+    actual = _export_serial_size(built, os.path.join(folder, "size-renamed"))
+    if expected is not None:
+        expected -= trimmed
+    if expected is not None and actual != expected:
+        raise RuntimeError(f"renaming the encoded texture changed its size ({actual} bytes instead of "
+                           f"{expected}); the game would crash loading it, so it was not shipped. "
+                           "Update Atelier's tools (Settings > Tools) and try again.")
 
 
 def apply(doc, material_game_rel, slots, scratch, project_dir=None):

@@ -1,12 +1,12 @@
 """Phase 4 — texture & material. Run: .venv/bin/python tests/test_phase4.py
 
-PHASES.md calls this "the first phase that needs your game", meaning a mod has to be exported and
+docs/PHASES.md calls this "the first phase that needs your game", meaning a mod has to be exported and
 looked at in-engine. Most of it turned out to be checkable before that: the parts that decide
 whether the mod is CORRECT — which path an asset is staged at, what the injected pixels actually
 are, whether an option reaches the builder — are all on this side of the game, and they are what
 this file asserts.
 
-What is NOT here, and is still the in-game check PHASES.md asks for:
+What is NOT here, and is still the in-game check docs/PHASES.md asks for:
   * whether the shader honours a zero-alpha ColorID the way the region maths says it does (#12)
   * whether a UI texture stops being mip-blurred once its group is TEXTUREGROUP_UI (#20)
   * whether "blanked" reads as gone rather than as a black hole on a particular material (#22)
@@ -220,15 +220,33 @@ def t_switching_an_option_off_removes_it():
 
     Storing an option at its default would make a project that had only ever LOOKED at the control
     immune to a later change of default — the same trap the deselected-set exists to avoid for
-    selection. no_mips defaults on, so it is stored only when switched off."""
+    selection. no_mips defaults on for UI textures and off for everything else, so it is stored
+    only when it differs from its own asset's default."""
     with sandbox() as sb:
         PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": False, "blank": True})
         PM.set_asset_opts(sb.project, "UI/T_A", {"no_mips": True})
         assert PM.get_asset_opts(sb.project, "UI/T_A") == {"blank": True}
-        assert PM.effective_asset_opts(PM.get_asset_opts(sb.project, "UI/T_A")) == {"no_mips": True, "blank": True}
+        assert PM.effective_asset_opts(PM.get_asset_opts(sb.project, "UI/T_A"), "UI/T_A") == {"no_mips": True, "blank": True}
         PM.set_asset_opts(sb.project, "UI/T_A", {"blank": False})
         raw = json.load(open(os.path.join(sb.project, ".atelier", "project.json"), encoding="utf-8"))
         assert raw.get("asset_opts") == {}, raw.get("asset_opts")
+        body = "Characters/1020/1020001/Texture/T_1020001_Body_D"
+        assert PM.effective_asset_opts({}, body) == {"no_mips": False}
+        PM.set_asset_opts(sb.project, body, {"no_mips": False})
+        assert PM.get_asset_opts(sb.project, body) == {}
+        PM.set_asset_opts(sb.project, body, {"no_mips": True})
+        assert PM.get_asset_opts(sb.project, body) == {"no_mips": True}
+
+
+def t_no_mips_defaults_on_only_for_ui_textures():
+    """A single mip blurs nothing on fixed-size UI art, but makes character and world textures
+    shimmer and read brighter at a distance -- the "every export looks brighter" report."""
+    for rel in ("UI/Textures/HeroLogo/img_herologo_1011_logo", "Marvel_LQ/UI/Textures/T_X",
+                "Plugins/MarvelGAS/UI/Common/Textures/T_Icon"):
+        assert PM.asset_opt_defaults(rel)["no_mips"] is True, rel
+    for rel in ("Characters/1020/1020001/Texture/T_1020001_Body_D", "VFX/Textures/T_Fire",
+                "Characters/1020/1020001/Texture/T_UI_Lookalike_D", None):
+        assert PM.asset_opt_defaults(rel)["no_mips"] is False, rel
 
 
 def t_deleting_an_asset_forgets_its_options():
@@ -259,6 +277,7 @@ def t_the_sidebar_can_see_an_altered_export():
 
 
 for t in (t_options_round_trip_per_project, t_switching_an_option_off_removes_it,
+          t_no_mips_defaults_on_only_for_ui_textures,
           t_deleting_an_asset_forgets_its_options, t_a_legacy_project_reads_as_defaults,
           t_the_sidebar_can_see_an_altered_export):
     check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
@@ -466,7 +485,7 @@ from PIL import Image
 def t_there_is_no_material_parameter_for_this():
     """Why this ships a texture and not a parameter edit — the record of the decision.
 
-    PHASES.md's pivot signal says to fall back to the alpha-ColorID trick if the material path
+    docs/PHASES.md's pivot signal says to fall back to the alpha-ColorID trick if the material path
     cannot do it. It cannot: the real dyeing MIs (MI_1050103_Body_01, MI_10600_1060300_Equip_01)
     expose BaseTint, UseDyeingGBChannel and the Region N sets, and nothing that switches dyeing off.
     """
@@ -859,7 +878,7 @@ def t_an_encode_gets_longer_than_the_default_cap():
 
     Injecting a texture rebuilds its mip chain, and BC7 is the slowest encoder in the set: three
     2048x2048 BC7 injections plus the pack took 804s on 2026-09-20, ~270s each. Two of three
-    legitimate injections were killed at 300s and reported to the user as a failure. PHASES.md's
+    legitimate injections were killed at 300s and reported to the user as a failure. docs/PHASES.md's
     pivot signal for #6 says to raise it and write down the real duration rather than revert.
     """
     from atelier.tools import _timeout_for, UAT_TIMEOUT

@@ -22,7 +22,8 @@ from atelier import hostos
 # legacy->Zen conversion (a no-op repack of Arakko crashes in-game), so level mods are built the
 # mr_app way instead: patch the VALUE bytes into the vanilla Zen chunk read from the game container,
 # and rebuild the container with io_lib. retoc is used only to pack a 1-sublevel TEMPLATE container.
-RETOC = os.path.join(TOOLS, "shaders", "retoc-rivals-cli.exe")
+from atelier.tools import container_retoc as _container_retoc
+RETOC = _container_retoc()
 # UAssetGUI = the FAITHFUL level round-trip writer. UAssetTool's from_json corrupts a level's
 # PostProcessVolume object refs (WeightedBlendables/cubemap/curves) -> in-game "Bad export/import
 # index" crash; UAssetGUI's fromjson (the writer that shipped the whole S8.5 roster) re-serializes

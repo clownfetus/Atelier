@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
-// AtelierMesh's SharpGLTF exporter swaps Y/Z but does not conjugate rotations.
+// AtelierNative's (CUE4Parse) SharpGLTF exporter swaps Y/Z but does not conjugate rotations.
 // Its inverse binds cancel that discrepancy for resting vertices, so exported
 // joint positions cannot be used as physical sockets. Reconstruct the physical
 // reference in metres, then carry animated deformation through the exported bind.
-// This is the same basis conversion used by AtelierAnimation's version 2 tracks.
+// This is the same basis conversion used by AtelierNative animation's version 2 tracks.
 export function attachmentRig(gltf) {
   const root=gltf.scene, nodes=new Map(), reference=new Map(), physical=new Map();
   root.updateMatrixWorld(true);

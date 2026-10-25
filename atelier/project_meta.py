@@ -42,9 +42,23 @@ _UNKNOWN  = "unknown"   # project predates version stamping — never guess a nu
 
 _lock = threading.RLock()
 
-# Asset options that default ON. Only a value that differs from its default is stored, so
-# switching one off writes False and an untouched asset keeps following the default.
-ASSET_OPT_DEFAULTS = {"no_mips": True}
+# Asset options whose default is not "off". Only a value that differs from its asset's default is
+# stored, so switching one writes the difference and an untouched asset follows the default.
+#
+# no_mips defaults ON only for UI textures. UI art is drawn at a fixed size, where a mip chain only
+# blurs it (the request it was added for). On character and world textures a single mip makes
+# distant surfaces shimmer and read brighter, specular (_S) maps worst of all -- that was the
+# "every export looks slightly brighter / has glare" report while it defaulted on for everything.
+ASSET_OPT_DEFAULTS = {"no_mips": False}
+
+
+def is_ui_texture(game_rel):
+    """True for assets under a UI folder (UI/..., Marvel_LQ/UI/..., a plugin's .../UI/...)."""
+    return any(part.lower() == "ui" for part in (game_rel or "").replace("\\", "/").split("/")[:-1])
+
+
+def asset_opt_defaults(game_rel=None):
+    return {**ASSET_OPT_DEFAULTS, "no_mips": is_ui_texture(game_rel)}
 
 
 def current_version():
@@ -122,7 +136,7 @@ def get_asset_opts(project_dir, game_rel=None):
 
     Keys in use (all optional; absent means ASSET_OPT_DEFAULTS, else "vanilla behaviour"):
       no_mips   bool - ship a single top mip instead of the full chain (inject_texture --no-mips);
-                       on unless stored False
+                       defaults on for UI textures only (asset_opt_defaults)
       lod_group str  - override the texture's LODGroup/TEXTUREGROUP_* (its texture group)
       blank     bool - ship the texture fully transparent instead of the edited PNG
       dye_off   bool - on a MATERIAL: also ship a neutral ColorID mask so the dye system stops
@@ -143,9 +157,9 @@ def get_asset_opts(project_dir, game_rel=None):
     return dict(opts.get(game_rel) or {})
 
 
-def effective_asset_opts(opts):
-    """One asset's stored options with the defaults filled in, as export and the dialog read them."""
-    return {**ASSET_OPT_DEFAULTS, **(opts or {})}
+def effective_asset_opts(opts, game_rel=None):
+    """One asset's stored options with its defaults filled in, as export and the dialog read them."""
+    return {**asset_opt_defaults(game_rel), **(opts or {})}
 
 
 def set_asset_opts(project_dir, game_rel, opts):
@@ -159,7 +173,7 @@ def set_asset_opts(project_dir, game_rel, opts):
         d   = load(project_dir)
         cur = dict(d["asset_opts"].get(game_rel) or {})
         for k, v in (opts or {}).items():
-            if v in (None, "") or v == ASSET_OPT_DEFAULTS.get(k, False):
+            if v in (None, "") or v == asset_opt_defaults(game_rel).get(k, False):
                 cur.pop(k, None)
             else:
                 cur[k] = v

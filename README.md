@@ -1,54 +1,40 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.2** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.3** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.2](docs/release-1.1.2.md)
+· [What's new in 1.1.3](docs/release-1.1.3.md)
 · [Tutorials](#tutorials)
-· [Development guide](DEVELOPMENT.md)
+· [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.1.2 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier 1.1.3 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.2
+## What's new in 1.1.3
 
-- **Follow the ink.** Loading, saving, exporting and finding the game configuration
-  share fluid flows along the app's borders, with hero and costume colours and
-  a visible reaction when work finishes. Try them in **Settings → Try Krackle**.
-- **Inspect connected model parts.** Assembly View links surfaces to their
-  geometry, verified materials and textures. UV X-Ray overlays decoded UV0 on a
-  texture and exports a transparent wireframe PNG.
-- **Shape effects together.** VFX Motionboard adds synchronized LUT tracks,
-  playback, original/edited comparison and 2D particle proxies. The proxies are
-  editing aids; they do not reproduce Unreal rendering or simulation.
-- **Edit materials in batches.** Review opacity, scalar, colour, parent and full
-  material changes across up to 1,000 assets.
-- **Start with a matching installer.** Paper and Ink artwork brings the app's
-  visual language into Windows setup. Browsing also gains corrected hero artwork
-  and reused costume previews, while save feedback preserves newer drafts.
+- **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
+  costume colours along the app's borders. Try the examples in **Settings → Try Krackle**.
+- **Quieter Windows pickers.** File and folder selection opens without a PowerShell console.
+- **Textures match the game's brightness.** Exports keep their mip chain and build mips the way
+  the game does, so textures no longer look brighter or glarey at a distance.
+- **BC7 exports finish in seconds,** and textures added at a custom path no longer crash the game.
+- **Assembly View** shows a model surface's material and connected texture slots.
+- **VFX Motionboard** edits Niagara LUT tracks on a timeline with playback and comparison.
+- **Bulk edit materials** changes up to 1,000 materials at once.
+- **Settings → Tools** shows tool versions and updates, repairs or rolls back the container tool.
+- **Linux AppImage** runs on newer distributions, with native model previews and animations.
 
-See the [patch notes](docs/release-1.1.2.md) for details and verification limits.
+See the [patch notes](docs/release-1.1.3.md) for details and verification limits.
 
 ## Included from 1.1.1
 
 - **Send models to Blender.** Use the bundled Atelier Live Bridge extension with an
-  open Blender session, or export a portable `.blend`. [Setup guide](BLENDER.md).
-- **Find more folders by name.** Character and costume names and artwork follow
-  recognized IDs across the library, search, breadcrumbs, pins and asset pickers.
-- **Use HDR cubemaps.** Import Radiance panoramas, six-face strips or HDR DDS
-  cubemaps, including material reflection slots, with all six faces retained.
-- **Keep Blender projects smaller.** Pack model textures into the `.blend`
-  without adding them to the project; existing painted textures are preserved.
-- **Prepare models faster on Windows.** Reuse the game reader, batch extraction
-  and load the selected body and weapons before optional forms and attachments.
-- **Preview and export more reliably.** Character materials, masks, weapon grips,
-  alternate forms and the T_Visor texture export error have dedicated fixes.
-  Replacement preparation preserves geometry modifiers and winding and catches
-  unassigned faces before rebuilding lower detail levels.
-
-See the [patch notes](docs/release-1.1.1.md) for details and verification limits.
+  open Blender session, or export a portable `.blend`. [Setup guide](docs/BLENDER.md).
+- **Find more folders by name** across the library, search, breadcrumbs, pins and asset pickers.
+- **Use HDR cubemaps,** including material reflection slots, with all six faces retained.
+- **Prepare models faster on Windows** and preview and export characters more reliably.
 
 ## Included from 1.1
 
@@ -83,8 +69,8 @@ See the [patch notes](docs/release-1.1.1.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-These instructions describe **1.1.2**. Check the release title when downloading;
-a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.2.md)
+These instructions describe **1.1.3**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.3.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -272,7 +258,7 @@ executable path in Settings.
 
 Download `Atelier-<version>-x86_64.AppImage` from a
 [release with a Linux build](https://github.com/clownfetus/Atelier/releases),
-mark it executable, and launch it. See [LINUX.md](LINUX.md) for platform setup.
+mark it executable, and launch it. See [LINUX.md](docs/LINUX.md) for platform setup.
 Download a new AppImage when updating; the in-app installer update flow is Windows-only.
 
 ## Updates
@@ -288,7 +274,7 @@ the installer is designed to retain projects, exports and settings.
 
 Commits and merged pull requests do not update installed copies. Maintainers
 must build and publish a higher-version release with the installer attached.
-Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
+Source checkouts are updated through Git; see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Tutorials
 
@@ -297,8 +283,8 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](DEVELOPMENT.md).
 - [Import HDR cubemaps](#hdr-cubemaps)
 - [Process S maps](#process-s-maps)
 - [Replace a material](#replace-a-material)
-- [Live Blender setup, portable scenes and mesh editing](BLENDER.md#send-to-blender-or-export-a-portable-scene)
-- [Linux installation and updates](LINUX.md#install-and-update)
+- [Live Blender setup, portable scenes and mesh editing](docs/BLENDER.md#send-to-blender-or-export-a-portable-scene)
+- [Linux installation and updates](docs/LINUX.md#install-and-update)
 - [Skin Swapper export](#skin-swapper-mods) and [isolated integration testing](docs/skin-swapper-testing.md)
 
 ## Basic workflow
@@ -392,19 +378,19 @@ a file is safe.
 
 ## Development and release builds
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for isolated source setup and verification,
-[CONTRIBUTION_NOTES.md](CONTRIBUTION_NOTES.md) for the feature/review map, and
-[PACKAGING.md](PACKAGING.md) for portable review packages. A portable review ZIP
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for isolated source setup and verification,
+[CONTRIBUTION_NOTES.md](docs/CONTRIBUTION_NOTES.md) for the feature/review map, and
+[PACKAGING.md](docs/PACKAGING.md) for portable review packages. A portable review ZIP
 must be extracted in full; `Atelier.exe` needs its adjacent `_internal` directory.
 
 To make a Windows release discoverable by existing installations:
 
-1. Build the intended source with a higher numeric version, such as `1.1.2`.
+1. Build the intended source with a higher numeric version, such as `1.1.3`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
-   using the [installer checks](DEVELOPMENT.md#disposable-windows-installer-verification).
+   using the [installer checks](docs/DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`1.1.2` or `v1.1.2`) and attaching the installer named **AtelierSetup.exe**.
+   (`1.1.3` or `v1.1.3`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the
    installed version; replacing an EXE under the same version will not trigger it.
 

@@ -1,17 +1,22 @@
 name: Build and verify release candidate
+# Builds both platforms from source with the pinned toolchain (toolchain/tools.lock.json), runs
+# the backend, browser, frozen-app, installer-upgrade and AppImage checks, then assembles the
+# release bundle. Nothing is published: a maintainer reviews the artifacts and publishes.
 on:
   push:
     branches: ['codex/release-*', 'release/*-candidate']
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  PYTHON_VERSION: '3.15'
+  DOTNET_VERSION: '10.0.402'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  PYTHONUTF8: '1'
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 45
-    env:
-      PYTHONUTF8: '1'
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -19,52 +24,20 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12'
-      - name: Prepare pinned Windows compiler and build environment
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Prepare the pinned build environment (.venv, Inno Setup, WebView2)
         shell: pwsh
         run: |
           ./scripts/bootstrap_windows.ps1 -Python (Get-Command python).Source -ToolchainDir "$env:RUNNER_TEMP/AtelierToolchain" -InstallWebView2
           "ISCC=$env:ISCC" >> $env:GITHUB_ENV
-          "$PWD/.venv-build/Scripts" >> $env:GITHUB_PATH
-          & ./.venv-build/Scripts/python.exe -m pip install -r requirements-dev.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$PWD/.venv/Scripts" >> $env:GITHUB_PATH
           "ATELIER_VERSION=$((Get-Content version -Raw).Trim())" >> $env:GITHUB_ENV
       - run: python -m playwright install chromium
       - run: python tests/run_checks.py --report-dir reports/backend
       - run: python tests/browser_smoke.py --report-dir reports/browser
-      - run: python scripts/release_inputs.py
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
-        with:
-          dotnet-version: '10.0.402'
-      - name: Verify exact native inputs and rebuild the standing idle decoder
-        shell: pwsh
-        run: |
-          python scripts/verify_native_inputs.py --tools Tools --tool animation --report reports/native-tools/verified-mesh-inputs.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/build_animation_decoder.py --tools Tools --output "$env:RUNNER_TEMP/AtelierAnimation-built"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          foreach ($name in @('AtelierAnimation.exe', 'CUE4Parse-Natives.dll', 'oo2core_9_win64.dll')) {
-            Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierAnimation-built/$name" -Destination "Tools/AtelierAnimation/$name" -Force
-          }
-          Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierAnimation-built/build-inputs.json" -Destination reports/native-tools/animation-build-inputs.json
-      - name: Build the persistent import server against the pinned mesh libraries
-        shell: pwsh
-        run: |
-          python scripts/build_import_server.py --tools Tools
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item -LiteralPath Tools/AtelierImport/build-inputs.json -Destination reports/native-tools/import-build-inputs.json
-      - name: Build the maintained shader fork from exact upstream and compiler archives
-        shell: pwsh
-        run: |
-          python scripts/build_shader_tool.py --tools Tools --output "$env:RUNNER_TEMP/AtelierShader-built" --cache "$env:RUNNER_TEMP/AtelierShader-archives" --log reports/native-tools/shader-build.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          foreach ($name in @('retoc-rivals-cli.exe', 'oo2core_9_win64.dll', 'build-inputs.json')) {
-            Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierShader-built/$name" -Destination "Tools/shaders/$name" -Force
-          }
-          Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierShader-built/licenses" -Destination Tools/shaders -Recurse -Force
-          Copy-Item -LiteralPath "$env:RUNNER_TEMP/AtelierShader-built/build-inputs.json" -Destination reports/native-tools/shader-build-inputs.json
-          python scripts/verify_native_inputs.py --tools Tools --require-shader-source --report reports/native-tools/verified-inputs.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Stage the Skin Swapper template from encrypted release inputs
         shell: pwsh
         env:
@@ -77,17 +50,9 @@ jobs:
           New-Item -ItemType Directory -Force Tools/Galacta | Out-Null
           [IO.File]::WriteAllBytes("$PWD/Tools/Galacta/GAL_ConfigTemplate.uasset", [Convert]::FromBase64String($env:GALACTA_UASSET))
           [IO.File]::WriteAllBytes("$PWD/Tools/Galacta/GAL_ConfigTemplate.uexp", [Convert]::FromBase64String($env:GALACTA_UEXP))
-      - run: python -m PyInstaller --noconfirm --clean Atelier.spec
-      - run: python scripts/stage_tools.py --platform windows
-      - run: python scripts/release_manifest.py
-      - name: Compile installer
-        shell: pwsh
-        run: |
-          $version = (Get-Content version -Raw).Trim()
-          & $env:ISCC Atelier.iss "/DAppVersion=$version"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/release_manifest.py --manifest
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build tools from the lockfile, freeze, stage and compile the installer
+        run: python scripts/build.py --platform windows
+      - run: python scripts/release_manifest.py --manifest
       - name: Verify the frozen WebView2 application
         run: python tests/frozen_smoke.py --exe dist/Atelier/Atelier.exe --report-dir reports/frozen --viewer-checks --viewer-followups --roster-checks
       - name: Archive the verified portable payload
@@ -123,14 +88,13 @@ jobs:
     timeout-minutes: 20
     env:
       ATELIER_DISPOSABLE_INSTALLER_TEST: '1'
-      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12'
+          python-version: ${{ env.PYTHON_VERSION }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: windows-installer
@@ -149,22 +113,28 @@ jobs:
           name: installer-report-${{ matrix.os }}
           path: ${{ runner.temp }}/installer-report
   linux:
+    # Ubuntu 24.04 (glibc 2.39): the AppImage runs on this and anything newer. GTK, GLib and
+    # WebKitGTK come from the user's system as one set (see packaging/Atelier.spec).
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Install native Linux GUI build dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-venv python3-gi gir1.2-webkit2-4.1 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core
-      - run: python3 -m venv --system-site-packages .venv
-      - run: .venv/bin/python -m pip install -r requirements-build.txt -r requirements-dev.txt
-      # UV geometry/export regressions exercise a real browser in the backend suite.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install GTK/WebKit build and GUI test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-webkit2-4.1 \
+            libwebkit2gtk-4.1-0 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core libfuse2t64
+      - run: python -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
       - run: .venv/bin/python -m playwright install --with-deps chromium
       - run: .venv/bin/python tests/run_checks.py --report-dir reports/backend
-      - run: .venv/bin/python scripts/release_inputs.py
       - name: Stage the Skin Swapper template from encrypted release inputs
         shell: bash
         env:
@@ -178,8 +148,10 @@ jobs:
           mkdir -p Tools/Galacta
           printf '%s' "$GALACTA_UASSET" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uasset
           printf '%s' "$GALACTA_UEXP" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uexp
-      - run: bash linux/build_appimage.sh
-      - run: .venv/bin/python scripts/release_manifest.py
+      - name: Build tools from the lockfile, freeze, stage and assemble the AppImage
+        run: .venv/bin/python scripts/build.py --platform linux
+      - name: Download the previous AppImage for the upgrade gate
+        run: .venv/bin/python scripts/release_inputs.py
       - name: Verify native AppImage, WebKit setup and upgrade preservation
         shell: bash
         run: |
@@ -187,7 +159,7 @@ jobs:
           xvfb-run -a dbus-run-session -- bash -c '
             openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
             export GTK_MODULES=gail:atk-bridge NO_AT_BRIDGE=0
-            .venv/bin/python tests/linux_appimage_smoke.py --appimage "dist/Atelier-'"$version"'-x86_64.AppImage" --source "$PWD" --previous-appimage "$RUNNER_TEMP/atelier-previous.AppImage" --report-dir "$RUNNER_TEMP/appimage-smoke"
+            /usr/bin/python3 tests/linux_appimage_smoke.py --appimage "dist/Atelier-'"$version"'-x86_64.AppImage" --source "$PWD" --previous-appimage "$RUNNER_TEMP/atelier-previous.AppImage" --report-dir "$RUNNER_TEMP/appimage-smoke"
           '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -215,7 +187,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12'
+          python-version: ${{ env.PYTHON_VERSION }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: ${{ runner.temp }}/candidate-artifacts

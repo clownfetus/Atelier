@@ -185,7 +185,7 @@ def repoint(base, repoints, usmap=None, verbose=True):
     patches base.uexp's FSkeletalMaterial entries. Returns a list of applied descriptions.
 
     Must run BEFORE `uat fix`, which stays the last word on the export's SerialSize (see
-    BLENDER.md S3.13).
+    docs/BLENDER.md S3.13).
     """
     from atelier.handlers import mesh as _mesh
 

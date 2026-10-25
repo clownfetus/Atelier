@@ -343,7 +343,7 @@ def static(path):
     r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return r
 
-# ── 3D viewport (mesh -> glTF via AtelierMesh / CUE4Parse) ────────────────────
+# ── 3D viewport (mesh -> glTF via AtelierNative / CUE4Parse) ──────────────────
 from atelier.tools import atelier_mesh
 from atelier.paths import skin_entries, skin_rel
 
@@ -450,7 +450,7 @@ def _model_glb(game_rel):
     if elsewhere:
         return elsewhere
     detail = "\n".join(l for l in ((r.stderr or "") + (r.stdout or "")).splitlines() if l.strip())[-600:]
-    message = (f"AtelierMesh could not decode {name} (exit code {r.returncode})"
+    message = (f"Atelier could not decode {name} (exit code {r.returncode})"
                + (f":\n{detail}" if detail else ", and it gave no reason."))
     # The decoder's own reason is often just "export failed". When it could also see installed
     # mods, a mod that overrides this mesh is the likeliest cause, and the user can test that.
@@ -1365,6 +1365,49 @@ def api_update_check():
     _update_cache = {"tag": tag, "download_url": download_url, "release_url": release_url}
     print(f"[update] update available: {current} -> {remote}")
     return json.dumps({"available": True, "tag": tag})
+
+
+# ── native tool updates (Settings > Tools) ─────────────────────────────────────
+# Game patches break container tools long before an Atelier release can ship. These routes install
+# reviewed, hash-pinned tool builds from the update channel (atelier/tool_updates.py).
+@app.get("/api/tools_status")
+def api_tools_status():
+    from atelier import tool_updates
+    response.content_type = "application/json"
+    return json.dumps(tool_updates.status(check=request.query.get("check") == "1"))
+
+
+@app.post("/api/tools_update")
+def api_tools_update():
+    from atelier import tool_updates
+    response.content_type = "application/json"
+    name = (request.json or {}).get("name")
+    try:
+        if name:
+            return json.dumps({"ok": True, "updated": [name], "tool": tool_updates.install(name)})
+        return json.dumps(tool_updates.update_all())
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+@app.post("/api/tools_repair")
+def api_tools_repair():
+    from atelier import tool_updates
+    response.content_type = "application/json"
+    try:
+        return json.dumps(tool_updates.repair())
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+@app.post("/api/tools_rollback")
+def api_tools_rollback():
+    from atelier import tool_updates
+    response.content_type = "application/json"
+    try:
+        return json.dumps({"ok": True, "tool": tool_updates.rollback((request.json or {}).get("name", ""))})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
 
 
 @app.post("/api/update_open_release")
@@ -3384,7 +3427,7 @@ def api_asset_opts():
     from atelier.handlers.texture import (TEXTURE_GROUPS, texture_props, texture_format,
                                           format_has_alpha)
     out = {"ok": True, "game_rel": gr,
-           "opts": _project_meta.effective_asset_opts(_project_meta.get_asset_opts(get_import_root(), gr)),
+           "opts": _project_meta.effective_asset_opts(_project_meta.get_asset_opts(get_import_root(), gr), gr),
            "groups": list(TEXTURE_GROUPS), "current_group": "", "has_lq": False,
            "dyeable": False, "mask": "", "format": "", "blank_alpha": True}
     try:
@@ -3438,7 +3481,7 @@ def api_asset_opts_save():
         clean["lod_group"] = g
     try:
         cur = _project_meta.set_asset_opts(get_import_root(), gr, clean)
-        return json.dumps({"ok": True, "opts": _project_meta.effective_asset_opts(cur)})
+        return json.dumps({"ok": True, "opts": _project_meta.effective_asset_opts(cur, gr)})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 

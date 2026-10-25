@@ -1,9 +1,28 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.2**.
+**1.1.3**.
 
 ## Unreleased
+
+## 1.1.3 — 25 October 2026
+
+### Upstream integration and exports
+
+- Integrate upstream through `25196ea`, including the unified native toolchain,
+  reorganized packaging and Python 3.15 build environment.
+- Keep mip chains for character, weapon and world textures, use linear-light
+  mip generation, and accelerate BC7 encoding with the bundled texture tool.
+- Validate renamed texture sizes before exporting assets at custom paths.
+- Consolidate model previews, animation decoding and persistent imports into
+  AtelierNative, built from pinned source on Windows and Linux.
+- Add Settings → Tools for verified container-tool updates, repair and rollback,
+  with file hashes and command probes checked before replacement.
+- Build Linux packages with system GTK and WebKit together, and preserve the
+  application version when checking AppImage upgrades.
+- Hide the PowerShell console when opening Windows file and folder pickers.
+- Preserve the connected hero/skin-coloured ink flows, draft safeguards and
+  Paper and Ink installer from the preceding release candidate.
 
 ## 1.1.2 — 22 October 2026
 

@@ -223,8 +223,9 @@ Tools/
 # Project Galacta's Skin Swapper template may not be redistributed outside Atelier: never commit it,
 # wherever it is copied (atelier/skin_swapper.py reads it from Tools/Galacta/).
 GAL_ConfigTemplate.*
-tools-src/**/bin/
-tools-src/**/obj/
+# Native tools are fetched/built from toolchain/tools.lock.json (scripts/toolchain.py), never committed.
+native/**/bin/
+native/**/obj/
 extracted/
 _work/
 _logs/
@@ -233,11 +234,10 @@ mr_config.json
 _cache/
 _webview/
 Atelier.exe
-# ooz checkout built by linux/build_ooz.sh into Tools/libooz.so
-linux/_ooz/
 
 # discord retrieval scratch (contains user token + scraped msgs)
 retrieval/.env
 retrieval/data/
 retrieval/test.py
-linux/_appimagetool/
+# Additional local virtual environments (.venv312 etc.)
+.venv*/

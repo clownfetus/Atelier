@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 sys.path.insert(0, str(ROOT))
 import build_shader_tool as B
-import native_inputs as N
+import toolchain as T
 from atelier import config as C
 
 
@@ -28,13 +28,14 @@ class ShaderBuildInputs(unittest.TestCase):
 
     def test_source_lock_identifies_the_complete_cargo_graph_and_reconstruction(self):
         lock = B.load_shader_lock()
-        native = N.load_lock()['shader']
-        self.assertEqual(native['source']['build_lock_sha256'], N.digest(B.LOCK))
-        self.assertEqual(native['source']['status'], 'verified')
-        self.assertEqual(native['legacy']['source']['status'], 'unavailable')
+        native = T.tool(T.load_lock(), 'retoc-shaders')
+        self.assertEqual((native['kind'], native['builder'], native['platforms']), ('build', 'atelier-shader', ['windows']))
+        self.assertIn('shaders/build-inputs.json', native['files']['windows'])
+        self.assertEqual(set(native['probe']['expect']), set(B.COMMANDS))
+        self.assertEqual(B.SOURCE, ROOT / 'native/AtelierShader')
         self.assertEqual(len(lock['compiler']['rust_commit']), 40)
         self.assertIn('Cargo.lock', lock['sources'])
-        self.assertEqual(set(native['commands']), {'dump-shaders', 'extract-shader', 'patch-shader', 'unpack', 'pack', 'info'})
+        self.assertEqual(set(B.COMMANDS), {'dump-shaders', 'extract-shader', 'patch-shader', 'unpack', 'pack', 'info'})
         for pin in lock['upstream'].values():
             self.assertEqual(len(pin['revision']), 40)
             self.assertTrue(pin['url'].endswith(pin['revision']))
@@ -154,7 +155,7 @@ let fixture = "''' + key + '''".parse()?;
         tools.mkdir(parents=True)
         (tools / 'oo2core_9_win64.dll').write_bytes(b'fixture native')
         lock = dict(schema=1, sources={}, recipe={}, upstream={}, git_dependencies={},
-                    compiler={'rust_commit': 'a' * 40}, native_files={'oo2core_9_win64.dll': N.digest(tools / 'oo2core_9_win64.dll')})
+                    compiler={'rust_commit': 'a' * 40}, native_files={'oo2core_9_win64.dll': B.digest(tools / 'oo2core_9_win64.dll')})
         path = self.root / 'build.lock.json'
         original_lock = json.dumps(lock).encode()
         path.write_bytes(original_lock)
@@ -176,7 +177,23 @@ let fixture = "''' + key + '''".parse()?;
              patch.object(B, 'checked_run', side_effect=run):
             result = B.build(self.root / 'Tools', self.root / 'published', self.root / 'cache', self.root / 'build.log')
         self.assertEqual(result['build_lock_sha256'], hashlib.sha256(original_lock).hexdigest())
-        self.assertNotEqual(result['build_lock_sha256'], N.digest(path))
+        self.assertNotEqual(result['build_lock_sha256'], B.digest(path))
+
+    def test_installed_build_is_reused_only_while_lock_and_outputs_match(self):
+        folder = self.root / 'shaders'
+        folder.mkdir()
+        (folder / 'retoc-rivals-cli.exe').write_bytes(b'fixture executable')
+        lock = dict(schema=1, sources={'a': '1'}, recipe={}, upstream={}, compiler={}, git_dependencies={}, native_files={})
+        lock_bytes = json.dumps(lock).encode()
+        manifest = dict(tool='AtelierShader', build_lock_sha256=hashlib.sha256(lock_bytes).hexdigest(), **{
+            k: v for k, v in lock.items() if k != 'schema'}, outputs={'retoc-rivals-cli.exe': B.digest(folder / 'retoc-rivals-cli.exe')})
+        (folder / 'build-inputs.json').write_text(json.dumps(manifest))
+        self.assertTrue(B.provenance_matches(folder, lock_bytes))
+        changed_lock = json.dumps(dict(lock, sources={'a': '2'})).encode()
+        self.assertFalse(B.provenance_matches(folder, changed_lock))
+        (folder / 'retoc-rivals-cli.exe').write_bytes(b'tampered')
+        self.assertFalse(B.provenance_matches(folder, lock_bytes))
+        self.assertFalse(B.provenance_matches(self.root / 'missing', lock_bytes))
 
     def test_failed_build_cleanup_handles_windows_long_cargo_paths(self):
         workspace = None

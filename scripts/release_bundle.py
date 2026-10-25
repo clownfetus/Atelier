@@ -72,9 +72,9 @@ def main():
     if data.get('previous_appimage_sha256')!=inputs['linux_seed_sha256']:
         raise RuntimeError('Linux upgrade gate did not use the pinned previous release')
     checks['linux_appimage']=data
-    input_paths=['version','CHANGELOG.md','gui','atelier','main.py','window.py','io_lib.py','Atelier.spec',
-                 'Atelier.iss','requirements.txt','requirements-build.txt','requirements-dev.txt',
-                 'scripts','tools-src','linux','images',
+    input_paths=['version','CHANGELOG.md','gui','atelier','main.py','window.py','io_lib.py',
+                 'requirements.txt','requirements-build.txt','requirements-dev.txt',
+                 'scripts','native','toolchain','packaging','images',
                  f'docs/release-{version}.md',f'docs/discord-{version}.md',
                  f'tests/fixtures/installer/release-{version}-inputs.json']
     changed=subprocess.check_output(['git','status','--porcelain','--untracked-files=all','--',*input_paths],cwd=ROOT,text=True)

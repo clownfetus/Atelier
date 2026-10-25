@@ -90,7 +90,7 @@ class ModelGltf(unittest.TestCase):
         status, body = self.call()
         self.assertEqual(status, 500)
         error = json.loads(body)["error"]
-        self.assertIn("AtelierMesh could not decode SK_1024_1024503 (exit code 3)", error)
+        self.assertIn("Atelier could not decode SK_1024_1024503 (exit code 3)", error)
         self.assertIn("unsupported skeletal mesh version 7", error)
         self.assertIn("reading SK_1024_1024503", error)
 
@@ -110,7 +110,7 @@ class ModelGltf(unittest.TestCase):
         status, body = self.call()
         self.assertEqual(status, 500)
         error = json.loads(body)["error"]
-        self.assertIn("AtelierMesh could not decode SK_1024_1024503 (exit code 2):\nexport failed", error)
+        self.assertIn("Atelier could not decode SK_1024_1024503 (exit code 2):\nexport failed", error)
         self.assertIn("Installed mods may be the cause: " + note, error)
         self.assertIn("move it out of the mods folder for now and reopen this model", error)
 
@@ -133,18 +133,16 @@ class ModelGltf(unittest.TestCase):
 
 
 class DecoderPaks(unittest.TestCase):
-    """Which folder the decoder reads, and whether installed mods were visible to it."""
+    """The decoder reads the game's Paks folder itself; AtelierNative registers only its top-level
+    containers, so mods in ~mods (or the Galacta loader) can never shadow a vanilla package and
+    there is no hardlinked mirror to fall back from."""
     def setUp(self):
         from atelier import tools as TL
         self.TL = TL
         self.temp = tempfile.TemporaryDirectory(prefix="atelier-decoder-paks-")
-        root = Path(self.temp.name)
-        self.paks = root / "Paks"
+        self.paks = Path(self.temp.name) / "Paks"
         (self.paks / "~mods" / "Hela").mkdir(parents=True)
-        (self.paks / "pakchunkCharacter-Windows.utoc").write_bytes(b"game")
-        (self.paks / "~mods" / "Hela" / "HelaRedeemed_9999999_P.utoc").write_bytes(b"mod")
-        self.mirror = root / "cache" / "vanilla_paks"
-        self.patches = [patch.multiple(TL, PAKS=str(self.paks), _VANILLA_PAKS=str(self.mirror)),
+        self.patches = [patch.multiple(TL, PAKS=str(self.paks)),
                         patch.object(TL.hostos, "run_exe",
                                      return_value=SimpleNamespace(returncode=2, stdout="", stderr="export failed"))]
         for p in self.patches:
@@ -155,38 +153,18 @@ class DecoderPaks(unittest.TestCase):
             p.stop()
         self.temp.cleanup()
 
-    def test_the_mirror_hides_installed_mods(self):
-        folder, problem = self.TL.vanilla_paks()
-        self.assertEqual((folder, problem), (str(self.mirror), None))
-        self.assertEqual(os.listdir(folder), ["pakchunkCharacter-Windows.utoc"])
+    def test_reads_the_real_paks_folder_with_the_mesh_command(self):
         r = self.TL.atelier_mesh("Marvel/Content/Marvel/Characters/1024/1024503/Meshes/SK_1024_1024503", self.temp.name)
-        self.assertIsNone(r.mods_note)
-        self.assertIn(os.path.abspath(str(self.mirror)), self.TL.hostos.run_exe.call_args[0][0])
-
-    def test_a_cross_drive_fallback_names_the_drives_and_the_mods_it_exposed(self):
-        drives = {str(self.mirror): "C:", str(self.paks): "D:"}
-        with patch.object(self.TL.os, "link", side_effect=OSError(18, "Not same device")), \
-             patch.object(self.TL, "_drive", side_effect=lambda p: drives[p]):
-            folder, problem = self.TL.vanilla_paks()
-            self.assertEqual(folder, str(self.paks))
-            self.assertEqual(problem, "Atelier's data folder is on C: and the game is on D:")
-            r = self.TL.atelier_mesh("Marvel/Content/Marvel/Characters/1024/1024503/Meshes/SK_1024_1024503", self.temp.name)
+        argv = self.TL.hostos.run_exe.call_args[0][0]
+        self.assertEqual(argv[:2], [self.TL.NATIVE, "mesh"])
+        self.assertEqual(argv[argv.index("--paks") + 1], os.path.abspath(str(self.paks)))
         self.assertEqual(r.paks, str(self.paks))
-        self.assertIn("could not keep installed mods out of this decode and also read ~mods/Hela", r.mods_note)
-
-    def test_a_same_drive_link_failure_gives_the_system_reason(self):
-        with patch.object(self.TL.os, "link", side_effect=PermissionError(13, "Access is denied")), \
-             patch.object(self.TL, "_drive", return_value="D:"):
-            folder, problem = self.TL.vanilla_paks()
-        self.assertEqual(folder, str(self.paks))
-        self.assertEqual(problem, "Atelier could not link the game's files into its cache (Access is denied)")
-
-    def test_a_fallback_without_mod_folders_does_not_blame_mods(self):
-        import shutil
-        shutil.rmtree(self.paks / "~mods")
-        with patch.object(self.TL.os, "link", side_effect=OSError(18, "Not same device")):
-            r = self.TL.atelier_mesh("Marvel/Content/Marvel/Characters/1024/1024503/Meshes/SK_1024_1024503", self.temp.name)
         self.assertIsNone(r.mods_note)
+
+    def test_no_mirror_is_built(self):
+        self.assertFalse(hasattr(self.TL, "vanilla_paks"))
+        self.TL.atelier_mesh("Marvel/Content/Marvel/Characters/1024/1024503/Meshes/SK_1024_1024503", self.temp.name)
+        self.assertEqual(sorted(os.listdir(self.temp.name)), ["Paks"])
 
 
 if __name__ == "__main__":
