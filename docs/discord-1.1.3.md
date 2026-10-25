@@ -4,7 +4,7 @@ The latest upstream export fixes and tools, together with the connected ink work
 
 • Texture mip chains and linear-light mip generation, faster BC7 encoding and size checks for textures added at custom paths.
 • One native model tool for previews, idle animations and persistent imports on Windows and Linux.
-• Settings → Tools for verified container-tool updates, repair and rollback.
+• Settings → Tools for verified container-tool updates and repair.
 • Windows file and folder pickers without the extra PowerShell console.
 • Connected hero/skin-coloured ink for loading, saving and exports, with clear sources and completion reactions along panel borders. Try it in Settings → Try Krackle.
 • Assembly View, UV X-Ray, Niagara Motionboard, bulk material edits and the matching Paper and Ink installer.

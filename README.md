@@ -23,7 +23,7 @@ before building it. Available for Windows and Linux.
 - **Assembly View** shows a model surface's material and connected texture slots.
 - **VFX Motionboard** edits Niagara LUT tracks on a timeline with playback and comparison.
 - **Bulk edit materials** changes up to 1,000 materials at once.
-- **Settings → Tools** shows tool versions and updates, repairs or rolls back the container tool.
+- **Settings → Tools** shows tool versions and offers verified updates and repairs for the container tool.
 - **Linux AppImage** runs on newer distributions, with native model previews and animations.
 
 See the [patch notes](docs/release-1.1.3.md) for details and verification limits.

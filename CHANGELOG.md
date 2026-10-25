@@ -16,7 +16,7 @@ The app, installers and update checker identify each release by its full number,
 - Validate renamed texture sizes before exporting assets at custom paths.
 - Consolidate model previews, animation decoding and persistent imports into
   AtelierNative, built from pinned source on Windows and Linux.
-- Add Settings → Tools for verified container-tool updates, repair and rollback,
+- Add Settings → Tools for verified container-tool updates and repair,
   with file hashes and command probes checked before replacement.
 - Build Linux packages with system GTK and WebKit together, and preserve the
   application version when checking AppImage upgrades.

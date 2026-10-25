@@ -11,9 +11,10 @@ connected ink workspace and refreshed Windows installer.
   export at a custom path.
 - **One native model tool.** AtelierNative handles mesh previews, idle animations
   and persistent imports on Windows and Linux, built from pinned source.
-- **Settings → Tools.** See installed tool versions and use verified updates,
-  repairs and rollback for the container tool. Downloads and extracted files must
-  match their hashes and pass a command probe before replacement.
+- **Settings → Tools.** See installed tool versions and use verified updates and
+  repairs for the container tool, with backups retained for recovery. Downloads
+  and extracted files must match their hashes and pass a command probe before
+  replacement.
 - **Windows picker fix.** File and folder selection opens without an extra
   PowerShell console.
 - **Connected ink stays connected.** Loading, saving, exporting and configuration

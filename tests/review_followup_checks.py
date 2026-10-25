@@ -1,5 +1,6 @@
 """Failure-oriented browser regressions for the review follow-ups; all builds are intercepted."""
 from urllib.parse import urlparse
+import json
 
 MESH = 'Characters/1024/1024503/Meshes/SK_1024_1024503'
 
@@ -47,6 +48,9 @@ def run_review_followup_checks(context, url, report, checks):
 
     tab = context.new_page()
     errors, builds, conflicts = [], [], []
+    # Grid readiness precedes the startup tray response. Let that response
+    # render before installing synthetic selected assets for the retry scenario.
+    tab.add_init_script("window.reviewTrayReady=false;window.addEventListener('atelier:project-assets',()=>{window.reviewTrayReady=true;});")
     status = {'available': True, 'template': True, 'enabled': True, 'reasons': []}
     tab.on('pageerror', lambda error: errors.append(str(error)))
     tab.route('**/api/skin_swapper/status', lambda route: route.fulfill(json=status))
@@ -66,11 +70,13 @@ def run_review_followup_checks(context, url, report, checks):
     try:
         tab.goto(url)
         tab.wait_for_selector('#grid-area .card, #grid-area .folder-card')
+        tab.wait_for_function('window.reviewTrayReady')
         tab.evaluate("""mesh => {
             _modsFolderSet=false; _protectionPassword='';
             sidebarData={mesh:{name:'SK_1024_1024503',game_rel:mesh,file_type:'mesh',selected:true},
                 texture:{name:'T_Test',game_rel:'Fixture/T_Test',file_type:'texture',selected:true}};
             document.getElementById('mod-name-input').value='RetryRegression';
+            window.reviewFixtureSnapshot = _captureExportReview();
             updateInstallBtn(); doInstallMod();
         }""", MESH)
         tab.wait_for_selector('input[name="export-format"]')
@@ -104,5 +110,16 @@ def run_review_followup_checks(context, url, report, checks):
         checks.append('Skin Swapper retry retains its endpoint, author, skin name and reviewed form')
         tab.screenshot(path=str(report / 'review-followup-retries.png'))
         assert not errors, errors
+    except Exception:
+        state = tab.evaluate("""() => ({
+            project: atelierProject(), checking: _exportReviewChecking, running: _exportRunningCount,
+            original: window.reviewFixtureSnapshot, current: _captureExportReview(),
+            overlays: [...document.querySelectorAll('.overlay.active')].map(el=>el.id),
+            review: document.getElementById('export-review-overlay').innerText,
+        })""")
+        (report / 'review-followup-failure.json').write_text(json.dumps(
+            {'state': state, 'errors': errors, 'builds': builds, 'conflicts': conflicts}, indent=2))
+        tab.screenshot(path=str(report / 'review-followup-failure.png'))
+        raise
     finally:
         tab.close()

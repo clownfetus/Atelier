@@ -1,5 +1,5 @@
 {
-  "version": "1.1.2",
+  "version": "1.1.3",
   "viewport": [
     1400,
     900
@@ -8,13 +8,13 @@
   "page_errors": [],
   "source_files": {
     "atelier/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "atelier/added_assets.py": "f0356134ba2b503d307db772a45d97d02539e8510ddca33b7ef5f4feeba25cb3",
+    "atelier/added_assets.py": "048c748d944888205d70cb8f3e6ad9a37e2096d828dfaed3892572c4aab1a8bd",
     "atelier/asset_cache.py": "6433fc1eb0051223857469dedc826f4a1395fa2c542926e87d81c7515219106a",
     "atelier/blender/assemble_studio.py": "478f1762f5fa37f5dbf982ebec334d0baaa766e8a2d8f570d27f5c0fbd0e13b3",
     "atelier/blender/atelier_live_bridge/__init__.py": "cbfae4db5a5a1a1eeec82c5be57fd9136c94f0848880ecc7428f1bd88531fcd7",
     "atelier/blender/atelier_live_bridge/safety.py": "bca60ab876a134bfc36d759cd9c843a296b48305e8c08ac6747cf9a0426bbd29",
     "atelier/blender/atelier_live_bridge/tracking.py": "698aba081ec60b435928a970c710acdda9592003cd61c3a749c20bbcd59f2b65",
-    "atelier/blender/blend_to_glb.py": "e526c32dac0758b6a46be0c7065ee47f5c135a1f2b7542280c01ac1f4aeb6101",
+    "atelier/blender/blend_to_glb.py": "08985faa8a349d19e88fe9f71f13a64bea63d186e2f1cf21344e15054c083e73",
     "atelier/blender/glb_to_blend.py": "bd38a7ea5d2ee5bbd0c90a9637b21bb900d9490ee35450993cfa4e8e334dcf58",
     "atelier/blender/import_geometry.py": "04dc0fd4113dc6b6bd9c54bf6b50ee7659228dfbdd6596da365596b92287ad44",
     "atelier/blender/material_nodes.py": "9de34347ef649ee29a2c919ed0136c3206d796aa05b95d370e8f0b58598df3a6",
@@ -26,27 +26,27 @@
     "atelier/bulk.py": "f3b6f36e6d261144ddd08ad0906d9c0f6981eb334e195f407ff20c59b18da004",
     "atelier/catalogue.py": "82717502c7b07f341f9aec6e9d87033b3cb68b59282348e8c185a92bd4e0ae9b",
     "atelier/changelog.py": "8ba0d39aa7febf7a53d3addcf98e48f6a17c601e78d0b971fd523609ce2baace",
-    "atelier/config.py": "a6f546ceb98253bf9e0f437a5317daf9c084ab8da714398c842212e3eb803958",
+    "atelier/config.py": "91d171ca45d4c9117df0c9c5792eb66a311c117bd78472a4ab8694eb25cbafb8",
     "atelier/handlers/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "atelier/handlers/animation.py": "0ada31eb7c86246e5b85ab4a22bb8788706e3da656c3368d0244366efc3e8bbd",
+    "atelier/handlers/animation.py": "6543d2e1649465dccaa06ff264ca5dc69350fa9317886a05412da99d3cc65118",
     "atelier/handlers/assembly.py": "0b19adc93529f24d2850c410e9883f6b78f705bf328f026b0d28b58a34220caf",
     "atelier/handlers/container_merge.py": "c1743a7c842de4a5f9665efb8e493cc3f061017c7481707005327f371d6a23be",
     "atelier/handlers/curve.py": "46b147dcfd9c6098c1f7d553ec4e5d5326b70b9d01f85f7020c43dd0ef6b2b59",
-    "atelier/handlers/custom_texture.py": "befb3907323f817d6df6afc6ff5986504b1d6aaef2887dba24f4e85a3e0ca696",
+    "atelier/handlers/custom_texture.py": "517a49b2b919101467aa29a4c7e35e7f0f3d0bd8b0bfbc417b62aac498dc31ac",
     "atelier/handlers/dxc_ir.py": "2d522b7de9482b2155c6fad5318491556ecf3b4b8490296d2893cea2567ab843",
-    "atelier/handlers/dye.py": "32b5d57f7c58538f7deb85bd7fc75665c244647bfbb84a8550d4a4e195d9fb7e",
+    "atelier/handlers/dye.py": "6ba764119b497b045ee1a56a800ec0891ba0ac85fb555dfa86ada7dd1a66dbc4",
     "atelier/handlers/hdr_texture.py": "a75c3a3967569598f2e52a4f0d06b32c6cfa1355b1d37aebb62770516b172cde",
     "atelier/handlers/material.py": "1734d416c79b857e3e220b0e0c6e76713c13a8c73844e6d28cabcef1fd968e16",
     "atelier/handlers/material_preview.py": "fb8ac9728cd22ee9138b29a112cc83d98ec03a7b6b042c1d8718e43f93132bd0",
-    "atelier/handlers/mesh.py": "9a6140d4434221396e2fb22feccd9648424615de3969afa3e7f55b175157e5f3",
+    "atelier/handlers/mesh.py": "1de60dfc91306e2e1425a205dbd8785c4d18f97764ed387352c0e6701571f37e",
     "atelier/handlers/meshedit.py": "8e8b69ed31f82e60acc6499f8a552aaefbf81a91979b510359879df71ff811bb",
-    "atelier/handlers/meshgraft.py": "4d26b22dff26b0af87b0b026e521e9621eff0985bb9627f66e3c0f6a828a07ff",
+    "atelier/handlers/meshgraft.py": "d71cdad011de655ed0ef3cfadfd93141443605756f0f52f2e97f38bc16e88b85",
     "atelier/handlers/meshimages.py": "3827cfe1627a9b245c258f87eff140d1b6bfa3dad69131ba7aadffe37d63f30c",
     "atelier/handlers/meshmat.py": "7ecc8b39852e0f39f4b1385662ccf1a28a6a5c9c271ba3fccdc65369629b0c5c",
     "atelier/handlers/meshport.py": "63280b83efb38da9608c0d48edc068be453d416c671b05b07e61028a89f4bbc0",
     "atelier/handlers/meshreplace.py": "40dbc50547cf970da08bce6e01fd2bc9c5ee810f038f2490dabc3ca752879c52",
     "atelier/handlers/meshstudio.py": "4aa005f5d465986a269ced7217398034f2e43fc55e67c8e7fb255f8b5582af47",
-    "atelier/handlers/meshsurvey.py": "bff34ee57f50816787187b9a3f90752a25a8830ffe601fe188a1c1b81a72cfb7",
+    "atelier/handlers/meshsurvey.py": "fee9d940bfc070dd86f03fb81d83dce6df14bdf027ea611a81c1631b09c8ad00",
     "atelier/handlers/meshtextures.py": "f6d0a12556da1a124149d6a8710c76ecef735bd66b65ad9518b1e1ecac30e317",
     "atelier/handlers/meshvisibility.py": "15cce2d3138db6c48bd8d6cbf17fce4359de7735a8a6eab0611f123566b1c445",
     "atelier/handlers/modlock.py": "d1f2bfa0a63022a504ac1af4b1dd590380a88e50800b76088967a31802cd3c39",
@@ -58,15 +58,15 @@
     "atelier/handlers/shaders.py": "ee206425565ad12ac23c1e4c2a11becb884b3cee0623b0b69205bdc5f13d9358",
     "atelier/handlers/skinnames.py": "c354ac6d560b7413330e3684cccd3e28badf7a750255e37faa23a36813f043ed",
     "atelier/handlers/text.py": "da69a88a1c5f94057ed1c61220179188ec018d461f7d12f8f25afedaacebc43f",
-    "atelier/handlers/texture.py": "c956abf5dd379952ffd9181aef3cce883dcdd2488c2551a5f0996f75c0ab2ea1",
+    "atelier/handlers/texture.py": "682e0a55126f008ce60afdadf800dcc51a52d99357fbffe458f4bd38943b0510",
     "atelier/handlers/texturerefresh.py": "f61f83d6e262f9956db38852b83efa1d6d485136b039e2473e83f78781d313a7",
     "atelier/handlers/vfx.py": "8ebdfe4b0d1c1f274753ad63b424ea6e715c79edd788367c8a7b528048b6a4b9",
-    "atelier/handlers/world.py": "30ef97c83de4688e18c8c3f64448419ac1e58772b4664496d37ce5a7eaddac83",
+    "atelier/handlers/world.py": "634fcf3d59e91a7e98e357e9d939c57c91abe6e9a6c5b5555ec14326012d2abf",
     "atelier/hero_artwork.py": "b17c8eee930b459df24010bffeeba382d5cd361c63e86e06c9044b3beca47da6",
-    "atelier/hostos.py": "b5aef84ec7a5aa4ddc3f704c5ab1f183101c6a06d934c194b906ef8eeb12ab68",
+    "atelier/hostos.py": "894c72a522dd20a321bebb99ef5e17e2ede1f1546a204c3af8b6aea7cfadd7d3",
     "atelier/identity.py": "d7408f08b4d9baebdcdc3f2c5e33859056d1cb61e4a14cd3b5f67415490c4e6d",
-    "atelier/import_server.py": "9f3937748b9c5a02bd8468db96657167dbebc059d42f005405efc34811ebdc07",
-    "atelier/index.py": "df030dae8ccde28a37fbbbb9ca8def056f30b81a75b5b7f936e60a96cf67dab9",
+    "atelier/import_server.py": "80bc0a910b4e6e7796d0a8d6b49ab5958c1894878b14fabcd3e0de9dfd323eb4",
+    "atelier/index.py": "fa83517a43595fb7e08b06ff955ebabf9dab0fdecee5605b59ebd8a9f620ac30",
     "atelier/inflight.py": "234c0fab2d9dcb4b33112a80453352721457ce369ce0ef05cfd4887261d58279",
     "atelier/jobs.py": "cda59981ffdf6b72a9bead6beb19372584286f0363374428fa39d8fbd0e6b36d",
     "atelier/manifest.py": "cb0c57faaa96d5e0d15c636fc13077a75a6811451d26ef2996e8347866d7b655",
@@ -74,7 +74,7 @@
     "atelier/operations.py": "69f8a4efdebe7c6125983ed3c17ad5f122c05fb62dd03dd6464f6e57b23ecaf0",
     "atelier/paths.py": "ff87c466157844dde4246a49c82b4f41210012e9a9a96e270507e921e6afb652",
     "atelier/preview.py": "947b7fdaf51ee99433e99c35956f09edacf021652295d1190e73783888198a66",
-    "atelier/project_meta.py": "fd815da77cf74411ca428bb7b0864a354fcf7d21da0fa2af25158980f028754e",
+    "atelier/project_meta.py": "a6e108806b17743f41892a5286a3205b735309e33089c753b217ead0bd0308c3",
     "atelier/project_trash.py": "c09828d4d6e35fbfca9d1d3bf385666226e9de581d8a5eb95f5efeab95969d6e",
     "atelier/properties.py": "58662f2e7a96fbb2abff51e36e29097de32a859970e163b030ff31c503d05e30",
     "atelier/s_maps.py": "01ca78323b1dea84de7af6c465da21ccab12f194aafa404865ac35e9ceb93d9d",
@@ -82,7 +82,9 @@
     "atelier/skin_name_fixes.py": "8dd5d66b6184e33cbb0fba21308f2f85b9ca16256bafb641cc92d730535c0821",
     "atelier/skin_swapper.py": "e318468a79080f8fca427735685f2713c1e3bbeaba70e04e250239c7dcb46967",
     "atelier/storage.py": "e48cb3cf53f269ee7f92b15e25f29890d9362a7e46483d692622d62100bc08fd",
-    "atelier/tools.py": "50d39dea2562feb2993c27d2e4f9acb7d09dd2be1388e6f79093df257aebe982",
+    "atelier/tool_updates.py": "8f87c3ab54815ab05e83a7f84c59d3df9b89345e1e407c248ad6d7e1204ed356",
+    "atelier/toolfiles.py": "d64e2f9bf3cad7143bc80e13dd247e8c6f66281e81205b98b90e407b8a630280",
+    "atelier/tools.py": "2ea47f5db21101b4a2f37ce898d1b9d78e5f12647796130708c6c65da7aebb4d",
     "atelier/ui_preview.py": "32b6a7cd2088fa367a2c1caf49233ebc904b84dbb6b7086df6e1aa6364596ed2",
     "atelier/unreal_names.py": "597a64bc54fb2feda5a74a0358a618e8975b61bb6f8c616b87e967a6281071ec",
     "atelier/unreal_refs.py": "5571e09e4baba10971aeac9e2508f33b4346399d8da396e3c710efc6931253ef",
@@ -90,13 +92,13 @@
     "atelier/web/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "atelier/web/app.py": "62857ccf354e3460172d76a3ce573d50d762674c61c29a7ebb1128c30213fa30",
     "atelier/web/browse.py": "d62eeb8ede0987e61a1ecf2c5818e6f22bd3cb32ae01194954f023ab80318516",
-    "atelier/web/routes.py": "83ae41ef83b49768144be6d8f6a9d2f689f0671cd559d43432ca42ed739c30a7",
+    "atelier/web/routes.py": "8f9c3fbc02fc0462ef87713c7b79d3268dd19a4c4f98430af039d19002244d42",
     "atelier/web/showcase.py": "c945e58c1cf61fccd5734bb675ca127b157d745a5db6039648fa962ec084d8d0",
     "atelier/window_theme.py": "19cb3795a91a416a3547a225d150a306857d08085aac513909c9bc780944c06b",
-    "atelier/windows_runtime.py": "4ea53e914999c3e0a0bffad45228958318d5d695ed9fc9b4b5834c9dd1f41809",
+    "atelier/windows_runtime.py": "9b03250a5b90145c409947f6e7ae27f6469456700b024aa44d9bc9b35895e951",
     "gui/add-asset.css": "61d98a20b66ac53de23b8a8cfb1c4a02f0210af2695ca795c6ac1b58dfb0b225",
     "gui/add-asset.js": "4cd8cb2303475d5648c502f34fdadd3c32db6f05b45753f33453aa792759e2e7",
-    "gui/app.js": "58a8b0e956d332d9d8c673cf300e768c1e584a5a7b7fffe3be80095cac9c3ceb",
+    "gui/app.js": "104fc77525cdf653de142c65b7284d76205a653262d43bbca1ca2efab7b2cf1c",
     "gui/assembly-data.js": "f9700fc29f9af919a9ba155ff845596badec7e8c6375851c9d75d5a2f1792845",
     "gui/assembly.css": "f1c756c7eb249e19bfd5dce5745d97bbcfbc5759b9c18675213d01b48fdb00b8",
     "gui/assembly.js": "2f87336eeda3717c046c3bfc983273abd24eb81e360eb707f17f801c3f6210b4",
@@ -120,7 +122,7 @@
     "gui/export-review.js": "36001288a7b1bb298b4fb5e2b410e8148dab72d8113a5dc3897ece89d82bab0c",
     "gui/folder-icons.js": "d344d5f08846e02a6d215991c8e160208bfb003f2b17d64b6dc40b7ce65263eb",
     "gui/icons.js": "5bd6a46e2e31216ce5242f98d67994f350068cbb5a9769f90c1e19382e8a4219",
-    "gui/index.html": "eb1e0c9164b772dd4c23ecd8e3fc98f85e36ceca56f46f39fa662cb6b9288f56",
+    "gui/index.html": "0ac8f81dffe672aef88cd5534bdf228ec837496df25a2f7841cfd95c6ac8dfd2",
     "gui/job-tools.css": "899bcdb7eb952f75ea5aa424eadfd989b66a4083a31f343d6fcdc39f80f29b20",
     "gui/job-tools.js": "21187d31a2d7543cf565e2dfeae429a1fa5bd342cc0ea55aaf91a90b51fbe6f9",
     "gui/library-pins.css": "e917d31a9651ee2943832e150f2234c2fc798ce0b29529b3049a059f21da0392",
@@ -292,72 +294,72 @@
     "gui/vfx-motionboard.css": "943cc98516d8b61f15da0a992e3ff20a6338f00654e2b742dc72d200a0d97ed5",
     "gui/vfx-motionboard.js": "799a0384220ba0f9239f1dde651573bd741e61bd18b144a7645b25fdc5047bc3",
     "gui/viewport-animation.js": "d425fba6bbfe5bdac53f6dbf286bbd7862958381f2ac3ba5365111fa3d455fc5",
-    "gui/viewport-attachments.js": "e21470a4a6260d2494562b97b1fb3feba71c8635f9be7d862de5d4e22206d7f0",
+    "gui/viewport-attachments.js": "07b9ca7a1315e0274df976a80a6fe21bedd92b5dcb4d60ac029a7be1995909b8",
     "gui/viewport-effects.js": "42edc43111f3afadc754ba67b1d34be1b03953b7f8b76b5d2eeeeaa470026d16",
     "gui/viewport-identity.js": "9b97ba2278d8ae706c59d3b5b63a76f57f05738c18aaa37ecc6a045845233963",
     "gui/viewport-inspection.js": "c23efa10609db35ea7ba461d460cc92558fd8053858e606597e340f26228fac4",
     "gui/viewport-materials.js": "3291694dfe384e22f3c325e5d68551e764e82ef953ef3a302783ddbab4e4b769",
     "gui/viewport-uv.js": "7cda202197c72f69651eb64eb2b57e6417d94aeb1cf7e6190339b7f0d5cdb0a3",
     "gui/viewport.css": "ee822f533c070c0cd96def9e374e05b1197ab9a758e1f9122690e3d2a81c73d1",
-    "gui/viewport.js": "b09a2399b13d40eca0e1cb7ded43615087ceda808629d877ab6a3985cf5ae627",
-    "version": "77123b8e4bdbd54505bf6e8021527ac60281602a06fe307564532c4dba39dbca"
+    "gui/viewport.js": "e12ca04f12b66c22669de01c781f005e52f17889306506624c2bc64be7810778",
+    "version": "5dae0c0a5ed3cdaa78704e25bb38d72c31018311e933283d06ed4f93360bfc6c"
   },
   "files": [
     {
       "path": "studio-dark.png",
-      "sha256": "a5c10843effe8cad3e32cd2a64d906c86ccb824d974a92b5ea5959608c02bb34"
+      "sha256": "795d1bba389d36e7e14d774a957bcddf55892e8065c73c3ba6e8274ee6d14138"
     },
     {
       "path": "studio-light.png",
-      "sha256": "e2f80c09b25f03bc80738d4dc540022c946650ccdecce0bb0b0b3935f3d702ad"
+      "sha256": "0e9b38abc1b66d89f354a66f8e5b9927858b8b60f5750e5f4bbb51c28dc7bdf8"
     },
     {
       "path": "asset-library.png",
-      "sha256": "2df2c3ecbde556779843039837f0da233e119eb33fce243a50cfcab323391a42"
+      "sha256": "38c3f9fade08d6be32db1ecf75298b37094dccd00e9ea8f5401b677a4cce8e4d"
     },
     {
       "path": "material-editor.png",
-      "sha256": "fa5163739c73536a7b67c9a3a53e5498665e930a4d158a64e758dedb83665474"
+      "sha256": "fdd90aaa5556f612fb24c19a9d949e2316ccd6ce360850a755c28a4a8f4ad683"
     },
     {
       "path": "material-replacement.png",
-      "sha256": "4ffea12445656621537de29fe32700ed675a3f2cac45cf1843fa8f0fcc5f7a5c"
+      "sha256": "8527aa30116c08d1f5cfaf440786b518677ff0dc8d2d18288ec2291166563447"
     },
     {
       "path": "model-studio.png",
-      "sha256": "0dccf0ff8ce43f8328f9e5be588c8500c79f977943f68ad883181072a17d3622"
+      "sha256": "c3e9704bbc80ac603df6fea88d181aa02300f2d15554aa90f96b04835ac57ddf"
     },
     {
       "path": "blender-live-setup.png",
-      "sha256": "77aef30ce31b695aefa7383f91884bd03a62fa17f4416366f76de43ef306f32b"
+      "sha256": "c366ddf063978b08650924bf3b2720e0c6c613c037c3cbfde37e70b08a561899"
     },
     {
       "path": "showcase.png",
-      "sha256": "cb983b7f7af23950ede6cb5286833a5336ea9f24b96ba6e404cbc9b0edf6d788"
+      "sha256": "083d3422862242ad2585366c6b1a52101f8b74f5e613a426cf171f3507510a81"
     },
     {
       "path": "assembly-view.png",
-      "sha256": "421149b653433e0efed709de0cb91f5044d90ced191c9e4610bf17ac080eda4a"
+      "sha256": "94689f31c98146beb6d6eaf71186479fe82a204813c9bb6b8696a1b773a804b5"
     },
     {
       "path": "uv-xray.png",
-      "sha256": "c0e550269adec319244c907d4d299257cb07fe7c545a4f29c737b76025520f52"
+      "sha256": "3fb942f7698c10258d3745a325738c9142ebb3f49753f44d98dec37c6e4a6c87"
     },
     {
       "path": "vfx-motionboard.png",
-      "sha256": "18f68edfae0cec5faf976460dfe3aa7eeff3e73e4c96a4c1f02ef7cbd0eb4923"
+      "sha256": "7c3d6cc65739b43aa6fdc010ed126fe92cc4ceab100c735296235a3458c59809"
     },
     {
       "path": "appearance-settings.png",
-      "sha256": "572cc82f24b28f92ce4f5c940fb9b101fb095ef2844e7a09d12604c5d8872986"
+      "sha256": "4f1183a6d3d9eab6e47b167c3205fbdd40404f4b4af618cc9b8832b9eb8a947d"
     },
     {
       "path": "krackle-examples.png",
-      "sha256": "c8624d089ad1d11ec75eb930da7e375856a7fdab625f79176a111009467c1b1c"
+      "sha256": "421f7fade2d580c23e5b56618ac6694c5a1d180d326dbdb505be6011dc301acd"
     },
     {
       "path": "blender-settings.png",
-      "sha256": "841e135bb0f33b52724ae547fd4e9abb2fbb1c1d2884aa3592a492c77440c459"
+      "sha256": "4148132671ef2674323a551823900df6cbf78af0f9def4d15f02b4453d9fce75"
     }
   ],
   "source_hash_format": "SHA-256; text line endings normalized to LF"
