@@ -232,7 +232,7 @@ def run_export_motion_checks(page, context, url, report, checks):
           for (const animation of fades) { animation.pause(); animation.currentTime = 60; }
           if (![host,fallback].every(node=>{const opacity=Number(getComputedStyle(node).opacity);return opacity>0 && opacity<1;}))
             throw Error('Both button icons did not participate in the crossfade');
-          if (fadeSlot.getBoundingClientRect().width !== 20) throw Error('Crossfade changed the icon slot');
+          if (fadeSlot.getBoundingClientRect().width !== 28) throw Error('Crossfade changed the icon slot');
           window.interruptedFades = fades;
           fadeDone = AtelierExportFeedback.begin(fadeButton);
           if (fadeSlot.dataset.amResetting || !interruptedFades.every(a=>a.playState==='idle'))
@@ -245,7 +245,7 @@ def run_export_motion_checks(page, context, url, report, checks):
         motion_page.emulate_media(reduced_motion='reduce')
         motion_page.wait_for_function('AtelierMotionPolicy.query().matches && !fadeSlot.dataset.amResetting && !fadeSlot.querySelector("[data-atelier-motion]") && !fadeSlot.getAnimations({subtree:true}).length')
         motion_page.emulate_media(reduced_motion='no-preference')
-        checks.append('Export results crossfade back to the static icon in a fixed 20px slot; new operations and reduced motion cancel the reset safely')
+        checks.append('Export results crossfade back to the static icon in a fixed 28px slot; new operations and reduced motion cancel the reset safely')
 
         motion_page.evaluate("""() => {
           document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove());
@@ -267,8 +267,8 @@ def run_export_motion_checks(page, context, url, report, checks):
         for theme in ('light', 'dark'):
             motion_page.locator('#settings-theme').select_option(theme, force=True)
             motion_page.evaluate("AtelierExportFeedback.begin(document.getElementById('install-btn'))('success')")
-            assert motion_page.locator('#install-btn-motion-host').evaluate('(el)=>el.getBoundingClientRect().width') == 20
-            assert motion_page.locator('#toast-area [data-atelier-motion="export-feedback"]').evaluate('(el)=>el.getBoundingClientRect().width') == 24
+            assert motion_page.locator('#install-btn-motion-host').evaluate('(el)=>el.getBoundingClientRect().width') == 28
+            assert motion_page.locator('#toast-area [data-atelier-motion="export-feedback"]').evaluate('(el)=>el.getBoundingClientRect().width') == 40
             motion_page.screenshot(path=str(report / f'export-motion-{theme}.png'), animations='disabled')
         motion_page.evaluate('visibleToast.remove()')
         checks.append('Export toasts dispose on explicit removal, click and timeout; light/dark feedback captured')

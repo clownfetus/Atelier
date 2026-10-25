@@ -1,11 +1,49 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.1**.
+**1.1.3**.
+
+## Unreleased
+
+## 1.1.3 — 25 October 2026
+
+### Upstream integration and exports
+
+- Integrate upstream through `25196ea`, including the unified native toolchain,
+  reorganized packaging and Python 3.15 build environment.
+- Keep mip chains for character, weapon and world textures, use linear-light
+  mip generation, and accelerate BC7 encoding with the bundled texture tool.
+- Validate renamed texture sizes before exporting assets at custom paths.
+- Consolidate model previews, animation decoding and persistent imports into
+  AtelierNative, built from pinned source on Windows and Linux.
+- Add Settings → Tools for verified container-tool updates and repair,
+  with file hashes and command probes checked before replacement.
+- Build Linux packages with system GTK and WebKit together, and preserve the
+  application version when checking AppImage upgrades.
+- Hide the PowerShell console when opening Windows file and folder pickers.
+- Preserve the connected hero/skin-coloured ink flows, draft safeguards and
+  Paper and Ink installer from the preceding release candidate.
 
 ## 1.1.2 — 22 October 2026
 
-### Editors
+### Connected ink and appearance
+
+- Give loading, saving, exports and configuration discovery one connected ink
+  system. Fluid SVG ribbons travel from clear sources into their destination
+  controls and native panel borders, with a catch and rebound when work finishes.
+- Follow the active hero and costume colours. Navigation, editor openings, the
+  Mod tray, model loaders and texture updates each have a purposeful gesture.
+  Replay the examples in **Settings → Try Krackle**. Calm, Off and system reduced
+  motion remain available.
+- Keep failures and incomplete saves distinct from success. Preserve newer
+  curve, level and text edits made during saving, and ignore old loading responses
+  after closing and reopening the same file.
+- Refresh the Windows installer with Paper and Ink artwork, a connected A-mark
+  illustration, clearer text and native Windows controls.
+- Correct hero artwork, discover new heroes and costumes from the published
+  catalogue, and reuse cached costume art for matching library previews.
+
+### Model and material tools
 
 - Add optional **Assembly View** beside Inspect and Showcase: select a model
   surface to inspect its geometry, verified material and connected texture slots.
@@ -13,6 +51,12 @@ The app, installers and update checker identify each release by its full number,
   texture, UV and Blender workflows, retain camera context across editor visits,
   and load small texture previews only when needed. Unverified assignments and
   unavailable VFX references are explained explicitly.
+
+- Add **UV X-Ray** to Inspect: pick a model surface, view its UV0 wireframe over
+  the selected texture, inspect the clicked UV coordinate and export a transparent
+  wireframe PNG. Keep the model geometry, texture and project edits unchanged.
+
+### VFX and batch editing
 
 - Add **VFX Motionboard** to the Niagara editor: synchronized editable LUT tracks,
   playback and scrubbing, original/edited comparison, per-point and per-track
@@ -28,40 +72,6 @@ The app, installers and update checker identify each release by its full number,
   assets at once. Missing scalar overrides are reported as unchanged.
 - Preserve batch parent changes during export, reject recursive parent chains,
   and keep reviewed material saves and their option changes recoverable together.
-
-### Fixes
-
-- **Exported textures no longer look brighter or glarey in game.** Exports no longer drop the
-  mip chain for character, weapon and world textures (only UI textures, where it prevents
-  blur), and the mips Atelier builds now match the game's own: they were averaged in the wrong
-  colour space and came out darker at every distance step.
-- **Exports with BC7 textures finish in seconds.** A 1366×1366 BC7 texture with mips took about
-  44 seconds and now takes about 2, so multi-texture builds no longer appear to hang.
-- **Textures added at a custom path no longer crash the game** ("ObjectSerializationError …
-  Serial size mismatch"). Atelier now also refuses to ship any renamed texture whose size differs
-  from a normal edit of the same image (after the trailer repair 1.1.1 introduced).
-- A missing tool now says which tool is missing and how to restore it, instead of
-  "[WinError 2] The system cannot find the file specified".
-- The Linux AppImage starts on newer distributions again (it uses the system's GTK and WebKit
-  together), runs mesh previews and idle animations natively instead of through Wine, and is
-  built on an older base so it runs on Fedora, Debian 13 and current Ubuntu.
-
-### Tools
-
-- **Settings > Tools** shows each bundled tool's version and can update the game-patch-sensitive
-  ones (the container tool) between Atelier releases, repair missing or damaged tools, and roll
-  back an update. Every download is hash-checked and must still offer the commands Atelier uses
-  before it replaces anything.
-- The three model helpers (mesh export, idle animations, persistent imports) are one tool,
-  built from source with the exact library version they shipped with, so previews are
-  byte-for-byte unchanged and the installer is smaller.
-- Container unpacking and packing use retoc 3.10.2 (was 3.4.1). On Windows this is Atelier's
-  source-built copy, which keeps every extracted file inside its output folder and fails when an
-  asset cannot be written; UAssetTool is built from the current upstream source with Atelier's
-  texture fixes.
-- Every bundled tool, including the shader tool rebuilt from source in 1.1.1, is listed with its
-  exact source and hashes in one lockfile (`toolchain/tools.lock.json`), built by one script.
-- Atelier now runs on Python 3.15.
 
 ## 1.1.1 — 22 October 2026
 

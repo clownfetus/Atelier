@@ -9,8 +9,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PIL import Image
-from atelier.catalogue import (Catalogue, PARSER_VERSION, allowed_url, build_entries, icon_url,
-                               nameplate_url, parse_item, parse_cards, parse_ids)
+from atelier.catalogue import (Catalogue, PARSER_VERSION, NAMEPLATES_URL, allowed_url,
+                               apply_hero_nameplates, build_entries, bundled_sprays, discover_characters, icon_url,
+                               matched_sprays, nameplate_url, parse_hero_nameplates, parse_item, parse_cards, parse_ids)
 
 IMAGE = 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/costume/1/hero.webp'
 HERO = 'https://rivalskins.com/hero/magik/'
@@ -116,6 +117,111 @@ class CatalogueTests(unittest.TestCase):
         self.assertEqual(len(parse_cards(CARDS + nameplate('AMETHYST ARMOR'))), 1)  # Costumes stay costumes.
         wrong_folder = f'<a data-type="nameplate"><img src="{IMAGE}" alt="Amethyst Armor"></a>'
         self.assertEqual(parse_cards(wrong_folder, kind='nameplate'), [])
+
+    def test_published_nameplates_match_explicit_default_and_fantastic_ids(self):
+        def row(key, name, image, kind=0):
+            return [1, key, name, 'slug', 2, kind, 53, -1, 2, 0, 0, image]
+        data = {'p': '/wp-content/uploads/marvel-assets/', 't': ['nameplate', 'costume'], 'rows': [
+            row('31066001', 'THE HOOD', 'items/nameplate/universal/img_icon_the-hood.png'),
+            row('31066002', 'Fantastic The Hood', 'items/nameplate/53/img_icon_fantastic-the-hood.png'),
+            row('31066208', 'Fantastic Beach Dad', 'items/nameplate/53/img_icon_beach-dad.png'),
+            row('31036002', 'Fantastic Spider-Man', 'items/costume/23/img_icon_spider-man.png'),
+            row('31029002', 'Fantastic Magik', 'items/nameplate/29/img_icon_magik.png', kind=1)]}
+        text = 'const itemsData=(function(){var D=' + json.dumps(data) + ';throw Error("never execute");})();'
+        plates = parse_hero_nameplates(text)
+        self.assertEqual(set(plates), {'1066'})
+        entry = {'name': 'The Hood', 'kind': 'hero', 'image': IMAGE,
+                 'banner': PLATES+'img_immortal-the-hood.webp', 'banner_style': 'immortal'}
+        apply_hero_nameplates(entry, '1066', plates)
+        self.assertEqual(entry['banner'], 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/universal/img_the-hood.webp')
+        self.assertEqual(entry['banner_style'], 'default')
+        self.assertEqual(entry['proficiency'], 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/nameplate/53/img_icon_fantastic-the-hood.webp')
+        wrong = {'name': 'Spider-Man', 'kind': 'hero', 'image': IMAGE}
+        apply_hero_nameplates(wrong, '1066', plates)
+        self.assertNotIn('banner', wrong)
+        self.assertNotIn('proficiency', wrong)
+        data['rows'].append(data['rows'][0])
+        duplicate = parse_hero_nameplates('var D='+json.dumps(data))
+        self.assertNotIn('default', duplicate['1066'])
+        for changed in ('<html>changed</html>', 'var D={"rows":[]}'):
+            with self.assertRaises(ValueError): parse_hero_nameplates(changed)
+        self.assertTrue(allowed_url(NAMEPLATES_URL))
+        self.assertFalse(allowed_url(NAMEPLATES_URL.replace('item-data.js', 'other.js')))
+
+    def test_common_material_folders_use_only_their_own_proficiency_reward(self):
+        icon = PLATES+'img_icon_fantastic-magik.webp'
+        self.catalogue.data['entries']['1029']['proficiency'] = icon
+        for path in ('Characters/1029/1029CommonMaterial', 'Characters/1029/CommonMaterial', 'UI/1029CommonMaterial'):
+            original = {'type': 'folder', 'name': path.rsplit('/', 1)[-1], 'rel_path': path}
+            result = self.catalogue.decorate(original)
+            self.assertEqual(result['thumbnail'], '/api/catalogue/proficiency/1029')
+            self.assertFalse(result['hero_fallback'])
+            self.assertEqual({key: result[key] for key in original}, original)
+        for path in ('Characters/1029', 'UI/1029OtherMaterial'):
+            result = self.catalogue.decorate({'type': 'folder', 'name': path.rsplit('/', 1)[-1], 'rel_path': path})
+            self.assertEqual(result['thumbnail'], '/api/catalogue/thumbnail/1029')
+        self.assertNotIn('thumbnail', self.catalogue.decorate({'type': 'folder', 'name': '1036CommonMaterial', 'rel_path': 'Characters/1029/1036CommonMaterial'}))
+        raw = io.BytesIO(); Image.new('RGBA', (16, 16)).save(raw, 'WEBP')
+        with patch('atelier.catalogue.fetch', return_value=(raw.getvalue(), {})) as get:
+            self.assertTrue(self.catalogue.proficiency('1029').is_file())
+            get.assert_called_once_with(icon)
+            self.assertIsNone(self.catalogue.proficiency('1029100'))
+            self.assertIsNone(self.catalogue.proficiency('1036'))
+
+    def test_site_discovers_new_heroes_and_skins_without_a_reference_list_release(self):
+        image = IMAGE.replace('/1/', '/23/')
+        roster = [{'name': 'Spider-Man', 'image': image, 'page': HERO}]
+        costumes = [{'id': '1036100', 'name': 'Future suit', 'image': image, 'site_hero': '23'}]
+        result = discover_characters({}, roster, costumes)
+        self.assertEqual(result['1036'], {'name': 'Spider-Man', 'skins': {'1036100': 'Future suit'}})
+        existing = {'1036': {'name': 'Spider-Man', 'skins': {'1036001': 'Original suit'}}}
+        self.assertEqual(set(discover_characters(existing, roster, costumes)['1036']['skins']), {'1036001', '1036100'})
+        self.assertNotIn('1036100', existing['1036']['skins'])
+        conflicting = costumes + [{**costumes[0], 'id': '1029100'}]
+        self.assertEqual(discover_characters({}, roster, conflicting), {})
+        self.assertEqual(discover_characters({}, roster + roster, costumes), {})
+
+    def test_sprays_require_unambiguous_published_bundle_membership(self):
+        costume = 'items/costume/5/img_icon_yggroot.png'
+        spray = 'items/spray/5/img_icon_yggroot.png'
+        def item(key, kind, image):
+            return [1, key, 'Different names are fine', 'slug', 2, kind, 5, -1, 0, 2, 0, image, 0, 0, 0]
+        bundle = item('bundle-id', 2, 0)
+        bundle[14] = [[costume, 0], [spray, 1]]
+        data = {'p': '/wp-content/uploads/marvel-assets/', 't': ['costume', 'spray', 'bundle'],
+                'rows': [item('1027301', 0, costume), item('41027203', 1, spray), bundle]}
+        parse = lambda: bundled_sprays('var D='+json.dumps(data))
+        url = 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/spray/5/img_yggroot.webp'
+        self.assertEqual(parse(), {'1027301': url})
+        self.catalogue.data['entries']['1027301'] = {'name': 'Yggroot', 'kind': 'skin', 'image': IMAGE, 'spray': url}
+        self.assertEqual(self.catalogue.describe('Characters/1027/1027301')['spray'], '/api/catalogue/spray/1027301')
+        raw = io.BytesIO(); Image.new('RGBA', (32, 32)).save(raw, 'WEBP')
+        with patch('atelier.catalogue.fetch', return_value=(raw.getvalue(), {})) as get:
+            self.assertTrue(self.catalogue.spray('1027301').is_file())
+            get.assert_called_once_with(url)
+            self.assertIsNone(self.catalogue.spray('1027'))
+        other = 'items/spray/23/img_icon_yggroot.png'
+        data['rows'][1][11] = other; bundle[14][1][0] = other
+        self.assertEqual(parse(), {})  # A same-named spray belonging to a different hero.
+        data['rows'][1][11] = spray; bundle[14][1][0] = spray
+        extra = 'items/costume/5/img_icon_other.png'
+        data['rows'].append(item('1027302', 0, extra)); bundle[14].append([extra, 0])
+        self.assertEqual(parse(), {})  # Multi-costume bundles cannot establish one skin's spray.
+
+    def test_non_bundle_spray_matches_only_one_same_hero_and_skin_name(self):
+        def item(key, kind, hero, name, file):
+            return [1, key, name, 'slug', 2, kind, hero, -1, 0, 2, 0, file, 0, 0, 0]
+        data = {'p': '/wp-content/uploads/marvel-assets/', 't': ['costume', 'spray', 'bundle'], 'rows': [
+            item('1024503', 0, 7, 'THE REDEEMED', 'items/costume/7/img_icon_the-redeemed.png'),
+            item('41024215', 1, 7, 'The Redeemed', 'items/spray/7/img_icon_the-redeemed.png'),
+            item('1036503', 0, 23, 'The Redeemed', 'items/costume/23/img_icon_the-redeemed.png')]}
+        parse = lambda: matched_sprays('var D='+json.dumps(data))
+        self.assertEqual(parse(), {'1024503': 'https://rivalskins.com/wp-content/uploads/marvel-assets/items/spray/7/img_the-redeemed.webp'})
+        data['rows'].append(item('1024504', 0, 7, 'The Redeemed', 'items/costume/7/img_icon_duplicate.png'))
+        self.assertEqual(parse(), {})
+        data['rows'].pop()
+        data['rows'][1][2] = 'Redeemed Queen'
+        self.assertEqual(parse(), {})
 
     def test_new_artwork_paths_are_narrowly_allowlisted(self):
         prefix = 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/'
@@ -299,6 +405,9 @@ class CatalogueTests(unittest.TestCase):
         seed = Path(__file__).resolve().parents[1] / 'gui' / 'catalogue.json'
         data, count = validate_seed(seed)
         self.assertGreater(count, 0)
+        published = [entry for cid, entry in data['entries'].items() if len(cid) == 4 and cid.startswith('10') and entry.get('image')]
+        self.assertTrue(all(entry.get('proficiency') and entry.get('banner_style') == 'default' for entry in published))
+        self.assertTrue(data['entries']['1036']['proficiency'].endswith('/23/img_icon_fantastic-spider-man.webp'))
         for sid, entry in data['entries'].items():
             if entry.get('banner'):
                 self.assertFalse(entry.get('hero_fallback'))
@@ -319,17 +428,34 @@ class CatalogueTests(unittest.TestCase):
         import hashlib
         chars = {str(1000+i): {'name': f'Hero {i}', 'skins': {}} for i in range(20)}
         roster = [{'name': f'Hero {i}', 'image': IMAGE, 'page': HERO} for i in range(20)]
+        plates = {cid: {} for cid in chars}
+        costumes = [{'id': cid+'100', 'site_hero': '1', 'name': char['name'], 'image': IMAGE} for cid, char in chars.items()]
         self.catalogue.data.update(parser_version=PARSER_VERSION,
-                                   content_hash=hashlib.sha256(json.dumps([chars, roster], sort_keys=True).encode()).hexdigest(), refreshed_at=1000)
+                                   content_hash=hashlib.sha256(json.dumps([chars, roster, plates, costumes, {}], sort_keys=True).encode()).hexdigest(), refreshed_at=1000)
         with patch('atelier.catalogue.time.time', return_value=1001), \
              patch('atelier.catalogue.fetch', return_value=(b'source', {})) as get, \
              patch('atelier.catalogue.parse_ids', return_value=chars), \
              patch('atelier.catalogue.parse_cards', return_value=roster), \
+             patch('atelier.catalogue.parse_hero_nameplates', return_value=plates), \
+             patch('atelier.catalogue.published_costumes', return_value=costumes), \
+             patch('atelier.catalogue.matched_sprays', return_value={}), \
              patch('atelier.catalogue.build_entries') as build:
             self.catalogue.update()
-        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_count, 3)
         build.assert_not_called()
         self.assertEqual(self.catalogue.status()['checked_at'], 1001)
+        costumes.append({**costumes[0], 'id': costumes[0]['id'][:4]+'999', 'name': 'New website skin'})
+        with patch('atelier.catalogue.time.time', return_value=1002), \
+             patch('atelier.catalogue.fetch', return_value=(b'source', {})), \
+             patch('atelier.catalogue.parse_ids', return_value=chars), \
+             patch('atelier.catalogue.parse_cards', return_value=roster), \
+             patch('atelier.catalogue.parse_hero_nameplates', return_value=plates), \
+             patch('atelier.catalogue.published_costumes', return_value=costumes), \
+             patch('atelier.catalogue.matched_sprays', return_value={}), \
+             patch('atelier.catalogue.build_entries', return_value={cid: {'name': char['name'], 'image': IMAGE} for cid, char in chars.items()}) as build:
+            self.catalogue.update()
+        build.assert_called_once()  # Website additions refresh immediately, even within the daily cache window.
+        self.assertIsNone(self.catalogue.status()['error'])
 
 
 if __name__ == '__main__':

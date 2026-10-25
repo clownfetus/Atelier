@@ -2,6 +2,9 @@
 (() => {
   'use strict';
   const api=window.AtelierSurfaces||={},transients=new Set(),emptyGlyphs=new Map();
+  function syncVisibility(){document.documentElement.toggleAttribute('data-krackle-hidden',document.hidden);}
+  syncVisibility();
+  document.addEventListener('visibilitychange',syncVisibility);
   const disposals=new MutationObserver(()=>{for(const [host,glyph] of emptyGlyphs)if(!host.isConnected){glyph.destroy();emptyGlyphs.delete(host);}});
   disposals.observe(document.documentElement,{childList:true,subtree:true});
   let startupStage=null,startupHost=null,launchAttempted=false;
@@ -43,22 +46,18 @@
     const drop=document.querySelector('.k-project-drop');if(!drop||!AtelierMotionPolicy.allows(2)||document.hidden)return;
     const release=AtelierMotion.moment.claim('new-project',2);if(!release)return;
     const rect=drop.getBoundingClientRect(),copy=drop.cloneNode(true);copy.removeAttribute('title');copy.removeAttribute('aria-label');copy.setAttribute('aria-hidden','true');copy.inert=true;
+    const energy=window.AtelierMotion?.energy?.resolve(drop);
+    if(energy){copy.style.setProperty('--krackle-energy',energy.charge);copy.style.setProperty('--krackle-energy-rift',energy.rift);}
     copy.classList.add('k-project-fall');copy.style.left=rect.x+'px';copy.style.top=rect.y+'px';document.body.append(copy);
     let animation;const dispose=()=>{animation?.cancel();copy.remove();release();transients.delete(dispose);};transients.add(dispose);
-    try{animation=copy.animate([{transform:'translateY(0)'},{transform:'translateY(100px) scale(1.2,.6)',opacity:0}],{duration:420,easing:'cubic-bezier(.55,0,1,.45)'});animation.finished.then(dispose,dispose);}catch(_){dispose();}
-    setTimeout(dispose,460);
+    // A single drop presses into its own slot before the project dialog takes over.
+    try{animation=copy.animate([{transform:'translateY(-3px) scale(.9,1.08)',opacity:1},{transform:'translateY(5px) scale(1.18,.7)',opacity:1,offset:.55},{transform:'translateY(7px) scale(.85,.18)',opacity:0}],{duration:300,easing:'cubic-bezier(.4,0,.6,1)'});animation.finished.then(dispose,dispose);}catch(_){dispose();}
+    setTimeout(dispose,340);
   };
   const drops=new Map();
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('.btn.primary:not(:disabled)');if(!button||!AtelierMotionPolicy.allows(2)||document.hidden)return;
-    const rect=button.getBoundingClientRect(),x=event.detail?event.clientX:rect.x+rect.width/2,y=event.detail?event.clientY:rect.y+rect.height/2;
-    for(let i=0;i<8;i++){
-      const dot=document.createElement('i');dot.className='k-button-pop';dot.setAttribute('aria-hidden','true');dot.style.left=x+'px';dot.style.top=y+'px';document.body.append(dot);
-      const angle=i/8*Math.PI*2;
-      let animation;const dispose=()=>{animation?.cancel();dot.remove();transients.delete(dispose);};transients.add(dispose);
-      try{animation=dot.animate([{transform:'scale(.3)',opacity:1},{transform:`translate(${Math.cos(angle)*28}px,${Math.sin(angle)*22}px) scale(1)`,opacity:0}],{duration:200,easing:'cubic-bezier(.2,0,0,1)'});animation.finished.then(dispose,dispose);}catch(_){dispose();}
-      setTimeout(dispose,220);
-    }
+    window.AtelierMotion?.workflow?.action?.(button);
   },true);
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
@@ -68,11 +67,11 @@
     const remove=button.remove.bind(button);button.remove=()=>{glyph?.destroy();button.getAnimations().forEach(a=>a.cancel());remove();if(drops.get(kind)===button)drops.delete(kind);};
     drops.set(kind,button);
     button.addEventListener('click',()=>{button.remove();open();});
-    if(AtelierMotionPolicy.allows(1)&&!document.hidden)try{button.animate([{transform:'translateY(-16px) scale(.4)'},{transform:'none'}],{duration:260,easing:'cubic-bezier(.2,0,0,1)'});}catch(_){}
+    if(AtelierMotionPolicy.allows(1)&&!document.hidden)try{button.animate([{transform:'translateY(-10px)',opacity:.5},{transform:'translateY(2px)',opacity:1,offset:.7},{transform:'none',opacity:1}],{duration:260,easing:'cubic-bezier(.2,0,0,1)'});}catch(_){}
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const button of drops.values())button.getAnimations().forEach(a=>a.cancel());});
   function stopTransients(){for(const dispose of [...transients])dispose();}
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopTransients();});
-  AtelierMotionPolicy.query().addEventListener('change',()=>{if(!AtelierMotionPolicy.allows(2))stopTransients();});
+  AtelierMotionPolicy.query().addEventListener('change',()=>{if(!AtelierMotionPolicy.allows(2))stopTransients();if(!AtelierMotionPolicy.allows(1))for(const button of drops.values())button.getAnimations().forEach(a=>a.cancel());});
   window.addEventListener('pagehide',()=>{stopTransients();api.startupDone();for(const button of drops.values())button.remove();for(const glyph of emptyGlyphs.values())glyph.destroy();emptyGlyphs.clear();disposals.disconnect();});
 })();

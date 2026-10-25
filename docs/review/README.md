@@ -1,5 +1,8 @@
 # Review screenshots
 
+The [connected ink review](connected-ink/README.md) covers the fluid loading/save
+system, configuration discovery, and native light/dark installer appearance.
+
 The [appearance review](appearance/README.md) contains updated interface,
 Settings, first-run and dropdown captures from Chromium and actual Windows
 WebView2, with the scope and validation report.

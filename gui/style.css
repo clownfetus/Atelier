@@ -1480,8 +1480,8 @@ kbd { font: 11px var(--studio-font); color: var(--muted); white-space: nowrap; b
 .setup-step-status { color: var(--text); font-size: 13px; }
 .setup-step-glyph { display: inline-flex; width: 24px; height: 24px; }
 .setup-step-nav { display: inline-flex; gap: 8px; }
-.trash-drain { position: fixed; width: 48px; height: 48px; pointer-events: none; z-index: 230; }
-.trash-drain i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--krackle-charge, var(--acc)); }
+.trash-drain { position: fixed; width: 28px; height: 12px; pointer-events: none; z-index: 230; }
+.trash-drain i { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 60% 56%,var(--bg2) 0 1.4px,var(--krackle-energy, var(--acc)) 1.7px); transform-origin: center bottom; }
 
 /* Kept last: editors previously suppressed native outlines. */
 #searchbar { position: relative; min-width: 0; }

@@ -42,8 +42,9 @@ sandbox.document = {
 };
 // Browser classic scripts share the window and global namespace. Shared modules
 // publish their registry on window; app.js uses the corresponding global name.
-Object.assign(sandbox, { addEventListener(){}, location: { href: "" }, matchMedia: () => ({matches:false, addEventListener(){}}) });
+Object.assign(sandbox, { addEventListener(){}, dispatchEvent(){ return true; }, location: { href: "" }, matchMedia: () => ({matches:false, addEventListener(){}}) });
 sandbox.window = sandbox;
+sandbox.CustomEvent = class { constructor(type, init = {}) { this.type = type; this.detail = init.detail ?? null; } };
 sandbox.localStorage = { _d:{}, getItem(k){return this._d[k] ?? null;}, setItem(k,v){this._d[k]=String(v);} };
 sandbox.lucide = { createIcons(){} };
 sandbox.EventSource = class { constructor(){} addEventListener(){} close(){} };

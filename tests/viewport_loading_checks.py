@@ -46,8 +46,10 @@ def run_viewport_loading_checks(page, context, url, report, checks):
         def spinners():
             return tab.locator('#viewport-status .vp-load-status').count()
         open_viewer()
+        tab.locator('#viewport-box.am-working-border').wait_for()
         first = requests[-1]
         tab.locator('#viewport-close').click()
+        tab.locator('#viewport-box.am-working-border').wait_for(state='detached')
         assert spinners()==0
         tab.wait_for_function('!document.querySelector("#viewport-overlay.active")')
         tab.wait_for_timeout(100)

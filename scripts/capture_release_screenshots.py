@@ -35,6 +35,7 @@ def main():
         def shot(name):
             page.mouse.move(1380,55)
             page.screenshot(path=str(args.output/name));files.append(name)
+            print('Captured '+name,flush=True)
         for value in ['dark','light']:
             theme(value);shot('studio-'+value+'.png')
         theme('dark')
@@ -58,13 +59,28 @@ def main():
         page.wait_for_timeout(300);shot('blender-live-setup.png')
         page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-showcase').click();page.wait_for_timeout(1200);shot('showcase.png')
+        page.locator('#viewport-assembly').click()
+        page.locator('.assembly-section').filter(has_text='Body').first.click()
+        page.wait_for_function("document.querySelectorAll('.assembly-texture-card').length>0")
+        page.wait_for_timeout(1500);shot('assembly-view.png')
+        page.get_by_role('button',name='Inspect UVs',exact=True).click()
+        page.wait_for_function("(()=>{const sheet=document.getElementById('viewport-uv-sheet'),button=document.getElementById('viewport-uv-export');return sheet && !sheet.hidden && button && !button.disabled;})()",timeout=120000)
+        page.wait_for_timeout(800);shot('uv-xray.png')
+        page.locator('#viewport-uv-toggle').click()
         page.locator('#viewport-inspect').click()
         page.locator('#viewport-close').click()
+        page.evaluate("openVfxEditor({name:'NS_103101_Buff_01',game_rel:'VFX/Particles/Characters/1031/1031001/103101/NS_103101_Buff_01'})")
+        page.wait_for_selector('#mb-tracks .mb-track',timeout=120000)
+        page.wait_for_timeout(1200);shot('vfx-motionboard.png')
+        page.evaluate('closeVfxEditor(true)')
         page.locator('#menu-btn').click();page.locator('#ctx-menu button',has_text='Settings').click()
         page.wait_for_function("!document.getElementById('setup-loading').classList.contains('active')")
         page.locator('#setup-overlay .setup-body').evaluate('el=>el.scrollTop=0')
         assert page.locator('#setup-aes').evaluate("el=>el.getBoundingClientRect().top >= el.closest('.setup-body').getBoundingClientRect().bottom"), 'Keep credential fields outside the captured viewport'
         page.wait_for_timeout(600);shot('appearance-settings.png')
+        page.locator('.k-motion-preview').scroll_into_view_if_needed()
+        assert page.locator('#setup-aes').evaluate("el=>{const a=el.getBoundingClientRect(),b=el.closest('.setup-body').getBoundingClientRect();return a.bottom<=b.top||a.top>=b.bottom;}"), 'Keep credential fields outside the captured viewport'
+        page.wait_for_timeout(600);shot('krackle-examples.png')
         page.locator('#settings-blender-project-textures').scroll_into_view_if_needed()
         assert page.locator('#setup-aes').evaluate("el=>{const a=el.getBoundingClientRect(),b=el.closest('.setup-body').getBoundingClientRect();return a.bottom<=b.top||a.top>=b.bottom;}"), 'Keep credential fields outside the captured viewport'
         page.wait_for_timeout(300);shot('blender-settings.png')

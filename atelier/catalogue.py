@@ -26,8 +26,9 @@ from atelier.identity import resolve_ids, identity_tokens
 
 IDS_URL = 'https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md'
 HEROES_URL = 'https://rivalskins.com/heroes/'
+NAMEPLATES_URL = 'https://rivalskins.com/wp-content/themes/astra-child/js/generated/item-data.js'
 DAY = 86400
-PARSER_VERSION = 6
+PARSER_VERSION = 7
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -69,7 +70,7 @@ def nameplate_url(icon):
     """A nameplate card's img_icon_<name>.webp -> its 848x192 banner img_<name>.webp, or None."""
     if not isinstance(icon, str):
         return None
-    match = re.fullmatch(r'(.*/items/nameplate/\d+/img_)icon_([^/]+\.webp)', icon)
+    match = re.fullmatch(r'(.*/items/nameplate/(?:\d+|universal)/img_)icon_([^/]+\.webp)', icon)
     return match[1] + match[2] if match and allowed_url(match[1] + match[2]) else None
 
 
@@ -84,13 +85,19 @@ def allowed_url(url):
     if parsed.scheme != 'https' or parsed.username or parsed.password or port:
         return False
     return (parsed.netloc == 'rivalskins.com' and (
-        parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/',
-                        '/assets/lord-icons/', '/assets/kill-icons/')
+        url == NAMEPLATES_URL
+        or parsed.path in ('/heroes/', '/assets/hero-logos/', '/assets/hero-icons-avatars/', '/assets/hero-story-images/',
+                        '/assets/lord-icons/', '/assets/kill-icons/', '/assets/hero-prestige-images/', '/assets/hero-signatures/')
         or parsed.path.startswith(('/hero/', '/item/', '/wp-content/uploads/marvel-assets/items/costume/',
                                    '/wp-content/uploads/marvel-assets/items/nameplate/',
+                                   '/wp-content/uploads/marvel-assets/items/spray/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-logos/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-icons-avatars/',
                                    '/wp-content/uploads/marvel-assets/assets/hero-story-images/'))
+        or bool(re.fullmatch(r'/wp-content/uploads/marvel-assets/assets/hero-prestige-images/'
+                             r'img_prestige_10\d{2}00(?:10|13)_hero\.(?:png|webp)', parsed.path))
+        or bool(re.fullmatch(r'/wp-content/uploads/marvel-assets/assets/hero-signatures/'
+                             r'img_story_herosign_10\d{2}_sign\.(?:png|webp)', parsed.path))
         or bool(re.fullmatch(r'/wp-content/uploads/marvel-assets/assets/(?:'
                              r'lord-icons/(?:item_herohead_\d+|img_squarehead_\d+_avatar|'
                              r'(?:[A-Za-z0-9_&-]|%20|%27)+%20Deluxe%20Avatar(?:%20\d+)?)|'
@@ -183,7 +190,167 @@ def parse_item(text):
     return {'ids': sorted(set(parser.ids)), 'image': parser.image}
 
 
-def build_entries(chars, roster, load_page, load_items):
+def parse_published_catalogue(text):
+    """Read the site's published JSON wire data without executing JavaScript."""
+    marker = re.search(r'\bvar D=', text)
+    if not marker:
+        raise ValueError('Published catalogue format changed')
+    data, _ = json.JSONDecoder().raw_decode(text, marker.end())
+    if (not isinstance(data, dict) or data.get('p') != '/wp-content/uploads/marvel-assets/'
+            or not isinstance(data.get('t'), list) or not isinstance(data.get('rows'), list)):
+        raise ValueError('Published catalogue format changed')
+    return data
+
+
+def parse_hero_nameplates(text):
+    """Default and Fantastic plates have explicit game IDs 3<hero>001/002.
+
+    Hero pages omit universal plates; catalogue HTML shows only its newest items.
+    """
+    data = parse_published_catalogue(text)
+    candidates = {}
+    for row in data['rows']:
+        if (not isinstance(row, list) or len(row) < 12 or not isinstance(row[1], str)
+                or not isinstance(row[2], str) or not isinstance(row[5], int)
+                or not 0 <= row[5] < len(data['t']) or data['t'][row[5]] != 'nameplate'
+                or not isinstance(row[11], str)):
+            continue
+        match = re.fullmatch(r'3(10\d{2})(001|002)', row[1])
+        image = 'https://rivalskins.com' + data['p'] + re.sub(r'\.png$', '.webp', row[11])
+        if not match or not nameplate_url(image):
+            continue
+        kind = 'default' if match[2] == '001' else 'fantastic'
+        candidates.setdefault((match[1], kind), []).append({'name': row[2], 'image': image})
+    result = {}
+    for (cid, kind), plates in candidates.items():
+        if len(plates) == 1:
+            result.setdefault(cid, {})[kind] = plates[0]
+    return result
+
+
+def published_costumes(text):
+    data = parse_published_catalogue(text)
+    costumes = []
+    for row in data['rows']:
+        if (not isinstance(row, list) or len(row) < 14 or not isinstance(row[1], str)
+                or not re.fullmatch(r'10\d{5}', row[1]) or not isinstance(row[2], str)
+                or not isinstance(row[5], int) or not 0 <= row[5] < len(data['t'])
+                or data['t'][row[5]] != 'costume' or not isinstance(row[13], str)):
+            continue
+        image = 'https://rivalskins.com' + data['p'] + re.sub(r'\.png$', '.webp', row[13])
+        folder = re.search(r'/items/costume/(\d+)/', image)
+        if folder and allowed_url(image) and icon_url(image):
+            costumes.append({'id': row[1], 'name': row[2], 'image': image, 'site_hero': folder[1]})
+    return costumes
+
+
+def discover_characters(chars, roster, costumes):
+    """New site heroes need an explicit costume game ID and an exact roster folder."""
+    chars = {cid: {**char, 'skins': dict(char['skins'])} for cid, char in chars.items()}
+    heroes, owners = {}, {}
+    for hero in roster:
+        folder = re.search(r'/items/costume/(\d+)/', hero['image'])
+        if folder:
+            heroes.setdefault(folder[1], []).append(hero)
+    for costume in costumes:
+        owners.setdefault(costume['site_hero'], set()).add(costume['id'][:4])
+    for costume in costumes:
+        site = costume['site_hero']
+        if len(heroes.get(site, [])) != 1 or len(owners[site]) != 1:
+            continue
+        cid, hero = costume['id'][:4], heroes[site][0]
+        if cid in chars:
+            name = normalized(chars[cid]['name'])
+            if ALIASES.get(name, name) != normalized(hero['name']):
+                continue
+        char = chars.setdefault(cid, {'name': hero['name'], 'skins': {}})
+        char['skins'].setdefault(costume['id'], costume['name'])
+    return chars
+
+
+def bundled_sprays(text):
+    """Match one costume and one spray listed together in a published bundle."""
+    data = parse_published_catalogue(text)
+    costumes, sprays, bundles = {}, {}, []
+    prefix = 'https://rivalskins.com' + data['p']
+    for row in data['rows']:
+        if not isinstance(row, list) or len(row) < 15 or not isinstance(row[5], int) or not 0 <= row[5] < len(data['t']):
+            continue
+        kind = data['t'][row[5]]
+        if kind == 'bundle' and isinstance(row[14], list):
+            bundles.append(row[14])
+        elif isinstance(row[11], str):
+            if kind == 'costume' and isinstance(row[1], str) and re.fullmatch(r'10\d{5}', row[1]):
+                costumes.setdefault(row[11], set()).add(row[1])
+            elif kind == 'spray':
+                image = row[13] if isinstance(row[13], str) else row[11].replace('/img_icon_', '/img_', 1)
+                url = prefix + re.sub(r'\.png$', '.webp', image)
+                if allowed_url(url) and re.fullmatch(r'.*/items/spray/\d+/img_(?!icon_)[^/]+\.webp', url):
+                    sprays.setdefault(row[11], set()).add(url)
+    candidates = {}
+    for bundle in bundles:
+        icons = [part[0] for part in bundle if isinstance(part, list) and len(part) == 2 and isinstance(part[0], str)]
+        outfits = [icon for icon in icons if icon in costumes]
+        art = [icon for icon in icons if icon in sprays]
+        if len(outfits) != 1 or len(art) != 1 or len(costumes[outfits[0]]) != 1 or len(sprays[art[0]]) != 1:
+            continue
+        # A matching bundle must also publish both items under the same hero folder.
+        if outfits[0].split('/')[2] != art[0].split('/')[2]:
+            continue
+        sid = next(iter(costumes[outfits[0]]))
+        candidates.setdefault(sid, set()).update(sprays[art[0]])
+    return {sid: next(iter(urls)) for sid, urls in candidates.items() if len(urls) == 1}
+
+
+def matched_sprays(text):
+    """Use bundles first, then a unique exact cosmetic name within the same hero."""
+    result = bundled_sprays(text)
+    data = parse_published_catalogue(text)
+    costumes, sprays = {}, {}
+    prefix = 'https://rivalskins.com' + data['p']
+    for row in data['rows']:
+        if (not isinstance(row, list) or len(row) < 14 or not isinstance(row[2], str)
+                or not isinstance(row[5], int) or not 0 <= row[5] < len(data['t'])
+                or not isinstance(row[11], str)):
+            continue
+        kind = data['t'][row[5]]
+        folder = re.fullmatch(r'items/(costume|spray)/(\d+)/img_icon_[^/]+\.png', row[11])
+        if not folder or folder[1] != kind or folder[2] != str(row[6]):
+            continue
+        key = (folder[2], normalized(row[2]))
+        if not key[1]:
+            continue
+        if kind == 'costume' and isinstance(row[1], str) and re.fullmatch(r'10\d{5}', row[1]):
+            costumes.setdefault(key, set()).add(row[1])
+        elif kind == 'spray':
+            image = row[13] if isinstance(row[13], str) else row[11].replace('/img_icon_', '/img_', 1)
+            url = prefix + re.sub(r'\.png$', '.webp', image)
+            if allowed_url(url) and re.fullmatch(r'.*/items/spray/'+folder[2]+r'/img_(?!icon_)[^/]+\.webp', url):
+                sprays.setdefault(key, set()).add(url)
+    for key, ids in costumes.items():
+        urls = sprays.get(key, set())
+        if len(ids) == len(urls) == 1:
+            result.setdefault(next(iter(ids)), next(iter(urls)))
+    return result
+
+
+def apply_hero_nameplates(entry, cid, plates):
+    """Require both the plate's explicit hero ID and exact hero name."""
+    if entry.get('kind') != 'hero' or not cid.startswith('10') or not entry.get('image'):
+        return
+    name = normalized(entry['name'])
+    name = ALIASES.get(name, name)
+    for kind, plate in plates.get(cid, {}).items():
+        expected = name if kind == 'default' else 'fantastic' + name
+        if normalized(plate['name']) != expected:
+            continue
+        if kind == 'default':
+            entry.update(banner=nameplate_url(plate['image']), badge=plate['image'], banner_style='default')
+        elif kind == 'fantastic':
+            entry['proficiency'] = plate['image']
+
+
+def build_entries(chars, roster, load_page, load_items, hero_nameplates=None, skin_sprays=None):
     heroes = {normalized(hero['name']): hero for hero in roster}
     entries = {}
     for cid, char in chars.items():
@@ -212,6 +379,7 @@ def build_entries(chars, roster, load_page, load_items):
                     if banner:
                         entry.update(banner=banner, badge=hero_plates[0]['image'], banner_style=style)
                 break
+            apply_hero_nameplates(entry, cid, hero_nameplates or {})
         for sid, name in char['skins'].items():
             entries[sid] = {'name': name, 'kind': 'skin', 'hero': cid,
                             'image': entry['image'], 'source': entry['source'], 'hero_fallback': True}
@@ -242,6 +410,9 @@ def build_entries(chars, roster, load_page, load_items):
                                 'image': artwork['image'], 'source': costume['page'], 'hero_fallback': False,
                                 'match': 'id' if artwork['ids'] else 'name',
                                 **({'banner': banner, 'badge': matched['image']} if banner else {})}
+    for sid, url in (skin_sprays or {}).items():
+        if sid in entries and not entries[sid].get('hero_fallback'):
+            entries[sid]['spray'] = url
     return entries
 
 
@@ -272,6 +443,8 @@ class Catalogue:
                        and (entry.get('image') is None or allowed_url(entry['image']))
                        and (entry.get('banner') is None or allowed_url(entry['banner']))
                        and (entry.get('badge') is None or allowed_url(entry['badge']))
+                       and (entry.get('proficiency') is None or nameplate_url(entry['proficiency']))
+                       and (entry.get('spray') is None or allowed_url(entry['spray']))
                        for key, entry in data['entries'].items()):
                 return None
             return data
@@ -305,6 +478,7 @@ class Catalogue:
         return {'name': entry.get('name'), 'thumbnail': f'/api/catalogue/thumbnail/{key}' if entry.get('image') else None,
                 'hero_fallback': entry.get('hero_fallback', False),
                 'banner': f'/api/catalogue/banner/{key}' if entry.get('banner') and not entry.get('hero_fallback') else None,
+                'spray': f'/api/catalogue/spray/{key}' if sid and entry.get('spray') and not entry.get('hero_fallback') else None,
                 'badge': f'/api/catalogue/badge/{key}' if sid and entry.get('badge') and not entry.get('hero_fallback') else None}
 
     def identity(self, path):
@@ -340,11 +514,21 @@ class Catalogue:
         if item.get('type') != 'folder':
             if resolve_ids(path.rpartition('/')[0], self.data.get('entries', {})) is None:
                 result['context_label'] = result['identity_label']
+            # These UI portraits duplicate the catalogue art. Do not decode all
+            # of their game textures just to populate the library grid.
+            skin = identity['skin']
+            portrait_path = path.replace('\\', '/').removeprefix('/Game/Marvel/')
+            match = re.fullmatch(r'(?:Marvel_LQ/)?UI/Textures/Show/Skin/img_skin_(10\d{5})(?:\.uasset)?',
+                                 portrait_path, re.IGNORECASE)
+            if (item.get('file_type') == 'texture' and not item.get('imported')
+                    and match and match[1] == identity['skin_id'] and skin
+                    and skin['thumbnail'] and not skin['hero_fallback']):
+                result['thumbnail'] = skin['thumbnail']
             return result
         portrait = self.describe(path)
         if not portrait:
             leaf = path.rsplit('/', 1)[-1]
-            if not resolve_ids(leaf, self.data.get('entries', {})):
+            if not resolve_ids(leaf, self.data.get('entries', {})) and normalized(leaf) != 'commonmaterial':
                 return result
             portrait = identity['skin'] or identity['hero']
             if not portrait: return result
@@ -355,6 +539,11 @@ class Catalogue:
             result.update(label=result['identity_label']+' — '+leaf, display_name=label,
                           context_label=result['identity_label'], thumbnail=portrait['thumbnail'],
                           hero_fallback=portrait['hero_fallback'])
+            cid = identity['char_id']
+            if (normalized(leaf) in ('commonmaterial', cid + 'commonmaterial')
+                    and self.data['entries'].get(cid, {}).get('proficiency')):
+                result['thumbnail'] = f'/api/catalogue/proficiency/{cid}'
+                result['hero_fallback'] = False
             return result
         key = path.rstrip('/').rsplit('/', 1)[-1]
         name = portrait.get('name') or (f'Skin {key[-3:]}' if len(key) == 7 else None)
@@ -381,13 +570,18 @@ class Catalogue:
         try:
             md, _ = fetch(IDS_URL)
             roster_html, _ = fetch(HEROES_URL)
-            digest = hashlib.sha256(md + roster_html).hexdigest()
+            nameplates, _ = fetch(NAMEPLATES_URL)
+            published = nameplates.decode('utf-8')
+            hero_nameplates = parse_hero_nameplates(published)
+            costumes = published_costumes(published)
+            skin_sprays = matched_sprays(published)
             chars = parse_ids(md.decode('utf-8'))
             roster = parse_cards(roster_html.decode('utf-8'), roster=True)
-            if len(chars) < 20 or len(roster) < 20:
+            if len(chars) < 20 or len(roster) < 20 or len(hero_nameplates) < 20 or len(costumes) < 20:
                 raise ValueError('Catalogue sources changed format; keeping the previous catalogue')
+            chars = discover_characters(chars, roster, costumes)
             # Compare useful content, not ad timestamps / scripts embedded in the page.
-            content_hash = hashlib.sha256(json.dumps([chars, roster], sort_keys=True).encode()).hexdigest()
+            content_hash = hashlib.sha256(json.dumps([chars, roster, hero_nameplates, costumes, skin_sprays], sort_keys=True).encode()).hexdigest()
             now = time.time()
             previous = self.data
             if (previous.get('parser_version') != PARSER_VERSION
@@ -395,12 +589,13 @@ class Catalogue:
                     or now - previous.get('refreshed_at', 0) >= DAY):
                 with ThreadPoolExecutor(max_workers=3, thread_name_prefix='catalogue-page') as pool:
                     entries = build_entries(chars, roster, lambda url: fetch(url)[0].decode('utf-8'),
-                                            lambda pages: list(pool.map(self.item_artwork, pages)))
+                                            lambda pages: list(pool.map(self.item_artwork, pages)), hero_nameplates, skin_sprays)
                 if sum(bool(e.get('image')) for e in entries.values()) < 20:
                     raise ValueError('No usable portraits; keeping the previous catalogue')
                 data = {'schema': 1, 'parser_version': PARSER_VERSION,
                         'entries': entries, 'refreshed_at': now, 'content_hash': content_hash,
-                        'sources': [IDS_URL, HEROES_URL], 'source_digest': digest}
+                        'sources': [IDS_URL, HEROES_URL, NAMEPLATES_URL],
+                        'source_digest': hashlib.sha256(md + roster_html + nameplates).hexdigest()}
             else:
                 data = dict(previous)
             data['checked_at'] = now
@@ -449,6 +644,22 @@ class Catalogue:
         entry = self.data.get('entries', {}).get(key, {})
         url = entry.get('badge')
         if entry.get('hero_fallback') or not isinstance(url, str) or not nameplate_url(url):
+            return None
+        return self._cached(url)
+
+    def proficiency(self, key):
+        """The hero's verified Fantastic proficiency reward icon."""
+        if not re.fullmatch(r'10\d{2}', key):
+            return None
+        url = self.data.get('entries', {}).get(key, {}).get('proficiency')
+        return self._cached(url) if nameplate_url(url) else None
+
+    def spray(self, key):
+        if not re.fullmatch(r'10\d{5}', key):
+            return None
+        entry = self.data.get('entries', {}).get(key, {})
+        url = entry.get('spray')
+        if entry.get('hero_fallback') or not isinstance(url, str) or not re.fullmatch(r'.*/items/spray/\d+/img_(?!icon_)[^/]+\.webp', url):
             return None
         return self._cached(url)
 

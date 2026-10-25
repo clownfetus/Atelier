@@ -22,6 +22,8 @@ PAGES = {'avatar': 'https://rivalskins.com/assets/hero-icons-avatars/',
          'logo': 'https://rivalskins.com/assets/hero-logos/',
          'story': 'https://rivalskins.com/assets/hero-story-images/',
          'lord': 'https://rivalskins.com/assets/lord-icons/',
+         'prestige': 'https://rivalskins.com/assets/hero-prestige-images/',
+         'signature': 'https://rivalskins.com/assets/hero-signatures/',
          'kill': 'https://rivalskins.com/assets/kill-icons/'}
 PREFIX = 'https://rivalskins.com/wp-content/uploads/marvel-assets/assets/'
 # The Hood's published 0010 image is a blank silhouette; 0011 is the usable portrait.
@@ -30,7 +32,8 @@ PREFERRED_AVATARS = {'img_squarehead_10660011_avatar': '1066'}
 
 def asset_url(url, kind):
     folder = {'avatar':'hero-icons-avatars/', 'logo':'hero-logos/', 'story':'hero-story-images/',
-              'lord':'lord-icons/', 'kill':'kill-icons/'}.get(kind)
+              'lord':'lord-icons/', 'kill':'kill-icons/', 'prestige':'hero-prestige-images/',
+              'signature':'hero-signatures/'}.get(kind)
     return bool(folder) and isinstance(url, str) and url.startswith(PREFIX + folder) and allowed_url(url)
 
 
@@ -46,6 +49,18 @@ class Assets(HTMLParser):
         if tag not in ('img', 'a') or not asset_url(url, self.kind):
             return
         name = Path(unquote(urlsplit(url).path)).stem
+        if self.kind == 'signature':
+            numeric = re.fullmatch(r'img_story_herosign_(10\d{2})_sign', name, re.I)
+            if numeric:
+                self.entries[numeric[1]] = url
+            return
+        if self.kind == 'prestige':
+            numeric = re.fullmatch(r'img_prestige_(10\d{2})0010_hero', name, re.I)
+            cid = numeric[1] if numeric else '1011' if name.lower() == 'img_prestige_10110013_hero' else None
+            rank = 3 if name.lower() == 'img_prestige_10110013_hero' else 2
+            if cid and rank > self.ranks.get(cid, 0):
+                self.entries[cid], self.ranks[cid] = url, rank
+            return
         if self.kind in ('lord', 'kill'):
             # Only the page's explicit, exact hero labels establish ownership. Numeric-only
             # item_herohead/item_kill filenames do not prove a hero or costume association.
@@ -90,6 +105,7 @@ class HeroArtwork:
         self.lock, self.slots = threading.Lock(), threading.BoundedSemaphore(3)
         self.sharp_pending, self.sharp_failed, self.sharp_running = [], {}, False
         self.started = False
+        self.failed_images = {}
         self.state = {'updating': False, 'error': None, 'checked_at': None}
         try:
             data = json.loads((self.root / 'hero-artwork.json').read_text(encoding='utf-8'))
@@ -139,7 +155,9 @@ class HeroArtwork:
                     raise ValueError('Unexpected hero artwork format or dimensions')
                 image.load()
                 image = image.convert('RGBA')
-                image.thumbnail((1600, 1600) if '/hero-story-images/' in url else (512, 512), Image.Resampling.LANCZOS)
+                if not image.getchannel('A').getbbox():
+                    raise ValueError('Hero artwork is blank')
+                image.thumbnail((1600, 1600) if any(folder in url for folder in ('/hero-story-images/', '/hero-prestige-images/')) else (512, 512), Image.Resampling.LANCZOS)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 staged = path.with_suffix(f'.{threading.get_ident()}.tmp')
                 try:
@@ -164,7 +182,8 @@ class HeroArtwork:
             def download(item):
                 (cid, kind), url = item
                 try:
-                    self._image(url)
+                    if kind not in ('prestige', 'signature'):
+                        self._image(url)
                     return cid, kind, url
                 except Exception:
                     return None
@@ -224,6 +243,16 @@ class HeroArtwork:
             url = self.entries.get(cid, {}).get(kind)
         # UI reads are local: a slow or offline artwork source never blocks navigation.
         path = self._path(url) if url else None
+        # Decorative portraits download only when an image requests one, independently
+        # of navigation or the background metadata refresh.
+        if kind in ('prestige', 'signature') and url:
+            if time.time() - self.failed_images.get(url, 0) < 300:
+                return None
+            try:
+                return self._image(url)
+            except Exception:
+                self.failed_images[url] = time.time()
+                return None
         if path and kind == 'story' and path.is_file():
             target = self._sharp_path(path)
             if target.is_file():

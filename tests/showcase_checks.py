@@ -47,6 +47,23 @@ window.__showcase={
         baseline=tab.evaluate('__showcase.snapshot()')
         for value in ['full','calm','off']:
             motion(value);tab.locator('#viewport-showcase').click();tab.wait_for_timeout(80)
+            if value == 'full':
+                flow=tab.locator('.k-workflow-svg[data-workflow-kind=workspace]')
+                flow.wait_for(state='attached')
+                assert flow.evaluate("""svg => {
+                    const ink=svg.getBoundingClientRect(), seam=document.getElementById('viewport-modes').getBoundingClientRect();
+                    return svg.namespaceURI==='http://www.w3.org/2000/svg'
+                        && svg.inert && getComputedStyle(svg).pointerEvents==='none'
+                        && [...svg.querySelectorAll('path[data-ink]')].some(path=>Number(path.getAttribute('opacity'))>0)
+                        && ['x','y','width','height'].every(key=>Math.abs(ink[key]-seam[key])<1);
+                }""")
+                assert tab.locator('#viewport-showcase').get_attribute('aria-pressed') == 'true'
+                tab.screenshot(path=str(report/'workflow-showcase-mode.png'))
+                flow.wait_for(state='detached')
+                tab.locator('#viewport-showcase').click()
+                assert not flow.count()
+            else:
+                assert not tab.locator('.k-workflow-svg[data-workflow-kind=workspace]').count()
             assert tab.evaluate('__inspection.presentation().showcase')
             assert tab.evaluate("__renderTypes.includes('MeshToonMaterial')")
             assert tab.locator('.vp-showcase-backdrop').is_visible()
@@ -54,6 +71,7 @@ window.__showcase={
             assert tab.evaluate('__showcase.restored()') and tab.evaluate('__showcase.snapshot()')==baseline
         assert not writes,writes
         checks.append('Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes')
+        checks.append('Workspace changes trace one Full SVG flow along the mode selector border without covering model artwork; selecting the same mode stays still, and Calm/Off never start the flow')
         composition=tab.evaluate("""() => {
           const render=inks=>{const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');AtelierShowcaseArt.draw(ctx,c.width,c.height,inks);return ctx.getImageData(0,0,c.width,c.height).data;};
           const a=render({charge:'#f94848',rift:'#ff0000'}),b=render({charge:'#19e06e',rift:'#00ffff'});

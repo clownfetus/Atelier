@@ -1,5 +1,8 @@
 {
   "version": "1.1.2",
+  "tools_seed_sha256": "c5c00386c037aa9ff632e7e383082ae4441fb45c77f712b53ba256ed5165a2ca",
+  "tools_seed_asset": "windows-tools.zip",
+  "tools_seed_api_url": "https://api.github.com/repos/clownfetus/Atelier/releases/assets/646582462",
   "previous_windows_url": "https://github.com/clownfetus/Atelier/releases/download/1.1.1/AtelierSetup.exe",
   "previous_windows_sha256": "43340c687f981d5ed3498e4a2d8b2227569be70422a602140b4c3dc9041594d4",
   "previous_windows_bytes": 183117054,

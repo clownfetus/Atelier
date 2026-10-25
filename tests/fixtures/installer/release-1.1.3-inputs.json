@@ -1,0 +1,8 @@
+{
+  "version": "1.1.3",
+  "previous_windows_url": "https://github.com/clownfetus/Atelier/releases/download/1.1.1/AtelierSetup.exe",
+  "previous_windows_sha256": "43340c687f981d5ed3498e4a2d8b2227569be70422a602140b4c3dc9041594d4",
+  "previous_windows_bytes": 183117054,
+  "linux_seed_url": "https://github.com/clownfetus/Atelier/releases/download/1.1.1/Atelier-1.1.1-x86_64.AppImage",
+  "linux_seed_sha256": "b885361199dcac7f46271e63909f3a7ee92460e52e68d09ba4693422bedb4d04"
+}

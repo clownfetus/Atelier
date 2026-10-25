@@ -81,6 +81,7 @@ def main():
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
     parser.add_argument('--workflow-motion-only', action='store_true', help='Check Krackle hero, navigation, editor and tray motion')
+    parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
@@ -240,8 +241,30 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
+                if args.working_panels_only:
+                    from working_panels_checks import run_working_panels_checks
+                    from fluid_work_checks import run_fluid_work_checks
+                    from material_save_motion_checks import run_material_save_motion_checks
+                    from export_motion_checks import run_export_motion_checks
+                    from export_review_checks import run_export_review_checks
+                    from viewport_loading_checks import run_viewport_loading_checks
+                    from viewport_motion_checks import run_viewport_motion_checks
+                    run_working_panels_checks(context, url, report, checks)
+                    run_fluid_work_checks(context, url, report, checks)
+                    run_material_save_motion_checks(page, context, url, report, checks)
+                    run_export_motion_checks(page, context, url, report, checks)
+                    run_export_review_checks(page, context, url, report, checks)
+                    run_viewport_loading_checks(page, context, url, report, checks)
+                    run_viewport_motion_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close(); return
+
                 if args.workflow_motion_only:
+                    from context_ink_checks import run_context_ink_checks
                     from workflow_motion_checks import run_workflow_motion_checks
+                    run_context_ink_checks(context, url, report, checks)
                     run_workflow_motion_checks(context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
@@ -430,7 +453,13 @@ def main():
                 from inks_dial_checks import run_inks_dial_checks
                 run_inks_dial_checks(page,context,url,report,checks)
                 from workflow_motion_checks import run_workflow_motion_checks
+                from context_ink_checks import run_context_ink_checks
+                run_context_ink_checks(context, url, report, checks)
                 run_workflow_motion_checks(context, url, report, checks)
+                from working_panels_checks import run_working_panels_checks
+                run_working_panels_checks(context, url, report, checks)
+                from fluid_work_checks import run_fluid_work_checks
+                run_fluid_work_checks(context, url, report, checks)
                 from find_checks import run_find_checks
                 run_find_checks(page, context, url, report, checks)
                 from shared_identity_checks import run_shared_identity_checks
@@ -580,6 +609,8 @@ def main():
                     assert stats[-1]['geometries'] <= stats[0]['geometries'], stats
                     assert stats[-1]['textures'] <= stats[0]['textures'], stats
                     checks.append('Real decoded GLB renders; three reopen/close cycles stop animation and release geometry')
+                from assembly_browser_checks import run_assembly_checks
+                run_assembly_checks(context, url, report, checks)
                 assert not errors, errors
 
                 # Capture the original frontend against the same deterministic fixture data.

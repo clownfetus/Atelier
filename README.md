@@ -1,29 +1,32 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.2** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.3** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.2](docs/release-1.1.2.md)
+· [What's new in 1.1.3](docs/release-1.1.3.md)
 · [Tutorials](#tutorials)
 · [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.1.2 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier 1.1.3 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.2
+## What's new in 1.1.3
 
+- **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
+  costume colours along the app's borders. Try the examples in **Settings → Try Krackle**.
+- **Quieter Windows pickers.** File and folder selection opens without a PowerShell console.
 - **Textures match the game's brightness.** Exports keep their mip chain and build mips the way
   the game does, so textures no longer look brighter or glarey at a distance.
 - **BC7 exports finish in seconds,** and textures added at a custom path no longer crash the game.
 - **Assembly View** shows a model surface's material and connected texture slots.
 - **VFX Motionboard** edits Niagara LUT tracks on a timeline with playback and comparison.
 - **Bulk edit materials** changes up to 1,000 materials at once.
-- **Settings → Tools** shows tool versions and updates, repairs or rolls back the container tool.
+- **Settings → Tools** shows tool versions and offers verified updates and repairs for the container tool.
 - **Linux AppImage** runs on newer distributions, with native model previews and animations.
 
-See the [patch notes](docs/release-1.1.2.md) for details and verification limits.
+See the [patch notes](docs/release-1.1.3.md) for details and verification limits.
 
 ## Included from 1.1.1
 
@@ -66,8 +69,8 @@ See the [patch notes](docs/release-1.1.2.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-These instructions describe **1.1.2**. Check the release title when downloading;
-a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.2.md)
+These instructions describe **1.1.3**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.3.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -382,12 +385,12 @@ must be extracted in full; `Atelier.exe` needs its adjacent `_internal` director
 
 To make a Windows release discoverable by existing installations:
 
-1. Build the intended source with a higher numeric version, such as `1.1.2`.
+1. Build the intended source with a higher numeric version, such as `1.1.3`.
    [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
    version to the installer compiler. Verify the installer and upgrade behavior
    using the [installer checks](docs/DEVELOPMENT.md#disposable-windows-installer-verification).
 2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`1.1.2` or `v1.1.2`) and attaching the installer named **AtelierSetup.exe**.
+   (`1.1.3` or `v1.1.3`) and attaching the installer named **AtelierSetup.exe**.
 3. Make it the latest release. The updater requires a version higher than the
    installed version; replacing an EXE under the same version will not trigger it.
 

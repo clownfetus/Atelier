@@ -2,14 +2,15 @@
  * Atelier — 3D Viewport Loader Motion Controller
  * Classic-script IIFE adding window.AtelierMotion.viewportLoader while preserving
  * existing window.AtelierMotion entries (such as exportFeedback).
- * Krackle artwork (scripts/krackle_art.py, also viewport-loader.svg): twelve dots charge
- * around a ball of energy whose bubbles boil while the model loads; an empty result
- * drains to three resting bubbles and a failure ends in a knocked-out splat.
+ * Generated static artwork stays intact; the busy layer feeds a continuous preview
+ * frame from an upper reservoir into a lower catch plate. Its twelve attached rim
+ * lobes thicken with the flow; empty/error retain their readable semantic formations.
  * Adapted from the supplied Gemini controller; Atelier adds failure and cleanup safeguards.
  */
 (function () {
   'use strict';
 
+  var fluidUid = 0;
   var VALID_STATES = new Set(['idle', 'loading', 'ready', 'empty', 'error']);
 
   var EASE_STANDARD = window.AtelierMotion.ease.standard;
@@ -93,6 +94,18 @@
     host.setAttribute('data-am-reduced', String(isReducedMotion()));
     host.innerHTML = SVG_MARKUP;
 
+    function repaintEnergy() {
+      if (destroyed) return;
+      var palette = window.AtelierMotion.energy?.resolve(host);
+      var artwork = host.querySelector('svg');
+      if (!artwork || !palette) return;
+      artwork.style.setProperty('--am-local-charge', palette.charge);
+      artwork.style.setProperty('--am-local-rift', palette.rift);
+    }
+    repaintEnergy();
+    window.addEventListener('atelier:energy', repaintEnergy);
+    window.addEventListener('atelier:inks', repaintEnergy);
+
     function q(selector) { return host.querySelector(selector); }
     function qa(selector) { return Array.prototype.slice.call(host.querySelectorAll(selector)); }
 
@@ -112,8 +125,35 @@
     var dripGroup = q('.am-viewport-loader-drip');
     var dizzies = qa('.am-viewport-loader-dizzy');
 
-    var animatedNodes = [loadingGroup, ringGroup, sphereGroup, emptyGroup, errorGroup, splatGroup, dripGroup]
-      .concat(dots, dotHoles, boils, looseBubbles, restBubbles, sats, dizzies);
+    // The inlet feeds both sides of the preview frame into its lower receiving plate.
+    // Existing rim dots are attached lobes of this outline, never loose satellites.
+    var fluidMask = 'am-viewport-fluid-' + (++fluidUid);
+    var inlet = 'M6 7.5 C12 7.5 15 7.5 24 7.5';
+    var rightFlow = inlet + ' A16.5 16.5 0 0 1 24 40.5';
+    var leftFlow = inlet + ' A16.5 16.5 0 0 0 24 40.5';
+    var holes = dots.map(function(dot) {
+      return '<circle cx="' + dot.getAttribute('cx') + '" cy="' + dot.getAttribute('cy') + '" r=".7" fill="black"/>';
+    }).join('');
+    svgEl.insertAdjacentHTML('afterbegin',
+      '<defs><mask id="' + fluidMask + '" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48">' +
+      '<rect width="48" height="48" fill="white"/>' + holes +
+      '<circle cx="5.2" cy="6.2" r="1.2" fill="black"/><circle cx="27" cy="41" r="1.1" fill="black"/>' +
+      '</mask></defs>');
+    loadingGroup.setAttribute('mask', 'url(#' + fluidMask + ')');
+    loadingGroup.insertAdjacentHTML('afterbegin',
+      '<g class="am-viewport-loader-fluid" data-source="inlet" data-destination="preview-frame">' +
+      '<path class="am-viewport-loader-conduit" d="' + rightFlow + ' ' + leftFlow + '"/>' +
+      '<path class="am-viewport-loader-flow" d="' + rightFlow + '" pathLength="100"/>' +
+      '<path class="am-viewport-loader-flow" d="' + leftFlow + '" pathLength="100"/>' +
+      '<path class="am-viewport-loader-source" d="M2 7 C2 3.5 6 2 8.5 4 C11 6 10 9.8 7 11 C4 12.1 1.5 10 2 7Z"/>' +
+      '<path class="am-viewport-loader-receiver" d="M16 40 C17 37.5 21 37 24 37 C28 37 31.5 38 32 40.5 C32.5 43.3 28 45 24 44.5 C20 45 15.5 43.2 16 40Z"/>' +
+      '</g>');
+    var fluid = q('.am-viewport-loader-fluid'), fluidFlows = qa('.am-viewport-loader-flow');
+    var fluidSource = q('.am-viewport-loader-source'), fluidReceiver = q('.am-viewport-loader-receiver');
+
+
+    var animatedNodes = [fluid, fluidSource, fluidReceiver, loadingGroup, ringGroup, sphereGroup, emptyGroup, errorGroup, splatGroup, dripGroup]
+      .concat(fluidFlows, dots, dotHoles, boils, looseBubbles, restBubbles, sats, dizzies);
 
     function centreOf(el) {
       var c = el.querySelector ? (el.querySelector('circle') || el) : el;
@@ -175,51 +215,27 @@
       host.setAttribute('data-am-reduced', String(reduced));
       if (reduced || isDocumentHidden()) return;
 
-      // The charge travels clockwise around the ring: each dot swells and shows a bubble.
+      // Both continuous channels carry pressure from the inlet into the lower plate.
+      fluidFlows.forEach(function(flow) {
+        runAnimation(flow, [{strokeDashoffset:'26'},{strokeDashoffset:'-74'}],
+          {duration:LOOP_DURATION_MS,iterations:Infinity,easing:'linear'});
+      });
+      runAnimation(fluidSource, [
+        {transform:'scale(1)',offset:0},{transform:'scale(.88,1.08)',offset:.18},
+        {transform:'scale(1.04,.96)',offset:.5},{transform:'scale(1)',offset:1}
+      ], {duration:LOOP_DURATION_MS,iterations:Infinity,easing:EASE_SWAY});
+      runAnimation(fluidReceiver, [
+        {transform:'scale(1)',offset:0},{transform:'scale(1)',offset:.5},
+        {transform:'scale(1.035,.82)',offset:.72},{transform:'scale(.98,1.08)',offset:.86},
+        {transform:'scale(1)',offset:1}
+      ], {duration:LOOP_DURATION_MS,iterations:Infinity,easing:EASE_SWAY});
+      // The original comic dots now thicken their attached rim as each side receives ink.
       for (var k = 0; k < dots.length; k++) {
-        var timing = {
-          duration: LOOP_DURATION_MS,
-          delay: (k * LOOP_DURATION_MS) / dots.length,
-          iterations: Infinity,
-          easing: 'linear'
-        };
+        var travel = Math.min(k, dots.length-k) / 6;
         runAnimation(dots[k], [
-          { transform: 'scale(1)', offset: 0 },
-          { transform: 'scale(1.75)', offset: 0.08 },
-          { transform: 'scale(1.25)', offset: 0.24 },
-          { transform: 'scale(1)', offset: 0.45 },
-          { transform: 'scale(1)', offset: 1 }
-        ], timing);
-        runAnimation(dotHoles[k], [
-          { transform: 'scale(0)', offset: 0 },
-          { transform: 'scale(1)', offset: 0.08 },
-          { transform: 'scale(0.5)', offset: 0.24 },
-          { transform: 'scale(0)', offset: 0.4 },
-          { transform: 'scale(0)', offset: 1 }
-        ], timing);
-      }
-
-      // The ball bobs while its bubbles boil, out of step with one another.
-      runAnimation(sphereGroup, [
-        { transform: 'translateY(0px) scale(1)' },
-        { transform: 'translateY(-0.9px) scale(1.03)', offset: 0.5 },
-        { transform: 'translateY(0px) scale(1)' }
-      ], { duration: LOOP_DURATION_MS, iterations: Infinity, easing: EASE_TURN });
-      for (var b = 0; b < boils.length; b++) {
-        runAnimation(boils[b], [
-          { transform: 'scale(1)' },
-          { transform: 'scale(' + (b % 2 ? 0.45 : 1.3) + ')', offset: 0.5 },
-          { transform: 'scale(1)' }
-        ], { duration: LOOP_DURATION_MS * (0.75 + b * 0.18), delay: -b * LOOP_DURATION_MS / 6, iterations: Infinity, easing: EASE_TURN });
-      }
-
-      // Loose bubbles drift around the edge of the stage.
-      for (var l = 0; l < looseBubbles.length; l++) {
-        runAnimation(looseBubbles[l], [
-          { transform: 'translate(0px, 0px) scale(1)' },
-          { transform: 'translate(' + (l % 2 ? -0.8 : 0.8) + 'px, -1.4px) scale(1.15)', offset: 0.5 },
-          { transform: 'translate(0px, 0px) scale(1)' }
-        ], { duration: LOOP_DURATION_MS * 2, delay: -l * LOOP_DURATION_MS / 3, iterations: Infinity, easing: EASE_TURN });
+          {transform:'scale(1)',offset:0},{transform:'scale(1.16)',offset:.2},
+          {transform:'scale(1)',offset:.45},{transform:'scale(1)',offset:1}
+        ], {duration:LOOP_DURATION_MS,delay:travel*LOOP_DURATION_MS*.5,iterations:Infinity,easing:EASE_SWAY});
       }
     }
 
@@ -242,20 +258,20 @@
       // Hide the whole loading artwork, including loose bubbles, until the show-delay ends.
       // Mounting stays immediate so the caller never flashes its static fallback.
       runAnimation(loadingGroup, [{ opacity: 0 }, { opacity: 0 }], { duration: SHOW_DELAY_MS });
-      // 220ms coalesce: the ring's dots gather out of the centre, then the ball swells in.
+      // The connected frame opens from its inlet; its attached rim lobes settle in place.
       var last = null;
       for (var k = 0; k < dots.length; k++) {
         var c = centreOf(dots[k]);
-        var from = 'translate(' + px(24 - c[0]) + ', ' + px(24 - c[1]) + ') scale(0.3)';
+        var from = 'scale(.72)';
         last = runAnimation(dots[k], [
           { transform: from, opacity: 0 },
           { transform: 'translate(0px, 0px) scale(1)', opacity: 1 }
         ], { duration: ASSEMBLY_DURATION_MS, delay: SHOW_DELAY_MS + k * 6, fill: 'backwards', easing: EASE_STANDARD });
       }
-      runAnimation(sphereGroup, [
-        { transform: 'scale(0.4)', opacity: 0, easing: EASE_STANDARD },
-        { transform: 'scale(1.08)', opacity: 1, offset: 0.7, easing: EASE_SWAY },
-        { transform: 'scale(1)', opacity: 1 }
+      runAnimation(fluid, [
+        { transform: 'scaleX(.82)', opacity: 0, easing: EASE_STANDARD },
+        { transform: 'scaleX(1.02)', opacity: 1, offset: 0.7, easing: EASE_SWAY },
+        { transform: 'scaleX(1)', opacity: 1 }
       ], { duration: ASSEMBLY_DURATION_MS + 66, delay: SHOW_DELAY_MS, fill: 'backwards', easing: 'linear' },
         function () {
           if (destroyed || generation !== myGen || currentState !== 'loading') return;
@@ -409,6 +425,8 @@
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
+        window.removeEventListener('atelier:energy', repaintEnergy);
+        window.removeEventListener('atelier:inks', repaintEnergy);
         release();clearMicro();
         cancelActiveAnimations();
         if (mql) {

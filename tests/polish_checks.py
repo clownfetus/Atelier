@@ -177,11 +177,39 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('#import-segments [data-state=failed]').count() == 1
         tab.evaluate("AtelierPolish.importProgress({done:true,results:[],error:'Cancelled after A'})")
         assert tab.locator('#import-segments [data-state=done]').count() == 1
-        tab.evaluate("AtelierPolish.packing(); localStorage.removeItem('atelier.firstExportCelebrated'); AtelierPolish.exported()")
-        assert tab.locator('.export-color-moment').count() > 0
-        tab.wait_for_timeout(550)
+        tab.evaluate('AtelierPolish.packing()')
+        tab.wait_for_function("!document.querySelector('.k-workflow-link,.k-workflow-svg')")
+        tab.evaluate("localStorage.removeItem('atelier.firstExportCelebrated'); AtelierPolish.exported()")
+        assert tab.locator('svg.export-color-moment').count() == 1
+        assert tab.evaluate("""() => {
+          const button=document.getElementById('install-btn'),bounds=button.getBoundingClientRect(),svg=document.querySelector('svg.export-color-moment');
+          const box=svg.getBoundingClientRect(),flow=svg.querySelector('.export-receipt-flow'),seal=svg.querySelector('.export-receipt-seal');
+          if(Math.abs(box.left-bounds.left)>.1||Math.abs(box.top-bounds.top)>.1||box.width!==bounds.width||box.height!==bounds.height)return false;
+          if(getComputedStyle(svg).overflow!=='hidden'||getComputedStyle(svg).pointerEvents!=='none')return false;
+          const length=flow.getTotalLength(),start=flow.getPointAtLength(0),end=flow.getPointAtLength(length),receiver=seal.getBBox();
+          const slot=button.querySelector('.am-export-feedback-slot').getBoundingClientRect();
+          if(start.x<slot.left-bounds.left||start.x>slot.right-bounds.left||start.y<slot.top-bounds.top||start.y>slot.bottom-bounds.top)return false;
+          if(end.x<receiver.x||end.x>receiver.x+receiver.width||end.y<receiver.y||end.y>receiver.y+receiver.height)return false;
+          // The measured route remains inside the receiver, never a detached particle trip.
+          for(let i=0;i<=80;i++){const point=flow.getPointAtLength(length*i/80);if(point.x<0||point.x>bounds.width||point.y<0||point.y>bounds.height)return false;}
+          const mask=svg.querySelector('mask'),cutouts=[...mask.querySelectorAll('.export-receipt-content-cutout')];
+          if(!cutouts.length||flow.parentElement.getAttribute('mask')!==`url(#${mask.id})`)return false;
+          const walker=document.createTreeWalker(button,NodeFilter.SHOW_TEXT);
+          while(walker.nextNode()){
+            const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.am-export-feedback-slot'))continue;
+            const range=document.createRange();range.selectNodeContents(text);
+            for(const label of range.getClientRects())if(!cutouts.some(cutout=>{const cut=cutout.getBBox();return cut.x<=label.left-bounds.left&&cut.y<=label.top-bounds.top&&cut.x+cut.width>=label.right-bounds.left&&cut.y+cut.height>=label.bottom-bounds.top;}))return false;
+          }
+          const stops=[...svg.querySelectorAll('linearGradient stop')];
+          return stops.length>=2&&stops.length%2===0&&stops.every((stop,i)=>
+            AtelierKrackleInks.contrast(stop.getAttribute('stop-color'),getComputedStyle(button).backgroundColor)>=3
+            &&(i%2===0||stop.getAttribute('stop-color')===stops[i-1].getAttribute('stop-color')));
+        }"""), 'Export flow must connect the glyph to its seal inside the button, mask the real label and preserve flat sampled inks'
+        tab.wait_for_function("Number(document.querySelector('.export-receipt-seal')?.getAttribute('opacity'))>=.8")
+        tab.locator('#install-btn').screenshot(path=str(report/'polish-export-ink-catch.png'))
+        tab.wait_for_function("!document.querySelector('.export-color-moment')", timeout=2000)
         tab.evaluate('AtelierPolish.exported()'); assert not tab.locator('.export-color-moment').count()
-        checks.append('Saved sidebar colors/curves, fly/packing snapshots, row removal, rolling counts, real import outcomes and one-time mod-color celebration clean up')
+        checks.append('Saved sidebar colors/curves, connected asset handoffs, row removal, rolling counts, real import outcomes and one-time mod-color export seal clean up')
         jobs=[{'id':'polish-job','project':'Smoke A','kind':'fixture','label':'Fixture job','state':'running','stage':'Working','current':2,'total':4,'can_cancel':True}]
         tab.route('**/api/jobs',lambda route:route.fulfill(json={'jobs':jobs}))
         tab.evaluate('AtelierJobs.refresh()')

@@ -58,7 +58,7 @@
 @keyframes digit-in { from {transform:translateY(70%);opacity:.15;} to {transform:none;opacity:1;} }
 .rolling-count { overflow:hidden; }
 .polish-ghost { position:fixed !important; z-index:310; pointer-events:none !important; max-width:none !important; max-height:none !important; }
-.export-color-moment { position:fixed; z-index:320; width:8px; height:8px; border-radius:2px; pointer-events:none; }
+.export-color-moment { position:fixed; z-index:320; pointer-events:none; }
 .polish-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px; color:var(--muted); text-align:center; }
 .polish-empty svg { width:96px; height:64px; opacity:.7; }
 .polish-empty strong { color:var(--text); font-size:13px; font-weight:500; }
