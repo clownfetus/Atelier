@@ -35,6 +35,11 @@ def needs_full_checks(changed):
     return not changed or any(name in names or name.startswith(prefixes) or name.startswith('requirements') for name in changed)
 
 
+def can_reuse_native(changed):
+    recipes = {'scripts/toolchain.py', 'scripts/build_shader_tool.py'}
+    return bool(changed) and not any(name.startswith(('native/', 'toolchain/', 'requirements')) or name in recipes for name in changed)
+
+
 def native_cache_key(config):
     paths = list((ROOT / 'native').rglob('*')) + list((ROOT / 'toolchain').rglob('*'))
     paths += [ROOT / 'scripts' / name for name in ('toolchain.py', 'release_config.json', 'build_shader_tool.py')]
@@ -70,6 +75,7 @@ def prepare(release_version, previous):
     context = {'version': release_version, 'tag': 'v' + release_version, 'source_commit': commit,
                'previous_tag': previous['tag_name'], 'previous_version': previous_version,
                'full_checks': needs_full_checks(changed), 'changed': changed,
+               'reuse_native': can_reuse_native(changed),
                'native_key': native_cache_key(config), 'previous_assets': assets}
     return context, inputs
 

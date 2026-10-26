@@ -112,8 +112,12 @@ jobs:
         with:
           path: Tools
           key: windows-2022-dotnet-10.0.402-native-${{ needs.prepare.outputs.native_key }}
-      - name: Build native tools from the lockfile when inputs change
+      - name: Reuse matching tools from the previous verified release
+        id: previous-native
         if: steps.native.outputs.cache-hit != 'true'
+        run: python scripts/reuse_release_tools.py
+      - name: Build native tools from the lockfile when inputs change
+        if: steps.native.outputs.cache-hit != 'true' && steps.previous-native.outputs.reused != 'true'
         run: python scripts/toolchain.py install --platform windows --dest Tools
       - run: python scripts/toolchain.py verify --platform windows --dest Tools
       - name: Keep private templates outside the reusable native cache
@@ -246,7 +250,11 @@ jobs:
         with:
           path: Tools
           key: ubuntu-24.04-native-${{ needs.prepare.outputs.native_key }}
-      - if: steps.native.outputs.cache-hit != 'true'
+      - name: Reuse matching tools from the previous verified release
+        id: previous-native
+        if: steps.native.outputs.cache-hit != 'true'
+        run: .venv/bin/python scripts/reuse_release_tools.py
+      - if: steps.native.outputs.cache-hit != 'true' && steps.previous-native.outputs.reused != 'true'
         run: .venv/bin/python scripts/toolchain.py install --platform linux --dest Tools
       - run: .venv/bin/python scripts/toolchain.py verify --platform linux --dest Tools
       - name: Keep private templates outside the native cache

@@ -53,6 +53,13 @@ class ReleasePlanning(unittest.TestCase):
             with self.subTest(number=number), self.assertRaisesRegex(ValueError, 'higher'):
                 R.prepare(number, self.previous())
 
+    def test_native_reuse_depends_on_native_sources_and_recipes(self):
+        self.assertTrue(R.can_reuse_native(['gui/app.js', 'atelier/catalogue.py']))
+        for name in ['native/AtelierNative/Program.cs', 'toolchain/tools.lock.json',
+                     'scripts/toolchain.py', 'scripts/build_shader_tool.py', 'requirements-build.txt']:
+            self.assertFalse(R.can_reuse_native([name]), name)
+        self.assertFalse(R.can_reuse_native([]))
+
     def test_missing_published_asset_digest_is_refused(self):
         previous = self.previous()
         previous['assets'][0]['digest'] = None
