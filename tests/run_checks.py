@@ -18,6 +18,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BROWSER_SUITES = {
+    "category_icon_checks.py": "--category-icons-only",
     "assembly_browser_checks.py": "--assembly-only",
     "shared_identity_checks.py": "--shared-identity-only",
     "texture_workflow_checks.py": "--texture-workflows-only",

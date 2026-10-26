@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--material-bulk-only', action='store_true', help='Run material-folder selection and reviewed batch saves')
     parser.add_argument('--motionboard-only', action='store_true', help='Run the VFX Motionboard timeline, proxy and persistence checks')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
+    parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
@@ -445,6 +446,14 @@ def main():
                     (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks:
                         print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.category_icons_only:
+                    from category_icon_checks import run_category_icon_checks
+                    run_category_icon_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     browser.close()
                     return
 
