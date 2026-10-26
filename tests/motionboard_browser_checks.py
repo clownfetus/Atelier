@@ -36,7 +36,8 @@ def run_motionboard_checks(page, context, url, report, checks):
                 patch.object(V,'_vfx_labels',side_effect=lambda *_args,**_kwargs:copy.deepcopy(bindings())), \
                 patch.object(V,'uat',side_effect=lambda args:SimpleNamespace(returncode=0,stdout=json.dumps(native),stderr='')):
             tab.goto(url);tab.wait_for_function("window.atelierProject?.()==='Smoke A' && window.AtelierMotionboard")
-            open_editor()
+            tab.evaluate('(item)=>{_openAfterImport=false;handleAssetClick(item);}',item)
+            tab.wait_for_selector('#vfx-overlay.has-motionboard .mb-track')
             assert tab.locator('.mb-track').count()==6
             assert not Path(C.project_base(ASSET,str(project))+'.json').exists()
             assert tab.locator('#mb-map-color').input_value()=='1,2'
@@ -45,7 +46,7 @@ def run_motionboard_checks(page, context, url, report, checks):
             assert tab.locator('#mb-map-rate').input_value()=='5'
             assert tab.locator('#mb-map-emission').input_value()=='6'
             assert not tab.evaluate('_vfxDirty()')
-            checks.append('Motionboard reads the real VFX API into six supported LUT tracks; exact named bindings drive proxy inputs and read-only opening creates no project edit')
+            checks.append('Clicking an unimported VFX opens its editor with auto-open disabled; the real API supplies six LUT tracks and read-only opening creates no project edit')
 
             before=tab.evaluate('_vfxSnapshot(vfxEditor)')
             row=tab.locator('.mb-track[data-track-key="7"]')

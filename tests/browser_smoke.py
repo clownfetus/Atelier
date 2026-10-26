@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--material-bulk-only', action='store_true', help='Run material-folder selection and reviewed batch saves')
     parser.add_argument('--motionboard-only', action='store_true', help='Run the VFX Motionboard timeline, proxy and persistence checks')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
+    parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
@@ -75,6 +76,7 @@ def main():
     parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
+    parser.add_argument('--skin-swapper-only', action='store_true', help='Check detected forms, export review and format-preserving retries')
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
@@ -287,7 +289,10 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
-                if args.review_followups_only:
+                if args.review_followups_only or args.skin_swapper_only:
+                    if args.skin_swapper_only:
+                        from skin_swapper_review_checks import run_skin_swapper_review_checks
+                        run_skin_swapper_review_checks(page, context, url, report, checks)
                     from review_followup_checks import run_review_followup_checks
                     run_review_followup_checks(context, url, report, checks)
                     assert not errors, errors
@@ -441,6 +446,14 @@ def main():
                     (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks:
                         print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.category_icons_only:
+                    from category_icon_checks import run_category_icon_checks
+                    run_category_icon_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     browser.close()
                     return
 

@@ -1797,7 +1797,11 @@ def api_prefetch_thumbs():
 @app.get("/api/imported")
 def api_imported():
     response.content_type = "application/json"
-    items = all_imported()
+    return json.dumps(_imported_items())
+
+
+def _imported_items(game_rel=None):
+    items = all_imported() if game_rel is None else all_imported(game_rel)
     from atelier.ui_preview import saved_preview
     for item in items:
         item['modified'] = item['mtime']
@@ -1806,7 +1810,7 @@ def api_imported():
             item['name'] += f" · {len(hidden)} hidden section{'s' if len(hidden) != 1 else ''}"
         preview = saved_preview(item['game_rel'], item['file_type'])
         if preview: item['ui_preview'] = preview
-    return json.dumps(items)
+    return items
 
 
 @app.get('/api/search')
@@ -1897,7 +1901,9 @@ def api_import_texture():
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": msg, "game_rel": gr})
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr})
+        items = _imported_items(gr)
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr,
+                           "imported": items[0] if items else None})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})

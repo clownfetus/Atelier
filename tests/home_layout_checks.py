@@ -79,6 +79,26 @@ def run_home_layout_checks(page, context, url, report, checks):
                 assert all(result.values()), (theme, width, result)
                 tab.screenshot(path=str(report/f'compact-surfaces-{theme}-{width}.png'))
         checks.append('Mod tray buttons and Continue fit without clipped text or touching dividers at 240, 300 and 420-pixel tray widths in both themes')
+        # Scrolling the categories yourself folds the wall into one row; the app's own scrolling never does.
+        tab.set_viewport_size({'width': 1400, 'height': 900})
+        tab.evaluate("document.getElementById('grid-area').scrollTop=80")
+        tab.wait_for_timeout(100)
+        assert not tab.locator('#hero-roster.roster-compact').count()
+        opened = tab.evaluate("document.getElementById('grid-area').scrollTop=0, document.getElementById('grid-area').clientHeight")
+        box = tab.locator('#grid-area').bounding_box()
+        tab.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        tab.mouse.wheel(0, 400)
+        tab.wait_for_selector('#hero-roster.roster-compact')
+        folded = tab.evaluate("""() => {
+            const strip=document.querySelector('.roster-strip'),tops=new Set([...strip.children].map(el=>Math.round(el.getBoundingClientRect().top)));
+            return {rows:tops.size, height:document.getElementById('grid-area').clientHeight,
+              costumes:!!document.querySelector('.roster-skin')?.getClientRects().length};
+        }""")
+        assert folded['rows'] == 1 and folded['height'] > opened and folded['costumes'], (opened, folded)
+        tab.evaluate("document.getElementById('grid-area').scrollTop=0")
+        tab.mouse.wheel(0, -200)
+        tab.wait_for_selector('#hero-roster:not(.roster-compact)')
+        checks.append('Scrolling the Home categories folds the hero wall into one row and gives the categories its room; programmatic scrolling never folds it and scrolling up at the top unfolds it')
         tab.locator('.roster-toggle').click()
         assert tab.locator('.roster-content').is_hidden()
         assert not errors, errors

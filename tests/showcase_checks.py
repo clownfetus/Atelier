@@ -48,7 +48,7 @@ window.__showcase={
         for value in ['full','calm','off']:
             motion(value);tab.locator('#viewport-showcase').click();tab.wait_for_timeout(80)
             if value == 'full':
-                flow=tab.locator('.k-workflow-svg[data-workflow-kind=workspace]')
+                flow=tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]')
                 flow.wait_for(state='attached')
                 assert flow.evaluate("""svg => {
                     const ink=svg.getBoundingClientRect(), seam=document.getElementById('viewport-modes').getBoundingClientRect();
@@ -63,7 +63,7 @@ window.__showcase={
                 tab.locator('#viewport-showcase').click()
                 assert not flow.count()
             else:
-                assert not tab.locator('.k-workflow-svg[data-workflow-kind=workspace]').count()
+                assert not tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]').count()
             assert tab.evaluate('__inspection.presentation().showcase')
             assert tab.evaluate("__renderTypes.includes('MeshToonMaterial')")
             assert tab.locator('.vp-showcase-backdrop').is_visible()
@@ -149,7 +149,9 @@ window.__showcase={
           const callbacks={confirm(){},refresh(){},settings(){},reveal(){cardReveal++;}};
           AtelierExportReview.open(cardSnapshot,callbacks);AtelierExportReview.finish(cardSnapshot,{ok:true,applied:['tex T_A','tex T_B','mat MI_Body','combined 2 containers into one pak'],skipped:[]});
         }""")
-        tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()');tab.locator('.mod-card summary').click()
+        tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()')
+        # The card is the build's payoff: open by default, directly after the outcome line.
+        assert tab.evaluate("(card => card.open && card.previousElementSibling?.classList.contains('export-review-summary'))(document.querySelector('.mod-card'))")
         assert tab.locator('.mod-card-stats').inner_text()=='3 assets · 2 textures · 1 material',tab.locator('.mod-card-stats').text_content()
         assert tab.locator('.mod-card p',has_text='Showcase capture').count()==1
         tab.locator('.mod-card button',has_text='Open export folder').click();assert tab.evaluate('cardReveal')==1

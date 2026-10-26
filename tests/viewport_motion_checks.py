@@ -229,6 +229,96 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         close_preview()
         checks.append('Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes')
 
+        # Opening from artwork flies it to the stage; it waits behind arriving geometry and leaves with the sweep.
+        from io import BytesIO
+        from PIL import Image
+        art = BytesIO(); Image.new('RGBA', (96, 96), (210, 160, 60, 255)).save(art, 'PNG'); art = art.getvalue()
+        motion_page.route('**/api/catalogue/thumbnail/*', lambda route: route.fulfill(body=art, content_type='image/png'))
+
+        def motion_mode(value):
+            motion_page.evaluate("value=>{const c=document.getElementById('settings-motion');c.value=value;c.dispatchEvent(new Event('change'));}", value)
+
+        def open_from_art(name):
+            motion_page.evaluate("""async name => {
+              document.querySelector('.poster-fixture')?.remove();
+              const card=document.createElement('button');card.className='card poster-fixture';
+              card.style='position:fixed;left:40px;top:140px;width:120px;height:150px;z-index:5;padding:0';
+              const image=new Image();image.className='hero-portrait';image.style='width:100%;height:100%;object-fit:cover';
+              image.src='/api/catalogue/thumbnail/1029001';card.append(image);document.body.append(card);
+              await image.decode();card.focus();
+              const game_rel='Characters/1029/1029001/Meshes/'+name;
+              __viewportMotion.configure({skinList:[{name,game_rel,kind:'body'}]});
+              window.viewportOpen=AtelierViewport.openMesh(game_rel,name,'1029001');
+            }""", name)
+
+        def settle_materials():
+            # The studio can ask for its material set more than once; answer until appearance loading ends.
+            motion_page.wait_for_function('__viewportMotion.state().materialRequests > 0')
+            for _ in range(60):
+                motion_page.evaluate('__viewportMotion.settleMaterials()')
+                if not motion_page.evaluate("document.getElementById('viewport-stage').classList.contains('vp-assets-loading')"):
+                    break
+                motion_page.wait_for_timeout(50)
+
+        motion_mode('full')
+        before = motion_page.evaluate('__viewportMotion.state().modelRequests')
+        open_from_art('Poster fixture')
+        motion_page.wait_for_function("document.querySelector('.vp-poster-flight') && document.querySelector('.vp-poster')?.style.visibility === 'hidden'")
+        motion_page.wait_for_function("!document.querySelector('.vp-poster-flight') && document.querySelector('.vp-poster')?.style.visibility === ''")
+        layout = motion_page.evaluate("""() => {
+          const poster=document.querySelector('.vp-poster'),slot=document.getElementById('viewport-loading-slot');
+          return {phase:poster.dataset.phase,z:getComputedStyle(poster).zIndex,next:poster.nextElementSibling?.id,
+            clear:slot.getBoundingClientRect().top>=poster.getBoundingClientRect().bottom,
+            marked:document.getElementById('viewport-stage').classList.contains('vp-has-poster')};
+        }""")
+        assert layout == {'phase': 'loading', 'z': '4', 'next': 'viewport-canvas', 'clear': True, 'marked': True}, layout
+        motion_page.evaluate(f'__viewportMotion.model({before})')
+        motion_page.wait_for_function("""() => {
+          const poster=document.querySelector('.vp-poster');
+          return poster?.dataset.phase==='geometry' && getComputedStyle(poster).zIndex==='auto';
+        }""")
+        motion_page.evaluate("""() => {
+          window.posterWipes=[];const poster=document.querySelector('.vp-poster');
+          const tick=()=>{if(!poster.isConnected)return;const value=poster.style.getPropertyValue('--vp-poster-wipe');
+            if(value&&posterWipes.at(-1)!==+value)posterWipes.push(+value);requestAnimationFrame(tick);};
+          requestAnimationFrame(tick);
+        }""")
+        settle_materials()
+        motion_page.wait_for_function("!document.querySelector('.vp-poster')")
+        wipes = motion_page.evaluate('posterWipes')
+        assert len(wipes) >= 3 and wipes == sorted(wipes) and wipes[-1] > .5, wipes
+        assert not motion_page.evaluate("document.getElementById('viewport-stage').classList.contains('vp-has-poster')")
+        close_preview()
+
+        motion_mode('off')
+        before = motion_page.evaluate('__viewportMotion.state().modelRequests')
+        open_from_art('Still poster fixture')
+        motion_page.wait_for_function("document.querySelector('.vp-poster')")
+        assert not motion_page.locator('.vp-poster-flight').count()
+        assert motion_page.evaluate("(p => p.style.visibility === '' && !p.getAnimations().length)(document.querySelector('.vp-poster'))")
+        motion_page.evaluate(f'__viewportMotion.model({before})')
+        settle_materials()
+        motion_page.wait_for_function("!document.querySelector('.vp-poster')")
+        close_preview()
+
+        motion_mode('full')
+        before = motion_page.evaluate('__viewportMotion.state().modelRequests')
+        open_from_art('Failed poster fixture')
+        motion_page.wait_for_function("document.querySelector('.vp-poster')")
+        motion_page.evaluate(f'__viewportMotion.model({before}, true); viewportOpen')
+        motion_page.wait_for_function("!document.querySelector('.vp-poster, .vp-poster-flight')")
+        assert 'Fixture decode failure' in motion_page.locator('#viewport-loading-msg').inner_text()
+        close_preview()
+        before = motion_page.evaluate('__viewportMotion.state().modelRequests')
+        open_from_art('Closed poster fixture')
+        motion_page.wait_for_function("document.querySelector('.vp-poster-flight')")
+        close_preview()
+        assert not motion_page.locator('.vp-poster, .vp-poster-flight').count()
+        motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
+        assert not motion_page.locator('.vp-poster').count()
+        motion_page.evaluate("document.querySelector('.poster-fixture')?.remove()")
+        checks.append('Opening from costume artwork flies it to the stage above the loader, keeps it behind arriving geometry and wipes it with the reveal sweep; Off stays still, and failures and closing remove it at once')
+
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Old fixture')
         motion_page.evaluate("window.oldViewportOpen=viewportOpen; window.oldViewportEffects=document.getElementById('viewport-loading-motion-host').getAnimations({subtree:true})")
@@ -334,7 +424,8 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                   return {width:rect.width, height:rect.height, dot:Math.min(...dots), dots:dots.length,
                     viewBox:svg.viewBox.baseVal.width};
                 }""")
-                assert dimensions['width'] == 112 and dimensions['height'] == 112, dimensions
+                # Browser transforms can round a CSS pixel to 111.99997 here.
+                assert abs(dimensions['width'] - 112) < .01 and abs(dimensions['height'] - 112) < .01, dimensions
                 assert dimensions['dots'] == 12 and dimensions['dot'] * dimensions['width'] / dimensions['viewBox'] >= 2.5, dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
                 assert motion_page.locator('#viewport-inspect-tools').is_hidden()

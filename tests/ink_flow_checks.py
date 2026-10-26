@@ -32,7 +32,7 @@ def run_ink_flow_checks(tab, report, checks):
             if(!AtelierMotion.workflow.transfer(source,destination,'arrival'))throw Error('Visible handoff refused');
             for(let i=0;i<10&&!document.querySelector('.k-workflow-link');i++)step(16);
             const link=document.querySelector('.k-workflow-link');
-            const receiver=document.querySelector('.k-workflow-svg[data-workflow-kind=arrival]');
+            const receiver=document.querySelector('.k-workflow-svg[data-workflow-trigger=arrival]');
             if(!link||!receiver)throw Error('Handoff did not establish its measured endpoints');
             step(0);const started=clock;
             const charge=Number(link.dataset.chargeMs),travel=Number(link.dataset.travelMs);

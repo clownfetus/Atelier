@@ -109,11 +109,11 @@ def run_surfaces_checks(page,context,url,report,checks):
         tab.evaluate("window.actionCount=0;window.popButton=document.createElement('button');popButton.className='btn primary';popButton.textContent='Immediate fixture';popButton.style='position:fixed;top:80px;left:300px;z-index:1000';popButton.onclick=()=>actionCount++;document.body.append(popButton)")
         for value in ['full','calm','off']:
             mode(value);tab.locator('button',has_text='Immediate fixture').click();assert tab.evaluate('actionCount')==['full','calm','off'].index(value)+1
-            if value!='full':assert not tab.locator('.k-workflow-svg[data-workflow-kind=action],.k-workflow-link').count()
+            if value!='full':assert not tab.locator('.k-workflow-svg[data-workflow-trigger=action],.k-workflow-link').count()
             else:
                 # The receiving SVG may wait for a finite native entrance before measuring its edges.
-                tab.wait_for_selector('.k-workflow-svg[data-workflow-kind=action]')
-                assert tab.locator('.k-workflow-svg[data-workflow-kind=action]').count()==1
+                tab.wait_for_selector('.k-workflow-svg[data-workflow-trigger=action]')
+                assert tab.locator('.k-workflow-svg[data-workflow-trigger=action]').count()==1
                 assert not tab.locator('.k-workflow-canvas').count()
             tab.wait_for_function("!document.querySelector('.k-workflow-svg,.k-workflow-link')")
         tab.evaluate("""() => {
@@ -129,7 +129,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         }""")
         tab.locator('.k-update-drop').click();assert tab.evaluate('fallbackOpened')
         mode('full');tab.locator('button',has_text='Immediate fixture').click()
-        tab.wait_for_selector('.k-workflow-svg[data-workflow-kind=action]')
+        tab.wait_for_selector('.k-workflow-svg[data-workflow-trigger=action]')
         tab.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
         assert not tab.locator('.k-workflow-svg,.k-workflow-link,.k-workflow-canvas,.k-project-fall').count()
         tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));popButton.remove()")

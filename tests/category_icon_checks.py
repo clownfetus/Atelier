@@ -82,14 +82,16 @@ def run_category_icon_checks(page, context, url, report, checks):
                 .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
               return [...document.querySelectorAll('#grid-area .card .card-icon')].map(el=>{
                 const energy=el.querySelector('.k-category-emblem-energy > *');
-                const color=energy?getComputedStyle(energy).fill:getComputedStyle(el).color;
+                const style=getComputedStyle(el);
+                const color=energy?getComputedStyle(energy).fill:style.color;
                 const bg=getComputedStyle(el.closest('.card-thumb')).backgroundColor;
                 const a=lum(color), b=lum(bg), cls=Object.keys(ICON_CLS_TO_LUCIDE).find(c=>el.classList.contains(c));
                 const chip=document.querySelector(`#category-icon-chips [data-category="${cls}"] svg`);
                 const chipEnergy=chip.querySelector('.k-category-emblem-energy > *');
                 return {cls,color,emblem:!!energy,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),
                   chipColor:chipEnergy?getComputedStyle(chipEnergy).fill:getComputedStyle(chip).color, chipSize:chip.getBoundingClientRect().width,
-                  slot:el.getBoundingClientRect().width,
+                  slot:el.getBoundingClientRect().width, plate:style.backgroundColor,
+                  glyphWidth:el.getBoundingClientRect().width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),
                   cardWidth:el.closest('.card').getBoundingClientRect().width,
                   thumbWidth:el.closest('.card-thumb').getBoundingClientRect().width};
               });
@@ -97,8 +99,13 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert len(measurements) == 39, measurements
             assert len({m['color'] for m in measurements}) >= 36, measurements
             assert all(m['ratio'] >= (3 if m['emblem'] else 4.5) for m in measurements), (theme, measurements)
-            assert all(100 <= m['slot'] <= 104 and m['cardWidth'] == 156 and m['thumbWidth'] == 134
-                       for m in measurements), measurements
+            # File outlines now have a smaller tonal plate; folder artwork still
+            # fills its original large slot. Both keep the standard card layout.
+            file_types = {'curve-icon', 'unhandled-icon'}
+            assert all(abs(m['slot'] - m['thumbWidth'] * (.64 if m['cls'] in file_types else .76)) < .02
+                       and m['cardWidth'] == 156 and m['thumbWidth'] == 134 for m in measurements), measurements
+            assert all(m['glyphWidth'] >= 32 and m['plate'] not in {'transparent', 'rgba(0, 0, 0, 0)'}
+                       for m in measurements if m['cls'] in file_types), measurements
             assert all(m['color'] == m['chipColor'] and m['chipSize'] == 18 for m in measurements), measurements
             aliases = icon_page.evaluate("""() => {
               const pairs = [['texture-folder-icon','texture-icon'], ['vfx-folder-icon','vfx-icon'],
@@ -111,6 +118,6 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert all(a == b for a, b in aliases), aliases
             icon_page.screenshot(path=str(report / f'category-icons-{theme}.png'), animations='disabled')
         assert not errors, errors
-        checks.append('All 39 icon types retain large preview slots; the 36 category emblems reach 3:1 in both themes, and 18px home chips share category colors')
+        checks.append('All 39 icon types retain readable folder artwork or file glyphs on tonal plates; category emblems reach 3:1 in both themes, and 18px home chips share category colors')
     finally:
         icon_page.close()

@@ -55,6 +55,18 @@ Pipeline for editing Marvel Rivals SkeletalMesh geometry in Blender and packing 
 as a playable mod. Vertices may be added, removed, moved, subdivided or sculpted; the
 skeleton and material set stay exactly as cooked.
 
+Luna Snow's `1031305` mesh has repeated material-slot names and baked body atlases
+in its two lowest detail levels. Export gives repeated slots distinct Blender
+names while retaining their cooked references. For these baked levels, sculpt
+without changing topology or deleting Atelier's tracking attributes: the original
+lower surfaces follow the sculpt while keeping their UV atlas, material mapping,
+colours and rig. Topology-changing replacements for these baked levels are
+explicitly refused. Ordinary meshes retain the existing topology rebuild path.
+
+Streamed/inline texture mip recovery includes `T_Noise_9_613_M`. LDR cube inputs
+such as `T_Common_CubeCity_02` retain all six faces and alpha in a packed RGBA TGA
+strip; it is a read-only named shader input, rather than a paintable game texture.
+
     python -m atelier.handlers.meshedit preflight <game_rel>
     python -m atelier.handlers.meshedit extract   <game_rel> [--base PATH] [--blend PATH]
     python -m atelier.handlers.meshedit build     <game_rel> [--base PATH] [--blend PATH] [--name N]

@@ -1677,6 +1677,7 @@ async function open(skinId, title, preferredMesh=null) {
   $('viewport-title').textContent = studioTitle(skinId,title);
   window.AtelierViewportIdentity?.show(skinId);
   $('viewport-status').textContent = '';
+  const posterOrigin = window.AtelierMotion?.viewportPoster?.source();
   inspection.show();
   $('viewport-loading').style.display = 'flex';
   requestAnimationFrame(onResize);
@@ -1686,6 +1687,7 @@ async function open(skinId, title, preferredMesh=null) {
   modelLoading=true;modelLoad={id:crypto.randomUUID(),project:viewportProject};
   loader.setRequestHeader({'X-Atelier-Project':encodeURIComponent(viewportProject),'X-Atelier-Preview':modelLoad.id});
   inspection.setLoading(true);
+  window.AtelierMotion?.viewportPoster?.begin({skinId, origin:posterOrigin, stage:$('viewport-stage'), canvas:$('viewport-canvas')});
   $('viewport-loading-msg').textContent = 'Decoding model…';
   startViewportLoader();
 
@@ -1762,6 +1764,7 @@ async function openMesh(gameRel, name, skinId) {
   $('viewport-title').textContent = studioTitle(_sk,name);
   window.AtelierViewportIdentity?.show(_sk, /characters\/(\d{4})\//i.exec(gameRel)?.[1]);
   $('viewport-status').textContent = '';
+  const posterOrigin = window.AtelierMotion?.viewportPoster?.source();
   inspection.show();
   $('viewport-loading').style.display = 'flex';
   $('viewport-loading-msg').textContent = `Decoding ${name || 'mesh'}… first time can take a moment`;
@@ -1772,6 +1775,7 @@ async function openMesh(gameRel, name, skinId) {
   modelLoading=true;modelLoad={id:crypto.randomUUID(),project:viewportProject};
   loader.setRequestHeader({'X-Atelier-Project':encodeURIComponent(viewportProject),'X-Atelier-Preview':modelLoad.id});
   inspection.setLoading(true);
+  window.AtelierMotion?.viewportPoster?.begin({skinId:_sk, origin:posterOrigin, stage:$('viewport-stage'), canvas:$('viewport-canvas')});
   startViewportLoader();
   try {
     const gltf = await loader.loadAsync(`/api/model_gltf?game_rel=${encodeURIComponent(gameRel)}`);
@@ -1807,6 +1811,7 @@ async function openMesh(gameRel, name, skinId) {
 async function close() {
   if (!(await canLeave())) return;
   if (inited) clearModel();
+  window.AtelierMotion?.viewportPoster?.end();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
   inspection?.closed();

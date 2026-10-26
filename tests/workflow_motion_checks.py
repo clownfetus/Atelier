@@ -40,9 +40,15 @@ def run_workflow_motion_checks(context, url, report, checks):
     def finished():
         tab.wait_for_function("!document.querySelector('.k-workflow-svg,.k-workflow-link')")
 
-    def formation(kind, screenshot=None):
-        selector = f'.k-workflow-svg[data-workflow-kind="{kind}"]'
+    # Every trigger draws one of four gestures: arrive, trace, seal or release.
+    gesture = {'hero': 'arrive', 'arrival': 'arrive', 'editor': 'arrive', 'panel': 'arrive',
+               'workspace': 'arrive', 'project': 'arrive', 'navigation': 'trace',
+               'action': 'seal', 'selection': 'seal', 'pin': 'seal', 'unpin': 'release'}
+
+    def formation(trigger, screenshot=None):
+        selector = f'.k-workflow-svg[data-workflow-trigger="{trigger}"]'
         tab.wait_for_selector(selector, state='attached', timeout=2500)
+        assert tab.locator(selector).get_attribute('data-workflow-kind') == gesture.get(trigger, trigger)
         tab.wait_for_function("""selector => {
             const c = document.querySelector(selector);
             return c && [...c.querySelectorAll('[data-ink]')].some(p=>Number(p.getAttribute('opacity'))>.15);
@@ -68,7 +74,7 @@ def run_workflow_motion_checks(context, url, report, checks):
             assert selected.get_attribute('aria-pressed') == 'true'
             formation('hero', f'workflow-hero-{theme}.png')
             assert tab.evaluate("""() => {
-                const svg=document.querySelector('.k-workflow-svg[data-workflow-kind=hero]');
+                const svg=document.querySelector('.k-workflow-svg[data-workflow-trigger=hero]');
                 const box=svg.getBoundingClientRect();
                 const host=document.querySelector('.roster-portrait[aria-pressed=true]').getBoundingClientRect();
                 return Math.abs(box.left-host.left)<1 && Math.abs(box.top-host.top)<1
@@ -93,12 +99,13 @@ def run_workflow_motion_checks(context, url, report, checks):
 
         folder.click(button='right')
         tab.wait_for_selector('#ctx-menu.active')
-        formation('menu', 'workflow-menu.png')
+        tab.wait_for_timeout(200)  # Past the menu's own scale entrance.
+        assert not tab.locator('.k-workflow-svg').count()
+        assert tab.evaluate("AtelierMotion.workflow.menu(document.getElementById('ctx-menu'))") is False
         assert tab.locator('#ctx-menu .ctx-item').first.is_enabled()
         tab.locator('#ctx-menu .ctx-item').first.press('Escape')
-        finished()
         assert not tab.locator('#ctx-menu').is_visible()
-        checks.append('Context menus unfold inside their border, clear of action labels and discard it on Escape while preserving normal keyboard controls')
+        checks.append('Context menus keep only their pointer-origin scale entrance and draw no edge ink; the retired menu call stays a safe no-op and Escape still closes them')
 
         tab.evaluate("_selectProject('Smoke B')")
         assert tab.locator('#project-chip-name').inner_text() == 'Smoke B'
@@ -150,7 +157,7 @@ def run_workflow_motion_checks(context, url, report, checks):
             mode(value); tab.locator('#job-activity').click()
             tab.wait_for_selector('#job-overlay.active')
             tab.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-            assert not tab.locator('.k-workflow-svg[data-workflow-kind=panel]').count()
+            assert not tab.locator('.k-workflow-svg[data-workflow-trigger=panel]').count()
             tab.locator('#job-close').click()
         mode('full')
         tab.evaluate("""() => new Promise(resolve => {
@@ -160,7 +167,7 @@ def run_workflow_motion_checks(context, url, report, checks):
                 overlay.classList.remove('active'); requestAnimationFrame(resolve);
             });
         })""")
-        assert not tab.locator('.k-workflow-svg[data-workflow-kind=panel]').count()
+        assert not tab.locator('.k-workflow-svg[data-workflow-trigger=panel]').count()
         assert tab.evaluate("(() => {const release=AtelierMotion.moment.claim('fixture-cancelled-panel',2);release?.();return !!release;})()")
         checks.append('Calm/Off keep panel openings static, and a fast dismissal cancels the pending entrance without retaining stage ownership')
 
@@ -176,7 +183,7 @@ def run_workflow_motion_checks(context, url, report, checks):
         formation('action', 'workflow-primary-action.png')
         tab.locator('#krackle-primary-fixture').click()
         assert tab.evaluate('primaryClicks') == 2
-        assert tab.locator('.k-workflow-svg[data-workflow-kind=action]').count() == 1
+        assert tab.locator('.k-workflow-svg[data-workflow-trigger=action]').count() == 1
         finished(); tab.locator('#krackle-primary-fixture').evaluate('button=>button.remove()')
         checks.append('Primary actions get a quick border strike without delaying clicks or stacking repeated effects')
 
@@ -186,7 +193,7 @@ def run_workflow_motion_checks(context, url, report, checks):
         tab.wait_for_selector('.sb-item .sb-thumb')
         formation('arrival', 'workflow-tray.png')
         assert tab.evaluate("""() => {
-            const ink=document.querySelector('.k-workflow-svg[data-workflow-kind=arrival]').getBoundingClientRect();
+            const ink=document.querySelector('.k-workflow-svg[data-workflow-trigger=arrival]').getBoundingClientRect();
             const row=document.querySelector('.sb-item').getBoundingClientRect();
             return ['left','top','width','height'].every(key=>Math.abs(ink[key]-row[key])<1);
         }"""), 'The Mod tray row frame must receive ink without covering its thumbnail'
@@ -282,11 +289,11 @@ def run_workflow_motion_checks(context, url, report, checks):
         preview = tab.get_by_role('group', name='Krackle motion preview')
         preview.get_by_role('button', name='Replay ink handoff', exact=True).click()
         tab.wait_for_selector('.k-workflow-link', state='attached', timeout=2500)
-        assert tab.locator('.k-motion-sample').count() == 12
+        assert tab.locator('.k-motion-sample').count() == 4
         tab.wait_for_timeout(130)
         tab.screenshot(path=str(report / 'workflow-handoff-demo.png'))
         formation('arrival'); finished()
-        checks.append('Try Krackle includes an accessible connected Edit to Mod tray handoff alongside twelve local gestures')
+        checks.append('Try Krackle includes an accessible connected Edit to Mod tray handoff alongside the four local gestures')
         for _ in range(2):
             tab.locator('#setup-close').click()
             tab.evaluate("document.getElementById('setup-overlay').classList.add('active')")
@@ -297,24 +304,24 @@ def run_workflow_motion_checks(context, url, report, checks):
         for theme in ('dark', 'light'):
             tab.locator('#settings-theme').select_option(theme, force=True)
             preview.scroll_into_view_if_needed()
-            for kind in ('hero', 'navigation', 'arrival', 'pin', 'unpin', 'menu', 'project', 'workspace', 'editor', 'action', 'panel', 'selection'):
+            for kind in ('arrive', 'trace', 'seal', 'release'):
                 tab.locator(f'[data-motion-sample="{kind}"]').click()
                 formation(kind, f'workflow-preview-{kind}-{theme}.png')
                 finished()
-        checks.append('Settings replays all twelve authored production gestures in both themes, without jobs or project writes')
+        checks.append('Settings replays all four production gestures in both themes, without jobs or project writes')
 
         # Rasterize the real native SVG to verify the entire protected interior.
-        tab.locator('[data-motion-sample=arrival] .k-motion-sample-art').evaluate("""host => {
+        tab.locator('[data-motion-sample=arrive] .k-motion-sample-art').evaluate("""host => {
             host.style.position='relative';
             const text=document.createElement('span');text.id='workflow-mask-label';text.textContent='M';
             text.style.cssText='position:absolute;left:6px;top:0;font:10px/10px sans-serif';
             host.append(text);
         }""")
-        tab.locator('[data-motion-sample=arrival]').click()
-        formation('arrival')
+        tab.locator('[data-motion-sample=arrive]').click()
+        formation('arrive')
         tab.wait_for_timeout(100)
         raster = tab.evaluate("""async () => {
-            const svg=document.querySelector('.k-workflow-svg[data-workflow-kind=arrival]');
+            const svg=document.querySelector('.k-workflow-svg[data-workflow-trigger=arrive]');
             const w=Math.ceil(svg.viewBox.baseVal.width),h=Math.ceil(svg.viewBox.baseVal.height);
             const inset=Math.ceil(Number(svg.dataset.edgeBand))+2;
             const image=new Image();
@@ -326,7 +333,7 @@ def run_workflow_motion_checks(context, url, report, checks):
             const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
             const all=ctx.getImageData(0,0,w,h).data;
             const inside=ctx.getImageData(inset,inset,w-2*inset,h-2*inset).data;
-            const host=document.querySelector('[data-motion-sample=arrival] .k-motion-sample-art');
+            const host=document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art');
             const origin=svg.getBoundingClientRect(),regions=[];
             for(const node of host.querySelectorAll('svg,img')) regions.push(node.getBoundingClientRect());
             const range=document.createRange();range.selectNodeContents(document.getElementById('workflow-mask-label'));
@@ -344,12 +351,12 @@ def run_workflow_motion_checks(context, url, report, checks):
         assert raster['regions'] >= 2 and raster['displayed'], raster
         finished()
         tab.locator('#workflow-mask-label').evaluate('node=>node.remove()')
-        tab.locator('[data-motion-sample=arrival] .k-motion-sample-art').evaluate("host=>host.style.removeProperty('position')")
+        tab.locator('[data-motion-sample=arrive] .k-motion-sample-art').evaluate("host=>host.style.removeProperty('position')")
         checks.append('Visible native SVG has edge ink, a transparent interior, and transparent full glyph/text bounds including a label touching its seam')
 
         # Artwork palette changes repaint the existing gesture without restarting it.
         pigment = tab.evaluate("""async () => {
-            const host=document.querySelector('[data-motion-sample=hero] .k-motion-sample-art');
+            const host=document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art');
             const semantic=getComputedStyle(host).getPropertyValue('--krackle-charge');
             host.style.setProperty('--roster-skin-accent','#e84f8a');
             AtelierMotion.workflow.hero(host);
@@ -418,14 +425,14 @@ def run_workflow_motion_checks(context, url, report, checks):
         run_ink_flow_checks(tab, report, checks)
 
         mode('calm')
-        tab.locator('[data-motion-sample=hero]').click()
+        tab.locator('[data-motion-sample=arrive]').click()
         assert not tab.locator('.k-workflow-svg').count()
         assert preview.locator('.k-motion-preview-mode').inner_text() == 'Calm'
-        tab.wait_for_function("!document.querySelector('[data-motion-sample=hero] .k-motion-sample-art').getAnimations().length")
-        tab.locator('[data-motion-sample=menu]').click()
-        assert tab.evaluate("document.querySelector('[data-motion-sample=menu] .k-motion-sample-art').getAnimations().length > 0")
+        tab.wait_for_function("!document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art').getAnimations().length")
+        tab.locator('[data-motion-sample=seal]').click()
+        assert tab.evaluate("document.querySelector('[data-motion-sample=seal] .k-motion-sample-art').getAnimations().length > 0")
         tab.evaluate("document.querySelector('.k-motion-preview').style.visibility='hidden'")
-        tab.wait_for_function("!document.querySelector('[data-motion-sample=menu] .k-motion-sample-art').getAnimations().length")
+        tab.wait_for_function("!document.querySelector('[data-motion-sample=seal] .k-motion-sample-art').getAnimations().length")
         tab.evaluate("document.querySelector('.k-motion-preview').style.removeProperty('visibility')")
         for system in (False, True):
             if system:
@@ -444,7 +451,7 @@ def run_workflow_motion_checks(context, url, report, checks):
         checks.append('Preview follows Calm, Off and OS reduced motion, with disabled replay controls for still presentation')
 
         # Rapid replay, dismissal, palette changes and unsupported graphics remain disposable.
-        tab.locator('[data-motion-sample=hero]').scroll_into_view_if_needed()
+        tab.locator('[data-motion-sample=arrive]').scroll_into_view_if_needed()
         tab.evaluate("""() => {
             const buttons = [...document.querySelectorAll('[data-motion-sample]')].slice(0,3);
             for (let i=0; i<20; i++) buttons[i%buttons.length].click();
@@ -456,8 +463,8 @@ def run_workflow_motion_checks(context, url, report, checks):
         formation('panel'); finished()
         preview.scroll_into_view_if_needed()
         assert not tab.locator('.k-workflow-svg').count()
-        tab.locator('[data-motion-sample=navigation]').click()
-        formation('navigation')
+        tab.locator('[data-motion-sample=trace]').click()
+        formation('trace')
         tab.locator('#settings-theme').select_option('dark', force=True)
         finished()
         # SVG gestures do not require Canvas support.
@@ -465,10 +472,10 @@ def run_workflow_motion_checks(context, url, report, checks):
             const native = HTMLCanvasElement.prototype.getContext;
             try {
                 HTMLCanvasElement.prototype.getContext = () => null;
-                document.querySelector('[data-motion-sample=hero]').click();
+                document.querySelector('[data-motion-sample=arrive]').click();
             } finally { HTMLCanvasElement.prototype.getContext = native; }
         }""")
-        formation('hero'); finished()
+        formation('arrive'); finished()
         assert tab.locator('#settings-motion').is_enabled()
         checks.append('Rapid replay owns one sample; dismissal and palette changes dispose it; SVG continues without Canvas')
 

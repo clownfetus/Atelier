@@ -334,6 +334,26 @@ def find_bulk_data_start_offset(uasset, uexp_len, search_limit):
     return None
 
 
+def material_slot_names(materials):
+    """Stable Blender/glTF keys for slots, including repeated cooked FNames.
+
+    A cooked mesh may use one slot name for distinct material references. Keep
+    its binary name/index untouched, but give each exported slot its own key so
+    Blender cannot rename it and a rebuild cannot merge its geometry with another.
+    """
+    names = [m.get('slot_name') or f'mat_{i}' for i, m in enumerate(materials)]
+    reserved, seen, result = set(names), set(), []
+    for index, name in enumerate(names):
+        key = name
+        if key in seen:
+            key = f'{name}__slot_{index}'
+            while key in reserved or key in seen:
+                key += '_'
+        seen.add(key)
+        result.append(key)
+    return result
+
+
 def resolve_materials(mats, names):
     for m in mats:
         m["slot_name"] = names[m["slot_name_idx"]] if 0 <= m["slot_name_idx"] < len(names) else None
@@ -1309,7 +1329,8 @@ def transfer_weights_from_vanilla(mesh, lod, sec, positions):
 def original_sections(mesh, lod_index, slots):
     """Section arrays from this LOD's original buffers for a partial replacement."""
     lod=mesh.lods[lod_index]
-    chosen=[(i,section) for i,section in enumerate(lod['sections']) if mesh.materials[section['mat']]['slot_name'] in slots]
+    slot_names=material_slot_names(mesh.materials)
+    chosen=[(i,section) for i,section in enumerate(lod['sections']) if slot_names[section['mat']] in slots]
     if not chosen:return {}
     position=mesh.positions(lod);normal,tangent,tan_w=mesh.normals_tangents(lod)
     uv=mesh.uvs(lod);color=mesh.colors(lod);indices,weights=mesh.skin_weights(lod)
@@ -1409,7 +1430,8 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
     # legitimately drop whole sections (LOD2 has 10 of this mesh's 12 -- S3.9) while the
     # .blend still carries all of the materials, so scoping this to one LOD would reject
     # every ordinary multi-LOD build.
-    known = {m["slot_name"] for m in mesh.materials}
+    slot_names = material_slot_names(mesh.materials)
+    known = set(slot_names)
     preserve_parts=set(preserve_parts or [])
     if preserve_parts-known:raise ValueError('The saved untouched-part slots changed; import the replacement again')
     preserved=original_sections(mesh,lod_index,preserve_parts)
@@ -1428,7 +1450,7 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
     for section_index,sec in enumerate(lod["sections"]):
         if section_index in preserved:
             sections_in.append(preserved[section_index]);continue
-        slot = mesh.materials[sec["mat"]]["slot_name"]
+        slot = slot_names[sec["mat"]]
         prims = by_mat.get(slot)
         if not prims:
             raise ValueError(f"no primitive in the glb uses material {slot!r} -- every "
@@ -1708,12 +1730,13 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
     # four missing names made the mesh fail to rebuild at all -- it was not editable before
     # this. Slot names are unique where asset names are not, which is exactly why they are
     # the key (S3.9, S3.18).
+    slot_names = material_slot_names(mesh.materials)
     materials_json = [
         # doubleSided so Blender's importer doesn't backface-cull thin geometry (skirts,
         # capes, hair cards) while the mesh is being edited -- purely a display aid, since
         # winding below is corrected to read right in a single-sided viewer too.
-        {"name": m["slot_name"] or f"mat_{i}", "doubleSided": True}
-        for i, m in enumerate(mesh.materials)]
+        {"name": name, "doubleSided": True}
+        for name in slot_names]
 
     # One vertex pool PER PRIMITIVE, with section-local indices. Sharing a single pool
     # across primitives is legal glTF but means every primitive nominally spans the whole

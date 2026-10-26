@@ -62,12 +62,14 @@
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
     const button=document.createElement('button');button.className='k-update-drop';button.type='button';button.title=kind==='usmap'?'Mapping update available':'Atelier update available';button.setAttribute('aria-label',button.title);
-    const host=document.createElement('span');button.append(host);document.body.append(button);
+    const host=document.createElement('span');button.append(host);
+    const topbar=document.getElementById('topbar');
+    if(topbar)topbar.insertBefore(button,document.getElementById('job-activity')||document.getElementById('menu-btn'));else document.body.append(button);
     let glyph;try{glyph=AtelierMotion.krackleGlyph.mount(host,{state:'info',reducedMotion:'reduce'});}catch(_){button.textContent='Update';}
     const remove=button.remove.bind(button);button.remove=()=>{glyph?.destroy();button.getAnimations().forEach(a=>a.cancel());remove();if(drops.get(kind)===button)drops.delete(kind);};
     drops.set(kind,button);
     button.addEventListener('click',()=>{button.remove();open();});
-    if(AtelierMotionPolicy.allows(1)&&!document.hidden)try{button.animate([{transform:'translateY(-10px)',opacity:.5},{transform:'translateY(2px)',opacity:1,offset:.7},{transform:'none',opacity:1}],{duration:260,easing:'cubic-bezier(.2,0,0,1)'});}catch(_){}
+    if(AtelierMotionPolicy.allows(1)&&!document.hidden)try{button.animate([{transform:'translateY(-10px)',opacity:.5},{transform:'none',opacity:1}],{duration:AtelierMotion.springMs?.snappy||340,easing:AtelierMotion.ease?.snappy||'cubic-bezier(.22,.8,.32,1.12)'});}catch(_){}
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const button of drops.values())button.getAnimations().forEach(a=>a.cancel());});
   function stopTransients(){for(const dispose of [...transients])dispose();}

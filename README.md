@@ -1,18 +1,31 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.3** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.4** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.3](docs/release-1.1.3.md)
+· [What's new in 1.1.4](docs/release-1.1.4.md)
 · [Tutorials](#tutorials)
 · [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.1.3 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.3
+## What's new in 1.1.4
+
+- **Download updates inside Atelier** and restart when you're ready. Compatible
+  Windows updates use smaller downloads; Linux replaces its AppImage in-app.
+- **More reliable model exports.** Skin Swapper uses the form belonging to the
+  selected mesh, and Blender rebuilds handle repeated material names and lower detail levels better.
+- **Better previews and texture inputs.** Gameplay and lobby models choose the
+  right standing animation, and Blender inputs retain complete cubemap faces and transparency.
+- **A smoother workspace.** Costume artwork stays visible while models load,
+  Home's hero list compacts as you browse, and export results are easier to review.
+
+See the [patch notes](docs/release-1.1.4.md) for update instructions and details.
+
+## Included from 1.1.3
 
 - **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
   costume colours along the app's borders. Try the examples in **Settings → Try Krackle**.
@@ -69,8 +82,8 @@ See the [patch notes](docs/release-1.1.3.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-These instructions describe **1.1.3**. Check the release title when downloading;
-a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.3.md)
+These instructions describe **1.1.4**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.4.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
@@ -339,9 +352,10 @@ Skin Swapper, which its Companion App then loads.
    own BLEND, FBX, GLB or PSK file, then select it under **Mod tray**.
 2. Set the mod filename. It becomes the Galacta folder name, so use letters,
    digits and underscores only.
-3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
-   and skin come from the mesh and cannot be changed. Enter the skin name and
-   author, and pick a form for multi-form heroes (Form 0 is the default).
+3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The
+   hero, skin and form come from the mesh and cannot be changed. Enter the skin
+   name and author. Multi-form mesh names supply their ShapeID automatically;
+   meshes without a ShapeID use form 0.
 4. Click **Build Skin Swapper mod**, then add the mod in the Companion App.
 
 The mod holds only your mesh and a Galacta config for it, under

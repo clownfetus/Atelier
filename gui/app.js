@@ -928,6 +928,13 @@ async function editAsset(item) {
   const key = _assetOperationKey(item.game_rel, project);
   if (_editsInFlight.has(key)) return;
   _editsInFlight.add(key);
+  if (item.file_type === "vfx") {
+    // Reading Niagara parameters does not create a project edit. Open its editor
+    // immediately so disabling external auto-open cannot turn this click into a no-op.
+    try { await openVfxEditor(item); }
+    finally { _editsInFlight.delete(key); }
+    return;
+  }
   suppressedImportGameRels.add(key);
   const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project);
   setStatus(`Preparing ${item.name} for editing…`);
@@ -939,9 +946,6 @@ async function editAsset(item) {
     } else if (item.file_type === "curve") {
       // curves: api_curve_params triggers extraction + to_json for any game_rel path
       res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`);
-    } else if (item.file_type === "vfx") {
-      // vfx: api_vfx_params triggers extraction + niagara_details for any game_rel path
-      res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`);
     } else if (item.file_type === "world") {
       // world: api_world_params triggers extraction + to_json for the level sublevel
       res = await api(`/api/world_params?game_rel=${encodeURIComponent(item.game_rel)}`);
@@ -959,11 +963,11 @@ async function editAsset(item) {
     if (res.ok) {
       suppressedImportGameRels.delete(key);
       suppressChangeToastUntil = Date.now() + 1500;
-      loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
-      setStatus("");
-      const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
+      const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id, res.imported);
       if(project!==_activeProjectName)return;
       updateImportedCard(item.game_rel, imported);
+      loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
+      setStatus("");
       if (_openAfterImport) {
         const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
         handleImportedFileAction(importedItem);
@@ -2843,9 +2847,17 @@ async function loadSidebar() {
   renderSidebar();
 }
 
-function refreshSidebarEntry(game_rel, name, skin_id) {
+function refreshSidebarEntry(game_rel, name, skin_id, imported) {
   const project = _activeProjectName, requestId = ++_sidebarRequest;
   window.AtelierEmptyAssetsUI?.begin();
+  if (imported?.token && imported.game_rel === game_rel) {
+    const previous = sidebarData[imported.token];
+    sidebarData[imported.token] = {...imported, selected: previous?.selected ?? imported.selected};
+    window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
+    renderSidebar();
+    window.AtelierPolish?.fly(game_rel);
+    return Promise.resolve(sidebarData[imported.token]);
+  }
   return api("/api/imported").then(data => {
     if (project !== _activeProjectName) return;
     if (requestId !== _sidebarRequest) return data.find(item=>item.game_rel===game_rel);
@@ -4452,6 +4464,18 @@ function _showUpdatePanel(id) {
   });
 }
 
+// Launch dialogs take turns: first-run setup keeps the screen until it closes.
+function _whenSetupClosed() {
+  const setup = document.getElementById("setup-overlay");
+  if (!setup.classList.contains("active")) return Promise.resolve();
+  return new Promise(resolve => {
+    const observer = new MutationObserver(() => {
+      if (!setup.classList.contains("active")) { observer.disconnect(); resolve(); }
+    });
+    observer.observe(setup, { attributes: true, attributeFilter: ["class"] });
+  });
+}
+
 // `pending` is the release check init() started alongside startup; the dialog only appears when
 // there is an update to offer.
 async function checkUpdate(pending = api("/api/update_check")) {
@@ -4461,6 +4485,7 @@ async function checkUpdate(pending = api("/api/update_check")) {
   catch { return false; }
 
   if (!info?.available) return false;
+  await _whenSetupClosed();
   await window.AtelierChangelog?.whenClosed();
   overlay.classList.add("active");
 
@@ -5164,7 +5189,7 @@ async function startShaderBuild() {
   _shEl("shader-build-btn").style.display = "none";
   _shEl("shader-build-err").style.display = "none";
   _shEl("shader-build-prog").style.display = "block";
-  _shEl("shader-bar-fill").style.width = "5%";
+  _shEl("shader-bar-fill").style.setProperty("--progress", ".05");
   _shEl("shader-build-msg").textContent = "Starting…";
   try { await api("/api/shaders/build", { method: "POST" }); }
   catch (e) { _shBuildError(e.message); return; }
@@ -5172,7 +5197,7 @@ async function startShaderBuild() {
     let st; try { st = await api("/api/shaders/status"); } catch { return; }
     const b = st.build || {};
     if (b.error) { clearInterval(_sh.poll); _sh.poll = null; _shBuildError(b.error); return; }
-    _shEl("shader-bar-fill").style.width = Math.max(5, b.pct || 0) + "%";
+    _shEl("shader-bar-fill").style.setProperty("--progress", Math.max(5, Math.min(100, b.pct || 0)) / 100);
     _shEl("shader-build-msg").textContent =
       (b.phase || "Working…") + (b.count ? `  (${b.count.toLocaleString()} shaders)` : "");
     if (st.db_ready && b.done) {

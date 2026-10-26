@@ -5,6 +5,7 @@ export function createViewportAnimation(api) {
   let generation = 0, meshRel = '', selected = '', loaded = '', loading = false, discovering = false, playing = false;
   let mixers = [], embedded = [], entries = [];
   const poses = new Map();
+  const verifiedIdles = new Map();
   function sync() {
     const button = $('viewport-play');
     button.disabled = loading || discovering || !entries.length;
@@ -56,7 +57,7 @@ export function createViewportAnimation(api) {
     if (!count) throw Error('This idle has no matching bones on the loaded model');
     playing = true;
   }
-  async function play() {
+  async function play({quiet = false} = {}) {
     selected = $('viewport-animation').value || entries[0]?.game_rel;
     if (!selected || loading) return;
     $('viewport-animation').value = selected;
@@ -73,9 +74,15 @@ export function createViewportAnimation(api) {
         if (!response.ok) throw Error(response.error || 'Idle animation unavailable');
         apply(response);
       }
-      loaded = selected; api.frame();
+      loaded = selected;
+      if (!selected.startsWith('embedded:')) verifiedIdles.set(meshRel, selected);
+      api.frame();
     } catch (error) {
-      if (stamp === generation) { restore(); loaded = ''; api.notify(`Standing idle unavailable: ${error.message}`, 'warning'); }
+      if (stamp === generation) {
+        restore(); loaded = '';
+        if (!quiet) api.notify(`Standing idle unavailable: ${error.message}`, 'warning');
+      }
+      return error;
     } finally { if (stamp === generation) { loading = false; sync(); } }
   }
   async function discover(gameRel) {
@@ -92,7 +99,19 @@ export function createViewportAnimation(api) {
     discovering = false;
     select.replaceChildren(new Option(entries.length ? 'Rest pose' : 'No compatible idle found',''),...entries.map(item=>new Option(item.label,item.game_rel)));
     sync();
-    if (entries.length) { select.value=entries[0].game_rel; await play(); }
+    // Some skins keep their usable full-body tracks only in the lobby clip.
+    // Try the listed alternatives through the same native compatibility check;
+    // manual choices still report their own failures without changing selection.
+    let failure;
+    const verified = verifiedIdles.get(gameRel);
+    const choices = verified ? [...entries.filter(entry=>entry.game_rel===verified), ...entries.filter(entry=>entry.game_rel!==verified)] : entries;
+    for (const entry of choices) {
+      select.value = entry.game_rel;
+      failure = await play({quiet:true});
+      if (stamp !== generation || !failure) return;
+      if (!/skeleton is incompatible|Additive clips require/i.test(failure.message)) break;
+    }
+    if (failure) api.notify(`Standing idle unavailable: ${failure.message}`, 'warning');
   }
   $('viewport-play').addEventListener('click',play);
   $('viewport-animation').addEventListener('change',() => {

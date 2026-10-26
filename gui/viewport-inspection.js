@@ -346,6 +346,7 @@ export function createViewportInspection(api) {
       reveal = revealStart === null ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
       if (reveal === 1) revealStart = null;
       if (!assetsLoading && reveal===1) effects.stopLoading();
+      window.AtelierMotion?.viewportPoster?.frame(assetsLoading, reveal, revealStart !== null);
     }
     if (comparison !== 'wipe' || showcase) {
       renderPass(!showcase && comparison === 'original', showcase,comic,canonical);

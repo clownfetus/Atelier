@@ -277,11 +277,12 @@ def extract_textures_to_project(tex_game_rels, root=None):
         # cannot outrank painted pixels. Cubes retain their authoritative HDR DDS.
         cache_base = project_base(gr, CACHE_3DVIEW)
         png = cache_base + ".png"
-        hdr=cache_base+'.hdr'
-        if os.path.isfile(hdr):
-            os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copyfile(hdr,dst+'.hdr')
-            return gr, {'path':dst+'.hdr','status':'existing','readonly':True,
-                        'note':'HDR source retained as a named input; game texture painting is unavailable.'}
+        for extension in ('.tga', '.hdr'):
+            auxiliary=cache_base+extension
+            if os.path.isfile(auxiliary):
+                os.makedirs(os.path.dirname(dst),exist_ok=True);shutil.copyfile(auxiliary,dst+extension)
+                return gr, {'path':dst+extension,'status':'existing','readonly':True,
+                            'note':'Cube or HDR source retained as a named input; game texture painting is unavailable.'}
         # A cached 4x4 is the signature of a failed mip recovery (see texture.decode_dds), not a
         # real texture -- handing one over as "editable" invites painting it and injecting a
         # destroyed map. Drop it and decode again; the cache predates the caller either way.
@@ -299,8 +300,9 @@ def extract_textures_to_project(tex_game_rels, root=None):
             hdr_record=recover_inline_hdr(wb,cache_base) if wb else None
             if hdr_record:
                 os.makedirs(os.path.dirname(dst),exist_ok=True)
-                shutil.copyfile(hdr_record['path'],dst+'.hdr')
-                return gr,{**hdr_record,'path':dst+'.hdr'}
+                extension=os.path.splitext(hdr_record['path'])[1]
+                shutil.copyfile(hdr_record['path'],dst+extension)
+                return gr,{**hdr_record,'path':dst+extension}
             return gr, {"path": None, "status": "failed", "readonly": False}
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         refreshed = os.path.exists(dst + ".png")
@@ -356,6 +358,8 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
     """Resolve materials + textures, stage the textures, and return the manifest dict that
     glb_to_blend.py consumes to wire the .blend's shader nodes."""
     slots = resolve_mesh_textures(resolve_mesh_materials(mesh_game_rel, mesh, work_base))
+    from atelier.handlers.mesh import material_slot_names
+    slot_names = material_slot_names(mesh.materials)
     files = extract_textures_to_project(
         [mp["game_rel"] for rec in slots for mp in rec["maps"]], root=root)
     out_slots, warnings, incomplete = {}, [], []
@@ -388,7 +392,7 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
                 role = None      # retain the unused source input without damaging the surface
             maps.append({"param": mp["param"], "role": role, "game_rel": mp["game_rel"], 'uv': mp.get('uv',0),
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
-        out_slots[rec["slot"]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
+        out_slots[slot_names[index]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
             'gameplay_tags': list(rec.get('gameplay_tags', [])),
             'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
         from atelier.handlers.meshtextures import source_maps
