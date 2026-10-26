@@ -424,7 +424,8 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                   return {width:rect.width, height:rect.height, dot:Math.min(...dots), dots:dots.length,
                     viewBox:svg.viewBox.baseVal.width};
                 }""")
-                assert dimensions['width'] == 112 and dimensions['height'] == 112, dimensions
+                # Browser transforms can round a CSS pixel to 111.99997 here.
+                assert abs(dimensions['width'] - 112) < .01 and abs(dimensions['height'] - 112) < .01, dimensions
                 assert dimensions['dots'] == 12 and dimensions['dot'] * dimensions['width'] / dimensions['viewBox'] >= 2.5, dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
                 assert motion_page.locator('#viewport-inspect-tools').is_hidden()

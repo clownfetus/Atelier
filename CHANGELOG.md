@@ -7,6 +7,9 @@ The app, installers and update checker identify each release by its full number,
 
 ## 1.1.4
 
+To get the new updater, use the 1.1.4 Windows installer or replace your Linux
+AppImage once. Your projects and settings carry over.
+
 ### Easier updates
 
 - Download updates inside Atelier, then choose **Restart and Update** when you're
