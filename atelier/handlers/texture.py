@@ -191,6 +191,9 @@ def decode_png(import_base, uasset_base):
     if hdr_texture.extract_files(import_base, uasset_base):
         return
     if not _decode_png_file(uasset_base + '.uasset', import_base + '.png'):
+        from atelier.handlers.cooked_texture import decode_png as recover_png
+        if recover_png(uasset_base, import_base + '.png'):
+            return
         print(f'  [warn] PNG decode failed for {os.path.basename(import_base)}', file=sys.stderr)
 
 def decode_batch(uasset_paths, output_root=None, base_root=None):

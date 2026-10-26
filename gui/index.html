@@ -27,6 +27,7 @@
 <link rel="stylesheet" href="/static/thumbnails.css">
 <link rel="stylesheet" href="/static/library-tools.css">
 <link rel="stylesheet" href="/static/material-workflow.css">
+<link rel="stylesheet" href="/static/vfx-motionboard.css">
 <link rel="stylesheet" href="/static/export-review.css">
 <link rel="stylesheet" href="/static/job-tools.css">
 <link rel="stylesheet" href="/static/s-maps.css">
@@ -37,12 +38,15 @@
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
 <link rel="stylesheet" href="/static/motion/viewport-loader.css">
 <link rel="stylesheet" href="/static/viewport.css">
+<link rel="stylesheet" href="/static/assembly.css">
 <link rel="stylesheet" href="/static/motion/folder-flap.css">
 <link rel="stylesheet" href="/static/motion/material-save.css">
 <link rel="stylesheet" href="/static/motion/empty-assets.css">
 <link rel="stylesheet" href="/static/motion/logo-entrance.css">
 <link rel="stylesheet" href="/static/motion/texture-reconstruction.css">
 <link rel="stylesheet" href="/static/motion/krackle-stage.css">
+<link rel="stylesheet" href="/static/motion/working-panels.css">
+<link rel="stylesheet" href="/static/motion/config-discovery.css">
 </head>
 <body>
 
@@ -81,6 +85,7 @@
       <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
       <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
       <button class="btn" id="library-clear" type="button" hidden>Clear filters</button>
+      <button class="btn" id="bulk-material-open" type="button" hidden>Bulk edit materials</button>
       </div>
       <div class="library-view-group" role="group" aria-label="Library display">
       <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
@@ -229,7 +234,8 @@
   <div id="viewport-box" role="dialog" aria-modal="true" aria-labelledby="viewport-title">
     <div id="viewport-head">
       <button class="vp-icon-button" id="viewport-back" title="Return to library" aria-label="Return to library"><i data-lucide="arrow-left" size="21"></i></button>
-      <div class="vp-workspace-identity"><span class="vp-workspace-label"><i data-lucide="box" size="15"></i> Model Studio</span><h2><img id="viewport-hero-logo" class="hero-emblem" alt="" hidden><span id="viewport-title">3D Preview</span></h2></div>
+      <div class="vp-workspace-identity"><span class="vp-workspace-label"><i data-lucide="box" size="15"></i><span id="viewport-workspace-label">Model Studio</span></span><h2><img id="viewport-hero-logo" class="hero-emblem" alt="" hidden><span id="viewport-title">3D Preview</span></h2></div>
+      <div id="viewport-modes" class="vp-segment" role="group" aria-label="Workspace mode"><button id="viewport-inspect" aria-pressed="true">Inspect</button><button id="viewport-assembly" aria-pressed="false">Assembly</button><button id="viewport-showcase" aria-pressed="false">Showcase</button></div>
       <span id="viewport-unsaved" role="status"></span>
       <button id="viewport-mat-save" disabled>Save changes</button>
       <details id="viewport-capture-menu" class="vp-menu"><summary title="Capture an image or turntable"><i data-lucide="camera" size="18"></i><span>Capture</span></summary><div class="vp-popover vp-capture-panel">
@@ -244,7 +250,6 @@
     <div id="viewport-body">
       <div id="viewport-stage">
         <div id="viewport-inspect-tools">
-          <div class="vp-segment" role="group" aria-label="Presentation mode"><button id="viewport-inspect" aria-pressed="true">Inspect</button><button id="viewport-showcase" aria-pressed="false">Showcase</button></div>
           <div class="vp-segment" role="group" aria-label="Texture comparison">
             <button id="viewport-edited" aria-pressed="true">Edited</button>
             <button id="viewport-original" aria-pressed="false">Original</button>
@@ -312,6 +317,8 @@
         </div>
       </div>
       <aside id="viewport-materials" aria-label="Material inspector">
+        <div class="vp-uv-toggle"><button id="viewport-uv-toggle" aria-expanded="false" aria-controls="viewport-uv-panel" title="Inspect a surface's texture and mesh UV layout">UV X-Ray</button></div>
+        <section id="viewport-uv-panel" aria-label="UV X-Ray inspector" hidden></section>
         <div id="viewport-mat-section">
           <div id="viewport-mat-head">
             <h3>Materials</h3>
@@ -569,7 +576,7 @@
         </button>
       </div>
     </div>
-    <div id="setup-loading">
+    <div id="setup-loading" role="status" aria-live="polite" aria-busy="false">
       <div class="spinner" style="width:28px;height:28px"></div>
       <span>Detecting configuration…</span>
     </div>
@@ -852,6 +859,7 @@
 </template>
 
 <script src="/static/motion/timing.js"></script>
+<script src="/static/motion/krackle-context.js"></script>
 <script src="/static/motion/moment.js"></script>
 <script src="/static/motion/export-feedback.js"></script>
 <script src="/static/motion/export-feedback-ui.js"></script>
@@ -866,7 +874,10 @@
 <script src="/static/motion/krackle-glyph.js"></script>
 <script src="/static/motion/empty-state.js"></script>
 <script src="/static/motion/krackle-stage.js"></script>
+<script src="/static/motion/working-panels.js"></script>
+<script src="/static/motion/config-discovery.js"></script>
 <script src="/static/motion/workflow-krackle.js"></script>
+<script src="/static/motion/motion-preview.js"></script>
 <script src="/static/motion/krackle-surfaces.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>
@@ -890,10 +901,13 @@
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>
+<script src="/static/motion/workflow-surfaces.js"></script>
 <script src="/static/motion/showcase-art.js"></script>
 <script src="/static/motion/foley.js"></script>
 <script src="/static/mod-card-data.js"></script>
 <script src="/static/mod-cards.js"></script>
+<script src="/static/vfx-motionboard-data.js"></script>
+<script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>

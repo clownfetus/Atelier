@@ -55,7 +55,7 @@ export function createViewportEffects({renderer,scene,camera,modelRoot,grid,redu
   const invisible=new THREE.MeshBasicMaterial({visible:false});
   // Krackle loading scan (gui/motion/README.md): while the appearance loads, a band of solid charge
   // energy travels up the model's screen silhouette. Bubbles are holes that show the model behind,
-  // rift satellites trail it and a 45° screen of charge dots covers the rest. Sizes are CSS pixels.
+  // short rift channels stay attached to its trailing edge; a 45° screen covers the rest. Sizes are CSS pixels.
   const scanUniforms={span:{value:new THREE.Vector4()},edges:{value:new THREE.Vector2()},mode:{value:0},time:{value:0},
     boil:{value:0},ratio:{value:1},charge:{value:new THREE.Color()},rift:{value:new THREE.Color()},glint:{value:new THREE.Color()}};
   const opaque=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);opaque.needsUpdate=true;
@@ -108,13 +108,19 @@ export function createViewportEffects({renderer,scene,camera,modelRoot,grid,redu
         float g=floor(p.x/41.),gx=(g+.5)*41.+(hash(vec2(g,3.))-.5)*16.;
         if(hash(vec2(g,11.))<.45&&length(p-vec2(gx,edges.y+scallop(gx,16.,1.)-6.-hash(vec2(g,9.))*3.))<1.6+hash(vec2(g,13.)))ink=glint;
       } else if(p.y<bottom){
-        // The handover sweep leaves the finished appearance behind it; the loop trails rift satellites.
+        // Completion reveals the finished model immediately behind the real handover band.
         if(mode>.5)discard;
-        vec2 local=vec2(p.x,p.y-edges.x),cell=floor(local/18.),centre=(cell+.5)*18.+(vec2(hash(cell+3.),hash(cell+5.))-.5)*6.;
-        float r=(5.4+min(0.,centre.y)*.075)*(.55+.45*hash(cell+7.)),d=length(local-centre);
-        if(hash(cell)<.5&&r>1.&&d<r+1./ratio){
+        // While loading, three repeating capillary lengths feed the moving band.
+        // Each channel touches its actual scalloped edge and stays within a 24px wake.
+        float lane=floor((p.x-span.x)/18.),laneX=span.x+(lane+.5)*18.;
+        float depth=bottom-p.y,reach=12.+4.*mod(lane,3.);
+        float r=mix(3.8,1.,clamp(depth/reach,0.,1.));
+        float d=length(vec2(p.x-laneX,max(0.,depth-reach)));
+        if(depth<24.&&d<r+1./ratio){
           ink=rift;alpha=clamp((r-d)*ratio+.5,0.,1.);
-          if(r>2.6)alpha=min(alpha,clamp((length(local-centre-vec2(.3,-.25)*r)-r*.42)*ratio+.5,0.,1.));
+          // A small negative-space bead reads as ink texture, still inside its channel.
+          float bead=length(vec2(p.x-laneX-.25,depth-5.-mod(lane,3.)));
+          alpha=min(alpha,clamp((bead-.85)*ratio+.5,0.,1.));
         }
       }
       if(ink.r<0.){
@@ -170,16 +176,22 @@ export function createViewportEffects({renderer,scene,camera,modelRoot,grid,redu
   }
   function withMaterials(convert,draw) {
     const restore=[],floorVisible=grid.visible;grid.visible=false;
-    const shown=m=>m.userData?.heldDuplicate?invisible:m.visible?convert(m):m;
-    modelRoot.traverse(mesh=>{if(mesh.isMesh){restore.push([mesh,mesh.material]);mesh.material=Array.isArray(mesh.material)?mesh.material.map(shown):shown(mesh.material);}});
+    const shown=(m,mesh)=>m.userData?.heldDuplicate?invisible:m.visible?convert(m,mesh):m;
+    modelRoot.traverse(mesh=>{if(mesh.isMesh){restore.push([mesh,mesh.material]);mesh.material=Array.isArray(mesh.material)?mesh.material.map(m=>shown(m,mesh)):shown(mesh.material,mesh);}});
     try{draw();}finally{for(const [mesh,material]of restore)mesh.material=material;grid.visible=floorVisible;}
   }
-  function drawOutline(name) {
-    if(!name)return;
+  function drawOutline(selection) {
+    if(!selection)return;
+    const names = selection.names || (selection instanceof Set ? selection : new Set([selection]));
+    const section=selection.section, geometry=section?.object?.geometry;
+    const range=geometry ? {...geometry.drawRange} : null;
     outline.uniforms.accent.value.set(getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#98b7e2');
     renderer.getSize(outline.uniforms.resolution.value);
     const clear=renderer.autoClear;renderer.autoClear=false;
-    try{withMaterials(m=>m.name===name?outline:invisible,()=>renderer.render(scene,camera));}finally{renderer.autoClear=clear;}
+    try {
+      if(geometry)geometry.setDrawRange(section.start,section.end-section.start);
+      withMaterials((m,mesh)=>names.has(m.name)&&(!section||mesh===section.object)?outline:invisible,()=>renderer.render(scene,camera));
+    } finally {renderer.autoClear=clear;if(geometry)geometry.setDrawRange(range.start,range.count);}
   }
   // One scan variant per source keeps its side and alpha cut-out, so hair cards stay cards.
   function scanFor(source) {
@@ -200,7 +212,7 @@ export function createViewportEffects({renderer,scene,camera,modelRoot,grid,redu
   function scanInks() {
     const stage=document.getElementById('viewport-stage')||document.documentElement,style=getComputedStyle(stage);
     const read=(name,fallback)=>style.getPropertyValue(name).trim()||fallback,backdrop=stage.dataset?.backdrop||'gradient';
-    const charge=read('--krackle-charge','#2a9fd6'),rift=read('--krackle-rift','#8a6cff'),glint=read('--krackle-glint','#eee5cf');
+    const charge=read('--krackle-energy',read('--acc','#98b7e2')),rift=read('--krackle-energy-rift',charge),glint=read('--krackle-glint','#eee5cf');
     const ends=[read('--vp-stage-top','#2b3e56'),read('--vp-stage-bottom','#111c2d'),read('--viewport-backdrop','#14161b')];
     const key=[charge,rift,glint,backdrop,...ends].join();
     if(key===inkKey)return inks;

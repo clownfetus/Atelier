@@ -3,7 +3,7 @@
  * Classic-script IIFE adding window.AtelierMotion.krackleStage.
  * The full Krackle language for real work, ported from the living-krackle prototype
  * without p5.js: every job starts as a drop of ink that splashes and is drawn out
- * into a charging ring of comic-sized dots; a result pops into a starburst, cracks
+ * into a gathering ring of comic-sized dots; a result pops into a starburst, cracks
  * the ring so a chunk falls out, or squeezes and bursts into a knocked-out splat.
  * States: idle, busy, success, warning, error. Settled results stop drawing; only
  * busy keeps the frame loop alive. Reduced motion jumps straight to each formation.
@@ -15,7 +15,7 @@
 
   var STATES = new Set(['idle', 'busy', 'success', 'warning', 'error']);
   var TAU = Math.PI * 2;
-  var DROP_T = 0.42, DROP_DUR = 1.05, PUDDLE = 118;
+  var DROP_T = 0.2, DROP_DUR = 0.64, PUDDLE = 118;
   var SETTLE = {success: 1.5, warning: 1.5, error: 3.3};
   var CODE = {drop: 5, busy: 11, success: 23, warning: 37, error: 53};
   var DIZZY_C = [0, -262, 70, 20];
@@ -174,6 +174,7 @@
     if (prior) prior.destroy();
     if (host.childNodes.length) throw new Error('Krackle stage needs an empty host.');
     var opts = options || {};
+    var packing = /export|build/.test(opts.kind || "");
     var size = Math.max(96, Math.min(480, Number(opts.size) || 200));
     var canvas = document.createElement('canvas');
     var ctx = canvas.getContext && canvas.getContext('2d');
@@ -230,7 +231,7 @@
     var kr = mulberry32(rndSeed);
     for (var i0 = 0; i0 < POOL; i0++) { SF[i0] = 0.55 + 1.55 * Math.pow(kr(), 2.2); SPECK[i0] = kr() < 0.32 ? 1 : 0; M[i0] = 1; COLT[i0] = 1; }
 
-    var form = 'idle', formStart = 0, clock = 0, carryHead = 0, kicked = false, fromInk = false;
+    var form = 'idle', formStart = 0, clock = 0, kicked = false, fromInk = false;
     var progress=0;
     var inks = [], hole = [18, 18, 22], successHole=[18,18,22], glint = [238,229,207];
     var raf = 0, last = 0, sleeping = true, destroyed = false, frames = 0;
@@ -261,23 +262,16 @@
 
     function readInks() {
       var cs = getComputedStyle(host);
+      var palette = window.AtelierMotion.energy?.resolve(host);
       inks = [
-        parseColour(ctx, cs.getPropertyValue('--krackle-charge'), '#37639d'),
-        parseColour(ctx, cs.getPropertyValue('--krackle-rift'), '#665b8a'),
+        parseColour(ctx, palette?.charge || cs.getPropertyValue('--krackle-energy') || cs.getPropertyValue('--krackle-charge'), '#37639d'),
+        parseColour(ctx, palette?.rift || cs.getPropertyValue('--krackle-energy-rift') || cs.getPropertyValue('--krackle-rift'), '#665b8a'),
         parseColour(ctx, cs.getPropertyValue('--krackle-success'), '#3e6d4a'),
         parseColour(ctx, cs.getPropertyValue('--krackle-warn'), '#786020'),
         parseColour(ctx, cs.getPropertyValue('--krackle-fault'), '#ad3032')
       ];
       hole = parseColour(ctx, cs.getPropertyValue('--krackle-hole'), '#121216');
       successHole = parseColour(ctx, cs.getPropertyValue('--krackle-success-hole'), '#121216');
-    }
-
-    function headAngle(tau) { return carryHead + tau * (1000 / (window.AtelierMotion.beatMs * 2)) * TAU; }
-    function waveAt(a, head) {
-      var dlt = (((head - a) % TAU) + TAU) % TAU, tr = 0.45 * TAU;
-      if (dlt < tr) return Math.pow(1 - dlt / tr, 1.6);
-      if (dlt > TAU - 0.2) return (dlt - (TAU - 0.2)) / 0.2 * 0.55;
-      return 0;
     }
 
     function enterDrop(rnd) {
@@ -295,7 +289,6 @@
 
     function enterForm(name) {
       if (name === 'drop' && reduced()) name = 'busy';
-      if (form === 'busy') carryHead = headAngle(clock - formStart);
       fromInk = form === 'drop' && name === 'busy';
       form = name; formStart = clock; kicked = false;
       var rnd = mulberry32(rndSeed + CODE[name] + 1 + results * 977);
@@ -314,7 +307,7 @@
         return 3;
       }
       var targets = shape.map(function (t) { return {x: t.x, y: t.y, r: t.r, k: t.k, m: t.m, role: t.role || R_SHAPE, dx: t.dx || 0, dy: t.dy || 0, al: 1, depth: depthOf(t)}; });
-      var visible = name === 'busy' || name === 'success' ? 6 : 0, n = 0, dizzy = 0;
+      var visible = name === 'success' ? 4 : 0, n = 0, dizzy = 0;
       for (var i = shape.length; i < POOL; i++, n++) {
         if (name === 'error' && dizzy < 3) {
           targets.push({x: DIZZY_C[0], y: DIZZY_C[1], r: P * 0.8, k: K_FAULT, m: 0, role: R_DIZZY, dz: dizzy++, al: 1});
@@ -392,8 +385,7 @@
     function update(dt) {
       var tau = clock - formStart, busy = form === 'busy', rm = reduced();
       var K = 90, C = 2 * 0.6 * Math.sqrt(K), A = 900 * Math.sqrt(P / 9);
-      var head = headAngle(tau);
-      var stamp = form === 'warning' && !rm ? 1 + 0.12 * (1 - easeOutBack(span(tau, 0.08, 0.42))) : 1;
+            var stamp = form === 'warning' && !rm ? 1 + 0.12 * (1 - easeOutBack(span(tau, 0.08, 0.42))) : 1;
       var squeeze = form === 'error' && tau < 0.16 && !rm;
       var fall = rm ? 1 : easeOutBounce(span(tau, 0.3, 0.95));
       var i;
@@ -407,7 +399,7 @@
           }
         } else if (form === 'success' && tau >= 0.18) {
           kicked = true;
-          for (i = 0; i < POOL; i++) { var a1 = Math.atan2(Y[i], X[i]), sp3 = 240 + 260 * KICK[i]; VX[i] += Math.cos(a1) * sp3; VY[i] += Math.sin(a1) * sp3; }
+          for (i = 0; i < POOL; i++) { var a1 = Math.atan2(Y[i], X[i]), sp3 = 110 + 100 * KICK[i]; VX[i] += Math.cos(a1) * sp3; VY[i] += Math.sin(a1) * sp3; }
         } else if (form === 'error' && tau >= 0.16) {
           kicked = true;
           for (i = 0; i < POOL; i++) {
@@ -422,14 +414,20 @@
         WAVE[i] = 0;
         if (busy) {
           var shape = ROLE[i] === R_SHAPE, tt = rm ? 0 : tau;
-          var a = PA[i] + (shape ? 0.22 : 0.12) * tt;
-          var w = waveAt(a, rm ? 0.9 : head);
-          var pr = PR[i] + (shape ? 5 * Math.sin(3 * a - tt * 2.2) + 3 * Math.sin(5 * a + tt * 1.3) : 0);
-          tx = Math.cos(a) * pr; ty = Math.sin(a) * pr;
-          tr = shape ? Math.min(P * 0.64, BASE[i] * (0.42 + 1.05 * w)) : BASE[i] * (1 + 1.2 * w);
+          // Keep the formation anchored: ink gathers in opposed sectors, never rotates.
+          // Masks retain their exact silhouette so real progress remains readable.
+          var a = PA[i];
+          var phase = (tt / ((window.AtelierMotion.beatMs || 1040) / 1000 * 2) +
+            (a + Math.PI) / Math.PI * .28) % 1;
+          var w = rm ? .35 : Math.pow(Math.max(0, Math.sin(phase * Math.PI)), 4);
+          var pr = PR[i] * (opts.mask ? 1 : 1 - (packing ? .18 : .065) * w);
+          tx = opts.mask ? TX[i] : Math.cos(a) * pr;
+          ty = opts.mask ? TY[i] : Math.sin(a) * pr;
+          tr = shape ? Math.min(P * .62, BASE[i] * (.75 + .35 * w)) : BASE[i];
           WAVE[i] = w;
         } else if (form === 'success' && tau < 0.18 && ROLE[i] === R_SHAPE) {
-          tr *= 1.25;
+          if (packing && !rm) ty += 55 * (1 - span(tau, 0, .18));
+          tr *= packing ? .84 : 1.12;
         } else if (form === 'warning') {
           if (ROLE[i] === R_CHUNK) { tx += DX[i] * (1 - fall); ty += DY[i] * (1 - fall); }
           else if (ROLE[i] === R_SHAPE) { tx *= stamp; ty *= stamp; }
@@ -444,7 +442,7 @@
         COLT[i] = Math.min(1, COLT[i] + dt * 3.2);
         var local = tau - DELAY[i];
         if (local >= 0) {
-          var fade = (Math.exp(-local * 2.4) + (busy ? 0.07 : 0)) * (form === 'drop' ? 0.35 : 1);
+          var fade = (Math.exp(-local * 4.8) * (busy ? .12 : .5)) * (form === 'drop' ? 0.35 : 1);
           var stiff = ROLE[i] === R_DIZZY ? 2.2 : 1;
           VX[i] += (K * stiff * (tx - X[i]) - C * Math.sqrt(stiff) * VX[i] + flowX(X[i], Y[i], clock) * A * fade) * dt;
           VY[i] += (K * stiff * (ty - Y[i]) - C * Math.sqrt(stiff) * VY[i] + flowY(X[i], Y[i], clock) * A * fade) * dt;
@@ -505,7 +503,7 @@
         var ckey = colourKey.apply(null,inks[K_CHARGE]);
         var blob = function (x, y, r) { addCircle(energy, ckey, x, y, r + 6); anyEnergy = true;addCircle(black,0,x,y,r*.45); };
         if (tau < DROP_T) {
-          var u = tau / DROP_T, yy = -620 + 620 * u * u, st = 1 + 0.8 * u, dy = 0;
+          var u = tau / DROP_T, yy = -270 + 270 * u * u, st = 1 + 0.8 * u, dy = 0;
           for (var q = 0; q < 10; q++) { var r = 30 * Math.pow(1 - q / 10, 1.45); blob(0, yy - dy, Math.max(1.6, r)); dy += Math.max(2.5, r * 0.55) * st; }
         } else {
           var g = easeOutCubic(span(tau, DROP_T, DROP_T + 0.12)), fd = 1 - span(tau, DROP_T + 0.1, DROP_T + 0.3), rr2 = (30 + 70 * g) * fd;
@@ -513,12 +511,16 @@
         }
       }
       ctx.setTransform(scale, 0, 0, scale, S / 2, S / 2);
-      // A success sends a ripple out through the stage.
-      if (form === 'success' && !reduced() && tau > 0.18 && tau < 1.2) {
-        var rad = 160 + 900 * (tau - 0.18), amp = 1 - span(tau, 0.3, 1.15);
-        ctx.fillStyle = 'rgba(' + inks[K_SUCCESS].join(',') + ',' + (0.7 * amp).toFixed(3) + ')';
+      // Confirmation stays inside its owner's stage: four brief registration flecks.
+      if (form === 'success' && !reduced() && tau > .18 && tau < .62) {
+        var u = span(tau, .18, .62), rad = 215 + 40 * easeOutCubic(u);
+        ctx.fillStyle = 'rgba(' + inks[K_SUCCESS].join(',') + ',' + (.65 * (1-u)).toFixed(3) + ')';
         ctx.beginPath();
-        for (var rp = 0; rp < 40; rp++) { var ra = rp / 40 * TAU, rx = Math.cos(ra) * rad, ry = Math.sin(ra) * rad, rs = (3 + 4 * amp) / k; ctx.moveTo(rx + rs, ry); ctx.arc(rx, ry, rs, 0, TAU); }
+        for (var rp = 0; rp < 4; rp++) {
+          var ra = Math.PI / 4 + rp * Math.PI / 2;
+          var rx = Math.cos(ra) * rad, ry = Math.sin(ra) * rad, rs = (2 + 2 * (1-u)) / k;
+          ctx.moveTo(rx + rs, ry); ctx.arc(rx, ry, rs, 0, TAU);
+        }
         ctx.fill();
       }
       drawPool(ctx,loose);
@@ -620,6 +622,8 @@
     if (mql && typeof mql.addEventListener === 'function') mql.addEventListener('change', onEnvironment);
     document.addEventListener('visibilitychange', onEnvironment);
     window.addEventListener('atelier:inks',onEnvironment);
+    window.addEventListener('atelier:energy',onEnergy);
+    function onEnergy() { if (!destroyed) { readInks(); if (!document.hidden && onScreen) render(); } }
     // A stage in a hidden dialog never draws; showing the dialog resumes it.
     var onScreen = true, io = null;
     if (typeof IntersectionObserver === 'function') {
@@ -660,6 +664,7 @@
         if (mql && typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onEnvironment);
         document.removeEventListener('visibilitychange', onEnvironment);
         window.removeEventListener('atelier:inks',onEnvironment);
+        window.removeEventListener('atelier:energy',onEnergy);
         if (canvas.parentNode === host) host.removeChild(canvas);
         if (filterSvg.parentNode === host) host.removeChild(filterSvg);
         ['data-atelier-motion', 'data-am-state', 'data-am-reduced', 'data-am-sleeping'].forEach(function (name) { host.removeAttribute(name); });

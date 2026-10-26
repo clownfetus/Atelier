@@ -1,6 +1,6 @@
 // Reassemble updated texture previews. Image loading and project writes stay with the app.
 // Krackle: the new pixels arrive through a 45° halftone screen, each dot swelling from
-// nothing until the dots overlap into the finished image (ink spreading from the centre).
+// nothing until the dots overlap into the finished image (one deliberate print pass).
 // A wipe swap sends the same swelling dots across the old preview from left to right.
 (() => {
   'use strict';
@@ -66,15 +66,15 @@
     canvas.dataset.swapMode = record.mode;
     // Comic-sized screen: about 14 dots across a tile, 8 in the compact sidebar.
     const pitch = canvas.width / (width >= 90 ? 14 : 8), reach = pitch * 0.76;
-    const cx = canvas.width / 2, cy = canvas.height / 2, far = Math.hypot(cx, cy) || 1;
+    const cx = canvas.width / 2, cy = canvas.height / 2;
     const dots = [];
     const c = Math.SQRT1_2, span = Math.ceil(Math.hypot(canvas.width, canvas.height) / pitch) + 2;
     for (let i = -span; i <= span; i++) for (let j = -span; j <= span; j++) {
       const x = cx + (i - j) * pitch * c, y = cy + (i + j) * pitch * c;
       if (x < -reach || y < -reach || x > canvas.width + reach || y > canvas.height + reach) continue;
-      // Delay grows outward from the centre with a little jitter, like ink soaking in.
-      const jitter = (Math.sin(i * 12.9898 + j * 78.233) * 43758.5453) % 1;
-      dots.push({x, y, delay: (Math.hypot(x - cx, y - cy) / far * 0.8 + Math.abs(jitter) * 0.2) * spread});
+      // Ordered diagonal rows read as a fresh proof coming off the press.
+      // The mask alone moves; sampled artwork never receives a tint or a distortion.
+      dots.push({x, y, delay: Math.max(0, Math.min(1, (x + y * .35) / (canvas.width + canvas.height * .35))) * spread});
     }
     const started = performance.now();
     const draw = now => {

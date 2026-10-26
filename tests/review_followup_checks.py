@@ -5,6 +5,8 @@ MESH = 'Characters/1024/1024503/Meshes/SK_1024_1024503'
 
 
 def run_review_followup_checks(context, url, report, checks):
+    from idle_selection_checks import run_idle_selection_checks
+    run_idle_selection_checks(context, url, report, checks)
     tab = context.new_page()
     errors, held = [], []
     tab.on('pageerror', lambda error: errors.append(str(error)))
@@ -46,11 +48,60 @@ def run_review_followup_checks(context, url, report, checks):
         tab.close()
 
     tab = context.new_page()
+    errors, held, snapshots = [], [], []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    tab.route('**/api/import_texture', lambda route: held.append(route))
+    tab.route('**/api/imported', lambda route: route.fulfill(json=[]))
+    try:
+        tab.goto(url)
+        tab.wait_for_selector('#grid-area .card, #grid-area .folder-card')
+        tab.wait_for_function('_activeProjectName === "Smoke A"')
+        tab.route('**/api/imported', lambda route: snapshots.append(route))
+        tab.evaluate('void loadSidebar()')
+        tab.wait_for_timeout(100)
+        assert len(snapshots) == 1
+        tab.evaluate("""() => {
+            _openAfterImport = false;
+            for (const name of ['T_First','T_Second','T_Third'])
+                void editAsset({game_rel:'Fixture/'+name,name,file_type:'texture'});
+        }""")
+        tab.wait_for_function('_editsInFlight.size === 3')
+        tab.wait_for_timeout(100)
+        assert len(held) == 3
+        def completed(index):
+            name = ['T_First', 'T_Second', 'T_Third'][index]
+            return {'ok': True, 'imported': {'token': name, 'name': name, 'game_rel': 'Fixture/'+name,
+                    'file_type': 'texture', 'selected': True, 'skin_id': '', 'mtime': 1}}
+        held[0].fulfill(json=completed(0))
+        tab.wait_for_selector('#sidebar-list .sb-item[data-token="T_First"]')
+        assert tab.evaluate('_editsInFlight.size') == 2
+        assert 'Ready to edit: T_First' in tab.locator('#tray-progress').inner_text()
+        assert tab.locator('#sidebar-list .sidebar-empty').count() == 0
+        tab.wait_for_function('document.getElementById("sel-count").textContent === "1"')
+        snapshots[0].fulfill(json=[])
+        tab.wait_for_timeout(100)
+        assert tab.locator('#sidebar-list .sb-item').count() == 1
+        tab.evaluate("sidebarData.T_First.selected = false; renderSidebar()")
+        held[2].fulfill(json=completed(2))
+        tab.wait_for_selector('#sidebar-list .sb-item[data-token="T_Third"]')
+        assert not tab.evaluate('sidebarData.T_First.selected')
+        held[1].fulfill(json={'ok': False, 'error': 'Fixture decode failure'})
+        tab.wait_for_function('_editsInFlight.size === 0')
+        assert tab.locator('#sidebar-list .sb-item').count() == 2
+        assert len(snapshots) == 1, 'Completed imports should not queue another full tray request'
+        assert not errors, errors
+        tab.screenshot(path=str(report / 'tray-progressive-imports.png'))
+        checks.append('Completed textures enter the tray while other imports are pending; stale snapshots, failed imports and existing export selections stay correct')
+    finally:
+        tab.close()
+
+    tab = context.new_page()
     errors, builds, conflicts = [], [], []
     status = {'available': True, 'template': True, 'enabled': True, 'reasons': []}
     tab.on('pageerror', lambda error: errors.append(str(error)))
     tab.route('**/api/skin_swapper/status', lambda route: route.fulfill(json=status))
-    tab.route('**/api/skin_swapper/plan', lambda route: route.fulfill(json={'problems': [], 'status': status}))
+    tab.route('**/api/skin_swapper/plan', lambda route: route.fulfill(json={
+        'problems': [], 'status': status, 'entries': [{'game_rel': MESH, 'sculpt': 0}]}))
     def conflict(route):
         conflicts.append(route.request.url)
         route.fulfill(json={'default': len(conflicts) == 1, 'mods': False})
@@ -93,15 +144,15 @@ def run_review_followup_checks(context, url, report, checks):
         tab.wait_for_selector('input[name="export-format"]')
         tab.locator('input[value="skin-swapper"]').check()
         tab.locator('#skin-swapper-author').fill('Regression author')
-        tab.locator('.skin-swapper-mesh select').select_option('2')
         tab.wait_for_function('!document.getElementById("export-review-confirm").disabled')
+        assert tab.locator('.skin-swapper-form').inner_text() == 'Form 0 (default)'
         tab.locator('#export-review-confirm').click()
         tab.wait_for_selector('#export-review-retry')
         tab.locator('#export-review-retry').click()
         tab.wait_for_function('document.getElementById("export-review-title").textContent.startsWith("Mod exported")')
         assert len(builds) == 4 and all(path == '/api/skin_swapper/build' for path, _ in builds[2:]), builds
-        assert builds[2][1] == builds[3][1] and builds[3][1]['meshes'] == [{'game_rel': MESH, 'sculpt': 2}]
-        checks.append('Skin Swapper retry retains its endpoint, author, skin name and reviewed form')
+        assert builds[2][1] == builds[3][1] and builds[3][1]['meshes'] == [{'game_rel': MESH}]
+        checks.append('Skin Swapper retry retains its endpoint, author, skin name and mesh for automatic form detection')
         tab.screenshot(path=str(report / 'review-followup-retries.png'))
         assert not errors, errors
     finally:

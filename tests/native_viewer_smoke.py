@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -85,9 +86,18 @@ def main():
                 if path=='/api/idle_animation':
                     try:
                         payload=response.json()
-                        if payload.get('ok'):return
+                        if payload.get('ok'):
+                            result.setdefault('idle_clips', []).append({'source':payload.get('source'),
+                                'tracks':len(payload.get('tracks', [])), 'name':payload.get('name')})
+                            return
                         message=payload.get('error','Native idle decoding failed')
                     except Exception:message='Idle response body unavailable'
+                    # Automatic selection can reject a sparse/additive candidate
+                    # before playing the next verified clip. Keep that evidence;
+                    # wait_for_idle still requires successful real playback.
+                    if re.search(r'skeleton is incompatible|Additive clips require',message,re.I):
+                        result.setdefault('idle_rejections', []).append(message)
+                        return
                     result['asset_errors'].append(dict(url=response.url,status=response.status,error=message))
                 elif response.status>=400 and path in ('/api/model_gltf','/api/skin_materials','/api/texture_png','/api/dye_texture'):
                     try:message=response.text()[:1200]
@@ -162,6 +172,9 @@ def main():
                     assert any(part['visible'] and part['name']=='Weapon · '+weapon for part in result['initial_parts'])
                 result['checks'].append('One body opens without decoding the alternate human form, and the real held weapon remains equipped')
             wait_for_idle()
+            result['selected_idle']=page.locator('#viewport-animation').input_value()
+            assert any(clip['tracks']>8 and clip['source'].endswith(result['selected_idle'])
+                       for clip in result.get('idle_clips', [])), 'Playback must use a successfully decoded native clip'
             if args.design_checks:
                 page.set_viewport_size({'width':1582,'height':995})
                 if page.locator('#viewport-expand').get_attribute('aria-pressed')!='true':page.locator('#viewport-expand').click()

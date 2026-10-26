@@ -208,7 +208,7 @@ def api_bulk_preview():
     from atelier import bulk
     body = request.json or {}
     if body.get("background"):
-        return _submit_job("bulk-preview", "Review VFX / curve edits",
+        return _submit_job("bulk-preview", "Review batch edits",
                            lambda job: bulk.preview(body.get("items"), body.get("edit")))
     return bulk.preview(body.get("items"), body.get("edit"))
 
@@ -218,7 +218,7 @@ def api_bulk_apply():
     from atelier import bulk
     body = request.json or {}
     if body.get("background"):
-        return _submit_job("bulk-save", "Save VFX / curve edits",
+        return _submit_job("bulk-save", "Save batch edits",
                            lambda job: bulk.apply(body.get("preview_id")))
     return bulk.apply(body.get("preview_id"))
 
@@ -490,7 +490,7 @@ def api_skin_materials():
     skin_id = body.get("skin_id", "")
     want    = set(str(n).lower() for n in (body.get("names") or []))
     response.content_type = "application/json"
-    if not skin_id:
+    if not skin_id and not body.get('meshes'):
         return json.dumps({"ok": False, "error": "missing skin_id"})
     if body.get('meshes'):
         from atelier.handlers.meshstudio import material_bindings
@@ -574,10 +574,21 @@ def _viewport_material_payload(gr, params):
     from atelier.handlers.material_preview import eye_material
     params = _preview_surface(params)
     texs = params.get('textures', {}) or {}
-    roles, texture_urls = {}, {}
+    roles, texture_urls, texture_sources = {}, {}, []
     custom = _custom_tex.assignments(gr) if gr else {}
+    versions = {g: _tex_version(g) for g in texs.values()}
     for name, path in texs.items():
         role = texture_role(name)
+        assignment = custom.get(name)
+        source_path = _custom_tex.package_game_rel(gr, name, assignment['name'], assignment.get('folder')) if assignment else path
+        source_url = '/api/material_custom_texture/preview?' + urlencode({
+            'game_rel': gr, 'slot': name, 'v': assignment['file']}) if assignment else '/api/texture_png?' + urlencode({
+                'game_rel': path, 'v': versions[path]})
+        texture_sources.append({'slot': name, 'game_rel': source_path, 'role': role,
+                                'preview_role': role if role and role not in roles else None,
+                                'texture_class': assignment.get('texture_class', 'Texture2D') if assignment else (params.get('texture_classes') or {}).get(name),
+                                'url': source_url, 'custom': bool(assignment),
+                                'inferred': name in params.get('eye_defaults', [])})
         if role and role not in roles:
             roles[role] = path
             if name in custom:
@@ -585,11 +596,40 @@ def _viewport_material_payload(gr, params):
                     'game_rel': gr, 'slot': name, 'v': custom[name]['file']})
     dyeable = 'DyeingTexture' in texs
     eye = eye_material(params)
-    versions = {g: _tex_version(g) for g in texs.values()}
     eye_version = hashlib.sha256(json.dumps([versions, params.get('colors'), params.get('scalars'), custom], sort_keys=True).encode()).hexdigest() if eye else '0'
     return {'game_rel': gr, 'token': token(gr) if gr else None, **params, 'texture_roles': roles, 'texture_urls': texture_urls,
+            'texture_sources': texture_sources,
             'tex_ver': versions, 'dyeable': dyeable,
             'dye_ver': _dye_version(gr, texs) if dyeable else '0', 'eye_preview': eye, 'eye_ver': eye_version}
+
+
+@app.post('/api/assembly_references')
+def api_assembly_references():
+    from atelier.handlers.assembly import references
+    body = request.json or {}
+    response.content_type = 'application/json'
+    return json.dumps(references(body.get('mesh_game_rel', ''), body.get('material_game_rel', '')))
+
+
+@app.get('/api/assembly_thumbnail')
+def api_assembly_thumbnail():
+    from io import BytesIO
+    from PIL import Image
+    gr = request.query.get('game_rel', '')
+    _c.validate_game_rel(gr)
+    slot = request.query.getunicode('slot') or ''
+    path = _custom_tex.image_path(gr, slot) if slot else _texture_png(gr)
+    if not path or not os.path.isfile(path):
+        response.status = 404
+        return ''
+    with Image.open(path) as source:
+        source.thumbnail((160, 160), Image.Resampling.LANCZOS)
+        image = source.convert('RGBA')
+        output = BytesIO()
+        image.save(output, 'PNG')
+    response.content_type = 'image/png'
+    response.set_header('Cache-Control', 'no-store')
+    return output.getvalue()
 
 
 @app.post('/api/mesh_visibility')
@@ -1781,7 +1821,11 @@ def api_prefetch_thumbs():
 @app.get("/api/imported")
 def api_imported():
     response.content_type = "application/json"
-    items = all_imported()
+    return json.dumps(_imported_items())
+
+
+def _imported_items(game_rel=None):
+    items = all_imported() if game_rel is None else all_imported(game_rel)
     from atelier.ui_preview import saved_preview
     for item in items:
         item['modified'] = item['mtime']
@@ -1790,7 +1834,7 @@ def api_imported():
             item['name'] += f" · {len(hidden)} hidden section{'s' if len(hidden) != 1 else ''}"
         preview = saved_preview(item['game_rel'], item['file_type'])
         if preview: item['ui_preview'] = preview
-    return json.dumps(items)
+    return items
 
 
 @app.get('/api/search')
@@ -1881,7 +1925,9 @@ def api_import_texture():
             response.content_type = "application/json"
             return json.dumps({"ok": False, "error": msg, "game_rel": gr})
         response.content_type = "application/json"
-        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr})
+        items = _imported_items(gr)
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr,
+                           "imported": items[0] if items else None})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -2131,12 +2177,15 @@ def api_material_sources():
     from atelier.catalogue import catalogue
     response.content_type = "application/json"
     query = (request.query.getunicode("q") or "").strip().casefold()
+    parents = request.query.get("parents") == "true"
     if len(query) < 2:
         return {"ok": True, "materials": [], "more": False}
     words = query.split()
     matches = {}
     for path, _container, mount in ensure_index():
-        if mount.rstrip("/") != "Marvel/Content/Marvel" or not path.lower().endswith(".uasset") or not is_material(path):
+        if mount.rstrip("/") != "Marvel/Content/Marvel" or not path.lower().endswith(".uasset"):
+            continue
+        if not (is_material(path) or parents and os.path.basename(path).upper().startswith("M_")):
             continue
         parts = path.split("/")
         label = ""

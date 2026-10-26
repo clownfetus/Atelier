@@ -441,7 +441,9 @@ def extract_files(destination, base):
     os.makedirs(config._CACHE, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='hdr-read-', dir=config._CACHE) as work:
         doc = document(base, Path(work)/'json')
-        if texture_class(doc) != 'TextureCube': return False
+        if (texture_class(doc) != 'TextureCube' or (doc['Exports'][0].get('PlatformData') or {}).get('PixelFormat')
+                not in ('PF_BC6H', 'PF_BC6H_Signed', 'PF_FloatRGBA')):
+            return False
         cube, _prefix, _start = read_cooked(doc, base)
         preview = preview_png(cube, Path(work)/'preview')
         Path(str(destination)+'.dds').write_bytes(write_dds(cube))

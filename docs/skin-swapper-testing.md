@@ -16,7 +16,8 @@ replace an installed Atelier or modify its projects.
 - [Git](https://git-scm.com/), or the [ZIP of main](https://github.com/clownfetus/Atelier/archive/refs/heads/main.zip).
 - [Blender](https://www.blender.org/) 4.5 to 5.1, used to edit or rebuild a mesh.
 - Microsoft Edge WebView2. Windows 11 already has it.
-- Your `GAL_ConfigTemplate.uasset` and `GAL_ConfigTemplate.uexp`.
+- A current Atelier installation, which includes the Skin Swapper template.
+  Publishers can optionally supply a different complete template pair.
 - A Companion App build that includes `GAL_ModSkinConfig`.
 
 ## Setup
@@ -24,11 +25,14 @@ replace an installed Atelier or modify its projects.
 ```powershell
 git clone https://github.com/clownfetus/Atelier.git
 cd Atelier
-.\scripts\Setup-SkinSwapperTest.ps1 -Template 'D:\Galacta\template' -DataDir 'D:\AtelierGalactaTest' -ToolsFrom 'C:\Path\To\Atelier' -Launch
+.\scripts\Setup-SkinSwapperTest.ps1 -DataDir 'D:\AtelierGalactaTest' -ToolsFrom 'C:\Path\To\Atelier' -Launch
 ```
 
 `-ToolsFrom` is the installed Atelier folder containing `Atelier.exe` and `Tools`;
-replace the example with your current installation path. `-Template` is the folder holding the two template files. `-DataDir` is where this test copy
+replace the example with your current installation path. The script reuses its
+bundled template automatically, including when native tools are already installed
+in the test directory. `-Template` is an optional publisher override naming a
+folder holding both template files. `-DataDir` is where this test copy
 of Atelier keeps its settings, projects, exports, logs and tools. Put it on the same drive as
 the game: the 3D viewer hardlinks the game's containers so that installed mods stay out of
 its reads, and hardlinks only work within one drive.
@@ -40,8 +44,8 @@ The script:
    Without that option, the script falls back to its hash-pinned historical 0.4.1
    installer and extracts it without running it. Use current installed tools for
    testing current model workflows;
-3. copies your template into `<DataDir>\Tools\Galacta` and prints both SHA-256 hashes, so
-   you can confirm they are your files;
+3. reuses a complete template already in `<DataDir>\Tools\Galacta`, or copies the
+   pair from the supplied installation, and prints both SHA-256 hashes;
 4. asks Atelier whether Skin Swapper export is available. It should print
    `Available: template installed, Galacta switch on.`;
 5. with `-Launch`, opens Atelier in a desktop window.
@@ -83,8 +87,9 @@ To start Atelier again later:
    - the hero and skin, read-only;
    - the Galacta folder the mod will use;
    - **Skin name** and **Author**;
-   - a **Form** choice for each mesh. Form 0 is the default; use one mesh per form for
-     multi-form heroes.
+   - a read-only **Form** for each mesh, detected from the optional fifth digit of
+     `SK_{HeroID}{ShapeID}_{SkinID}`. For example, `SK_10251_1025001` is Cloak,
+     hero 1025, form 1. Without a fifth digit, the form is 0. Use one mesh per form.
 
    Any rule the mod breaks is listed, and **Build Skin Swapper mod** stays disabled until it is
    fixed.

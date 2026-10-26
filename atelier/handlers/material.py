@@ -1,4 +1,4 @@
-import os, json, shutil, tempfile, threading, hashlib
+import os, json, shutil, tempfile, threading, hashlib, copy
 from atelier.storage import atomic_json, publish_files, publish_project_json
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root, validate_game_rel,
                             project_base, project_base_legacy)
@@ -8,6 +8,7 @@ from atelier.paths import pak_game_path
 
 _original_lock = threading.Lock()
 _SOURCE_KEY = "_atelier_material_source"
+_PARENT_KEY = "_atelier_material_parent"
 
 def is_material(path_or_name):
     return os.path.basename(path_or_name).upper().startswith("MI_")
@@ -34,18 +35,19 @@ def _mat_color(entry):
         return v[0]["Value"]
     return None
 
-def _mat_params(d):
+def _mat_params(d, *, precision=5):
+    number = lambda value: _f(value) if precision is None else round(_f(value), precision)
     ex = d["Exports"][0]
     vp = _gn(_ex_props(ex), "VectorParameterValues")
     sp = _gn(_ex_props(ex), "ScalarParameterValues")
     colors, scalars = [], []
     for e in (vp or {}).get("Value", []):
         nm = _mat_pname(e); lc = _mat_color(e)
-        if nm and lc: colors.append({"name": nm, "rgba": [round(_f(lc[k]), 5) for k in "RGBA"]})
+        if nm and lc: colors.append({"name": nm, "rgba": [number(lc[k]) for k in "RGBA"]})
     for e in (sp or {}).get("Value", []):
         nm = _mat_pname(e); pv = _gn(e["Value"], "ParameterValue")
         if nm and pv is not None and not isinstance(pv.get("Value"), (list, dict)):
-            scalars.append({"name": nm, "value": round(_f(pv.get("Value")), 5)})
+            scalars.append({"name": nm, "value": number(pv.get("Value"))})
     return colors, scalars
 
 def texture_slots(d):
@@ -193,7 +195,8 @@ def read_material(game_rel, cache_only=False):
         **({'prefer_exact':True} if cache_only else {})), encoding="utf-8-sig"))
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d),
-            "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, "")}
+            "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, ""),
+            "material_parent": d.get(_PARENT_KEY, "")}
 
 
 def _import_parameters(game_rel, original=False):
@@ -276,7 +279,7 @@ def read_material_original(game_rel):
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d)}
 
 
-def _material_path(game_rel):
+def _material_path(game_rel, *, allow_base=False):
     """Accept a browser path or a copied UE object/package path, never a filesystem path."""
     from atelier.index import get_content_prefix
     if not isinstance(game_rel, str):
@@ -291,8 +294,9 @@ def _material_path(game_rel):
         if obj == package.rsplit("/", 1)[-1]:
             gr = package
     validate_game_rel(gr)
-    if not is_material(gr) or "." in gr.rsplit("/", 1)[-1]:
-        raise ValueError("Choose a material instance (MI_…)")
+    name = os.path.basename(gr).upper()
+    if not (is_material(gr) or allow_base and name.startswith("M_")) or "." in name:
+        raise ValueError("Choose a material (M_… or MI_…)" if allow_base else "Choose a material instance (MI_…)")
     # These are the package paths understood by the material/texture readers.
     if gr.casefold().startswith(("plugins/", "marvel_lq/")) or \
             get_content_prefix(gr).rstrip("/").casefold() != "marvel/content/marvel":
@@ -368,6 +372,118 @@ def _check_replacement_parents(d, source, target):
         d = _original_document(source)
 
 
+def _parent_class(game_rel):
+    """Verify the new parent exists and is a material, rather than trusting its filename."""
+    d = _original_document(game_rel)
+    exports = [e for e in d.get("Exports", [])
+               if not e.get("OuterIndex") and e.get("ObjectName") == os.path.basename(game_rel)]
+    imports = d.get("Imports", [])
+    index = exports[0].get("ClassIndex") if len(exports) == 1 else None
+    if type(index) is not int or not -len(imports) <= index < 0:
+        raise ValueError("Parent must have one matching material export")
+    kind = imports[-index-1].get("ObjectName")
+    if kind not in ("Material", "MaterialInstanceConstant"):
+        raise ValueError("Parent must be a material or material instance")
+    return kind
+
+
+def _set_material_parent(d, target, parent, kind):
+    """Append isolated imports so texture slots sharing an old package keep their identity."""
+    from atelier.properties import mark_changed
+    from atelier.unreal_names import add_names
+    ex = _material_export(d, target)
+    prop = _gn(_ex_props(ex), "Parent")
+    imports = d.get("Imports", [])
+    index = prop.get("Value") if prop else None
+    if type(index) is not int or not -len(imports) <= index < 0:
+        raise ValueError("Material has no supported parent reference")
+    obj = imports[-index-1]
+    outer = obj.get("OuterIndex")
+    if type(outer) is not int or not -len(imports) <= outer < 0:
+        raise ValueError("Material has no supported parent package")
+    package = "/Game/Marvel/" + parent
+    if (imports[-outer-1].get("ObjectName") == package and
+            obj.get("ObjectName") == os.path.basename(parent) and obj.get("ClassName") == kind):
+        return False
+    pkg, obj = copy.deepcopy(imports[-outer-1]), copy.deepcopy(obj)
+    pkg.update(ObjectName=package, OuterIndex=0)
+    imports.append(pkg)
+    obj.update(ObjectName=os.path.basename(parent), ClassName=kind, OuterIndex=-len(imports))
+    imports.append(obj)
+    mark_changed(ex, prop)
+    prop["Value"] = -len(imports)
+    # Cooked packages keep explicit load-order dependencies. Preserve old links
+    # (other properties can share them) and give the new parent the same ordering.
+    linked = False
+    for field in ("SerializationBeforeSerializationDependencies", "CreateBeforeSerializationDependencies",
+                  "SerializationBeforeCreateDependencies", "CreateBeforeCreateDependencies"):
+        dependencies = ex.get(field)
+        if isinstance(dependencies, list) and index in dependencies:
+            dependencies.append(prop["Value"])
+            linked = True
+    if not linked:
+        ex.setdefault("CreateBeforeSerializationDependencies", []).append(prop["Value"])
+    export_index = next(i for i, entry in enumerate(d["Exports"]) if entry is ex)
+    depends = d.get("DependsMap", [])
+    if export_index < len(depends) and isinstance(depends[export_index], list) and index in depends[export_index]:
+        depends[export_index].append(prop["Value"])
+    add_names(d, package, os.path.basename(parent), kind)
+    d[_PARENT_KEY] = parent
+    return True
+
+
+def _check_project_parents(documents):
+    """Check proposed parents together with saved project parents, including cross-asset cycles."""
+    from atelier.unreal_refs import imported_package
+    pending = {gr.casefold(): d for gr, d in documents.items()}
+    resolved, dependencies = {}, {}
+
+    def read(gr):
+        key = gr.casefold()
+        if key in pending:
+            return pending[key]
+        if key not in resolved:
+            for base in (project_base(gr), project_base_legacy(gr)):
+                if os.path.isfile(base + ".json"):
+                    with open(base + ".json", "rb") as stream:
+                        payload = stream.read()
+                    dependencies[base + ".json"] = hashlib.sha256(payload).hexdigest()
+                    resolved[key] = json.loads(payload.decode("utf-8-sig"))
+                    break
+                dependencies[base + ".json"] = None
+            else:
+                resolved[key] = _original_document(gr)
+        return resolved[key]
+
+    for start, document in documents.items():
+        seen, gr, d = set(), start, document
+        while True:
+            jobs.checkpoint()
+            key = gr.casefold()
+            if key in seen or len(seen) >= 64:
+                raise ValueError("Material parent chain is recursive or excessively deep")
+            seen.add(key)
+            ex = _material_export(d, gr)
+            prop = _gn(_ex_props(ex), "Parent")
+            index = prop.get("Value") if prop else None
+            imports = d.get("Imports", [])
+            if index in (None, 0):
+                break
+            if type(index) is not int or not -len(imports) <= index < 0:
+                raise ValueError("Material has an invalid parent reference")
+            kind = imports[-index-1].get("ClassName")
+            if kind == "Material":
+                break
+            if kind != "MaterialInstanceConstant":
+                raise ValueError("Material has an unsupported parent class")
+            package = imported_package(d, index)
+            if not package:
+                raise ValueError("Material has an invalid parent package")
+            gr = _material_path(package[1])
+            d = read(gr)
+    return dependencies
+
+
 def replace_material(game_rel, source_game_rel):
     """Save an independent donor snapshot at the target; the donor's project edits are untouched.
 
@@ -441,15 +557,17 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
     from atelier.handlers import custom_texture
     custom = custom_texture.assignments(game_rel) if use_project else {}
     saved_colors, saved_scalars = {}, {}
-    source = game_rel
+    source, parent = game_rel, None
     project_bases = (project_base(game_rel), project_base_legacy(game_rel)) if use_project else ()
     for base in project_bases:
         if os.path.isfile(base + ".json"):
             with open(base + ".json", encoding="utf-8-sig") as stream:
                 saved = json.load(stream)
-                cols, scals = _mat_params(saved)
+                cols, scals = _mat_params(saved, precision=None)
                 if saved.get(_SOURCE_KEY):
                     source = _material_path(saved[_SOURCE_KEY])
+                if saved.get(_PARENT_KEY):
+                    parent = _material_path(saved[_PARENT_KEY], allow_base=True)
             saved_colors = {c["name"]: c["rgba"] for c in cols}
             saved_scalars = {s["name"]: s["value"] for s in scals}
             break
@@ -474,8 +592,14 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
         with open(jp, encoding="utf-8-sig") as stream:
             d = json.load(stream)
         if source != game_rel:
-            _check_replacement_parents(d, source, game_rel)
+            if not parent:
+                _check_replacement_parents(d, source, game_rel)
             d = _retarget_material(d, source, game_rel)
+        if parent:
+            _set_material_parent(d, game_rel, parent, _parent_class(parent))
+            d.pop(_PARENT_KEY, None)
+        if parent or source != game_rel:
+            _check_project_parents({game_rel: d})
         current_colors, current_scalars = _mat_params(d)
         missing = sorted((saved_colors.keys() - {c["name"] for c in current_colors}) |
                          (saved_scalars.keys() - {s["name"] for s in current_scalars}))

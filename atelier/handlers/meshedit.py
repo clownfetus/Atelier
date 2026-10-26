@@ -172,8 +172,9 @@ def extract_blend(game_rel, base_path=None, blend_path=None, force=False, with_m
         try:
             jobs.progress('Preparing Blender materials · '+os.path.basename(game_rel))
             manifest = _meshmat.build_manifest(game_rel, m, work_base=base,root=texture_root)
+            slot_names = _mesh.material_slot_names(m.materials)
             for index in presentation_hidden:
-                slot=manifest['slots'].get(m.materials[index]['slot_name'])
+                slot=manifest['slots'].get(slot_names[index])
                 if slot is not None:slot['hidden']=True;slot['presentation_only_hidden']=True
             manifest['pack_images']=pack_images
             json.dump(manifest, open(manifest_path, "w"), indent=1)
@@ -242,6 +243,15 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         except (OSError,ValueError):record={}
         preserve_parts=(record.get('validation',{}).get('preserved_parts',[]) if record.get('blend_sha256')==digest(blend_path) else [])
     m = _mesh.Mesh(base)
+    slot_names = _mesh.material_slot_names(m.materials)
+    from atelier.handlers import mesh_lods
+    maps = (mesh_lods.load_material_maps(base)
+            if len(m.lods) > 1 and os.path.isfile(base+'.uasset') else [])
+    remapped = {i: maps[lod.get('layout', {}).get('source_index', i)] for i, lod in enumerate(m.lods)
+                if i > 0 and lod.get('layout', {}).get('source_index', i) < len(maps)
+                and maps[lod.get('layout', {}).get('source_index', i)]}
+    reference = _mesh.Mesh(base) if remapped else None
+    sculpt = None
 
     graft = _meshgraft.load_graft(blend_path)
     reweight = _meshgraft.reweights_from(graft)
@@ -254,12 +264,20 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
     for i, lod in enumerate(m.lods):
         jobs.progress(f'Building {os.path.basename(game_rel)} · detail level {i+1} of {len(m.lods)}…')
         ratio = 1.0 if i == 0 else (sum(s["num_tris"] for s in lod["sections"]) / lod0_tris)
+        if i in remapped:
+            if sculpt is None:
+                raise ValueError('The original top detail level is needed to deform baked lower detail materials')
+            secs = sculpt.sections(i, remapped[i])
+            info = m.rebuild_lod(i, secs, keep_morphs=options['keep_morphs'])
+            applied.append({'lod': i, 'ratio': round(ratio, 4), 'method': 'authored_lod_sculpt',
+                            'simplification': [], **info})
+            continue
         glb = f"{blend_path}.lod{i}.glb"
         if os.path.exists(glb):
             os.remove(glb)        # never let a previous run's output be mistaken for fresh
         detail_counts={}
         for section in lod['sections']:detail_counts[section['mat']]=detail_counts.get(section['mat'],0)+section['num_tris']
-        detail_ratios={m.materials[index]['slot_name']:min(1,count/max(1,top_counts.get(index,count))) for index,count in detail_counts.items()}
+        detail_ratios={slot_names[index]:min(1,count/max(1,top_counts.get(index,count))) for index,count in detail_counts.items()}
         # Export intact vertex channels; meshoptimizer reduces the index buffers
         # below, after the target LOD's own bone palette and morph IDs are known.
         out = _run_blender("blend_to_glb.py", [blend_path, glb, '1.000000',json.dumps({'section_ratios':{}})], "GLB")
@@ -269,7 +287,7 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         mats = next((l[len("MATERIALS "):] for l in out.splitlines()
                      if l.startswith("MATERIALS ")), "")
         have = set(mats.split("|")) if mats else set()
-        need = {m.materials[s["mat"]]["slot_name"] for s in lod["sections"]}
+        need = {slot_names[s["mat"]] for s in lod["sections"]}
         missing = sorted(n for n in need if n and n not in have and n not in (preserve_parts or []))
         if missing:
             raise RuntimeError(
@@ -279,11 +297,13 @@ def stage_mesh(game_rel, stage, blend_path=None, base_path=None, preserve_parts=
         section_options={'preserve_parts':preserve_parts} if preserve_parts else {}
         if options.get('repair_weights'):section_options['repair_weights']=True
         secs = _mesh.glb_to_sections(m, i, glb, reweight=reweight,**section_options)
+        if i == 0 and reference is not None:
+            sculpt = mesh_lods.Sculpt(reference, secs)
         simplification = []
         if i > 0:
             from atelier.mesh_optimizer import simplify_section
             for section_index, section in enumerate(secs):
-                slot = m.materials[section['mat']]['slot_name']
+                slot = slot_names[section['mat']]
                 if slot in (preserve_parts or []):
                     continue
                 jobs.checkpoint()

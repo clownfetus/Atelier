@@ -25,6 +25,10 @@
   --krackle-ring-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='3.8' r='2.15'/%3E%3Ccircle cx='19.1' cy='7.9' r='2.15'/%3E%3Ccircle cx='19.1' cy='16.1' r='2.15'/%3E%3Ccircle cx='12' cy='20.2' r='2.15'/%3E%3Ccircle cx='4.9' cy='16.1' r='2.15'/%3E%3Ccircle cx='4.9' cy='7.9' r='2.15'/%3E%3C/svg%3E");
   --krackle-crest-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='3.8' r='3.6'/%3E%3Ccircle cx='4.9' cy='7.9' r='2.75'/%3E%3C/svg%3E");
   /* krackle-art:spinner:end */
+  /* krackle-art:fluid-spinner:begin */
+  --krackle-fluid-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3Cmask id='h' maskUnits='userSpaceOnUse' x='0' y='0' width='24' height='24'%3E%3Crect width='24' height='24' fill='white'/%3E%3Ccircle cx='4.5' cy='3.8' r='.85' fill='black'/%3E%3Ccircle cx='16.8' cy='18.4' r='1.15' fill='black'/%3E%3Ccircle cx='12.9' cy='18.8' r='.55' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg mask='url(%23h)' fill='white'%3E%3Cpath d='M5 5C5 9 10 7 10 11C10 15 16 12 16 18' fill='none' stroke='white' stroke-width='3.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M1.5 4C1.5 1 5.5 .7 7.5 2.6C9 4.2 7.1 7 5.2 7.5C3 8 1.2 6.4 1.5 4Z'/%3E%3Cpath d='M10 18C10 15.8 13.1 15 16 15C19 15 22.5 16.3 22.5 18.2C22.5 20.8 18.5 22 15.5 21.5C12 21.4 9.5 20.1 10 18Z'/%3E%3C/g%3E%3C/svg%3E");
+  --krackle-fluid-pressure-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3Cmask id='h' maskUnits='userSpaceOnUse' x='0' y='0' width='24' height='24'%3E%3Crect width='24' height='24' fill='white'/%3E%3Ccircle cx='4.5' cy='3.8' r='.85' fill='black'/%3E%3Ccircle cx='16.8' cy='18.4' r='1.15' fill='black'/%3E%3Ccircle cx='12.9' cy='18.8' r='.55' fill='black'/%3E%3C/mask%3E%3C/defs%3E%3Cg mask='url(%23h)' fill='white'%3E%3Cpath d='M5 5C5 9 10 7 10 11C10 15 16 12 16 18' fill='none' stroke='white' stroke-width='6.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M1.5 4C1.5 1 5.5 .7 7.5 2.6C9 4.2 7.1 7 5.2 7.5C3 8 1.2 6.4 1.5 4Z'/%3E%3Cpath d='M10 18C10 15.8 13.1 15 16 15C19 15 22.5 16.3 22.5 18.2C22.5 20.8 18.5 22 15.5 21.5C12 21.4 9.5 20.1 10 18Z'/%3E%3C/g%3E%3C/svg%3E");
+  /* krackle-art:fluid-spinner:end */
   /* krackle-art:edited-corner:begin */
   --krackle-edited-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M0 0H24V24ZM11.3 3a1.3 1.3 0 1 0 -2.6 0a1.3 1.3 0 1 0 2.6 0ZM19 4a2 2 0 1 0 -4 0a2 2 0 1 0 4 0ZM21.6 10a1.6 1.6 0 1 0 -3.2 0a1.6 1.6 0 1 0 3.2 0Z'/%3E%3C/svg%3E");
   /* krackle-art:edited-corner:end */
@@ -42,7 +46,7 @@
 [data-am-state='success'] .am-export-feedback-hole,
 [data-am-state='success'] .am-material-save-hole { fill:var(--krackle-success-hole) !important; }
 
-/* ── Busy: every .spinner in the app becomes a six-dot charge ring ──────────── */
+/* Busy: a connected reservoir → conduit → catch plate at the native 20px size. */
 .spinner {
   position: relative;
   width: 20px;
@@ -55,30 +59,39 @@
 }
 .spinner::before,
 .spinner::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--krackle-charge);
-  -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
-  mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
+  content:'';position:absolute;inset:0;
+  background:var(--krackle-energy,var(--acc));
+  -webkit-mask:var(--krackle-fluid-mask) center / 100% 100% no-repeat;
+  mask:var(--krackle-fluid-mask) center / 100% 100% no-repeat;
 }
-.spinner::before { opacity: 0.5; }
-/* The crest (and the dot it just left) jumps dot to dot: a count, not a spin. */
+/* The opaque carrier stays still; a thicker parcel moves only inside its connected silhouette. */
+.spinner::before { opacity:1; }
 .spinner::after {
-  background: radial-gradient(circle at 50% 15.8%, var(--krackle-hole) 0 5.9%, var(--krackle-charge) 6.3%);
-  -webkit-mask-image: var(--krackle-crest-mask);
-  mask-image: var(--krackle-crest-mask);
-  animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
+  -webkit-mask-image:var(--krackle-fluid-pressure-mask);
+  mask-image:var(--krackle-fluid-pressure-mask);
+  clip-path:ellipse(0% 0% at 21% 21%);
+  animation:krackle-fluid-charge var(--krackle-beat,1040ms) linear infinite;
 }
+@keyframes krackle-fluid-charge {
+  0% { clip-path:ellipse(0% 0% at 21% 21%); }
+  12% { clip-path:ellipse(23% 17% at 21% 21%); }
+  35% { clip-path:ellipse(24% 18% at 41% 38%); }
+  57% { clip-path:ellipse(25% 18% at 46% 55%); }
+  76% { clip-path:ellipse(27% 18% at 67% 75%); }
+  88% { clip-path:ellipse(35% 19% at 67% 78%); }
+  100% { clip-path:ellipse(0% 0% at 67% 78%); }
+}
+:root[data-krackle='off'] .spinner::after { animation:none !important; }
+/* Activity retains its established six-stop progress language. */
 @keyframes krackle-charge { to { transform: rotate(360deg); } }
 
-/* ── Determinate progress: a bar of energy with bubbles drifting along it ───── */
+/* ── Determinate progress: a bar of energy with a registered halftone screen ───── */
 .progress-bar-bg {
   position: relative;
   height: 10px;
   border-radius: 5px;
   background-color: var(--bg3);
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--krackle-charge) 32%, transparent) 0 1px, transparent 1.4px);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--krackle-energy, var(--acc)) 32%, transparent) 0 1px, transparent 1.4px);
   background-size: 8px 8px;
   background-position: 4px 1px;
   overflow: visible;
@@ -87,12 +100,13 @@
   position: relative;
   min-width: 10px;
   border-radius: 5px;
-  background-color: var(--krackle-charge);
+  background-color: var(--krackle-energy, var(--acc));
   background-image: radial-gradient(circle, var(--krackle-hole) 0 1.15px, transparent 1.5px),
                     radial-gradient(circle, var(--krackle-hole) 0 .7px, transparent 1px);
   background-size: 9px 10px, 9px 10px;
   background-position: 0 2px, 4.5px 6px;
-  animation: krackle-drift 1.6s linear infinite;
+  /* The advancing edge already communicates progress; its screen stays registered. */
+  animation: none;
 }
 /* The leading edge is a blob of energy, so the bar reads as ink being pushed. */
 .progress-bar-fill::after {
@@ -104,9 +118,8 @@
   height: 14px;
   margin-top: -7px;
   border-radius: 50%;
-  background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 2px, var(--krackle-charge) 2.4px);
+  background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 2px, var(--krackle-energy, var(--acc)) 2.4px);
 }
-@keyframes krackle-drift { to { background-position: 18px 2px, 22.5px 6px; } }
 
 /* ── Indeterminate progress (<progress> without a value) ───────────────────── */
 progress:not([value]) {
@@ -117,9 +130,9 @@ progress:not([value]) {
   border-radius: 5px;
   background-color: var(--bg3);
   background-image:
-    radial-gradient(circle, var(--krackle-charge) 0 3.4px, transparent 3.8px),
-    radial-gradient(circle, var(--krackle-charge) 0 2.3px, transparent 2.7px),
-    radial-gradient(circle, color-mix(in srgb, var(--krackle-charge) 45%, transparent) 0 1.2px, transparent 1.6px);
+    radial-gradient(circle, var(--krackle-energy, var(--acc)) 0 3.4px, transparent 3.8px),
+    radial-gradient(circle, var(--krackle-energy, var(--acc)) 0 2.3px, transparent 2.7px),
+    radial-gradient(circle, color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent) 0 1.2px, transparent 1.6px);
   background-size: 48px 10px, 48px 10px, 8px 10px;
   background-position: 0 0, 14px 0, 0 0;
   background-repeat: repeat-x;
@@ -133,14 +146,14 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 #job-activity .activity-ring {
   position: relative;
   border-radius: 0;
-  background: conic-gradient(var(--krackle-charge) var(--job-progress, 25%), color-mix(in srgb, var(--krackle-charge) 32%, transparent) 0);
+  background: conic-gradient(var(--krackle-energy, var(--acc)) var(--job-progress, 25%), color-mix(in srgb, var(--krackle-energy, var(--acc)) 32%, transparent) 0);
   -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
   mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
 }
 /* Indeterminate work: the crest counts round the dots instead of a spinning arc. */
 #job-activity .activity-ring.indeterminate {
   animation: none;
-  background: color-mix(in srgb, var(--krackle-charge) 45%, transparent);
+  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent);
   -webkit-mask: none;
   mask: none;
 }
@@ -149,13 +162,13 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   content: '';
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--krackle-charge) 45%, transparent);
+  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent);
   -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
   mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
 }
 #job-activity .activity-ring.indeterminate { background: none; }
 #job-activity .activity-ring.indeterminate::after {
-  background: var(--krackle-charge);
+  background: var(--krackle-energy, var(--acc));
   -webkit-mask-image: var(--krackle-crest-mask);
   mask-image: var(--krackle-crest-mask);
   animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
@@ -238,7 +251,7 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 [data-atelier-motion="empty-state"] .am-empty-state-svg { width: 100%; height: 100%; display: block; overflow: visible; }
 [data-atelier-motion="empty-state"] .am-empty-state-energy { fill: currentColor; }
 [data-atelier-motion="empty-state"] .am-empty-state-well { opacity: 0.4; }
-[data-atelier-motion="empty-state"] .am-empty-state-bubble .am-empty-state-energy { fill: var(--krackle-charge); }
+[data-atelier-motion="empty-state"] .am-empty-state-bubble .am-empty-state-energy { fill: var(--krackle-energy, var(--acc)); }
 [data-atelier-motion="empty-state"] .am-empty-state-hole { fill: var(--krackle-hole); }
 [data-atelier-motion="empty-state"] .am-empty-state-floor { fill: currentColor; opacity: 0.45; }
 [data-atelier-motion="empty-state"] .am-empty-state-drip-line { fill: none; stroke: currentColor; stroke-width: 4.68; stroke-linecap: round; }
@@ -269,23 +282,17 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
   background:var(--krackle-charge);clip-path:none;mask:var(--krackle-edited-mask) center/contain no-repeat;
 }
-/* First export: the skin's colours burst out of the button as Krackle bubbles. */
+/* First export: one glyph-fed stream presses a joined seal into the button seam. */
 .export-color-moment {
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  border-radius: 50%;
+  position: fixed;
+  z-index: 320;
+  display: block;
+  overflow: hidden;
+  margin: 0;
+  pointer-events: none;
 }
-.export-color-moment::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 4.5px;
-  height: 4.5px;
-  border-radius: 50%;
-  background: var(--krackle-hole);
-}
+.export-receipt-flow { fill: none; }
+.export-receipt-source,.export-receipt-seal { will-change: auto; }
 /* Import results: one dot per asset; done dots are success energy with a bubble. */
 #import-segments { gap: 4px; }
 #import-segments span {
@@ -294,7 +301,7 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   height: 10px;
   min-width: 10px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--krackle-charge) 28%, transparent);
+  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 28%, transparent);
 }
 #import-segments [data-state=done] {
   background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 1.5px, var(--krackle-success) 1.9px);
@@ -303,3 +310,11 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   border-radius: 50% 50% 50% 0;
   background: radial-gradient(circle at 50% 50%, var(--krackle-hole) 0 1.6px, var(--krackle-warn) 2px);
 }
+
+/* Calm keeps the counted formation; hidden documents never run CSS busy loops. */
+:root[data-krackle='calm'] .spinner::after,
+:root[data-krackle='calm'] #job-activity .activity-ring::after,
+:root[data-krackle='calm'] progress:not([value]) { animation: none !important; }
+:root[data-krackle-hidden] .spinner::after,
+:root[data-krackle-hidden] #job-activity .activity-ring::after,
+:root[data-krackle-hidden] progress:not([value]) { animation-play-state: paused !important; }

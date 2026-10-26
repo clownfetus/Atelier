@@ -39,8 +39,8 @@ def run_logo_motion_checks(page, context, url, report, checks):
         tab.wait_for_function('document.querySelector("[data-atelier-motion=logo-entrance]").dataset.amState==="settled"')
         assert tab.evaluate('logoAnimationOptions[0].options.duration') == 320
         assert tab.evaluate('logoAnimationOptions[0].frames.every(frame=>frame.opacity===1)')
-        assert tab.evaluate('logoAnimationOptions[0].frames[0].transform') == 'translateY(1px) scale(1.04, 0.94)'
-        assert tab.evaluate('logoAnimationOptions[0].frames[1].offset') == .45
+        assert tab.evaluate('logoAnimationOptions[0].frames[0].transform') == 'translateY(-2px) scale(.97,1.02)'
+        assert tab.evaluate('logoAnimationOptions[0].frames[1].offset') == .32
         assert tab.evaluate('logoAnimationOptions[0].options.easing') == 'linear'
         assert tab.locator('.studio-brand > img').evaluate('el=>el.naturalWidth>0 && el.hidden')
         assert tab.locator('.studio-brand [data-atelier-motion=logo-entrance]').evaluate('el=>el.getBoundingClientRect().width===32 && el.getBoundingClientRect().height===32 && !el.getAnimations({subtree:true}).length')

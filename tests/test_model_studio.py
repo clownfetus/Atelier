@@ -65,8 +65,25 @@ class Studio(unittest.TestCase):
         context = config.project_context(str(self.root/'project')); context.__enter__()
         self.addCleanup(context.__exit__, None, None, None)
         self.gr = 'Characters/1029/1029001/Meshes/SK_Body'
+        mapping = patch('atelier.handlers.mesh_lods.load_material_maps', return_value=[])
+        mapping.start(); self.addCleanup(mapping.stop)
         self.slots = [{'index': 0, 'slot': 'MI_Body', 'mi': 'Characters/1029/1029001/Materials/MI_Body', 'via': 'imports'},
                       {'index': 1, 'slot': 'MI_Hair', 'mi': 'Characters/1029/1029001/Materials/MI_Hair', 'via': 'imports'}]
+
+    def test_visibility_uses_the_lower_lod_material_map_instead_of_its_raw_section_index(self):
+        source, target = self.root/'original/SK_Body', self.root/'stage/SK_Body'
+        fixture(source); fixture(target)
+        with patch.object(mesh, 'Mesh', side_effect=BufferMesh), \
+                patch('atelier.handlers.texture.find_extracted', return_value=str(source)), \
+                patch('atelier.handlers.mesh_lods.load_material_maps', return_value=[[], [], [1,0]]):
+            meshvisibility.apply_to_staged(self.gr, str(target)+'.uasset',
+                                          sections=[{'slot_index':0, 'slot_name':'MI_Body'}])
+        before, after = BufferMesh(str(source)), BufferMesh(str(target))
+        for index, lod in enumerate(after.lods):
+            values = struct.unpack_from('<9H', after._blob(lod), lod['idx_off'])
+            expected = (0,0,0,3,3,3,6,7,8) if index < 2 else (0,1,2,3,4,5,6,6,6)
+            self.assertEqual(values, expected)
+        self.assertEqual(before.uasset, after.uasset)
 
     def test_small_skeletal_name_table_requires_class_and_export_identity(self):
         names = ['lambert1', 'Root', 'SK_Tiny', '/Script/Engine', 'Class',
