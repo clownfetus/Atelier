@@ -84,6 +84,8 @@ def apply_to_staged(game_rel, uasset, sections=None):
     if Path(config.project_base(game_rel)).resolve() == Path(base):
         raise ValueError('Mesh visibility cannot overwrite a project mesh')
     mesh = Mesh(base)
+    from atelier.handlers import mesh_lods
+    maps = mesh_lods.load_material_maps(original or base) if len(mesh.lods) > 1 else []
     if not mesh._layout or any(r.get('blob') == 'missing' for r in mesh._layout) or len(mesh.lods) != len(mesh._layout):
         raise ValueError('Cannot verify every cooked LOD for this mesh; visibility export was stopped.')
     indices = set()
@@ -97,10 +99,13 @@ def apply_to_staged(game_rel, uasset, sections=None):
     for i, lod in enumerate(mesh.lods):
         jobs.checkpoint()
         count = 0
+        source_index = lod.get('layout', {}).get('source_index', i)
+        mapping = maps[source_index] if source_index < len(maps) else []
         for section in lod['sections']:
-            if section['mat'] in indices:
+            material = mesh_lods.material_index(section, mapping)
+            if material in indices:
                 mesh.degenerate_triangles(lod, section, 0)
-                found.add(section['mat']); count += 1
+                found.add(material); count += 1
         applied.append({'lod': i, 'sections': count})
     if found != indices:
         raise ValueError('A hidden slot has no cooked render section; visibility export was stopped.')
@@ -108,11 +113,13 @@ def apply_to_staged(game_rel, uasset, sections=None):
     with tempfile.TemporaryDirectory(prefix='atelier-hidden-sections-') as scratch:
         mesh.save(scratch,path.stem)
         verified = Mesh(os.path.join(scratch,path.stem))
-        for lod in verified.lods:
+        for i, lod in enumerate(verified.lods):
             fmt = '<I' if lod['idx_stride'] == 4 else '<H'
             blob = verified._blob(lod)
+            source_index = lod.get('layout', {}).get('source_index', i)
+            mapping = maps[source_index] if source_index < len(maps) else []
             for section in lod['sections']:
-                if section['mat'] not in indices:
+                if mesh_lods.material_index(section, mapping) not in indices:
                     continue
                 start = lod['idx_off'] + section['base_index'] * lod['idx_stride']
                 if any(struct.unpack_from(fmt, blob, start + i * lod['idx_stride'])[0] != section['base_vertex']

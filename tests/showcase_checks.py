@@ -47,6 +47,15 @@ window.__showcase={
         baseline=tab.evaluate('__showcase.snapshot()')
         for value in ['full','calm','off']:
             motion(value);tab.locator('#viewport-showcase').click();tab.wait_for_timeout(80)
+            if value == 'full':
+                tab.wait_for_selector('.k-workflow-svg[data-workflow-trigger=workspace]', state='attached')
+                assert tab.locator('#viewport-showcase').get_attribute('aria-pressed') == 'true'
+                tab.screenshot(path=str(report/'workflow-showcase-mode.png'))
+                tab.wait_for_function("!document.querySelector('.k-workflow-svg[data-workflow-trigger=workspace]')")
+                tab.locator('#viewport-showcase').click()
+                assert not tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]').count()
+            else:
+                assert not tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]').count()
             assert tab.evaluate('__inspection.presentation().showcase')
             assert tab.evaluate("__renderTypes.includes('MeshToonMaterial')")
             assert tab.locator('.vp-showcase-backdrop').is_visible()
@@ -54,6 +63,7 @@ window.__showcase={
             assert tab.evaluate('__showcase.restored()') and tab.evaluate('__showcase.snapshot()')==baseline
         assert not writes,writes
         checks.append('Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes')
+        checks.append('Committed workspace changes get one Full ink flare outside model artwork; selecting the same mode stays still, and Calm/Off never start a particle canvas')
         composition=tab.evaluate("""() => {
           const render=inks=>{const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');AtelierShowcaseArt.draw(ctx,c.width,c.height,inks);return ctx.getImageData(0,0,c.width,c.height).data;};
           const a=render({charge:'#f94848',rift:'#ff0000'}),b=render({charge:'#19e06e',rift:'#00ffff'});
@@ -131,7 +141,9 @@ window.__showcase={
           const callbacks={confirm(){},refresh(){},settings(){},reveal(){cardReveal++;}};
           AtelierExportReview.open(cardSnapshot,callbacks);AtelierExportReview.finish(cardSnapshot,{ok:true,applied:['tex T_A','tex T_B','mat MI_Body','combined 2 containers into one pak'],skipped:[]});
         }""")
-        tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()');tab.locator('.mod-card summary').click()
+        tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()')
+        # The card is the build's payoff: open by default, directly after the outcome line.
+        assert tab.evaluate("(card => card.open && card.previousElementSibling?.classList.contains('export-review-summary'))(document.querySelector('.mod-card'))")
         assert tab.locator('.mod-card-stats').inner_text()=='3 assets · 2 textures · 1 material',tab.locator('.mod-card-stats').text_content()
         assert tab.locator('.mod-card p',has_text='Showcase capture').count()==1
         tab.locator('.mod-card button',has_text='Open export folder').click();assert tab.evaluate('cardReveal')==1

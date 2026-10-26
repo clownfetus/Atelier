@@ -83,6 +83,11 @@ class InstallerShipsTools(unittest.TestCase):
         for line in section("Files"):
             self.assertNotIn("skipifsourcedoesntexist", line)
 
+    def test_the_skin_swapper_template_cannot_be_skipped_by_the_installer(self):
+        self.assertNotIn('#if FileExists("dist\\Atelier\\Tools\\Galacta', ISS)
+        for name in ("GAL_ConfigTemplate.uasset", "GAL_ConfigTemplate.uexp"):
+            self.assertTrue(any(name in line for line in section("Files")))
+
     def test_tools_the_code_loads_are_in_the_manifest(self):
         win = {rel for rel, _ in ST.MANIFEST["windows"]}
         for rel in ("UAssetTool.exe", "UAssetGUI.exe", "AtelierMesh/AtelierMesh.exe",

@@ -63,6 +63,8 @@ def main():
     parser.add_argument('--mesh', type=Path, help='Optional real decoded GLB for render/disposal smoke')
     parser.add_argument('--idle', type=Path, help='Optional real decoded standing-idle JSON for playback verification')
     parser.add_argument('--jobs-bulk-only', action='store_true', help='Run only tracked job and bulk editing workflows')
+    parser.add_argument('--material-bulk-only', action='store_true', help='Run material-folder selection and reviewed batch saves')
+    parser.add_argument('--motionboard-only', action='store_true', help='Run the VFX Motionboard timeline, proxy and persistence checks')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
@@ -73,18 +75,21 @@ def main():
     parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
+    parser.add_argument('--skin-swapper-only', action='store_true', help='Check detected forms, export review and format-preserving retries')
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
     parser.add_argument('--workflow-motion-only', action='store_true', help='Check Krackle hero, navigation, editor and tray motion')
+    parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
     parser.add_argument('--shared-identity-only', action='store_true', help='Check named ID folders, search, pins and template picking in every content branch')
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
+    parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -202,6 +207,15 @@ def main():
                     browser.close()
                     return
 
+                if args.assembly_only:
+                    from assembly_browser_checks import run_assembly_checks
+                    run_assembly_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+
                 if args.model_export_only:
                     from model_studio_export_browser_checks import run_model_studio_export_browser_checks
                     run_model_studio_export_browser_checks(page, context, url, report, checks)
@@ -228,8 +242,30 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
+                if args.working_panels_only:
+                    from working_panels_checks import run_working_panels_checks
+                    from fluid_work_checks import run_fluid_work_checks
+                    from material_save_motion_checks import run_material_save_motion_checks
+                    from export_motion_checks import run_export_motion_checks
+                    from export_review_checks import run_export_review_checks
+                    from viewport_loading_checks import run_viewport_loading_checks
+                    from viewport_motion_checks import run_viewport_motion_checks
+                    run_working_panels_checks(context, url, report, checks)
+                    run_fluid_work_checks(context, url, report, checks)
+                    run_material_save_motion_checks(page, context, url, report, checks)
+                    run_export_motion_checks(page, context, url, report, checks)
+                    run_export_review_checks(page, context, url, report, checks)
+                    run_viewport_loading_checks(page, context, url, report, checks)
+                    run_viewport_motion_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close(); return
+
                 if args.workflow_motion_only:
+                    from context_ink_checks import run_context_ink_checks
                     from workflow_motion_checks import run_workflow_motion_checks
+                    run_context_ink_checks(context, url, report, checks)
                     run_workflow_motion_checks(context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
@@ -244,7 +280,10 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
-                if args.review_followups_only:
+                if args.review_followups_only or args.skin_swapper_only:
+                    if args.skin_swapper_only:
+                        from skin_swapper_review_checks import run_skin_swapper_review_checks
+                        run_skin_swapper_review_checks(page, context, url, report, checks)
                     from review_followup_checks import run_review_followup_checks
                     run_review_followup_checks(context, url, report, checks)
                     assert not errors, errors
@@ -381,6 +420,26 @@ def main():
                     browser.close()
                     return
 
+                if args.material_bulk_only:
+                    from material_bulk_browser_checks import run_material_bulk_checks
+                    run_material_bulk_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks:
+                        print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.motionboard_only:
+                    from motionboard_browser_checks import run_motionboard_checks
+                    run_motionboard_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks:
+                        print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.appearance_only:
                     from appearance_checks import run_appearance_checks
                     run_appearance_checks(page, context, url, report, checks)
@@ -398,7 +457,13 @@ def main():
                 from inks_dial_checks import run_inks_dial_checks
                 run_inks_dial_checks(page,context,url,report,checks)
                 from workflow_motion_checks import run_workflow_motion_checks
+                from context_ink_checks import run_context_ink_checks
+                run_context_ink_checks(context, url, report, checks)
                 run_workflow_motion_checks(context, url, report, checks)
+                from working_panels_checks import run_working_panels_checks
+                run_working_panels_checks(context, url, report, checks)
+                from fluid_work_checks import run_fluid_work_checks
+                run_fluid_work_checks(context, url, report, checks)
                 from find_checks import run_find_checks
                 run_find_checks(page, context, url, report, checks)
                 from shared_identity_checks import run_shared_identity_checks
@@ -433,6 +498,10 @@ def main():
                 run_library_pins_checks(page, context, url, report, checks)
                 from jobs_bulk_browser_checks import run_job_bulk_checks
                 run_job_bulk_checks(page, context, url, report, checks)
+                from material_bulk_browser_checks import run_material_bulk_checks
+                run_material_bulk_checks(page, context, url, report, checks)
+                from motionboard_browser_checks import run_motionboard_checks
+                run_motionboard_checks(page, context, url, report, checks)
                 from thumbnail_checks import run_thumbnail_checks
                 run_thumbnail_checks(page, context, url, report, checks)
                 from texture_reconstruction_checks import run_texture_reconstruction_checks

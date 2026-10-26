@@ -36,6 +36,34 @@
     const open=openByDefault(),control=document.getElementById('settings-home-heroes');
     if(control)control.checked=open;expandHeroes(open);
   });
+  // Scrolling the Home categories yourself folds the portrait wall into one strip of avatars so the
+  // categories get the room; the app's own scrolling never does. An upward scroll at their top or
+  // keyboard focus returning to the heroes unfolds it. Layout changes once; the categories then
+  // slide into their new place. The Heroes toggle keeps its plain disclosure meaning.
+  let folded=false,userScroll=0;
+  function fold(on,animate=true) {
+    const root=host();if(!root||folded===on)return;
+    const library=document.querySelector('#explorer > .library-content'),before=library?.getBoundingClientRect().top;
+    folded=on;root.classList.toggle('roster-compact',on);
+    if(!animate||!library||document.hidden||window.AtelierMotionPolicy?.allows(1)===false)return;
+    const shift=before-library.getBoundingClientRect().top;
+    if(Math.abs(shift)>1)try{library.animate([{transform:`translateY(${shift}px)`},{transform:'none'}],
+      {duration:window.AtelierMotion?.springMs?.snappy||340,easing:window.AtelierMotion?.ease?.snappy||'cubic-bezier(.2,0,0,1)'});}catch(_){}
+  }
+  const categories=document.getElementById('grid-area');
+  // Wheel, touch, scrolling keys and dragging the scrollbar itself count; pressing a control does not.
+  const intent=event=>{
+    if(event.type==='pointerdown'&&event.target!==categories)return;
+    if(event.type==='keydown'&&!['ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(event.key))return;
+    userScroll=performance.now();
+  };
+  for(const type of ['wheel','touchmove','keydown','pointerdown'])categories?.addEventListener(type,intent,{passive:true});
+  categories?.addEventListener('scroll',()=>{
+    if(performance.now()-userScroll<600&&requested&&heroesOpen&&!host()?.hidden&&categories.scrollTop>24)fold(true);
+  },{passive:true});
+  categories?.addEventListener('wheel',event=>{if(folded&&event.deltaY<0&&categories.scrollTop<=0)fold(false);},{passive:true});
+  // Pointer clicks only select a hero: unfolding under a pressed button would move it mid-click.
+  host()?.addEventListener('focusin',event=>{if(folded&&event.target.closest('.roster-strip')&&event.target.matches(':focus-visible'))fold(false);});
   const reduced = () => (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)')).matches;
   function cleanup() { for (const dispose of carouselCleanups) dispose(); carouselCleanups = []; }
   function carousel(track, label) {
@@ -95,7 +123,13 @@
     const img = document.createElement('img'); img.alt=''; img.loading='lazy'; img.decoding='async';
     const sources=[...new Set([item.avatar,item.thumbnail].filter(Boolean))];
     const next=()=>{if(sources.length)img.src=sources.shift();else img.hidden=true;};
-    img.addEventListener('load',()=>{const colour=window.AtelierPolish?.accent(img);if(colour&&img.isConnected)img.parentElement?.style.setProperty('--roster-accent',colour);});
+    img.addEventListener('load',()=>{
+      const colour=window.AtelierPolish?.accent(img);
+      if(colour&&img.isConnected) {
+        img.parentElement?.style.setProperty('--roster-accent',colour);
+        if (requested && !host()?.hidden && img.closest('.roster-portrait')?.getAttribute('aria-pressed') === 'true') window.AtelierPolish?.artwork(img);
+      }
+    });
     img.addEventListener('error',next);next();return img;
   }
   function render() {
@@ -106,7 +140,7 @@
     const heading=document.createElement('h2');heading.className='roster-heading';
     const toggle=document.createElement('button');toggle.type='button';toggle.className='roster-toggle';toggle.setAttribute('aria-controls','home-heroes-content');
     toggle.innerHTML='<span class="roster-disclosure" aria-hidden="true">▸</span> Heroes';
-    toggle.addEventListener('click',()=>expandHeroes(!heroesOpen));heading.append(toggle);
+    toggle.addEventListener('click',()=>{fold(false,false);expandHeroes(!heroesOpen);});heading.append(toggle);
     const content=document.createElement('div');content.className='roster-content';content.id='home-heroes-content';
     details.append(heading,content);root.append(details);expandHeroes(heroesOpen);
     if (!data.heroes?.length) { window.AtelierPolish?.empty(content,'Catalogue unavailable','Browse the library folders below. Saved artwork will return when available.'); return; }
@@ -133,7 +167,10 @@
         tintSkin(tile,skin,hero);
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
-      if (record && changed) window.AtelierMotion?.workflow?.hero(button);
+      if (record && changed) {
+        window.AtelierPolish?.artwork(button.querySelector('img'));
+        window.AtelierMotion?.workflow?.hero(button);
+      }
     }
     const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;
     const shown=data.heroes.filter(hero=>filter==='all'||(filter==='edited'?editCount(hero)>0:recent.includes(hero.path)));
@@ -171,9 +208,15 @@
   });
   function show(home, onNavigate,opts={}) {
     requested=home; navigate=onNavigate;options=opts;const root=host(); if (!root) return;
+    fold(false,false);
     renderContinue();
     if (!home) {root.hidden=true;return;}
-    if (data) {if(!root.childNodes.length) render();else root.hidden=false;return;}
+    if (data) {
+      if(!root.childNodes.length) render();else root.hidden=false;
+      const portrait = root.querySelector('.roster-portrait[aria-pressed=true] img');
+      if (portrait?.complete && portrait.naturalWidth) window.AtelierPolish?.artwork(portrait);
+      return;
+    }
     if (!pending) pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
       .then(result=>{data=result;window.AtelierCatalogueArt?.setIdentities(result);render();}).catch(()=>{data={heroes:[]};render();}).finally(()=>{pending=null;});
   }

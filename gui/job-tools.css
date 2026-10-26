@@ -1,26 +1,34 @@
 .job-activity-button { flex: 0 0 auto; min-height: 36px; margin-left: 12px; }
 .modal.job-modal, .modal.bulk-modal { width: min(800px, calc(100vw - 40px)); max-width: min(800px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; }
+.modal.bulk-modal { gap: 12px; }
 #job-overlay .job-modal { overflow: hidden; }
 .job-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; }
 .job-body, .bulk-body { display: grid; gap: 12px; margin: 16px 0; }
 .job-body { min-height: 0; overflow-y: auto; }
 .job-body p, .bulk-body p { margin: 4px 0; line-height: 1.5; }
-.job-row { border: 1px solid var(--border); padding: 14px; border-radius: 6px; }
-.job-state { float: right; font-size: 12px; color: var(--muted); text-transform: capitalize; }
+.job-row { border: 1px solid var(--border); padding: 14px; border-radius: var(--studio-shape-small); }
+.job-state { float: right; font-size: var(--studio-text-detail); color: var(--muted); text-transform: capitalize; }
 .job-row .btn { margin: 8px 8px 0 0; }
-.job-path, .bulk-path { font-size: 12px; overflow-wrap: anywhere; color: var(--muted); }
+.job-path, .bulk-path { font-size: var(--studio-text-detail); overflow-wrap: anywhere; color: var(--muted); }
 .bulk-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-.bulk-controls label { display: grid; gap: 6px; font-size: 12px; }
+.bulk-controls label { display: grid; gap: 6px; font-size: var(--studio-text-detail); }
 .bulk-controls > [hidden] { display: none; }
 .bulk-controls select, .bulk-controls input { min-height: 36px; background: var(--bg2); color: var(--text); border: 1px solid var(--border); padding: 6px; }
-.bulk-list { max-height: 220px; overflow: auto; border: 1px solid var(--border); padding: 8px; }
+.bulk-material-source { flex: 1 1 100%; min-width: 0; }
+.bulk-material-source input, .bulk-material-source select { width: 100%; min-width: 0; }
+.bulk-material-source select[hidden], #bulk-material-open[hidden] { display: none; }
+.bulk-hint { margin: 0; font-size: var(--studio-text-label); line-height: 1.5; color: var(--muted); }
+.bulk-selection-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#bulk-selection-count { margin-right: auto; font-size: var(--studio-text-label); }
+.bulk-list { flex-shrink: 0; max-height: 180px; overflow: auto; border: 1px solid var(--border); padding: 8px; }
+.bulk-body { flex-shrink: 0; max-height: min(40vh, 360px); overflow: auto; margin: 8px 0; }
 .bulk-choice { display: grid; grid-template-columns: 20px 1fr; gap: 6px; padding: 6px; align-items: start; }
 .bulk-choice input { margin-top: 4px; }
-.bulk-results { width: 100%; border-collapse: collapse; font-size: 13px; }
-.bulk-results td, .bulk-results th { text-align: left; border-bottom: 1px solid var(--border); padding: 8px; vertical-align: top; }
-.bulk-actions { display: flex; gap: 8px; justify-content: end; }
+.bulk-results { width: 100%; border-collapse: collapse; font-size: var(--studio-text-label); }
+.bulk-results td, .bulk-results th { text-align: left; border-bottom: 1px solid var(--border); padding: 8px; vertical-align: top; overflow-wrap: anywhere; }
+.bulk-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: end; }
 #bulk-edit-open { margin: 0 12px 8px; }
-@media (max-width: 1100px) { .job-activity-button { padding: 4px 8px; font-size: 12px; } }
+@media (max-width: 1100px) { .job-activity-button { padding: 4px 8px; font-size: var(--studio-text-detail); } }
 
 /* Krackle state glyph beside each job's state label. */
 .job-state { display: inline-flex; align-items: center; gap: 6px; }

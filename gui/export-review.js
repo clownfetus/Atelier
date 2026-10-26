@@ -78,7 +78,7 @@
   function showStage(state) {
     try {
       if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
-        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 156, kind:'export-review'});
+        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 216, kind:'export-review'});
       }
       stage?.setState(state);
     } catch (_) {
@@ -135,17 +135,16 @@
     const { snapshot, callbacks } = current;
     const state = current.swapper || (current.swapper = {
       skinName: offer.defaults.skinName || '', author: offer.defaults.author || '',
-      sculpts: Object.fromEntries(offer.meshes.map(mesh => [mesh.game_rel, 0])),
     });
     const options = () => ({ skin_name: state.skinName, author: state.author,
-      meshes: offer.meshes.map(mesh => ({ game_rel: mesh.game_rel, sculpt: state.sculpts[mesh.game_rel] || 0 })) });
+      meshes: offer.meshes.map(mesh => ({ game_rel: mesh.game_rel })) });
     const target = el('dl', undefined, 'export-review-meta');
     for (const [label, value] of [
       ['Hero', (offer.heroLabel ? offer.heroLabel + ' · ' : '') + offer.hero],
       ['Skin', (offer.skinLabel ? offer.skinLabel + ' · ' : '') + offer.skin],
       ['Galacta folder', `/Game/Marvel/ProjectGalacta/Meshes/${offer.hero}/${offer.skin}/${snapshot.modName}/`],
     ]) target.append(el('dt', label), el('dd', value));
-    body.append(target, el('p', 'Hero and skin come from the edited mesh and cannot be changed. The mod filename is the folder name.', 'export-review-summary'));
+    body.append(target, el('p', 'Hero, skin and form come from the edited mesh and cannot be changed. The mod filename is the folder name.', 'export-review-summary'));
     const field = (id, label, key) => {
       const wrap = el('label', undefined, 'skin-swapper-field'); wrap.htmlFor = id;
       const input = document.createElement('input');
@@ -155,18 +154,14 @@
     };
     field('skin-swapper-name', 'Skin name', 'skinName');
     field('skin-swapper-author', 'Author', 'author');
-    const meshes = el('div', undefined, 'skin-swapper-meshes');
+    const meshes = el('div', undefined, 'skin-swapper-meshes'), forms = new Map();
     for (const mesh of offer.meshes) {
       const name = mesh.name || mesh.game_rel.split('/').pop();
-      const row = el('label', undefined, 'skin-swapper-mesh');
-      const select = document.createElement('select');
-      select.className = 'setup-input'; select.setAttribute('aria-label', 'Hero form for ' + name);
-      for (let n = 0; n <= 9; n++) {
-        const choice = el('option', n === 0 ? 'Form 0 (default)' : 'Form ' + n); choice.value = String(n); select.append(choice);
-      }
-      select.value = String(state.sculpts[mesh.game_rel] || 0);
-      select.addEventListener('change', () => { state.sculpts[mesh.game_rel] = Number(select.value); schedule(); });
-      row.append(el('span', name), select); meshes.append(row);
+      const row = el('div', undefined, 'skin-swapper-mesh');
+      const form = el('span', 'Reading form…', 'skin-swapper-form');
+      form.setAttribute('aria-label', 'Hero form for ' + name);
+      forms.set(mesh.game_rel, form);
+      row.append(el('span', name), form); meshes.append(row);
     }
     body.append(meshes);
     const others = snapshot.included.filter(item => !offer.meshes.includes(item));
@@ -189,6 +184,12 @@
       const id = ++request; let result;
       try { result = await offer.plan(options()); } catch (error) { result = { problems: [error.message] }; }
       if (id !== request || !checks.isConnected) return;
+      for (const [gameRel, form] of forms) {
+        const entry = result?.entries?.find(entry => entry.game_rel === gameRel);
+        form.textContent = Number.isInteger(entry?.sculpt)
+          ? entry.sculpt === 0 ? 'Form 0 (default)' : 'Form ' + entry.sculpt
+          : 'Form unavailable';
+      }
       const problems = [...(result?.problems || ['The Skin Swapper checks could not run.']),
         ...(result?.status && !result.status.available ? result.status.reasons : [])];
       checks.replaceChildren(...problems.map(problem => el('li', problem)));
@@ -245,7 +246,9 @@
     if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
-    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt});
+    // The card is the build's payoff: it follows the outcome line, and only a just-finished build deals it in.
+    const entrance = current.fresh; current.fresh = false;
+    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt,anchor:status,entrance});
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
     if (!result.ok) button('Retry export', current.retry || callbacks.confirm, true).id = 'export-review-retry';
@@ -296,7 +299,7 @@
     },
     finish(snapshot, result) {
       if (current?.snapshot !== snapshot) return;
-      busy = false; current.result = result;current.builtAt=new Date().toISOString(); lastResult = current;
+      busy = false; current.result = result;current.builtAt=new Date().toISOString(); current.fresh = true; lastResult = current;
       lastButton.hidden = false; lastButton.disabled = false;
       lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();

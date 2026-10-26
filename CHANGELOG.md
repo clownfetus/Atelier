@@ -5,6 +5,64 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Opening a costume in Model Studio carries its artwork onto the stage while the
+  model decodes, keeps it behind the arriving geometry, and wipes it away with the
+  reveal sweep. Calm fades it; Off and failed loads show no motion.
+- Fold the Home hero wall into one row of avatars while you scroll the categories;
+  scrolling back up at the top or moving keyboard focus to a hero unfolds it.
+- Deal the mod card in as the export result, open and directly under the outcome,
+  with its asset total rolling up after a fresh build.
+- Reduce Krackle's twelve edge gestures to four that each mean one thing: Arrive,
+  Trace, Seal and Release. Context menus no longer draw edge ink over their own
+  opening, and Try Krackle in Settings previews the four gestures.
+- Show one launch dialog at a time: an available update waits for first-run setup.
+- Keep update reminders in the toolbar row instead of over Activity and Menu.
+- Add spring, emphasized-easing, elevation, shape, text-size and stacking tokens;
+  dark mode gets visible shadows, the global search results regain their shadow,
+  and supporting text is never smaller than 11px. Loading previews use the Krackle
+  dot screen, file glyphs sit on tonal plates, and "Preview unavailable" is legible
+  over transparency.
+- Add each completed texture to the Mod tray immediately during multiple imports,
+  preserve export selections, and show "Ready to edit" after its tray entry appears.
+- Choose normal standing idles for gameplay models and lobby idles for lobby
+  models, fixing Hela's Redeemed skin being given an incompatible lobby animation.
+  Try the next listed idle when a skin cannot use the preferred clip.
+- Enlarge hero icons in the Mod tray, breadcrumbs, Continue and asset pickers.
+
+- Fix Luna Snow's noise and reflection inputs in Blender exports, keep repeated
+  material slots distinct, and preserve baked lower-detail materials during
+  sculpts. Section visibility follows each detail level's actual material map.
+- Preserve complete cooked export bytes when moving complex meshes into a
+  Skin Swapper package, including their physics and morph metadata.
+
+- Detect Skin Swapper forms from each mesh's game ShapeID and show the result
+  read-only, so Cloak exports as form 1. Reuse the bundled Galacta template during
+  isolated setup and require the complete pair in Windows installers.
+- Open the VFX editor when clicking an effect even when automatic opening after
+  import is disabled, instead of reporting it ready without showing any controls.
+
+- Add optional **Assembly View** beside Inspect and Showcase: select a model
+  surface to inspect its geometry, verified material and connected texture slots.
+  Texture and material selections highlight their actual users. Reuse material,
+  texture, UV and Blender workflows, retain camera context across editor visits,
+  and load small texture previews only when needed. Unverified assignments and
+  unavailable VFX references are explained explicitly.
+
+- Add **VFX Motionboard** to the Niagara editor: synchronized editable LUT tracks,
+  playback and scrubbing, original/edited comparison, per-point and per-track
+  restores, local track organisation and 2D particle proxy arrangements. Existing
+  gradient controls, bulk editing and the Niagara export format remain available.
+- Preserve untouched Niagara LUTs during saves/exports and validate edited export
+  dimensions. Proxy inputs use precise named bindings or explicit manual choices;
+  inferred categories do not claim Unreal rendering or simulation accuracy.
+
+- Add **Bulk edit materials** to material folders and **Bulk materials** inside
+  the material editor. Select all or clear the selection, then review and save
+  opacity, named scalar, colour, parent or full material changes for up to 1,000
+  assets at once. Missing scalar overrides are reported as unchanged.
+- Preserve batch parent changes during export, reject recursive parent chains,
+  and keep reviewed material saves and their option changes recoverable together.
+
 ## 1.1.1 — 22 October 2026
 
 ### Asset pipeline and layout

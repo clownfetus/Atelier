@@ -11,7 +11,7 @@ from atelier import config, hostos
 from atelier.paths import pak_game_path
 
 _decode_lock = threading.Lock()
-_STANDING = re.compile(r"^(?:lobby_)?(?:stand(?:ing)?_?idle|idle_?stand(?:ing)?)$", re.I)
+_STANDING = re.compile(r"^(?:(?:lobby_)?(?:stand(?:ing)?_?idle|idle_?stand(?:ing)?)|idle_n)$", re.I)
 
 
 def idle_candidates(mesh_rel):
@@ -21,6 +21,7 @@ def idle_candidates(mesh_rel):
         return []
     hero, skin, mesh_path = match.groups()
     rig = mesh_path.split('/')[0] if '/' in mesh_path else hero
+    lobby_mesh = bool(re.search(r'_lobby(?:_|$)', mesh_path.rsplit('/', 1)[-1], re.I))
     from atelier.index import ensure_index
     candidates = []
     from atelier.index import prefix_entries
@@ -35,9 +36,13 @@ def idle_candidates(mesh_rel):
         game_rel = path[:-7]
         same_rig = f"/animations/{rig.lower()}/" in path.lower()
         same_skin = path.lower().startswith(f"characters/{hero}/{skin}/")
+        # The game body and the lobby body can use different skeletons for the
+        # same costume. Idle_N is the normal gameplay idle; a lobby mesh keeps
+        # preferring its full-body lobby clip. Native hierarchy checks still apply.
+        gameplay_idle = name.lower() == 'idle_n'
         candidates.append({"name": name, "game_rel": game_rel,
                            "label": f"{name} · {path.split('/')[2]}",
-                           "_rank": (not same_rig, not same_skin, path.lower())})
+                           "_rank": (not same_rig, gameplay_idle == lobby_mesh, not same_skin, path.lower())})
     candidates.sort(key=lambda item: item.pop('_rank'))
     return candidates[:24]
 

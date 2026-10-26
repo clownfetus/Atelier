@@ -28,11 +28,11 @@
   background: linear-gradient(90deg, var(--library-hero-surface) 25%, transparent 44%);
 }
 .library-hero-copy { position: relative; z-index: 2; width: fit-content; max-width: 48%; padding: 22px 24px; }
-.library-hero-copy > span { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); }
+.library-hero-copy > span { font-size: var(--studio-text-micro); letter-spacing: 1.5px; color: var(--muted); }
 .library-hero-copy h2 { display:flex; align-items:center; gap:10px; margin: 8px 0 2px; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
 .library-hero-signature { display: block; width: 132px; height: 36px; max-width: 100%; margin: -2px 0 8px; object-fit: contain; object-position: left center; visibility: hidden; opacity: .45; filter: var(--studio-brand-filter); pointer-events: none; user-select: none; }
 .library-hero-signature.loaded { visibility: visible; }
-.library-hero-copy p { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.library-hero-copy p { margin: 0; color: var(--muted); font-size: var(--studio-text-detail); overflow-wrap: anywhere; }
 /* Both kinds of banner bleed to the header edges; the surface behind the copy keeps it readable. */
 .library-hero-art.nameplate { width: 84%; }
 @media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 14px 20px; } .library-hero-copy h2 { font-size: 24px; } }

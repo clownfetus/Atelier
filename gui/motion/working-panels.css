@@ -1,0 +1,32 @@
+/* The animated SVG replaces the native border paint. Content and layout stay native. */
+.am-working-border {
+  border-color: transparent !important;
+  background-image: var(--am-working-frame), var(--am-working-image) !important;
+  background-origin: border-box, var(--am-working-origin) !important;
+  background-clip: border-box, var(--am-working-clip) !important;
+  background-size: 100% 100%, var(--am-working-size) !important;
+  background-position: 0 0, var(--am-working-position) !important;
+  background-repeat: no-repeat, var(--am-working-repeat) !important;
+  background-attachment: scroll, var(--am-working-attachment) !important;
+  background-blend-mode: normal, var(--am-working-blend) !important;
+}
+.am-working-save {
+  position: relative;
+  color: var(--krackle-energy, var(--acc));
+  display: inline-flex;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+}
+.am-working-dock {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+.am-working-save [data-atelier-motion='material-save'] { --am-material-save-size: 44px; }
+#viewport-head .am-working-save { flex-basis: 36px; width: 36px; height: 36px; }
+#viewport-head .am-working-save [data-atelier-motion='material-save'] { --am-material-save-size: 36px; }

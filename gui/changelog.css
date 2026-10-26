@@ -1,5 +1,5 @@
 /* Keep launch toasts beneath the scrim and clear of the dismissal controls. */
-#changelog-overlay { z-index: 350; }
+#changelog-overlay { z-index: calc(var(--studio-layer-toast) + 50); }
 #changelog-overlay .changelog-modal {
   max-width: 680px;
   max-height: calc(100dvh - 40px);
@@ -16,19 +16,19 @@
   border-radius: var(--studio-shape-small);
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
-  font-size: 12px;
+  font-size: var(--studio-text-detail);
   font-weight: 600;
 }
 .changelog-modal .changelog-intro { padding: 14px 24px 0; flex-shrink: 0; }
 .changelog-body { padding: 18px 24px 24px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .changelog-release + .changelog-release { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 .changelog-release h3 { font: var(--studio-type-title); }
-.changelog-release h4 { margin: 18px 0 8px; font-size: 13px; }
-.changelog-release .changelog-date { margin: 4px 0 14px; font-size: 12px; }
+.changelog-release h4 { margin: 18px 0 8px; font-size: var(--studio-text-label); }
+.changelog-release .changelog-date { margin: 4px 0 14px; font-size: var(--studio-text-detail); }
 .changelog-release ul { padding-left: 20px; margin: 10px 0 0; }
-.changelog-release li { padding-left: 3px; margin: 8px 0; font-size: 13px; line-height: 1.65; }
+.changelog-release li { padding-left: 3px; margin: 8px 0; font-size: var(--studio-text-label); line-height: 1.65; }
 .changelog-release li::marker { color: var(--acc); }
 .changelog-release p + p { margin-top: 10px; }
 .changelog-release code { font-size: .92em; overflow-wrap: anywhere; }
 .changelog-modal .setup-foot .modal-row { justify-content: space-between; align-items: center; flex-wrap: wrap; }
-.changelog-link { font-size: 13px; }
+.changelog-link { font-size: var(--studio-text-label); }

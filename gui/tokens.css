@@ -68,7 +68,11 @@
   --studio-icon-environment: #3e7058;
   --studio-icon-movie: #735982;
   --studio-scrim: rgb(20 24 30 / 40%);
-  --studio-shadow: 0 12px 36px rgb(20 24 30 / 14%);
+  /* One elevation scale: resting cards, floating menus/popups/toasts, and dialogs. */
+  --studio-elevation-card: 0 1px 2px rgb(20 24 30 / 8%);
+  --studio-elevation-menu: 0 8px 24px rgb(20 24 30 / 16%);
+  --studio-elevation-dialog: 0 18px 64px rgb(20 24 30 / 30%);
+  --studio-shadow: var(--studio-elevation-menu);
 
   --studio-font: 'Roboto', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   --studio-display: 'Bricolage Grotesque', var(--studio-font);
@@ -77,12 +81,18 @@
   --studio-type-body: 400 14px/1.5 var(--studio-font);
   --studio-type-label: 500 13px/1.4 var(--studio-font);
   --studio-type-detail: 400 12px/1.5 var(--studio-font);
+  /* Text sizes. 11px is the floor for eyebrows, badges and paths; display sizes stay with their components. */
+  --studio-text-micro: 11px;
+  --studio-text-detail: 12px;
+  --studio-text-label: 13px;
+  --studio-text-body: 14px;
   --studio-space-1: 4px;
   --studio-space-2: 8px;
   --studio-space-3: 12px;
   --studio-space-4: 16px;
   --studio-space-6: 24px;
   --screen-dot:rgb(18 18 22 / 12%);
+  --studio-shape-xs: 4px;
   --studio-shape-small: 6px;
   --studio-shape-medium: 8px;
   --studio-shape-large: 6px;
@@ -94,7 +104,23 @@
   --studio-motion-exit: 120ms;
   --studio-easing: cubic-bezier(.2, 0, 0, 1);
   --studio-easing-exit: cubic-bezier(.3, 0, 1, 1);
+  /* Large surfaces travelling into place decelerate harder than ordinary state changes. */
+  --studio-easing-emphasized: cubic-bezier(.05, .7, .1, 1);
+  /* Damped springs for things that land: snappy (ζ .72, 4% overshoot) and bouncy (ζ .5, 16%).
+     Each duration is its spring's own settle time. Engines without linear() keep these overshoot beziers. */
+  --studio-spring-snappy: cubic-bezier(.22, .8, .32, 1.12);
+  --studio-spring-bouncy: cubic-bezier(.34, 1.56, .64, 1);
+  --studio-spring-snappy-duration: 340ms;
+  --studio-spring-bouncy-duration: 610ms;
   --krackle-beat: 1040ms;
+  /* Global stacking bands, lowest first. Neighbours inside a band are offsets from it; stacking
+     within one component keeps small local numbers. Model Studio is its own band above the library. */
+  --studio-layer-float: 150;
+  --studio-layer-overlay: 200;
+  --studio-layer-toast: 300;
+  --studio-layer-menu: 400;
+  --studio-layer-workspace: 2200;
+  --studio-layer-top: 10000;
   --studio-control-height: 36px;
   --studio-icon-size: 18px;
 
@@ -122,6 +148,15 @@
   --card-w: 156px;
   --studio-hover: color-mix(in srgb, var(--text) 8%, transparent);
   --studio-primary-hover: color-mix(in srgb, var(--md-sys-color-on-primary) 8%, var(--acc));
+}
+
+/* The springs above as sampled unit-step responses, x(t) = 1 - e^(-ζωt)(cos ω_d t + ζω/ω_d · sin ω_d t),
+   evenly spaced up to the point where they stay within 0.2% of rest. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --studio-spring-snappy: linear(0, 0.053, 0.179, 0.334, 0.493, 0.638, 0.76, 0.857, 0.929, 0.979, 1.011, 1.029, 1.037, 1.038, 1.035, 1.03, 1.024, 1.018, 1.012, 1.008, 1.005, 1);
+    --studio-spring-bouncy: linear(0, 0.087, 0.291, 0.536, 0.767, 0.951, 1.077, 1.144, 1.163, 1.149, 1.116, 1.076, 1.038, 1.008, 0.988, 0.977, 0.973, 0.976, 0.981, 0.988, 0.994, 0.999, 1.002, 1.004, 1.004, 1.004, 1.003, 1);
+  }
 }
 
 :root[data-theme='dark'] {
@@ -176,5 +211,8 @@
   --studio-icon-environment: #83bb9d;
   --studio-icon-movie: #b9a0cb;
   --studio-scrim: rgb(0 0 0 / 56%);
-  --studio-shadow: 0 12px 36px rgb(0 0 0 / 36%);
+  /* Near-black surfaces need far denser shadows before elevation reads at all. */
+  --studio-elevation-card: 0 1px 2px rgb(0 0 0 / 45%);
+  --studio-elevation-menu: 0 8px 24px rgb(0 0 0 / 48%);
+  --studio-elevation-dialog: 0 18px 64px rgb(0 0 0 / 62%);
 }

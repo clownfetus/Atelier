@@ -109,9 +109,13 @@ def run_surfaces_checks(page,context,url,report,checks):
         tab.evaluate("window.actionCount=0;window.popButton=document.createElement('button');popButton.className='btn primary';popButton.textContent='Immediate fixture';popButton.style='position:fixed;top:80px;left:300px;z-index:1000';popButton.onclick=()=>actionCount++;document.body.append(popButton)")
         for value in ['full','calm','off']:
             mode(value);tab.locator('button',has_text='Immediate fixture').click();assert tab.evaluate('actionCount')==['full','calm','off'].index(value)+1
-            if value!='full':assert not tab.locator('.k-button-pop').count()
-            tab.wait_for_timeout(230)
-        tab.evaluate('popButton.remove()')
+            if value!='full':assert not tab.locator('.k-workflow-svg[data-workflow-trigger=action],.k-workflow-link').count()
+            else:
+                # The receiving SVG may wait for a finite native entrance before measuring its edges.
+                tab.wait_for_selector('.k-workflow-svg[data-workflow-trigger=action]')
+                assert tab.locator('.k-workflow-svg[data-workflow-trigger=action]').count()==1
+                assert not tab.locator('.k-workflow-canvas').count()
+            tab.wait_for_function("!document.querySelector('.k-workflow-svg,.k-workflow-link')")
         tab.evaluate("""() => {
           window.buildDone=beginExportFeedback(atelierProject());
           const host=document.getElementById('install-btn-motion-host');
@@ -124,12 +128,14 @@ def run_surfaces_checks(page,context,url,report,checks):
           try{AtelierSurfaces.updateDrop('fallback',()=>window.fallbackOpened=true);}finally{Element.prototype.animate=animate;}
         }""")
         tab.locator('.k-update-drop').click();assert tab.evaluate('fallbackOpened')
+        mode('full');tab.locator('button',has_text='Immediate fixture').click()
+        tab.wait_for_selector('.k-workflow-svg[data-workflow-trigger=action]')
         tab.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
-        assert not tab.locator('.k-button-pop,.k-project-fall').count()
-        tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))")
-        checks.append('Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose transient bubbles')
+        assert not tab.locator('.k-workflow-svg,.k-workflow-link,.k-workflow-canvas,.k-project-fall').count()
+        tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));popButton.remove()")
+        checks.append('Real results interrupt the Build drop immediately; missing Canvas/WAAPI retain usable controls and hidden documents dispose active SVG gestures and connections')
         assert tab.evaluate("Object.keys(AtelierCategoryEmblems.names).length===36")
-        checks.append('Update drops stay nonblocking; primary actions fire immediately while bubbles are Full-only; all 36 category emblems are available')
+        checks.append('Update drops stay nonblocking; primary actions fire immediately while SVG edge gestures are Full-only; all 36 category emblems are available')
         escaped=tab.evaluate("""() => {
           const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),out=[];svg.setAttribute('viewBox','0 0 24 24');document.body.append(svg);
           try{for(const cls of Object.keys(AtelierCategoryEmblems.names))for(const scale of [24,102]){
@@ -159,8 +165,12 @@ def run_surfaces_checks(page,context,url,report,checks):
             })""")
         energy={};thumbs={};surfaces={}
         tab.mouse.move(0,0)  # A hovered card paints --bg3; measure the resting card.
+        # Theme colours can transition independently on the card and thumbnail.
+        # Contrast describes the selected settled palette, not an intermediate frame.
+        settled="surface=>{const card=document.querySelector('#grid-area .card'),probe=document.createElement('i');probe.style.color='var('+surface+')';card.append(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(card).backgroundColor===color;}"
         for theme in ['light','dark']:
             tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
+            tab.wait_for_function(settled,arg='--bg2')
             inks=emblem_inks()
             assert len(inks)==2 and len({ink['mask'] for ink in inks})==2 and inks[0]['energy']!=inks[1]['energy'],inks
             for ink in inks:
@@ -171,7 +181,6 @@ def run_surfaces_checks(page,context,url,report,checks):
             tab.locator('#grid-area .grid').screenshot(path=str(report/f'category-emblems-app-{theme}.png'),animations='disabled')
             # Hovered, the body paints --bg3, so its edited corner takes the raised charge; the emblem keeps its ink.
             card=tab.locator('#grid-area .card').first;card.evaluate("node=>node.classList.add('imported')");card.hover()
-            settled="surface=>{const card=document.querySelector('#grid-area .card'),probe=document.createElement('i');probe.style.color='var('+surface+')';card.append(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(card).backgroundColor===color;}"
             tab.wait_for_function(settled,arg='--bg3')
             hovered=tab.evaluate("""() => {const card=document.querySelector('#grid-area .card'),corner=getComputedStyle(card,'::after').backgroundColor;
               return {corner,contrast:AtelierKrackleInks.contrast(corner,getComputedStyle(card).backgroundColor),energy:getComputedStyle(card.querySelector('.k-category-emblem-energy > *')).fill};}""")

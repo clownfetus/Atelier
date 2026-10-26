@@ -20,7 +20,7 @@
       const motion = window.AtelierMotion.polish.mount(el,{frames,duration,state:'playing'});
       motion.finished.catch(() => {}).finally(() => motion.destroy()); return motion;
     }
-    try { return el.animate(frames, {duration, easing: 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+    try { return el.animate(frames, {duration, easing: window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
   }
   async function transition(update, before, after, fallback) {
     if (active) {
@@ -96,13 +96,17 @@
       hero.avatar||'/api/catalogue/hero/'+match[1].split('/')[1]+'/avatar',
       hero.thumbnail||'/api/catalogue/thumbnail/'+match[1].split('/')[1],story,
     ].filter(Boolean))];
+    let identityColoured = false;
     const tint=(index=0)=>{
       if(!current()||index>=sources.length)return;
       const source=new Image();
       source.onload=()=>{
         if(!current())return;
         const colour=window.AtelierPolish?.accent(source);
-        if(colour){host.style.setProperty('--library-art-colour',colour);host.classList.add('has-art-colour');}
+        if(colour){
+          host.style.setProperty('--library-art-colour',colour);host.classList.add('has-art-colour');
+          identityColoured = true; window.AtelierPolish?.artwork(source);
+        }
         else tint(index+1);
       };
       source.onerror=()=>tint(index+1);source.src=sources[index];
@@ -114,7 +118,10 @@
     const showNameplate = on => { image.classList.toggle('nameplate', on); host.classList.toggle('has-nameplate', on); };
     let sourceIndex = 0;
     const nextSource = () => { showNameplate(sourceIndex < plates.length); image.src = bannerSources[sourceIndex++]; };
-    image.onload = () => { if(current()&&image.isConnected){host.classList.add('has-art'); window.AtelierPolish?.artwork(image);} };
+    image.onload = () => { if(current()&&image.isConnected){
+      host.classList.add('has-art');
+      if (!identityColoured) window.AtelierPolish?.artwork(image);
+    } };
     image.onerror = () => {
       if(!current())return;
       if (sourceIndex < bannerSources.length) { nextSource(); return; }

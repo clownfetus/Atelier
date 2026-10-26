@@ -64,6 +64,25 @@ class TemplateInstallation(unittest.TestCase):
         for name in ST.FILES:
             self.assertEqual((self.destination / name).read_bytes(), (self.source / name).read_bytes())
 
+    def test_bundled_pair_is_discovered_without_a_manual_source(self):
+        for name in ST.FILES:
+            (self.destination / name).unlink()
+        self.assertEqual(ST.find_bundled_template(self.destination, [self.source]), self.source)
+        ST.install_template(ST.find_bundled_template(self.destination, [self.source]), self.destination)
+        self.assertEqual(ST.find_bundled_template(self.destination, [self.source]), self.destination)
+
+    def test_a_half_pair_is_never_combined_with_another_directory(self):
+        (self.destination / ST.FILES[1]).unlink()
+        (self.source / ST.FILES[0]).unlink()
+        with self.assertRaisesRegex(ValueError, "No bundled"):
+            ST.find_bundled_template(self.destination, [self.source])
+
+    def test_reusing_the_installed_pair_does_not_republish_it(self):
+        with patch.object(ST.storage, "publish_files") as publish:
+            ST.install_template(self.destination, self.destination)
+        publish.assert_not_called()
+        self.previous_pair_intact()
+
 
 if __name__ == "__main__":
     unittest.main()

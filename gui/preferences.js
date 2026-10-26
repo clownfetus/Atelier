@@ -41,20 +41,27 @@
     const point = origin; origin = null; reveal?.skipTransition();
     let current;try{current=document.startViewTransition(update);}catch(_){release();return false;}reveal = current;
     current.ready.then(() => {
-      const radius = Math.hypot(Math.max(point.x, innerWidth-point.x), Math.max(point.y, innerHeight-point.y));
-      const wave=scale=>{
-        let path='';for(let i=0;i<8;i++){const angle=i/8*Math.PI*2,r=Math.max(.1,radius*scale*(.78+i%3*.08));
-          const x=point.x+Math.cos(angle)*radius*.22*scale,y=point.y+Math.sin(angle)*radius*.22*scale;
-          path+=`M${x-r} ${y}a${r} ${r} 0 1 0 ${2*r} 0a${r} ${r} 0 1 0 ${-2*r} 0Z`;
-        }return `path('${path}')`;
+      if(reveal!==current||document.hidden||!window.AtelierMotionPolicy.allows(2)){current.skipTransition();return;}
+      // A print wash crosses the page from the chosen control's side. The modest
+      // scalloped leading edge belongs to the sheet, never a floating screen-sized arc.
+      const fromRight=point.x>innerWidth/2;
+      const wash=front=>{
+        const x=value=>fromRight?innerWidth-value:value;
+        const points=[`${x(-24)}px -24px`,`${x(front)}px -24px`];
+        for(let i=0;i<=12;i++)points.push(`${x(front+(i%2?5:-5))}px ${innerHeight*i/12}px`);
+        points.push(`${x(front)}px ${innerHeight+24}px`,`${x(-24)}px ${innerHeight+24}px`);
+        return `polygon(${points.join(',')})`;
       };
-      themeAnimation = document.documentElement.animate({clipPath:[wave(.001),wave(1.5)]},
-        {duration:240,easing:'cubic-bezier(.2,0,0,1)',pseudoElement:'::view-transition-new(root)'});
+      themeAnimation = document.documentElement.animate({clipPath:[wash(-12),wash(innerWidth+12)]},
+        {duration:300,easing:'cubic-bezier(.3,0,.2,1)',pseudoElement:'::view-transition-new(root)'});
+      themeAnimation.finished.catch(()=>{});
     }).catch(() => {});
-    current.finished.catch(() => {}).finally(() => {release(); if (reveal === current) reveal = null; });
+    current.finished.catch(() => {}).finally(() => {release(); if (reveal === current) {reveal = null;themeAnimation = null;} });
     return true;
   }
   changes.addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(2)) { themeAnimation?.cancel(); reveal?.skipTransition(); } });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){themeAnimation?.cancel();reveal?.skipTransition();}});
+  window.addEventListener('pagehide',()=>{themeAnimation?.cancel();reveal?.skipTransition();});
   window.AtelierPreferences = Object.freeze({revealTheme, adaptive:() => adaptive});
   apply();
   document.addEventListener('DOMContentLoaded', () => {

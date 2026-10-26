@@ -10,7 +10,7 @@ docs/skin-swapper-testing.md for the whole test. This script:
   2. installs Atelier's native tools into <DataDir>\Tools, copied from an existing Atelier
      install (-ToolsFrom) or unpacked from the hash-pinned 0.4.1 release installer, which is
      extracted and never run;
-  3. copies your GAL_ConfigTemplate.uasset and .uexp into <DataDir>\Tools\Galacta;
+  3. reuses the bundled Skin Swapper template, or installs an explicit publisher override;
   4. asks Atelier itself whether Skin Swapper export is available;
   5. starts Atelier in a desktop window when you pass -Launch.
 
@@ -19,7 +19,8 @@ The template stays on your machine: <DataDir> is outside the checkout, and git i
 GAL_ConfigTemplate.* everywhere.
 
 .PARAMETER Template
-Folder that holds GAL_ConfigTemplate.uasset and GAL_ConfigTemplate.uexp.
+Optional publisher override: a folder holding GAL_ConfigTemplate.uasset and .uexp.
+Normally the complete pair is copied automatically from -ToolsFrom.
 
 .PARAMETER DataDir
 Atelier's isolated data folder: configuration, projects, exports, logs and tools.
@@ -27,17 +28,17 @@ Put it on the same drive as Marvel Rivals so the 3D viewer can keep installed mo
 its reads (it hardlinks the game's containers).
 
 .PARAMETER ToolsFrom
-An existing Atelier 0.4.x install folder (the one holding Atelier.exe and Tools\) to copy
-the native tools from, instead of downloading the 0.4.1 installer (about 150 MB).
+A current Atelier install folder (the one holding Atelier.exe and Tools\) to copy
+native tools and the bundled template from, instead of downloading historical tools.
 
 .PARAMETER Launch
 Start Atelier in a desktop window when setup finishes.
 
 .EXAMPLE
-.\scripts\Setup-SkinSwapperTest.ps1 -Template D:\Galacta\template -DataDir D:\AtelierGalactaTest -Launch
+.\scripts\Setup-SkinSwapperTest.ps1 -ToolsFrom C:\Atelier -DataDir D:\AtelierGalactaTest -Launch
 #>
 param(
-    [Parameter(Mandatory)][string]$Template,
+    [string]$Template,
     [string]$DataDir = (Join-Path $env:LOCALAPPDATA 'AtelierSkinSwapperTest'),
     [string]$ToolsFrom,
     [switch]$Launch
@@ -92,6 +93,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Installing requirements.txt failed; see the pi
 Write-Host "Python: $python"
 
 Step 'Native tools'
+$source = $null
 New-Item -ItemType Directory -Force -Path $tools | Out-Null
 if (Missing-Tools) {
     if ($ToolsFrom) {
@@ -122,9 +124,18 @@ if (Missing-Tools) {
 Write-Host "Tools: $tools"
 
 Step 'Skin Swapper template'
-$templateDir = [IO.Path]::GetFullPath($Template)
 $galacta = Join-Path $tools 'Galacta'
-& $python (Join-Path $root 'scripts\stage_galacta_template.py') --source $templateDir --destination $galacta
+$templateArgs = @('--destination', $galacta)
+if ($Template) {
+    $templateArgs += @('--source', [IO.Path]::GetFullPath($Template))
+} else {
+    if ($ToolsFrom) {
+        $templateArgs += @('--bundled-from', (Join-Path ([IO.Path]::GetFullPath($ToolsFrom)) 'Tools\Galacta'))
+    }
+    if ($source) { $templateArgs += @('--bundled-from', (Join-Path $source 'Galacta')) }
+    $templateArgs += @('--bundled-from', (Join-Path $root 'Tools\Galacta'))
+}
+& $python (Join-Path $root 'scripts\stage_galacta_template.py') @templateArgs
 if ($LASTEXITCODE -ne 0) { throw 'Installing the template pair failed. See the error above for recovery details.' }
 
 Step 'Asking Atelier whether Skin Swapper export is available'

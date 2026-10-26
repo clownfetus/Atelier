@@ -289,6 +289,22 @@ def spinner_masks():
     return mask_uri(base), mask_uri(crest)
 
 
+def fluid_spinner_masks():
+    """A source, continuous S-shaped conduit and catch plate with true holes."""
+    conduit = 'M5 5C5 9 10 7 10 11C10 15 16 12 16 18'
+    source = 'M1.5 4C1.5 1 5.5 .7 7.5 2.6C9 4.2 7.1 7 5.2 7.5C3 8 1.2 6.4 1.5 4Z'
+    receiver = 'M10 18C10 15.8 13.1 15 16 15C19 15 22.5 16.3 22.5 18.2C22.5 20.8 18.5 22 15.5 21.5C12 21.4 9.5 20.1 10 18Z'
+    holes = ("<defs><mask id='h' maskUnits='userSpaceOnUse' x='0' y='0' width='24' height='24'>"
+             "<rect width='24' height='24' fill='white'/><circle cx='4.5' cy='3.8' r='.85' fill='black'/>"
+             "<circle cx='16.8' cy='18.4' r='1.15' fill='black'/><circle cx='12.9' cy='18.8' r='.55' fill='black'/>"
+             "</mask></defs>")
+    def silhouette(width):
+        return mask_uri(holes + "<g mask='url(#h)' fill='white'>"
+                        + f"<path d='{conduit}' fill='none' stroke='white' stroke-width='{width}' stroke-linecap='round' stroke-linejoin='round'/>"
+                        + f"<path d='{source}'/><path d='{receiver}'/></g>")
+    return silhouette(3.8), silhouette(6.4)
+
+
 # ── writing ───────────────────────────────────────────────────────────────────
 # One ink per category, so no two emblems share a colour. Every ink has a relative luminance near
 # .207, which reads at 3:1 on Studio's cards and thumbs in both themes (#eef0f3/#e4e7eb, #1e2126/#2b2f35),
@@ -477,6 +493,8 @@ def targets():
             out.setdefault(MOTION / f'{name}.js', []).append((name, f'  var SVG_INNER = {js_literal(inner)};', 'js'))
     base, crest = spinner_masks()
     out.setdefault(MOTION / 'krackle.css', []).append(('spinner', f'  --krackle-ring-mask: {base};\n  --krackle-crest-mask: {crest};', 'css'))
+    fluid, pressure = fluid_spinner_masks()
+    out.setdefault(MOTION / 'krackle.css', []).append(('fluid-spinner', f'  --krackle-fluid-mask: {fluid};\n  --krackle-fluid-pressure-mask: {pressure};', 'css'))
     corner='M0 0H24V24Z'
     for x,y,r in [(10,3,1.3),(17,4,2),(20,10,1.6)]:
         corner+=f'M{n(x+r)} {y}a{r} {r} 0 1 0 {-2*r} 0a{r} {r} 0 1 0 {2*r} 0Z'

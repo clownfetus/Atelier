@@ -329,9 +329,10 @@ Skin Swapper, which its Companion App then loads.
    own BLEND, FBX, GLB or PSK file, then select it under **Mod tray**.
 2. Set the mod filename. It becomes the Galacta folder name, so use letters,
    digits and underscores only.
-3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The hero
-   and skin come from the mesh and cannot be changed. Enter the skin name and
-   author, and pick a form for multi-form heroes (Form 0 is the default).
+3. Click **Build mod** and choose **Skin Swapper mod (Project Galacta)**. The
+   hero, skin and form come from the mesh and cannot be changed. Enter the skin
+   name and author. Multi-form mesh names supply their ShapeID automatically;
+   meshes without a ShapeID use form 0.
 4. Click **Build Skin Swapper mod**, then add the mod in the Companion App.
 
 The mod holds only your mesh and a Galacta config for it, under

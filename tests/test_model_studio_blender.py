@@ -73,6 +73,38 @@ class BlenderPort(unittest.TestCase):
              patch.object(meshedit._mesh, 'Mesh'), self.assertRaisesRegex(ValueError, 'true or false'):
             meshedit.extract_blend('Meshes/SK_Body', base_path='source', project_textures='false')
 
+    def test_duplicate_slot_names_round_trip_as_distinct_geometry_without_changing_the_cooked_table(self):
+        from test_blender_import import FakeMesh
+        model = FakeMesh()
+        model.lods[0]['col_off'] = None
+        model.materials = [{'slot_name':'Shared', 'pkg_idx':-1}, {'slot_name':'Shared', 'pkg_idx':-2}]
+        before = json.loads(json.dumps(model.materials))
+        path = self.root/'duplicate-slots.glb'
+        mesh.export_glb(model, 0, str(path))
+        document, _ = mesh.load_glb(str(path))
+        self.assertEqual([m['name'] for m in document['materials']], ['Shared', 'Shared__slot_1'])
+        sections = mesh.glb_to_sections(model, 0, str(path))
+        self.assertEqual([len(section['positions']) for section in sections], [16, 16])
+        for section, original in zip(sections, model.lods[0]['sections']):
+            start = original['base_vertex']
+            np.testing.assert_allclose(section['positions'], model.pos[start:start+16], atol=1e-5)
+        self.assertEqual(model.materials, before)
+
+    def test_generated_slot_keys_cannot_collide_with_real_slot_names(self):
+        names = ['Shared', 'Shared', 'Shared__slot_1', 'Shared__slot_1_']
+        keys = mesh.material_slot_names([{'slot_name':name} for name in names])
+        self.assertEqual(keys, ['Shared', 'Shared__slot_1__', 'Shared__slot_1', 'Shared__slot_1_'])
+
+    def test_duplicate_slot_manifest_keeps_each_imported_material(self):
+        model = types.SimpleNamespace(materials=[{'slot_name':'Shared'}, {'slot_name':'Shared'}])
+        slots = [{'slot':'Shared', 'mi':mi, 'maps':[], 'parameters':{}} for mi in (self.child, self.parent)]
+        with patch.object(meshmat, 'resolve_mesh_materials', return_value=slots), \
+                patch.object(meshmat, 'resolve_mesh_textures', side_effect=lambda value:value), \
+                patch.object(meshmat, 'extract_textures_to_project', return_value={}):
+            result = meshmat.build_manifest('Meshes/SK_Body', model)
+        self.assertEqual({key:value['mi'] for key,value in result['slots'].items()},
+                         {'Shared':self.child, 'Shared__slot_1':self.parent})
+
     def test_texture_rename_preserves_inline_mips_without_interpreting_pixels_as_headers(self):
         injected=self.root/'encoded.uasset';injected.write_bytes(b'header')
         payload=b'properties'+bytes(range(256))*4+b'inline mips'
@@ -316,7 +348,8 @@ class BlenderPort(unittest.TestCase):
         with patch.object(meshmat,'resolve_mesh_materials',return_value=slots), \
              patch.object(meshmat,'resolve_mesh_textures',side_effect=lambda s:s), \
              patch.object(meshmat,'extract_textures_to_project',return_value={}):
-            result=meshmat.build_manifest('Meshes/SK_Body',None,root=str(self.root/'portable'))
+            model=types.SimpleNamespace(materials=[{'slot_name':record['slot']} for record in slots])
+            result=meshmat.build_manifest('Meshes/SK_Body',model,root=str(self.root/'portable'))
         red=result['slots']['Body']['maps'][0]['path'];blue=result['slots']['Weapon']['maps'][0]['path']
         self.assertNotEqual(red,blue)
         self.assertEqual(Image.open(red).getpixel((0,0)),(255,0,0))

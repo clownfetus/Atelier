@@ -2,7 +2,15 @@
 (() => {
   'use strict';
   const blob=canvas=>new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Image encoding unavailable')),'image/png'));
-  function mount(parent,snapshot,result,{reveal,builtAt=new Date().toISOString()}={}) {
+  // A just-finished build deals the card in (Full only): it flips down onto the result on the bouncy
+  // spring and its asset total rolls up. Re-opened results and other motion modes show it at rest.
+  function deal(card,total) {
+    if(!window.AtelierMotionPolicy?.allows(2)||document.hidden)return;
+    try{card.animate([{opacity:0,transformOrigin:'50% 0',transform:'perspective(900px) rotateX(-68deg) translateY(14px) scale(.96)'},
+      {opacity:1,transformOrigin:'50% 0',transform:'none'}],{duration:window.AtelierMotion?.springMs?.bouncy||610,easing:window.AtelierMotion?.ease?.bouncy||'cubic-bezier(.34,1.56,.64,1)'});}catch(_){}
+    if(total&&window.AtelierPolish?.count){window.AtelierPolish.count(total,'0'.repeat(total.textContent.length));requestAnimationFrame(()=>window.AtelierPolish.count(total,total.dataset.value));}
+  }
+  function mount(parent,snapshot,result,{reveal,builtAt=new Date().toISOString(),anchor=null,entrance=false}={}) {
     const context=window.AtelierModCardData.context(snapshot);if(!(result.ok||result.built)||!context)return ()=>{};
     let disposed=false,image=null,stamp=null,objectUrl=null;
     const controller=new AbortController();
@@ -37,14 +45,18 @@
       }else ctx.fillText(source,34,1168,930);
       ctx.font='400 20px Roboto,sans-serif';ctx.fillText(`Built with Atelier ${version.version} · ${builtAt.slice(0,10)}`,34,1212,930);
       if(disposed)return;
-      const card=document.createElement('details');card.className='mod-card';card.dataset.warning=String(warning);const summary=document.createElement('summary');summary.textContent='Mod card';card.append(summary,canvas);
-      const stats=document.createElement('p');stats.className='mod-card-stats';stats.textContent=countLabel+(warning?` · ${skipped} skipped`:'');card.append(stats);
+      const card=document.createElement('details');card.className='mod-card';card.open=true;card.dataset.warning=String(warning);const summary=document.createElement('summary');summary.textContent='Mod card';card.append(summary,canvas);
+      const stats=document.createElement('p');stats.className='mod-card-stats';
+      const total=document.createElement('span');total.className='mod-card-total';total.dataset.value=String(count.total);total.textContent=total.dataset.value;
+      stats.append(total,countLabel.slice(total.dataset.value.length)+(warning?` · ${skipped} skipped`:''));card.append(stats);
       const provenance=document.createElement('p');provenance.textContent=source+(source==='Catalogue artwork'?' · representative artwork; your applied edits are counted above.':'');card.append(provenance);
       const actions=document.createElement('div');actions.className='mod-card-actions';
       const button=(label,action)=>{const control=document.createElement('button');control.type='button';control.className='btn';control.textContent=label;control.addEventListener('click',async()=>{try{await action();}catch(error){window.toast?.(error.message,'warning');}});actions.append(control);};
       button('Copy image',async()=>{if(!navigator.clipboard?.write||!window.ClipboardItem)throw Error('Image copying is unavailable. Save PNG instead.');await navigator.clipboard.write([new ClipboardItem({'image/png':await blob(canvas)})]);window.toast?.('Mod card copied','success');});
       button('Save PNG',async()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(await blob(canvas));const anchor=document.createElement('a');anchor.href=objectUrl;anchor.download=snapshot.modName.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')+'-Atelier.png';anchor.click();});
-      button('Open export folder',()=>reveal?.());card.append(actions);parent.append(card);
+      button('Open export folder',()=>reveal?.());card.append(actions);
+      if(anchor?.parentElement===parent)anchor.after(card);else parent.append(card);
+      if(entrance)deal(card,total);
     })().catch(()=>{/* A missing capture/artwork skips the optional card. Export remains complete. */});
     return ()=>{disposed=true;controller.abort();if(image)image.src='';if(stamp)stamp.src='';if(objectUrl)URL.revokeObjectURL(objectUrl);};
   }

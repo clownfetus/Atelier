@@ -22,19 +22,19 @@
   width: 100%;
   height: 100%;
   display: block;
-  overflow: visible;
+  overflow: hidden;
   fill: currentColor;
 }
 
 /* Neutral toast surface uses semantic outcome tokens; primary button inherits on-primary foreground */
 .toast [data-atelier-motion="export-feedback"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"] {
-  --am-export-feedback-size: 24px;
+  --am-export-feedback-size: 40px;
 }
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="busy"],
 [data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="busy"] {
-  color: var(--krackle-charge, var(--acc, #335d9f));
+  color: var(--krackle-energy, var(--krackle-charge, var(--acc, #335d9f)));
 }
 
 .toast [data-atelier-motion="export-feedback"][data-am-state="success"],
@@ -98,7 +98,7 @@
 }
 
 [data-atelier-motion="export-feedback"] .am-export-feedback-well {
-  transition: opacity 180ms var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
+  transition: opacity var(--studio-motion-standard, 200ms) var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
 }
 
 /* State: idle — a drop waiting above the tray */
@@ -140,7 +140,10 @@
   display: inline-flex !important;
 }
 
-.toast .am-export-feedback-slot { width: 24px; height: 24px; }
+.toast .am-export-feedback-slot { width: 40px; height: 40px; }
+.toast .am-export-feedback-slot > .am-export-feedback-fallback { width: 40px; height: 40px; }
+#install-btn .am-export-feedback-slot { width: 28px; height: 28px; }
+#install-btn [data-atelier-motion="export-feedback"] { --am-export-feedback-size: 28px; }
 .toast.am-export-feedback-toast > .am-export-feedback-message { white-space: pre-line; overflow-wrap: anywhere; }
 .toast.am-export-feedback-toast.error { border-color: var(--md-sys-color-error); cursor: pointer; }
 
@@ -148,4 +151,10 @@
 [data-atelier-motion="export-feedback"][data-am-reduced="true"] * { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   [data-atelier-motion="export-feedback"] * { transition: none; }
+}
+
+/* Busy ink follows the hero; result ink remains semantic. */
+.toast [data-atelier-motion="export-feedback"][data-am-state="busy"] .am-export-feedback-svg,
+[data-am-surface="toast"][data-atelier-motion="export-feedback"][data-am-state="busy"] .am-export-feedback-svg {
+  color: var(--am-local-charge, var(--krackle-energy, currentColor));
 }

@@ -18,13 +18,22 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BROWSER_SUITES = {
+    "assembly_browser_checks.py": "--assembly-only",
     "shared_identity_checks.py": "--shared-identity-only",
     "texture_workflow_checks.py": "--texture-workflows-only",
     "browser_smoke.py": None,
+    "material_bulk_browser_checks.py": "--material-bulk-only",
+    "motionboard_browser_checks.py": "--motionboard-only",
     "surfaces_checks.py": "--surfaces-only",
+    "working_panels_checks.py": "--working-panels-only",
+    "fluid_work_checks.py": "--working-panels-only",
+    "workflow_motion_checks.py": "--workflow-motion-only",
+    "context_ink_checks.py": "--workflow-motion-only",
+    "ink_flow_checks.py": "--workflow-motion-only",
     "polish_checks.py": "--polish-only",
     "appearance_checks.py": "--appearance-only",
     "review_followup_checks.py": "--review-followups-only",
+    "skin_swapper_review_checks.py": "--skin-swapper-only",
     "viewer_followup_checks.py": "--viewer-followups-only",
     "library_pins_checks.py": "--library-only",
     "inks_dial_checks.py": "--inks-dial-only",

@@ -12,7 +12,7 @@
   --krackle-charge:#2693c6;--krackle-rift:#8a6cff;--krackle-success:#121216;
   --krackle-warn:#9a6b00;--krackle-fault:#c8336a;--krackle-hole:#121216;--krackle-success-hole:#eee5cf;
   --caption-ink:var(--krackle-charge);
-  color:#121216;background:#eee5cf;border:1px solid #121216;border-radius:4px;
+  color:#121216;background:#eee5cf;border:1px solid #121216;border-radius:var(--studio-shape-xs);
   border-left:4px solid var(--caption-ink);box-shadow:2px 3px 8px #12121628;
 }
 :root[data-theme=dark] .toast { box-shadow:4px 4px 0 #121216; }
@@ -21,12 +21,15 @@
 .toast[data-operation-state=error],.toast.error {--caption-ink:var(--krackle-fault);border-left-color:var(--caption-ink);}
 .toast-timed::after { background:var(--caption-ink); }
 .toast-repeat {font-size:0;padding:0;width:calc(var(--repeat-count,1)*8px);height:8px;background:radial-gradient(circle,#121216 2px,transparent 2.2px) 0 0/8px 8px repeat-x;}
-.toast-repeat-number {font-size:12px;width:auto;height:auto;background:none;}
+.toast-repeat-number {font-size:var(--studio-text-detail);width:auto;height:auto;background:none;}
 .toast .toast-undo {background:#eee5cf;color:#121216;border-color:#121216;}
 #sel-count {display:inline-flex;align-items:center;gap:5px;}
 #sel-count::before {content:'';width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 28%,#eee5cf 0 1px,transparent 1.2px),radial-gradient(circle at 65% 68%,#121216 0 2px,transparent 2.2px),var(--krackle-charge);}
-.k-update-drop {position:fixed;top:0;right:70px;width:40px;height:40px;border:0;background:var(--bg2);color:var(--krackle-charge);border-radius:0 0 6px 6px;z-index:210;cursor:pointer;display:grid;place-items:center;}
-.k-update-drop+ .k-update-drop {right:116px;}
+/* Update drops sit in the topbar row before Activity, so toolbar labels never collide with them. */
+.k-update-drop {flex:0 0 auto;width:36px;height:36px;margin-left:8px;padding:0;border:1px solid var(--border);border-radius:var(--studio-shape-small);background:transparent;color:var(--krackle-charge);cursor:pointer;display:grid;place-items:center;}
+.k-update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}
+.k-update-drop > span {width:22px;height:22px;}
+[data-density=compact] .k-update-drop {width:30px;height:30px;}
 .k-startup-stage {margin:auto;}
 #startup-splash[data-launch=true] > img {display:none;}
 #startup-splash[data-launch=true] > progress {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
@@ -35,14 +38,15 @@
 :root:not([data-krackle=full]) .k-startup-stage {display:none;}
 .k-index-failure {flex-shrink:0;}
 .toast:has(.k-index-failure) {max-width:520px;flex-wrap:wrap;}
-.card.k-texture-pool {outline:3px solid var(--krackle-charge);outline-offset:-4px;}
-.card.k-texture-pool::before {content:'';position:absolute;inset:4px;pointer-events:none;border-radius:3px;background:radial-gradient(circle at 0 25%,var(--krackle-charge) 0 6px,transparent 6.5px),radial-gradient(circle at 100% 65%,var(--krackle-charge) 0 7px,transparent 7.5px),radial-gradient(circle at 50% 0,var(--krackle-rift) 0 6px,transparent 6.5px);}
-.k-project-drop {width:48px;height:48px;display:grid;place-items:center;border:0;background:var(--bg2);color:var(--krackle-charge);cursor:pointer;}
+.card.k-texture-pool {outline:2px solid var(--krackle-energy, var(--acc));outline-offset:-4px;}
+.card.k-texture-pool::before {content:'';position:absolute;inset:auto 8px 7px;height:3px;pointer-events:none;border-radius:2px;background:var(--krackle-energy, var(--acc));}
+.k-project-drop {width:48px;height:48px;display:grid;place-items:center;border:0;background:var(--bg2);color:var(--krackle-energy, var(--acc));cursor:pointer;}
 .k-project-drop [data-atelier-motion] {width:48px;height:48px;}
-.k-project-fall {position:fixed;z-index:290;pointer-events:none;}
-.hdr-ring {position:absolute;inset:calc(-1 * var(--hdr-radius,4px));border:2px solid var(--swatch-color);border-radius:8px;pointer-events:none;}
+.k-project-drop [data-am-state=info] {color:var(--krackle-energy, var(--acc));}
+.k-project-fall {position:fixed;z-index:calc(var(--studio-layer-toast) - 10);pointer-events:none;}
+.hdr-ring {position:absolute;inset:calc(-1 * var(--hdr-radius,4px));border:2px solid var(--swatch-color);border-radius:var(--studio-shape-medium);pointer-events:none;}
 .hdr-ring i {position:absolute;width:4px;height:4px;margin:-2px;background:#121216;border-radius:50%;}
-.k-button-pop {position:fixed;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--krackle-charge);pointer-events:none;z-index:9999;}
+.k-button-pop {position:fixed;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--krackle-energy, var(--acc));pointer-events:none;z-index:calc(var(--studio-layer-top) - 1);}
 .mod-card {margin-top:18px;border:1px solid var(--border);padding:12px;background:var(--bg2);border-radius:var(--studio-shape-large);}
 .mod-card summary {cursor:pointer;font-weight:600;}
 .mod-card-preview {display:block;width:min(100%,440px);height:auto;margin:12px auto;}
