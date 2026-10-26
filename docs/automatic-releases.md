@@ -72,8 +72,7 @@ Native tool builds are cached by platform and hashes of `native/`, `toolchain/`
 and their build recipes. On a cache miss, the last published release's tools can
 also be reused when native sources, build recipes and the SDK match; their
 download digest and current lockfile/probes must pass. Otherwise they are rebuilt.
-Private
-Skin Swapper templates enter the build after caching and are excluded from test
+Private Skin Swapper templates enter the build after caching and are excluded from test
 report uploads. Marketing screenshots and Discord copy are no longer release
 prerequisites. Existing release-candidate workflows remain available for historical
 verification; use **Release Atelier** for normal updates.
@@ -96,6 +95,6 @@ reuses the local key and uploads it without printing its contents. Key rotation
 requires shipping the new public key in a release still signed by the old key
 before switching release signing.
 
-The first complete hosted release still needs to pass Windows and Linux packaging
-and upgrade gates. `Verify release updater` checks the protocol and frozen helper
-on both operating systems without publishing or running an installer locally.
+Every release must pass Windows and Linux packaging, upgrade and native updater
+gates before publication. `Verify release updater` also checks the protocol and
+frozen helper on pull requests without publishing or running an installer locally.

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -91,6 +92,25 @@ def healthy(process, request, timeout=120):
             return False
         time.sleep(.25)
     return False
+
+
+def stop_application(process):
+    if os.name == 'nt':
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=20)
+        return
+    # Extract-and-run AppImages can have a wrapper and a child application.
+    # launch() creates their own session, so stop that entire group before rollback.
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=20)
 
 
 @contextmanager
@@ -180,10 +200,7 @@ def _run(request_path, recover=False, parent_pid=None):
         data['process_pid'] = process.pid
         protocol.atomic_json(journal, data)
         if not healthy(process, request):
-            # Only terminate the new process we launched, before restoring its files.
-            if process.poll() is None:
-                process.terminate()
-                process.wait(timeout=20)
+            stop_application(process)
             raise RuntimeError('The updated application did not finish starting; restored the previous version.')
         data = json.loads(journal.read_bytes())
         data['state'] = 'committed'

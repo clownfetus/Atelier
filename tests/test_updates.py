@@ -401,13 +401,14 @@ class HelperTests(UpdateFixtures):
         process.poll.return_value = None
         with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=process), \
              patch.object(H, 'healthy', return_value=successful), \
+             patch.object(H, 'stop_application') as stop_application, \
              patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
             if successful:
                 H.run(path)
             else:
                 with self.assertRaisesRegex(RuntimeError, 'restored the previous'):
                     H.run(path)
-                process.terminate.assert_called_once()
+                stop_application.assert_called_once_with(process)
         return path, request
 
     def test_helper_commits_only_after_new_application_is_healthy(self):
@@ -469,6 +470,14 @@ class HelperTests(UpdateFixtures):
         request = {'folder': str(self.root), 'version': '1.1.4', 'token': 'different-token'}
         ack.rename(self.root / 'healthy.json')
         self.assertFalse(H.healthy(process, request))
+
+    def test_failed_linux_startup_stops_the_appimage_wrapper_and_child_group(self):
+        process = Mock(pid=123456)
+        with patch.object(H.os, 'name', 'posix'), patch.object(H.os, 'killpg', create=True) as kill_group:
+            H.stop_application(process)
+        kill_group.assert_called_once_with(process.pid, H.signal.SIGTERM)
+        process.terminate.assert_not_called()
+        process.wait.assert_called_once_with(timeout=20)
 
 
 class LinuxHelperTests(UpdateFixtures):
