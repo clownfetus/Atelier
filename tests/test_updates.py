@@ -369,7 +369,7 @@ class HelperTests(UpdateFixtures):
 
     def run_helper(self, successful):
         path, request = self.request()
-        process = Mock()
+        process = Mock(pid=123456)
         process.poll.return_value = None
         with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=process), \
              patch.object(H, 'healthy', return_value=successful), \
@@ -463,7 +463,7 @@ class LinuxHelperTests(UpdateFixtures):
 
     def test_appimage_update_installs_and_keeps_user_files(self):
         path, request = self.linux_request()
-        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch'), patch.object(H, 'healthy', return_value=True), \
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=Mock(pid=123456)), patch.object(H, 'healthy', return_value=True), \
              patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
             H.run(path)
         self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF new AppImage')
@@ -472,7 +472,7 @@ class LinuxHelperTests(UpdateFixtures):
 
     def test_failed_appimage_startup_restores_previous_image(self):
         path, request = self.linux_request()
-        process = Mock()
+        process = Mock(pid=123456)
         process.poll.return_value = 1
         with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=process), patch.object(H, 'healthy', return_value=False), \
              patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
@@ -493,7 +493,7 @@ class LinuxHelperTests(UpdateFixtures):
 
     def test_cleanup_failure_does_not_roll_back_or_start_a_second_healthy_app(self):
         path, request = self.linux_request()
-        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch') as launch, \
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=Mock(pid=123456)) as launch, \
              patch.object(H, 'healthy', return_value=True), patch.object(H, 'prune_backups', side_effect=OSError('busy backup file')), \
              patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
             H.run(path)

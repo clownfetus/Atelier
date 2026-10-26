@@ -131,7 +131,7 @@ def _run(request_path, recover=False, parent_pid=None):
     pending = Path(request['data_root']) / '_updates' / 'pending.json'
     transaction = folder / 'transaction'
     journal = transaction / 'journal.json'
-    command = [str(Path(request['installation']) / 'Atelier.exe')] if request['platform'] == 'windows-x64' else [request['image']]
+    command = [str(Path(request['installation']) / 'Atelier.exe')] if request['platform'] == 'windows-x64' else [request['image'], '--appimage-extract-and-run']
     wait_for_exit(parent_pid or request['parent_pid'])
     if recover:
         if journal.is_file():
@@ -176,6 +176,9 @@ def _run(request_path, recover=False, parent_pid=None):
             protocol._replace_file(package, image)
             image.chmod(0o755)
         process = launch(command, request, healthy=True)
+        data = json.loads(journal.read_bytes())
+        data['process_pid'] = process.pid
+        protocol.atomic_json(journal, data)
         if not healthy(process, request):
             # Only terminate the new process we launched, before restoring its files.
             if process.poll() is None:

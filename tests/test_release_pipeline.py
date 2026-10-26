@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from atelier import update_protocol as P
 import assemble_release as A
 import prepare_release as R
+import verify_update_results as V
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -181,6 +182,34 @@ class Assembly(unittest.TestCase):
         self.full.write_bytes(b'wrong portable zip')
         with self.assertRaisesRegex(ValueError, 'Update package differs'):
             self.assemble()
+
+    def native_results(self):
+        feed = json.loads((self.output / P.FEED).read_bytes())['signed']
+        reports = Path(self.temp.name) / 'native-results'
+        for runner, platform in [('windows-2022', 'windows-x64'), ('ubuntu-24.04', 'linux-x64')]:
+            self.write(reports / f'in-app-update-{runner}/results.json', {'ok': True, 'platform': platform,
+                       'version': '1.1.4', 'source_commit': self.commit,
+                       'package_sha256': feed['platforms'][platform]['full']['sha256']})
+        return reports
+
+    def test_native_handoff_results_are_bound_to_this_exact_release(self):
+        self.assemble()
+        reports = self.native_results()
+        with patch.object(V, 'ROOT', self.root):
+            V.verify(self.output, reports)
+        receipt = json.loads((self.output / 'VERIFICATION.json').read_bytes())
+        self.assertTrue(receipt['checks']['windows-x64_in_app_update']['ok'])
+        self.assertTrue(receipt['checks']['linux-x64_in_app_update']['ok'])
+
+    def test_handoff_report_from_another_binary_is_rejected(self):
+        self.assemble()
+        reports = self.native_results()
+        path = reports / 'in-app-update-windows-2022/results.json'
+        data = json.loads(path.read_bytes())
+        data['package_sha256'] = '0' * 64
+        self.write(path, data)
+        with patch.object(V, 'ROOT', self.root), self.assertRaisesRegex(ValueError, 'does not match'):
+            V.verify(self.output, reports)
 
 
 if __name__ == '__main__':

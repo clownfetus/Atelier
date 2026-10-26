@@ -292,7 +292,7 @@ jobs:
             reports/appimage/*.log
             reports/appimage/*.txt
 
-  publish:
+  bundle:
     needs: [prepare, windows, linux, installer]
     if: >-
       always() && needs.prepare.result == 'success' && needs.windows.result == 'success' &&
@@ -322,6 +322,84 @@ jobs:
         env:
           ATELIER_UPDATE_PRIVATE_KEY: ${{ secrets.ATELIER_UPDATE_PRIVATE_KEY }}
         run: python scripts/assemble_release.py --artifacts "$RUNNER_TEMP/release-artifacts" --output "$RUNNER_TEMP/release"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+          compression-level: 0
+  update:
+    needs: [prepare, bundle]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      ATELIER_DISPOSABLE_UPDATE_TEST: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install cryptography==50.0.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+      - name: Provision the Linux native window environment
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0 xvfb dbus-x11 openbox libfuse2t64
+      - name: Exercise the real Windows updater and restarted native window
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python tests/in_app_update_smoke.py --release "$env:RUNNER_TEMP/release" --report-dir "$env:RUNNER_TEMP/in-app-update"
+      - name: Exercise the real Linux updater and restarted native window
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c '
+            openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+            export WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+            python tests/in_app_update_smoke.py --release "$RUNNER_TEMP/release" --report-dir "$RUNNER_TEMP/in-app-update"
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: in-app-update-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/in-app-update/results.json
+            ${{ runner.temp }}/in-app-update/data/_updates/*/error.json
+            ${{ runner.temp }}/in-app-update/data/_updates/*/transaction/journal.json
+
+  publish:
+    needs: [prepare, bundle, update]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: in-app-update-*
+          path: ${{ runner.temp }}/update-reports
+      - name: Bind both native updater results to the signed packages
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python -m pip install cryptography==50.0.2
+          python scripts/verify_update_results.py --release "$RUNNER_TEMP/release" --reports "$RUNNER_TEMP/update-reports"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Atelier-${{ needs.prepare.outputs.version }}-release

@@ -48,7 +48,12 @@ changes use the installer to avoid replacing the interpreter used by recovery.
 ## Checks and build reuse
 
 Backend suites run in parallel, with separate disposable copies. Browser and
-packaged-app checks run for every version. When an installer, native tool,
+packaged-app checks run for every version. The signed update also passes through
+the actual frozen helper on Windows and Linux: a running native window closes,
+the package is applied, and the reopened frontend must acknowledge the new
+version while project/settings canaries survive. This handoff check uses a
+synthetic baseline; the installer/AppImage and delta checks separately cover the
+actual previous release. When an installer, native tool,
 dependency, storage/export implementation or build recipe changes, the action
 also runs the complete installer lifecycle on Windows 2022 and 2025. Routine
 interface changes reuse that installer machinery. Every emitted Windows delta

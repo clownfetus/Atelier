@@ -33,7 +33,10 @@ def run_suite(suite):
 
 def main():
     suites = sorted((ROOT / 'tests').glob('test_*.py'))
-    with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1)) as pool:
+    # Hosted Windows has fewer cores and aggressively scans each disposable tree.
+    # Four simultaneous tree copies can stall short Node/browser subprocesses.
+    workers = min(2 if os.name == 'nt' else 4, os.cpu_count() or 1)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         results = list(pool.map(run_suite, suites))
     output = ROOT / 'reports/backend'
     output.mkdir(parents=True, exist_ok=True)
