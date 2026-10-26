@@ -152,6 +152,7 @@ window.__showcase={
         tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()')
         # The card is the build's payoff: open by default, directly after the outcome line.
         assert tab.evaluate("(card => card.open && card.previousElementSibling?.classList.contains('export-review-summary'))(document.querySelector('.mod-card'))")
+        tab.wait_for_function("document.querySelector('.mod-card-total')?.textContent === '3'", timeout=5000)
         assert tab.locator('.mod-card-stats').inner_text()=='3 assets · 2 textures · 1 material',tab.locator('.mod-card-stats').text_content()
         assert tab.locator('.mod-card p',has_text='Showcase capture').count()==1
         tab.locator('.mod-card button',has_text='Open export folder').click();assert tab.evaluate('cardReveal')==1
