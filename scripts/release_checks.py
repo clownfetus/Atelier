@@ -33,11 +33,16 @@ def run_suite(suite):
 
 def main():
     suites = sorted((ROOT / 'tests').glob('test_*.py'))
+    exclusive = [suite for suite in suites if suite.name == 'test_search.py']
+    parallel = [suite for suite in suites if suite not in exclusive]
     # Hosted Windows has fewer cores and aggressively scans each disposable tree.
     # Four simultaneous tree copies can stall short Node/browser subprocesses.
     workers = min(2 if os.name == 'nt' else 4, os.cpu_count() or 1)
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(run_suite, suites))
+        results = list(pool.map(run_suite, parallel))
+    # Performance budgets describe an idle runner, not contention from unrelated
+    # test processes. Keep the original thresholds and run these after the pool.
+    results.extend(run_suite(suite) for suite in exclusive)
     output = ROOT / 'reports/backend'
     output.mkdir(parents=True, exist_ok=True)
     data = {'python': sys.version, 'platform': sys.platform, 'results': results,
