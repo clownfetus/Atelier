@@ -23,7 +23,7 @@
   const handoffTitle = document.createElement('span'); handoffTitle.className = 'k-motion-handoff-title';
   handoffTitle.textContent = 'Replay ink handoff';
   const handoffSurfaces = [];
-  for (const [label, icon] of [['Edit', 'pencil'], ['Mod tray', 'package']]) {
+  for (const [label, icon] of [['Edit', 'file-box'], ['Mod tray', 'package']]) {
     const item = document.createElement('span'); item.className = 'k-motion-handoff-item';
     const surface = document.createElement('span'); surface.className = 'k-motion-sample-art';
     surface.setAttribute('aria-hidden', 'true');
@@ -39,25 +39,17 @@
     window.AtelierMotion.workflow.transfer(handoffSurfaces[0], handoffSurfaces[1], 'arrival');
   });
   for (const [kind, label, icon, description] of [
-    ['hero', 'Hero crown', 'user', 'Two corners rise to greet your hero.'],
-    ['navigation', 'Folder zipper', 'folder', 'A seam follows your direction.'],
-    ['arrival', 'Tray dock', 'package', 'Four brackets catch the new edit.'],
-    ['pin', 'Pin clasp', 'pin', 'Two edge clasps click together.'],
-    ['unpin', 'Pin release', 'pin-off', 'The clasp neatly unwinds.'],
-    ['menu', 'Menu hinge', 'menu', 'One corner unfolds along the menu.'],
-    ['project', 'Project handoff', 'folder-open', 'Opposite rails exchange places.'],
-    ['workspace', 'Showcase rails', 'sparkles', 'The border opens from its centre.'],
-    ['editor', 'Editor latch', 'sliders-horizontal', 'Two seams meet in a tiny clasp.'],
-    ['action', 'Action strike', 'sparkles', 'A quick stroke turns the corner.'],
-    ['panel', 'Panel unfold', 'layers', 'Opposite corners introduce a panel.'],
-    ['selection', 'Selection stitch', 'check', 'A checked hem seals your choice.'],
+    ['arrive', 'Arrive', 'user', 'Rails rise to greet a hero, editor or panel.'],
+    ['trace', 'Trace', 'folder', 'A seam follows the way you moved.'],
+    ['seal', 'Seal', 'check', 'Two jaws close on a pin, choice or action.'],
+    ['release', 'Release', 'pin-off', 'The same seal unwinds when you undo.'],
   ]) {
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'k-motion-sample'; button.dataset.motionSample = kind;
     button.setAttribute('aria-label', 'Preview ' + label.toLowerCase());
     const art = document.createElement('span'); art.className = 'k-motion-sample-art';
     art.setAttribute('aria-hidden', 'true');
-    if (kind === 'hero') {
+    if (kind === 'arrive') {
       const image = document.createElement('img'); image.src = '/static/brand/atelier-mark.png';
       image.alt = ''; image.width = image.height = 28; art.append(image);
     } else {
@@ -69,7 +61,7 @@
     button.addEventListener('click', () => {
       // Previews never start a job, touch a project, or queue an automatic replay.
       window.AtelierMotion.workflow.stop();
-      window.AtelierMotion.workflow[kind](art, kind === 'workspace' ? 'showcase' : undefined);
+      window.AtelierMotion.workflow[kind](art);
     });
   }
   panel.append(heading, note, handoff, samples); control.closest('.setup-field').append(panel);

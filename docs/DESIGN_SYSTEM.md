@@ -30,6 +30,13 @@ This is a desktop adaptation of [Material 3 color roles](https://m3.material.io/
 | `atelier/catalogue.py` | Optional character/skin metadata refresh and image cache |
 | `gui/catalogue.js` | Non-blocking launch check and Settings status |
 
+Other shared tokens:
+
+- **Elevation:** `--studio-elevation-card`, `-menu` (menus, popups, toasts; `--studio-shadow` is its alias) and `-dialog`, redefined for dark surfaces where light-theme shadows would vanish.
+- **Shape:** `--studio-shape-xs` (4px: badges, chips, swatches), `-small` (6px: controls, previews, panels), `-medium` (8px: menus and intermediate surfaces), `-dialog` and `-full`. Only 2px hairlines stay literal.
+- **Text size:** `--studio-text-micro` (11px, the floor), `-detail` (12px), `-label` (13px) and `-body` (14px); display sizes stay with their components.
+- **Layers:** `--studio-layer-float`, `-overlay`, `-toast`, `-menu`, `-workspace` (Model Studio) and `-top` (tooltips). Neighbours are offsets from a band; local stacking keeps small numbers.
+
 Use semantic foreground/background pairs instead of adding hexadecimal colors to individual components. Existing `--bg`, `--text`, `--acc` and related aliases keep dynamically generated editors compatible. Add a role to the token file when a new state needs one; do not use the primary color to mean an error.
 
 | Role | Light | Dark |
@@ -74,7 +81,7 @@ Palette selection, custom drafts and named palettes use version 2 of `atelier.ap
 
 Global select/option/optgroup roles theme filters and editors as well as Settings. Supporting engines progressively opt into [customizable native selects](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select) using `appearance: base-select` and `::picker(select)`: popup surfaces, checkmarks, selected, hover and keyboard focus states use semantic roles while retaining real HTML select behavior. Older WebView2 falls back to its OS picker, with explicit text/background roles and `color-scheme`; OS-owned hover/highlight and native color-picker chrome cannot be fully styled with page CSS. App context menus, dialogs and delegated title tooltips use the same roles. Tooltips retain accessible descriptions/names, restore title fallbacks on dismissal and support Escape without consuming keyboard navigation.
 
-Use 120ms for small state changes and 200ms for entering surfaces. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input and animating layout in the asset grid. At the user's updated request, the 3D viewer starts a compatible standing idle on repeat; Play, Pause and Rest pose remain available. The camera rotates only during a requested turntable capture. Both `prefers-reduced-motion: reduce` and Settings → Motion → Reduce motion select static interface presentation.
+Use 120ms (`--studio-motion-fast`) for small state changes and 200ms (`--studio-motion-standard`) for entering surfaces; durations and easings come from `tokens.css`, never literals. Large surfaces travelling into place use `--studio-easing-emphasized`. Things that land use a damped spring: `--studio-spring-snappy` (ζ .72, about 4% overshoot, 340ms) for toasts, update reminders and folder flaps, and `--studio-spring-bouncy` (ζ .5, about 16%, 610ms) for the mod card. Springs are sampled `linear()` step responses with overshoot-bezier fallbacks where `linear()` is unsupported; `AtelierMotion.ease` and `AtelierMotion.springMs` expose the same values to WAAPI. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input and animating layout in the asset grid. At the user's updated request, the 3D viewer starts a compatible standing idle on repeat; Play, Pause and Rest pose remain available. The camera rotates only during a requested turntable capture. Both `prefers-reduced-motion: reduce` and Settings → Motion → Reduce motion select static interface presentation.
 
 ## Continuity and presentation preferences
 
@@ -200,7 +207,7 @@ panels, Calm and Off have no moving borders; overlapping operations share one fr
 Job feedback, ownership markers, empty states and occasional brand moments use **Krackle**, after Jack Kirby's krackle (credited here only; the product calls it Krackle). Solid ink defines each silhouette, with holes composed inside it. Loading and saving have an identifiable reservoir, a continuous fluid channel and a receiving seal. Actual panel borders carry that same ink; confirmed completion catches, compresses, rebounds and spreads along the receiving edge. Configuration discovery connects the panel edges through its scanner and latch. Activity's compact counted ring remains a job indicator. Success, warning and failure retain distinct settled silhouettes and adjacent text that carries their meaning.
 
 - Every gesture has a source, a path and a receiving point. Imports connect the asset card frame to its Mod tray row; packing connects the selection to Export. A source reservoir visibly charges, then a thick, tapered SVG stream follows a measured curve. At arrival, the receiving ink compresses, rebounds once and spreads along its own border. Artwork and controls remain fixed. Missing or hidden sources skip the transfer. Local gestures stay in the owning surface's edge band, with filled seals and punched holes. Calm retains brief local pulses; Off stays static. Chrome keeps Material Sharp glyphs.
-- Text, control glyphs, inputs, source previews, swatches and model canvases are cut out of decorative ink. At most three finite workflow gestures run; wide formations share the existing stage owner. Menus unfold a hinge, editors close a latch, pins clasp, and selections stitch. Loading gathers into a reservoir, saving presses a stamp, and export packs and releases; no unrelated particle scatter accompanies these actions.
+- Text, control glyphs, inputs, source previews, swatches and model canvases are cut out of decorative ink. At most three finite workflow gestures run; wide formations share the existing stage owner. Edge ink has four gestures, each with one meaning: **Arrive** (a hero, editor, panel, workspace, project or tray entry arrived), **Trace** (you moved; folder navigation follows its direction), **Seal** (you committed a pin, selection or primary action) and **Release** (you undid one; the seal's jaws unwind). Context menus keep only their pointer-origin scale and draw no edge ink. Loading gathers into a reservoir, saving presses a stamp, and export packs and releases; no unrelated particle scatter accompanies these actions.
 - Keep edited artwork trustworthy: never texture a colour swatch, a dye preview or the material-inspection viewport. A comic viewport mode would be an explicit showcase mode.
 - Compose, don't scatter: bubbles gather into deliberate dark masses on the shadow side, with clean energy elsewhere and a clear silhouette edge. Bubbles sit at least one dot step inside the shape, so thin bands such as the ring keep only a sparse centreline. Success is mostly clean; failure carries one substantial mass. Highlights are crisp Paper specks, never a soft glow.
 - Outcome colours are fixed per measured surface (`--krackle-*` in `gui/motion/krackle.css`); bubbles use Ink, except Paper holes in light-surface success. Paper glints are not counted as inks. Semantic UI colours remain separate.
@@ -208,6 +215,13 @@ Job feedback, ownership markers, empty states and occasional brand moments use *
 - Reduced motion (OS or Atelier's setting) shows the final pose of every state.
 
 Artwork is generated by `scripts/krackle_art.py`; see the [motion README](../gui/motion/README.md).
+
+The Windows installer uses native scalable controls with paired Paper and Ink
+artwork. Its A mark feeds one continuous channel into a Krackle seal. The wizard
+follows the system light/dark appearance, keeps installation progress native,
+and leaves installation, upgrade and data-preservation behavior unchanged.
+`scripts/installer_art.py --check` verifies the deterministic high-resolution
+plates and transparent header mark.
 
 The Windows installer uses native scalable controls with paired Paper and Ink
 artwork. Its A mark feeds one continuous channel into a Krackle seal. The wizard
@@ -289,6 +303,12 @@ segment on load. The v1 storage shape, paths and pin ordering stay intact.
 Nested pins use contextual labels such as `Storm · Goddess of Thunder · Textures`.
 Resolved labels omit redundant numeric prefixes; full paths remain in tooltips.
 Unknown ancestors retain their path segments until display labels are available.
+
+Loading previews show the Krackle 45° dot screen, breathing in opacity on two beats (still in
+Calm, Off and reduced motion), instead of a generic shimmer. File glyphs (meshes, textures and
+other assets) sit on a rounded tonal plate in their family colour, which gives the thin Sharp
+outlines the visual weight of the filled folder emblems while still marking them as files.
+"Preview unavailable" sits on its own solid chip so it stays legible over the checkerboard.
 
 Texture tiles request cached previews on every grid build, including search.
 Missed background completion events recover through status polling. Failed or
@@ -396,6 +416,16 @@ by a charging ring around a boiling mass of bubbles. The fixed preview surface
 keeps the energy and punched holes readable in both interface themes. Empty/error poses settle;
 geometry readiness hides the overlay immediately, independently of texture loading.
 
+Opening a costume from visible artwork (a costume card, roster costume or search row) lands that
+artwork on the stage as a poster (`motion/viewport-poster.js`). In Full a disposable copy flies
+from the card's own crop to the poster over 460ms on the emphasized easing, above the fading
+studio; Calm fades the poster in; Off shows it still. While the model decodes, the poster sits
+above the loader, which moves below it. When geometry arrives the poster drops behind the canvas
+at 38% so the orbitable model reads over it, and the 420ms reveal sweep wipes it away in step
+with its crest. Without a sweep it fades once appearance loading ends. Errors, empty results,
+closing and a newer open remove it at once; loading never waits for it, and it claims no moment
+of its own because it belongs to the studio's `viewport-load` moment.
+
 Generic folder tiles crossfade between official Sharp closed/open folder outlines
 on hover or keyboard focus (180ms open, 150ms close), with a 1px open-pose lift.
 The artwork fills about 90px within the existing
@@ -439,6 +469,10 @@ Escape/backdrop as Cancel, and initially focuses Cancel for destructive actions.
 Async leave guards retain drafts until an affirmative answer. Project-management
 and export-review dialogs retain their dedicated layouts.
 
+Launch dialogs take turns: an available update waits until first-run setup closes, and What's
+new waits for any open dialog, so only one launch dialog is ever on screen. A dismissed update
+stays reachable from its reminder in the toolbar row, beside Activity.
+
 First-run setup validates Find the game, Unlock the paks and Make it yours in
 order. Existing controls are reparented, retaining their IDs and save contract;
 Settings restores the complete form. Automatic retrieval runs behind the first
@@ -451,6 +485,13 @@ accent behind the image; names and counts keep a plain panel surface. Edited
 heroes carry a charge corner. Project-local recent history does not imply an
 edit. Category folders become compact chips with a More folders control, while
 folders deeper in the library retain their full preview slots. Pins stay separate.
+Scrolling the categories yourself (wheel, touch, scrolling keys or the scrollbar) more than 24px
+folds the wall into one row of 84px avatars with names; the app's own scrolling never folds it.
+Filters and counts hide, costume chips stay, and the categories take the freed height. The
+layout changes once and the categories slide into place on the snappy spring. Scrolling up at the
+top of the categories or keyboard focus returning to a hero unfolds it; pointer clicks on an
+avatar only select it. The Heroes toggle keeps its disclosure meaning, and returning to Home
+always starts unfolded, without motion.
 
 The header scope explicitly distinguishes Everywhere from This folder. Global
 results group heroes, costumes, folders and assets, use one active keyboard row,
@@ -510,6 +551,9 @@ including explicitly reported generated textures. Version comes from the local
 build, and date is captured when the build finishes. Warning cards carry the
 cracked ring/skipped count; failed builds have no card. All lettering sits on a
 Paper footer. Cards are client canvases and never enter mod/project payloads.
+The card is the export payoff: it opens directly under the outcome line rather than after the
+build report. After a fresh build in Full it flips down onto the result on the bouncy spring and
+its asset total rolls up; reopening the result, Calm and Off show it at rest.
 
 Opt-in foley synthesizes three brief stage sounds with WebAudio. It defaults off,
 requires Full and a visible document, starts only after an enabled user gesture,

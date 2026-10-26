@@ -246,7 +246,9 @@
     if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
-    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt});
+    // The card is the build's payoff: it follows the outcome line, and only a just-finished build deals it in.
+    const entrance = current.fresh; current.fresh = false;
+    if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt,anchor:status,entrance});
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
     if (!result.ok) button('Retry export', current.retry || callbacks.confirm, true).id = 'export-review-retry';
@@ -297,7 +299,7 @@
     },
     finish(snapshot, result) {
       if (current?.snapshot !== snapshot) return;
-      busy = false; current.result = result;current.builtAt=new Date().toISOString(); lastResult = current;
+      busy = false; current.result = result;current.builtAt=new Date().toISOString(); current.fresh = true; lastResult = current;
       lastButton.hidden = false; lastButton.disabled = false;
       lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();

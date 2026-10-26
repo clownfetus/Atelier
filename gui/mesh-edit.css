@@ -1,15 +1,15 @@
-.mesh-edit-overlay { z-index:2300; }
+.mesh-edit-overlay { z-index:calc(var(--studio-layer-workspace) + 100); }
 .mesh-edit-modal { width:min(620px,94vw);padding:24px;display:flex;flex-direction:column;gap:18px; }
 .mesh-edit-modal h2 { font-size:19px; }
-.mesh-edit-modal p { font-size:13px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere; }
+.mesh-edit-modal p { font-size:var(--studio-text-label);line-height:1.6;color:var(--muted);overflow-wrap:anywhere; }
 .mesh-edit-modal #mesh-edit-status { color:var(--text); }
-.mesh-edit-path { font-size:11px!important; }
+.mesh-edit-path { font-size:var(--studio-text-micro)!important; }
 .mesh-edit-actions { display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap; }
 .mesh-edit-actions [hidden] { display:none; }
-.mesh-import-options { margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--border);border-radius:8px;min-width:0; }
-.mesh-import-options legend { padding:0 5px;font-size:13px;font-weight:600;color:var(--text); }
+.mesh-import-options { margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--border);border-radius:var(--studio-shape-medium);min-width:0; }
+.mesh-import-options legend { padding:0 5px;font-size:var(--studio-text-label);font-weight:600;color:var(--text); }
 .mesh-import-option { display:flex;align-items:flex-start;gap:10px;cursor:pointer; }
 .mesh-import-option input { margin:3px 0 0;accent-color:var(--acc);flex-shrink:0; }
 .mesh-import-option span { display:flex;flex-direction:column;gap:4px;min-width:0; }
-.mesh-import-option strong { font-size:13px;font-weight:600;color:var(--text); }
-.mesh-import-option small { font-size:12px;line-height:1.5;color:var(--muted); }
+.mesh-import-option strong { font-size:var(--studio-text-label);font-weight:600;color:var(--text); }
+.mesh-import-option small { font-size:var(--studio-text-detail);line-height:1.5;color:var(--muted); }

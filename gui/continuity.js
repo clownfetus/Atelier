@@ -20,7 +20,7 @@
       const motion = window.AtelierMotion.polish.mount(el,{frames,duration,state:'playing'});
       motion.finished.catch(() => {}).finally(() => motion.destroy()); return motion;
     }
-    try { return el.animate(frames, {duration, easing: 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+    try { return el.animate(frames, {duration, easing: window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
   }
   async function transition(update, before, after, fallback) {
     if (active) {

@@ -37,6 +37,7 @@ never take over that stage.
 | --- | --- | --- |
 | Export feedback | Export button and notifications | 28px / 40px, charge ring, starburst, cracked ring, splat |
 | Viewport loader | Existing 3D loading overlay | 112px, twelve-dot ring around a boiling ball; resting bubbles; KO splat |
+| Viewport poster | Model Studio opened from costume artwork | Artwork flies to the stage (Full), waits above the loader, drops behind geometry and leaves with the reveal sweep |
 | Folder flap | Generic folder cards | 76% of thumbnail, Krackle folder whose front panel tips open |
 | Material save | Editor save indicators and result notifications | 44px while saving (36px in Model Studio), 40px results |
 | Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance with a bubble splash |
@@ -48,19 +49,31 @@ never take over that stage.
 | Krackle stage | Export review and edit import dialogs | 184-216px canvas particle formations; smaller in short windows |
 | Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
-| Workflow accents | Pin/unpin, context menus, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
+| Workflow accents | Pin/unpin, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
 | Connected surfaces | Primary actions, build selections, Settings, Activity, projects and tool panels | Surface-bound seams receive ink from actual initiating controls |
 | `krackle.css` | Every `.spinner`, progress bars, the Activity ring, import segments, edited rows | CSS only |
 
 `workflow-krackle.js` gives committed actions a finite SVG gesture inside their
 own rounded bounds. A 3–6px edge mask and content cutouts protect labels, controls,
-portraits, textures, swatches and model canvases. Hero crowns, folder zippers,
-editor latches, tray docks, pin clasps/releases, menu hinges, project handoffs,
-workspace rails, action strikes, panel unfolds and selection stitches each have
-their own direction and receiving point. Filled receiver seals have true holes.
-Local gestures take 500–820ms, and at most three run together. Wide gestures share
-`moment.js` with import/export. Repeated selections, failed navigation, typing
-and background panels never start an arrival.
+portraits, textures, swatches and model canvases. There are four gestures, each
+with one meaning:
+
+| Gesture | Meaning | Call names |
+|---|---|---|
+| Arrive | something opened or arrived here | `arrive`, `hero`, `arrival`, `editor`, `panel`, `workspace`, `project` |
+| Trace | you moved somewhere (`'back'` reverses it) | `trace`, `navigation` |
+| Seal | you committed something | `seal`, `action`, `selection`, `pin` |
+| Release | you undid something | `release`, `unpin` |
+
+Arrive's rails leave a lower seal and rise up both sides, capped on tall panels.
+Seal closes two jaws on a lower clasp, and Release unwinds those same jaws. The
+SVG carries `data-workflow-kind` (the gesture) and `data-workflow-trigger` (the
+call name). Context menus already scale open from the pointer, so they draw no
+edge ink; `workflow.menu` stays as a no-op. Filled receiver seals have true
+holes. Local gestures take 500–720ms, and at most three run together. Trace and
+the navigation, editor, workspace and panel calls share `moment.js` with
+import/export. Repeated selections, failed navigation, typing and background
+panels never start an arrival.
 
 `workflow.transfer(source, destination, kind)` joins two actual, visible DOM
 edges with a filled SVG stream. A visible reservoir charges at the source before
@@ -70,7 +83,7 @@ The source, stream and reaction share one clock and the same contextual pigment;
 the actual surface, artwork and controls stay fixed. Transfers finish in about
 1.1–1.4 seconds, including the receiving gesture.
 It skips missing, overlapping or hidden endpoints. Pointer and keyboard origins
-can supply the source of menus, navigation, editors and selections. Imports use
+can supply the source of navigation, editors, projects and selections. Imports use
 the real asset card frame and matching Mod tray row; packing joins a selected
 tray entry to Export. Connections protect intervening content and cancel when
 either endpoint moves, disappears, or loses visibility. Scroll, resize, policy
@@ -91,7 +104,7 @@ Theme controls, ownership markers and semantic result inks retain their roles.
 
 `motion-preview.js` adds **Try Krackle** beside the Motion dial in Settings.
 **Replay ink handoff** connects two real sample surfaces from Edit to Mod tray.
-Its twelve gesture buttons use the production formations directly, without
+Its four gesture buttons use the production formations directly, without
 starting jobs or writing project state. Calm previews the same local pulse;
 Off and system reduced motion show still artwork and disable replay. Samples
 never play automatically, and rapid replay replaces the previous sample.

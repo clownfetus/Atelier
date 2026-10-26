@@ -33,7 +33,7 @@
 /* Open pose, shared by keyboard focus and fine-pointer hover. */
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-front {
   transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
-  transition: transform 260ms cubic-bezier(.22,.8,.32,1.12);
+  transition: transform var(--studio-spring-snappy-duration) var(--studio-spring-snappy);
 }
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
   transform: translateY(-2px) rotate(1deg);
@@ -43,7 +43,7 @@
 @media (hover: hover) and (pointer: fine) {
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-front {
     transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
-    transition: transform 260ms cubic-bezier(.22,.8,.32,1.12);
+    transition: transform var(--studio-spring-snappy-duration) var(--studio-spring-snappy);
   }
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
     transform: translateY(-2px) rotate(1deg);

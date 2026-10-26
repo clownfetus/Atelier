@@ -98,7 +98,7 @@
 }
 
 [data-atelier-motion="export-feedback"] .am-export-feedback-well {
-  transition: opacity 180ms var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
+  transition: opacity var(--studio-motion-standard, 200ms) var(--studio-easing, cubic-bezier(.2, 0, 0, 1));
 }
 
 /* State: idle — a drop waiting above the tray */

@@ -23,7 +23,7 @@
   max-height: 156px; overflow-y: auto;
 }
 .library-pins[hidden] { display: none; }
-.library-pins-label { color: var(--muted); font-size: 12px; font-weight: 500; padding-top: 8px; }
+.library-pins-label { color: var(--muted); font-size: var(--studio-text-detail); font-weight: 500; padding-top: 8px; }
 .library-pins-items { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .library-pin-chip {
   display: inline-flex; align-items: center; min-width: 0; max-width: 280px;

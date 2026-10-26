@@ -2,10 +2,13 @@
 (() => {
   'use strict';
   const NS = 'http://www.w3.org/2000/svg', active = new Map();
-  const durations = {hero: 780, navigation: 620, editor: 760, arrival: 680,
-    pin: 560, unpin: 500, menu: 580, project: 740, workspace: 740,
-    action: 540, panel: 820, selection: 580};
-  const wide = new Set(['navigation', 'editor', 'workspace', 'panel']);
+  // Four gestures, one meaning each: something arrived, you moved, you
+  // committed, you undid. Older call names stay as aliases of their gesture.
+  const durations = {arrive: 720, trace: 620, seal: 560, release: 500};
+  const gestures = {arrive: 'arrive', hero: 'arrive', arrival: 'arrive', editor: 'arrive',
+    panel: 'arrive', workspace: 'arrive', project: 'arrive', trace: 'trace', navigation: 'trace',
+    seal: 'seal', action: 'seal', selection: 'seal', pin: 'seal', release: 'release', unpin: 'release'};
+  const wide = new Set(['trace', 'navigation', 'editor', 'workspace', 'panel']);
   let serial = 0;
   const clamp = n => Math.max(0, Math.min(1, n));
   const ease = n => 1 - (1 - clamp(n)) ** 3;
@@ -50,7 +53,7 @@
   };
   document.addEventListener('pointerdown', remember, {capture: true, passive: true});
   document.addEventListener('keydown', remember, true);
-  const linkedKinds = new Set(['navigation', 'editor', 'menu', 'project', 'selection']);
+  const linkedKinds = new Set(['navigation', 'editor', 'project', 'selection']);
 
   function connection(source, destination, colors) {
     if (!source || source === destination || source.contains(destination) || destination.contains(source)) return null;
@@ -212,8 +215,9 @@
       }};
   }
 
-  function run(kind, host, direction, source) {
-    if (!durations[kind] || !host || !permitted(host)) return false;
+  function run(trigger, host, direction, source) {
+    const kind = gestures[trigger];
+    if (!kind || !host || !permitted(host)) return false;
     const initial = bounds(host);
     if (!initial) return false;
     active.get(host)?.();
@@ -241,7 +245,8 @@
     const radius = Math.min(parseFloat(getComputedStyle(host).borderTopLeftRadius) || 0, w / 2, h / 2);
     const band = Math.min(6, Math.max(3, Math.min(w, h) * .12));
     const svg = svgNode('svg', {class: 'k-workflow-svg', 'aria-hidden': 'true', focusable: 'false',
-      viewBox: `0 0 ${w} ${h}`, width: w, height: h, 'data-workflow-kind': kind, 'data-edge-band': band});
+      viewBox: `0 0 ${w} ${h}`, width: w, height: h, 'data-workflow-kind': kind,
+      'data-workflow-trigger': trigger, 'data-edge-band': band});
     svg.inert = true;
     Object.assign(svg.style, {position: 'fixed', width: w + 'px', height: h + 'px',
       overflow: 'hidden', pointerEvents: 'none'});
@@ -264,7 +269,7 @@
     const strokes = [], seals = [];
     // All coordinates sit within the viewport, including wide header seams.
     const inset = 1.2, l = inset, r = w - inset, t = inset, b = h - inset;
-    const cx = w / 2, cy = h / 2, turn = Math.min(Math.max(radius, 3), w / 4, h / 4);
+    const cx = w / 2, turn =Math.min(Math.max(radius, 3), w / 4, h / 4);
     const leftBottom = `L ${l + turn} ${b} Q ${l} ${b} ${l} ${b - turn}`;
     const rightBottom = `L ${r - turn} ${b} Q ${r} ${b} ${r} ${b - turn}`;
     function stroke(d, delay = 0, role = 'charge', width = 2.2, reverse = false) {
@@ -293,72 +298,28 @@
         'data-ink': 'charge', 'data-ink-seal': ''});
       drawing.append(path); seals.push({path, delay});
     }
-    if (kind === 'hero') {
-      // Crown: lower corners rise into two shoulders; a centre seal settles.
-      stroke(`M ${cx - 3} ${b} ${leftBottom} L ${l} ${h * .62}`, 0);
-      stroke(`M ${cx + 3} ${b} ${rightBottom} L ${r} ${h * .62}`, .045);
+    if (kind === 'arrive') {
+      // Arrive: rails leave a lower seal, turn both corners and rise to greet
+      // the surface; tall panels cap the rise so it stays a gesture.
+      const rise = b - Math.min((b - t) * .38, 86);
+      stroke(`M ${cx - 3} ${b} ${leftBottom} L ${l} ${rise}`, 0);
+      stroke(`M ${cx + 3} ${b} ${rightBottom} L ${r} ${rise}`, .045);
       seal(cx, b);
       inkSeal(cx, b);
-    } else if (kind === 'navigation') {
-      // Zipper: a directional seam closes behind a short offset return stitch.
+    } else if (kind === 'trace') {
+      // Trace: a directional seam closes behind a short offset return stitch.
       const back = direction === 'back', from = back ? r : l, to = back ? l : r;
       stroke(`M ${from} ${b} L ${to} ${b}`, 0, 'charge', 2.5);
       stroke(`M ${from + (to - from) * .24} ${b - 2.7} L ${from + (to - from) * .67} ${b - 2.7}`, .11, 'rift', 1.1);
       inkSeal(back ? l + 9 : r - 9, b, 0, .34);
-    } else if (kind === 'editor') {
-      // Twin latch: opposing rails meet in one quiet notched clasp.
-      stroke(`M ${l} ${b - 5} L ${l} ${b} L ${cx - 6} ${b}`, 0);
-      stroke(`M ${r} ${b - 5} L ${r} ${b} L ${cx + 6} ${b}`, .04);
-      seal(cx, b, true, .28);
-      inkSeal(cx, b, 0, .32);
-    } else if (kind === 'arrival') {
-      // Dock: four short brackets enclose the new thumbnail.
-      for (const [x, y, dx, dy] of [[l,t,1,1],[r,t,-1,1],[l,b,1,-1],[r,b,-1,-1]])
-        stroke(`M ${x} ${y + dy * h * .27} L ${x} ${y + dy * turn} Q ${x} ${y} ${x + dx * turn} ${y} L ${x + dx * w * .27} ${y}`, .035 * strokes.length);
-      inkSeal(cx, b, 0, .3);
-    } else if (kind === 'pin' || kind === 'unpin') {
-      // Clasp/release: two edge jaws close or undo in opposite directions.
-      const release = kind === 'unpin';
-      stroke(`M ${cx} ${t} L ${l + turn} ${t} Q ${l} ${t} ${l} ${t + turn} L ${l} ${b - turn} Q ${l} ${b} ${l + turn} ${b} L ${cx} ${b}`,
-        0, 'charge', 2.2, release);
-      stroke(`M ${cx} ${t} L ${r - turn} ${t} Q ${r} ${t} ${r} ${t + turn} L ${r} ${b - turn} Q ${r} ${b} ${r - turn} ${b} L ${cx} ${b}`,
-        .06, 'rift', 1.8, release);
-      inkSeal(cx, b, 0, release ? 0 : .26);
-    } else if (kind === 'menu') {
-      // Hinge: a compact corner unfolds into the top and left seam.
-      stroke(`M ${l} ${Math.min(h * .54, 64)} L ${l} ${t + turn} Q ${l} ${t} ${l + turn} ${t} L ${Math.min(w * .7, 150)} ${t}`);
-      stroke(`M ${l + 3} ${Math.min(h * .36, 40)} L ${l + 3} ${t + turn + 3}`, .16, 'rift', 1);
-      inkSeal(Math.min(w * .35, 36), t, 180, .12);
-    } else if (kind === 'project') {
-      // Handoff: unequal rails exchange sides through a joined lower seam.
-      stroke(`M ${l} ${cy} L ${l} ${b - turn} Q ${l} ${b} ${l + turn} ${b} L ${w * .7} ${b}`);
-      stroke(`M ${r} ${cy} L ${r} ${t + turn} Q ${r} ${t} ${r - turn} ${t} L ${w * .3} ${t}`, .1, 'rift', 1.8);
-      seal(cx, b, true, .3);
-      inkSeal(w * .7, b, 0, .32);
-    } else if (kind === 'workspace') {
-      // Showcase opens from centre; Assembly closes; Inspect traces one rail.
-      const inward = direction === 'assembly';
-      if (direction === 'inspect') stroke(`M ${l} ${b} L ${r} ${b}`);
-      else for (const end of [l, r]) stroke(inward
-        ? `M ${end} ${b} L ${cx} ${b}` : `M ${cx} ${b} L ${end} ${b}`, 0, end === l ? 'rift' : 'charge');
-      stroke(`M ${cx - 8} ${t} L ${cx + 8} ${t}`, .22, 'rift', 1.5);
-      inkSeal(inward ? cx : r - 9, b, 0, .32);
-    } else if (kind === 'action') {
-      // Strike: a pressure stroke runs around the lower right corner.
-      stroke(`M ${w * .18} ${b} ${rightBottom} L ${r} ${h * .3}`, 0, 'charge', 2.8);
-      stroke(`M ${w * .35} ${b - 3} L ${w * .66} ${b - 3}`, .12, 'rift', 1.1);
-      inkSeal(w * .68, b, 0, .18);
-    } else if (kind === 'panel') {
-      // Unfold: two restrained seams establish the surface boundary.
-      stroke(`M ${l} ${Math.min(h * .34, 86)} L ${l} ${t + turn} Q ${l} ${t} ${l + turn} ${t} L ${Math.min(w * .48, 210)} ${t}`);
-      stroke(`M ${r} ${h - Math.min(h * .34, 86)} L ${r} ${b - turn} Q ${r} ${b} ${r - turn} ${b} L ${w - Math.min(w * .48, 210)} ${b}`, .12, 'rift', 2);
-      inkSeal(Math.min(w * .2, 32), t, 180, .16);
-      inkSeal(w - Math.min(w * .2, 32), b, 0, .3);
-    } else if (kind === 'selection') {
-      // Stitch: a checked hem resolves directly underneath the count.
-      stroke(`M ${w * .16} ${b} L ${cx - 5} ${b} l 3 -2 l 3 2 L ${w * .84} ${b}`);
-      stroke(`M ${w * .3} ${t} L ${w * .7} ${t}`, .18, 'rift', 1.1);
-      inkSeal(cx, b, 0, .25);
+    } else {
+      // Seal: two jaws close on a lower clasp. Release unwinds the same jaws
+      // into the clasp, so undoing reads as the reverse of committing.
+      const release = kind === 'release', rise = b - Math.min((b - t) * .5, 28);
+      stroke(`M ${l} ${rise} L ${l} ${b - turn} Q ${l} ${b} ${l + turn} ${b} L ${cx - 4} ${b}`, 0, 'charge', 2.4, release);
+      stroke(`M ${r} ${rise} L ${r} ${b - turn} Q ${r} ${b} ${r - turn} ${b} L ${cx + 4} ${b}`, .06, 'rift', 1.8, release);
+      if (!release) seal(cx, b, true, .26);
+      inkSeal(cx, b, 0, release ? 0 : .28);
     }
 
     // Native clipping contains ink. Additional cutouts protect real labels,
@@ -412,7 +373,7 @@
         `M ${x} ${b} L ${r-turn} ${b} Q ${r} ${b} ${r} ${b-turn} L ${r} ${h-reachY}`];
       for (const path of paths) stroke(path, 0, 'charge', 4.4).dataset.flowRole = 'border-spread';
     }
-    const release = wide.has(kind) || link ? window.AtelierMotion?.moment?.claim('workflow-' + kind, 2) : () => {};
+    const release = wide.has(trigger) || link ? window.AtelierMotion?.moment?.claim('workflow-' + kind, 2) : () => {};
     if (!release) return false;
     let frame = 0, start = null, disposed = false, dirty = false, timer;
     const dispose = () => {
@@ -530,7 +491,7 @@
     } catch (_) { active.get(host)?.(); return false; }
   };
   function transfer(source, destination, kind = 'arrival') {
-    if (!durations[kind] || !source || !destination || !permitted(destination)) return false;
+    if (!gestures[kind] || !source || !destination || !permitted(destination)) return false;
     for (const host of [source, destination])
       if (!bounds(host) && (!bounds(host, true) || !entrances(host).length)) return false;
     if (mode() !== 'full') return present(kind, destination, undefined, source, true);
@@ -565,12 +526,10 @@
   }
   window.AtelierMotion ||= {};
   window.AtelierMotion.workflow = Object.freeze({
-    hero: host => present('hero', host), navigation: (host, direction) => present('navigation', host, direction),
-    editor: host => present('editor', host), arrival: host => present('arrival', host),
-    pin: host => present('pin', host), unpin: host => present('unpin', host), menu: host => present('menu', host),
-    project: host => present('project', host), workspace: (host, direction) => present('workspace', host, direction),
-    action: host => present('action', host), panel: host => present('panel', host), selection: host => present('selection', host), stop,
-    transfer,
+    ...Object.fromEntries(Object.keys(gestures).map(trigger =>
+      [trigger, (host, direction) => present(trigger, host, direction)])),
+    // Context menus already scale open from the pointer, so they draw no edge ink.
+    menu: () => false, stop, transfer,
   });
   window.AtelierMotionPolicy?.query().addEventListener('change', stop);
   window.addEventListener('atelier:inks', stop);
