@@ -1408,6 +1408,12 @@ def api_update_apply():
         return json.dumps({"ok": False, "error": str(error)})
 
 
+@app.get("/api/update_ready")
+def api_update_ready_required():
+    response.content_type = "application/json"
+    return json.dumps({"required": bool(os.environ.get("ATELIER_UPDATE_TOKEN") and os.environ.get("ATELIER_UPDATE_ACK"))})
+
+
 @app.post("/api/update_ready")
 def api_update_ready():
     response.content_type = "application/json"

@@ -112,6 +112,8 @@ class UpdateClient:
         frozen = getattr(sys, 'frozen', False)
         supported = platform.machine().lower() in {'amd64', 'x86_64'}
         native = frozen and supported and (self.windows or self.image is not None)
+        if not self.windows and native:
+            native = self.image.is_file() and not self.image.is_symlink() and os.access(self.image.parent, os.W_OK)
         if protocol.FEED in assets and native:
             envelope = read_json(release_url(assets[protocol.FEED]['browser_download_url']))
             feed = protocol.verify_feed(envelope, self._keys())
@@ -128,6 +130,8 @@ class UpdateClient:
                     if installed['version'] != current:
                         raise ValueError('Installation metadata differs from running version.')
                 except (OSError, ValueError, KeyError):
+                    if target.get('installer'):
+                        self.offer['installer_descriptor'] = target['installer']
                     return self._legacy_offer(assets, tag)
                 if installed.get('runtime_id') != target.get('runtime_id'):
                     self.offer['installer_descriptor'] = target['installer']
@@ -144,7 +148,10 @@ class UpdateClient:
         installer = assets.get('AtelierSetup.exe')
         if installer:
             self.offer['installer'] = installer
-            return {'available': True, 'tag': tag, 'installer': True}
+            result = {'available': True, 'tag': tag, 'installer': True}
+            if self._restore_ready():
+                result['ready'] = True
+            return result
         return {'available': True, 'tag': tag, 'manual': True}
 
     def _restore_ready(self):
@@ -153,12 +160,19 @@ class UpdateClient:
             request = json.loads(path.read_bytes())
             package = Path(request['package'])
             descriptor = request['descriptor']
-            target = self.offer['target']
-            if request.get('envelope') != self.offer['envelope'] or request['version'] != self.offer['version'] or not package.resolve().is_relative_to(path.parent.resolve()):
+            target = self.offer.get('target', {})
+            if request.get('envelope') != self.offer.get('envelope') or request['version'] != self.offer['version'] or not package.resolve().is_relative_to(path.parent.resolve()):
                 return False
             if Path(request['installation']).resolve() != self.installation.resolve() or request.get('image') != (str(self.image) if self.image else None):
                 return False
-            if descriptor not in [target['full'], *target.get('patches', [])] or package.stat().st_size != descriptor['bytes'] or protocol.digest(package) != descriptor['sha256']:
+            if request['kind'] == 'installer':
+                asset = self.offer['installer']
+                expected = self.offer.get('installer_descriptor') or {
+                    'name': asset['name'], 'bytes': asset['size'], 'sha256': (asset.get('digest') or '').removeprefix('sha256:')}
+                candidates = [expected]
+            else:
+                candidates = [target['full'], *target.get('patches', [])]
+            if descriptor not in candidates or package.stat().st_size != descriptor['bytes'] or protocol.digest(package) != descriptor['sha256']:
                 return False
             if request['kind'] == 'patch':
                 protocol.verify_files(self.installation, protocol.load_inventory(self.installation)['files'])
@@ -261,8 +275,10 @@ class UpdateClient:
                                     'version': self.offer['version']}
                 shutil.rmtree(folder / 'payload', ignore_errors=True)
             self.request['folder'] = str(folder)
-            if self.request['kind'] != 'installer':
-                protocol.atomic_json(self.data_root / '_updates/ready.json', self.request)
+            self.request.update(version=self.offer['version'], installation=str(self.installation),
+                                image=str(self.image) if self.image else None,
+                                envelope=self.offer.get('envelope'))
+            protocol.atomic_json(self.data_root / '_updates/ready.json', self.request)
             with self.lock:
                 self.state = 'ready'
         except Exception as error:

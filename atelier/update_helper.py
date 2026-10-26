@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -13,7 +14,23 @@ from atelier import update_protocol as protocol
 from atelier.updates import clean_environment
 
 
-def wait_for_exit(pid, timeout=300):
+def prune_backups(data_root, current):
+    root = (Path(data_root) / '_updates').resolve()
+    for folder in root.iterdir():
+        if folder == current or not re.fullmatch('[a-f0-9]{32}', folder.name) or folder.is_symlink() or folder.is_junction():
+            continue
+        # The updater owns only completed transaction folders below this root.
+        if not folder.is_dir() or not folder.resolve().is_relative_to(root):
+            continue
+        try:
+            journal = json.loads((folder / 'transaction/journal.json').read_bytes())
+        except (OSError, ValueError):
+            continue
+        if journal.get('state') in {'committed', 'rolled_back'}:
+            shutil.rmtree(folder)
+
+
+def wait_for_exit(pid, timeout=24 * 60 * 60):
     deadline = time.monotonic() + timeout
     if os.name == 'nt':
         import ctypes
@@ -124,23 +141,23 @@ def _run(request_path, recover=False, parent_pid=None):
         pending.unlink(missing_ok=True)
         launch(command, request)
         return
-    keys = json.loads((Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'update_keys.json').read_bytes())
-    feed = protocol.verify_feed(request['envelope'], keys)
-    target = feed['platforms'][request['platform']]
-    descriptor = request['descriptor']
-    if feed['version'] != request['version'] or descriptor not in [target['full'], *target.get('patches', [])]:
-        raise ValueError('Update request is not in the signed release.')
-    package = Path(request['package'])
-    if package.stat().st_size != descriptor['bytes'] or protocol.digest(package) != descriptor['sha256']:
-        raise ValueError('Staged update package was modified.')
     atomic_pending = {'request': str(request_path)}
     try:
+        keys = json.loads((Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'update_keys.json').read_bytes())
+        feed = protocol.verify_feed(request['envelope'], keys)
+        target = feed['platforms'][request['platform']]
+        descriptor = request['descriptor']
+        if feed['version'] != request['version'] or descriptor not in [target['full'], *target.get('patches', [])]:
+            raise ValueError('Update request is not in the signed release.')
+        package = Path(request['package'])
+        if package.stat().st_size != descriptor['bytes'] or protocol.digest(package) != descriptor['sha256']:
+            raise ValueError('Staged update package was modified.')
         if request['platform'] == 'windows-x64':
             # Recheck the base after all application work has drained.
             staging = folder / 'apply-payload'
             plan = protocol.stage_windows(request['installation'], package, staging, request['kind'])
-            if plan['target']['version'] != feed['version']:
-                raise ValueError('Package version differs from its signed release.')
+            if plan['target']['version'] != feed['version'] or plan['target']['source_commit'] != feed['source_commit']:
+                raise ValueError('Package version or source differs from its signed release.')
             protocol.atomic_json(pending, atomic_pending)
             protocol.apply_windows(request['installation'], staging, plan, transaction)
         else:
@@ -171,6 +188,7 @@ def _run(request_path, recover=False, parent_pid=None):
         for name in ('payload', 'apply-payload'):
             shutil.rmtree(folder / name, ignore_errors=True)
         package.unlink(missing_ok=True)
+        prune_backups(request['data_root'], folder)
     except BaseException:
         if journal.is_file():
             if request['platform'] == 'windows-x64':

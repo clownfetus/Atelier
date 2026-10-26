@@ -4,6 +4,7 @@ import importlib.metadata
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -20,6 +21,13 @@ def run_suite(suite):
         raise RuntimeError(suite.name + ' produced no report:\n' + process.stdout[-3000:] + process.stderr[-3000:])
     data = json.loads(receipt.read_bytes())
     print(('FAIL ' if process.returncode else 'PASS ') + suite.name, flush=True)
+    output = ROOT / 'reports/backend'
+    output.mkdir(parents=True, exist_ok=True)
+    log = folder / (suite.name + '.log')
+    if log.is_file():
+        shutil.copy2(log, output / log.name)
+    if process.returncode:
+        print(process.stdout[-10000:] + process.stderr[-4000:], flush=True)
     return data['results'][0]
 
 

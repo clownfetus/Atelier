@@ -398,10 +398,27 @@ class HelperTests(UpdateFixtures):
     def test_helper_rechecks_download_digest_before_any_change(self):
         path, request = self.request()
         Path(request['package']).write_bytes(b'modified after download')
-        with patch.object(H, 'wait_for_exit'), patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch') as restart, patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
             with self.assertRaisesRegex(ValueError, 'modified'):
                 H.run(path)
+        restart.assert_called_once()
         P.verify_files(self.install, self.base['files'])
+
+    def test_backup_cleanup_only_removes_finished_owned_transactions(self):
+        path, request = self.request()
+        old = self.root / 'data/_updates' / ('a' * 32)
+        P.atomic_json(old / 'transaction/journal.json', {'state': 'committed'})
+        incomplete = self.root / 'data/_updates' / ('b' * 32)
+        P.atomic_json(incomplete / 'transaction/journal.json', {'state': 'applying'})
+        custom = self.root / 'data/_updates/user-files/keep.txt'
+        custom.parent.mkdir()
+        custom.write_text('preserve')
+        H.prune_backups(request['data_root'], path.parent)
+        self.assertFalse(old.exists())
+        self.assertTrue(incomplete.exists())
+        self.assertEqual(custom.read_text(), 'preserve')
+        self.assertTrue(path.exists())
+
 
     def test_interrupted_transaction_can_be_recovered(self):
         path, request = self.request()
@@ -424,6 +441,56 @@ class HelperTests(UpdateFixtures):
         request = {'folder': str(self.root), 'version': '1.1.4', 'token': 'different-token'}
         ack.rename(self.root / 'healthy.json')
         self.assertFalse(H.healthy(process, request))
+
+
+class LinuxHelperTests(UpdateFixtures):
+    def linux_request(self):
+        folder = self.root / 'data/_updates' / ('f' * 32)
+        folder.mkdir(parents=True)
+        image = self.write(self.root, 'Atelier.AppImage', b'\x7fELF old AppImage')
+        package = self.write(folder, 'Atelier-1.1.4.AppImage', b'\x7fELF new AppImage')
+        feed = copy.deepcopy(self.feed)
+        feed['platforms']['linux-x64']['full'] = P.file_record(package)
+        envelope = P.sign_feed(feed, self.secret, 'fixture')
+        self.write(self.root, 'keys/update_keys.json', P.canonical(self.keys))
+        request = {'kind': 'full', 'package': str(package), 'descriptor': P.file_record(package),
+                   'envelope': envelope, 'platform': 'linux-x64', 'version': '1.1.4',
+                   'installation': str(self.install), 'folder': str(folder), 'parent_pid': 999999,
+                   'token': 'linux-token', 'data_root': str(self.root / 'data'), 'image': str(image)}
+        path = folder / 'request.json'
+        P.atomic_json(path, request)
+        return path, request
+
+    def test_appimage_update_installs_and_keeps_user_files(self):
+        path, request = self.linux_request()
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch'), patch.object(H, 'healthy', return_value=True), \
+             patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
+            H.run(path)
+        self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF new AppImage')
+        self.assertFalse((self.root / 'data/_updates/pending.json').exists())
+        self.preserved()
+
+    def test_failed_appimage_startup_restores_previous_image(self):
+        path, request = self.linux_request()
+        process = Mock()
+        process.poll.return_value = 1
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch', return_value=process), patch.object(H, 'healthy', return_value=False), \
+             patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
+            with self.assertRaisesRegex(RuntimeError, 'restored the previous'):
+                H.run(path)
+        self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF old AppImage')
+        self.preserved()
+
+    def test_recovering_committed_appimage_transaction_keeps_new_version(self):
+        path, request = self.linux_request()
+        transaction = path.parent / 'transaction'
+        self.write(transaction, 'previous.AppImage', b'\x7fELF previous')
+        P.atomic_json(transaction / 'journal.json', {'state': 'committed'})
+        Path(request['image']).write_bytes(b'\x7fELF committed version')
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch'):
+            H.run(path, recover=True)
+        self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF committed version')
+
 
 
 if __name__ == '__main__':

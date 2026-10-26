@@ -4435,6 +4435,13 @@ async function checkUsmapUpdate() {
 }
 
 // ── update check ──────────────────────────────────────────────────────────────
+async function acknowledgeUpdateStartup() {
+  try {
+    const status = await api("/api/update_ready");
+    if (status?.required) await api("/api/update_ready", { method: "POST" });
+  } catch (_) {}
+}
+
 function _fmtMB(bytes) {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
@@ -5098,13 +5105,13 @@ async function init() {
   if (await checkSetup()) {
     window.AtelierPolish?.startupDone(); console.log("[init] halted for setup");
     checkUpdate(update);
-    api("/api/update_ready", { method: "POST" }).catch(() => {});
+    acknowledgeUpdateStartup();
     return;
   }
   await checkProject(() => {
     checkUpdate(update);
     if (document.getElementById("project-overlay").classList.contains("active")) {
-      api("/api/update_ready", { method: "POST" }).catch(() => {});
+      acknowledgeUpdateStartup();
     }
   });
   await checkPrereqs();
@@ -5112,7 +5119,7 @@ async function init() {
   await loadSidebar();
   checkUsmapUpdate();
   window.AtelierChangelog?.ready();
-  api("/api/update_ready", { method: "POST" }).catch(() => {});
+  acknowledgeUpdateStartup();
 }
 
 init();
