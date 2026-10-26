@@ -1,5 +1,10 @@
 # Preparing a public release
 
+For normal updates, use **Actions → Release Atelier** or push a numeric `v*` tag.
+See [automatic releases and in-app updates](automatic-releases.md) for the release
+controls, signing, patch compatibility and verification. The candidate procedure
+below remains available for historical/manual verification.
+
 Dispatch `.github/workflows/release-candidate.yml` against the release commit (or push a
 `codex/release-*` / `release/*-candidate` branch). It builds the Windows installer and the Linux
 AppImage **from source** with the pinned toolchain, runs the backend and browser suites, verifies the

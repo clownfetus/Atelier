@@ -400,7 +400,7 @@
         <button class="btn" id="update-later">Later</button>
         <button class="btn primary" id="update-now">
           <i data-lucide="download" size="14"></i>
-          Update Now
+          Download Update
         </button>
       </div>
     </div>
@@ -414,9 +414,17 @@
       </div>
       <div id="update-dl-label" style="font-size:12px;color:var(--muted)">Starting&hellip;</div>
     </div>
+    <div id="update-ready" style="display:none;flex-direction:column;gap:14px">
+      <h2><i data-lucide="check-circle" size="18" style="color:var(--acc)"></i> Update Ready</h2>
+      <p>Save your open edits before restarting. Atelier will finish active tasks, then install the update and reopen.</p>
+      <div class="modal-row">
+        <button class="btn" id="update-restart-later">Restart Later</button>
+        <button class="btn primary" id="update-restart">Restart and Update</button>
+      </div>
+    </div>
     <div id="update-error" style="display:none;flex-direction:column;gap:14px">
       <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Update Failed</h2>
-      <p>Could not download the update. Check your connection and try again.</p>
+      <p id="update-error-message">Could not download the update. Check your connection and try again.</p>
       <div class="modal-row">
         <button class="btn primary" id="update-error-ok">Continue</button>
       </div>

@@ -126,6 +126,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; Mappings and AES_KEY.txt are game-derived and never ship; the app fetches both on first run.
 [Files]
 Source: "dist\Atelier\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Atelier\Atelier.update.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Atelier\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "dist\Atelier\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Atelier\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs

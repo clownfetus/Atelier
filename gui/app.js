@@ -4440,7 +4440,7 @@ function _fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 function _showUpdatePanel(id) {
-  ["update-confirm", "update-downloading", "update-error"].forEach(p => {
+  ["update-confirm", "update-downloading", "update-ready", "update-error"].forEach(p => {
     document.getElementById(p).style.display = p === id ? "flex" : "none";
   });
 }
@@ -4464,11 +4464,24 @@ async function checkUpdate(pending = api("/api/update_check")) {
       '<i data-lucide="external-link" size="14"></i> Open Release Page';
     document.getElementById("update-tag").nextSibling.textContent = " is available to download.";
   }
-  _showUpdatePanel("update-confirm");
+  _showUpdatePanel(info.ready ? "update-ready" : "update-confirm");
   lucide.createIcons();
 
   return new Promise(resolve => {
     const dismiss = (remind=false) => { overlay.classList.remove("active");if(remind)window.AtelierSurfaces?.updateDrop('app',()=>overlay.classList.add('active')); resolve(false); };
+    const failed = message => {
+      document.getElementById("update-error-message").textContent = message || "Could not download the update. Check your connection and try again.";
+      _showUpdatePanel("update-error");
+    };
+    document.getElementById("update-restart-later").onclick = () => dismiss(true);
+    document.getElementById("update-restart").onclick = async () => {
+      const button = document.getElementById("update-restart");
+      button.disabled = true;
+      try {
+        const result = await api("/api/update_apply", { method: "POST" });
+        if (!result?.ok) throw new Error(result?.error || "Could not restart Atelier.");
+      } catch (error) { failed(error.message); button.disabled = false; }
+    };
     document.getElementById("update-later").onclick = ()=>dismiss(true);
     if (info.manual) {
       document.getElementById("update-now").onclick = async () => {
@@ -4481,8 +4494,10 @@ async function checkUpdate(pending = api("/api/update_check")) {
       _showUpdatePanel("update-downloading");
       const fill  = document.getElementById("update-dl-fill");
       const label = document.getElementById("update-dl-label");
-      try { await api("/api/update_download", { method: "POST" }); }
-      catch { _showUpdatePanel("update-error"); return; }
+      try {
+        const result = await api("/api/update_download", { method: "POST" });
+        if (!result?.ok) throw new Error(result?.error || "Could not start the download.");
+      } catch (error) { failed(error.message); return; }
       const poll = setInterval(async () => {
         let s, p;
         try {
@@ -4490,7 +4505,7 @@ async function checkUpdate(pending = api("/api/update_check")) {
         } catch {
           // Losing the status stream must not leave "Downloading…" up with no way out.
           clearInterval(poll);
-          _showUpdatePanel("update-error");
+          failed();
           return;
         }
         if (p.total > 0) {
@@ -4499,8 +4514,12 @@ async function checkUpdate(pending = api("/api/update_check")) {
         }
         if (s.state === "error") {
           clearInterval(poll);
-          _showUpdatePanel("update-error");
+          failed(s.error);
           document.getElementById("update-error-ok").onclick = () => { overlay.classList.remove("active"); resolve(false); };
+        }
+        if (s.state === "ready") {
+          clearInterval(poll);
+          _showUpdatePanel("update-ready");
         }
       }, 300);
     };
@@ -5079,14 +5098,21 @@ async function init() {
   if (await checkSetup()) {
     window.AtelierPolish?.startupDone(); console.log("[init] halted for setup");
     checkUpdate(update);
+    api("/api/update_ready", { method: "POST" }).catch(() => {});
     return;
   }
-  await checkProject(() => checkUpdate(update));
+  await checkProject(() => {
+    checkUpdate(update);
+    if (document.getElementById("project-overlay").classList.contains("active")) {
+      api("/api/update_ready", { method: "POST" }).catch(() => {});
+    }
+  });
   await checkPrereqs();
   await renderGrid();
   await loadSidebar();
   checkUsmapUpdate();
   window.AtelierChangelog?.ready();
+  api("/api/update_ready", { method: "POST" }).catch(() => {});
 }
 
 init();

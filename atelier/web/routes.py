@@ -10,6 +10,7 @@ from atelier import jobs
 from atelier import preview
 from atelier import import_server
 from atelier import changelog
+from atelier import updates
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
@@ -1302,69 +1303,17 @@ def api_open_discord_key():
 
 # ── auto-update ───────────────────────────────────────────────────────────────
 
-_update_cache      = None   # {"tag": str, "download_url": str} set by update_check
-_update_state      = "idle" # idle | downloading | error
-_update_state_lock = threading.Lock()
-_update_progress   = {"pct": 0, "bytes": 0, "total": 0}
+_updater = updates.UpdateClient(ROOT, VERSION_FILE, _c.DATA_ROOT)
 
 
 @app.get("/api/update_check")
 def api_update_check():
-    global _update_cache
     response.content_type = "application/json"
-
     try:
-        with open(VERSION_FILE, "r") as f:
-            current = tuple(int(x) for x in f.read().strip().split("."))
-        print(f"[update] current version: {current}")
-    except Exception as e:
-        print(f"[update] failed to read version: {e}")
+        return json.dumps(_updater.check())
+    except Exception as error:
+        print(f"[update] check failed: {error}")
         return json.dumps({"available": False})
-
-    try:
-        req = urllib.request.Request(
-            "https://api.github.com/repos/clownfetus/Atelier/releases/latest",
-            headers={"User-Agent": "Atelier-Updater"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as r:
-            data = json.loads(r.read().decode())
-        if not data or "tag_name" not in data:
-            return json.dumps({"available": False})
-    except Exception as e:
-        print(f"[update] GitHub request failed: {e}")
-        return json.dumps({"available": False})
-
-    tag = data.get("tag_name", "")
-    try:
-        remote = tuple(int(x) for x in tag.lstrip("v").split("."))
-    except Exception:
-        return json.dumps({"available": False})
-
-    if remote <= current:
-        print(f"[update] up to date ({current} >= {remote})")
-        return json.dumps({"available": False})
-
-    release_url = data.get("html_url") or f"https://github.com/clownfetus/Atelier/releases/tag/{tag}"
-
-    # Only Windows updates in place (Inno Setup installer). Elsewhere the same prompt sends the
-    # user to the release page to grab the new AppImage by hand.
-    if not hostos.IS_WINDOWS:
-        _update_cache = {"tag": tag, "download_url": None, "release_url": release_url}
-        print(f"[update] update available: {current} -> {remote} (manual, via release page)")
-        return json.dumps({"available": True, "tag": tag, "manual": True})
-
-    download_url = None
-    for asset in data.get("assets", []):
-        if asset["name"] == "AtelierSetup.exe":
-            download_url = asset["browser_download_url"]
-            break
-    if not download_url:
-        print("[update] AtelierSetup.exe not found in release assets")
-        return json.dumps({"available": False})
-
-    _update_cache = {"tag": tag, "download_url": download_url, "release_url": release_url}
-    print(f"[update] update available: {current} -> {remote}")
-    return json.dumps({"available": True, "tag": tag})
 
 
 # ── native tool updates (Settings > Tools) ─────────────────────────────────────
@@ -1413,9 +1362,9 @@ def api_tools_rollback():
 @app.post("/api/update_open_release")
 def api_update_open_release():
     response.content_type = "application/json"
-    if not _update_cache:
+    if not _updater.offer:
         return json.dumps({"ok": False})
-    try: hostos.open_path(_update_cache["release_url"])
+    try: hostos.open_path(_updater.offer["release_url"])
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
     return json.dumps({"ok": True})
@@ -1423,69 +1372,47 @@ def api_update_open_release():
 
 @app.post("/api/update_download")
 def api_update_download():
-    global _update_state
     response.content_type = "application/json"
-    if not _update_cache:
-        return json.dumps({"ok": False, "error": "no update info cached"})
-    with _update_state_lock:
-        if _update_state == "downloading":
-            return json.dumps({"ok": True})
-        _update_state = "downloading"
-    threading.Thread(target=_do_update_download, args=(_update_cache["download_url"],), daemon=True).start()
-    return json.dumps({"ok": True})
+    try:
+        _updater.start_download()
+        return json.dumps({"ok": True})
+    except Exception as error:
+        return json.dumps({"ok": False, "error": str(error)})
 
 
 @app.get("/api/update_status")
 def api_update_status():
     response.content_type = "application/json"
-    return json.dumps({"state": _update_state})
+    return json.dumps({"state": _updater.state, "error": _updater.error})
 
 
 @app.get("/api/update_progress")
 def api_update_progress():
     response.content_type = "application/json"
-    return json.dumps(_update_progress)
+    return json.dumps(_updater.progress)
 
 
-def _do_update_download(download_url):
-    """Downloads and runs the Inno Setup installer. Windows-only by construction — releases ship
-    an .exe installer, and on Linux update_check offers the release page instead."""
-    global _update_state, _update_progress
-    if not hostos.IS_WINDOWS:
-        print("[update] in-app update is Windows-only; download the new release from the release page")
-        with _update_state_lock:
-            _update_state = "error"
-        return
-    tmp_path = os.path.join(tempfile.gettempdir(), "AtelierSetup.exe")
-
-    def _reporthook(block_num, block_size, total_size):
-        global _update_progress
-        if total_size > 0:
-            downloaded = min(block_num * block_size, total_size)
-            _update_progress = {
-                "pct":   int(downloaded * 100 / total_size),
-                "bytes": downloaded,
-                "total": total_size,
-            }
-
+@app.post("/api/update_apply")
+def api_update_apply():
+    response.content_type = "application/json"
     try:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        print(f"[update] downloading to {tmp_path}...")
-        urllib.request.urlretrieve(download_url, tmp_path, reporthook=_reporthook)
-        print("[update] download complete, launching installer...")
-    except Exception as e:
-        print(f"[update] download failed: {e}")
-        with _update_state_lock:
-            _update_state = "error"
-        return
-    subprocess.Popen(
-        [tmp_path, "/SILENT"],
-        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-        close_fds=True,
-    )
-    print("[update] installer launched, exiting...")
-    os._exit(0)
+        import webview
+        if not webview.windows:
+            raise ValueError("Restart updates from the Atelier desktop window.")
+        _updater.apply()
+        # Normal window closing drains saves, jobs and native workers. The helper
+        # waits for the process rather than interrupting an export.
+        threading.Timer(.5, webview.windows[0].destroy).start()
+        return json.dumps({"ok": True})
+    except Exception as error:
+        return json.dumps({"ok": False, "error": str(error)})
+
+
+@app.post("/api/update_ready")
+def api_update_ready():
+    response.content_type = "application/json"
+    updates.acknowledge_startup(VERSION_FILE)
+    return json.dumps({"ok": True})
 
 
 # ── USMAP management ──────────────────────────────────────────────────────────

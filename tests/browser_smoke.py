@@ -84,6 +84,7 @@ def main():
     parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
+    parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
     parser.add_argument('--shared-identity-only', action='store_true', help='Check named ID folders, search, pins and template picking in every content branch')
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
@@ -176,6 +177,13 @@ def main():
 
                 from changelog_checks import run_changelog_checks
                 run_changelog_checks(context, url, report, checks)
+                from update_browser_checks import run_update_browser_checks
+                run_update_browser_checks(context, url, report, checks)
+                if args.updates_only:
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2), encoding='utf-8')
+                    browser.close()
+                    return
                 if args.changelog_only:
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))

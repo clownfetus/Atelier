@@ -241,3 +241,7 @@ retrieval/data/
 retrieval/test.py
 # Additional local virtual environments (.venv312 etc.)
 .venv*/
+
+# Release/update working files
+_updates/
+_release/
