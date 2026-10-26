@@ -17,6 +17,10 @@ on:
         description: 'Build and verify only; do not create a release or tag'
         default: false
         type: boolean
+      full_browser:
+        description: 'Force all browser and visual workflows'
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       version:
@@ -27,6 +31,9 @@ on:
         type: boolean
       verify_only:
         default: true
+        type: boolean
+      full_browser:
+        default: false
         type: boolean
 
 concurrency:
@@ -63,6 +70,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          ATELIER_FULL_BROWSER: ${{ inputs.full_browser }}
         run: python scripts/prepare_release.py --version "$RELEASE_VERSION"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -106,7 +114,7 @@ jobs:
           "$PWD/.venv/Scripts" >> $env:GITHUB_PATH
       - run: python -m playwright install chromium
       - run: python scripts/release_checks.py
-      - run: python tests/browser_smoke.py --report-dir reports/browser
+      - run: python scripts/release_browser_checks.py
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         id: native
         with:
@@ -244,7 +252,7 @@ jobs:
       - run: .venv/bin/python -m pip install -r requirements-dev.txt
       - run: .venv/bin/python -m playwright install --with-deps chromium
       - run: .venv/bin/python scripts/release_checks.py
-      - run: .venv/bin/python tests/browser_smoke.py --report-dir reports/browser
+      - run: .venv/bin/python scripts/release_browser_checks.py
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         id: native
         with:

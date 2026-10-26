@@ -21,11 +21,31 @@ from atelier import update_protocol as P
 import assemble_release as A
 import prepare_release as R
 import verify_update_results as V
+import release_check_scope as S
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 class ReleasePlanning(unittest.TestCase):
+    def test_browser_scope_broadens_for_other_components_and_unknown_layouts(self):
+        self.assertEqual(S.browser_mode(['gui/viewport.js'], lambda _: '', lambda _: ''), 'full')
+        self.assertEqual(S.browser_mode(['atelier/handlers/mesh.py'], lambda _: '', lambda _: ''), 'full')
+        self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: 'unknown', lambda _: 'unknown'), 'full')
+        self.assertEqual(S.browser_mode([], lambda _: '', lambda _: ''), 'full')
+        self.assertEqual(S.browser_mode(['atelier/updates.py', 'scripts/build.py'], lambda _: '', lambda _: ''), 'updates')
+
+    def test_updater_routes_do_not_hide_changes_to_other_api_functions(self):
+        old = 'value = 1\n\ndef save():\n    return value\n'
+        new = old + '\nfrom atelier import updates\n_updater = updates.UpdateClient()\ndef api_update_ready():\n    return True\n'
+        self.assertEqual(S.routes_without_updates(old), S.routes_without_updates(new))
+        self.assertNotEqual(S.routes_without_updates(old), S.routes_without_updates(new.replace('value = 1', 'value = 2')))
+
+    def test_shared_interface_changes_outside_update_region_require_full_coverage(self):
+        base = '// ── update check\nold\n// ── project picker\nshared\n// ── initial load\ninit\n// ── Shader Studio\n'
+        new = base.replace('old', 'new')
+        self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: base, lambda _: new), 'updates')
+        self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: base, lambda _: new.replace('shared', 'changed')), 'full')
+
     def previous(self):
         return {'tag_name': '1.1.3', 'assets': [
             {'name': name, 'size': 123, 'digest': 'sha256:' + 'a' * 64,

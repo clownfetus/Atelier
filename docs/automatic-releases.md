@@ -62,6 +62,12 @@ interface changes reuse that installer machinery. Every emitted Windows delta
 is applied to the actual previous portable release, launches the upgraded app,
 and is rolled back while checking user-data preservation.
 
+Startup, release-note and update browser checks always run. Changes confined to
+the update components use these checks; other interface/backend changes or an
+unknown source layout select the complete browser suite. **Full browser** forces
+all visual/workflow checks when needed. Packaged native-window and update-handoff
+checks remain mandatory in both modes.
+
 Native tool builds are cached by platform and hashes of `native/`, `toolchain/`
 and their build recipes. On a cache miss, the last published release's tools can
 also be reused when native sources, build recipes and the SDK match; their

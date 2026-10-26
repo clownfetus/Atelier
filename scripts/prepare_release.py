@@ -18,7 +18,7 @@ REPOSITORY = 'clownfetus/Atelier'
 
 
 def git(*args):
-    return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
+    return subprocess.check_output(['git', *args], cwd=ROOT, text=True, encoding='utf-8').strip()
 
 
 def asset_digest(asset):
@@ -118,6 +118,8 @@ def main():
     release_version = args.version.removeprefix('v') or (ROOT / 'version').read_text().strip()
     previous = json.loads(subprocess.check_output(['gh', 'api', f'repos/{REPOSITORY}/releases/latest'], text=True))
     context, inputs = prepare(release_version, previous)
+    from release_check_scope import select
+    context['browser_mode'] = 'full' if os.environ.get('ATELIER_FULL_BROWSER') == 'true' else select(context)
     directory = ROOT / '_release'
     atomic_json(directory / 'context.json', context)
     atomic_json(directory / 'inputs.json', inputs)
@@ -133,7 +135,7 @@ def main():
     heading = '## ' + release_version
     if not any(line == heading or line.startswith(heading + ' ') for line in changelog.splitlines()):
         log = subprocess.check_output(['git', 'log', '--first-parent', '--format=%T%x1f%s%x1f%b%x1e',
-                                       f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True)
+                                       f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True, encoding='utf-8')
         entries = release_summaries(log, git('rev-parse', context['previous_tag'] + '^{tree}'))
         today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         section = f'## {release_version} — {today}\n\n' + '\n'.join('- ' + entry for entry in entries) + '\n\n'
@@ -159,6 +161,7 @@ def main():
                 output.write(f'{key}={context[key]}\n')
             output.write(f"full_checks={str(context['full_checks']).lower()}\n")
     print('Prepared ' + context['tag'] + ' against ' + context['previous_tag'])
+    print('Browser coverage: ' + context['browser_mode'])
 
 
 if __name__ == '__main__':
