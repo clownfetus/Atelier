@@ -332,6 +332,20 @@ class ClientTests(UpdateFixtures):
         with self.assertRaisesRegex(ValueError, 'not finished'):
             self.client().apply()
 
+    def test_refresh_during_download_keeps_the_selected_release(self):
+        client = self.client()
+        self.offer(client)
+        client.state = 'downloading'
+        with patch.object(U, 'read_json') as network:
+            self.assertEqual(client.check()['tag'], 'v1.1.4')
+        network.assert_not_called()
+
+    def test_malformed_ready_cache_does_not_block_a_new_update(self):
+        client = self.client()
+        self.offer(client)
+        P.atomic_json(client.data_root / '_updates/ready.json', {'package': None, 'descriptor': {}})
+        self.assertFalse(client._restore_ready())
+
     def test_restart_environment_discards_frozen_bundle_paths_and_retains_system_paths(self):
         prefix = str(self.root / 'bundle')
         env = {'GI_TYPELIB_PATH': prefix + '/gi' + os.pathsep + '/system/gi',

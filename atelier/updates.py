@@ -109,6 +109,13 @@ class UpdateClient:
         return json.loads(path.read_bytes())
 
     def check(self):
+        with self.lock:
+            if self.state in {'downloading', 'ready', 'applying'} and self.offer:
+                return {'available': True, 'tag': self.offer['tag'], 'ready': self.state == 'ready',
+                        'patch': bool(self.offer.get('target'))}
+            return self._check()
+
+    def _check(self):
         current = self.version_file.read_text(encoding='utf-8').strip()
         protocol.version(current)
         release = read_json(RELEASE_API)
@@ -189,7 +196,7 @@ class UpdateClient:
                 protocol.verify_files(self.installation, protocol.load_inventory(self.installation)['files'])
             self.request, self.state = request, 'ready'
             return True
-        except (OSError, ValueError, KeyError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
             return False
 
     def _descriptor(self, row):

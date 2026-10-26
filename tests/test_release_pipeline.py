@@ -39,6 +39,7 @@ class ReleasePlanning(unittest.TestCase):
         new = old + '\nfrom atelier import updates\n_updater = updates.UpdateClient()\ndef api_update_ready():\n    return True\n'
         self.assertEqual(S.routes_without_updates(old), S.routes_without_updates(new))
         self.assertNotEqual(S.routes_without_updates(old), S.routes_without_updates(new.replace('value = 1', 'value = 2')))
+        self.assertNotEqual(S.routes_without_updates(old), S.routes_without_updates(old + '\ndef api_update_mesh():\n    return True\n'))
 
     def test_shared_interface_changes_outside_update_region_require_full_coverage(self):
         base = '// ── update check\nold\n// ── project picker\nshared\n// ── initial load\ninit\n// ── Shader Studio\n'

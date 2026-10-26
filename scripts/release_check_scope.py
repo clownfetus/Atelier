@@ -32,8 +32,11 @@ def routes_without_updates(text):
     module = ast.parse(text)
     body = []
     globals_ = {'_updater', '_update_cache', '_update_state', '_update_state_lock', '_update_progress'}
+    functions = {'api_update_check', 'api_update_open_release', 'api_update_download',
+                 'api_update_status', 'api_update_progress', 'api_update_apply',
+                 'api_update_ready', 'api_update_ready_required', '_do_update_download'}
     for node in module.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and (node.name.startswith('api_update_') or node.name == '_do_update_download'):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in functions:
             continue
         if isinstance(node, ast.Assign) and all(isinstance(target, ast.Name) and target.id in globals_ for target in node.targets):
             continue
