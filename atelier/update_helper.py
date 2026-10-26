@@ -16,6 +16,7 @@ from atelier.updates import clean_environment
 
 def prune_backups(data_root, current):
     root = (Path(data_root) / '_updates').resolve()
+    current = Path(current).resolve()
     for folder in root.iterdir():
         if folder == current or not re.fullmatch('[a-f0-9]{32}', folder.name) or folder.is_symlink() or folder.is_junction():
             continue
@@ -142,6 +143,7 @@ def _run(request_path, recover=False, parent_pid=None):
         launch(command, request)
         return
     atomic_pending = {'request': str(request_path)}
+    committed = False
     try:
         keys = json.loads((Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'update_keys.json').read_bytes())
         feed = protocol.verify_feed(request['envelope'], keys)
@@ -183,6 +185,7 @@ def _run(request_path, recover=False, parent_pid=None):
         data = json.loads(journal.read_bytes())
         data['state'] = 'committed'
         protocol.atomic_json(journal, data)
+        committed = True
         pending.unlink(missing_ok=True)
         # Retain the backup and receipt, but avoid retaining two expanded payloads.
         for name in ('payload', 'apply-payload'):
@@ -190,6 +193,9 @@ def _run(request_path, recover=False, parent_pid=None):
         package.unlink(missing_ok=True)
         prune_backups(request['data_root'], folder)
     except BaseException:
+        if committed:
+            # Cleanup must never roll back or relaunch an already healthy app.
+            return
         if journal.is_file():
             if request['platform'] == 'windows-x64':
                 protocol.rollback_windows(transaction)

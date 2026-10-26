@@ -491,6 +491,15 @@ class LinuxHelperTests(UpdateFixtures):
             H.run(path, recover=True)
         self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF committed version')
 
+    def test_cleanup_failure_does_not_roll_back_or_start_a_second_healthy_app(self):
+        path, request = self.linux_request()
+        with patch.object(H, 'wait_for_exit'), patch.object(H, 'launch') as launch, \
+             patch.object(H, 'healthy', return_value=True), patch.object(H, 'prune_backups', side_effect=OSError('busy backup file')), \
+             patch.object(sys, '_MEIPASS', str(self.root / 'keys'), create=True):
+            H.run(path)
+        launch.assert_called_once()
+        self.assertEqual(Path(request['image']).read_bytes(), b'\x7fELF new AppImage')
+
 
 
 if __name__ == '__main__':
