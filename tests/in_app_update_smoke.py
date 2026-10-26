@@ -34,7 +34,7 @@ def stop(pid):
         os.killpg(pid, signal.SIGTERM)
 
 
-def wait_server(port, process):
+def wait_server(port, process, marker, token):
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -42,10 +42,11 @@ def wait_server(port, process):
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/update_ready', timeout=1) as response:
                 json.load(response)
-            time.sleep(3)  # Allow the native window to attach before requesting normal close.
-            return
-        except OSError:
-            time.sleep(.3)
+            if marker.is_file() and json.loads(marker.read_bytes()).get('token') == token:
+                return
+        except (OSError, ValueError):
+            pass
+        time.sleep(.3)
     raise TimeoutError('Frozen application did not start.')
 
 
@@ -108,13 +109,15 @@ def main():
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     env = dict(os.environ, ATELIER_DATA_DIR=str(data), ATELIER_HOME=str(data), ATELIER_PORT=str(port), PYINSTALLER_RESET_ENVIRONMENT='1')
-    options = {'env': env, 'cwd': str(executable.parent)}
+    baseline_marker, baseline_token = report / 'baseline-ready.json', uuid.uuid4().hex
+    old_env = env | {'ATELIER_UPDATE_TOKEN': baseline_token, 'ATELIER_UPDATE_ACK': str(baseline_marker)}
+    options = {'env': old_env, 'cwd': str(executable.parent)}
     if os.name != 'nt':
         options['start_new_session'] = True
     old = subprocess.Popen([str(executable)] + ([] if os.name == 'nt' else ['--appimage-extract-and-run']), **options)
     new_pid = None
     try:
-        wait_server(port, old)
+        wait_server(port, old, baseline_marker, baseline_token)
         request = {'kind': 'full', 'package': str(package), 'descriptor': descriptor,
                    'envelope': json.loads((release / P.FEED).read_bytes()), 'platform': host,
                    'version': feed['version'], 'installation': str(installation), 'image': str(image) if image else None,
