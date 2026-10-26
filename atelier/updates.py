@@ -39,6 +39,17 @@ def read_json(url):
 
 def clean_environment():
     env = dict(os.environ)
+    bundle = str(getattr(sys, '_MEIPASS', '')).rstrip('/\\')
+    if bundle:
+        for name in ('PATH', 'GI_TYPELIB_PATH', 'GIO_MODULE_DIR', 'GSETTINGS_SCHEMA_DIR',
+                     'GDK_PIXBUF_MODULE_FILE', 'GDK_PIXBUF_MODULEDIR', 'GTK_DATA_PREFIX',
+                     'GTK_EXE_PREFIX', 'GTK_PATH', 'XDG_DATA_DIRS'):
+            kept = [entry for entry in env.get(name, '').split(os.pathsep) if entry and
+                    entry != bundle and not entry.startswith((bundle + '/', bundle + '\\'))]
+            if kept:
+                env[name] = os.pathsep.join(kept)
+            else:
+                env.pop(name, None)
     for name in list(env):
         if name.startswith('_PYI_') or name in {'APPDIR', 'APPIMAGE', 'APPIMAGE_EXTRACT_AND_RUN',
                                                'ATELIER_UPDATE_ACK', 'ATELIER_UPDATE_TOKEN'}:

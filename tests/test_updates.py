@@ -332,6 +332,20 @@ class ClientTests(UpdateFixtures):
         with self.assertRaisesRegex(ValueError, 'not finished'):
             self.client().apply()
 
+    def test_restart_environment_discards_frozen_bundle_paths_and_retains_system_paths(self):
+        prefix = str(self.root / 'bundle')
+        env = {'GI_TYPELIB_PATH': prefix + '/gi' + os.pathsep + '/system/gi',
+               'XDG_DATA_DIRS': prefix + '/share' + os.pathsep + '/system/share',
+               'LD_LIBRARY_PATH': prefix, 'LD_LIBRARY_PATH_ORIG': '/system/lib',
+               '_PYI_APPLICATION_HOME_DIR': prefix, 'ATELIER_UPDATE_TOKEN': 'old-token'}
+        with patch.dict(os.environ, env), patch.object(sys, '_MEIPASS', prefix, create=True):
+            cleaned = U.clean_environment()
+        self.assertEqual(cleaned['GI_TYPELIB_PATH'], '/system/gi')
+        self.assertEqual(cleaned['XDG_DATA_DIRS'], '/system/share')
+        self.assertEqual(cleaned['LD_LIBRARY_PATH'], '/system/lib')
+        self.assertNotIn('_PYI_APPLICATION_HOME_DIR', cleaned)
+        self.assertNotIn('ATELIER_UPDATE_TOKEN', cleaned)
+
     def test_verified_download_survives_closing_and_reopening_the_app(self):
         client = self.client()
         assets = self.offer(client)
