@@ -20,6 +20,10 @@ SEED = 'Tools/MarvelRivalsCharacterIDs.md'
 PLATFORMS = {'windows-x64', 'linux-x64'}
 
 
+class InstallerRequired(ValueError):
+    """A structural/runtime change needs the installer's complete owned-folder reset."""
+
+
 def version(value):
     if not isinstance(value, str) or not re.fullmatch(r'[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}', value):
         raise ValueError('Expected a version such as 1.2.3.')
@@ -190,14 +194,14 @@ def make_patch(root, previous, output):
     if version(target['version']) <= version(previous['version']):
         raise ValueError('Patch must increase the version.')
     if target.get('runtime_id') != previous.get('runtime_id'):
-        raise ValueError('A changed Python runtime requires the installer.')
+        raise InstallerRequired('A changed Python runtime requires the installer.')
     old = {row['path']: row for row in previous['files']}
     new = {row['path']: row for row in target['files']}
     changed = [name for name, row in new.items() if row != old.get(name)]
     removed = sorted(set(old) - set(new))
     # A case-only rename on Windows cannot be safely treated as two files.
     if any(name.casefold() == other.casefold() and name != other for name in new for other in removed):
-        raise ValueError('Case-only rename requires the full package.')
+        raise InstallerRequired('Case-only rename requires the installer.')
     metadata = {'schema': SCHEMA, 'base': previous, 'target': target,
                 'changed': changed, 'removed': removed}
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
@@ -261,7 +265,14 @@ def stage_windows(installation, package, staging, kind):
         if version(target['version']) <= version(previous['version']):
             raise ValueError('Refusing an update that does not increase the version.')
         if target.get('runtime_id') != previous.get('runtime_id'):
-            raise ValueError('A changed Python runtime requires the installer.')
+            raise InstallerRequired('A changed Python runtime requires the installer.')
+        old_names = {name.casefold(): name for name in old}
+        for name in new:
+            if name.casefold() in old_names and old_names[name.casefold()] != name:
+                raise InstallerRequired('Case-only rename requires the installer.')
+            destination = safe_path(installation, name)
+            if destination.is_dir() or any(parent.is_file() for parent in destination.parents if parent.is_relative_to(installation)):
+                raise InstallerRequired('A changed file/directory layout requires the installer.')
         # Preflight every destination, including unchanged paths and removals.
         for name in set(old) | set(new) | {INVENTORY}:
             safe_path(installation, name)

@@ -13,6 +13,21 @@ on:
         description: 'Publish after all checks pass (off leaves a draft)'
         default: true
         type: boolean
+      verify_only:
+        description: 'Build and verify only; do not create a release or tag'
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      publish:
+        default: false
+        type: boolean
+      verify_only:
+        default: true
+        type: boolean
 
 concurrency:
   group: atelier-release
@@ -313,6 +328,7 @@ jobs:
           path: ${{ runner.temp }}/release
           compression-level: 0
       - name: Upload every asset before making the release visible to updaters
+        if: ${{ !inputs.verify_only }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

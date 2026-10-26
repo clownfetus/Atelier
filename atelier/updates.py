@@ -232,10 +232,13 @@ class UpdateClient:
                                 break
                             selected, kind = patch, 'patch'
                             break
+                installer_fallback = False
                 try:
                     package = self._download(selected, folder)
                     if self.windows:
                         protocol.stage_windows(self.installation, package, folder / 'payload', kind)
+                except protocol.InstallerRequired:
+                    installer_fallback = True
                 except (OSError, ValueError, zipfile.BadZipFile):
                     if kind != 'patch':
                         raise
@@ -243,11 +246,19 @@ class UpdateClient:
                     shutil.rmtree(folder / 'payload', ignore_errors=True)
                     selected, kind = target['full'], 'full'
                     package = self._download(selected, folder)
-                    protocol.stage_windows(self.installation, package, folder / 'payload', kind)
-                self.request = {'kind': kind, 'package': str(package), 'descriptor': selected,
-                                'envelope': self.offer['envelope'], 'platform': self.offer['platform'],
-                                'installation': str(self.installation), 'image': str(self.image) if self.image else None,
-                                'version': self.offer['version']}
+                    try:
+                        protocol.stage_windows(self.installation, package, folder / 'payload', kind)
+                    except protocol.InstallerRequired:
+                        installer_fallback = True
+                if installer_fallback:
+                    selected = target['installer']
+                    package = self._download(selected, folder)
+                    self.request = {'kind': 'installer', 'package': str(package), 'descriptor': selected}
+                else:
+                    self.request = {'kind': kind, 'package': str(package), 'descriptor': selected,
+                                    'envelope': self.offer['envelope'], 'platform': self.offer['platform'],
+                                    'installation': str(self.installation), 'image': str(self.image) if self.image else None,
+                                    'version': self.offer['version']}
                 shutil.rmtree(folder / 'payload', ignore_errors=True)
             self.request['folder'] = str(folder)
             if self.request['kind'] != 'installer':

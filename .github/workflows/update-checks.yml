@@ -19,6 +19,17 @@ permissions:
   contents: read
 
 jobs:
+  release:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[verify release]')
+    needs: updater
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
+    with:
+      version: '1.1.4'
+      verify_only: true
+      publish: false
   updater:
     strategy:
       fail-fast: false

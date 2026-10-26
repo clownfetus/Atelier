@@ -11,6 +11,9 @@ It uploads every asset into a draft before publishing it as latest. Turning
 **Publish** off keeps the complete release as a draft. Nothing publishes on an
 ordinary branch push or pull request.
 
+Select **Verify only** to run the complete build and gates without creating a
+release or tag. The verified bundle stays in the workflow's artifacts.
+
 Finished changes should be merged as they are ready. Releasing a selected commit
 does not combine unfinished feature branches. The release action generates the
 build's version and changelog entry automatically; the matching source ZIP contains
