@@ -46,6 +46,7 @@ class ReleasePlanning(unittest.TestCase):
         new = base.replace('old', 'new')
         self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: base, lambda _: new), 'updates')
         self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: base, lambda _: new.replace('shared', 'changed')), 'full')
+        self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: base, lambda _: new.replace('\ninit\n', '\nnewStartupFeature();\n')), 'full')
 
     def previous(self):
         return {'tag_name': '1.1.3', 'assets': [

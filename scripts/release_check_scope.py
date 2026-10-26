@@ -1,6 +1,7 @@
 """Keep core release checks mandatory; broaden browser coverage for other changes."""
 import ast
 from pathlib import Path
+import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,15 @@ def omit_region(text, start, end):
 def gui_without_updates(name, text):
     if name == 'gui/app.js':
         text = omit_region(text, '// ── update check', '// ── project picker')
-        return omit_region(text, '// ── initial load', '// ── Shader Studio')
+        # Normalize only the updater's startup acknowledgement. Other init()
+        # changes still require the complete browser coverage.
+        text = text.replace('''  await checkProject(() => {
+    checkUpdate(update);
+    if (document.getElementById("project-overlay").classList.contains("active")) {
+      acknowledgeUpdateStartup();
+    }
+  });''', '  await checkProject(() => checkUpdate(update));')
+        return re.sub(r'(?m)^[ \t]*acknowledgeUpdateStartup\(\);\n', '', text)
     if name == 'gui/index.html':
         return omit_region(text, '<!-- ── update check / download', '<!-- ── release notes')
     if name == 'window.py':
