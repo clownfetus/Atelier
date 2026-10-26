@@ -380,7 +380,10 @@ ConvertTo-Json -InputObject $items -Compress
             journal('native-debug-unavailable', errors=last_errors)
             raise
         browser = pw.chromium.connect_over_cdp(connected)
-        page = browser.contexts[0].pages[0]
+        context = browser.contexts[0]
+        # The debugging socket can precede WebView2's first page. Waiting here
+        # also pumps Playwright's page-created event on slower hosted runners.
+        page = context.pages[0] if context.pages else context.wait_for_event('page', timeout=60000)
         page.wait_for_load_state('domcontentloaded')
         journal('native-connect-complete', url=page.url)
         return browser, page
