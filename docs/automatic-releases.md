@@ -67,6 +67,11 @@ report uploads. Marketing screenshots and Discord copy are no longer release
 prerequisites. Existing release-candidate workflows remain available for historical
 verification; use **Release Atelier** for normal updates.
 
+Run the action on `main` for the fastest repeat builds: GitHub shares that branch's
+cache with future releases. Caches created only under a version tag are scoped to
+that tag. Uninstall also clears the application-owned `_internal` directory so
+files introduced by later patches are removed; user-data folders remain intact.
+
 ## Signing setup
 
 `update_keys.json` contains the public verification keys included in Atelier and

@@ -533,7 +533,10 @@ ConvertTo-Json -InputObject $items -Compress
             page.screenshot(path=str(report / 'reinstalled-first-launch.png'))
             assert not result['page_errors'], result['page_errors']
             result['checks'].append('Same-version reinstall preserves synthetic user files and browser preferences')
+            patch_canary = upgrade / '_internal/gui/later-patch-canary.js'
+            patch_canary.write_text('// Added after installation by an app patch', encoding='utf-8')
             uninstall(upgrade, 'upgrade-uninstall')
+            assert not patch_canary.exists(), 'Uninstall left an application file introduced by a patch'
             browser.close()
             for name, content in protected.items():
                 assert (upgrade / name).read_bytes() == content, 'Uninstall removed user data: ' + name

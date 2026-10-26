@@ -44,8 +44,8 @@ class InstallerKeepsUserData(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertIn(field(line, "Name"), OWNED)
 
-    def test_no_uninstall_delete(self):
-        self.assertEqual(section("UninstallDelete"), [])
+    def test_uninstall_cleans_patched_runtime_files_only(self):
+        self.assertEqual([field(line, "Name") for line in section("UninstallDelete")], [r"{app}\_internal"])
 
     def test_no_code_section_deletes_files(self):
         code = "\n".join(section("Code"))

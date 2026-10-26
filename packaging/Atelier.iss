@@ -191,6 +191,11 @@ Type: filesandordirs; Name: "{app}\Tools\AtelierAnimation"
 Type: filesandordirs; Name: "{app}\Tools\AtelierImport"
 Type: filesandordirs; Name: "{app}\Tools\retoc-rivals-cli"
 
+; Later in-app patches may add files absent from this installer's original log.
+; _internal is entirely application-owned; all user data stays outside it.
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall
 
