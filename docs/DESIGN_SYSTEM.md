@@ -216,6 +216,13 @@ and leaves installation, upgrade and data-preservation behavior unchanged.
 `scripts/installer_art.py --check` verifies the deterministic high-resolution
 plates and transparent header mark.
 
+The Windows installer uses native scalable controls with paired Paper and Ink
+artwork. Its A mark feeds one continuous channel into a Krackle seal. The wizard
+follows the system light/dark appearance, keeps installation progress native,
+and leaves installation, upgrade and data-preservation behavior unchanged.
+`scripts/installer_art.py --check` verifies the deterministic high-resolution
+plates and transparent header mark.
+
 ## Symbols and brand assets
 
 [Material Symbols Sharp](https://developers.google.com/fonts/docs/material_symbols) use unfilled geometry for a precise, angular visual language. Compact controls use 24px optical artwork at weight 400; 41 large aliases use 48px optical artwork at weight 300 when requested at 32px or larger. This keeps large previews from becoming heavy, enlarged toolbar symbols. Folder glyph slots occupy 76% of their thumbnail; toolbar glyphs stay compact. The bundle has 103 aliases, preserving all 72 previous aliases, `data-lucide` markers and `lucide.createIcons` calls as a compatibility boundary. The production page loads the local Material adapter, not the old library. Glyph provenance for both sizes is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.

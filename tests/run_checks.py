@@ -33,6 +33,7 @@ BROWSER_SUITES = {
     "polish_checks.py": "--polish-only",
     "appearance_checks.py": "--appearance-only",
     "review_followup_checks.py": "--review-followups-only",
+    "skin_swapper_review_checks.py": "--skin-swapper-only",
     "viewer_followup_checks.py": "--viewer-followups-only",
     "library_pins_checks.py": "--library-only",
     "inks_dial_checks.py": "--inks-dial-only",

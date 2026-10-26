@@ -432,11 +432,29 @@ Skin Swapper export (`atelier/skin_swapper.py`) needs Galacta's cooked config te
 elsewhere, and this repository is public, so it is never committed (`.gitignore`
 blocks `GAL_ConfigTemplate.*` everywhere).
 
+Installers require the complete pair. A custom native-tools path falls back to
+the pair in the isolated data folder or application directory; it never combines halves from
+different directories. `Setup-SkinSwapperTest.ps1 -ToolsFrom <installed-Atelier>`
+copies the bundled pair automatically; `-Template` is only a publisher override.
+Skin Swapper derives the form from the optional fifth digit of the mesh's hero
+token (`SK_10251_1025001` → hero 1025, form 1). The review shows the server's
+read-only result, and the build ignores caller-supplied form overrides.
+
+Luna `SK_1031_1031305` exercises the cooked texture fallback, repeated slot keys,
+and remapped/baked lower LODs. `tests/test_cooked_texture.py` uses labelled resource
+tables and alpha-bearing cube faces; `tests/test_mesh_lods.py` verifies tracked
+sculpts, normal/tangent transforms, atlas retention and topology rejection. The
+LOD map follows the game's [FSkeletalMeshLODInfo contract](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/FSkeletalMeshLODInfo).
+The opt-in `tests/native_model_workflows.py --mesh Characters/1031/1031305/Meshes/SK_1031_1031305`
+checks real portable export, sculpt import, all four LODs, standard/Galacta
+containers and mapped section visibility in isolated application data. In-game
+rendering and the Galacta runtime remain separate checks.
+
 - **Local and release builds:** put both files in `Tools/Galacta/`. `stage_tools.py`
   stages the pair when present (a lone half fails the build), the dist audit accepts
-  exactly those two cooked files, and `Atelier.iss` installs them only if staged.
-  Without them the build succeeds, prints a notice, and the export reports itself
-  unavailable.
+  exactly those two cooked files, and `Atelier.iss` requires both at compile time.
+  A developer-only app bundle may omit them and report the format unavailable;
+  a Windows installer cannot be built without them.
 - **CI release candidates:** store each file base64-encoded in the repository
   secrets `GALACTA_TEMPLATE_UASSET_B64` and `GALACTA_TEMPLATE_UEXP_B64`, for example
   with `[Convert]::ToBase64String([IO.File]::ReadAllBytes('GAL_ConfigTemplate.uasset'))`.

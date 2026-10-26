@@ -149,13 +149,10 @@ Source: "dist\Atelier\Tools\tools.json"; DestDir: "{app}\Tools"; Flags: ignoreve
 Source: "dist\Atelier\Tools\THIRD_PARTY_TOOLS.md"; DestDir: "{app}\Tools"; Flags: ignoreversion
 ; A seed only: browse._fetch_char_data writes fetched IDs back into it, so never overwrite.
 Source: "dist\Atelier\Tools\MarvelRivalsCharacterIDs.md"; DestDir: "{app}\Tools"; Flags: onlyifdoesntexist uninsneveruninstall
-; Project Galacta's Skin Swapper template is optional (stage_tools.py GALACTA_TEMPLATE): it is never in
-; git, so a build without it simply cannot export Skin Swapper mods. A compile-time check, not
-; skipifsourcedoesntexist, so a required tool can still never be skipped silently.
-#if FileExists(AddBackslash(SourcePath) + "..\dist\Atelier\Tools\Galacta\GAL_ConfigTemplate.uasset")
+; Ship the complete publisher template in every installer. It is staged privately,
+; never committed. Missing either half must fail the build instead of reaching users.
 Source: "dist\Atelier\Tools\Galacta\GAL_ConfigTemplate.uasset"; DestDir: "{app}\Tools\Galacta"; Flags: ignoreversion
 Source: "dist\Atelier\Tools\Galacta\GAL_ConfigTemplate.uexp"; DestDir: "{app}\Tools\Galacta"; Flags: ignoreversion
-#endif
 
 ; User data lives beside the exe. These are never installed, never deleted by an upgrade, and
 ; uninsneveruninstall keeps even an uninstall from removing them.

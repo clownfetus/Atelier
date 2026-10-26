@@ -199,5 +199,19 @@ class IdleDiscovery(unittest.TestCase):
                 self.assertEqual(len(candidates),1)
                 self.assertIn('/Animations/HeroDetails/',candidates[0]['game_rel'])
 
+    def test_game_and_lobby_meshes_prefer_their_own_full_body_idle(self):
+        entries=[(p,'pak','Marvel/Content/Marvel/') for p in [
+            'Characters/1024/1024001/Animations/HeroDetails/Lobby_Stand_Idle.uasset',
+            'Characters/1024/1024001/Animations/Idle_N.uasset',
+            'Characters/1024/1024001/Animations/Idle_C.uasset',
+            'Characters/1024/1024001/Animations/AimOffset/Idle_N_AO_CC.uasset',
+            'Characters/1024/1024001/Weapons/Animations/Idle_N.uasset']]
+        with patch('atelier.index.ensure_index',return_value=entries):
+            body=A.idle_candidates('Characters/1024/1024503/Meshes/SK_1024_1024503')
+            lobby=A.idle_candidates('Characters/1024/1024503/Meshes/SK_1024_1024503_Lobby')
+        self.assertEqual(len(body),2)
+        self.assertEqual(body[0]['name'],'Idle_N')
+        self.assertEqual(lobby[0]['name'],'Lobby_Stand_Idle')
+
 
 if __name__=='__main__': unittest.main()

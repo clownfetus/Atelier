@@ -229,6 +229,7 @@ native/**/obj/
 extracted/
 _work/
 _logs/
+_jobs/
 assets/
 mr_config.json
 _cache/

@@ -928,6 +928,13 @@ async function editAsset(item) {
   const key = _assetOperationKey(item.game_rel, project);
   if (_editsInFlight.has(key)) return;
   _editsInFlight.add(key);
+  if (item.file_type === "vfx") {
+    // Reading Niagara parameters does not create a project edit. Open its editor
+    // immediately so disabling external auto-open cannot turn this click into a no-op.
+    try { await openVfxEditor(item); }
+    finally { _editsInFlight.delete(key); }
+    return;
+  }
   suppressedImportGameRels.add(key);
   const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project);
   setStatus(`Preparing ${item.name} for editing…`);
@@ -939,9 +946,6 @@ async function editAsset(item) {
     } else if (item.file_type === "curve") {
       // curves: api_curve_params triggers extraction + to_json for any game_rel path
       res = await api(`/api/curve_params?game_rel=${encodeURIComponent(item.game_rel)}`);
-    } else if (item.file_type === "vfx") {
-      // vfx: api_vfx_params triggers extraction + niagara_details for any game_rel path
-      res = await api(`/api/vfx_params?game_rel=${encodeURIComponent(item.game_rel)}`);
     } else if (item.file_type === "world") {
       // world: api_world_params triggers extraction + to_json for the level sublevel
       res = await api(`/api/world_params?game_rel=${encodeURIComponent(item.game_rel)}`);
@@ -959,11 +963,11 @@ async function editAsset(item) {
     if (res.ok) {
       suppressedImportGameRels.delete(key);
       suppressChangeToastUntil = Date.now() + 1500;
-      loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
-      setStatus("");
-      const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id);
+      const imported = await refreshSidebarEntry(item.game_rel, item.name, item.skin_id, res.imported);
       if(project!==_activeProjectName)return;
       updateImportedCard(item.game_rel, imported);
+      loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
+      setStatus("");
       if (_openAfterImport) {
         const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
         handleImportedFileAction(importedItem);
@@ -2843,9 +2847,17 @@ async function loadSidebar() {
   renderSidebar();
 }
 
-function refreshSidebarEntry(game_rel, name, skin_id) {
+function refreshSidebarEntry(game_rel, name, skin_id, imported) {
   const project = _activeProjectName, requestId = ++_sidebarRequest;
   window.AtelierEmptyAssetsUI?.begin();
+  if (imported?.token && imported.game_rel === game_rel) {
+    const previous = sidebarData[imported.token];
+    sidebarData[imported.token] = {...imported, selected: previous?.selected ?? imported.selected};
+    window.AtelierEmptyAssetsUI?.confirmed(project, Object.keys(sidebarData).length);
+    renderSidebar();
+    window.AtelierPolish?.fly(game_rel);
+    return Promise.resolve(sidebarData[imported.token]);
+  }
   return api("/api/imported").then(data => {
     if (project !== _activeProjectName) return;
     if (requestId !== _sidebarRequest) return data.find(item=>item.game_rel===game_rel);

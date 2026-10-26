@@ -7,6 +7,7 @@ SkeletalMesh import) and replace the native tool, so they cover Atelier's own de
 the names, every rule the cooked config is held to, the off switch and what may reach the stage.
 The real template and tools were exercised end to end separately (see the module docstring)."""
 import atexit
+import base64
 import copy
 import io
 import json
@@ -70,8 +71,13 @@ def template_doc():
     }
 
 
+def form_mesh(sculpt):
+    return f"Characters/1024/1024503/Meshes/1024{sculpt}/SK_1024{sculpt}_1024503"
+
+
 def entry(sculpt=0, mod="RedeemedRedux"):
-    layout = S.plan(mod, [{"game_rel": MESH, "sculpt": sculpt}], "The Redeemed Redux", "Tendo", check_edits=False)
+    layout = S.plan(mod, [{"game_rel": form_mesh(sculpt) if sculpt else MESH}],
+                    "The Redeemed Redux", "Tendo", check_edits=False)
     assert not layout["problems"], layout["problems"]
     return layout["entries"][0]
 
@@ -84,6 +90,24 @@ class TargetIds(unittest.TestCase):
         self.assertIsNone(S.target_ids("Characters/1024/1035503/Meshes/SK_X"))
         self.assertIsNone(S.target_ids("Weapons/1024/1024503/SK_X"))
         self.assertIsNone(S.target_ids(None))
+
+
+class TargetSculpt(unittest.TestCase):
+    def test_cloak_and_dagger_share_a_hero_and_skin_but_have_distinct_forms(self):
+        for sculpt in (0, 1):
+            mesh = f"Characters/1025/1025001/Meshes/1025{sculpt}/SK_1025{sculpt}_1025001"
+            self.assertEqual(S.target_ids(mesh), ("1025", "1025001"))
+            self.assertEqual(S.target_sculpt(mesh), sculpt)
+
+    def test_all_shape_digits_are_read_from_the_game_mesh_name(self):
+        for sculpt in range(10):
+            self.assertEqual(S.target_sculpt(form_mesh(sculpt)), sculpt)
+            self.assertEqual(S.target_sculpt(form_mesh(sculpt) + "_Lobby"), sculpt)
+
+    def test_missing_shape_or_a_different_hero_does_not_supply_a_form(self):
+        for mesh in (MESH, None, MESH.replace("SK_1024_", "SK_10251_"),
+                     MESH.replace("SK_1024_1024503", "SK_10241_1024001")):
+            self.assertEqual(S.target_sculpt(mesh), 0)
 
 
 class Plan(unittest.TestCase):
@@ -103,11 +127,11 @@ class Plan(unittest.TestCase):
         self.assertEqual(entry(sculpt=9)["config_name"], "GAL_RedeemedRedux_S9")
 
     def test_each_form_needs_its_own_mesh(self):
-        result = self.plan([{"game_rel": MESH, "sculpt": 1}, {"game_rel": MESH + "_Form2", "sculpt": 1}])
+        result = self.plan([{"game_rel": form_mesh(1)}, {"game_rel": form_mesh(1) + "_Lobby"}])
         self.assertIn("Two meshes use form 1. Each form needs its own mesh.", result["problems"])
 
     def test_two_forms_get_two_configs(self):
-        result = self.plan([{"game_rel": MESH, "sculpt": 0}, {"game_rel": MESH + "_Form2", "sculpt": 2}])
+        result = self.plan([{"game_rel": MESH}, {"game_rel": form_mesh(2)}])
         self.assertEqual(result["problems"], [])
         self.assertEqual([e["config_name"] for e in result["entries"]], ["GAL_RedeemedRedux", "GAL_RedeemedRedux_S2"])
 
@@ -126,11 +150,14 @@ class Plan(unittest.TestCase):
         self.assertIn("Skin name must be one line of at most 64 characters.",
                       self.plan(skin="two\nlines")["problems"])
 
-    def test_forms_are_whole_numbers_from_0_to_9(self):
-        for sculpt in (10, -1, True, "1", 1.0):
+    def test_caller_supplied_forms_cannot_override_the_game_shape(self):
+        for sculpt in (0, 2, 10, -1, True, "1", 1.0):
             with self.subTest(sculpt=sculpt):
-                problems = self.plan([{"game_rel": MESH, "sculpt": sculpt}])["problems"]
-                self.assertIn("SK_1024_1024503: the form must be a number from 0 to 9.", problems)
+                result = self.plan([{"game_rel": form_mesh(1), "sculpt": sculpt}])
+                self.assertEqual(result["problems"], [])
+                self.assertEqual(result["entries"][0]["sculpt"], 1)
+                self.assertEqual(result["entries"][0]["config_name"], "GAL_RedeemedRedux_S1")
+        self.assertEqual(self.plan([{"game_rel": MESH, "sculpt": 9}])["entries"][0]["sculpt"], 0)
 
     def test_a_mesh_outside_a_skin_folder_is_refused(self):
         problems = self.plan([{"game_rel": "Weapons/SK_Gun", "sculpt": 0}])["problems"]
@@ -239,6 +266,38 @@ class GeometryGate(unittest.TestCase):
                 self.assertIn("has no edits", S._edit_problem(MESH))
 
 
+class MeshRelocation(unittest.TestCase):
+    def test_header_relocation_preserves_every_mesh_and_physics_export_as_opaque_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, target = root/'source/SK_Body', root/'stage/SK_Body'
+            source.parent.mkdir()
+            source.with_suffix('.uasset').write_bytes(b'original package header')
+            chunks = [b'cooked physics properties', b'geometry, bones and material tags']
+            payload = b''.join(chunks)+b'\xc1\x83\x2a\x9e'
+            source.with_suffix('.uexp').write_bytes(payload)
+            source.with_suffix('.ubulk').write_bytes(b'streamed lower detail data')
+            header = source.with_suffix('.uasset').stat().st_size
+            document = {'ObjectVersionUE5':'DATA_RESOURCES', 'NameMap':['OriginalName'], 'FolderName':'Old',
+                        'Exports':[{'ObjectName':'Physics', 'SerialOffset':header, 'SerialSize':len(chunks[0])},
+                                   {'ObjectName':'SK_Body', 'SerialOffset':header+len(chunks[0]), 'SerialSize':len(chunks[1])}]}
+            saved = []
+            def write(doc, _json, uasset):
+                saved.append(copy.deepcopy(doc))
+                Path(uasset).parent.mkdir(parents=True)
+                Path(uasset).write_bytes(b'relocated package header')
+                Path(uasset).with_suffix('.uexp').write_bytes(payload)
+            package = '/Game/Marvel/ProjectGalacta/Meshes/1031/1031305/Test/SK_Body'
+            with patch.object(S, '_to_json', side_effect=[(document, str(root/'source.json')), ({'FolderName':package}, '')]), \
+                    patch.object(S, '_from_json', side_effect=write):
+                S._relocate(str(source), str(target), package, str(root/'scratch'))
+            self.assertEqual([base64.b64decode(e['Data']) for e in saved[0]['Exports']], chunks)
+            self.assertTrue(all('RawExport' in e['$type'] for e in saved[0]['Exports']))
+            self.assertEqual(saved[0]['NameMap'][0], 'OriginalName')
+            self.assertEqual(target.with_suffix('.uexp').read_bytes(), payload)
+            self.assertEqual(target.with_suffix('.ubulk').read_bytes(), b'streamed lower detail data')
+
+
 class ConfigPatch(unittest.TestCase):
     def test_numeric_mesh_names_and_mod_folders_add_the_serializable_fname_bases(self):
         e = entry(mod='Feature_7')
@@ -253,7 +312,7 @@ class ConfigPatch(unittest.TestCase):
         doc = S.patch_config(template_doc(), e, "The Redeemed Redux", "Tendo")
         self.assertEqual(S.verify_config(doc, e, "The Redeemed Redux", "Tendo"), [])
         package = "/Game/Marvel/ProjectGalacta/Meshes/1024/1024503/RedeemedRedux/GAL_RedeemedRedux_S1"
-        mesh = "/Game/Marvel/ProjectGalacta/Meshes/1024/1024503/RedeemedRedux/SK_1024_1024503"
+        mesh = "/Game/Marvel/ProjectGalacta/Meshes/1024/1024503/RedeemedRedux/SK_10241_1024503"
         self.assertEqual(doc["FolderName"], package)
         self.assertEqual(doc["Exports"][0]["ObjectName"], "GAL_RedeemedRedux_S1")
         imports = [(i["ObjectName"], i["ClassPackage"], i["ClassName"]) for i in doc["Imports"]]
@@ -262,7 +321,7 @@ class ConfigPatch(unittest.TestCase):
             ("Default__GAL_ModSkinConfig_C", S.CLASS_PACKAGE, "GAL_ModSkinConfig_C"),
             (S.CLASS_PACKAGE, "/Script/CoreUObject", "Package"),
             (mesh, "/Script/CoreUObject", "Package"),
-            ("SK_1024_1024503", "/Script/Engine", "SkeletalMesh")])
+            ("SK_10241_1024503", "/Script/Engine", "SkeletalMesh")])
         values = {p["Name"]: p["Value"] for p in doc["Exports"][0]["Data"]}
         self.assertEqual(values, {"TargetHeroID": 1024, "TargetSkinID": 1024503, "TargetSculptID": 1,
                                   "SkinName": "The Redeemed Redux", "Author": "Tendo", "MeshToSwap": -5,
@@ -561,6 +620,18 @@ class Routes(unittest.TestCase):
         self.assertEqual((body["hero_id"], body["skin_id"]), ("1024", "1024503"))
         self.assertIn("Author is required.", body["problems"])
 
+    def test_cloak_plan_uses_form_one_even_when_a_client_sends_form_zero(self):
+        mesh = "Characters/1025/1025001/Meshes/10251/SK_10251_1025001"
+        with patch.object(S, "_edit_problem", return_value=None):
+            status, body = self.call("POST", "/api/skin_swapper/plan", {
+                "mod_name": "CloakEdit", "skin_name": "Skin", "author": "Author",
+                "meshes": [{"game_rel": mesh, "sculpt": 0}]})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["problems"], [])
+        self.assertEqual((body["hero_id"], body["skin_id"]), ("1025", "1025001"))
+        self.assertEqual(body["entries"][0]["sculpt"], 1)
+        self.assertTrue(body["entries"][0]["config_game_rel"].endswith("/GAL_CloakEdit_S1"))
+
     def test_invalid_mod_names_are_rejected_without_sanitizing(self):
         for name in ("Foo.Bar", "../Foo", "Foo\\Bar", "Foo\n", "", None):
             with self.subTest(name=name), patch.object(S, "_edit_problem", return_value=None):
@@ -575,6 +646,36 @@ class Routes(unittest.TestCase):
             status, body = self.call("POST", "/api/skin_swapper/build", {"mod_name": "RedeemedRedux", "meshes": []})
         self.assertEqual(status, 200)
         self.assertEqual((body["ok"], body["problems"]), (False, ["p1"]))
+
+
+class TemplateResolution(unittest.TestCase):
+    def test_isolated_setup_pair_is_found_with_a_custom_native_tools_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pair = root / "data" / "Tools" / "Galacta"
+            pair.mkdir(parents=True)
+            for name in ("GAL_ConfigTemplate.uasset", "GAL_ConfigTemplate.uexp"):
+                (pair / name).write_bytes(b"bundled")
+            with patch.multiple(C, ROOT=str(root / "app"), DATA_ROOT=str(root / "data"),
+                                TOOLS=str(root / "custom-native-tools")):
+                self.assertEqual(S.template_files(), tuple(str(pair / (S.TEMPLATE_NAME + ext))
+                                                         for ext in (".uasset", ".uexp")))
+
+    def test_custom_tools_do_not_hide_the_bundled_pair_or_mix_partial_pairs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            custom, bundled = root / "custom", root / "app" / "Tools"
+            for tools in (custom, bundled):
+                (tools / "Galacta").mkdir(parents=True)
+            for name in ("GAL_ConfigTemplate.uasset", "GAL_ConfigTemplate.uexp"):
+                (bundled / "Galacta" / name).write_bytes(b"bundled")
+            (custom / "Galacta" / "GAL_ConfigTemplate.uasset").write_bytes(b"override")
+            with patch.multiple(C, ROOT=str(root / "app"), TOOLS=str(custom)):
+                self.assertEqual(S.template_files(), tuple(str(bundled / "Galacta" / (S.TEMPLATE_NAME + ext))
+                                                         for ext in (".uasset", ".uexp")))
+                (custom / "Galacta" / "GAL_ConfigTemplate.uexp").write_bytes(b"override")
+                self.assertEqual(S.template_files(), tuple(str(custom / "Galacta" / (S.TEMPLATE_NAME + ext))
+                                                         for ext in (".uasset", ".uexp")))
 
 
 class Packaging(unittest.TestCase):

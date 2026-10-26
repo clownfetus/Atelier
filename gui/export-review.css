@@ -29,7 +29,7 @@
 .skin-swapper-field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
 .skin-swapper-meshes { display: grid; gap: 8px; }
 .skin-swapper-mesh { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
-.skin-swapper-mesh select { width: auto; flex-shrink: 0; }
+.skin-swapper-form { flex-shrink: 0; color: var(--muted); }
 .skin-swapper-problems { margin: 0; padding: 10px 12px 10px 28px; display: grid; gap: 4px; font-size: 12px; color: var(--yellow); border-left: 3px solid var(--yellow); background: var(--bg); }
 .skin-swapper-problems[hidden] { display: none; }
 .export-last-result { width: 100%; justify-content: center; font-size: 12px; }

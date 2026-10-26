@@ -28,7 +28,7 @@ def main():
     if not os.environ.get('ATELIER_DATA_DIR'):
         parser.error('Set ATELIER_DATA_DIR to configured disposable data.')
     from atelier import config, skin_swapper, tools
-    from atelier.handlers import mesh, meshedit, meshport, meshreplace, meshstudio, meshvisibility, texture
+    from atelier.handlers import mesh, meshedit, meshport, meshreplace, meshstudio, meshvisibility, mesh_lods, texture
     from atelier.storage import atomic_json
     import numpy as np
 
@@ -135,14 +135,17 @@ def main():
             meshvisibility.set_hidden(args.mesh, 0, slot, True)
             hidden = meshedit.stage_mesh(args.mesh, str(report/'hidden-stage'))
             hidden_mesh = mesh.Mesh(hidden['uasset'][:-7])
+            material_maps = mesh_lods.load_material_maps(source)
             assert len(hidden['visibility']) == len(original.lods)
-            for old_lod, new_lod in zip(original.lods, hidden_mesh.lods):
+            for lod_index, (old_lod, new_lod) in enumerate(zip(original.lods, hidden_mesh.lods)):
                 np.testing.assert_array_equal(original.positions(old_lod), hidden_mesh.positions(new_lod))
                 dtype = '<u4' if new_lod['idx_stride'] == 4 else '<u2'
                 for old_section, new_section in zip(old_lod['sections'], new_lod['sections']):
                     start = new_lod['idx_off']+new_section['base_index']*new_lod['idx_stride']
                     indices = np.frombuffer(hidden_mesh._blob(new_lod), dtype=dtype, count=new_section['num_tris']*3, offset=start)
-                    if new_section['mat'] == 0:
+                    source_index = old_lod.get('layout', {}).get('source_index', lod_index)
+                    mapping = material_maps[source_index] if source_index < len(material_maps) else []
+                    if mesh_lods.material_index(new_section, mapping) == 0:
                         assert np.all(indices == new_section['base_vertex'])
                     else:
                         old_start = old_lod['idx_off']+old_section['base_index']*old_lod['idx_stride']

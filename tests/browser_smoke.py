@@ -75,6 +75,7 @@ def main():
     parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
+    parser.add_argument('--skin-swapper-only', action='store_true', help='Check detected forms, export review and format-preserving retries')
     parser.add_argument('--trust-only', action='store_true', help='Check project trash, themed dialogs and guided setup')
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
@@ -287,7 +288,10 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
-                if args.review_followups_only:
+                if args.review_followups_only or args.skin_swapper_only:
+                    if args.skin_swapper_only:
+                        from skin_swapper_review_checks import run_skin_swapper_review_checks
+                        run_skin_swapper_review_checks(page, context, url, report, checks)
                     from review_followup_checks import run_review_followup_checks
                     run_review_followup_checks(context, url, report, checks)
                     assert not errors, errors

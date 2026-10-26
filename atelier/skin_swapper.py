@@ -75,8 +75,16 @@ _refreshing = threading.Event()
 # ── availability: template and Galacta's switch ─────────────────────────────────────
 
 def template_files():
-    base = os.path.join(config.TOOLS, "Galacta", TEMPLATE_NAME)
-    return base + ".uasset", base + ".uexp"
+    # A custom native-tools directory must not hide the pair shipped with Atelier.
+    # Resolve both halves together so different template versions are never mixed.
+    candidates = [os.path.join(root, "Galacta", TEMPLATE_NAME)
+                  for root in (config.TOOLS, os.path.join(config.DATA_ROOT, "Tools"),
+                               os.path.join(config.ROOT, "Tools"))]
+    for base in candidates:
+        pair = base + ".uasset", base + ".uexp"
+        if all(os.path.isfile(path) and os.path.getsize(path) for path in pair):
+            return pair
+    return candidates[0] + ".uasset", candidates[0] + ".uexp"
 
 
 def _flag_path():
@@ -199,6 +207,21 @@ def target_ids(game_rel):
     return m.group(1), m.group(2)
 
 
+def target_sculpt(game_rel):
+    """Read the game's optional ShapeID digit from SK_{HeroID}{ShapeID}_{SkinID}.
+
+    Multi-form bodies share the same four-digit hero folder and seven-digit skin
+    folder. For example, SK_10251_1025001 is Cloak (hero 1025, form 1), while
+    SK_10250_1025001 is Dagger (form 0). Ordinary SK_1031_1031305 has no shape digit.
+    Never take the form from a caller-supplied value.
+    """
+    ids = target_ids(game_rel)
+    match = re.match(r"^SK_(\d{4})(\d?)_(\d{7})(?:_|$)", os.path.basename(game_rel or ""))
+    if ids and match and (match.group(1), match.group(3)) == ids:
+        return int(match.group(2) or 0)
+    return 0
+
+
 def config_name(mod_folder, sculpt):
     """GAL_{ModFolder}, with _S{n} for form n. Form 0 is the default form and has no suffix."""
     return f"GAL_{mod_folder}" + (f"_S{sculpt}" if sculpt else "")
@@ -247,15 +270,12 @@ def plan(mod_folder, meshes, skin_name, author, check_edits=True):
     entries, targets, sculpts, names = [], set(), set(), set()
     for item in meshes or []:
         game_rel = item.get("game_rel") if isinstance(item, dict) else None
-        sculpt = item.get("sculpt", 0) if isinstance(item, dict) else None
         label = os.path.basename(game_rel or "") or "A mesh"
         ids = target_ids(game_rel or "")
         if ids is None:
             problems.append(f"{label} is not a character skin mesh, so its hero and skin cannot be identified.")
             continue
-        if type(sculpt) is not int or not 0 <= sculpt <= 9:
-            problems.append(f"{label}: the form must be a number from 0 to 9.")
-            continue
+        sculpt = target_sculpt(game_rel)
         if sculpt in sculpts:
             problems.append(f"Two meshes use form {sculpt}. Each form needs its own mesh.")
         if label in names:
@@ -497,6 +517,11 @@ def _from_json(doc, json_path, uasset):
 def _relocate(src, target, package, scratch):
     """Move a cooked mesh package to `package`, changing only its header. src/target are stems."""
     doc, json_path = _to_json(src + ".uasset", os.path.join(scratch, "json", os.path.basename(target)))
+    # Complex skeletal/physics exports do not all survive the native typed JSON
+    # writer. As with a texture rename, preserve every validated export as opaque
+    # bytes: moving a package requires no property or geometry reserialization.
+    from atelier.handlers.custom_texture import _preserve_export_bytes
+    _preserve_export_bytes(doc, src + '.uasset')
     doc["FolderName"] = package
     add_names(doc, package)
     _from_json(doc, json_path, target + ".uasset")

@@ -1,6 +1,6 @@
 import os, re, json, hashlib, threading, urllib.request
 from atelier.catalogue import catalogue
-from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel
+from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel, validate_game_rel
 from atelier.index import ensure_index
 from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
                            char_id as get_char_id)
@@ -423,13 +423,15 @@ def char_skin_ids(cid):
 _HERO_LABEL_RES = [re.compile(rf"^{re.escape(hp)}/(\d{{4}})/(\d{{7}})/", re.IGNORECASE)
                    for hp in CHAR_LABEL_PATHS]
 
-def all_imported():
+def all_imported(game_rel=None):
     """Walk the active project dir (subfolder-mirrored by game_rel) and return all imported assets.
     Files stored under a subfolder path carry their own game_rel; legacy flat files (no subfolder)
     are resolved through asset_cache by basename."""
     import atelier.asset_cache as _ac
     import atelier.project_meta as _pm
     from atelier.handlers.hdr_texture import project_info as hdr_project_info
+    if game_rel is not None:
+        validate_game_rel(game_rel)
     import_root = get_import_root()
     if not os.path.isdir(import_root): return []
     deselected = _pm.get_deselected(import_root)
@@ -437,7 +439,15 @@ def all_imported():
     # like one that ships normally — so the sidebar has to be able to mark them.
     all_opts = _pm.get_asset_opts(import_root)
     items = []
-    for dirpath, _dirs, files in os.walk(import_root):
+    if game_rel is None:
+        folders = os.walk(import_root)
+    else:
+        # A completed import can return its tray entry without walking the whole
+        # project or waiting for a second request behind other queued imports.
+        parents = dict.fromkeys(os.path.dirname(base) for base in
+                                (project_base(game_rel), project_base_legacy(game_rel)))
+        folders = ((parent, [], os.listdir(parent)) for parent in parents if os.path.isdir(parent))
+    for dirpath, _dirs, files in folders:
         # Atelier's own per-project bookkeeping, not user edits. Pruned by name rather than left
         # to _classify_file, which rejects "manifest"/"project" only by accident of prefix.
         _dirs[:] = [d for d in _dirs if d not in ('.atelier', '.atelier-trash')]
@@ -463,6 +473,8 @@ def all_imported():
             if not fname.endswith('.mesh.json'):gr = project_game_rel(fpath, import_root)
             if "/" not in gr and not os.path.isfile(project_base(gr, import_root) + '.asset.json'):
                 gr = _ac.by_name(gr) or gr
+            if game_rel is not None and gr != game_rel:
+                continue
             name = os.path.basename(gr)
             if ext == ".png":
                 ft = "texture"
