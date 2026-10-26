@@ -4,8 +4,14 @@
 
 1. Download `Atelier-<version>-x86_64.AppImage` from an
    [official release](https://github.com/clownfetus/Atelier/releases).
-2. Install your distribution's WebKitGTK 4.1 runtime and `zenity` for file/folder
-   pickers. Install Blender for Blender workflows.
+2. Install your distribution's WebKitGTK 4.1 and GObject Introspection 2.0 runtimes,
+   plus `zenity` for file/folder pickers. On Ubuntu 24.04 or newer:
+
+   ```sh
+   sudo apt install gir1.2-webkit2-4.1 libgirepository-2.0-0 zenity
+   ```
+
+   Install Blender for Blender workflows.
 3. Mark the downloaded file executable and open it. For example, once you have
    downloaded the 1.1.2 asset:
 
@@ -18,9 +24,12 @@
    installation and supply a current mapping and AES key if automatic retrieval
    is unavailable. Set the mods folder and Blender executable in **Menu → Settings**.
 
-To update, close Atelier, download the newer AppImage, mark it executable and
-launch it. Linux does not run the Windows installer. Keep the previous AppImage
-until the replacement opens successfully. Projects, settings, mappings and keys
+To update a build with the in-app updater, choose **Download Update**, then
+**Restart and Update** when ready. Atelier replaces the writable AppImage and
+restores the previous one if startup fails. Older builds can be updated by closing
+Atelier, downloading the newer AppImage, marking it executable and launching it.
+Keep the previous AppImage until the replacement opens successfully when updating
+manually. Projects, settings, mappings and keys
 live in `~/.local/share/Atelier` by default, independently of the downloaded file.
 Do not delete that data directory when replacing the AppImage. If you use
 `XDG_DATA_HOME` or `ATELIER_HOME`, keep the same value across launches.
@@ -45,7 +54,7 @@ sudo pacman -S blender          # for Blender workflows
 
 | Feature | Linux requirement or limit |
 | --- | --- |
-| Desktop window | GTK/WebKitGTK 4.1 runtime |
+| Desktop window | GTK/WebKitGTK 4.1 and GObject Introspection 2.0 runtimes |
 | Folder and file pickers | `zenity` |
 | Asset reading, textures and packing | Bundled native UAssetTool, retoc and Linux Oodle inputs |
 | Model and standing-idle decoding | Bundled native `AtelierNative` (no Wine) |
@@ -54,7 +63,7 @@ sudo pacman -S blender          # for Blender workflows
 | Reveal files and desktop notifications | Desktop file manager / `xdg-open`, D-Bus and optional `notify-send` |
 | DXIL shader editing | Unsupported on Linux |
 | Level/world editing through UAssetGUI | Unsupported on Linux |
-| Updating | Download and launch a newer AppImage (Settings > Tools updates the container tool) |
+| Updating | Download the AppImage in-app and restart when ready (Settings > Tools updates the container tool) |
 
 Every tool Atelier ships has a native Linux build: UAssetTool, retoc and **AtelierNative** (mesh
 export, idle animations and the persistent import server). The Linux AtelierNative mesh output was

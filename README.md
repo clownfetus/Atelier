@@ -259,14 +259,19 @@ executable path in Settings.
 Download `Atelier-<version>-x86_64.AppImage` from a
 [release with a Linux build](https://github.com/clownfetus/Atelier/releases),
 mark it executable, and launch it. See [LINUX.md](docs/LINUX.md) for platform setup.
-Download a new AppImage when updating; the in-app installer update flow is Windows-only.
+Builds with the new updater can download the AppImage in-app and replace it on restart.
 
 ## Updates
 
-Atelier checks the main repository's latest published release at launch. On
-Windows, a newer version offers **Update Now** or **Later**. **Update Now**
-downloads `AtelierSetup.exe`, launches the installer and closes Atelier.
-Installation requires that choice; updates are not installed silently at launch.
+Atelier checks the main repository's latest published release at launch. Choose
+**Download Update**, then **Restart and Update** when ready, or **Restart Later**
+to finish editing first. Compatible Windows updates download only changed app
+files; skipped versions use the full package, and runtime changes use the installer.
+Linux downloads and replaces the full AppImage. Downloads are verified against
+signed metadata, and failed startup restores the previous app version.
+
+Existing Windows installations need one regular installer update to receive this
+updater. Older Linux builds need one manual AppImage replacement.
 
 If the update prompt is unavailable, close Atelier and download/run the latest
 official `AtelierSetup.exe` manually. Use the existing installation directory;
@@ -383,19 +388,19 @@ See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for isolated source setup and verifica
 [PACKAGING.md](docs/PACKAGING.md) for portable review packages. A portable review ZIP
 must be extracted in full; `Atelier.exe` needs its adjacent `_internal` directory.
 
-To make a Windows release discoverable by existing installations:
+To release an update for Windows and Linux:
 
-1. Build the intended source with a higher numeric version, such as `1.1.3`.
-   [BUILD.bat](BUILD.bat) writes the application version and supplies the matching
-   version to the installer compiler. Verify the installer and upgrade behavior
-   using the [installer checks](docs/DEVELOPMENT.md#disposable-windows-installer-verification).
-2. Publish a stable release in **clownfetus/Atelier**, using that numeric tag
-   (`1.1.3` or `v1.1.3`) and attaching the installer named **AtelierSetup.exe**.
-3. Make it the latest release. The updater requires a version higher than the
-   installed version; replacing an EXE under the same version will not trigger it.
+1. Merge finished changes into `main`.
+2. Open **Actions → Release Atelier → Run workflow**, enter the next version
+   (for example `1.1.4`), and leave **Publish** enabled. Pushing a numeric tag such
+   as `v1.1.4` runs the same workflow.
+3. GitHub prepares the version and release notes, builds both platforms, runs the
+   packaged-app and upgrade checks, signs the update metadata, and publishes all
+   assets together. Choose **Verify only** for a rehearsal without a release or tag.
 
-Drafts and prereleases are not the stable update channel. The release-candidate workflow builds and verifies Windows and Linux packages;
-it does not publish a release automatically.
+The new version must be higher than the latest published release. Drafts and
+prereleases are outside the stable update channel. See
+[automatic releases](docs/automatic-releases.md) for signing, checks and compatibility.
 
 ## Collaborators
 

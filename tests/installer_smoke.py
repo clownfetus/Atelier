@@ -380,7 +380,10 @@ ConvertTo-Json -InputObject $items -Compress
             journal('native-debug-unavailable', errors=last_errors)
             raise
         browser = pw.chromium.connect_over_cdp(connected)
-        page = browser.contexts[0].pages[0]
+        context = browser.contexts[0]
+        # The debugging socket can precede WebView2's first page. Waiting here
+        # also pumps Playwright's page-created event on slower hosted runners.
+        page = context.pages[0] if context.pages else context.wait_for_event('page', timeout=60000)
         page.wait_for_load_state('domcontentloaded')
         journal('native-connect-complete', url=page.url)
         return browser, page
@@ -533,7 +536,10 @@ ConvertTo-Json -InputObject $items -Compress
             page.screenshot(path=str(report / 'reinstalled-first-launch.png'))
             assert not result['page_errors'], result['page_errors']
             result['checks'].append('Same-version reinstall preserves synthetic user files and browser preferences')
+            patch_canary = upgrade / '_internal/gui/later-patch-canary.js'
+            patch_canary.write_text('// Added after installation by an app patch', encoding='utf-8')
             uninstall(upgrade, 'upgrade-uninstall')
+            assert not patch_canary.exists(), 'Uninstall left an application file introduced by a patch'
             browser.close()
             for name, content in protected.items():
                 assert (upgrade / name).read_bytes() == content, 'Uninstall removed user data: ' + name

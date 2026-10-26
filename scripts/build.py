@@ -86,6 +86,8 @@ def main():
     step("Stage tools and audit the dist")
     run(sys.executable, "scripts/stage_tools.py", "--platform", args.platform)
     run(sys.executable, "scripts/release_manifest.py")
+    if args.platform == "windows":
+        run(sys.executable, "scripts/package_updates.py", "--inventory-only")
     if args.no_package:
         print(f"\nStaged dist/Atelier for {args.platform}.")
         return

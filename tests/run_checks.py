@@ -58,7 +58,7 @@ def main():
             for name in ("atelier", "gui", "tests", "scripts", "toolchain", "native", "packaging"):
                 shutil.copytree(ROOT / name, checkout / name,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            for name in ("io_lib.py", "main.py", "version", "CHANGELOG.md", "BUILD.bat", ".gitignore", "icon.ico", "icon.png"):
+            for name in ("io_lib.py", "main.py", "version", "CHANGELOG.md", "BUILD.bat", ".gitignore", "icon.ico", "icon.png", "update_keys.json"):
                 shutil.copy2(ROOT / name, checkout / name)
             if suite in ("browser_smoke.py", "surfaces_checks.py"):
                 shutil.copytree(ROOT / "docs" / "review", checkout / "docs" / "review")

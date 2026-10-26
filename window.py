@@ -5,6 +5,15 @@ import threading
 import urllib.request
 import os
 import datetime
+from pathlib import Path
+from atelier.updates import recover_interrupted
+
+# Recovery runs before importing backend/native modules that may belong to an
+# interrupted transaction. The standalone helper waits for this process to exit.
+_early_root = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
+_early_data = Path(os.environ.get('ATELIER_DATA_DIR', str(_early_root)))
+if getattr(sys, 'frozen', False) and recover_interrupted(_early_root, _early_data):
+    raise SystemExit(0)
 if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
     os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
 if sys.platform.startswith("linux") and getattr(sys, "frozen", False):

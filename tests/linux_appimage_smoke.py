@@ -66,8 +66,10 @@ def main():
         parser.error('Use a fresh report directory')
     report.mkdir(parents=True)
     previous = args.previous_appimage.resolve(strict=True)
-    inputs = json.loads((source / 'tests/fixtures/installer' / f'release-{(source / "version").read_text().strip()}-inputs.json').read_text())
-    if sha256(previous) != inputs['linux_seed_sha256']:
+    inputs_path = (Path(os.environ['ATELIER_RELEASE_INPUTS']) if os.environ.get('ATELIER_RELEASE_INPUTS')
+                   else source / 'tests/fixtures/installer' / f'release-{(source / "version").read_text().strip()}-inputs.json')
+    inputs = json.loads(inputs_path.read_text(encoding='utf-8'))
+    if sha256(previous) != inputs.get('previous_linux_sha256', inputs.get('linux_seed_sha256')):
         parser.error('Previous AppImage does not match the pinned upgrade baseline')
     result = {'appimage_sha256': sha256(appimage), 'previous_appimage_sha256': sha256(previous), 'checks': [], 'platform': sys.platform}
     version = (source / 'version').read_text().strip()

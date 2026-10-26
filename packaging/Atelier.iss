@@ -126,6 +126,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; Mappings and AES_KEY.txt are game-derived and never ship; the app fetches both on first run.
 [Files]
 Source: "dist\Atelier\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Atelier\Atelier.update.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Atelier\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "dist\Atelier\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Atelier\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -189,6 +190,11 @@ Type: filesandordirs; Name: "{app}\Tools\AtelierMesh"
 Type: filesandordirs; Name: "{app}\Tools\AtelierAnimation"
 Type: filesandordirs; Name: "{app}\Tools\AtelierImport"
 Type: filesandordirs; Name: "{app}\Tools\retoc-rivals-cli"
+
+; Later in-app patches may add files absent from this installer's original log.
+; _internal is entirely application-owned; all user data stays outside it.
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall

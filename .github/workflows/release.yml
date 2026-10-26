@@ -1,0 +1,438 @@
+name: Release Atelier
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version, higher than the published release (for example 1.1.4)'
+        required: true
+        type: string
+      publish:
+        description: 'Publish after all checks pass (off leaves a draft)'
+        default: true
+        type: boolean
+      verify_only:
+        description: 'Build and verify only; do not create a release or tag'
+        default: false
+        type: boolean
+      full_browser:
+        description: 'Force all browser and visual workflows'
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      publish:
+        default: false
+        type: boolean
+      verify_only:
+        default: true
+        type: boolean
+      full_browser:
+        default: false
+        type: boolean
+
+concurrency:
+  group: atelier-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.15'
+  DOTNET_VERSION: '10.0.402'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  PYTHONUTF8: '1'
+  ATELIER_RELEASE_INPUTS: _release/inputs.json
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      tag: ${{ steps.prepare.outputs.tag }}
+      full_checks: ${{ steps.prepare.outputs.full_checks }}
+      native_key: ${{ steps.prepare.outputs.native_key }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          ATELIER_FULL_BROWSER: ${{ inputs.full_browser }}
+        run: python scripts/prepare_release.py --version "$RELEASE_VERSION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-inputs
+          path: _release
+          if-no-files-found: error
+
+  windows:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-inputs
+          path: _release
+      - name: Use the prepared version and changelog
+        shell: pwsh
+        run: |
+          Copy-Item _release/version version
+          Copy-Item _release/CHANGELOG.md CHANGELOG.md
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Prepare pinned compiler, Python and WebView2
+        shell: pwsh
+        run: |
+          ./scripts/bootstrap_windows.ps1 -Python (Get-Command python).Source -ToolchainDir "$env:RUNNER_TEMP/AtelierToolchain" -InstallWebView2
+          "ISCC=$env:ISCC" >> $env:GITHUB_ENV
+          "$PWD/.venv/Scripts" >> $env:GITHUB_PATH
+      - run: python -m playwright install chromium
+      - run: python scripts/release_checks.py
+      - run: python scripts/release_browser_checks.py
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: native
+        with:
+          path: Tools
+          key: windows-2022-dotnet-10.0.402-native-${{ needs.prepare.outputs.native_key }}
+      - name: Reuse matching tools from the previous verified release
+        id: previous-native
+        if: steps.native.outputs.cache-hit != 'true'
+        run: python scripts/reuse_release_tools.py
+      - name: Build native tools from the lockfile when inputs change
+        if: steps.native.outputs.cache-hit != 'true' && steps.previous-native.outputs.reused != 'true'
+        run: python scripts/toolchain.py install --platform windows --dest Tools
+      - run: python scripts/toolchain.py verify --platform windows --dest Tools
+      - name: Keep private templates outside the reusable native cache
+        if: steps.native.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath Tools/Galacta) { throw 'Private template cannot enter the native build cache.' }
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: steps.native.outputs.cache-hit != 'true'
+        with:
+          path: Tools
+          key: windows-2022-dotnet-10.0.402-native-${{ needs.prepare.outputs.native_key }}
+      - name: Stage the private Skin Swapper template
+        shell: pwsh
+        env:
+          GALACTA_UASSET: ${{ secrets.GALACTA_TEMPLATE_UASSET_B64 }}
+          GALACTA_UEXP: ${{ secrets.GALACTA_TEMPLATE_UEXP_B64 }}
+        run: |
+          if (-not $env:GALACTA_UASSET -or -not $env:GALACTA_UEXP) { throw 'Both Skin Swapper template secrets are required.' }
+          New-Item -ItemType Directory -Force Tools/Galacta | Out-Null
+          [IO.File]::WriteAllBytes("$PWD/Tools/Galacta/GAL_ConfigTemplate.uasset", [Convert]::FromBase64String($env:GALACTA_UASSET))
+          [IO.File]::WriteAllBytes("$PWD/Tools/Galacta/GAL_ConfigTemplate.uexp", [Convert]::FromBase64String($env:GALACTA_UEXP))
+      - run: python scripts/build.py --platform windows --skip-tools --no-package
+      - name: Build the installer for new and legacy installations
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          & $env:ISCC packaging/Atelier.iss "/DAppVersion=$env:RELEASE_VERSION"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_manifest.py --manifest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: python tests/frozen_smoke.py --exe dist/Atelier/Atelier.exe --report-dir reports/frozen --viewer-checks --viewer-followups --roster-checks
+      - run: python scripts/package_updates.py
+      - run: python tests/patch_smoke.py --report-dir reports/patch
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-windows
+          path: |
+            dist/AtelierSetup.exe
+            dist/Atelier-Windows-*.zip
+            dist/Atelier-Windows-*-inventory.json
+            dist/windows-update.json
+            dist/installer-manifest.json
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-windows-reports
+          path: |
+            reports/backend
+            reports/browser
+            reports/frozen
+            reports/patch/results.json
+            reports/native-tools
+
+  installer:
+    needs: [prepare, windows]
+    if: needs.prepare.outputs.full_checks == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      ATELIER_DISPOSABLE_INSTALLER_TEST: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-windows
+          path: ${{ runner.temp }}/candidate
+      - run: python -m pip install playwright==1.64.0
+      - name: Verify install, upgrade, reinstall and uninstall on a disposable runner
+        shell: pwsh
+        run: |
+          $manifest = Get-Content "$env:RUNNER_TEMP/candidate/installer-manifest.json" -Raw | ConvertFrom-Json
+          Invoke-WebRequest -Uri $manifest.previous_installer_url -OutFile "$env:RUNNER_TEMP/previous.exe"
+          python tests/installer_smoke.py --installer "$env:RUNNER_TEMP/candidate/AtelierSetup.exe" --previous-installer "$env:RUNNER_TEMP/previous.exe" --previous-sha256 $manifest.previous_installer_sha256 --payload-manifest "$env:RUNNER_TEMP/candidate/installer-manifest.json" --report-dir "$env:RUNNER_TEMP/installer-report"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-installer-${{ matrix.os }}
+          path: ${{ runner.temp }}/installer-report
+
+  linux:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-inputs
+          path: _release
+      - run: cp _release/version version && cp _release/CHANGELOG.md CHANGELOG.md
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-webkit2-4.1 \
+            libwebkit2gtk-4.1-0 xvfb dbus-x11 openbox scrot xdotool python3-pyatspi at-spi2-core libfuse2t64
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -r requirements-dev.txt
+      - run: .venv/bin/python -m playwright install --with-deps chromium
+      - run: .venv/bin/python scripts/release_checks.py
+      - run: .venv/bin/python scripts/release_browser_checks.py
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: native
+        with:
+          path: Tools
+          key: ubuntu-24.04-native-${{ needs.prepare.outputs.native_key }}
+      - name: Reuse matching tools from the previous verified release
+        id: previous-native
+        if: steps.native.outputs.cache-hit != 'true'
+        run: .venv/bin/python scripts/reuse_release_tools.py
+      - if: steps.native.outputs.cache-hit != 'true' && steps.previous-native.outputs.reused != 'true'
+        run: .venv/bin/python scripts/toolchain.py install --platform linux --dest Tools
+      - run: .venv/bin/python scripts/toolchain.py verify --platform linux --dest Tools
+      - name: Keep private templates outside the native cache
+        if: steps.native.outputs.cache-hit != 'true'
+        run: test ! -e Tools/Galacta
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: steps.native.outputs.cache-hit != 'true'
+        with:
+          path: Tools
+          key: ubuntu-24.04-native-${{ needs.prepare.outputs.native_key }}
+      - name: Stage private template and actual previous AppImage
+        env:
+          GALACTA_UASSET: ${{ secrets.GALACTA_TEMPLATE_UASSET_B64 }}
+          GALACTA_UEXP: ${{ secrets.GALACTA_TEMPLATE_UEXP_B64 }}
+        run: |
+          test -n "$GALACTA_UASSET" && test -n "$GALACTA_UEXP"
+          mkdir -p Tools/Galacta
+          printf '%s' "$GALACTA_UASSET" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uasset
+          printf '%s' "$GALACTA_UEXP" | base64 -d > Tools/Galacta/GAL_ConfigTemplate.uexp
+          .venv/bin/python scripts/release_inputs.py
+      - run: .venv/bin/python scripts/build.py --platform linux --skip-tools
+      - name: Verify real Linux desktop and previous-version upgrade
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c '
+            openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+            export GTK_MODULES=gail:atk-bridge NO_AT_BRIDGE=0
+            /usr/bin/python3 tests/linux_appimage_smoke.py --appimage "dist/Atelier-${{ needs.prepare.outputs.version }}-x86_64.AppImage" --source "$PWD" --previous-appimage "$RUNNER_TEMP/atelier-previous.AppImage" --report-dir reports/appimage
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-linux
+          path: dist/Atelier-*-x86_64.AppImage
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-linux-reports
+          path: |
+            reports/backend
+            reports/browser
+            reports/appimage/*.json
+            reports/appimage/*.jsonl
+            reports/appimage/*.png
+            reports/appimage/*.log
+            reports/appimage/*.txt
+
+  bundle:
+    needs: [prepare, windows, linux, installer]
+    if: >-
+      always() && needs.prepare.result == 'success' && needs.windows.result == 'success' &&
+      needs.linux.result == 'success' &&
+      (needs.installer.result == 'success' || needs.installer.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: ${{ runner.temp }}/release-artifacts
+      - name: Restore the prepared release inputs
+        run: |
+          mkdir -p _release
+          cp "$RUNNER_TEMP/release-artifacts/release-inputs/"* _release/
+      - run: cp _release/version version && cp _release/CHANGELOG.md CHANGELOG.md
+      - run: python -m pip install cryptography==50.0.2
+      - name: Bind checks, source and update packages, then sign
+        env:
+          ATELIER_UPDATE_PRIVATE_KEY: ${{ secrets.ATELIER_UPDATE_PRIVATE_KEY }}
+        run: python scripts/assemble_release.py --artifacts "$RUNNER_TEMP/release-artifacts" --output "$RUNNER_TEMP/release"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+          compression-level: 0
+  update:
+    needs: [prepare, bundle]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      ATELIER_DISPOSABLE_UPDATE_TEST: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install cryptography==50.0.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+      - name: Provision the Linux native window environment
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0 libgirepository-2.0-0 xvfb dbus-x11 openbox libfuse2t64
+      - name: Exercise the real Windows updater and restarted native window
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python tests/in_app_update_smoke.py --release "$env:RUNNER_TEMP/release" --report-dir "$env:RUNNER_TEMP/in-app-update"
+      - name: Exercise the real Linux updater and restarted native window
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c '
+            openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+            export WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
+            python tests/in_app_update_smoke.py --release "$RUNNER_TEMP/release" --report-dir "$RUNNER_TEMP/in-app-update"
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: in-app-update-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/in-app-update/results.json
+            ${{ runner.temp }}/in-app-update/data/_updates/*/error.json
+            ${{ runner.temp }}/in-app-update/data/_updates/*/transaction/journal.json
+
+  publish:
+    needs: [prepare, bundle, update]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: in-app-update-*
+          path: ${{ runner.temp }}/update-reports
+      - name: Bind both native updater results to the signed packages
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python -m pip install cryptography==50.0.2
+          python scripts/verify_update_results.py --release "$RUNNER_TEMP/release" --reports "$RUNNER_TEMP/update-reports"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Atelier-${{ needs.prepare.outputs.version }}-release
+          path: ${{ runner.temp }}/release
+          compression-level: 0
+      - name: Upload every asset before making the release visible to updaters
+        if: ${{ !inputs.verify_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+        run: |
+          gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft --title "Atelier ${RELEASE_TAG#v}" --notes-file "$RUNNER_TEMP/release/RELEASE_NOTES.md" "$RUNNER_TEMP/release/"*
+          if [ "$RELEASE_PUBLISH" = true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi

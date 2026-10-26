@@ -27,9 +27,11 @@ def download(url, path, sha):
 
 def main():
     version = (ROOT / 'version').read_text(encoding='utf-8').strip()
-    inputs = json.loads((ROOT / 'tests/fixtures/installer' / f'release-{version}-inputs.json').read_text(encoding='utf-8'))
+    path = Path(os.environ['ATELIER_RELEASE_INPUTS']) if os.environ.get('ATELIER_RELEASE_INPUTS') else ROOT / 'tests/fixtures/installer' / f'release-{version}-inputs.json'
+    inputs = json.loads(path.read_text(encoding='utf-8'))
     target = Path(os.environ.get('RUNNER_TEMP') or tempfile.gettempdir()) / 'atelier-previous.AppImage'
-    download(inputs['linux_seed_url'], target, inputs['linux_seed_sha256'])
+    download(inputs.get('previous_linux_url', inputs.get('linux_seed_url')), target,
+             inputs.get('previous_linux_sha256', inputs.get('linux_seed_sha256')))
     target.chmod(0o755)
     print('Previous AppImage staged: ' + str(target))
 

@@ -1,6 +1,7 @@
 """Model Studio export controls against real HTTP jobs and a labelled worker fixture."""
 from pathlib import Path
 import threading
+import time
 from unittest.mock import patch
 from urllib.parse import unquote
 
@@ -73,7 +74,13 @@ def run_model_studio_export_browser_checks(page, context, url, report, checks):
             tab.wait_for_function("document.getElementById('job-activity').getAttribute('aria-label').includes('1 running')")
             assert button.is_disabled()
             assert 'Preparing model, materials and textures' in tab.locator('#viewport-status').inner_text()
-            assert calls == [{'game_rel': 'Characters/1029/1029001/Meshes/Body', 'weapons': []}]
+            # Activity includes queued work; it can become visible before the
+            # executor enters the worker. Keep dispatching browser routes while
+            # waiting for this fixture's actual call rather than racing it.
+            deadline = time.monotonic() + 10
+            while not calls and time.monotonic() < deadline:
+                tab.wait_for_timeout(20)
+            assert calls == [{'game_rel': 'Characters/1029/1029001/Meshes/Body', 'weapons': []}], calls
             for theme in ('light', 'dark'):
                 tab.locator('#settings-theme').select_option(theme, force=True)
                 tab.screenshot(path=str(report / ('model-blender-preparing-' + theme + '.png')))

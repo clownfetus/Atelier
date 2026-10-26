@@ -1,5 +1,5 @@
 """Create the installer smoke-test manifest and collect distribution licenses."""
-import hashlib,json,shutil,subprocess,sys
+import hashlib,json,os,shutil,subprocess,sys
 from pathlib import Path
 from package_release import collect_licenses
 
@@ -9,7 +9,8 @@ shutil.copy2(ROOT/'LICENSE',bundle/'LICENSE')
 (bundle/'licenses').mkdir(exist_ok=True)
 collect_licenses(bundle/'licenses')
 if '--manifest' in sys.argv:
-    inputs=json.loads((ROOT/'tests/fixtures/installer'/f"release-{(ROOT/'version').read_text().strip()}-inputs.json").read_text())
+    path = Path(os.environ['ATELIER_RELEASE_INPUTS']) if os.environ.get('ATELIER_RELEASE_INPUTS') else ROOT/'tests/fixtures/installer'/f"release-{(ROOT/'version').read_text().strip()}-inputs.json"
+    inputs=json.loads(path.read_text())
     def sha(path):
         with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
