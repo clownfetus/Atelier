@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import urllib.request
@@ -25,6 +26,34 @@ def asset_digest(asset):
     if not isinstance(value, str) or not value.startswith('sha256:') or len(value) != 71:
         raise ValueError('Published asset has no SHA-256 digest: ' + asset['name'])
     return value[7:]
+
+
+def merge_changelog_history(current, historical):
+    pattern = r'(?m)(?=^## [0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}(?:\s|$))'
+    current_parts = re.split(pattern, current)
+    releases = {}
+    for document in (historical, current):
+        for section in re.split(pattern, document)[1:]:
+            number = re.match(r'## ([0-9]+\.[0-9]+\.[0-9]+)', section)[1]
+            releases[number] = section.strip()
+    return current_parts[0].rstrip() + '\n\n' + '\n\n'.join(releases[number] for number in sorted(releases, key=version, reverse=True)) + '\n'
+
+
+def release_summaries(log, previous_tree):
+    entries = []
+    for record in log.split('\x1e'):
+        if not record.strip():
+            continue
+        tree, subject, body = record.strip('\r\n').split('\x1f', 2)
+        if tree == previous_tree:
+            continue
+        title = body.strip().splitlines()[0] if subject.startswith('Merge pull request ') and body.strip() else subject
+        if title.startswith('Merge '):
+            continue
+        title = re.sub(r'\s*\[verify release\]', '', title).strip()
+        if title and title not in entries:
+            entries.append(title)
+    return entries
 
 
 def needs_full_checks(changed):
@@ -94,14 +123,24 @@ def main():
     atomic_json(directory / 'inputs.json', inputs)
     (ROOT / 'version').write_text(release_version + '\n', encoding='utf-8')
     changelog = (ROOT / 'CHANGELOG.md').read_text(encoding='utf-8')
+    previous_changelog = context['previous_assets'].get('CHANGELOG.md')
+    if previous_changelog:
+        with urllib.request.urlopen(previous_changelog['browser_download_url'], timeout=30) as response:
+            raw = response.read(4 * 1024 * 1024 + 1)
+        if len(raw) > 4 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != asset_digest(previous_changelog):
+            raise ValueError('Published changelog failed its release digest.')
+        changelog = merge_changelog_history(changelog, raw.decode('utf-8'))
     heading = '## ' + release_version
     if not any(line == heading or line.startswith(heading + ' ') for line in changelog.splitlines()):
-        entries = git('log', '--format=%s', f"{context['previous_tag']}..HEAD").splitlines()
-        entries = [entry for entry in entries if not entry.startswith('Merge ')]
+        log = subprocess.check_output(['git', 'log', '--first-parent', '--format=%T%x1f%s%x1f%b%x1e',
+                                       f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True)
+        entries = release_summaries(log, git('rev-parse', context['previous_tag'] + '^{tree}'))
         today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         section = f'## {release_version} — {today}\n\n' + '\n'.join('- ' + entry for entry in entries) + '\n\n'
         first, separator, remainder = changelog.partition('\n')
         changelog = first + '\n\n' + section + remainder.lstrip() if first.startswith('# ') else section + changelog
+        (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
+    else:
         (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
     # The prepared metadata is identical in both build jobs and the source ZIP.
     (directory / 'version').write_text(release_version + '\n', encoding='utf-8')

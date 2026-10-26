@@ -93,6 +93,7 @@ def assemble(artifacts, output, context, private_key):
     notes = next((section for section in re.split(r'(?m)^## ', changelog)[1:]
                   if section.startswith(release_version + ' ') or section.startswith(release_version + '\n')), release_version + '\n')
     (output / 'RELEASE_NOTES.md').write_text('# Atelier ' + notes.strip() + '\n', encoding='utf-8')
+    shutil.copy2(ROOT / 'CHANGELOG.md', output / 'CHANGELOG.md')
     source = output / f'Atelier-{release_version}-source.zip'
     raw_source = output / 'source-input.zip'
     subprocess.run(['git', 'archive', '--format=zip', '--output', str(raw_source), commit], cwd=ROOT, check=True)
@@ -111,7 +112,8 @@ def assemble(artifacts, output, context, private_key):
                     'files': [protocol.file_record(path) for path in sorted(output.iterdir())]}
     protocol.atomic_json(output / 'VERIFICATION.json', verification)
     platforms = {'windows-x64': metadata, 'linux-x64': {'full': protocol.file_record(image), 'patches': []}}
-    feed = {'schema': 1, 'version': release_version, 'source_commit': commit, 'platforms': platforms}
+    feed = {'schema': 1, 'version': release_version, 'source_commit': commit, 'platforms': platforms,
+            'changelog': protocol.file_record(output / 'CHANGELOG.md')}
     key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(private_key, validate=True))
     public = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     key_id = hashlib.sha256(public).hexdigest()[:16]

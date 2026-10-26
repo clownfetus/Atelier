@@ -60,6 +60,21 @@ class ReleasePlanning(unittest.TestCase):
             self.assertFalse(R.can_reuse_native([name]), name)
         self.assertFalse(R.can_reuse_native([]))
 
+    def test_generated_changelog_retains_skipped_releases_and_authored_corrections(self):
+        current = '# Changelog\n\n## 1.1.3\n\nCorrected original notes\n'
+        previous = '# Changelog\n\n## 1.1.4\n\nIn-app updates\n\n## 1.1.3\n\nOriginal notes\n'
+        merged = R.merge_changelog_history(current, previous)
+        self.assertIn('## 1.1.4', merged)
+        self.assertIn('Corrected original notes', merged)
+        self.assertNotIn('\nOriginal notes', merged)
+        self.assertLess(merged.index('1.1.4'), merged.index('1.1.3'))
+
+    def test_release_notes_use_merge_titles_and_omit_rehearsal_markers(self):
+        log = ('oldtree\x1fMerge pull request #34\x1fAlready released\x1e\n'
+               'newtree\x1fMerge pull request #35\x1fIn-app updates\n\nDetails\x1e\n'
+               'othertree\x1fFix restart [verify release]\x1f\x1e\n')
+        self.assertEqual(R.release_summaries(log, 'oldtree'), ['In-app updates', 'Fix restart'])
+
     def test_missing_published_asset_digest_is_refused(self):
         previous = self.previous()
         previous['assets'][0]['digest'] = None

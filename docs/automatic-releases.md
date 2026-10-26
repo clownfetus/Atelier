@@ -19,6 +19,8 @@ does not combine unfinished feature branches. The release action generates the
 build's version and changelog entry automatically; the matching source ZIP contains
 those two generated files and records the original commit in `VERIFICATION.json`.
 Other source files must still match that commit.
+Release summaries use merged change titles, and the published changelog is carried
+into later builds so users who skip versions still receive the intervening notes.
 
 ## What users receive
 
