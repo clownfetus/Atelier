@@ -1,9 +1,41 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.3**.
+**1.1.4**.
 
 ## Unreleased
+
+## 1.1.4
+
+### Easier updates
+
+- Download updates inside Atelier, then choose **Restart and Update** when you're
+  ready. **Restart Later** lets you finish editing first. Compatible Windows
+  updates use smaller downloads; Linux downloads the new AppImage.
+- Updates check their downloads before installing and restore the previous app
+  version if the new one cannot start. Projects and settings are kept.
+
+### Model and texture fixes
+
+- Model previews choose the correct standing animation for gameplay and lobby
+  models, avoiding mismatched poses on costumes that use different skeletons.
+- Skin Swapper exports automatically use the form belonging to the selected
+  mesh, helping multi-form heroes export with the correct appearance.
+- Improve material matching when rebuilding Blender edits, including models with
+  repeated material names or different materials at lower detail levels.
+- Fix incomplete texture exports and preserve all cubemap faces and transparency
+  when preparing texture inputs for Blender.
+
+### A smoother workspace
+
+- Costume artwork stays visible while its model loads, then clears as the model
+  appears. The Home hero list also folds into a compact row as you browse categories.
+- Simplify Krackle previews and make text, controls and motion more consistent.
+  Calm, Off and system reduced-motion settings remain available.
+- Open the VFX editor even when automatic external opening is turned off, and
+  show newly imported textures in the Mod tray without waiting for a full refresh.
+- Make completed exports easier to review, with the finished Mod card beside the
+  result. Update prompts wait until first-time setup is finished.
 
 ## 1.1.3 — 25 October 2026
 

@@ -1,18 +1,31 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.3** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.1.4** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.3](docs/release-1.1.3.md)
+· [What's new in 1.1.4](docs/release-1.1.4.md)
 · [Tutorials](#tutorials)
 · [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
-![Atelier 1.1.3 hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
+![Atelier hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.3
+## What's new in 1.1.4
+
+- **Download updates inside Atelier** and restart when you're ready. Compatible
+  Windows updates use smaller downloads; Linux replaces its AppImage in-app.
+- **More reliable model exports.** Skin Swapper uses the form belonging to the
+  selected mesh, and Blender rebuilds handle repeated material names and lower detail levels better.
+- **Better previews and texture inputs.** Gameplay and lobby models choose the
+  right standing animation, and Blender inputs retain complete cubemap faces and transparency.
+- **A smoother workspace.** Costume artwork stays visible while models load,
+  Home's hero list compacts as you browse, and export results are easier to review.
+
+See the [patch notes](docs/release-1.1.4.md) for update instructions and details.
+
+## Included from 1.1.3
 
 - **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
   costume colours along the app's borders. Try the examples in **Settings → Try Krackle**.
@@ -69,8 +82,8 @@ See the [patch notes](docs/release-1.1.3.md) for details and verification limits
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
-These instructions describe **1.1.3**. Check the release title when downloading;
-a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.3.md)
+These instructions describe **1.1.4**. Check the release title when downloading;
+a candidate branch does not replace the latest published installer. See the [release notes](docs/release-1.1.4.md)
 for verification and platform limits. Screenshots show the actual interface with
 an isolated, configured game installation; [capture details](images/README.md).
 
