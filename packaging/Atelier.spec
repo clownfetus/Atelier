@@ -13,7 +13,7 @@ from update_catalogue_seed import validate_seed
 validate_seed(ROOT / 'gui' / 'catalogue.json')
 from build_blender_bridge import package as package_blender_bridge
 bridge_zip = package_blender_bridge(ROOT / 'build' / 'Atelier-Live-Bridge.zip')
-from build_update_helper import build as build_update_helper
+from build_update_helper import build as build_update_helper, compatibility_binaries
 update_helper = build_update_helper(ROOT / 'build' / 'updater')
 
 datas = [
@@ -35,7 +35,7 @@ datas += [(str(script), 'atelier/blender/atelier_live_bridge')
 # upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
 datas += [(str(item), 'atelier/models') for item in (ROOT / 'atelier/models').iterdir() if item.is_file()]
 datas += [(str(item), 'atelier/vendor/meshoptimizer') for item in (ROOT / 'atelier/vendor/meshoptimizer').iterdir() if item.is_file()]
-binaries = []
+binaries = compatibility_binaries()
 hiddenimports = [
     'io_lib',
     'atelier.config',

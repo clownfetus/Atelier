@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import stage_tools as ST  # noqa: E402
+import build_update_helper as UH
 
 ISS = (ROOT / "packaging" / "Atelier.iss").read_text(encoding="utf-8")
 
@@ -36,6 +37,26 @@ def section(name):
 def field(line, key):
     m = re.search(key + r':\s*"([^"]*)"', line)
     return m.group(1) if m else None
+
+
+class StableAbiPackaging(unittest.TestCase):
+    def test_gil_build_uses_its_compatibility_shim_before_a_free_threaded_shim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp)
+            (prefix / 'python3t.dll').write_bytes(b'free-threaded ABI')
+            shim = prefix / 'abi3t-compat/python3t.dll'
+            shim.parent.mkdir()
+            shim.write_bytes(b'GIL-compatible ABI')
+            with patch.object(UH.sys, 'platform', 'win32'), patch.object(UH.sys, 'version_info', (3, 15)), \
+                 patch.object(UH.sys, 'base_prefix', tmp), patch.object(UH.sysconfig, 'get_config_var', return_value=0):
+                self.assertEqual(UH.compatibility_binaries(), [(str(shim), '.')])
+
+    def test_missing_python_315_shim_fails_before_freezing_a_broken_updater(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(UH.sys, 'platform', 'win32'), patch.object(UH.sys, 'version_info', (3, 15)), \
+                 patch.object(UH.sys, 'base_prefix', tmp), patch.object(UH.sysconfig, 'get_config_var', return_value=0):
+                with self.assertRaisesRegex(RuntimeError, 'python3t.dll'):
+                    UH.compatibility_binaries()
 
 
 class InstallerKeepsUserData(unittest.TestCase):

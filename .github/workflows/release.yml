@@ -369,7 +369,7 @@ jobs:
           path: ${{ runner.temp }}/release
       - name: Provision the Linux native window environment
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0 xvfb dbus-x11 openbox libfuse2t64
+        run: sudo apt-get update && sudo apt-get install -y gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0 libgirepository-2.0-0 xvfb dbus-x11 openbox libfuse2t64
       - name: Exercise the real Windows updater and restarted native window
         if: runner.os == 'Windows'
         shell: pwsh

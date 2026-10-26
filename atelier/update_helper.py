@@ -231,8 +231,18 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--request', type=Path)
     group.add_argument('--recover', type=Path)
+    group.add_argument('--self-test', action='store_true')
     parser.add_argument('--parent-pid', type=int)
     args = parser.parse_args()
+    if args.self_test:
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+            key = Ed25519PrivateKey.generate()
+            message = b'Atelier frozen updater signature check'
+            key.public_key().verify(key.sign(message), message)
+            return 0
+        except Exception:
+            return 1
     path = args.request or args.recover
     try:
         run(path, recover=bool(args.recover), parent_pid=args.parent_pid)
