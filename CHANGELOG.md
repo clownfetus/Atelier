@@ -5,6 +5,13 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Building a mod now shows the Krackle ink-well: bubbles form, circulate, crowd
+  and burst while your mod cooks, and a few of them carry colours averaged from
+  the original costume's textures. When the build finishes, a successful export
+  bursts cleanly from the top and settles calm, an export with warnings strains
+  under pressure without breaking, and a failed export ruptures and leaks. Calm,
+  Off and reduced motion show a still pose.
+
 ## 1.1.4
 
 To get the new updater, use the 1.1.4 Windows installer or replace your Linux

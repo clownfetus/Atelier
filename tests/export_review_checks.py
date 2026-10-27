@@ -145,16 +145,17 @@ def run_export_review_checks(page, context, url, report, checks):
         overlay.locator('.am-working-border').wait_for()
         assert overlay.locator('.am-working-dot').count() == 0
         assert overlay.locator('.am-working-border').evaluate("el=>getComputedStyle(el).backgroundImage.includes('data:image/svg+xml')")
-        assert overlay.locator('.am-krackle-stage-canvas').evaluate('el=>el.style.width') == '216px'
+        # The build cooks in the ink-well; its bubbles are drawn geometry, not a static image.
+        assert overlay.locator('.am-ink-well').evaluate('el=>el.style.width') == '216px'
+        assert overlay.locator('.export-review-stage').get_attribute('data-atelier-motion') == 'ink-well'
         review.wait_for_function("""() => {
-          const c=document.querySelector('.export-review-stage canvas');
-          if(!c)return false;
-          return c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3 && v>100);
+          const holes=document.querySelector('.export-review-stage .am-ink-well-hole');
+          return holes && (holes.getAttribute('d')||'').split('M').length > 30;
         }""")
         review.wait_for_timeout(900)
         review.screenshot(path=str(report / 'working-export-busy.png'))
         review.set_viewport_size({'width': 1024, 'height': 640})
-        assert overlay.locator('.am-krackle-stage-canvas').bounding_box()['height'] == 164
+        assert overlay.locator('.am-ink-well').bounding_box()['height'] == 164
         action_box = overlay.locator('.export-review-actions').bounding_box()
         assert action_box['y'] >= 0 and action_box['y'] + action_box['height'] <= 640
         review.screenshot(path=str(report / 'working-export-compact.png'))

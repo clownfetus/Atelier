@@ -264,6 +264,8 @@ def main():
                     run_material_save_motion_checks(page, context, url, report, checks)
                     run_export_motion_checks(page, context, url, report, checks)
                     run_export_review_checks(page, context, url, report, checks)
+                    from ink_well_checks import run_ink_well_checks
+                    run_ink_well_checks(context, url, report, checks)
                     run_viewport_loading_checks(page, context, url, report, checks)
                     run_viewport_motion_checks(page, context, url, report, checks)
                     assert not errors, errors
@@ -549,6 +551,8 @@ def main():
                 run_logo_motion_checks(page, context, url, report, checks)
                 from krackle_motion_checks import run_krackle_motion_checks
                 run_krackle_motion_checks(page, context, url, report, checks)
+                from ink_well_checks import run_ink_well_checks
+                run_ink_well_checks(context, url, report, checks)
 
                 from release_interface_checks import run_release_interface_checks
                 run_release_interface_checks(page, context, browser, url, report, checks)

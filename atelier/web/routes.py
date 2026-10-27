@@ -1637,6 +1637,33 @@ def api_thumb():
     return b""
 
 
+@app.get("/api/diffuse_palette")
+def api_diffuse_palette():
+    """Average colours of a few original diffuse textures of the skins being exported, for the
+    export review's ink-well. Reads cached thumbnails/viewport PNGs only and never decodes, so a
+    skin nobody has browsed yet returns no colours. Not project-scoped: originals are shared."""
+    from atelier.diffuse_palette import skin_palette
+    from atelier.index import prefix_entries
+    skins = list(dict.fromkeys(s for s in request.query.getall("skin") if re.fullmatch(r"\d{7}", s)))[:3]
+
+    def folder(skin_id):
+        return [virt for virt, _cont, _mount in prefix_entries(f"Characters/{skin_id[:4]}/{skin_id}/")]
+
+    def cached(game_rel):
+        thumb = _thumb_path(game_rel)
+        if _valid_thumb(thumb):
+            return thumb
+        decoded = project_base(game_rel, CACHE_3DVIEW) + ".png"
+        return decoded if os.path.isfile(decoded) else None
+
+    response.content_type = "application/json"
+    response.set_header("Cache-Control", "no-store")
+    try:
+        return json.dumps(skin_palette(skins, folder, cached) if skins else {"colors": [], "sources": []})
+    except Exception as exc:  # decorative: an unreadable index or cache only costs the colours
+        return json.dumps({"colors": [], "sources": [], "error": str(exc)})
+
+
 def _requested_thumbs(body):
     return list(dict.fromkeys("/".join(_c.validate_game_rel(gr))
                              for gr in body.get("game_rels", []) if gr))

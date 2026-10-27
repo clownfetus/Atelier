@@ -47,6 +47,7 @@ never take over that stage.
 | Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
 | Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
 | Krackle stage | Export review and edit import dialogs | 184-216px canvas particle formations; smaller in short windows |
+| Ink-well | Export review: checking, building and the result | 216px SVG vessel of living bubbles (164px in short windows); a few carry the cooked skin's colours; success releases, warning strains in a loop, failure ruptures |
 | Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
 | Workflow accents | Pin/unpin, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
@@ -508,10 +509,60 @@ unsupported or slow (WebKitGTK). Settled results stop the frame loop
 (`data-am-sleeping="true"`), and an IntersectionObserver stops a stage whose
 dialog is hidden. Hidden documents pause; reduced motion jumps to each formation.
 `mount` throws without canvas, so callers keep their static progress UI. The export
-review shows a 216px stage while checking and building, then the result formation
-(cancelled exports hide it) under a heading that names the outcome ("Mod exported
-with warnings"); long reports scroll inside the dialog so the heading and actions
-stay visible. The edit import dialog shows a 184px stage while open. Short windows
+review's stage host holds the ink-well instead (below) for checking, building and the
+result, under a heading that names the outcome ("Mod exported with warnings");
+cancelled exports hide it, and the canvas stage remains its fallback when the
+ink-well cannot mount. Long reports scroll inside the dialog so the heading and
+actions stay visible.
+
+`ink-well.js` (`AtelierMotion.inkWell`) is the build's busy voice, an SVG vessel
+traced from the approved concept: rift body, charge ink and rim, with holes for its
+bubbles. Each bubble runs its own life (nucleate, grow, circulate round a central
+void, then dissolve or merge into the bubble ahead) on lanes that follow the cavity
+and turn at different rates. A 3.4s pressure cycle crowds the field (contact faces
+flatten, a few pairs fuse through metaball necks), then releases it: pairs split, a
+bud pinches off the void, climbs the neck and bursts into the mouth, throwing the
+splash, and the walls rebound once. Collisions carry over between frames with a speed
+limit, so crowded bubbles slide round each other rather than hop.
+
+Results interrupt the cook where it is: it coasts to a stop and its pressure relaxes,
+and the outcome ink washes out from the void with a small pop per bubble (skin tints
+keep their colours).
+
+- **Failure, ruptured** (`--krackle-fault`, 1.75s): subtle cracks run from the void
+  and widen; the vessel breaks into seven wedge pieces (`<use>` copies of it, each
+  clipped to its wedge) that drift apart while the split rim, neck and shoulders slump
+  and tip; red ink leaks from the low cracks, runs to the ground and pools, and drops
+  splash out and flatten where they land. It settles on the broken pose.
+- **Warning, overpressurised** (`--krackle-warn`): the body swells and wobbles slowly,
+  the bubbles swell and fuse under held pressure, the rim stretches and an amber bulge
+  strains up out of the mouth, spitting a drop that falls back now and then. It never
+  breaks. By request it holds in this tense loop, the one result that loops: Full motion
+  only, stopped when hidden, and still after 15s so a dialog left open stops drawing.
+- **Success, clean release** (`--krackle-success`, 1.6s): the bubbles rise and gather
+  under the neck, the mouth brims and a burst of tendrils leaps and curls outward; their
+  tips break into drops that float up and dissipate with a spray of small bubbles, and
+  the well settles calm back in its cooking frame.
+
+The artboard eases out while released ink needs room, so it stays inside the stage and
+clear of the heading. `mount(host, {size, kind, state, settled, palette})` returns
+`setState` (`busy`, `success`, `warning`, `error`), `setPalette`, `setReducedMotion`,
+`frames` and an idempotent `destroy`; a reopened result mounts `settled`. It claims the
+moment like the stage (refused, it shows the 48px glyph for its state), Calm/Off/reduced
+motion draw each state's still pose, and hidden documents or off-screen hosts stop
+drawing. Success plays the `pop` foley and failure the `splat`, under the same rules as
+the stage.
+
+The palette is up to four colours averaged from the cooked skins' original `_D` /
+`BaseColor` maps. `export-review.js` asks `/api/diffuse_palette?skin=…` once per
+review for the skins in the included paths; the server reads cached library
+thumbnails or decoded viewport PNGs only (never decoding), weights coloured texels
+over grey ones in linear light and lifts a near-black result along its hue so it
+cannot pass for a hole. Two to four inner-ring bubbles carry the colours, rotating
+between lives so the hues mix through the well; they never merge or fuse. No answer
+leaves plain holes. `tests/ink_well_checks.py` (in `--working-panels-only`) covers the
+palette, busy-after-busy continuity, failure and success performing once and settling,
+the warning loop and its reduced-motion pose, hiding and teardown; `tests/test_diffuse_palette.py` covers selection, averaging and the route. The edit import dialog shows a 184px stage while open. Short windows
 use 164px and 144px respectively so actions remain reachable.
 
 `working-panels.js` observes real `aria-busy` and controller states, plus explicit
