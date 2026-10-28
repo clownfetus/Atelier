@@ -47,6 +47,7 @@
 <link rel="stylesheet" href="/static/motion/krackle-stage.css">
 <link rel="stylesheet" href="/static/motion/working-panels.css">
 <link rel="stylesheet" href="/static/motion/config-discovery.css">
+<link rel="stylesheet" href="/static/identity.css">
 </head>
 <body>
 
@@ -198,15 +199,24 @@
 
 <!-- ── progress overlay (un-closable) ── -->
 <div class="overlay" id="prog-overlay">
-  <div id="prog-box">
-    <h2><div class="spinner"></div> Editing Assets…</h2>
-    <div id="prog-counter" style="font-size:13px;color:var(--muted)">Preparing 0 / 0 assets for editing…</div>
-    <div id="import-segments" aria-label="Import results"></div>
-    <div class="warning" style="margin-top:4px">
-      <i data-lucide="shield-alert" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>Completed assets are retained if cancelled. Check Activity after reopening this view.</span>
+  <div id="prog-box" class="at-identity at-import" role="dialog" aria-modal="true" aria-labelledby="import-title" aria-describedby="import-status" data-import-state="idle">
+    <header class="at-import-head">
+      <span class="at-label" id="import-kicker">Import</span>
+      <h2 id="import-title">Editing assets</h2>
+    </header>
+    <div class="at-import-stage" id="import-stage" aria-hidden="true"></div>
+    <div class="at-import-status" id="import-status" aria-live="polite">
+      <b id="import-status-title">Extracting from game</b>
+      <span id="prog-counter">Preparing 0 / 0 assets for editing…</span>
+      <span class="at-import-current" id="import-current"></span>
     </div>
-    <div class="bulk-actions"><button class="btn" id="import-hide" type="button">Hide</button><button class="btn" id="import-cancel" type="button">Cancel import</button></div>
+    <div id="import-segments" aria-label="Import results"></div>
+    <p class="at-import-note" id="import-note">Completed assets are kept if you cancel. Hide this view to keep working; Activity shows the result.</p>
+    <div class="at-import-actions">
+      <button class="at-btn at-btn--quiet" id="import-hide" type="button">Hide</button>
+      <button class="at-btn at-btn--danger" id="import-cancel" type="button">Cancel import</button>
+      <button class="at-btn at-btn--primary" id="import-done" type="button" hidden>Done</button>
+    </div>
   </div>
 </div>
 
@@ -898,7 +908,7 @@
 <script src="/static/motion/config-discovery.js"></script>
 <script src="/static/motion/workflow-krackle.js"></script>
 <script src="/static/motion/motion-preview.js"></script>
-<script src="/static/motion/krackle-surfaces.js"></script>
+<script src="/static/motion/import-ink.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>
 <script src="/static/library-pins.js"></script>
@@ -914,6 +924,7 @@
 <script src="/static/add-asset.js"></script>
 <script src="/static/tooltips.js"></script>
 <script src="/static/polish.js"></script>
+<script src="/static/import-dialog.js"></script>
 <script src="/static/roster.js"></script>
 <script src="/static/catalogue-art.js"></script>
 <script src="/static/continuity.js"></script>

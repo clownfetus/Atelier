@@ -38,5 +38,4 @@
 .export-review-stage:empty, .export-review-stage[hidden] { display: none; }
 @media (max-height: 700px) {
   .export-review-stage .am-krackle-stage-canvas, .export-review-stage .am-ink-well { width: 164px !important; height: 164px !important; }
-  .prog-krackle-stage .am-krackle-stage-canvas { width: 144px !important; height: 144px !important; }
 }

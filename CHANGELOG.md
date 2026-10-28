@@ -11,6 +11,14 @@ The app, installers and update checker identify each release by its full number,
   bursts cleanly from the top and settles calm, an export with warnings strains
   under pressure without breaking, and a failed export ruptures and leaks. Calm,
   Off and reduced motion show a still pose.
+- Edit All has a redesigned progress dialog, the first part of Atelier to use its
+  new identity: Gesso and Lamp Black surfaces (Charcoal in Dark), Instrument Sans
+  and Fragment Mono beside Bricolage, and one dot per texture. Ink gathers on the
+  textures you chose, pours into the dialog, charges while they import and leaves
+  for the Mod tray as each one lands. The dialog now stays open with the result
+  (imported, imported with warnings, failed or cancelled) until you choose Done;
+  hiding it still reports through a notification. Calm, Off and reduced motion
+  show still poses and nothing travels.
 
 ## 1.1.4
 

@@ -29,7 +29,7 @@ before the formation settles. A busy state that follows another busy state (a
 destination check running straight into a build) continues the current animation
 rather than dropping new ink. Only busy states loop; results animate once and hold
 still, and a settled or hidden stage stops drawing. The large Krackle stage belongs
-to the dialog the user has open (export review or edit import); other jobs that
+to the dialog the user has open (export review or the Edit All import); other jobs that
 finish or fail meanwhile report through their own toasts and Activity rows and
 never take over that stage.
 
@@ -46,7 +46,8 @@ never take over that stage.
 | Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
 | Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
 | Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
-| Krackle stage | Export review and edit import dialogs | 184-216px canvas particle formations; smaller in short windows |
+| Krackle stage | Export review | 184-216px canvas particle formations; smaller in short windows |
+| Import ink | Edit All import dialog (`import-ink.js`, styled in `../identity.css`) | 176px SVG stage (140px in short windows); ink gathers on the chosen asset cards, pours into the stage's well, charges a six-dot ring and leaves for the Mod tray header per finished asset; burst, cracked ring, splat or a still muted drop for the result |
 | Ink-well | Export review: checking, building and the result | 216px SVG vessel of living bubbles (164px in short windows); a few carry the cooked skin's colours; success releases, warning strains in a loop, failure ruptures |
 | Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
@@ -476,6 +477,30 @@ playback is introduced. Browser and native viewer checks include rendering,
 interruption, alpha captures and target disposal. Native automation intercepts
 only the final download click to inspect real encoded bytes before an OS dialog.
 
+# Import ink
+
+`import-ink.js` draws the Edit All dialog's stage and the ink that joins the real
+asset cards, the stage and the Mod tray. `../import-dialog.js` maps the job to it;
+`app.js` still owns the request, SSE progress and the library refresh, and
+`AtelierPolish.importStart/importProgress` still own the result dots.
+
+| Real event | Ink |
+| --- | --- |
+| Edit All confirmed | A drop gathers on each visible chosen card (up to five, 85ms apart) and pours into the stage; the first splashes and is drawn out into the six-dot ring. With no visible card, the stage charges at once. |
+| Extracting / decoding | The crest steps once per sixth of the 1040ms beat: a count, not a spin. |
+| One texture finished | The crest pops a starburst (imported) or a splat (failed); imported ink leaves for the Mod tray header, coalesced to one flight per 320ms. |
+| Job done | Success bursts, a partial import cracks the ring and drops its chunk, failure splats and drips. Kept work rides a blue core to the tray header and spreads a seam along it. A cancel with nothing imported settles to a still, muted drop. |
+
+Results interrupt inbound ink at once; the status text, dots and Done button are
+already written. Flights are hidden over the dialog panel except inside the stage
+well, so ink never crosses text or controls. The stage redraws on twos (12 fps) and
+re-seeds its boil each drawn frame; flights step at 24 fps. Full motion only: Calm,
+Off and reduced motion show each state's final pose and nothing travels. Hidden
+stages and documents stop drawing, and a flight whose endpoint leaves the screen
+ends without landing. The dialog's own ink replaces the working-panel border charge.
+Colours are the identity roles in `../identity.css` (energy, its core, done, caution
+and fault), so Light draws Lamp Black ink and Dark draws Smalt Light.
+
 # Krackle glyphs, empty states and the stage
 
 `krackle-glyph.js` (`AtelierMotion.krackleGlyph`) renders the micro shapes for job
@@ -562,8 +587,7 @@ cannot pass for a hole. Two to four inner-ring bubbles carry the colours, rotati
 between lives so the hues mix through the well; they never merge or fuse. No answer
 leaves plain holes. `tests/ink_well_checks.py` (in `--working-panels-only`) covers the
 palette, busy-after-busy continuity, failure and success performing once and settling,
-the warning loop and its reduced-motion pose, hiding and teardown; `tests/test_diffuse_palette.py` covers selection, averaging and the route. The edit import dialog shows a 184px stage while open. Short windows
-use 164px and 144px respectively so actions remain reachable.
+the warning loop and its reduced-motion pose, hiding and teardown; `tests/test_diffuse_palette.py` covers selection, averaging and the route. Short windows use 164px so actions remain reachable.
 
 `working-panels.js` observes real `aria-busy` and controller states, plus explicit
 request leases from editor saves/loads. An animated SVG paints the native border
@@ -682,7 +706,7 @@ particle frames on a still formation. Off keeps static feedback.
 
 `AtelierMotion.moment.claim(kind,tier)` returns an idempotent release or null.
 Only one Tier 2/3 formation owns the screen; refused stages render a hand-drawn
-48 px glyph. Export review, edit import and the model loader release ownership
+48 px glyph. Export review and the model loader release ownership
 on completion, hiding or disposal. A Tier 3 kind can claim only once per page
 session. Result states interrupt work immediately. Theme changes repaint still
 formations without replaying a result. Tests cover the colour guard, every

@@ -237,6 +237,28 @@ and leaves installation, upgrade and data-preservation behavior unchanged.
 `scripts/installer_art.py --check` verifies the deterministic high-resolution
 plates and transparent header mark.
 
+### Identity v1.0 (first use: the import dialog)
+
+The Atelier identity sheet (v1.0, 28 Oct 2026) introduces pigment primitives
+(`--at-gesso`, `--at-lamp-black`, `--at-smalt` and their family), role tokens that
+components read (`--surface`, `--text`, `--action`, `--drop`, `--done`, `--caution`,
+`--fault`, `--energy`…), the drop spacing scale (`--space-1`…`--space-8`, ×1.6),
+flat-footed radii, a 2px halo, and the motion beat and curves. `gui/identity.css`
+holds them. Pigments sit on `:root`; roles live under `.at-identity` and switch to
+the ink surface in Dark (`:root[data-theme="dark"]`) or with `data-surface="ink"`,
+so nothing outside an opted-in surface changes.
+
+Type: Bricolage Grotesque (display, 760–800 at 84–86% width, never below 18px),
+Instrument Sans (interface) and Fragment Mono (asset names and paths), all bundled
+under the SIL OFL in `gui/vendor/`. Components: `.at-label`, `.at-btn` with
+`--primary`, `--quiet` and `--danger`. Smalt marks only what is yours: focus, the
+asset at the head of the queue, the core that rides into the Mod tray.
+
+The Edit All import dialog (`#prog-box`) is the only opted-in surface for now. It
+keeps its IDs, job wiring and Activity behaviour; it now holds its result until
+Done. Custom palettes and the Darcula/Repak X presets do not yet recolour it. See
+the motion README's **Import ink** section for its animation contract.
+
 ## Symbols and brand assets
 
 [Material Symbols Sharp](https://developers.google.com/fonts/docs/material_symbols) use unfilled geometry for a precise, angular visual language. Compact controls use 24px optical artwork at weight 400; 41 large aliases use 48px optical artwork at weight 300 when requested at 32px or larger. This keeps large previews from becoming heavy, enlarged toolbar symbols. Folder glyph slots occupy 76% of their thumbnail; toolbar glyphs stay compact. The bundle has 103 aliases, preserving all 72 previous aliases, `data-lucide` markers and `lucide.createIcons` calls as a compatibility boundary. The production page loads the local Material adapter, not the old library. Glyph provenance for both sizes is recorded in `gui/vendor/material-symbols/sources.json`, pinned to Google repository commit `49d4db35df873165d6bd6ba09b063c7dafbac2f4`. Keep accessible names on buttons; decorative SVGs are hidden from assistive technology.

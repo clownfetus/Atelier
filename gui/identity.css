@@ -1,0 +1,298 @@
+/*
+ * Atelier identity tokens · v1.0, first applied to the Edit All import dialog.
+ * Pigments are primitives; components read only the role tokens, so the ink
+ * surface (dark theme) is a token swap. Roles live under `.at-identity` so they
+ * never reach the rest of the interface until it adopts the identity too.
+ * Source: the Atelier identity sheet; see docs/DESIGN_SYSTEM.md → Identity.
+ */
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/static/vendor/instrument-sans/InstrumentSans-Latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fragment Mono';
+  src: url('/static/vendor/fragment-mono/FragmentMono-Latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Pigments */
+  --at-gesso: #FAF7F0;          /* ground, from the master artwork */
+  --at-linen: #F1ECE2;          /* panels on paper */
+  --at-chalk: #E2DBCD;          /* hairlines, empty slots, off tracks */
+  --at-ash: #A9A49A;            /* muted text on ink */
+  --at-graphite: #5C5A54;       /* muted text on paper */
+  --at-slate: #3A3935;          /* raised on ink */
+  --at-charcoal: #2B2A28;       /* ink panels */
+  --at-lamp-black: #1F1F1E;     /* the ink, from the master artwork */
+  --at-smalt: #5165A9;          /* the drop, from the master artwork */
+  --at-smalt-deep: #3F5190;     /* drop pressed, drop text on paper */
+  --at-smalt-light: #95A5DD;    /* the drop on ink */
+  --at-smalt-wash: #E1E5F2;     /* selected, on paper */
+  --at-smalt-dusk: #343A52;     /* selected, on ink */
+  --at-terre-verte: #4C7556;    /* done */
+  --at-terre-verte-light: #8DB59A;
+  --at-ochre: #C08A28;          /* caution energy */
+  --at-ochre-ink: #855E12;      /* caution text on paper */
+  --at-ochre-light: #D4A24A;
+  --at-madder: #B03F4B;         /* failed */
+  --at-madder-light: #E0848D;
+}
+
+/* Roles: paper surface (light theme) */
+.at-identity {
+  --surface: var(--at-gesso);
+  --surface-panel: var(--at-linen);
+  --surface-sunk: var(--at-chalk);
+  --line: var(--at-chalk);
+  --text: var(--at-lamp-black);
+  --text-muted: var(--at-graphite);
+  --action: var(--at-lamp-black);
+  --action-hover: var(--at-charcoal);
+  --on-action: var(--at-gesso);
+  --drop: var(--at-smalt);              /* yours: selection, focus, owned work */
+  --drop-text: var(--at-smalt-deep);
+  --on-drop: var(--at-gesso);
+  --drop-wash: var(--at-smalt-wash);
+  --done: var(--at-terre-verte);
+  --caution: var(--at-ochre);
+  --caution-text: var(--at-ochre-ink);
+  --fault: var(--at-madder);
+  --energy: var(--at-lamp-black);       /* Krackle ink */
+  --energy-hole: var(--surface);        /* bubbles show the surface */
+  --energy-glint: var(--at-gesso);      /* crisp specks, never a glow */
+  --energy-core: var(--at-smalt);       /* the drop the ink carries to the Mod tray */
+
+  /* Type */
+  --font-display: 'Bricolage Grotesque', 'Arial Narrow', sans-serif;
+  --font-ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Fragment Mono', 'Cascadia Code', ui-monospace, monospace;
+  --stretch-display: 86%;
+  --type-display: 780 64px/0.94 var(--font-display);
+  --type-headline: 760 36px/1 var(--font-display);
+  --type-title: 600 20px/26px var(--font-ui);
+  --type-body: 400 14px/21px var(--font-ui);
+  --type-label: 600 11px/14px var(--font-ui);   /* uppercase, 0.09em */
+  --type-data: 400 12px/18px var(--font-mono);
+
+  /* Space: the drop scale, x1.6 */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 16px;
+  --space-5: 26px;
+  --space-6: 42px;
+  --space-7: 68px;
+  --space-8: 110px;
+
+  /* Shape: containers are flat-footed, meaning is round */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-panel: 14px;
+  --radius-drop: 999px;
+  --halo: 2px;                  /* paper gap between touching forms */
+  --control-height: 32px;
+
+  /* Motion */
+  --beat: 1040ms;               /* the only loop: busy */
+  --dur-form: 200ms;
+  --dur-transform: 500ms;
+  --dur-resolve: 400ms;
+  --ease-gather: cubic-bezier(.55, 0, .8, .35);
+  --ease-pour: cubic-bezier(.25, .1, .15, 1);
+  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-settle: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* Roles: ink surface (dark theme and explicit ink panels) */
+:root[data-theme="dark"] .at-identity, .at-identity[data-surface="ink"] {
+  --surface: var(--at-charcoal);
+  --surface-panel: var(--at-slate);
+  --surface-sunk: var(--at-lamp-black);
+  --line: var(--at-slate);
+  --text: var(--at-gesso);
+  --text-muted: var(--at-ash);
+  --action: var(--at-gesso);
+  --action-hover: var(--at-linen);
+  --on-action: var(--at-lamp-black);
+  --drop: var(--at-smalt-light);
+  --drop-text: var(--at-smalt-light);
+  --on-drop: var(--at-lamp-black);
+  --drop-wash: var(--at-smalt-dusk);
+  --done: var(--at-terre-verte-light);
+  --caution: var(--at-ochre-light);
+  --caution-text: var(--at-ochre-light);
+  --fault: var(--at-madder-light);
+  --energy: var(--at-smalt-light);
+  --energy-hole: var(--at-lamp-black);
+  --energy-glint: var(--at-gesso);
+  --energy-core: var(--at-gesso);
+}
+
+/* ── Shared components ─────────────────────────────────────── */
+.at-label {
+  font: var(--type-label);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+}
+.at-btn {
+  height: var(--control-height);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: 600 13px/1 var(--font-ui);
+  background: var(--surface-panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 120ms var(--ease-settle);
+}
+.at-btn:hover { background: var(--surface-sunk); }
+.at-btn--primary { background: var(--action); color: var(--on-action); }
+.at-btn--primary:hover { background: var(--action-hover); }
+.at-btn--quiet { background: transparent; }
+.at-btn--quiet:hover { background: var(--surface-panel); }
+.at-btn--danger { color: var(--fault); }
+.at-btn[disabled] { color: var(--text-muted); opacity: 0.55; cursor: not-allowed; }
+.at-btn[hidden] { display: none; }
+.at-identity :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop);
+}
+
+/* ── Edit All import dialog ─────────────────────────────────────── */
+#prog-box.at-import {
+  position: relative;
+  width: min(400px, calc(100% - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--studio-elevation-dialog, 0 16px 48px rgb(0 0 0 / 28%));
+  font: var(--type-body);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+.at-import-head { display: grid; gap: var(--space-2); }
+.at-import-head h2 {
+  margin: 0;
+  font: 760 30px/0.95 var(--font-display);
+  font-stretch: 84%;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+/* The stage well: a flat-footed Linen field the ink performs in. */
+.at-import-stage {
+  display: grid;
+  place-items: center;
+  height: 196px;
+  border-radius: var(--radius-card);
+  background: var(--surface-panel);
+  overflow: hidden;
+  --energy-hole: var(--surface-panel);
+}
+.at-import-stage > svg { display: block; width: 176px; height: 176px; overflow: visible; }
+.at-import-status { display: grid; gap: 3px; min-height: 58px; }
+.at-import-status b { font: 600 16px/22px var(--font-ui); color: var(--text); }
+#prog-counter { font: 400 13px/19px var(--font-ui); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.at-import-current {
+  font: var(--type-data);
+  color: var(--drop-text);
+  min-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#prog-box[data-import-state="warning"] .at-import-status b { color: var(--caution-text); }
+#prog-box[data-import-state="error"] .at-import-status b { color: var(--fault); }
+#prog-box[data-import-state="cancelled"] .at-import-status b { color: var(--text-muted); }
+
+/* One dot per asset. Circles carry meaning: the drop marks the asset at the head
+   of the queue, ink marks done, Madder marks the ones that did not import. */
+#prog-box.at-import #import-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 13px;
+  max-height: 58px;
+  margin: 0;
+  padding: 2px;
+  overflow: auto;
+}
+#prog-box.at-import #import-segments:empty { display: none; }
+#prog-box.at-import #import-segments span {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  min-width: 0;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  transition: background-color 120ms steps(2, end);
+}
+/* Done dots are ink (--text): on the ink surface Krackle energy and the drop share Smalt Light. */
+#prog-box.at-import #import-segments span[data-state="done"] { background: var(--text); }
+#prog-box.at-import #import-segments span[data-state="failed"] { background: var(--fault); }
+#prog-box.at-import[data-import-state="busy"] #import-segments span[data-state="pending"]:first-child,
+#prog-box.at-import[data-import-state="busy"] #import-segments span:not([data-state="pending"]) + span[data-state="pending"] {
+  width: 13px;
+  height: 13px;
+  margin: -2px 0;
+  background: var(--drop);
+  box-shadow: 0 0 0 var(--halo) var(--surface);
+}
+.at-import-note {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  font: 400 12.5px/1.45 var(--font-ui);
+  color: var(--text-muted);
+}
+.at-import-note[hidden] { display: none; }
+.at-import-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+@media (max-height: 700px) {
+  .at-import-stage { height: 152px; }
+  .at-import-stage > svg { width: 140px; height: 140px; }
+}
+
+/* ── Import ink ─────────────────────────────────────── */
+.am-import-ink-stage .e, .am-import-ink-stage .crisp, .am-import-ink-flight .e, .am-import-ink-flight .crisp { fill: var(--energy); }
+.am-import-ink-stage .r, .am-import-ink-stage .rc { fill: var(--ink-result, var(--done)); }
+.am-import-ink-stage .pop-ok { fill: var(--done); }
+.am-import-ink-stage .pop-fail { fill: var(--fault); }
+.am-import-ink-stage .core, .am-import-ink-flight .core { fill: var(--energy-core); }
+.am-import-ink-stage .glint, .am-import-ink-flight .glint { fill: var(--energy-glint); }
+[data-atelier-motion="import-ink"][data-am-state="success"] { --ink-result: var(--done); }
+[data-atelier-motion="import-ink"][data-am-state="warning"] { --ink-result: var(--caution); }
+[data-atelier-motion="import-ink"][data-am-state="error"] { --ink-result: var(--fault); }
+[data-atelier-motion="import-ink"][data-am-state="cancelled"] .e { fill: var(--text-muted); }
+/* Ink in flight sits above the dialog scrim; it never takes a pointer. */
+.am-import-ink-flight {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: calc(var(--studio-layer-overlay, 200) + 40);
+  pointer-events: none;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .at-btn, #prog-box.at-import #import-segments span { transition: none; }
+}

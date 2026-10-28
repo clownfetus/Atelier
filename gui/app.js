@@ -2578,6 +2578,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
   window.AtelierPolish?.importStart(items);
   showProgress(0, items.length);
   document.getElementById("prog-overlay").classList.add("active");
+  window.AtelierImportDialog?.begin(items);
 
   const res = await (window.AtelierJobs?.run || api)("/api/import_all", {
     method: "POST",
@@ -2585,6 +2586,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
     body: JSON.stringify({ items }),
   });
   if (!res.ok && importing) {
+    window.AtelierImportDialog?.abandon();
     document.getElementById("prog-overlay").classList.remove("active");
     importing = false;
     toast(`Edit failed: ${res.error}`, "warning");
@@ -2800,16 +2802,21 @@ function handleSSE(d) {
   }
   if (!d.done && importing) {
     showProgress(d.current, d.total);
+    window.AtelierImportDialog?.progress(d);
     return;
   }
   if (d.done && importing) {
     importing = false;
     suppressChangeToastUntil = Date.now() + 2500;
-    document.getElementById("prog-overlay").classList.remove("active");
-    if (d.error) {
-      toast(`Edit All failed: ${d.error}`, "warning", 8000);
-    } else {
-      toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
+    // An open dialog keeps the result as its receipt; a hidden one reports through a toast.
+    const shown = window.AtelierImportDialog?.finish(d);
+    if (!shown) {
+      document.getElementById("prog-overlay").classList.remove("active");
+      if (d.error) {
+        toast(`Edit All failed: ${d.error}`, "warning", 8000);
+      } else {
+        toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
+      }
     }
     setStatus("");
     loadSidebar();

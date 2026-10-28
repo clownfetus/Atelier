@@ -269,11 +269,6 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   [data-atelier-motion="krackle-glyph"] *, [data-atelier-motion="empty-state"] * { transition: none !important; }
 }
 
-/* The import progress dialog's stage replaces its small heading spinner. */
-.prog-krackle-stage { display: flex; justify-content: center; }
-.prog-krackle-stage:empty { display: none; }
-#prog-box[data-krackle-stage] h2 > .spinner { display: none; }
-
 /* ── Krackle on the 0.4 polish surfaces ────────────────────────────────────── */
 /* The startup splash's progress is a run of dots, tall enough to read as Krackle. */
 #startup-progress:not([value]) { height: 10px; }
@@ -293,23 +288,7 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 }
 .export-receipt-flow { fill: none; }
 .export-receipt-source,.export-receipt-seal { will-change: auto; }
-/* Import results: one dot per asset; done dots are success energy with a bubble. */
-#import-segments { gap: 4px; }
-#import-segments span {
-  flex: 0 0 10px;
-  width: 10px;
-  height: 10px;
-  min-width: 10px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 28%, transparent);
-}
-#import-segments [data-state=done] {
-  background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 1.5px, var(--krackle-success) 1.9px);
-}
-#import-segments [data-state=failed] {
-  border-radius: 50% 50% 50% 0;
-  background: radial-gradient(circle at 50% 50%, var(--krackle-hole) 0 1.6px, var(--krackle-warn) 2px);
-}
+/* Import result dots live with the import dialog in ../identity.css. */
 
 /* Calm keeps the counted formation; hidden documents never run CSS busy loops. */
 :root[data-krackle='calm'] .spinner::after,
