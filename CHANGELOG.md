@@ -19,6 +19,24 @@ The app, installers and update checker identify each release by its full number,
   (imported, imported with warnings, failed or cancelled) until you choose Done;
   hiding it still reports through a notification. Calm, Off and reduced motion
   show still poses and nothing travels.
+- The Projects screen is now Atelier's front page in the new identity: the mark
+  stands in for the A of the wordmark, each project is an ink portfolio with your
+  latest edited texture tucked inside, and with no projects yet a single drop of
+  ink waits on the baseline. Creating a project adds it to the list instead of
+  opening it straight away: ink runs in along the floor from the edge of the
+  screen and the portfolio rises out of it. Open it when you're ready. Deleting
+  a project plays it backwards: the portfolio melts and drains away, and the
+  projects beside it glide into the gap.
+- The setup check at launch now happens on the Projects page itself, and only
+  shows when it takes longer than a moment: a drop of ink pours along the header
+  rule to a latch while Atelier looks for Marvel Rivals, its unlock key and its
+  mapping file. First-time setup is now one page that says what was found and
+  asks only for what's missing, instead of three steps. A drop of ink runs down
+  past each thing that's ready, waits at the first one that isn't, and once
+  everything is in, the ink-well labelled Open Atelier opens its lid and the drop
+  falls in. Appearance and motion
+  are in Settings. If the check can't finish, the page shows the real error with
+  Try again.
 - Fixed costumes that could stay unpainted in the viewer, Assembly and the
   material editor until the next game update. The game reader sometimes
   started up unable to read some materials and returned them empty without an

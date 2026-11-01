@@ -148,7 +148,8 @@ def main():
                 setup = wait_for(lambda: json.load(urllib.request.urlopen(base + '/api/setup_status', timeout=2)), process)
                 if setup['configured']:
                     raise RuntimeError('Smoke fixture unexpectedly configured a real game')
-                title = ('Find the game' if tuple(map(int, expected_version.split('.'))) >= (1, 0, 0)
+                release = tuple(map(int, expected_version.split('.')))
+                title = ('Unlock key' if release > (1, 1, 4) else 'Find the game' if release >= (1, 0, 0)
                          else 'Initial Configuration')
                 wait_for(lambda: any(title in name for name in accessible_names()), process)
                 if launch != 'previous-launch':

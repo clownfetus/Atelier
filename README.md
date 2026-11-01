@@ -78,7 +78,7 @@ See the [patch notes](docs/release-1.1.3.md) for details and verification limits
   readable result captions, new palettes and a Full / Calm / Off motion dial.
   Optional formation sounds start off; system reduced-motion settings take
   precedence.
-- **Start and build with clearer guidance.** Three-step setup, progress tied to
+- **Start and build with clearer guidance.** One-page setup, progress tied to
   actual work, a Mod tray for edits, and a review before Build mod. A slow update
   service no longer holds up launch.
 
@@ -247,7 +247,7 @@ in-game appearance still needs checking.
 
 Open **Menu → Settings → Appearance** to choose a mode and palette. Use **Custom**
 to change the background, foreground, surface and accent, then name and save the
-palette to reuse it. Appearance is also available during first-run configuration.
+palette to reuse it.
 
 ![Appearance settings with palette presets and the Full, Calm and Off motion dial](images/appearance-settings.png)
 
@@ -307,9 +307,9 @@ Source checkouts are updated through Git; see [DEVELOPMENT.md](docs/DEVELOPMENT.
 
 ## Basic workflow
 
-On first run, Find the game and Unlock the paks validate your installation before
-Make it yours offers palettes and motion. Key/mapping retrieval has manual
-fallbacks. Menu → Settings keeps the full configuration form.
+On first run, Atelier checks for the game, its unlock key and its mapping file on one
+page and asks only for what it couldn't find. Key/mapping retrieval has manual
+fallbacks. Menu → Settings keeps the full configuration form, palettes and motion.
 
 1. Create or open a project. The project button beside the Atelier logo shows
    the open project and its edit count; click it to switch projects.

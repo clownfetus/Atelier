@@ -2,7 +2,11 @@
  * Atelier — Krackle micro glyphs for notifications
  * Classic-script IIFE adding window.AtelierMotion.krackleGlyph and window.AtelierKrackleGlyph.
  * States: busy (six-dot charge ring), info (a drop of ink), success (starburst),
- * warning (cracked ring, chunk falls out) and error (splat). Artwork is generated
+ * warning (cracked ring, chunk falls out) and error (splat). mount(host, {state, found,
+ * reducedMotion}) with found 'key', 'file' or 'folder' shows the ink key, the code file or the
+ * folder in place of the starburst for success, with the starburst's pop and flecks (the setup
+ * page's rows): the key and folder pop in the energy ink and take the done colour; the file
+ * draws its lines; the folder's front flips open. Artwork is generated
  * by scripts/krackle_art.py, which also writes krackle-glyph.svg.
  * Results animate once and then hold still; only busy loops. Reduced motion,
  * hidden documents and missing/throwing Web Animations all leave the static pose.
@@ -19,9 +23,13 @@
   var CHUNK_FROM = [-1.54, -4.02];
   var DIZZY_ORBIT = {cx: 12, cy: 3, rx: 4.4, ry: 1, rest: [7.6, 3.3], turns: 1.5};
   var mounted = typeof WeakMap === 'function' ? new WeakMap() : null;
+  // Found glyphs: when each takes the done colour after popping in the energy ink (-1: it is
+  // done from the start), and when its flecks burst.
+  var FOUND = {key: {tint: 290, flecks: 0}, file: {tint: -1, flecks: 0}, folder: {tint: 380, flecks: 400}};
+  var EASE_BOUNCY = window.AtelierMotion.ease.bouncy;
 
   // krackle-art:krackle-glyph:begin
-  var SVG_MARKUP = '<svg xmlns="http://www.w3.org/2000/svg" class="am-krackle-glyph-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor"><g class="am-krackle-glyph-busy"><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-0" cx="12" cy="3.8" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-1" cx="19.1" cy="7.9" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-2" cx="19.1" cy="16.1" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-3" cx="12" cy="20.2" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-4" cx="4.9" cy="16.1" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-5" cx="4.9" cy="7.9" r="2.15" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-0" cx="12" cy="3.8" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-1" cx="19.1" cy="7.9" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-2" cx="19.1" cy="16.1" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-3" cx="12" cy="20.2" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-4" cx="4.9" cy="16.1" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-5" cx="4.9" cy="7.9" r="1.05" /></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-info"><path class="am-krackle-glyph-energy am-krackle-glyph-drop" d="M12 2.2 C14.27 7.24 17.4 10.85 17.4 14.2 A5.4 5.4 0 1 1 6.6 14.2 C6.6 10.85 9.73 7.24 12 2.2 Z" /><circle class="am-krackle-glyph-hole" cx="13.7" cy="15.4" r="1.7" /><circle class="am-krackle-glyph-glint" cx="10.1" cy="12.9" r="0.7" /></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-success"><path class="am-krackle-glyph-energy am-krackle-glyph-burst" d="M22.98 14.23 L17.57 15.15 L19.57 20.25 L14.66 17.82 L13.28 23.13 L10.73 18.27 L6.49 21.75 L7.28 16.33 L1.81 16.65 L5.64 12.73 L1.02 9.77 L6.43 8.85 L4.43 3.75 L9.34 6.18 L10.72 0.87 L13.27 5.73 L17.51 2.25 L16.72 7.67 L22.19 7.35 L18.36 11.27 Z" /><circle class="am-krackle-glyph-hole am-krackle-glyph-burst-hole" cx="12.6" cy="12.4" r="2.35" /><g class="am-krackle-glyph-flecks"><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="16.51" cy="3.52" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="20.31" cy="16.8" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="7.49" cy="20.48" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="3.52" cy="7.49" r="1.05" /></g></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-warning"><g class="am-krackle-glyph-ring"><path class="am-krackle-glyph-arc" d="M11.61 17.99 A7.2 7.2 0 1 1 18.67 13.51" /><circle class="am-krackle-glyph-hole am-krackle-glyph-arc-hole" cx="5.05" cy="9.15" r="1.2" /></g><g class="am-krackle-glyph-chunk"><circle class="am-krackle-glyph-energy" cx="17.4" cy="20.9" r="2.2" /><circle class="am-krackle-glyph-hole" cx="17.9" cy="21.2" r="0.75" /></g></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-error"><g class="am-krackle-glyph-splat"><circle class="am-krackle-glyph-energy" cx="12" cy="12" r="5.52" /><circle class="am-krackle-glyph-energy" cx="7.92" cy="13.92" r="3.12" /><circle class="am-krackle-glyph-energy" cx="15.84" cy="9.6" r="3.12" /><circle class="am-krackle-glyph-energy" cx="14.88" cy="15.6" r="2.64" /><circle class="am-krackle-glyph-energy" cx="9.6" cy="8.4" r="2.4" /><circle class="am-krackle-glyph-hole" cx="12.48" cy="11.76" r="2.16" /><circle class="am-krackle-glyph-hole" cx="8.4" cy="13.68" r="1.08" /></g><g class="am-krackle-glyph-sats"><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="2.4" cy="7.68" r="1.44" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="22.08" cy="14.4" r="1.32" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="4.8" cy="20.16" r="1.2" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="19.92" cy="3.36" r="1.2" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="20.64" cy="20.64" r="0.96" /></g><g class="am-krackle-glyph-drip"><path class="am-krackle-glyph-drip-line" d="M8.64 16.32 V20.64" /><circle class="am-krackle-glyph-energy" cx="8.64" cy="21.6" r="1.68" /></g><g class="am-krackle-glyph-dizzy"><circle class="am-krackle-glyph-energy" cx="7.6" cy="3.3" r="1.45" /><circle class="am-krackle-glyph-hole" cx="7.9" cy="3.4" r="0.62" /></g></g></svg>';
+  var SVG_MARKUP = '<svg xmlns="http://www.w3.org/2000/svg" class="am-krackle-glyph-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor"><g class="am-krackle-glyph-busy"><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-0" cx="12" cy="3.8" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-1" cx="19.1" cy="7.9" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-2" cx="19.1" cy="16.1" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-3" cx="12" cy="20.2" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-4" cx="4.9" cy="16.1" r="2.15" /><circle class="am-krackle-glyph-energy am-krackle-glyph-dot am-krackle-glyph-dot-5" cx="4.9" cy="7.9" r="2.15" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-0" cx="12" cy="3.8" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-1" cx="19.1" cy="7.9" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-2" cx="19.1" cy="16.1" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-3" cx="12" cy="20.2" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-4" cx="4.9" cy="16.1" r="1.05" /><circle class="am-krackle-glyph-hole am-krackle-glyph-dot-hole am-krackle-glyph-dot-hole-5" cx="4.9" cy="7.9" r="1.05" /></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-info"><path class="am-krackle-glyph-energy am-krackle-glyph-drop" d="M12 2.2 C14.27 7.24 17.4 10.85 17.4 14.2 A5.4 5.4 0 1 1 6.6 14.2 C6.6 10.85 9.73 7.24 12 2.2 Z" /><circle class="am-krackle-glyph-hole" cx="13.7" cy="15.4" r="1.7" /><circle class="am-krackle-glyph-glint" cx="10.1" cy="12.9" r="0.7" /></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-success"><path class="am-krackle-glyph-energy am-krackle-glyph-burst" d="M22.98 14.23 L17.57 15.15 L19.57 20.25 L14.66 17.82 L13.28 23.13 L10.73 18.27 L6.49 21.75 L7.28 16.33 L1.81 16.65 L5.64 12.73 L1.02 9.77 L6.43 8.85 L4.43 3.75 L9.34 6.18 L10.72 0.87 L13.27 5.73 L17.51 2.25 L16.72 7.67 L22.19 7.35 L18.36 11.27 Z" /><circle class="am-krackle-glyph-hole am-krackle-glyph-burst-hole" cx="12.6" cy="12.4" r="2.35" /><g class="am-krackle-glyph-found am-krackle-glyph-key"><g transform="translate(-2.4 4.7) scale(0.096) translate(-50 -124) translate(200 200) skewX(-8) translate(-200 -200)"><path class="am-krackle-glyph-energy" d="M0 -13 C2.52 -7.54 6 -3.72 6 0 A6 6 0 1 1 -6 0 C-6 -3.72 -2.52 -7.54 0 -13 Z" transform="translate(132 200) rotate(90) scale(11)" /><rect class="am-krackle-glyph-energy" x="226" y="187" width="110" height="26" rx="13" /><rect class="am-krackle-glyph-energy" x="294" y="200" width="24" height="50" rx="12" /><rect class="am-krackle-glyph-energy" x="254" y="200" width="22" height="36" rx="11" /><circle class="am-krackle-glyph-hole am-krackle-glyph-key-hole" cx="128" cy="200" r="27" /><circle class="am-krackle-glyph-hole" cx="166" cy="232" r="7" /><circle class="am-krackle-glyph-glint" cx="98" cy="170" r="8" /></g></g><g class="am-krackle-glyph-found am-krackle-glyph-file"><g transform="scale(1.2)"><path class="am-krackle-glyph-energy" d="M3.5 1 L12 1 L16.5 5.5 L16.5 19 L3.5 19 Z" /><rect class="am-krackle-glyph-hole am-krackle-glyph-file-line" x="6" y="7.4" width="5" height="1.6" rx="0.8" /><rect class="am-krackle-glyph-hole am-krackle-glyph-file-line" x="7.8" y="10.2" width="6" height="1.6" rx="0.8" /><rect class="am-krackle-glyph-hole am-krackle-glyph-file-line" x="7.8" y="13" width="4.2" height="1.6" rx="0.8" /><rect class="am-krackle-glyph-hole am-krackle-glyph-file-line" x="6" y="15.8" width="7.5" height="1.6" rx="0.8" /></g></g><g class="am-krackle-glyph-found am-krackle-glyph-folder"><g transform="scale(1.2)"><path class="am-krackle-glyph-energy" d="M2 4.6A1.6 1.6 0 0 1 3.6 3H7.4L9.2 5H16.4A1.6 1.6 0 0 1 18 6.6V15.4A1.6 1.6 0 0 1 16.4 17H3.6A1.6 1.6 0 0 1 2 15.4Z" /><g class="am-krackle-glyph-folder-flap"><rect class="am-krackle-glyph-hole" x="1.4" y="7.4" width="17.2" height="10.2" rx="1.9" /><rect class="am-krackle-glyph-energy" x="2" y="8.2" width="16" height="8.8" rx="1.6" /></g></g></g><g class="am-krackle-glyph-flecks"><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="16.51" cy="3.52" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="20.31" cy="16.8" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="7.49" cy="20.48" r="1.05" /><circle class="am-krackle-glyph-energy am-krackle-glyph-fleck" cx="3.52" cy="7.49" r="1.05" /></g></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-warning"><g class="am-krackle-glyph-ring"><path class="am-krackle-glyph-arc" d="M11.61 17.99 A7.2 7.2 0 1 1 18.67 13.51" /><circle class="am-krackle-glyph-hole am-krackle-glyph-arc-hole" cx="5.05" cy="9.15" r="1.2" /></g><g class="am-krackle-glyph-chunk"><circle class="am-krackle-glyph-energy" cx="17.4" cy="20.9" r="2.2" /><circle class="am-krackle-glyph-hole" cx="17.9" cy="21.2" r="0.75" /></g></g><g class="am-krackle-glyph-outcome am-krackle-glyph-outcome-error"><g class="am-krackle-glyph-splat"><circle class="am-krackle-glyph-energy" cx="12" cy="12" r="5.52" /><circle class="am-krackle-glyph-energy" cx="7.92" cy="13.92" r="3.12" /><circle class="am-krackle-glyph-energy" cx="15.84" cy="9.6" r="3.12" /><circle class="am-krackle-glyph-energy" cx="14.88" cy="15.6" r="2.64" /><circle class="am-krackle-glyph-energy" cx="9.6" cy="8.4" r="2.4" /><circle class="am-krackle-glyph-hole" cx="12.48" cy="11.76" r="2.16" /><circle class="am-krackle-glyph-hole" cx="8.4" cy="13.68" r="1.08" /></g><g class="am-krackle-glyph-sats"><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="2.4" cy="7.68" r="1.44" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="22.08" cy="14.4" r="1.32" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="4.8" cy="20.16" r="1.2" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="19.92" cy="3.36" r="1.2" /><circle class="am-krackle-glyph-energy am-krackle-glyph-sat" cx="20.64" cy="20.64" r="0.96" /></g><g class="am-krackle-glyph-drip"><path class="am-krackle-glyph-drip-line" d="M8.64 16.32 V20.64" /><circle class="am-krackle-glyph-energy" cx="8.64" cy="21.6" r="1.68" /></g><g class="am-krackle-glyph-dizzy"><circle class="am-krackle-glyph-energy" cx="7.6" cy="3.3" r="1.45" /><circle class="am-krackle-glyph-hole" cx="7.9" cy="3.4" r="0.62" /></g></g></svg>';
   // krackle-art:krackle-glyph:end
 
   function px(value) {
@@ -36,6 +44,7 @@
 
     var opts = options || {};
     var state = VALID_STATES.has(opts.state) ? opts.state : 'info';
+    var found = FOUND[opts.found] ? opts.found : '';
     var reducedPref = opts.reducedMotion === 'reduce' ? 'reduce' : 'system';
     var destroyed = false;
     var unavailable = false;
@@ -52,6 +61,7 @@
     host.setAttribute('data-atelier-motion', 'krackle-glyph');
     host.setAttribute('data-am-state', state);
     host.setAttribute('data-am-reduced', String(reduced()));
+    if (found) host.setAttribute('data-am-found', found);
     host.innerHTML = SVG_MARKUP;
     var svg = host.querySelector('svg');
     function repaintEnergy() {
@@ -70,7 +80,9 @@
     function qa(sel) { return Array.prototype.slice.call(host.querySelectorAll(sel)); }
     var parts = {
       busy: q('.am-krackle-glyph-busy'), dots: qa('.am-krackle-glyph-dot'), holes: qa('.am-krackle-glyph-dot-hole'),
-      drop: q('.am-krackle-glyph-outcome-info'), burst: q('.am-krackle-glyph-burst'), burstHole: q('.am-krackle-glyph-burst-hole'),
+      drop: q('.am-krackle-glyph-outcome-info'), burst: q(found ? '.am-krackle-glyph-' + found : '.am-krackle-glyph-burst'),
+      burstHole: found === 'key' ? q('.am-krackle-glyph-key-hole') : found ? null : q('.am-krackle-glyph-burst-hole'),
+      lines: qa('.am-krackle-glyph-file-line'), flap: q('.am-krackle-glyph-folder-flap'),
       flecks: qa('.am-krackle-glyph-fleck'), ring: q('.am-krackle-glyph-ring'), chunk: q('.am-krackle-glyph-chunk'),
       splat: q('.am-krackle-glyph-splat'), sats: qa('.am-krackle-glyph-sat'), drip: q('.am-krackle-glyph-drip'),
       dizzy: q('.am-krackle-glyph-dizzy')
@@ -110,6 +122,14 @@
     }
 
     function centre(el) { return [Number(el.getAttribute('cx')) - 12, Number(el.getAttribute('cy')) - 12]; }
+    // A found glyph pops in the energy ink and takes the done colour `delay` in (260ms, ease-out);
+    // off an identity surface the roles are missing and it keeps the state colour throughout.
+    function tint(delay) {
+      var style = null;
+      try { style = getComputedStyle(host); } catch (_) { return; }
+      var from = style.getPropertyValue('--energy').trim(), to = style.getPropertyValue('--done').trim();
+      if (from && to) run(parts.burst, [{color: from}, {color: to}], {duration: 260, delay: delay, easing: EASE_STANDARD, fill: 'backwards'});
+    }
 
     function play(previousState) {
       cancel();
@@ -156,10 +176,20 @@
           { transform: 'scale(0.95) rotate(-1deg)', opacity: 1, offset: 0.66, easing: EASE_SWAY },
           { transform: 'scale(1) rotate(0deg)', opacity: 1, offset: 1 }
         ], { duration: 380, easing: 'linear' });
-        run(parts.burstHole, [
+        if (parts.burstHole) run(parts.burstHole, [
           { transform: 'scale(0)', offset: 0 }, { transform: 'scale(0)', offset: 0.36, easing: EASE_STANDARD },
           { transform: 'scale(1.35)', offset: 0.64, easing: EASE_SWAY }, { transform: 'scale(1)', offset: 1 }
         ], { duration: 380, easing: 'linear' });
+        if (found && FOUND[found].tint >= 0) tint(FOUND[found].tint);
+        // The code file's lines draw left to right one after another; the folder's front flips
+        // open and settles, hinged at its bottom.
+        if (found === 'file') parts.lines.forEach(function (line, k) {
+          run(line, [{transform: 'scaleX(0)'}, {transform: 'scaleX(1)'}], {duration: 240, delay: 180 + 90 * k, easing: EASE_STANDARD, fill: 'backwards'});
+        });
+        if (found === 'folder') run(parts.flap, [
+          { transform: 'none', offset: 0, easing: EASE_BOUNCY }, { transform: 'skewX(-16deg) scaleY(0.62)', offset: 0.35, easing: EASE_BOUNCY },
+          { transform: 'skewX(3deg) scaleY(1.06)', offset: 0.7, easing: EASE_BOUNCY }, { transform: 'none', offset: 1 }
+        ], { duration: 560, delay: 160, easing: 'linear', fill: 'backwards' });
         if (decorative()) parts.flecks.forEach(function (fleck) {
           var d = centre(fleck);
           run(fleck, [
@@ -167,7 +197,7 @@
             { opacity: 1, offset: 0.25 },
             { transform: 'translate(0px, 0px) scale(1)', opacity: 1, offset: 0.55, easing: EASE_FALL },
             { transform: 'translate(' + px(d[0] * 0.25) + ', ' + px(d[1] * 0.25) + ') scale(0)', opacity: 0, offset: 1 }
-          ], { duration: 420, easing: 'linear' });
+          ], { duration: 420, delay: found ? FOUND[found].flecks : 0, easing: 'linear' });
         });
       } else if (state === 'warning') {
         run(parts.ring, [
@@ -250,6 +280,7 @@
         host.removeAttribute('data-atelier-motion');
         host.removeAttribute('data-am-state');
         host.removeAttribute('data-am-reduced');
+        host.removeAttribute('data-am-found');
         if (mounted && mounted.get(host) === handle) mounted.delete(host);
       }
     };

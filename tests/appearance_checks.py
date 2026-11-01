@@ -173,31 +173,33 @@ def run_appearance_checks(page, context, url, report, checks):
             tab.screenshot(path=str(report / f'appearance-workspace-{mode}.png'), animations='disabled')
         checks.append('Themed tooltips preserve title/accessibility text and Escape; right-aligned menus remain onscreen and return keyboard focus')
 
-        # Appearance is available in the actual unconfigured startup, too.
+        # First run asks only for what the check couldn't find; appearance lives in Settings.
         setup = context.new_page()
         try:
             setup.route('**/api/setup_status', lambda route: route.fulfill(json={'configured': False}))
             setup.route('**/api/validate_paks?*', lambda route: route.fulfill(json={'status':'ok'}))
             setup.route('**/api/validate_usmap?*', lambda route: route.fulfill(json={'status':'ok'}))
+            setup.route('**/AES.json', lambda route: route.abort())
+            setup.route('**/api/download_usmap', lambda route: route.fulfill(json={'ok': False}))
             setup.goto(url)
-            setup.wait_for_function('document.getElementById("setup-overlay").classList.contains("active") && !document.getElementById("setup-loading").classList.contains("active")')
-            assert setup.locator('#setup-title').inner_text() == 'Initial Configuration'
+            setup.wait_for_selector('#setup-overlay.active[data-setup-page=first-run]')
+            setup.wait_for_function("document.querySelectorAll('#setup-rows [data-state=missing]').length===3")
             setup.locator('#setup-path').fill('Fixture game')
-            setup.locator('#setup-next').click()
-            setup.locator('#setup-step-2').wait_for()
             setup.locator('#setup-aes').fill('0x'+'a'*64)
             setup.locator('#setup-usmap').fill('fixture.usmap')
-            setup.wait_for_function("!document.getElementById('setup-next').disabled")
-            setup.locator('#setup-next').click()
-            setup.locator('#setup-step-3').wait_for()
+            setup.wait_for_function("!document.getElementById('setup-save').disabled")
+            assert setup.locator('#settings-theme').is_hidden()
+            assert 'Appearance and motion are in Settings.' in setup.locator('#setup-page-note').inner_text()
+            setup.screenshot(path=str(report / 'appearance-first-run.png'), animations='disabled')
+            setup.evaluate('openPaths()')
+            setup.wait_for_function("!document.getElementById('setup-loading').classList.contains('active')", timeout=20000)
             setup.locator('#settings-theme').select_option('dark')
             setup.locator('[data-theme-preset="repak"]').click()
             setup.wait_for_function("document.documentElement.dataset.palette==='repak'")
             assert setup.locator('html').get_attribute('data-palette') == 'repak'
-            setup.screenshot(path=str(report / 'appearance-first-run.png'), animations='disabled')
         finally:
             setup.close()
-        checks.append('First-time configuration includes the same appearance controls without a header selector')
+        checks.append('First-time configuration leaves appearance to Settings, says so, and Settings applies it before setup is saved')
 
         # Malformed old preferences and blocked storage must still allow launch/customization.
         for blocked in (False, True):

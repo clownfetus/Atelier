@@ -33,7 +33,8 @@ def run_ink_well_checks(context, url, report, checks):
           AtelierExportReview.open(inkSnapshot, {{confirm(){{}}, refresh(){{}}, settings(){{}}, reveal(){{}}}});
           AtelierExportReview.checking(inkSnapshot);
         }}""")
-        tab.wait_for_function("document.querySelector('.export-review-stage .am-ink-well-tint')")
+        # The tint paths exist as soon as the palette answers; wait for their first drawn frame.
+        tab.wait_for_function("[...document.querySelectorAll('.export-review-stage .am-ink-well-tint')].some(el => (el.getAttribute('d') || '').includes('M'))")
         assert asked == [['1015101', '1014100']], asked
         tints = tab.evaluate("""() => [...document.querySelectorAll('.export-review-stage .am-ink-well-tint')]
           .map(el => ({fill: getComputedStyle(el).fill, shapes: (el.getAttribute('d')||'').split('M').length - 1}))""")
@@ -122,6 +123,27 @@ def run_ink_well_checks(context, url, report, checks):
         assert reduced['frames'] == 0 and reduced['sleeping'] == 'true' and reduced['foam'] > 200, reduced
         tab.emulate_media(reduced_motion='no-preference')
         checks.append('Ink-well failure breaks and leaks, success bursts and settles calm (both hold still); warning loops until hidden or reduced, which shows its pose without frames')
+
+        # A fixed frame keeps the artboard still through the success, so a label laid over the
+        # well stays on it; the released ink spills past the SVG instead. A sparse well keeps a
+        # few large bubbles and none of the small ones.
+        fixed = tab.evaluate("""async () => {
+          const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:40px;top:120px;z-index:9999';
+          document.body.append(host);
+          const holes = () => (host.querySelector('.am-ink-well-hole')?.getAttribute('d') || '').split('M').length - 1;
+          const full = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-dense'});
+          await new Promise(r => setTimeout(r, 250));
+          const dense = holes(); full.destroy();
+          const well = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-fixed', fixedFrame: true, sparse: true});
+          await new Promise(r => setTimeout(r, 250));
+          const sparse = holes();
+          well.setState('success');
+          await new Promise(r => setTimeout(r, 400));
+          const out = [host.dataset.amSleeping, host.querySelector('svg').getAttribute('viewBox'), sparse <= 12 && dense > 3 * sparse].join();
+          well.destroy(); host.remove(); return out;
+        }""")
+        assert fixed == 'false,10 10 236 236,true', fixed
+        checks.append('Ink-well success in a fixed frame performs without moving its artboard; a sparse well keeps only a few large bubbles')
 
         # Hidden documents and reduced motion stop frames; reduced motion holds one still pose.
         tab.evaluate("""() => {

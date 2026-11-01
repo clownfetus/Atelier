@@ -225,11 +225,24 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-dot,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-dot-hole,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-burst-hole,
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-key-hole,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-fleck,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-sat { transform-box: fill-box; transform-origin: center; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-busy,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-burst,
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-found,
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-splat { transform-box: view-box; transform-origin: 12px 12px; }
+/* The found glyphs (ink key, code file, folder) stand in for the starburst on glyphs mounted
+   with found: 'key' | 'file' | 'folder'. The file's lines draw from their left end; the
+   folder's front is hinged at its bottom. */
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-found,
+[data-atelier-motion="krackle-glyph"][data-am-found] .am-krackle-glyph-burst,
+[data-atelier-motion="krackle-glyph"][data-am-found] .am-krackle-glyph-burst-hole { display: none; }
+[data-atelier-motion="krackle-glyph"][data-am-found="key"] .am-krackle-glyph-key,
+[data-atelier-motion="krackle-glyph"][data-am-found="file"] .am-krackle-glyph-file,
+[data-atelier-motion="krackle-glyph"][data-am-found="folder"] .am-krackle-glyph-folder { display: inline; }
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-file-line { transform-box: fill-box; transform-origin: 0 50%; }
+[data-atelier-motion="krackle-glyph"] .am-krackle-glyph-folder-flap { transform-box: fill-box; transform-origin: 50% 100%; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-ring { transform-box: view-box; transform-origin: 12px 10.8px; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-outcome-info { transform-box: view-box; transform-origin: 12px 19.6px; }
 [data-atelier-motion="krackle-glyph"] .am-krackle-glyph-drip { transform-box: fill-box; transform-origin: center top; }

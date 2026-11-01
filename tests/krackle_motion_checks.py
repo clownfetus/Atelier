@@ -208,6 +208,103 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           if (result[0] !== 'krackle-charge' || !result[1]) throw Error('Activity ring is not Krackle: ' + result);
         }""")
         checks.append('Activity shows its running-jobs ring as six Krackle dots with a counting crest')
+
+        # Found glyphs (the setup rows): the ink key pops in the energy ink and takes the done
+        # colour 290ms in; the code file is done from the start and draws its four lines left to
+        # right from 180ms, 90ms apart; the folder pops in the energy ink, its front flips open at
+        # 160ms, it takes the done colour at 380ms and its flecks burst at 400ms. Other states are
+        # unchanged, plain glyphs keep the starburst, and reduced motion holds every final pose.
+        found = tab.evaluate("""() => {
+          const page = document.createElement('section'); page.className = 'at-identity';
+          page.style.cssText = 'position:fixed;left:20px;top:20px;z-index:9999;display:flex;gap:8px';
+          document.body.append(page);
+          const shown = (host, sel) => getComputedStyle(host.querySelector(sel)).display !== 'none';
+          const delays = (el, dur) => el.getAnimations().filter(a => a.effect.getTiming().duration === dur).map(a => a.effect.getTiming().delay);
+          const out = {};
+          for (const kind of ['key', 'file', 'folder']) {
+            const host = document.createElement('span'); host.style.cssText = 'display:inline-flex;width:20px;height:20px'; page.append(host);
+            const glyph = AtelierMotion.krackleGlyph.mount(host, {state: 'busy', found: kind});
+            glyph.setState('success');
+            const part = host.querySelector('.am-krackle-glyph-' + kind);
+            const o = {found: host.dataset.amFound, shown: shown(host, '.am-krackle-glyph-' + kind), burst: shown(host, '.am-krackle-glyph-burst'),
+              pop: delays(part, 380).length === 1, tint: delays(part, 260),
+              flecks: [...host.querySelectorAll('.am-krackle-glyph-fleck')].map(f => delays(f, 420)[0])};
+            if (kind === 'file') o.lines = [...host.querySelectorAll('.am-krackle-glyph-file-line')].map(l => delays(l, 240)[0]);
+            if (kind === 'folder') o.flap = delays(host.querySelector('.am-krackle-glyph-folder-flap'), 560);
+            glyph.setState('warning');
+            o.ring = getComputedStyle(host.querySelector('.am-krackle-glyph-outcome-warning')).opacity === '1';
+            glyph.setReducedMotion('reduce'); glyph.setState('success');
+            o.still = [...host.querySelectorAll('*')].every(el => el.getAnimations().length === 0);
+            const box = part.getBoundingClientRect(); o.size = [Math.round(box.width), Math.round(box.height)];
+            o.rest = [...host.querySelectorAll('.am-krackle-glyph-file-line, .am-krackle-glyph-folder-flap')].every(el => getComputedStyle(el).transform === 'none');
+            glyph.destroy(); o.cleaned = !host.hasAttribute('data-am-found');
+            out[kind] = o;
+          }
+          const plain = document.createElement('span'); page.append(plain);
+          const other = AtelierMotion.krackleGlyph.mount(plain, {state: 'success'});
+          out.plain = shown(plain, '.am-krackle-glyph-burst') && !['key', 'file', 'folder'].some(k => shown(plain, '.am-krackle-glyph-' + k));
+          other.destroy(); page.remove();
+          return out;
+        }""")
+        for kind, o in ((k, found[k]) for k in ('key', 'file', 'folder')):
+            assert o['found'] == kind and o['shown'] and not o['burst'] and o['pop'] and o['ring'] and o['still'] and o['rest'] and o['cleaned'], (kind, o)
+        assert found['key']['tint'] == [290] and found['key']['flecks'] == [0] * 4 and found['key']['size'] == [23, 11], found['key']
+        assert found['file']['tint'] == [] and found['file']['lines'] == [180, 270, 360, 450] and found['file']['flecks'] == [0] * 4, found['file']
+        assert 12 <= found['file']['size'][0] <= 14 and 17 <= found['file']['size'][1] <= 19, found['file']
+        assert found['folder']['tint'] == [380] and found['folder']['flap'] == [160] and found['folder']['flecks'] == [400] * 4, found['folder']
+        assert 15 <= found['folder']['size'][0] <= 17 and 13 <= found['folder']['size'][1] <= 15, found['folder']
+        assert found['plain'], found
+        checks.append('Found glyphs: the ink key and folder pop in the energy ink and take the done colour, the code file draws its lines, the folder flips open, flecks keep their times, plain glyphs keep the starburst, and reduced motion holds the final poses')
+
+        # The setup check band loops only while busy. The setup drop runs down a dotted line only as
+        # far as the rows are valid and falls into the export review's ink-well once all are; the
+        # well cooks until then and lands as its success. A row stopping being valid, or
+        # reduced motion, settles at once.
+        tab.evaluate("""() => {
+          const page = window.wellPage = document.createElement('section');
+          page.className = 'at-identity'; page.style.cssText = 'position:fixed;left:40px;top:40px;width:400px;height:460px;z-index:9999';
+          page.innerHTML = [0, 1, 2].map(i => '<div class="fixture-row" style="position:absolute;left:0;right:0;top:' + (20 + i * 68) + 'px;height:68px">' +
+            '<span class="fixture-glyph" style="position:absolute;left:0;top:24px;width:20px;height:20px"></span></div>').join('') +
+            '<span id="fixture-well" style="position:absolute;left:0;top:250px"></span><span id="fixture-line" style="position:absolute;left:0;right:0;top:0;height:72px"></span>';
+          document.body.append(page);
+          window.wellInfo = waiting => ({rows: page.querySelectorAll('.fixture-row'), glyphs: page.querySelectorAll('.fixture-glyph'), waiting});
+          window.well = AtelierMotion.setupDrop.mount(page.querySelector('#fixture-well'), {layer: page, size: 176});
+          window.line = AtelierMotion.setupCheck.mount(page.querySelector('#fixture-line'), {state: 'busy'});
+          well.setProgress(0, wellInfo('busy'));
+        }""")
+        host = "document.getElementById('fixture-well').dataset"
+        state = f"[{host}.amReached, {host}.amFull, {host}.amMoving].join()"
+        ink = "document.querySelector('#fixture-well [data-atelier-motion=ink-well]').dataset"
+        tab.wait_for_function(f"[{ink}.amState, {ink}.amSleeping].join() === 'busy,false'", timeout=3000)
+        lid = "document.querySelector('#fixture-well .am-setup-drop-lid-swing')"
+        assert tab.evaluate(f"{host}.amLid") == 'shut' and tab.evaluate(f"getComputedStyle({lid}).transform") == 'none'
+        assert tab.evaluate(state) == '0,false,false' and tab.evaluate("document.getElementById('fixture-line').dataset.amRunning") == 'true'
+        assert tab.locator('.am-setup-drop-flight .am-setup-drop-flier').count() == 1
+        assert tab.locator('.am-setup-drop-flight[data-am-waiting=busy]').count() == 1
+        dots = tab.locator('.am-setup-drop-line .am-setup-drop-dot')
+        assert dots.count() > 12 and tab.locator('.am-setup-drop-line .is-inked').count() <= 1
+        tab.evaluate("well.setProgress(2, wellInfo('still'))")
+        assert tab.evaluate(f"{host}.amMoving") == 'true'
+        tab.wait_for_function(f"{state} === '2,false,false'", timeout=3000)
+        inked = tab.locator('.am-setup-drop-line .is-inked').count()
+        assert 1 < inked < dots.count() and tab.locator('.am-setup-drop-flight[data-am-waiting=still]').count() == 1
+        tab.evaluate("well.setProgress(3, wellInfo('still'))")
+        tab.wait_for_function(f"{state} === '3,true,false'", timeout=3000)
+        assert tab.locator('.am-setup-drop-line .is-inked').count() == dots.count()
+        # Landed: the well performed its success and its lid swung open in the done colour.
+        assert tab.evaluate(f"{ink}.amState") == 'success' and tab.evaluate(f"{host}.amLid") == 'open'
+        assert tab.evaluate(f"getComputedStyle({lid}).transform") != 'none'
+        tab.evaluate("well.setProgress(1, wellInfo('still'))")
+        assert tab.evaluate(state) == '1,false,false' and tab.evaluate(f"{ink}.amState") == 'busy' and tab.evaluate(f"{host}.amLid") == 'shut'
+        tab.evaluate("line.setState('success'); document.documentElement.dataset.motion = 'reduce'; well.setProgress(3, wellInfo('still'))")
+        assert tab.evaluate(state) == '3,true,false'
+        assert tab.evaluate(f"[{ink}.amState, {ink}.amReduced, {ink}.amSleeping].join()") == 'success,true,true'
+        assert tab.evaluate(f"{host}.amLid") == 'open' and tab.evaluate(f"getComputedStyle({lid}).transform") != 'none'
+        assert tab.evaluate("document.getElementById('fixture-line').dataset.amRunning") == 'false'
+        tab.evaluate("delete document.documentElement.dataset.motion; well.destroy(); well.destroy(); line.destroy(); line.destroy()")
+        assert tab.evaluate("!wellPage.querySelector('svg') && !document.getElementById('fixture-well').hasAttribute('data-atelier-motion')")
+        tab.evaluate("wellPage.remove()")
+        checks.append('Setup check loops only while busy; the setup drop travels its dotted line only as far as rows are valid and lands in the cooking ink-well as its success with its lid swung open, settles at once on regression or reduced motion, and cleans up')
         assert not errors, errors
     finally:
         tab.close()

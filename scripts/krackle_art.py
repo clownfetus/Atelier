@@ -88,12 +88,57 @@ def micro_busy(p, extra_cls=''):
     return f'<g class="{p}-busy{extra_cls}">{dots}{holes}</g>'
 
 
-def micro_success(p):
+# The ink key: a key whose bow is the Krackle drop lying on its side, its point running into the
+# blade, drawn in a 400-unit design box and cropped to KEY_VIEW. A glyph mounted with
+# found: 'key' shows it in place of the starburst (the setup page's Unlock key row).
+KEY_VIEW = (50, 124, 300, 152)          # x, y, width, height of the crop
+# The key is half as tall as it is wide, so it runs 20% past the glyph's sides to keep its weight:
+# 24px wide at the setup rows' 20px, still inside their 24-28px glyph column.
+KEY_SPAN = 28.8
+
+
+def micro_key(p):
+    x, y, w, h = KEY_VIEW
+    k = KEY_SPAN / w                     # centred on the glyph both ways
+    place = f'translate({n((24 - KEY_SPAN) / 2)} {n((24 - h * k) / 2)}) scale({k:.4g}) translate({n(-x)} {n(-y)}) translate(200 200) skewX(-8) translate(-200 -200)'
+    body = (path(teardrop(0, 0, 6, -13), f'{p}-energy', ' transform="translate(132 200) rotate(90) scale(11)"') +
+            '<rect class="%s-energy" x="226" y="187" width="110" height="26" rx="13" />' % p +
+            '<rect class="%s-energy" x="294" y="200" width="24" height="50" rx="12" />' % p +
+            '<rect class="%s-energy" x="254" y="200" width="22" height="36" rx="11" />' % p +
+            circle(128, 200, 27, f'{p}-hole {p}-key-hole') + circle(166, 232, 7, f'{p}-hole') +
+            circle(98, 170, 8, f'{p}-glint'))
+    return f'<g class="{p}-found {p}-key"><g transform="{place}">{body}</g></g>'
+
+
+# The code file (the Mapping file row): a sheet with its top-right corner cut off and four code
+# lines in the surface colour, drawn in a 20-unit box scaled to fill the glyph.
+FILE_LINES = [(6, 7.4, 5), (7.8, 10.2, 6), (7.8, 13, 4.2), (6, 15.8, 7.5)]
+
+
+def micro_file(p):
+    body = poly([(3.5, 1), (12, 1), (16.5, 5.5), (16.5, 19), (3.5, 19)])
+    lines = ''.join(f'<rect class="{p}-hole {p}-file-line" x="{n(x)}" y="{n(y)}" width="{n(w)}" height="1.6" rx="0.8" />'
+                    for x, y, w in FILE_LINES)
+    return f'<g class="{p}-found {p}-file"><g transform="scale(1.2)">{path(body, f"{p}-energy")}{lines}</g></g>'
+
+
+# The folder (the Game folder row): a back with a tab, and a front panel that flips open. A
+# surface-coloured halo behind the front keeps it a separate flap without an outline.
+FOLDER_BACK = 'M2 4.6A1.6 1.6 0 0 1 3.6 3H7.4L9.2 5H16.4A1.6 1.6 0 0 1 18 6.6V15.4A1.6 1.6 0 0 1 16.4 17H3.6A1.6 1.6 0 0 1 2 15.4Z'
+
+
+def micro_folder(p):
+    flap = (f'<g class="{p}-folder-flap"><rect class="{p}-hole" x="1.4" y="7.4" width="17.2" height="10.2" rx="1.9" />'
+            f'<rect class="{p}-energy" x="2" y="8.2" width="16" height="8.8" rx="1.6" /></g>')
+    return f'<g class="{p}-found {p}-folder"><g transform="scale(1.2)">{path(FOLDER_BACK, f"{p}-energy")}{flap}</g></g>'
+
+
+def micro_success(p, key=False):
     burst = path(starburst(12, 12, 11.2, 6.4, 10, 0.2), f'{p}-energy {p}-burst')
     hole = circle(12.6, 12.4, 2.35, f'{p}-hole {p}-burst-hole')
     flecks = ''.join(circle(12 + math.cos(a) * 9.6, 12 + math.sin(a) * 9.6, 1.05, f'{p}-energy {p}-fleck')
                      for a in FLECKS)
-    return f'<g class="{p}-outcome {p}-outcome-success">{burst}{hole}<g class="{p}-flecks">{flecks}</g></g>'
+    return f'<g class="{p}-outcome {p}-outcome-success">{burst}{hole}{micro_key(p) + micro_file(p) + micro_folder(p) if key else ""}<g class="{p}-flecks">{flecks}</g></g>'
 
 
 def micro_warning(p):
@@ -168,7 +213,7 @@ def material_save():
 
 def krackle_glyph():
     p = 'am-krackle-glyph'
-    body = micro_busy(p) + micro_info(p) + micro_success(p) + micro_warning(p) + micro_error(p)
+    body = micro_busy(p) + micro_info(p) + micro_success(p, key=True) + micro_warning(p) + micro_error(p)
     return svg(f'{p}-svg', 24, body, extra=' fill="currentColor"')
 
 
@@ -276,6 +321,69 @@ def empty_state():
 
 
 # ── spinner and Activity masks (CSS data URIs) ────────────────────────────────
+# ── setup check (identity v1.0): the launch check draws the Projects header rule ──
+# Each part is drawn about its own anchor; setup-check.js measures the header and moves
+# them onto the rule. The preview below lays them out along one 520-unit band.
+SETUP_FLECKS = [(-30, -22, 2.6), (-31, 20, 2.2), (22, -27, 2), (24, 26, 2.4)]
+SETUP_SATS = [(-28, -12, 2.9), (29, 7, 2.6), (-21, 24, 2.4), (23, -25, 2.4), (25, 25, 1.9)]
+
+
+def setup_check():
+    p = 'am-setup-check'
+    e, h, g = f'{p}-energy', f'{p}-hole', f'{p}-glint'
+    track = path('M44 36 H320', f'{p}-track')
+    pour = path('M44 36 H320', f'{p}-pour', ' pathLength="1"')
+    # The reservoir: a drop resting on the rule, its bubbles massed low on the channel side.
+    drop = (f'<g class="{p}-drop" transform="translate(22 36)"><g class="{p}-drop-ink">' + circle(0, 0, 18, e) +
+            circle(4, 5, 4.2, h) + circle(-2.5, 10.5, 1.9, h) + circle(9, -3, 1.6, h) + circle(-6.5, -7, 1.6, g) + '</g></g>')
+    # The latch: a receiver open towards the channel, anchored on its right edge.
+    latch = (f'<g class="{p}-latch" transform="translate(356 36)"><g class="{p}-latch-ink">' +
+             path('M-26 -22 H-10 Q0 -22 0 -12 V12 Q0 22 -10 22 H-26 Q-36 22 -36 12 V10 H-12 V-10 H-36 V-12 Q-36 -22 -26 -22 Z', e) +
+             circle(-6, 15, 2.2, h) + '</g></g>')
+    # Results replace the latch, anchored on its centre.
+    burst = path(starburst(0, 0, 24, 12.6, 8, -math.pi / 2), f'{e} {p}-burst')
+    flecks = ''.join(circle(x, y, r, f'{e} {p}-fleck') for x, y, r in SETUP_FLECKS)
+    success = (f'<g class="{p}-result {p}-success" transform="translate(400 36)"><g class="{p}-burst-ink">' + burst +
+               circle(4, 5, 2.8, h) + circle(-6, -7, 1.6, g) + f'</g><g class="{p}-flecks">{flecks}</g></g>')
+    ring = (f'<g class="{p}-ring">' + path(arc_path(0, 0, 15, GAP + .55, GAP - .55 + 2 * math.pi), f'{p}-arc') +
+            circle(-14.1, -5.1, 1.6, h) + circle(-5.1, -14.1, 1.3, g) + '</g>')
+    chunk = f'<g class="{p}-chunk">' + path('M14 26 L23 24.5 L24.5 31 L15 32.5 Z', e) + circle(19.2, 28.6, 1.3, h) + '</g>'
+    warning = f'<g class="{p}-result {p}-warning" transform="translate(452 36)">{ring}{chunk}</g>'
+    body = ''.join(circle(x * 64, y * 64, r * 64, e) for x, y, r in SPLAT_BODY)
+    sats = ''.join(circle(x, y, r, f'{e} {p}-sat') for x, y, r in SETUP_SATS)
+    drip = f'<g class="{p}-drip">' + path('M-9 11.5 V21.5', f'{p}-drip-line') + circle(-9, 23.5, 3.4, e) + '</g>'
+    dizzy = f'<g class="{p}-dizzy">' + circle(-10, -22, 2.9, e) + circle(-9.4, -21.8, 1.2, h) + '</g>'
+    error = (f'<g class="{p}-result {p}-error" transform="translate(500 36)"><g class="{p}-splat">{body}' +
+             circle(1.28, -.64, 5.5, h) + circle(-9.6, 4.5, 2.9, h) + circle(-5.3, -6.7, 2, g) +
+             f'</g><g class="{p}-sats">{sats}</g>{drip}{dizzy}</g>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="{p}-svg" viewBox="0 0 520 72" width="520" height="72"'
+            f' aria-hidden="true" focusable="false" fill="currentColor">{track}{pour}{drop}{latch}{success}{warning}{error}</svg>')
+
+
+# The first-run drop: one drop of ink that runs down a dotted line through the setup rows' glyph
+# column and falls into the export review's ink-well (gui/motion/ink-well.js), whose label is the
+# page's own Open Atelier button. The drop sits belly-down on its anchor, point up; the dot is one
+# dot of the line it follows.
+# The well's lid is a status, not decoration: shut in the energy ink while rows need the person,
+# open in the done colour once every row is valid. A pill over the mouth, 8px past the rim on
+# each side and 4px above it, with a 24x10 knob on top; it swings about its left cap's centre
+# (8, 15 in its own box). Drawn for the page's 240px well (rim 91.5px); other sizes scale it.
+LID = (108, 16, 24, 10)                  # pill width and height, knob width and height
+
+
+def setup_drop():
+    p = 'am-setup-drop'
+    drop = (f'<g class="{p}-drop">' + path(teardrop(0, 0, 6, -13), f'{p}-energy') + circle(-2.2, -1.6, 1.3, f'{p}-glint') + '</g>')
+    w, h, kw, kh = LID
+    kx = (w - kw) / 2
+    knob = f'M{n(kx)} {n(kh)} V6 Q{n(kx)} 0 {n(kx + 6)} 0 H{n(kx + kw - 6)} Q{n(kx + kw)} 0 {n(kx + kw)} 6 V{n(kh)} Z'
+    lid = (f'<svg class="{p}-lid" viewBox="0 0 {w} {h + kh - 3}" width="{w}" height="{h + kh - 3}" x="14" y="-14" overflow="visible">'
+           f'<g class="{p}-lid-swing">' + path(knob, f'{p}-lid-energy') +
+           f'<rect class="{p}-lid-energy" x="0" y="{n(kh - 3)}" width="{w}" height="{h}" rx="{n(h / 2)}" /></g></svg>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="{p}-svg" viewBox="-7 -14 {w + 22} 30" width="{w + 22}" height="30"'
+            f' aria-hidden="true" focusable="false" fill="currentColor">{drop}' + circle(0, 12, 1.8, f'{p}-dot') + lid + '</svg>')
+
+
 def mask_uri(body, view=24):
     raw = f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {view} {view}'>{body}</svg>"
     return "url(\"data:image/svg+xml," + raw.replace('<', '%3C').replace('>', '%3E').replace('#', '%23').replace('"', "'") + "\")"
@@ -449,15 +557,17 @@ def category_emblems():
 HEADER = {
     'export-feedback': 'Krackle export feedback: drop and tray (idle), six-dot charge ring (busy), starburst, cracked ring and splat.',
     'material-save': 'Krackle material save: shaded swatch (idle), charge ring around a small swatch (saving), starburst, cracked ring and splat.',
-    'krackle-glyph': 'Krackle micro glyphs for notifications: charge ring, ink drop (info), starburst, cracked ring and splat.',
+    'krackle-glyph': 'Krackle micro glyphs for notifications: charge ring, ink drop (info), starburst (or the ink key, code file and folder), cracked ring and splat.',
     'viewport-loader': 'Krackle viewport loader: twelve-dot charge ring around a boiling ball, resting bubbles (empty) and a knocked-out splat (error).',
     'folder-flap': 'Krackle folder: energy panels with one composed mass of bubbles. The front panel tips open on hover/focus.',
     'empty-assets': 'Krackle empty tray: a tray of energy holding a few loose bubbles, with a drop of ink waiting above it.',
     'empty-state': 'Krackle grid empty states: a tray with two bubbles (empty folder), three loose bubbles (no matches) and a splat (failed to load).',
+    'setup-check': 'Krackle setup check: a drop pours along the header rule into a latch (busy), which becomes a starburst, cracked ring or splat.',
+    'setup-drop': 'Krackle setup drop: one drop follows a dotted line down the setup rows and falls into the ink-well, whose lid is its status.',
 }
 ART = {'export-feedback': export_feedback, 'material-save': material_save, 'krackle-glyph': krackle_glyph,
        'viewport-loader': viewport_loader, 'folder-flap': folder_flap, 'empty-assets': empty_assets,
-       'empty-state': empty_state}
+       'empty-state': empty_state, 'setup-check': setup_check, 'setup-drop': setup_drop}
 
 
 def standalone(name, markup):

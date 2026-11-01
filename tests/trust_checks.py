@@ -79,6 +79,7 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         for path in files:path.unlink(missing_ok=True)
         shutil.rmtree(root/'.atelier-trash',ignore_errors=True)
     _setup(context,url,report,checks)
+    _launch_check(context,url,report,checks)
 
 
 def _confirm_paths(tab,checks):
@@ -151,39 +152,111 @@ def _confirm_paths(tab,checks):
 
 
 def _setup(context,url,report,checks):
+    rows="['game','key','map'].map(n=>document.querySelector(`#setup-rows [data-row=${n}]`).dataset.state).join()"
+    well="document.querySelector('#setup-well [data-atelier-motion=setup-drop]')?.dataset"
+    ink="document.querySelector('#setup-well [data-atelier-motion=ink-well]')?.dataset"
     for automatic in (True,False):
         tab=context.new_page();writes=[];errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
         try:
             tab.add_init_script("""const previous=window.fetch;window.fetch=(url,opts)=>String(url).startsWith('https://')?Promise.resolve({ok:true,json:async()=>({mainKey:'a'.repeat(64)})}):previous(url,opts);""" if automatic else """const previous=window.fetch;window.fetch=(url,opts)=>String(url).startsWith('https://')?Promise.reject(Error('Offline')):previous(url,opts);""")
             tab.route('**/api/setup_status',lambda route:route.fulfill(json={'configured':False,'paks_prefill':'D:/Steam/MarvelRivals'}))
             tab.route('**/api/validate_paks?*',lambda route:route.fulfill(json={'status':'ok'}))
-            tab.route('**/api/validate_usmap?*',lambda route:route.fulfill(json={'status':'ok'}))
+            tab.route('**/api/validate_usmap?*',lambda route:route.fulfill(json={'status':'empty' if route.request.url.endswith('path=') else 'ok'}))
             tab.route('**/api/download_usmap',lambda route:route.fulfill(json={'ok':automatic,'path':'Fixture.usmap' if automatic else None}))
             def save(route):writes.append(route.request.post_data_json);route.fulfill(json={'ok':True})
             tab.route('**/api/save_paks',save)
-            tab.goto(url);tab.wait_for_selector('#setup-step-1')
-            tab.wait_for_function("document.querySelector('#setup-next:not(:disabled)')")
-            assert tab.locator('#setup-step-1 .setup-step-status').inner_text()=='Found in your Steam library'
-            assert tab.locator('#settings-theme').is_hidden()
-            tab.locator('#setup-next').click();tab.locator('#setup-step-2').wait_for()
-            if not automatic:
-                tab.wait_for_function("document.getElementById('setup-aes-retrieval').textContent.includes('Paste')")
-                assert tab.locator('#setup-next').is_disabled()
-                tab.locator('#setup-aes').fill('0x'+'a'*64);tab.locator('#setup-usmap').fill('Fixture.usmap')
-            tab.wait_for_function("document.querySelector('#setup-next:not(:disabled)')")
-            tab.locator('#setup-back').click();assert tab.locator('#setup-step-1').is_visible()
-            tab.locator('#setup-next').click();tab.locator('#setup-step-2').wait_for();tab.locator('#setup-next').click()
-            tab.locator('#setup-step-3').wait_for();assert tab.locator('#settings-theme').is_visible()
+            tab.goto(url);tab.wait_for_selector('#setup-overlay.active[data-setup-page=first-run]')
+            # One page: what the check found, and only what is missing asks for input.
+            assert tab.locator('#settings-theme').is_hidden() and tab.locator('#setup-title').is_hidden()
             assert tab.locator('#setup-save').inner_text().strip()=='Open Atelier'
             if automatic:
+                tab.wait_for_function(rows+"==='done,done,done'")
+                # One drop runs down past every valid row and falls into the well Open Atelier labels.
+                tab.wait_for_function(well+".amFull==='true'",timeout=5000)
+                # Landing is the export review's ink-well performing its success.
+                assert tab.evaluate(ink+".amState")=='success'
+                assert tab.locator('#setup-rows > li').evaluate_all('rows=>rows.map(r=>r.dataset.row).join()')=='key,map,game'
+                assert tab.locator('#setup-well .at-setup-save-slot #setup-save').count()==1
+                assert tab.locator('[data-row=game] .at-setup-what').inner_text()=='Found on this PC'
+                assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Current key retrieved'
+                # Each row's found glyph: the ink key, the code file, the folder; the well's lid is open.
+                for row,found in (('key','key'),('map','file'),('game','folder')):
+                    assert tab.locator(f'[data-row={row}] [data-atelier-motion=krackle-glyph][data-am-found={found}][data-am-state=success]').count()==1
+                assert tab.evaluate(well+".amLid")=='open'
+                assert tab.locator('#setup-page-title').inner_text()=='Ready to open Atelier'
+                assert tab.locator('#setup-path').is_hidden() and tab.locator('#setup-save').is_enabled()
+                tab.locator('[data-row=game] .at-setup-change').click()
+                assert tab.locator('#setup-path').is_visible()
                 for theme in ('dark','light'):
-                    tab.locator('#settings-theme').select_option(theme)
+                    tab.evaluate("theme=>{const s=document.getElementById('settings-theme');s.value=theme;s.dispatchEvent(new Event('change',{bubbles:true}))}",theme)
                     tab.screenshot(path=str(report/f'trust-setup-{theme}.png'),animations='disabled')
+            else:
+                tab.wait_for_function(rows+"==='done,missing,missing'")
+                # The key comes first, so the drop waits above it although the game was found.
+                tab.wait_for_function(well+".amReached==='0' && "+well+".amFull==='false' && "+well+".amMoving==='false'",timeout=5000)
+                # Waiting on the person, the well is alive: it cooks as it does in the export review,
+                # and its lid is shut.
+                tab.wait_for_function(ink+".amState==='busy' && "+ink+".amSleeping==='false'",timeout=3000)
+                assert tab.evaluate(well+".amLid")=='shut'
+                assert "couldn't be reached" in tab.locator('[data-row=key] .at-setup-what').inner_text()
+                assert tab.locator('#setup-page-title').inner_text()=='Atelier needs two things from you'
+                assert tab.locator('#setup-save').is_disabled() and tab.locator('#setup-aes').is_visible()
+                tab.locator('#setup-aes').fill('0x'+'a'*64);tab.locator('#setup-usmap').fill('Fixture.usmap')
+                tab.wait_for_function(rows+"==='done,done,done'")
+                tab.wait_for_function(well+".amFull==='true'",timeout=5000)
+                assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Key entered'
+            tab.wait_for_function("document.querySelector('#setup-save:not(:disabled)')")
             tab.locator('#setup-save').click();tab.wait_for_function("!document.getElementById('setup-overlay').classList.contains('active')")
             assert writes==[{'path':'D:/Steam/MarvelRivals','aes_key':'a'*64,'usmap_path':'Fixture.usmap'}]
+            # Settings keeps its full form with every control back in place.
             tab.evaluate('openPaths()')
+            tab.wait_for_function("!document.getElementById('setup-loading').classList.contains('active')",timeout=20000)
             assert tab.locator('#setup-path').is_visible();assert tab.locator('#settings-theme').is_visible()
-            assert tab.locator('#setup-next').is_hidden();assert tab.locator('#setup-save-label').inner_text()=='Save'
+            assert tab.locator('#setup-page').is_hidden();assert tab.locator('#setup-save-label').inner_text()=='Save'
+            assert tab.locator('#setup-overlay[data-setup-page]').count()==0
+            assert tab.locator('#setup-well [data-atelier-motion], .am-setup-drop-flight').count()==0
             assert not errors,errors
         finally:tab.close()
-    checks.append('First-run setup validates three panels, supports Back and offline fallback, preserves the save payload and keeps Settings as a full form')
+    checks.append('First-run setup is one page that fills from the check and its ink-well, asks only for what is missing, supports offline fallback, preserves the save payload and keeps Settings as a full form')
+
+
+def _launch_check(context,url,report,checks):
+    # The checking page appears only when the status request is slow, a failure offers Try again,
+    # and a quick configured launch never shows the cover at all.
+    watch="""window.__setupCheck={};const previous=window.fetch;window.fetch=(url,opts)=>{const result=previous(url,opts);if(String(url).includes('/api/setup_status')&&!window.__setupCheck.asked){window.__setupCheck.asked=performance.now();result.finally(()=>{window.__setupCheck.answered=performance.now()}).catch(()=>{})}return result};
+      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{if(document.getElementById('setup-overlay').classList.contains('active'))window.__setupCheck.shown=window.__setupCheck.shown||performance.now()}).observe(document.getElementById('setup-overlay'),{attributes:true,attributeFilter:['class']}));"""
+    tab=context.new_page();errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
+    try:
+        tab.add_init_script(watch)
+        held=[];tab.route('**/api/setup_status',lambda route:held.append(route))
+        tab.goto(url);tab.wait_for_selector('#setup-overlay.active[data-setup-page=checking]')
+        timing=tab.evaluate('window.__setupCheck')
+        assert timing['shown']-timing['asked']>=380,timing
+        assert tab.locator('#setup-page-title').inner_text()=='Checking your setup'
+        assert tab.locator('#setup-rows [data-state=waiting]').count()==3
+        assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=busy]').count()==1
+        held.pop(0).fulfill(status=500,body='Traceback: boom')
+        tab.wait_for_selector('#setup-overlay.active[data-setup-page=failed]')
+        assert tab.locator('#setup-page-error').inner_text()=='server error (500)'
+        assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=error]').count()==1
+        tab.screenshot(path=str(report/'trust-launch-failed.png'),animations='disabled')
+        tab.unroute('**/api/setup_status');tab.route('**/api/setup_status',lambda route:route.fulfill(json={'configured':True}))
+        tab.locator('#setup-retry').click()
+        tab.wait_for_function("!document.getElementById('setup-overlay').classList.contains('active')")
+        assert not tab.locator('#setup-hero [data-atelier-motion=setup-check]').count()
+        assert not errors,errors
+    finally:tab.close()
+    tab=context.new_page();errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
+    try:
+        tab.add_init_script(watch)
+        tab.route('**/api/setup_status',lambda route:route.fulfill(json={'configured':True}))
+        tab.goto(url);tab.wait_for_function("!!window.__setupCheck.answered")
+        tab.wait_for_timeout(700)
+        timing=tab.evaluate('window.__setupCheck')
+        # A busy machine can take longer than 400 ms to answer; the cover may then appear, never sooner.
+        if timing['answered']-timing['asked']<350:assert 'shown' not in timing,timing
+        else:assert 'shown' not in timing or timing['shown']-timing['asked']>=380,timing
+        assert tab.locator('#setup-overlay.active').count()==0
+        assert not errors,errors
+    finally:tab.close()
+    checks.append('The launch check shows its page only after 400 ms, reports a failed check with Try again, and a quick configured launch never shows it')

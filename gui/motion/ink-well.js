@@ -10,11 +10,15 @@
  * bubbles; warning boils over, foam crowning the lip, dripping down the neck and bubbling over
  * the sides; failure cracks the vessel from the void outwards and throws shards.
  *
- * mount(host, {size, kind, tier, state, settled, palette, reducedMotion}) returns setState
- * ('busy', 'success', 'warning', 'error'), setPalette, setReducedMotion, frames and an idempotent
- * destroy. There are no API or storage calls. Calm, Off and reduced motion show each state's still
- * pose; settled results, hidden documents and off-screen hosts stop drawing; a refused moment
- * shows the 48px glyph for the state instead.
+ * mount(host, {size, kind, tier, state, settled, palette, reducedMotion, fixedFrame, sparse})
+ * returns setState ('busy', 'success', 'warning', 'error'), setPalette, setReducedMotion, frames
+ * and an idempotent destroy. fixedFrame keeps the artboard still through results, so the well
+ * holds its place under something laid over it (released ink spills past the SVG instead).
+ * sparse keeps a few large bubbles and drops the small ones, for a well people look at while
+ * waiting rather than one that reports a build. There are
+ * no API or storage calls. Calm, Off and reduced motion show each state's still pose; settled
+ * results, hidden documents and off-screen hosts stop drawing; a refused moment shows the 48px
+ * glyph for the state instead.
  */
 (function () {
   'use strict';
@@ -134,6 +138,9 @@
       sqLag2: C.squash(ph - 0.075), surge: Math.max(0, C.surge(ph)), flowRate: C.flow(ph), sway: C.sway(ph),
       ft: PERIOD * (cyc * FLOW.total + ftab), live: true};
   }
+  // A sparse well (the first-run page) keeps every other bubble of the inner ring, two neck
+  // risers, no secondary pockets and only the large satellites.
+  var SPARSE = {ringEvery: 2, risers: 2, micro: 0, satMinR: 6};
   var STILL = {t: 0.9, ph: 0.05, cyc: 0, press: 0, sq: 0, sqLag: 0, sqLag2: 0, surge: 0, flowRate: 1, sway: 0, ft: 0.9, live: false};
 
   /* ── outcomes, performed from wherever the cook was ──
@@ -577,6 +584,7 @@
       var space = lane.psi === 0 ? 1 : lerp(0.2, 1, sstep(12, 36, span));
       var rFull = lerp(lane.rMin, lane.rMax, hk) * space * (1 + 0.045 * Math.sin(t * (0.9 + hk * 0.8) + id * 2.1)) * (1 + 0.06 * press) * swellR;
       SL.extra[s] = 0; SL.m[s] = 0; SL.tail[s] = 0; SL.env[s] = 0;
+      if (this.sparse && (SL.lane[s] !== 0 || si % SPARSE.ringEvery)) { SL.alive[s] = 0; SL.r[s] = 0; continue; }
       if (u >= active) {
         SL.alive[s] = 0; SL.r[s] = 0;
         // A merged bubble's receiver keeps the absorbed volume a while, then relaxes.
@@ -634,7 +642,7 @@
     // Neck risers expand as they climb, then break through the lip into the mouth. They run on
     // flow time, so the release sends them racing up.
     var popSum = 0, RZ = L.risers;
-    for (i = 0; i < RZ.n; i++) {
+    for (i = 0; i < (this.sparse ? SPARSE.risers : RZ.n); i++) {
       var rid = 500 + i, P = lerp(RZ.pMin, RZ.pMax, hash(rid * 3.3)), rlt = (ch.ft + hash(rid * 5.9) * P) / P, ru = rlt - Math.floor(rlt);
       if (still) ru = (i + 0.5) / RZ.n * 0.8;
       var rh = hash(rid * 7.7 + Math.floor(rlt) * 1.3), rise = clamp(ru / 0.84, 0, 1), pop = ru > 0.84 ? (ru - 0.84) / 0.16 : 0;
@@ -651,7 +659,7 @@
 
     // Secondary bubbling: tiny pockets that open in the webs and fade.
     var MZ = L.micro;
-    for (i = 0; i < MZ.n; i++) {
+    for (i = 0; i < (this.sparse ? SPARSE.micro : MZ.n); i++) {
       var mid = 700 + i, MP = lerp(1.6, 3, hash(mid * 1.7)), mlt = (t + hash(mid * 4.1) * MP) / MP, mk = Math.floor(mlt), mu = still ? 0.5 : mlt - mk;
       var h1 = hash(mid * 3.1 + mk * 2.9), h2 = hash(mid * 8.3 + mk * 1.1);
       var mr = lerp(MZ.rMin, MZ.rMax, hash(mid + mk * 0.37)) * sstep(0, 0.25, mu) * (1 - sstep(0.7, 1, mu)) * (1 + 0.5 * surge);
@@ -832,6 +840,7 @@
     /* satellites and their knockout gaps */
     var sat = ['', ''], gapD = 'M-60 -60H316V316H-60Z';
     G.sats.forEach(function (st) {
+      if (self.sparse && st.rx < SPARSE.satMinR) return;
       var sdx = st.x - 128, sdy = st.y - 150, sl = Math.hypot(sdx, sdy) || 1, out = 2.2 * press - 1.2 * surge;
       self.deform(ch, st.x + sdx / sl * out + 0.7 * Math.sin(t * TAU * st.f * 0.5 + st.ph), st.y + sdy / sl * out + 0.8 * Math.sin(t * TAU * st.f * 0.42 + st.ph * 1.7), true);
       var sc = 1 + 0.07 * press - 0.035 * surge + 0.03 * Math.sin(t * 1.7 + st.ph), br = 0.035 * Math.sin(t * 1.3 + st.ph * 2.3);
@@ -948,7 +957,7 @@
       this.outClass = out.cls;
       [this.elOutIn, this.elOutNecksIn, this.elOutNecks, this.elOutOver].forEach(function (el) { el.setAttribute('class', out.cls); });
     }
-    var vv = out ? outcomeView(name, tau) : [VIEW, 0], vk = vv[1], view = vv[0], vs = q(lerp(VIEW[2], view[2], vk));
+    var vv = out && !this.fixedFrame ? outcomeView(name, tau) : [VIEW, 0], vk = vv[1], view = vv[0], vs = q(lerp(VIEW[2], view[2], vk));
     var vb = q(lerp(VIEW[0], view[0], vk)) + ' ' + q(lerp(VIEW[1], view[1], vk)) + ' ' + vs + ' ' + vs;
     if (vb !== this.viewBox) { this.viewBox = vb; this.svg.setAttribute('viewBox', vb); }
     this.elOutIn.setAttribute('d', outIn); this.elOutNecksIn.setAttribute('d', necksOut.join('')); this.elCracks.setAttribute('d', cracks);
@@ -983,6 +992,8 @@
     svg.style.width = svg.style.height = size + 'px';
     host.appendChild(svg);
     var well = new Well(svg);
+    well.fixedFrame = !!opts.fixedFrame;
+    well.sparse = !!opts.sparse;
     well.setPalette(opts.palette);
 
     var reducedPref = opts.reducedMotion === 'reduce' ? 'reduce' : 'system', mql = null;
