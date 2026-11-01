@@ -266,6 +266,21 @@ def mesh_slots(game_rel):
     return slots
 
 
+def _unconfirmed(data):
+    """An instance read that names a parent but carries no textures or colours.
+
+    Some reader processes start in a state where affected materials read empty,
+    with no error (docs/dye-latency-spike-2026-10-29.md, "Dye reads" A). Many
+    children also override nothing, and the two look identical. Publishing one
+    would keep a bad start's empty read until the next game update, so these are
+    held for the reader process that produced them and read again by the next.
+    """
+    return bool((data.get('surface') or {}).get('parent_path')) and not data.get('textures') and not data.get('colors')
+
+
+_unconfirmed_reads = {}
+
+
 def material(game_rel):
     if not available():
         return None
@@ -274,7 +289,13 @@ def material(game_rel):
     target = _target(source[1], 'materials', asset, '.json')
     with key_lock('native-material', source[0], asset):
         if target.is_file():
-            return json.loads(target.read_text(encoding='utf-8'))
+            data = json.loads(target.read_text(encoding='utf-8'))
+            if not _unconfirmed(data):
+                return data  # Older caches may hold an empty read; those are read again.
+        reader = (source[0], getattr(_worker, 'pid', None))
+        held = _unconfirmed_reads.get(asset)
+        if held and held[0] == reader:
+            return held[1]
         data = _request('material', {'asset': asset}, source)
         if not isinstance(data.get('colors'), list) or not isinstance(data.get('textures'), dict):
             raise ImportError('The import server returned invalid material parameters.')
@@ -283,6 +304,11 @@ def material(game_rel):
         if (data.get('surface') or {}).get('parent_path'):
             config.validate_game_rel(data['surface']['parent_path'])
         jobs.checkpoint()
+        if _unconfirmed(data):
+            _unconfirmed_reads[asset] = ((source[0], getattr(_worker, 'pid', None)), data)
+            target.unlink(missing_ok=True)
+            return data
+        _unconfirmed_reads.pop(asset, None)
         atomic_json(str(target), data)
         return data
 

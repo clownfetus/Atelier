@@ -19,6 +19,11 @@ The app, installers and update checker identify each release by its full number,
   (imported, imported with warnings, failed or cancelled) until you choose Done;
   hiding it still reports through a notification. Calm, Off and reduced motion
   show still poses and nothing travels.
+- Fixed costumes that could stay unpainted in the viewer, Assembly and the
+  material editor until the next game update. The game reader sometimes
+  started up unable to read some materials and returned them empty without an
+  error, and Atelier kept those empty results. It no longer saves an empty
+  material read, and materials saved empty by earlier versions are read again.
 
 ## 1.1.4
 
