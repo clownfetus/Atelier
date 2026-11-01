@@ -124,7 +124,7 @@ def prepare(game_rel,source,options=None,companions=()):
         info['rig_bones']=len(expected)
         if options['keep_skeleton'] and not info['skeleton_preserved']:raise ValueError('The rebuilt model changed the original skeleton')
         if [(b['name'],b['parent']) for b in verified.bones]!=[(b['name'],b['parent']) for b in expected]:raise ValueError('The replacement skeleton is incompatible with this character')
-        mesh.export_glb(verified,0,str(preview),with_morphs=options['keep_morphs'])
+        mesh.export_glb(verified,0,str(preview),with_morphs=options['keep_morphs'],for_preview=True)
         if bundle:
             jobs.progress('Connecting the imported textures in Blender…')
             meshedit._run_blender('wire_import_materials.py',[str(candidate),str(bundle['manifest'])],'IMPORT_MATERIALS')
@@ -161,7 +161,7 @@ def is_original(game_rel):
 
 
 def revert(game_rel):
-    from atelier.handlers import meshedit
+    from atelier.handlers import meshedit,mesh
     base=target_base(game_rel);root=config.get_import_root()
     suffixes=('.blend','.mesh.glb','.mesh.json') if Path(base+'.blend').is_file() else ('.mesh.json',)
     before={suffix:digest(base+suffix) for suffix in suffixes}
@@ -170,9 +170,10 @@ def revert(game_rel):
         if '.blend' in suffixes:
             jobs.progress('Restoring the original model and skeleton…')
             candidate=work/'original.blend'
-            meshedit.extract_blend(game_rel,base_path=meshedit._resolve_base(game_rel),blend_path=str(candidate),with_materials=False)
+            original=meshedit._resolve_base(game_rel)
+            meshedit.extract_blend(game_rel,base_path=original,blend_path=str(candidate),with_materials=False)
             preview=work/'original.mesh.glb'
-            meshedit._run_blender('blend_to_glb.py',[str(candidate),str(preview),'1','preview'],'GLB')
+            mesh.export_glb(mesh.Mesh(original),0,str(preview),with_morphs=True,for_preview=True)
             record['original_blend_sha256']=digest(candidate)
             files=(candidate,preview,work/'original.mesh.json')
         else: files=(work/'original.mesh.json',)
@@ -191,16 +192,16 @@ def preview(game_rel):
         original = source_base(game_rel)
         if not original:
             return None
-        if not target.is_file():
+        if not mesh.is_current_preview(target):
             descriptor, temporary = tempfile.mkstemp(suffix='.glb', prefix='.added-mesh-preview-', dir=target.parent)
             os.close(descriptor)
             try:
-                mesh.export_glb(mesh.Mesh(original), 0, temporary)
+                mesh.export_glb(mesh.Mesh(original), 0, temporary, for_preview=True)
                 os.replace(temporary, target)
             finally:
                 Path(temporary).unlink(missing_ok=True)
         return str(target)
-    if not target.is_file() or target.stat().st_mtime_ns<blend.stat().st_mtime_ns:
+    if not mesh.is_current_preview(target) or target.stat().st_mtime_ns<blend.stat().st_mtime_ns:
         descriptor,temporary=tempfile.mkstemp(suffix='.glb',prefix='.mesh-preview-',dir=target.parent);os.close(descriptor)
         try:
             output=meshedit._run_blender('blend_to_glb.py',[str(blend),temporary,'1','preview'],'GLB')
@@ -208,7 +209,7 @@ def preview(game_rel):
             original=mesh.Mesh(meshedit._resolve_base(game_rel))
             if not options['keep_skeleton']:original.apply_skeleton_from_glb(temporary)
             original.rebuild_lod(0,mesh.glb_to_sections(original,0,temporary),keep_morphs=options['keep_morphs'])
-            mesh.export_glb(original,0,temporary,with_morphs=options['keep_morphs'])
+            mesh.export_glb(original,0,temporary,with_morphs=options['keep_morphs'],for_preview=True)
             os.replace(temporary,target)
         finally:Path(temporary).unlink(missing_ok=True)
     return str(target)

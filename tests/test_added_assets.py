@@ -119,11 +119,12 @@ class AddedAssets(unittest.TestCase):
 
     def test_added_mesh_preview_uses_its_local_package_without_blender(self):
         from atelier.handlers import mesh
+        from test_blender_import import FakeMesh
         gr = self.add('mesh')['game_rel']
-        with patch.object(mesh, 'Mesh') as parse, patch.object(mesh, 'export_glb', side_effect=lambda obj, lod, path: Path(path).write_bytes(b'glTF fixture')):
+        with patch.object(mesh, 'Mesh', return_value=FakeMesh()) as parse:
             path = meshreplace.preview(gr)
             parse.assert_called_once_with(A.source_base(gr))
-            self.assertEqual(Path(path).read_bytes(), b'glTF fixture')
+            self.assertTrue(mesh.is_current_preview(path))
             self.assertEqual(meshreplace.preview(gr), path)
             parse.assert_called_once()
 

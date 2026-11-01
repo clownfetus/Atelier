@@ -10,6 +10,11 @@ The app, installers and update checker identify each release by its full number,
   editable on the material. Send to Blender asks for the updated Atelier Live
   Bridge add-on.
 
+- Edited and replaced models keep their shape when the idle animation plays in
+  the 3D preview, including straight after Edit in Blender. Previews now use the
+  same skeleton transforms and numbered bone names as the game's animation
+  decoder, and older previews rebuild automatically.
+
 ## 1.2.2 — 2026-11-12
 
 - Library folders with nothing to list no longer appear at any level, so opening
