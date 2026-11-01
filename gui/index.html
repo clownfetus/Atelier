@@ -831,6 +831,52 @@
   </div>
 </div>
 
+<!-- ── Open a mod: a page on the identity ground (mod-open.js) ── -->
+<div class="overlay at-identity" id="mod-open-overlay">
+  <div class="modal at-modopen" role="dialog" aria-modal="true" aria-labelledby="mod-open-title">
+    <header class="at-modopen-head">
+      <div>
+        <h1 id="mod-open-title" tabindex="-1">Open a mod</h1>
+        <p class="at-modopen-lede" id="mod-open-lede" role="status" aria-live="polite">Choose a cooked mod. Atelier shows what each asset is, where it lives in the game and what it uses, and adds what you can edit to your Mod tray.</p>
+      </div>
+      <button type="button" class="at-btn at-btn--quiet" id="mod-open-close">Close</button>
+    </header>
+    <div class="at-modopen-scroll">
+      <ul class="at-setup-rows at-modopen-rows">
+        <li class="at-setup-row" id="mod-open-file-row" data-state="waiting">
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <span class="at-setup-name">Mod file</span>
+          <div class="at-setup-detail">
+            <span class="at-setup-what" id="mod-open-what">A .pak, .utoc, .ucas or .zip.</span>
+            <span class="at-setup-where" id="mod-open-where"></span>
+            <ul class="at-modopen-problems" id="mod-open-problems"></ul>
+          </div>
+          <button type="button" class="at-btn at-btn--primary" id="mod-open-pick">Choose mod…</button>
+        </li>
+        <li class="at-setup-row is-editing" id="mod-open-password-row" data-state="missing" hidden>
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <label class="at-setup-name" for="mod-open-password">Password</label>
+          <div class="at-setup-detail">
+            <span class="at-setup-what" id="mod-open-password-what">Its author locked this mod. Enter the password they gave you.</span>
+            <div class="at-setup-field" id="mod-open-password-field">
+              <input id="mod-open-password" type="password" autocomplete="off" spellcheck="false">
+              <button type="button" class="at-btn at-btn--primary" id="mod-open-unlock">Open</button>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <div id="mod-open-groups"></div>
+    </div>
+    <footer class="at-modopen-foot" id="mod-open-foot" hidden>
+      <button type="button" class="at-btn at-btn--primary" id="mod-open-add" disabled>Add to Mod tray</button>
+      <button type="button" class="at-btn at-btn--quiet" id="mod-open-save-all">Save all as JSON…</button>
+      <span class="at-modopen-outcome" id="mod-open-outcome" aria-hidden="true"></span>
+      <span class="at-setup-note" id="mod-open-note" role="status" aria-live="polite"></span>
+    </footer>
+  </div>
+</div>
+
+<!-- ── Shader Studio ── -->
 <div class="overlay" id="shader-overlay">
   <div class="modal shader-modal">
     <div class="shader-head">
@@ -989,6 +1035,7 @@
 <script src="/static/mesh-edit.js"></script>
 <script src="/static/s-maps.js"></script>
 <script src="/static/add-asset.js"></script>
+<script src="/static/mod-open.js"></script>
 <script src="/static/tooltips.js"></script>
 <script src="/static/polish.js"></script>
 <script src="/static/import-dialog.js"></script>

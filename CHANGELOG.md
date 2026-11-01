@@ -42,6 +42,11 @@ The app, installers and update checker identify each release by its full number,
   started up unable to read some materials and returned them empty without an
   error, and Atelier kept those empty results. It no longer saves an empty
   material read, and materials saved empty by earlier versions are read again.
+- Menu → Open a mod… reads a cooked mod (.pak, .utoc/.ucas or a .zip of them)
+  and shows what each asset really is, where it lives in the game and what it
+  uses. Its textures and materials can be added to your Mod tray as edits of
+  the game assets they replace; everything else can be saved as JSON. A mod
+  its author locked asks for the password first.
 
 ## 1.1.4
 

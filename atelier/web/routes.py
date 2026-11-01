@@ -3297,6 +3297,70 @@ def _repatch_payload(body):
             shutil.rmtree(work, ignore_errors=True)
         _build_lock.release()
 
+# ── open a mod ────────────────────────────────────────────────────────────────
+
+@app.post("/api/mod_open/pick")
+def api_mod_open_pick():
+    """Native picker for a cooked mod to read. Reports whether it is password-locked."""
+    try:
+        path = hostos.pick_file("Open a mod", ("*.pak", "*.utoc", "*.ucas", "*.zip"))
+        locked = False
+        if path:
+            from atelier.handlers import modlock
+            locked = modlock.is_locked(path)
+        return {"ok": True, "path": path, "locked": locked}
+    except Exception as e:
+        return {"ok": False, "path": "", "error": str(e)}
+
+
+@app.post("/api/mod_open/read")
+def api_mod_open_read():
+    """Read a picked mod into the assets it contains. body: {path, unlock}."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    path = (body.get("path") or "").strip()
+    def work(job):
+        result = mod_open.read_mod(path, body.get("unlock") or None)
+        if not result.get("ok"):
+            return result
+        return {"ok": True, "mod": mod_open.present(result["manifest"])}
+    if body.get("background"):
+        return _submit_job("mod-read", "Read " + (os.path.basename(path) or "mod"), work)
+    return work(None)
+
+
+@app.post("/api/mod_open/add")
+def api_mod_open_add():
+    """Add chosen assets from a read mod to the Mod tray. body: {key, ids}."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    def work(job):
+        result = mod_open.add_to_tray(body.get("key"), body.get("ids") or [])
+        result["mod_state"] = mod_open.present(mod_open.load(body.get("key")))
+        return result
+    if body.get("background"):
+        return _submit_job("mod-add", "Add mod assets", work)
+    return work(None)
+
+
+@app.post("/api/mod_open/save_json")
+def api_mod_open_save_json():
+    """Save a read mod's JSON (all assets, or body.ids) into a folder the user picks."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    try:
+        manifest = mod_open.load(body.get("key"))
+        dest = hostos.pick_folder(title="Choose where to save the JSON")
+        if not dest:
+            return {"ok": False, "cancelled": True}
+        ids = body.get("ids")
+        result = mod_open.save_json(manifest["key"], dest, ids if isinstance(ids, list) else None)
+        hostos.reveal(result["path"])
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/api/open_export_folder")
 def api_open_export_folder():
     """Open the app's export folder (assets/exported), selecting a specific pak when given."""
