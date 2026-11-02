@@ -79,7 +79,7 @@ def run_workspace_checks(context, url, report, checks):
     recolour_saves = []
     blue = BytesIO(); Image.new('RGB', (16, 16), (32, 80, 255)).save(blue, 'PNG')
     page.route('**/api/texture_recolour?*', lambda route: route.fulfill(json={
-        'ok': True, 'recipe': {k: recolour_saves[-1][k] for k in ('colour', 'mode', 'strength')} if recolour_saves else None,
+        'ok': True, 'recipe': {k: recolour_saves[-1][k] for k in ('colour', 'mode', 'strength', 'curve')} if recolour_saves else None,
         'edited': bool(recolour_saves), 'hand_edited': False, 'hdr': False, 'token': 'tok-tex'}))
     page.route('**/api/texture_recolour/preview', lambda route: route.fulfill(body=blue.getvalue(), content_type='image/png'))
     def recolour_save(route):
@@ -171,20 +171,57 @@ def run_workspace_checks(context, url, report, checks):
         section.locator('.vp-hex').fill('#2050ff')
         section.locator('.vp-hex').press('Tab')
         page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent.startsWith("Preview only")')
-        page.locator('.vp-recolour').screenshot(path=str(report / 'recolour-panel.png'), animations='disabled')
-        page.locator('.vp-recolour .vp-recolour-apply').click()
+        section = page.locator('.vp-recolour')
+        assert section.locator('.vp-recolour-caption svg').count() == 4
+        for button in ('.vp-recolour-apply', '.vp-recolour-cancel', '.vp-curve-preset'):
+            assert section.locator(f'{button} svg').first.is_visible(), button
+        lighter = [[0, 0], [.5, .65], [1, 1]]
+        with page.expect_request('**/api/texture_recolour/preview') as request:
+            section.locator('.vp-curve-preset[data-preset="Lighter"]').click()
+        assert request.value.post_data_json['curve'] == lighter
+        assert section.locator('.vp-curve-preset[data-preset="Lighter"]').get_attribute('aria-pressed') == 'true'
+        assert section.locator('.vp-curve-graph').is_hidden()
+        section.locator('.vp-curve-custom > summary').click()
+        middle = section.locator('.vp-curve-point').nth(1)
+        section.locator('.vp-curve-graph').scroll_into_view_if_needed()
+        box = middle.bounding_box()
+        page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        page.mouse.down(); page.mouse.move(box['x'] + box['width'] / 2, box['y'] - 20, steps=4); page.mouse.up()
+        raised = int(section.locator('.vp-curve-point').nth(1).get_attribute('aria-valuenow'))
+        assert raised > 65 and section.locator('.vp-curve-preset[aria-pressed="true"]').count() == 0
+        section.locator('.vp-curve-point').nth(1).focus()
+        for _ in range(3):
+            page.keyboard.press('ArrowDown')
+        assert int(section.locator('.vp-curve-point').nth(1).get_attribute('aria-valuenow')) == raised - 3
+        page.keyboard.press('Delete')
+        assert section.locator('.vp-curve-point').count() == 2
+        assert section.locator('.vp-curve-reset').is_hidden()
+        section.locator('.vp-curve-preset[data-preset="Lighter"]').click()
+        page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent.startsWith("Preview only")')
+        # A tall window so the whole section fits in the inspector for review.
+        page.set_viewport_size({'width': 1400, 'height': 1900})
+        for theme in ['light', 'dark']:
+            page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
+            for state, open_ in (('', False), ('-curve', True)):
+                section.locator('.vp-curve-custom').evaluate('(e,o)=>{e.open=o}', open_)
+                section.screenshot(path=str(report / f'recolour-panel{state}-{theme}.png'), animations='disabled')
+        page.set_viewport_size({'width': 1400, 'height': 900})
+        page.evaluate('document.documentElement.dataset.theme="light"')
+        section.locator('.vp-recolour-apply').click()
         page.wait_for_selector(f'.workspace-slot[data-game-rel="{texture_rel}"]')
-        assert recolour_saves[-1] == {'game_rel': texture_rel, 'colour': '#2050FF', 'mode': 'color', 'strength': 1, 'replace': False}
+        assert recolour_saves[-1] == {'game_rel': texture_rel, 'colour': '#2050FF', 'mode': 'color', 'strength': 1,
+                                      'curve': lighter, 'replace': False}
         assert not page.evaluate('__workspace.recolouring()')
         page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent==="This recolour is in your mod."')
         assert page.locator('.vp-recolour .vp-hex').input_value() == '#2050FF'
         assert page.locator('.vp-recolour .vp-recolour-restore').is_visible()
+        assert page.locator('.vp-curve-preset[data-preset="Lighter"]').get_attribute('aria-pressed') == 'true'
         page.screenshot(path=str(report / 'workspace-recoloured-1400.png'), animations='disabled')
         page.locator(f'.workspace-slot[data-game-rel="{texture_rel}"] .workspace-restore').click()
         page.wait_for_selector('#atelier-confirm.active')
         page.locator('#atelier-confirm-ok').click()
         page.wait_for_function('!document.querySelector(".workspace-slot")')
-        checks.append('Recolour texture previews a blend on the model, Cancel puts the map back, and Apply saves it into Your mod')
+        checks.append('Recolour texture previews a blend and a curve on the model, Cancel puts the map back, and Apply saves both into Your mod')
 
         page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-chroma').select_option('1029002')

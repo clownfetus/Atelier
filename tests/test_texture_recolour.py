@@ -35,6 +35,34 @@ class Recipe(unittest.TestCase):
                 R.recipe(*args)
 
 
+class Curve(unittest.TestCase):
+    LIGHTER = [[0, 0], [.5, .65], [1, 1]]
+
+    def test_curve_is_kept_and_a_straight_one_is_left_out(self):
+        self.assertEqual(R.recipe("#2050FF", "color", 1, self.LIGHTER)["curve"], self.LIGHTER)
+        for straight in (None, [[0, 0], [1, 1]], [[0, 0], [.4, .4], [1, 1]]):
+            self.assertNotIn("curve", R.recipe("#2050FF", "color", 1, straight))
+
+    def test_bad_curves_are_refused(self):
+        for curve in ([[0, 0]], [[0, 0], [.5, 1.2], [1, 1]], [[.1, 0], [1, 1]], [[0, 0], [.6, .5], [.4, .5], [1, 1]],
+                      [[0, 0], [1, 1], [1, 1]], "lighter", [[0, 0], [True, 1], [1, 1]], [[i / 9, i / 9] for i in range(10)]):
+            with self.assertRaises(ValueError, msg=curve):
+                R.recipe("#2050FF", "color", 1, curve)
+
+    def test_lookup_passes_through_its_points_without_overshooting(self):
+        lut = R.curve_lut([[0, 0], [.25, .17], [.75, .83], [1, 1]])
+        self.assertAlmostEqual(float(lut[0]), 0, places=5); self.assertAlmostEqual(float(lut[255]), 1, places=5)
+        self.assertTrue(np.all(np.diff(lut) >= 0))
+        np.testing.assert_allclose(R.curve_lut([[0, 0], [1, 1]]), np.linspace(0, 1, 256), atol=1e-6)
+        lifted = R.curve_lut([[0, .08], [.5, .5], [1, .92]])
+        self.assertAlmostEqual(float(lifted[0]), .08, places=5); self.assertAlmostEqual(float(lifted[255]), .92, places=5)
+
+    def test_curve_works_on_its_own_and_keeps_alpha(self):
+        spec = R.recipe("#2050FF", "color", 0, self.LIGHTER)
+        r, g, b, a = pixel(R.bake(image((128, 128, 128), alpha=90), spec))
+        self.assertEqual((r, g, b, a), (166, 166, 166, 90))
+
+
 class Blend(unittest.TestCase):
     def bake(self, rgb, colour, mode, strength=1, alpha=255):
         return pixel(R.bake(image(rgb, alpha), R.recipe(colour, mode, strength)))

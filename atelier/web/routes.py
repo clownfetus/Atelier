@@ -760,7 +760,7 @@ def _recolour_state(gr):
     saved = _project_meta.get_recolour(get_import_root(), gr)
     edited = os.path.isfile(png)
     current = edited and saved and saved.get("stamp") == texture_recolour.stamp(png)
-    return {"recipe": {k: saved[k] for k in ("colour", "mode", "strength")} if current else None,
+    return {"recipe": {k: saved[k] for k in ("colour", "mode", "strength", "curve") if k in saved} if current else None,
             "edited": edited, "hand_edited": bool(edited and not current), "token": token(gr),
             "hdr": bool(hdr_texture.project_info(base))}
 
@@ -781,7 +781,7 @@ def _recolour_request():
     body = request.json or {}
     gr = body.get("game_rel", "")
     _c.validate_game_rel(gr)
-    spec = texture_recolour.recipe(body.get("colour"), body.get("mode"), body.get("strength"))
+    spec = texture_recolour.recipe(body.get("colour"), body.get("mode"), body.get("strength"), body.get("curve"))
     source = _texture_png(gr, original=True)
     if not source or not os.path.isfile(source):
         raise ValueError("The original texture could not be read.")

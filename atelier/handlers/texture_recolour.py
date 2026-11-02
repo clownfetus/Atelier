@@ -10,6 +10,9 @@ project.json with the PNG's stamp; a PNG that no longer matches its recipe was c
 way (painted, replaced) and is not overwritten without the caller saying so.
 
 Blend formulas follow the W3C Compositing and Blending spec, in sRGB, as image editors apply them.
+An optional curve then remaps the result's brightness, the same on every channel, through a monotone
+cubic (Fritsch-Carlson) so it never overshoots between points; gui/viewport-recolour.js draws it
+with the same maths.
 """
 import hashlib
 import os
@@ -19,18 +22,67 @@ import numpy as np
 
 MODES = ("multiply", "screen", "overlay", "soft_light", "hue", "color")
 PREVIEW_SIZE = 1024
+MAX_CURVE_POINTS = 8
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
-def recipe(colour, mode, strength):
-    """A validated recipe, or ValueError naming what is wrong."""
+def recipe(colour, mode, strength, curve=None):
+    """A validated recipe, or ValueError naming what is wrong. A curve that changes nothing is left out."""
     if not isinstance(colour, str) or not _HEX.match(colour):
         raise ValueError("Choose a colour as #RRGGBB")
     if mode not in MODES:
         raise ValueError("Choose a blend mode")
     if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not 0 <= strength <= 1:
         raise ValueError("Strength runs from 0 to 1")
-    return {"colour": colour.upper(), "mode": mode, "strength": round(float(strength), 3)}
+    spec = {"colour": colour.upper(), "mode": mode, "strength": round(float(strength), 3)}
+    points = _curve(curve)
+    if points:
+        spec["curve"] = points
+    return spec
+
+
+def _number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
+
+
+def _curve(points):
+    if points is None:
+        return None
+    if not isinstance(points, list) or not 2 <= len(points) <= MAX_CURVE_POINTS:
+        raise ValueError(f"A curve has 2 to {MAX_CURVE_POINTS} points")
+    if not all(isinstance(p, (list, tuple)) and len(p) == 2 and all(map(_number, p)) for p in points):
+        raise ValueError("Curve points run from 0 to 1")
+    points = [[round(float(x), 3), round(float(y), 3)] for x, y in points]
+    xs = [x for x, _ in points]
+    if xs[0] != 0 or xs[-1] != 1 or any(b <= a for a, b in zip(xs, xs[1:])):
+        raise ValueError("Curve points run left to right from 0 to 1")
+    return None if all(x == y for x, y in points) else points
+
+
+def curve_lut(points):
+    """256 output levels (0..1) for the curve through `points`."""
+    xs = np.array([p[0] for p in points], dtype=np.float64)
+    ys = np.array([p[1] for p in points], dtype=np.float64)
+    n = len(xs)
+    d = np.diff(ys) / np.diff(xs)
+    m = np.empty(n)
+    m[0], m[-1] = d[0], d[-1]
+    m[1:-1] = np.where(d[:-1] * d[1:] > 0, (d[:-1] + d[1:]) / 2, 0)
+    for k in range(n - 1):
+        if d[k] == 0:
+            m[k] = m[k + 1] = 0
+            continue
+        a, b = m[k] / d[k], m[k + 1] / d[k]
+        if a * a + b * b > 9:
+            t = 3 / np.sqrt(a * a + b * b)
+            m[k], m[k + 1] = t * a * d[k], t * b * d[k]
+    x = np.linspace(0, 1, 256)
+    k = np.clip(np.searchsorted(xs, x, side="right") - 1, 0, n - 2)
+    h = xs[k + 1] - xs[k]
+    t = (x - xs[k]) / h
+    y = ((2 * t ** 3 - 3 * t ** 2 + 1) * ys[k] + (t ** 3 - 2 * t ** 2 + t) * h * m[k]
+         + (3 * t ** 2 - 2 * t ** 3) * ys[k + 1] + (t ** 3 - t ** 2) * h * m[k + 1])
+    return np.clip(y, 0, 1).astype(np.float32)
 
 
 def _lum(c):
@@ -90,6 +142,8 @@ def bake(image, spec):
     rgb, alpha = rgba[..., :3], rgba[..., 3:]
     colour = [int(spec["colour"][i:i + 2], 16) / 255 for i in (1, 3, 5)]
     mixed = rgb + (np.clip(blend(rgb, colour, spec["mode"]), 0, 1) - rgb) * spec["strength"]
+    if spec.get("curve"):
+        mixed = curve_lut(spec["curve"])[np.rint(mixed * 255).astype(np.intp)]
     out = np.concatenate([mixed, alpha], axis=-1)
     return Image.fromarray(np.rint(out * 255).astype(np.uint8), "RGBA")
 

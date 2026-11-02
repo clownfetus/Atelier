@@ -178,7 +178,7 @@
 .vp-recolour { border-top:1px solid var(--border); padding:18px 0 6px; margin-top:6px; }
 .vp-recolour h4 { margin:0 0 6px; font-size:var(--studio-text-body); font-weight:600; }
 .vp-recolour .vp-inspector-hint { margin-bottom:14px; }
-.vp-recolour-row { display:grid; grid-template-columns:72px 1fr; align-items:center; gap:10px; margin-bottom:12px; font-size:var(--studio-text-label); color:var(--muted); }
+.vp-recolour-row { display:grid; grid-template-columns:104px 1fr; align-items:center; gap:10px; margin-bottom:12px; font-size:var(--studio-text-label); color:var(--muted); }
 #viewport-box .vp-recolour-row select { min-height:36px; }
 .vp-recolour-strength { display:flex; align-items:center; gap:10px; }
 .vp-recolour-strength input { flex:1; accent-color:var(--acc); }
@@ -188,6 +188,33 @@
 #viewport-box .vp-recolour-apply:disabled { opacity:.5; }
 #viewport-box :is(.vp-recolour-cancel,.vp-recolour-restore) { background:transparent; border:0; color:var(--acc); padding:7px 4px; }
 .vp-recolour-actions [hidden] { display:none; }
+.vp-recolour-caption { display:inline-flex; align-items:center; gap:6px; }
+.vp-recolour-caption svg { flex:none; color:var(--acc); }
+#viewport-box :is(.vp-recolour-apply,.vp-recolour-cancel,.vp-recolour-restore,.vp-curve-reset) { display:inline-flex; align-items:center; gap:6px; }
+.vp-recolour-curve { grid-template-columns:1fr; align-items:start; gap:8px; }
+.vp-curve { display:grid; gap:8px; --vp-curve-edge:color-mix(in srgb, var(--text) 24%, transparent); --vp-curve-faint:color-mix(in srgb, var(--text) 10%, transparent); }
+.vp-curve-presets { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+#viewport-box .vp-curve-preset { display:flex; align-items:center; gap:8px; min-height:36px; padding:6px 10px; border:1px solid var(--vp-curve-edge); border-radius:8px; background:var(--bg2); color:var(--text); font-size:var(--studio-text-detail); text-align:left; }
+#viewport-box .vp-curve-preset:hover { border-color:var(--acc); }
+#viewport-box .vp-curve-preset[aria-pressed="true"] { border-color:var(--acc); box-shadow:inset 0 0 0 1px var(--acc); color:var(--acc); }
+.vp-curve-preset svg { flex:none; fill:none; stroke-linecap:round; }
+.vp-curve-glyph-base { stroke:var(--vp-curve-edge); stroke-width:1.5; }
+.vp-curve-glyph-line { stroke:currentColor; stroke-width:2; }
+.vp-curve-graph { display:block; width:100%; max-width:240px; aspect-ratio:1; margin:4px auto 0; touch-action:none; cursor:crosshair; overflow:visible; }
+.vp-curve-frame { fill:var(--bg2); stroke:var(--vp-curve-edge); stroke-width:1; }
+.vp-curve-grid { fill:none; stroke:var(--vp-curve-faint); stroke-width:.5; }
+.vp-curve-diagonal { fill:none; stroke:var(--muted); stroke-width:.6; stroke-dasharray:2 2; opacity:.6; }
+.vp-curve-line { fill:none; stroke:var(--acc); stroke-width:1.8; pointer-events:none; }
+.vp-curve-point { fill:var(--bg2); stroke:var(--acc); stroke-width:1.6; cursor:grab; }
+.vp-curve-point:hover, .vp-curve-point:focus-visible { fill:var(--acc); outline:none; }
+.vp-curve-scale { display:flex; justify-content:space-between; width:100%; max-width:240px; margin:4px auto 8px; font-size:var(--studio-text-detail); color:var(--muted); }
+.vp-curve-hint { margin:0; font-size:var(--studio-text-detail); color:var(--muted); }
+#viewport-box .vp-curve-reset { justify-self:start; background:transparent; border:0; color:var(--acc); padding:4px 0; }
+.vp-curve-reset[hidden] { display:none; }
+.vp-curve-custom > summary { display:flex; align-items:center; gap:6px; padding:6px 0; color:var(--acc); cursor:pointer; list-style:none; font-size:var(--studio-text-label); }
+.vp-curve-custom > summary::-webkit-details-marker { display:none; }
+.vp-curve-custom > summary svg:last-child { margin-left:auto; transition:transform .15s; }
+.vp-curve-custom[open] > summary svg:last-child { transform:rotate(180deg); }
 .vp-recolour-status { min-height:1.4em; margin:10px 0 0; font-size:var(--studio-text-detail); color:var(--muted); }
 .vp-advanced { border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:6px; }
 #viewport-box .vp-advanced > summary { font-size:var(--studio-text-body); font-weight:500; cursor:pointer; padding:19px 0; display:flex; justify-content:space-between; align-items:center; }
