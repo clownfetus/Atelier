@@ -153,6 +153,8 @@ def main():
                     route.continue_()
             context.route('**/api/**', fixture)
             context.route('https://**', lambda route: route.fulfill(json={}))
+            from browser_startup import enter_library_on_startup
+            enter_library_on_startup(context)
             page.reload()
             page.wait_for_function("window.AtelierViewport && window.atelierProject?.() === 'Frozen smoke'")
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 6")

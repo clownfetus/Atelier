@@ -484,6 +484,8 @@ ConvertTo-Json -InputObject $items -Compress
                 route.fulfill(json=value) if value is not None else route.continue_()
             context.route('**/api/**', fixture)
             context.route('https://**', lambda route: route.fulfill(json={}))
+            from browser_startup import enter_library_on_startup
+            enter_library_on_startup(context)
             # The UI assertions below are the gate; Windows 2022's WebView2 can hold the full
             # load event past 30 s after an upgrade, so don't also wait for every subresource.
             page.reload(wait_until='domcontentloaded')
