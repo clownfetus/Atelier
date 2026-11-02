@@ -175,6 +175,20 @@
 #viewport-box .vp-saved-swatch:hover:not(:disabled) { background:var(--vp-saved-color); outline:2px solid var(--acc); outline-offset:2px; }
 .vp-color-reference code { font-family:inherit; font-size:var(--studio-text-detail); text-transform:uppercase; }
 .vp-color-field.is-modified .vp-color-label::after { content:'Edited'; color:var(--acc); font-size:var(--studio-text-micro); font-weight:400; margin-left:8px; }
+.vp-recolour { border-top:1px solid var(--border); padding:18px 0 6px; margin-top:6px; }
+.vp-recolour h4 { margin:0 0 6px; font-size:var(--studio-text-body); font-weight:600; }
+.vp-recolour .vp-inspector-hint { margin-bottom:14px; }
+.vp-recolour-row { display:grid; grid-template-columns:72px 1fr; align-items:center; gap:10px; margin-bottom:12px; font-size:var(--studio-text-label); color:var(--muted); }
+#viewport-box .vp-recolour-row select { min-height:36px; }
+.vp-recolour-strength { display:flex; align-items:center; gap:10px; }
+.vp-recolour-strength input { flex:1; accent-color:var(--acc); }
+.vp-recolour-strength output { width:40px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); }
+.vp-recolour-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+#viewport-box .vp-recolour-apply { background:var(--acc); border-color:var(--acc); color:var(--bg2); font-weight:600; }
+#viewport-box .vp-recolour-apply:disabled { opacity:.5; }
+#viewport-box :is(.vp-recolour-cancel,.vp-recolour-restore) { background:transparent; border:0; color:var(--acc); padding:7px 4px; }
+.vp-recolour-actions [hidden] { display:none; }
+.vp-recolour-status { min-height:1.4em; margin:10px 0 0; font-size:var(--studio-text-detail); color:var(--muted); }
 .vp-advanced { border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:6px; }
 #viewport-box .vp-advanced > summary { font-size:var(--studio-text-body); font-weight:500; cursor:pointer; padding:19px 0; display:flex; justify-content:space-between; align-items:center; }
 #viewport-box .vp-advanced[open] > summary svg { transform:rotate(90deg); }

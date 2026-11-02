@@ -750,6 +750,88 @@ def api_texture_png():
     response.status = 404
     return b""
 
+# ── texture recolour (bake a colour into a part's base-colour map) ─────────────
+
+def _recolour_state(gr):
+    """What the recolour panel needs to know about one texture in the active project."""
+    from atelier.handlers import texture_recolour, hdr_texture
+    base = _import_base(gr)
+    png = base + ".png"
+    saved = _project_meta.get_recolour(get_import_root(), gr)
+    edited = os.path.isfile(png)
+    current = edited and saved and saved.get("stamp") == texture_recolour.stamp(png)
+    return {"recipe": {k: saved[k] for k in ("colour", "mode", "strength")} if current else None,
+            "edited": edited, "hand_edited": bool(edited and not current), "token": token(gr),
+            "hdr": bool(hdr_texture.project_info(base))}
+
+
+@app.get("/api/texture_recolour")
+def api_texture_recolour_state():
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    try:
+        _c.validate_game_rel(gr)
+        return json.dumps({"ok": True, "game_rel": gr, **_recolour_state(gr)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+def _recolour_request():
+    from atelier.handlers import texture_recolour
+    body = request.json or {}
+    gr = body.get("game_rel", "")
+    _c.validate_game_rel(gr)
+    spec = texture_recolour.recipe(body.get("colour"), body.get("mode"), body.get("strength"))
+    source = _texture_png(gr, original=True)
+    if not source or not os.path.isfile(source):
+        raise ValueError("The original texture could not be read.")
+    return gr, spec, source, body
+
+
+@app.post("/api/texture_recolour/preview")
+def api_texture_recolour_preview():
+    from atelier.handlers import texture_recolour
+    try:
+        gr, spec, source, _ = _recolour_request()
+        path = texture_recolour.preview(source, spec, os.path.join(CACHE_3DVIEW, "recolour"))
+    except Exception as e:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+    response.set_header("Cache-Control", "no-store")
+    return static_file(os.path.basename(path), root=os.path.dirname(path), mimetype="image/png")
+
+
+@app.post("/api/texture_recolour")
+def api_texture_recolour_save():
+    from atelier.handlers import texture_recolour
+    response.content_type = "application/json"
+    try:
+        gr, spec, source, body = _recolour_request()
+        state = _recolour_state(gr)
+        if state["hdr"]:
+            raise ValueError("HDR textures can't be recoloured here.")
+        if state["hand_edited"] and body.get("replace") is not True:
+            return json.dumps({"ok": False, "needs_replace": True,
+                               "error": "This texture has other edits. Recolouring replaces them."})
+        cb = ensure_work_base(gr)
+        if not cb or not os.path.exists(cb + ".uasset"):
+            raise ValueError("The game texture could not be extracted, so it can't ship in a mod.")
+        target = _import_base(gr) + ".png"
+        stamp = texture_recolour.save(source, target, spec)
+        _project_meta.set_recolour(get_import_root(), gr, {**spec, "stamp": stamp})
+        thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+        try:
+            if os.path.exists(thumb): os.remove(thumb)
+        except OSError:
+            pass
+        items = _imported_items(gr)
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr, "ver": _tex_version(gr),
+                           "imported": items[0] if items else None})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
 @app.get('/api/eye_texture')
 @app.post('/api/eye_preview')
 def api_eye_texture():

@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Recolour texture: select a part that doesn't dye and blend a colour into its texture with Colour, Hue, Multiply, Screen, Overlay or Soft light at any strength. The model previews it as you go, Cancel preview puts the part back, and Apply recolour saves an ordinary edited texture into Your mod, so it ships, compares and restores like any other texture edit. Adjusting a recolour starts again from the game's texture instead of stacking, and replacing a texture you edited another way asks first.
+
 - Your mod sits under the model in the workspace. Each saved edit shows its colour before and after, and Restore puts it back to the game's original with Undo, the same as deleting it from the Mod tray. Review & install opens the usual export review without leaving the workspace.
 
 - Atelier opens on Projects. Open a project into its workspace, return to its last costume, or start a recolour by choosing a hero and costume. The model sits in the page, with Projects and the full Library always reachable. Colour changes still use the existing Save changes button.

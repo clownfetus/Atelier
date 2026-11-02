@@ -97,6 +97,8 @@ def load(project_dir):
         "deselected":      [s for s in (d.get("deselected") or []) if isinstance(s, str)],
         "asset_opts":      {k: v for k, v in (d.get("asset_opts") or {}).items()
                             if isinstance(k, str) and isinstance(v, dict)},
+        "recolours":       {k: v for k, v in (d.get("recolours") or {}).items()
+                            if isinstance(k, str) and isinstance(v, dict)},
     }
 
 
@@ -223,6 +225,7 @@ def forget_asset(project_dir, game_rel, selection=False):
     with _lock:
         d = load(project_dir)
         changed = d["asset_opts"].pop(game_rel, None) is not None or (selection and game_rel in d['deselected'])
+        changed = d["recolours"].pop(game_rel, None) is not None or changed
         if selection:
             d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
         if changed:
@@ -237,7 +240,28 @@ def restore_asset(project_dir, game_rel, saved):
             d['asset_opts'][game_rel] = saved['opts']
         else:
             d['asset_opts'].pop(game_rel, None)
+        if saved.get('recolour'):
+            d['recolours'][game_rel] = saved['recolour']
+        else:
+            d['recolours'].pop(game_rel, None)
         d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
         if saved.get('deselected'):
             d['deselected'].append(game_rel)
+        _write(project_dir, d)
+
+
+def get_recolour(project_dir, game_rel):
+    """The blend recipe a texture was last baked with, and the PNG stamp it produced (or None)."""
+    saved = load(project_dir)["recolours"].get(game_rel)
+    return dict(saved) if saved else None
+
+
+def set_recolour(project_dir, game_rel, recolour):
+    """Record (or with None, drop) the recipe behind a texture's recolour bake."""
+    with _lock:
+        d = load(project_dir)
+        if recolour:
+            d["recolours"][game_rel] = recolour
+        elif d["recolours"].pop(game_rel, None) is None:
+            return
         _write(project_dir, d)

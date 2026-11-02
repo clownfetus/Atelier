@@ -25,6 +25,7 @@ HOOK = r"""
     stats(){renderers.add(renderer);return {renderers:renderers.size,textures:renderer.info.memory.textures,
       geometries:renderer.info.memory.geometries,cached:texCache.size,disposed,animating:!!raf};},
     state:()=>({skin:meshSkin,materialSet:chromaSkin,project:viewportProject}),
+    recolouring:()=>recolour.previewing(),
   };
 })();
 """
@@ -51,7 +52,8 @@ def run_workspace_checks(context, url, report, checks):
         route.fulfill(json={'ok': True, 'materials': {'MI_Body': {
             'game_rel': f'Characters/1029/{skin}/Materials/MI_Body',
             'colors': [{'name': 'BaseTint', 'rgba': [.6, .6, .9, 1]}], 'scalars': [],
-            'textures': {'BaseColor': f'Characters/1029/{skin}/Textures/T_Body'}, 'tex_ver': {}}}})
+            'textures': {'BaseColor': f'Characters/1029/{skin}/Textures/T_Body'},
+            'texture_roles': {'basecolor': f'Characters/1029/{skin}/Textures/T_Body'}, 'tex_ver': {}}}})
     page.route('**/api/skin_materials', materials)
     def texture(route):
         texture_reads.append(route.request.url)
@@ -73,6 +75,18 @@ def run_workspace_checks(context, url, report, checks):
     page.route('**/api/material_changes?*', lambda route: route.fulfill(json={'ok': True, 'changes': [
         {'name': 'BaseTint', 'before': '#9999e6', 'after': '#9644cc'}, {'name': 'Trim', 'before': None, 'after': '#ffffff'}]}))
     page.route('**/api/delete_imported', delete)
+    texture_rel = 'Characters/1029/1029001/Textures/T_Body'
+    recolour_saves = []
+    blue = BytesIO(); Image.new('RGB', (16, 16), (32, 80, 255)).save(blue, 'PNG')
+    page.route('**/api/texture_recolour?*', lambda route: route.fulfill(json={
+        'ok': True, 'recipe': {k: recolour_saves[-1][k] for k in ('colour', 'mode', 'strength')} if recolour_saves else None,
+        'edited': bool(recolour_saves), 'hand_edited': False, 'hdr': False, 'token': 'tok-tex'}))
+    page.route('**/api/texture_recolour/preview', lambda route: route.fulfill(body=blue.getvalue(), content_type='image/png'))
+    def recolour_save(route):
+        recolour_saves.append(route.request.post_data_json)
+        imported.append({**body_edit, 'token': 'tok-tex', 'game_rel': texture_rel, 'name': 'T_Body', 'file_type': 'texture'})
+        route.fulfill(json={'ok': True, 'token': 'tok-tex', 'game_rel': texture_rel, 'ver': '2'})
+    page.route('**/api/texture_recolour', recolour_save)
     try:
         page.goto(url)
         page.wait_for_selector('#proj-lead button')
@@ -142,6 +156,35 @@ def run_workspace_checks(context, url, report, checks):
         assert page.locator('#workspace-review').is_disabled()
         assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
         checks.append('Your mod dock lists saved edits with before and after colours, opens the export review, and Restore reloads the costume')
+
+        if not page.locator('.vp-recolour').count():
+            page.locator('.vp-material-select').first.click()
+        section = page.locator('.vp-recolour')
+        section.wait_for()
+        assert section.locator('.vp-recolour-apply').is_disabled()
+        section.locator('select').select_option('multiply')
+        page.wait_for_function('__workspace.recolouring()')
+        section.locator('.vp-recolour-cancel').click()
+        page.wait_for_function('!__workspace.recolouring()')
+        assert page.locator('.vp-recolour .vp-recolour-apply').is_disabled()
+        section = page.locator('.vp-recolour')
+        section.locator('.vp-hex').fill('#2050ff')
+        section.locator('.vp-hex').press('Tab')
+        page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent.startsWith("Preview only")')
+        page.locator('.vp-recolour').screenshot(path=str(report / 'recolour-panel.png'), animations='disabled')
+        page.locator('.vp-recolour .vp-recolour-apply').click()
+        page.wait_for_selector(f'.workspace-slot[data-game-rel="{texture_rel}"]')
+        assert recolour_saves[-1] == {'game_rel': texture_rel, 'colour': '#2050FF', 'mode': 'color', 'strength': 1, 'replace': False}
+        assert not page.evaluate('__workspace.recolouring()')
+        page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent==="This recolour is in your mod."')
+        assert page.locator('.vp-recolour .vp-hex').input_value() == '#2050FF'
+        assert page.locator('.vp-recolour .vp-recolour-restore').is_visible()
+        page.screenshot(path=str(report / 'workspace-recoloured-1400.png'), animations='disabled')
+        page.locator(f'.workspace-slot[data-game-rel="{texture_rel}"] .workspace-restore').click()
+        page.wait_for_selector('#atelier-confirm.active')
+        page.locator('#atelier-confirm-ok').click()
+        page.wait_for_function('!document.querySelector(".workspace-slot")')
+        checks.append('Recolour texture previews a blend on the model, Cancel puts the map back, and Apply saves it into Your mod')
 
         page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-chroma').select_option('1029002')

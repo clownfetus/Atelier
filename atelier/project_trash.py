@@ -63,6 +63,7 @@ def remove(root, game_rels):
             continue
         assets.append({'game_rel': gr, 'files': [p.relative_to(root).as_posix() for p in files],
                        'project_meta': {'opts': metadata['asset_opts'].get(gr, {}),
+                                        'recolour': metadata['recolours'].get(gr),
                                         'deselected': gr in metadata['deselected']},
                        'cache': dict(asset_cache.get(gr) or {})})
     if not assets:

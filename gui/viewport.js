@@ -12,6 +12,7 @@ import { createViewportFloor } from './viewport-effects.js';
 import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, applyEmissive } from './viewport-materials.js';
 import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials, weaponSide } from './viewport-attachments.js';
 import { createAssemblyView } from './assembly.js';
+import { createViewportRecolour } from './viewport-recolour.js';
 import { verifiedBinding } from './assembly-data.js';
 
 const $ = id => document.getElementById(id);
@@ -44,6 +45,14 @@ let meshSlots = [];
 let heroId = '';
 let selectedMaterial = null;
 let assembly, workspaceMode = 'inspect', connectedEditorPending = false, assemblyRefreshTimer = 0;
+const recolour = createViewportRecolour({
+  materials:name => matsByName[name] || [], baseline:name => baselineMaps.get(name), loader:texLoader,
+  fetch:(url, options) => projectFetch(url, options), retint:name => retint(name), note:(message, kind) => note(message, kind),
+  rebuild:() => buildPanel(), reload:() => reloadMaterials(),
+  // A saved recolour replaces the map on every part that draws this texture.
+  applied:(texture, ver) => Promise.all(Object.entries(matData).filter(([, info]) => info.texture_roles?.basecolor === texture)
+    .map(([name, info]) => { info.tex_ver = {...info.tex_ver, [texture]:ver}; return applyMatTexture(name, texture, 'map', ver); })),
+});
 let preserveAnimationCamera = false;
 try { if (localStorage.getItem('atelier.assembly') === '1') workspaceMode = 'assembly'; } catch (_) {}
 
@@ -1088,6 +1097,7 @@ async function loadMaterialSet(skinId, load, additions=null) {
   const matGen = additions ? materialGeneration : ++materialGeneration;
   if(!additions) {
     inspection?.clearMaterials();
+    recolour.discard();
     clearLiveDyes(); baselineMaps.clear();
     matData = {}; edited = {};
   }
@@ -1333,7 +1343,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   const advancedOpen = editor.querySelector('.vp-advanced')?.open && editor.dataset.material === selectedMaterial;
   editor.replaceChildren(); editor.hidden = !info; $('viewport-material-empty').hidden = !!info;
   editor.dataset.material = selectedMaterial || '';
-  if (!info) return;
+  if (!info) { recolour.discard(); return; }
   const name = selectedMaterial;
   const heading = document.createElement('div'); heading.className = 'vp-editor-title';
   const title = document.createElement('h3'); title.textContent = materialGroup(name);
@@ -1366,6 +1376,8 @@ function buildMaterialInspector(names = Object.keys(matData)) {
     const label = index === info.emiIdx ? 'Glow colour' : index === info.baseIdx ? 'Main colour' : colors[index].name.replace(/\s*-\s*ColorA$/i,' colour');
     editor.append(colorField(name,colors[index],label,true));
   }
+  const recolourSection = recolour.section(name, info);
+  if (recolourSection) editor.append(recolourSection);
   const advanced = document.createElement('details'); advanced.className = 'vp-advanced'; advanced.open = !!advancedOpen;
   const summary = document.createElement('summary'); summary.innerHTML = 'Advanced parameters <i data-lucide="chevron-right" size="18"></i>'; advanced.append(summary);
   const hint = document.createElement('p'); hint.textContent = 'Exact shader parameters. Some colours are saved for the game and may not have a faithful live preview.'; advanced.append(hint);

@@ -54,3 +54,20 @@ Deviations from `WORKSPACE_PLAN.md` Phase 1:
 - **Selection stays in the Library's Mod tray.** The dock shows edits left out of the mod at reduced opacity, says how many go in, and points to the tray to change that.
 
 Validation: `tests.test_project_workspace` (8 tests, 4 new for colour changes) passes, and `tests/browser_smoke.py --workspace-only` passes all six grouped checks, including a new one for the dock's listing, swatches, export review and Restore. Screenshots: `_work/dock-review/` (`workspace-with-dock-1400.png`, `dock-light.png`, `dock-dark.png`). Not exercised: real game materials, the native original read's latency, and installing into the game.
+
+## Recolour texture (Phase 3, first step)
+
+| Work | Main files | Result |
+| --- | --- | --- |
+| Blend and bake | `atelier/handlers/texture_recolour.py` | Colour, Hue, Multiply, Screen, Overlay and Soft light per the W3C compositing formulas in sRGB, mixed by strength, alpha kept. Always baked from the game's original texture, so a new recolour replaces the last rather than stacking. Previews are 1024 px and cached by source and recipe. |
+| Saved recipe | `atelier/project_meta.py` (`recolours`), `atelier/project_trash.py` | The recipe is stored with the PNG's mtime and size. A PNG that no longer matches was edited another way, and Apply asks before replacing it. Delete forgets the recipe; Undo brings it back. |
+| Routes | `atelier/web/routes.py` | `GET /api/texture_recolour` (state), `POST /api/texture_recolour/preview` (PNG, not stored), `POST /api/texture_recolour` (saves to the edited PNG; refuses HDR textures). |
+| Inspector | `gui/viewport-recolour.js`, `gui/viewport.js`, `gui/viewport.css` | A Recolour texture section for parts with a base-colour map that don't dye, aren't eyes and have no replaced texture. Changes preview on the model after 180 ms. The preview is never a pending edit: choosing another part or Cancel preview puts the map back. Apply reloads every material sharing the texture and refreshes Your mod. |
+
+Deviations from `WORKSPACE_PLAN.md` Phase 3:
+
+- **Whole part only.** No area limit or colour-range limit yet; both arrive with box select's mask.
+- **Inside the existing inspector.** The Colour and Texture tabs come later; the section sits under the colour fields.
+- **No edit history.** Restore is the dock's (or the section's) Restore original texture, with the project trash's Undo.
+
+Validation: `tests.test_texture_recolour` (12 tests: recipe checks, blend identities, luminance kept by Hue and Colour, red-and-white to blue-and-white, preview size and cache, full-size save, recipe round trip through delete and Undo) passes. `tests/browser_smoke.py --workspace-only` passes seven grouped checks, including a new one for preview, Cancel, Apply and the slot in Your mod. Screenshots: `_work/recolour-review/` (`recolour-panel.png`, `workspace-recoloured-1400.png`). Not exercised: real game textures, preview latency on 4K maps, exporting a recoloured PNG, and how it looks in game.
