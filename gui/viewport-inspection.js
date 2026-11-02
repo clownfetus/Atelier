@@ -577,6 +577,10 @@ export function createViewportInspection(api) {
   }
   function reset() {
     related = null;
+    if ($('viewport-overlay').classList.contains('mounted')) {
+      wireframe = false;
+      $('viewport-wireframe').setAttribute('aria-pressed', 'false');
+    }
     if (uvOpen) openUV();
     setShowcase(false);showcaseColors=null;
     setLoading(false);

@@ -93,18 +93,83 @@ def run_workspace_checks(context, url, report, checks):
         route.fulfill(json={'ok': True, 'token': 'tok-tex', 'game_rel': texture_rel, 'ver': '2'})
     page.route('**/api/texture_recolour', recolour_save)
     try:
+        page.add_init_script("localStorage.setItem('atelier.editorMode','workspace')")
         page.goto(url)
-        page.wait_for_selector('#proj-lead button')
+        page.wait_for_selector('#grid-area .card')
         page.wait_for_function('window.__workspace && window.AtelierWorkspace')
-        assert page.locator('#proj-lead h3').inner_text() == 'Smoke A'
-        page.screenshot(path=str(report / 'projects-light.png'), animations='disabled')
-        page.locator('#proj-lead button').click()
+        assert page.evaluate('atelierProject()') == 'Smoke A'
+        assert page.locator('#page-library').inner_text() == 'Library'
+        assert page.locator('#page-workspace').inner_text() == 'Workspace'
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#workspace').is_hidden()
+        assert page.locator('#searchbar').is_visible()
+        page.screenshot(path=str(report / 'library-startup.png'), animations='disabled')
+        checks.append('Configured startup opens the active project directly in Library, even with a saved Workspace preference')
+        page.locator('#project-chip').click()
+        page.wait_for_selector('#project-overlay.active .proj-card')
+        assert page.locator('.proj-modal').get_attribute('role') == 'dialog'
+        assert page.locator('.proj-modal').get_attribute('aria-modal') == 'true'
+        real_projects = page.evaluate('_projAll')
+        folder_projects = real_projects + [
+            {'name': name, 'asset_count': i * 3, 'mtime': 1762041600 + i, 'last_opened_at': 0}
+            for i, name in enumerate([
+                'Magik — Midnight blue', 'Luna Snow — Soft lilac', 'Scarlet Witch — Crimson',
+                'A very long project name that should wrap without covering the folder or its actions',
+                'Storm — Silver lining', 'Venom — Black & white', 'Mantis — Spring green',
+                'Rocket — Racing stripes', 'Groot — Autumn', 'Psylocke — Violet'], 1)]
+        page.evaluate('projects=>_renderProjectPicker(projects)', folder_projects)
+        for width, height in [(1400, 900), (900, 600)]:
+            page.set_viewport_size({'width': width, 'height': height})
+            for theme in ['light', 'dark']:
+                page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
+                page.locator('#proj-grid').evaluate('el=>el.scrollTop=0')
+                page.screenshot(path=str(report / f'project-picker-{theme}-{width}.png'), animations='disabled')
+                bounds = page.locator('.proj-modal').bounding_box()
+                assert 0 < bounds['x'] and bounds['width'] <= 660
+                assert bounds['y'] >= 0 and bounds['y'] + bounds['height'] <= height
+                assert page.locator('#proj-grid').evaluate('el=>el.scrollWidth<=el.clientWidth+1')
+                assert page.locator('.proj-card').evaluate_all("cards=>cards.every(card=>card.querySelector('.proj-name').title)")
+            page.locator('.proj-card').last.scroll_into_view_if_needed()
+            assert page.locator('.proj-card').last.evaluate('el=>el.getBoundingClientRect().bottom<=innerHeight+1')
+        page.locator('#proj-search').fill('Midnight')
+        assert page.locator('.proj-card').count() == 1
+        page.locator('.proj-card').hover()
+        page.locator('.proj-check input').check()
+        assert page.locator('#proj-selbar').inner_text().startswith('1 selected')
+        page.locator('#proj-search').fill('')
+        page.locator('#proj-view-list').click()
+        assert page.locator('.proj-row').count() == len(folder_projects)
+        assert page.locator('#proj-view-list').get_attribute('aria-pressed') == 'true'
+        page.locator('#proj-view-grid').click()
+        page.evaluate('projects=>_renderProjectPicker(projects)', real_projects)
+        page.set_viewport_size({'width': 1400, 'height': 900})
+        page.evaluate('document.documentElement.dataset.theme="light"')
+        page.keyboard.press('Escape')
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#project-chip').evaluate('el=>el===document.activeElement')
+        page.locator('#project-chip').click()
+        page.locator('#proj-close').click()
+        page.locator('#project-overlay').wait_for(state='hidden')
+        page.locator('#project-chip').click()
+        page.locator('#project-overlay').click(position={'x': 2, 'y': 2})
+        page.locator('#project-overlay').wait_for(state='hidden')
+        checks.append('Compact project picker supports search, selection, grid/list, scrolling and close/Escape/backdrop in both themes')
+        page.locator('#page-workspace').click()
         page.wait_for_selector('.workspace-costume')
         page.locator('.workspace-costume').first.click()
         page.wait_for_selector('#workspace-stage #viewport-overlay.active')
         page.evaluate('__workspace.settled()')
         assert page.locator('#viewport-box').get_attribute('role') == 'region'
         assert page.locator('#viewport-box').get_attribute('aria-modal') is None
+        assert page.locator('#workspace-step-edit').get_attribute('aria-current') == 'step'
+        assert page.locator('#viewport-mat-head h3').inner_text() == 'Choose a part'
+        assert page.locator('#viewport-modes').is_hidden()
+        assert page.locator('#viewport-uv-toggle').is_hidden()
+        page.locator('#viewport-model-menu > summary').click()
+        assert page.locator('#viewport-blender-send').is_hidden()
+        assert page.locator('#viewport-mesh-edit').is_hidden()
+        page.locator('#viewport-model-menu > summary').click()
         assert page.locator('#page-library').is_visible()
         assert page.locator('#workspace-dock').is_visible()
         assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
@@ -145,14 +210,14 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('.vp-hex').first.fill('#9644CC')
         page.locator('.vp-hex').first.press('Tab')
         assert page.locator('#viewport-mat-save').is_enabled()
-        page.locator('#page-projects').click()
+        page.locator('#project-chip').click()
         page.wait_for_selector('#atelier-confirm.active')
         page.locator('#atelier-confirm-cancel').click()
         assert page.locator('#workspace').is_visible()
         assert page.locator('#viewport-mat-save').is_enabled()
         page.locator('#viewport-mat-save').click()
         page.wait_for_function('!AtelierViewport.hasPendingEdits()')
-        checks.append('Projects opens an embedded workspace; explicit Save and cancelled navigation preserve colour drafts')
+        checks.append('Workspace guides costume and part selection, hides technical model tools, and preserves colour drafts when navigation is cancelled')
 
         slot = page.locator('#workspace-dock-list .workspace-slot')
         slot.wait_for()
@@ -257,9 +322,10 @@ def run_workspace_checks(context, url, report, checks):
         page.evaluate('__workspace.settled()')
         page.locator('#viewport-model-menu > summary').click()
 
-        page.locator('#page-projects').click()
-        page.wait_for_selector('#proj-lead button')
-        page.locator('#proj-lead button').click()
+        page.locator('#project-chip').click()
+        page.locator('#proj-grid [data-name="Smoke A"]').click()
+        page.wait_for_function('document.body.dataset.page==="library"')
+        page.locator('#page-workspace').click()
         page.wait_for_selector('#workspace-stage #viewport-overlay.active')
         page.evaluate('__workspace.settled()')
         assert page.evaluate('__workspace.state().skin') == '1029001'
@@ -267,10 +333,33 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('#page-library').click()
         page.wait_for_selector('#grid-area .card')
         assert not page.evaluate('__workspace.stats().animating')
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        page.evaluate("AtelierViewport.open('1029001','Magik / Original costume')")
+        page.wait_for_selector('#viewport-overlay.active')
+        page.evaluate('__workspace.settled()')
+        assert page.locator('#viewport-modes').is_visible()
+        assert page.locator('#viewport-uv-toggle').is_visible()
+        page.locator('#viewport-model-menu > summary').click()
+        assert page.locator('#viewport-blender-send').is_visible()
+        assert page.locator('#viewport-mesh-edit').is_visible()
+        page.locator('#viewport-model-menu > summary').click()
+        page.locator('#viewport-settings-menu > summary').click()
+        page.locator('#viewport-wireframe').click()
+        assert page.locator('#viewport-wireframe').get_attribute('aria-pressed') == 'true'
+        page.locator('#viewport-settings-menu > summary').click()
+        page.locator('#viewport-assembly').click()
+        page.locator('#viewport-close').click()
+        page.locator('#project-chip').click()
+        page.locator('#proj-grid [data-name="Smoke A"]').click()
+        page.wait_for_function('document.body.dataset.page==="library"')
+        assert page.locator('#workspace').is_hidden()
         page.locator('#page-workspace').click()
         page.wait_for_selector('#workspace-stage #viewport-overlay.active')
         page.evaluate('__workspace.settled()')
-        checks.append('The last costume and colour set reopen in one click; Library remains reachable and hidden stages stop rendering')
+        assert page.locator('#viewport-inspect').get_attribute('aria-pressed') == 'true'
+        assert page.locator('#viewport-wireframe').get_attribute('aria-pressed') == 'false'
+        assert page.evaluate('localStorage.getItem("atelier.assembly")') == '1'
+        checks.append('Projects open in Library with full model tools; Workspace restores the saved costume and material set without losing the Library assembly preference')
 
         async_switch = r"""async start=>{
           const samples=[];
@@ -291,32 +380,94 @@ def run_workspace_checks(context, url, report, checks):
         (report / 'skin-switch-stress.json').write_text(json.dumps({'warmup': warm, 'measured': measured, 'texture_reads': before, 'additional_reads': len(texture_reads)-before}, indent=2))
         checks.append('Twenty measured skin switches after cache warmup keep one renderer, stable live textures/geometries and zero repeated texture downloads')
 
-        page.locator('#page-projects').click()
-        page.wait_for_selector('#project-overlay.active #proj-lead button')
+        page.locator('#project-chip').click()
         page.locator('#proj-grid [data-name="Smoke B"]').click()
+        page.wait_for_function('document.body.dataset.page==="library" && atelierProject()==="Smoke B"')
+        assert page.locator('#workspace').is_hidden()
+        page.locator('#page-workspace').click()
         page.wait_for_selector('.workspace-costume')
         assert page.locator('#workspace-stage').is_hidden()
-        page.locator('#page-projects').click()
-        page.wait_for_function('document.querySelector("#project-overlay.active #proj-lead h3")?.textContent === "Smoke B"')
-        assert page.locator('#proj-lead h3').inner_text() == 'Smoke B'
         page.reload()
-        page.wait_for_selector('#proj-lead button')
-        assert page.locator('#proj-lead h3').inner_text() == 'Smoke B'
-        checks.append('Opening recency survives reload, and an empty project asks for a costume instead of guessing')
+        page.wait_for_selector('#grid-area .card')
+        assert page.evaluate('atelierProject()') == 'Smoke B'
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        checks.append('Switching projects and reloading return to Library; Workspace still asks for a costume when the project has none')
+
+        page.route('**/api/projects', lambda route: route.fulfill(json={'ok': True, 'active': 'Missing project', 'projects': real_projects}))
+        page.reload()
+        page.wait_for_selector('#project-overlay.active .proj-card')
+        assert page.locator('#proj-close').is_hidden()
+        page.keyboard.press('Escape')
+        assert page.locator('#project-overlay').is_visible()
+        page.locator('#proj-grid [data-name="Smoke A"]').click()
+        page.wait_for_selector('#grid-area .card')
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        page.unroute('**/api/projects')
+        checks.append('A missing active project offers the picker and opens a valid selection in Library')
 
         page.route('**/api/projects', lambda route: route.fulfill(json={'ok': True, 'active': '', 'projects': []}))
         page.reload()
-        page.wait_for_selector('#proj-lead button')
-        assert page.locator('#proj-lead button').inner_text().strip() == 'Start a recolour'
+        page.wait_for_selector('#project-overlay.active .proj-empty')
+        assert 'No projects yet' in page.locator('.proj-empty').inner_text()
+        assert page.locator('#proj-close').is_hidden()
         page.screenshot(path=str(report / 'projects-empty.png'), animations='disabled')
-        page.locator('#proj-lead button').click()
-        page.wait_for_selector('.workspace-costume')
-        page.screenshot(path=str(report / 'choose-costume.png'), animations='disabled')
+        page.keyboard.press('Escape')
+        assert page.locator('#project-overlay').is_visible()
         page.unroute('**/api/projects')
+        page.locator('#proj-new-btn').click()
+        page.locator('#proj-name-input').fill('Library first project')
+        page.locator('#proj-name-ok').click()
+        page.wait_for_selector('#grid-area .card')
+        page.wait_for_function('atelierProject()==="Library first project"')
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        page.locator('#page-workspace').click()
+        page.wait_for_selector('.workspace-costume')
+        assert page.locator('#workspace-step-choose').get_attribute('aria-current') == 'step'
+        page.screenshot(path=str(report / 'choose-costume.png'), animations='disabled')
         page.locator('.workspace-costume').first.click()
         page.wait_for_selector('#workspace-stage #viewport-overlay.active')
-        assert page.evaluate('atelierProject()') == 'Magik — Original costume'
-        checks.append('Start a recolour chooses a costume before creating its automatically named project')
+        assert page.evaluate('atelierProject()') == 'Library first project'
+        checks.append('First-project creation opens Library immediately; Workspace remains available for costume editing')
         assert not errors, errors
+    finally:
+        page.close()
+    run_project_picker_checks(context, url, report, checks)
+
+
+def run_project_picker_checks(context, url, report, checks):
+    """Closing the restored picker must never expose a deleted active project."""
+    page = context.new_page()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    try:
+        page.goto(url)
+        page.wait_for_selector('#grid-area .card')
+        page.locator('#menu-btn').click()
+        page.get_by_text('My projects', exact=True).click()
+        page.locator('#proj-new-btn').click()
+        page.locator('#proj-name-input').fill('Picker deletion fixture')
+        page.locator('#proj-name-ok').click()
+        page.wait_for_function('atelierProject()==="Picker deletion fixture" && !_projectOpening')
+        page.locator('#project-overlay').wait_for(state='hidden')
+        page.locator('#project-chip').click()
+        card = page.locator('#proj-grid [data-name="Picker deletion fixture"]')
+        card.hover()
+        card.locator('[data-action=delete]').click()
+        page.locator('#proj-delete-ok').click()
+        card.wait_for(state='detached')
+        page.wait_for_function('!atelierProject()')
+        assert page.locator('#proj-close').is_hidden()
+        page.locator('.proj-modal').focus()
+        page.keyboard.press('Escape')
+        assert page.locator('#project-overlay').is_visible()
+        page.locator('#proj-grid [data-name="Smoke A"]').click()
+        page.wait_for_function('atelierProject()==="Smoke A" && !_projectOpening')
+        page.locator('#project-overlay').wait_for(state='hidden')
+        assert page.locator('#page-library').get_attribute('aria-current') == 'page'
+        assert not errors, errors
+        checks.append('Menu opens the project picker; deleting the active project requires a valid selection before returning to Library')
     finally:
         page.close()

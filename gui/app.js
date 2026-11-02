@@ -3060,23 +3060,40 @@ function toggleSelectAll() {
 }
 
 // Persist the OFF set to the active project. Debounced: toggling several assets in a row is one
-// write, and a failure is deliberately silent -- losing a checkbox state must never interrupt
-// what the user is actually doing.
-const _saveSelTimers = new Map();
+// write. Keep pending/in-flight snapshots until saved so rename and duplicate can flush them.
+const _selectionSaves = new Map();
 function saveSelection() {
   const project = _activeProjectName;
-  clearTimeout(_saveSelTimers.get(project));
+  const previous = _selectionSaves.get(project);
+  clearTimeout(previous?.timer);
   const deselected = Object.values(sidebarData)
     .filter(i => !i.selected && i.game_rel)
     .map(i => i.game_rel);
-  _saveSelTimers.set(project, setTimeout(() => {
-    _saveSelTimers.delete(project);
-    api("/api/project/asset_selection", {
+  const pending = {deselected, before:previous?.promise || previous?.before, promise:null, timer:null};
+  _selectionSaves.set(project, pending);
+  pending.timer = setTimeout(() => _persistSelection(project, pending).catch(() => {}), 400);
+}
+
+function _persistSelection(project, pending) {
+  if (pending.promise) return pending.promise;
+  clearTimeout(pending.timer); pending.timer=null;
+  pending.promise = Promise.resolve(pending.before).catch(() => {}).then(async () => {
+    const result = await api("/api/project/asset_selection", {
       project,
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deselected }),
-    }).catch(() => {});
-  }, 400));
+      body: JSON.stringify({deselected:pending.deselected}),
+    });
+    if (!result.ok) throw Error('Could not save your build selection. Try again before changing the project.');
+  });
+  pending.promise.then(() => {
+    if (_selectionSaves.get(project)===pending) _selectionSaves.delete(project);
+  }, () => { pending.promise=null; });
+  return pending.promise;
+}
+
+function _flushSelection(project) {
+  const pending = _selectionSaves.get(project);
+  return pending ? _persistSelection(project, pending) : Promise.resolve();
 }
 
 function _modsTopFolderName() {
@@ -3399,7 +3416,11 @@ document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 window.AtelierModTray = {
   items: () => Object.values(sidebarData).map(item => ({...item})),
   // Resolves true once the edit has left the project (the user can still cancel the confirm).
-  restore: async token => { await clearImported(token); return !sidebarData[token]; },
+  restore: async token => {
+    const project = _activeProjectName;
+    await clearImported(token);
+    return project===_activeProjectName && !sidebarData[token];
+  },
   review: doInstallMod,
   preview: item => handlerFor(item.file_type).preview
     ? `/api/preview?token=${encodeURIComponent(item.token)}&game_rel=${encodeURIComponent(item.game_rel)}` : '',
@@ -3572,7 +3593,7 @@ async function _fetchUsmapPath() {
 
 // The launch check shares the setup overlay with Settings. In Settings the old cover and its
 // configuration discovery run as before; at launch the check is the setup page itself, and it
-// only appears when /api/setup_status is slow, so a quick check goes straight to Projects.
+// only appears when /api/setup_status is slow, so a quick check goes straight to the Library.
 const SETUP_COVER_DELAY = 400;
 let _setupLoadingFinish = null, _setupLoadingRevision = 0, _setupCoverTimer = 0;
 function _setupPresent(call) {
@@ -3608,7 +3629,7 @@ function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevisi
 }
 
 // Resolves false when the setup is configured (launch continues; the page, if it showed, stays
-// until _finishLaunchCheck hands it to Projects) and true when the first-run page needs the person.
+// until _finishLaunchCheck hands it to the Library) and true when the first-run page needs the person.
 // A failed check waits on the page for Try again, or for Settings to close.
 let _setupRetry = null;
 async function checkSetup() {
@@ -3660,14 +3681,9 @@ async function checkSetup() {
   }
 }
 
-// Launch continues past a configured check: Projects (or the library) takes over from the page.
+// Launch continues past a configured check into the Library or the initial project picker.
 function _finishLaunchCheck() {
-  const projects = document.getElementById("project-overlay").classList.contains("active");
-  if (projects) {
-    const status = document.getElementById("proj-status");
-    if (!status.textContent) { status.dataset.kind = ""; status.textContent = "Setup checked"; }
-  }
-  _setupPresent(setup => setup?.handover(projects));
+  _setupPresent(setup => setup?.handover());
   if (!_pathsMode) document.getElementById("setup-overlay").classList.remove("active");
 }
 
@@ -4629,6 +4645,8 @@ async function checkUpdate(pending = api("/api/update_check")) {
 // ── project picker ────────────────────────────────────────────────────────────
 let _projPickerResolve  = null;
 let _projNameCtx        = null;
+let _projNameBusy       = false;
+let _projNameOpener     = null;
 let _projDeleteNames    = null;   // the names the delete confirmation is holding
 let _projExportNames    = null;   // …and the export one
 
@@ -4646,8 +4664,7 @@ async function checkProject(onReady = () => {}) {
   const res = await api("/api/projects");
   if (res.active && res.projects.find(p => p.name === res.active)) {
     _applyActiveProject(res.active);
-    _renderProjectPicker(res.projects || []);
-    document.getElementById("project-overlay").classList.add("active");
+    await window.AtelierWorkspace?.library({closed:true});
     onReady();
     return;
   }
@@ -4655,6 +4672,7 @@ async function checkProject(onReady = () => {}) {
     _projPickerResolve = resolve;
     _renderProjectPicker(res.projects || []);
     document.getElementById("project-overlay").classList.add("active");
+    document.getElementById("proj-new-btn").focus();
     onReady();
   });
 }
@@ -4739,12 +4757,16 @@ function _projRename(proj) {
   _showProjNameModal({
     title: "Rename Project", value: proj.name, okLabel: "Rename",
     action: async newName => {
+      await _flushSelection(proj.name);
+      const filename = document.getElementById('mod-name-input').value;
+      const customFilename = _activeProjectName===proj.name && filename && filename!==proj.name;
       const r = await api("/api/project/rename", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ old_name: proj.name, new_name: newName }),
       });
-      if (r.ok) await _projRefresh();
-      else toast(`Rename failed: ${r.error}`, "warning");
+      if (!r.ok) throw Error(r.error || 'Could not rename the project.');
+      await _projRefresh();
+      if (customFilename && _activeProjectName===newName) document.getElementById('mod-name-input').value=filename;
     },
   });
 }
@@ -4753,12 +4775,13 @@ function _projDuplicate(proj) {
   _showProjNameModal({
     title: "Duplicate Project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
     action: async newName => {
+      await _flushSelection(proj.name);
       const r = await api("/api/project/duplicate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: proj.name, new_name: newName }),
       });
-      if (r.ok) await _projRefresh();
-      else toast(`Duplicate failed: ${r.error}`, "warning");
+      if (!r.ok) throw Error(r.error || 'Could not duplicate the project.');
+      await _projRefresh();
     },
   });
 }
@@ -4767,40 +4790,14 @@ function _projDuplicate(proj) {
 async function _projRefresh() {
   const res = await api("/api/projects");
   _projAll = res.projects || [];
+  if (res.active !== undefined && res.active !== _activeProjectName) _applyActiveProject(res.active || '');
+  document.getElementById('page-library').disabled=!_activeProjectName;
   [..._projSel].forEach(n => { if (!_projAll.some(p => p.name === n)) _projSel.delete(n); });
   _renderProjectPicker(_projAll, true);
   return res;
 }
 
-// A project is a portfolio: the card is the folder itself, drawn in the identity's moves. Solid
-// ink on a flat foot (a back panel with its tab), the newest edited texture inside as a loose sheet,
-// unaltered, then the front panel behind a paper halo carrying the project's name. A punched
-// clasp cuts right through, beside the Smalt drop (the project is yours). project-ink.js forms
-// and dissolves these parts; its liquid outlines follow the same geometry.
-let _projFolderSeq = 0;
-const _PROJ_PORTFOLIO = {
-  back:  "M6 236V16Q6 6 16 6H80Q88 6 92 12L100 24H184Q194 24 194 34V236Z",
-  halo:  "M3 236V109Q3 97 16 97H184Q197 97 197 109V236Z",
-  front: "M6 236V110Q6 100 16 100H184Q194 100 194 110V236Z",
-};
-function _projPortfolioSvg(thumbUrl) {
-  const id = `pp-${++_projFolderSeq}`, f = _PROJ_PORTFOLIO;
-  const image = thumbUrl ? `<image class="pp-image" href="${_esc(thumbUrl)}" x="22" y="36" width="156" height="100"
-      preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}-sheet)" onerror="this.remove()"/>` : "";
-  return `<svg class="proj-portfolio" viewBox="0 0 200 240" aria-hidden="true" focusable="false">
-    <defs><clipPath id="${id}-sheet"><rect x="22" y="36" width="156" height="100" rx="4"/></clipPath></defs>
-    <path class="pp-back" d="${f.back}"/><g class="pp-live" data-slot="back"></g>
-    <g class="pp-sheet-slide"><g class="pp-sheet" transform="rotate(-2.5 100 86)">
-      <rect class="pp-sheet-ground" x="22" y="36" width="156" height="100" rx="4"/>${image}</g></g>
-    <path class="pp-halo" d="${f.halo}"/><path class="pp-front" d="${f.front}"/><g class="pp-live" data-slot="front"></g>
-    <circle class="pp-punch" cx="170" cy="124" r="9.5"/>
-    <circle class="pp-drop-halo" cx="146" cy="127" r="8"/><circle class="pp-drop" cx="146" cy="127" r="6"/>
-    <g class="pp-live" data-slot="top"></g>
-  </svg>`;
-}
-
-// The picker reports its own results in its header, in the identity's voice, not as a toast.
-// The project name is set as text, never markup.
+// Project actions report their results in the picker. Names are always text.
 function _projStatus(name, rest = "", kind = "") {
   const el = document.getElementById("proj-status");
   if (!el) return;
@@ -4815,6 +4812,19 @@ function _projStatus(name, rest = "", kind = "") {
 
 function _renderProjectPicker(projects, keepQuery) {
   const grid = document.getElementById("proj-grid");
+  const focused = document.activeElement, focusedCard = focused?.closest('#proj-grid [data-name]');
+  const focusedName = focusedCard?.dataset.name, scrollTop = grid.scrollTop;
+  const focusedControl = focused?.matches('.proj-check input') ? '.proj-check input'
+    : focused?.dataset.action ? `[data-action="${focused.dataset.action}"]` : null;
+  const restoreFocus = () => {
+    if (!keepQuery || !focusedCard) return;
+    const card = [...grid.children].find(node => node.dataset.name === focusedName);
+    const next = card && (focusedControl ? card.querySelector(focusedControl) : card);
+    // Focusing the card first reveals its keyboard actions, including an unticked checkbox.
+    card?.focus({preventScroll:true});
+    (next || document.getElementById('proj-search')).focus({preventScroll:true});
+    grid.scrollTop = scrollTop;
+  };
   if (!keepQuery) {
     _projStatus("");
     _projAll = projects;
@@ -4826,17 +4836,8 @@ function _renderProjectPicker(projects, keepQuery) {
   grid.innerHTML = "";
   const q = _projSearchValue();
   const all = _projAll.length ? _projAll : projects;
-  document.getElementById('proj-library-btn').hidden=!_activeProjectName;
+  document.getElementById('proj-close').hidden=!all.some(project=>project.name===_activeProjectName);
   document.getElementById('proj-toolbar').style.display=all.length?'':'none';
-  const lead = document.getElementById("proj-lead");
-  lead.hidden = !!q;
-  const recent = [...all].sort((a,b) => (b.last_opened_at || 0) - (a.last_opened_at || 0))[0];
-  const latest = recent?.last_opened_at ? recent : all.find(p=>p.name===_activeProjectName) || recent;
-  lead.innerHTML = latest
-    ? `<div class="proj-lead-copy"><span class="proj-eyebrow">Pick up where you left off</span><h3>${_esc(latest.name)}</h3><p>${latest.asset_count} saved asset${latest.asset_count===1?'':'s'} · Your next idea starts here.</p><button class="at-btn at-btn--primary" type="button">Open workspace <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg(latest.asset_count ? `/api/project/thumb?project=${encodeURIComponent(latest.name)}&_t=${latest.mtime}` : '')}</div>`
-    : `<div class="proj-lead-copy"><span class="proj-eyebrow">Your first creation</span><h3>A favourite skin.<br>A little more you.</h3><p>Choose a hero, pick a costume, and make it your own.</p><button class="at-btn at-btn--primary" type="button">Start a recolour <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg('')}</div>`;
-  lead.querySelector('button').onclick = () => latest ? _selectProject(latest.name) : window.AtelierWorkspace ? window.AtelierWorkspace.start() : document.getElementById('proj-new-btn').click();
-  lucide.createIcons({nodes:[lead]});
   projects = q ? all.filter(p => (p.name || "").toLowerCase().includes(q)) : all;
   const search = document.getElementById("proj-search-row");
   if (search) search.style.display = all.length > 1 ? "" : "none";   // pointless with one project
@@ -4844,20 +4845,21 @@ function _renderProjectPicker(projects, keepQuery) {
   if (count) { count.textContent = String(all.length); count.hidden = !all.length; }
   for (const v of ["grid", "list"]) {
     const btn = document.getElementById("proj-view-" + v);
-    if (btn) btn.classList.toggle("on", _projView === v);
+    if (btn) { btn.classList.toggle("on", _projView === v); btn.setAttribute('aria-pressed',String(_projView === v)); }
   }
   // a project filtered out of view is out of the selection too
   const visible = new Set(projects.map(p => p.name));
   [..._projSel].forEach(n => { if (!visible.has(n)) _projSel.delete(n); });
   _renderProjSelBar();
   grid.className = _projView === "list" ? "proj-list-mode" : "proj-grid-mode";
-  if (!projects.length && q) {
-    grid.innerHTML = `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`;
+  if (!projects.length) {
+    grid.innerHTML = q
+      ? `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`
+      : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
     lucide.createIcons({ nodes: [grid] });
-    window.AtelierPolish?.empty(grid.firstElementChild, 'No project matches your search', 'Try another project name.');
+    restoreFocus();
     return;
   }
-  if (!projects.length) return;
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
@@ -4867,8 +4869,11 @@ function _renderProjectPicker(projects, keepQuery) {
     card.setAttribute("aria-label", `${proj.name}, ${proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`}`);
     const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
-    const check = `<div class="proj-check" title="Select"><input type="checkbox" ${sel ? "checked" : ""}></div>`;
-    const thumb = `<div class="proj-thumb">${_projPortfolioSvg(proj.asset_count ? thumbUrl : "")}</div>`;
+    const check = `<div class="proj-check" title="Select"><input type="checkbox" aria-label="Select ${_esc(proj.name)}" ${sel ? "checked" : ""}></div>`;
+    const thumb = `<div class="proj-thumb">
+      ${proj.asset_count ? `<img src="${thumbUrl}" alt="" loading="lazy" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">` : ''}
+      <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon"></i>
+    </div>`;
     const actions = `
       <div class="proj-actions">
         <button class="proj-action-btn" title="Rename" data-action="rename"><i data-lucide="pencil" size="13"></i></button>
@@ -4923,6 +4928,7 @@ function _renderProjectPicker(projects, keepQuery) {
     grid.appendChild(card);
   });
   lucide.createIcons({ nodes: [grid] });
+  restoreFocus();
 }
 
 function _renderProjSelBar() {
@@ -5023,17 +5029,26 @@ function _applyActiveProject(name) {
 }
 
 async function openProjectPicker() {
-  if (document.getElementById('viewport-overlay').classList.contains('mounted')) {
-    if (await window.AtelierViewport.close({navigate:false})===false)return;
-    window.AtelierViewport.mount(null);
-    document.getElementById('workspace').hidden=true;
-    document.getElementById('body').hidden=false;
+  if (document.body.dataset.page==='workspace') {
+    if (await window.AtelierWorkspace.library()===false)return;
   }
   const res = await api("/api/projects");
   _renderProjectPicker(res.projects || []);
   document.getElementById("project-overlay").classList.add("active");
+  document.querySelector('#project-overlay .proj-modal').focus();
 }
 document.getElementById("project-chip").addEventListener("click", openProjectPicker);
+function closeProjectPicker() {
+  if (!_activeProjectName || !_projAll.some(project => project.name === _activeProjectName)) return;
+  document.getElementById("project-overlay").classList.remove("active");
+  document.getElementById("project-chip").focus();
+}
+document.getElementById("proj-close").addEventListener("click", closeProjectPicker);
+window.AtelierJobDialogs.trap(document.getElementById('project-overlay'),
+  document.querySelector('#project-overlay .proj-modal'), closeProjectPicker);
+document.getElementById('project-overlay').addEventListener('click', event => {
+  if (event.target.id==='project-overlay') closeProjectPicker();
+});
 
 let _projectOpening=false;
 async function _selectProject(name, workspace=null) {
@@ -5057,6 +5072,7 @@ async function _selectProject(name, workspace=null) {
   suppressChangeToastUntil = Date.now() + 2500;
   toast(`Project: ${name}`, "success");
   _applyActiveProject(name);
+  if (!workspace) await window.AtelierWorkspace?.library({closed:true});
   document.getElementById("project-overlay").classList.remove("active");
   if (_projPickerResolve) {
     const resolve = _projPickerResolve;
@@ -5078,14 +5094,19 @@ async function _selectProject(name, workspace=null) {
   if(workspace) {
     window.AtelierWorkspace.present();
     await window.AtelierViewport.open(workspace.skin_id,workspace.title);
-  } else await window.AtelierWorkspace?.resume();
+  }
   } finally {_projectOpening=false;}
 }
 
 function _showProjNameModal(ctx) {
+  if (_projNameBusy) return;
   _projNameCtx = ctx;
+  const opener = document.activeElement;
+  _projNameOpener = {node:opener, name:opener?.closest('#proj-grid [data-name]')?.dataset.name};
   document.getElementById("proj-name-title").textContent = ctx.title;
   document.getElementById("proj-name-input").value = ctx.value;
+  document.getElementById('proj-name-error').hidden=true;
+  document.getElementById('proj-name-input').removeAttribute('aria-invalid');
   const okBtn = document.getElementById("proj-name-ok");
   okBtn.innerHTML = `<i data-lucide="check" size="14"></i> ${ctx.okLabel}`;
   lucide.createIcons({ nodes: [okBtn] });
@@ -5104,38 +5125,59 @@ document.getElementById("proj-new-btn").addEventListener("click", () => {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!r.ok) { _projStatus("", `Couldn't create the project: ${r.error}`, "fault"); return; }
-      // The new project joins the list (it opens when you choose it), so it must not be filtered out.
-      const search = document.getElementById("proj-search");
-      if (search && search.value && !name.toLowerCase().includes(search.value.trim().toLowerCase())) search.value = "";
-      await _projRefresh();
-      const card = [...document.querySelectorAll("#proj-grid [data-name]")].find(node => node.dataset.name === name);
-      if (!card) return;
-      card.scrollIntoView({ block: "nearest" });
-      card.focus({ preventScroll: true });
-      card.classList.add("is-new");
-      _projStatus(name, " is ready. Open it to start editing.");
-      try { window.AtelierMotion?.projectInk?.form(card); }
-      catch (_) { /* the folder is already drawn; the ink is optional */ }
+      if (!r.ok) throw Error(r.error || 'Could not create the project.');
+      await _selectProject(name);
     },
   });
 });
 
-document.getElementById("proj-name-cancel").addEventListener("click", () => {
+function _closeProjNameModal(savedName=null) {
+  if (_projNameBusy) return;
   document.getElementById("proj-name-overlay").classList.remove("active");
   _projNameCtx = null;
-});
+  if (document.getElementById('project-overlay').classList.contains('active')) {
+    const name = savedName || _projNameOpener?.name;
+    const card = [...document.querySelectorAll('#proj-grid [data-name]')].find(node => node.dataset.name===name);
+    const opener = _projNameOpener?.node;
+    (card || (opener?.isConnected ? opener : document.getElementById('proj-new-btn'))).focus();
+  }
+  _projNameOpener=null;
+}
+document.getElementById("proj-name-cancel").addEventListener("click", () => _closeProjNameModal());
+window.AtelierJobDialogs.trap(document.getElementById('proj-name-overlay'),
+  document.querySelector('#proj-name-overlay .modal'), () => _closeProjNameModal());
 
 document.getElementById("proj-name-ok").addEventListener("click", async () => {
-  const name = document.getElementById("proj-name-input").value.trim();
-  if (!name) return;
-  document.getElementById("proj-name-overlay").classList.remove("active");
-  if (_projNameCtx) { const ctx = _projNameCtx; _projNameCtx = null; await ctx.action(name); }
+  const ctx = _projNameCtx;
+  if (!ctx || _projNameBusy) return;
+  const input = document.getElementById('proj-name-input'), error = document.getElementById('proj-name-error');
+  const name = input.value.trim();
+  if (!name) {
+    error.textContent='Enter a project name.'; error.hidden=false;
+    input.setAttribute('aria-invalid','true'); input.focus(); return;
+  }
+  _projNameBusy=true;
+  const ok = document.getElementById('proj-name-ok'), cancel = document.getElementById('proj-name-cancel');
+  ok.disabled=cancel.disabled=true; input.readOnly=true; error.hidden=true; input.removeAttribute('aria-invalid');
+  document.querySelector('#proj-name-overlay .modal').setAttribute('aria-busy','true');
+  ok.textContent=({Create:'Creating…',Rename:'Renaming…',Duplicate:'Duplicating…'})[ctx.okLabel] || 'Saving…';
+  let saved=false;
+  try { await ctx.action(name); saved=true; }
+  catch (reason) {
+    error.textContent=reason.message || 'Could not save the project. Try again.'; error.hidden=false;
+  } finally {
+    _projNameBusy=false;
+    ok.disabled=cancel.disabled=false; input.readOnly=false;
+    document.querySelector('#proj-name-overlay .modal').removeAttribute('aria-busy');
+    ok.innerHTML=`<i data-lucide="check" size="14"></i> ${ctx.okLabel}`;
+    lucide.createIcons({nodes:[ok]});
+    if (saved) _closeProjNameModal(name);
+    else input.focus();
+  }
 });
 
 document.getElementById("proj-name-input").addEventListener("keydown", e => {
-  if (e.key === "Enter")  document.getElementById("proj-name-ok").click();
-  if (e.key === "Escape") document.getElementById("proj-name-cancel").click();
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("proj-name-ok").click(); }
 });
 
 document.getElementById("proj-delete-cancel").addEventListener("click", () => {
@@ -5147,8 +5189,6 @@ document.getElementById("proj-delete-ok").addEventListener("click", async () => 
   document.getElementById("proj-delete-overlay").classList.remove("active");
   const names = _projDeleteNames; _projDeleteNames = null;
   if (!names || !names.length) return;
-  // Where every card stood before the delete, so the ones that go can leave as ink.
-  const before = window.AtelierMotion?.projectInk?.snapshot(document.getElementById("proj-grid"));
   const failed = [], deleted = [];
   for (const name of names) {
     const r = await api("/api/project/delete", {
@@ -5156,18 +5196,20 @@ document.getElementById("proj-delete-ok").addEventListener("click", async () => 
       body: JSON.stringify({ name }),
     });
     if (!r.ok) failed.push(`${name} (${r.error})`);
-    else { _projSel.delete(name); deleted.push(name); }
+    else {
+      const pending = _selectionSaves.get(name);
+      clearTimeout(pending?.timer); _selectionSaves.delete(name);
+      _projSel.delete(name); deleted.push(name);
+    }
   }
   const done = deleted.length;
   const res = await _projRefresh();
   if (failed.length) _projStatus("", `Couldn't delete ${failed.join("; ")}`, "fault");
   else if (done === 1) _projStatus(deleted[0], " was deleted.");
   else if (done) _projStatus("", `Deleted ${done} projects.`);
-  if (deleted.length) {
-    try { window.AtelierMotion?.projectInk?.dissolve(before, deleted); }
-    catch (_) { /* the list is already up to date; the ink is optional */ }
-  }
   if (!res.active || !(res.projects || []).find(p => p.name === res.active)) {
+    _applyActiveProject('');
+    document.getElementById('page-library').disabled=true;
     document.getElementById("project-overlay").classList.add("active");
   }
 });
@@ -5189,7 +5231,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
   _ctxShow(
     { preventDefault: () => {}, stopPropagation: () => e.stopPropagation(), clientX: rect.left, clientY: rect.bottom + 4 },
     [
-      { icon: "folder-open", label: "Back to Projects", action: openProjectPicker },
+      { icon: "folder-open", label: "My projects", action: openProjectPicker },
       { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
       { icon: "package-open", label: "Open Export Folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },

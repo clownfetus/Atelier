@@ -84,6 +84,35 @@ NAMEPLATE_PATHS = [
     ("UI/Textures/Show/PlayerheadFrame", "Cropped icon — the round frame on your portrait"),
 ]
 
+_HOME_CONTENT = None
+_HOME_CONTENT_LOCK = threading.Lock()
+
+
+def _home_content():
+    """Browsable roots from the loaded index, cached until that index is replaced."""
+    global _HOME_CONTENT
+    index = ensure_index()
+    with _HOME_CONTENT_LOCK:
+        if _HOME_CONTENT is not None and _HOME_CONTENT[0] is index:
+            return _HOME_CONTENT[1:]
+        roots, nameplates, text = set(), False, False
+        plate_prefixes = tuple(path.casefold() + '/' for path, _ in NAMEPLATE_PATHS)
+        for game_rel, _container, _mount in index:
+            if not game_rel.lower().endswith('.uasset'):
+                continue
+            path, _, name = game_rel.rpartition('/')
+            lower = game_rel.casefold()
+            if '/data/stringtable/' in '/' + lower:
+                text = True
+            if _classify_file(name, path) not in LISTED_FILE_TYPES:
+                continue
+            if path:
+                roots.add(game_rel.split('/', 1)[0].casefold())
+            if lower.startswith(plate_prefixes):
+                nameplates = True
+        _HOME_CONTENT = (index, roots, nameplates, text)
+        return roots, nameplates, text
+
 def _parse_char_md_text(text):
     """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
     chars = {}
@@ -393,12 +422,20 @@ def _browse_text(path):
 def _browse_game_dispatch(path):
     """Unified browse entry point. path is relative to Marvel/Content/Marvel/."""
     path = (path or "").strip("/")
-    if not path:                         # root: pin synthetic "Maps" + "Text" sections (not indexed)
-        res = _browse_pak_level("")
-        res.insert(0, {"type": "folder", "name": "Nameplates",
-                       "label": "Nameplates (all three paths)", "rel_path": "Nameplates"})
-        res.insert(0, {"type": "folder", "name": "Text", "label": "Text (StringTables)", "rel_path": "Text"})
-        res.insert(0, {"type": "folder", "name": "Maps", "label": "Maps", "rel_path": "Maps"})
+    if not path:
+        roots, nameplates, text = _home_content()
+        synthetic = {'maps', 'text', 'nameplates'}
+        res = [item for item in _browse_pak_level('') if item['type'] != 'folder'
+               or (item['name'].casefold() in roots and item['name'].casefold() not in synthetic)]
+        if nameplates:
+            res.insert(0, {"type": "folder", "name": "Nameplates",
+                           "label": "Nameplates (all three paths)", "rel_path": "Nameplates"})
+        if text:
+            res.insert(0, {"type": "folder", "name": "Text", "label": "Text (StringTables)", "rel_path": "Text"})
+        # Map levels use .umap packages, which are enumerated separately from the asset index.
+        from atelier.handlers.world import list_maps
+        if list_maps():
+            res.insert(0, {"type": "folder", "name": "Maps", "label": "Maps", "rel_path": "Maps"})
         return res
     if path.lower() == "nameplates":
         return _browse_nameplates()

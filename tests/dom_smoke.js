@@ -64,6 +64,6 @@ sandbox.cancelAnimationFrame = clearTimeout;
 vm.createContext(sandbox);
 // Same shared-service order as index.html. Motion/SVG rendering is covered by the
 // real-browser suite; this harness exercises the existing editor render assertions.
-for (const filename of ["folder-icons.js", "library-pins.js", "thumbnails.js", "library-tools.js", "export-review.js", "app.js"])
+for (const filename of ["folder-icons.js", "library-pins.js", "thumbnails.js", "library-tools.js", "job-tools.js", "export-review.js", "app.js"])
   vm.runInContext(fs.readFileSync(path.join(ROOT, "gui", filename), "utf8"), sandbox, { filename: "gui/" + filename });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "dom_checks.js"), "utf8"), sandbox, { filename: "tests/dom_checks.js" });

@@ -330,27 +330,7 @@
 }
 .at-count[hidden] { display: none; }
 
-/* ── Projects: the first screen ─────────────────────────────────────────── */
-/* The picker is a page, not a dialog over a scrim: the ground is the identity's surface. */
-#project-overlay.at-identity { background: var(--surface); color: var(--text); }
-#project-overlay .proj-modal.at-projects {
-  width: calc(100% - 2 * var(--space-6));
-  max-width: 1120px;
-  height: calc(100vh - 2 * var(--space-5));
-  max-height: 900px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--text);
-  font: var(--type-body);
-  -webkit-font-smoothing: antialiased;
-}
+/* ── Launch and setup identity ─────────────────────────────────────────── */
 .at-proj-hero {
   display: flex;
   align-items: flex-end;
@@ -364,7 +344,7 @@
 .at-proj-lockup {
   display: inline-flex;
   align-items: baseline;
-  font: 780 clamp(52px, 7.4vw, 96px)/1 var(--font-display);
+  font: 780 clamp(40px, 5vw, 64px)/1 var(--font-display);
   font-stretch: var(--stretch-display);
   letter-spacing: -0.03em;
   color: var(--text);
@@ -395,231 +375,15 @@
 }
 .at-projects .at-proj-tagline {
   margin: 0 0 0.35em;
-  max-width: 15ch;
-  font: 700 clamp(22px, 2.4vw, 32px)/1.05 var(--font-display);
+  max-width: 24ch;
+  font: 600 18px/1.3 var(--font-display);
   font-stretch: var(--stretch-display);
   letter-spacing: -0.02em;
   color: var(--text-muted);
   text-wrap: balance;
 }
-.at-projects .proj-modal-header { padding: var(--space-5) 0 var(--space-4); border: 0; gap: var(--space-4); }
-.at-projects .proj-modal-header h2 {
-  display: flex; align-items: center; gap: var(--space-3);
-  margin: 0;
-  font: var(--type-headline);
-  font-stretch: 84%;
-  letter-spacing: -0.02em;
-  color: var(--text);
-}
-.at-projects .proj-modal-header .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
-.at-projects #proj-toolbar { padding: 0 0 var(--space-4); gap: var(--space-3); }
-.at-projects #proj-lead { display:flex; align-items:center; justify-content:space-between; gap:32px; min-height:230px; padding:28px 40px; margin:0 0 24px; background:var(--surface-panel); border:1px solid var(--line); border-radius:16px; flex-shrink:0; }
-.at-projects #proj-lead[hidden] { display:none; }
-.proj-lead-copy { min-width:0; }
-.proj-eyebrow { color:var(--drop-text); font:600 13px/1.4 var(--font-ui); }
-.proj-lead-copy h3 { font:650 clamp(28px,3vw,40px)/1.08 var(--font-display); letter-spacing:-.025em; margin:10px 0; overflow-wrap:anywhere; }
-.proj-lead-copy p { margin:0 0 20px; color:var(--text-muted); font:var(--type-body); }
-.proj-lead-copy .at-btn { min-height:40px; }
-.proj-lead-art { width:220px; flex:0 0 220px; }
-.proj-lead-art svg { width:100%; display:block; }
-@media(max-height:800px) { .at-projects #proj-lead { min-height:185px; padding:20px 32px; } .proj-lead-art { width:160px; flex-basis:160px; } }
-.at-projects #proj-selbar {
-  margin: 0 0 var(--space-3);
-  padding: 6px 6px 6px 14px;
-  border: 0;
-  border-radius: var(--radius-card);
-  background: var(--drop-wash);
-  color: var(--drop-text);
-  font: 600 13px/1 var(--font-ui);
-}
-.at-projects #proj-selbar button {
-  height: 28px; padding: 0 12px; border: 0; border-radius: var(--radius-control);
-  background: var(--surface); color: var(--text); font: 600 12.5px/1 var(--font-ui);
-}
-.at-projects #proj-selbar button:hover { background: var(--surface-panel); border: 0; }
-.at-projects #proj-selbar button.danger, .at-projects #proj-selbar button.danger:hover { color: var(--fault); background: var(--surface); border: 0; }
-
-.at-projects #proj-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
-  align-content: start;
-  gap: var(--space-4);
-  padding: 8px 8px var(--space-5);
-  margin: -8px -8px 0;
-  overflow-y: auto;
-}
-/* Deleted cards' ghosts are placed in the grid, beneath its live cards. */
-.at-projects #proj-grid { position: relative; isolation: isolate; }
-.at-projects #proj-grid.proj-list-mode { display: flex; flex-direction: column; gap: var(--space-2); }
-
-/* A project is a portfolio: the card is the folder itself (app.js draws it). Ink mass on a flat
-   foot, the latest artwork inside as a loose sheet, the name printed on the front panel. Paper
-   portfolios are Lamp Black; on ink they reverse to Gesso, as the mark does. */
-.at-projects {
-  --folder: var(--text);
-  --folder-hover: color-mix(in srgb, var(--text) 86%, var(--surface) 14%);
-  --on-folder: var(--surface);
-  --folder-meta: var(--at-ash);
-  --sheet-ground: var(--at-chalk);
-}
-:root[data-theme="dark"] .at-projects { --folder-meta: var(--at-graphite); --sheet-ground: var(--at-slate); }
-.at-projects #proj-grid:not(.proj-list-mode) { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--space-5) var(--space-4); }
-.at-projects .proj-card {
-  position: relative;
-  width: auto;
-  display: block;
-  aspect-ratio: 200 / 240;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-card);
-  background: transparent;
-  overflow: visible;
-}
-.at-projects .proj-card:hover { border: 0; background: transparent; --folder: var(--folder-hover); }
-.at-projects .proj-card.sel { border: 0; background: transparent; --folder: var(--drop); --on-folder: var(--on-drop); --folder-meta: var(--drop-wash); }
-.at-projects .proj-row.sel { border: 0; background: var(--drop-wash); }
-.at-projects .proj-card:focus-visible, .at-projects .proj-row:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop);
-}
-.at-projects .proj-card .proj-thumb {
-  position: absolute; inset: 0;
-  aspect-ratio: auto; width: auto; height: auto;
-  background: transparent; border-radius: 0; overflow: visible;
-}
-.proj-portfolio { display: block; width: 100%; height: 100%; overflow: visible; }
-.proj-portfolio .pp-back, .proj-portfolio .pp-front { fill: var(--folder, var(--text)); transition: fill 120ms var(--ease-settle); }
-.proj-portfolio .pp-halo, .proj-portfolio .pp-punch, .proj-portfolio .pp-drop-halo { fill: var(--surface); }
-.proj-portfolio .pp-sheet-ground { fill: var(--sheet-ground, var(--at-chalk)); }
-.proj-portfolio .pp-drop { fill: var(--drop); }
-.at-projects .proj-card.sel .pp-drop { fill: var(--on-drop); }
-.proj-portfolio .pp-image { image-rendering: pixelated; }
-/* While ink forms or dissolves a portfolio, its live outlines stand in for the drawn parts. */
-.proj-portfolio.is-live .pp-back, .proj-portfolio.is-live .pp-halo, .proj-portfolio.is-live .pp-front,
-.proj-portfolio.is-live .pp-punch, .proj-portfolio.is-live .pp-drop-halo, .proj-portfolio.is-live .pp-drop { visibility: hidden; }
-.at-projects .proj-card.is-forming .proj-body, .at-projects .proj-card.is-forming .proj-actions,
-.at-projects .proj-card.is-forming .proj-check { visibility: hidden; }
-.at-projects .proj-card.is-printing .proj-body { opacity: 0.5; }
-/* The name is printed on the front panel (y 100 to 236 of 240). */
-.at-projects .proj-card .proj-body {
-  position: absolute; left: 9%; right: 9%; bottom: 7%;
-  display: grid; gap: 4px; padding: 0; min-width: 0;
-  color: var(--on-folder);
-}
-.at-projects .proj-card .proj-name {
-  font: 760 clamp(18px, 1.7vw, 22px)/1.05 var(--font-display);
-  font-stretch: 84%; letter-spacing: -0.01em;
-  color: var(--on-folder);
-}
-.at-projects .proj-card .proj-meta { margin: 0; font: 400 11px/14px var(--font-mono); color: var(--folder-meta); }
-.at-projects .proj-row .proj-body { display: grid; gap: 3px; padding: 0 4px; min-width: 0; }
-.at-projects .proj-row .proj-name { font: 600 14px/1.3 var(--font-ui); color: var(--text); }
-.at-projects .proj-row .proj-meta { margin: 0; font: 400 11px/16px var(--font-mono); color: var(--text-muted); }
-.at-projects .proj-actions {
-  top: 12%; right: 6%; gap: 2px; padding: 3px;
-  border: 0; border-radius: var(--radius-control);
-  background: var(--surface);
-}
-.at-projects .proj-action-btn { width: 26px; height: 26px; border-radius: var(--radius-control); color: var(--text-muted); }
-.at-projects .proj-action-btn:hover { background: var(--surface-panel); color: var(--text); }
-.at-projects .proj-action-btn.danger:hover { background: var(--surface-panel); color: var(--fault); }
-/* Selection is the drop: a Smalt circle behind a paper halo on the portfolio's tab. */
-.at-projects .proj-card .proj-check {
-  top: -6px; left: -6px;
-  width: 20px; height: 20px;
-  border: 0; border-radius: 50%;
-  background: var(--surface-sunk);
-  box-shadow: 0 0 0 var(--halo) var(--surface);
-}
-.at-projects .proj-card.sel .proj-check, .at-projects .proj-row.sel .proj-check { background: var(--drop); }
-.at-projects .proj-check input {
-  -webkit-appearance: none; appearance: none;
-  width: 100%; height: 100%; margin: 0;
-  border-radius: 50%; background: transparent; cursor: pointer;
-}
-.at-projects .proj-row .proj-check { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-sunk); }
-.at-projects .proj-row {
-  gap: var(--space-3);
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--surface-panel);
-}
-.at-projects .proj-row:hover { border: 0; background: color-mix(in srgb, var(--surface-panel) 88%, var(--text) 12%); }
-.at-projects .proj-row .proj-thumb { width: 30px; height: 36px; aspect-ratio: auto; border-radius: 0; background: transparent; overflow: visible; flex-shrink: 0; }
-.at-projects .proj-row .proj-col-assets { width: 76px; }
-.at-projects .proj-row .proj-col-time { width: 84px; }
-.at-projects .proj-empty:not(.at-proj-empty) { color: var(--text-muted); grid-column: 1 / -1; }
-
-/* The empty first screen: one drop of ink standing on the baseline. */
-.at-projects .at-proj-empty {
-  grid-column: 1 / -1;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: var(--space-4);
-  min-height: 100%;
-  padding: var(--space-6) var(--space-4);
-  text-align: center;
-  color: var(--text);
-}
-.at-projects .k-project-drop {
-  position: relative;
-  display: block;
-  width: 120px;
-  height: 148px;
-  padding: 0 0 16px;
-  border: 0;
-  border-radius: var(--radius-card);
-  background: transparent;
-  cursor: pointer;
-}
-.at-projects .k-project-drop svg { display: block; width: 120px; height: 132px; }
-.at-projects .k-project-drop::after {
-  content: ""; position: absolute; left: 50%; bottom: 14px; width: 240px; margin-left: -120px;
-  border-top: 1px solid var(--line);
-}
-.at-projects .k-project-drop .pe-ink { fill: var(--text); }
-.at-projects .k-project-drop .pe-core { fill: var(--drop); }
-.at-projects .k-project-drop .pe-glint { fill: var(--surface); }
-.at-projects .at-proj-empty h3 {
-  margin: var(--space-2) 0 0;
-  font: var(--type-display);
-  font-size: clamp(44px, 5vw, 64px);
-  font-stretch: var(--stretch-display);
-  letter-spacing: -0.03em;
-}
-.at-projects .at-proj-empty p { margin: 0; max-width: 46ch; font: 400 15px/1.6 var(--font-ui); color: var(--text-muted); }
-
-/* New project ink. The bleed creeps across the page beneath its content (the picker sits above
-   it), so it never crosses text; the folder forms in a layer above its card. Neither takes a pointer. */
-.am-project-bleed {
-  position: fixed; inset: 0; width: 100%; height: 100%;
-  z-index: 0; pointer-events: none; overflow: visible;
-}
-#project-overlay .proj-modal.at-projects { position: relative; z-index: 1; }
-/* Picker results speak here, in the page's own voice, rather than in a toast. */
-.at-proj-status {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font: 400 13px/1.4 var(--font-ui);
-  color: var(--text-muted);
-  text-align: right;
-}
-.at-proj-status b { color: var(--text); font-weight: 600; }
-.at-proj-status[data-kind="fault"] { color: var(--fault); }
-.at-proj-status:empty { visibility: hidden; }
-.am-project-ink {
-  position: fixed; inset: 0; width: 100%; height: 100%;
-  z-index: calc(var(--studio-layer-overlay, 200) + 40);
-  pointer-events: none; overflow: visible;
-}
-
 /* ── Launch check and first-run setup (#setup-overlay outside Settings) ──────────────────── */
-/* The same page as Projects: its ground, its header, and the header's rule drawn by the check
+/* Setup has its own header and ground, with the header's rule drawn by the check
    (motion/setup-check.css). Settings keeps the Material dialog; setup-wizard.js moves the
    controls between them, so IDs, validators and save payloads are shared. */
 #setup-overlay.at-identity { background: var(--surface); color: var(--text); backdrop-filter: none; }
@@ -757,10 +521,6 @@
 #setup-page [data-atelier-motion="krackle-glyph"] { color: var(--energy); --krackle-hole: var(--energy-hole); --krackle-glint: var(--energy-glint); }
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
-/* Projects takes over from the check without its dialog entrance, standing on the same rule;
-   the extra room under the rule matches the check page while the result sits on it. */
-#project-overlay.at-handover > :first-child { animation: none; }
-.at-proj-hero.at-has-line + .proj-modal-header { padding-top: var(--space-6); }
 @media (max-width: 640px) {
   .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 24px minmax(0, 1fr) auto; gap: var(--space-4); }
   .at-setup-row .at-setup-detail, #setup-page .at-setup-detail { grid-column: 2 / -1; }
@@ -887,9 +647,11 @@
 .modal.at-dialog h2 { margin: 0 0 var(--space-2); font: 760 28px/1 var(--font-display); font-stretch: 84%; letter-spacing: -0.02em; }
 .modal.at-proj-name .at-field { height: 36px; font: 400 14px/1 var(--font-ui); }
 .modal.at-dialog p { margin: 0; font: 400 14px/1.55 var(--font-ui); color: var(--text-muted); }
+.modal.at-dialog .proj-name-error { color:var(--fault); }
+.proj-name-error[hidden] { display:none; }
 .modal.at-dialog .modal-row { margin-top: var(--space-3); gap: var(--space-2); }
 
 @media (max-height: 760px) {
-  .at-proj-hero { padding: var(--space-4) 0; }
-  .at-projects .proj-modal-header { padding: var(--space-4) 0 var(--space-3); }
+  .at-proj-hero { padding:14px 0; }
+  .at-proj-lockup { font-size:44px; }
 }

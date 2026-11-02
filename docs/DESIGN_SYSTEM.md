@@ -254,8 +254,22 @@ under the SIL OFL in `gui/vendor/`. Components: `.at-label`, `.at-btn` with
 `--primary`, `--quiet` and `--danger`. Smalt marks only what is yours: focus, the
 asset at the head of the queue, the core that rides into the Mod tray.
 
-Three surfaces have opted in so far. The Projects screen (`#project-overlay`) is a
-full page on the identity ground. Its lockup reads "Rivals Atelier" as one mark: "RIVALS" is
+Atelier opens in Library with the active project. Workspace remains a separate tab
+for guided costume and colour editing. Library Home only lists folders with browsable
+content; empty synthetic sections stay hidden, and project-added folders remain visible.
+Projects (`#project-overlay`) is a compact
+modal available from the project chip or menu, with thumbnail cards, search,
+grid/list views and project actions. Creating or selecting a project opens Library;
+Workspace restores that project's saved costume when selected. The picker can be
+closed while an active project exists; first-time users create or choose one.
+
+The Edit All import dialog (`#prog-box`) keeps its IDs, job wiring and Activity
+behaviour, and holds its result until Done. Custom palettes and the Darcula/Repak X
+presets do not yet recolour it. See the motion README's **Import ink** section.
+
+The launch check and first-run setup (`#setup-overlay` with `data-setup-page`) own
+the identity lockup and tagline. Their check channel is drawn on the header rule.
+The setup lockup reads "Rivals Atelier" as one mark: "RIVALS" is
 bespoke lettering (inline SVG in `index.html`) on a 100-unit cap height that fills the
 x-height band of "telier" (0.53em) on the shared baseline. Its stems are 24 units on flat
 feet with sharp chamfers, one 18° slant is baked into the outlines, the V and A nest on
@@ -266,19 +280,9 @@ Light `#F0A93C` on ink, 7:1 on Charcoal), kept apart from Ochre so it never read
 warning, then the mark standing in for the wordmark's A at cap height on the baseline,
 beside the tagline. The i of "telier" is set dotless with a Smalt tittle (0.168em) at
 Bricolage's own tittle height; this departs from the sheet's rule that a lockup shows
-only the mark's drop. Each project card is a portfolio: the card is the folder itself,
-Lamp Black on paper and Gesso on ink, with the newest edited texture inside as a loose
-sheet, unaltered, the name printed on the front panel, and a punched clasp beside the
-Smalt drop. A selected portfolio turns Smalt. Creating a project adds it to the list
-(it no longer opens at once) and focuses its card. The Edit All import dialog
-(`#prog-box`) keeps its IDs, job wiring and Activity behaviour; it now holds its
-result until Done. Custom palettes and the Darcula/Repak X presets do not yet recolour it. See
-the motion README's **Import ink** section for its animation contract.
+only the mark's drop.
 
-The launch check and first-run setup (`#setup-overlay` with `data-setup-page`) are the
-third surface. They stand on the Projects page itself: the same ground, lockup and
-tagline, with the check's channel drawn exactly on the header rule, so a configured
-launch hands over to Projects without a change of scene. The page appears only when
+A configured launch continues into Library; the setup page appears only when
 the check takes longer than 400ms. First run is one page, not a wizard: three rows (Unlock
 key `AES`, Mapping file `USMAP`, Game folder) say what the check found, with the path
 or file in Fragment Mono and a quiet Change, and open a field with Browse or Paste only

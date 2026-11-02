@@ -13,10 +13,11 @@
 
   // Original reads go through the game reader one at a time, and each saved version is read once.
   function colourChanges(item) {
-    const key = [project, item.game_rel, item.mtime].join('|');
+    const origin = project;
+    const key = [origin, item.game_rel, item.mtime].join('|');
     if (!changes.has(key)) {
       const url = '/api/material_changes?game_rel=' + encodeURIComponent(item.game_rel);
-      const request = queue.then(() => window.atelierFetch(url, {}, project).then(r => r.json()))
+      const request = queue.then(() => window.atelierFetch(url, {}, origin).then(r => r.json()))
         .then(data => data.ok ? data.changes : null, () => null);
       queue = request.then(() => {});
       changes.set(key, request);
@@ -77,12 +78,14 @@
   }
 
   async function restoreSlot(item) {
+    const origin = window.atelierProject?.();
     const viewport = window.AtelierViewport;
     if (viewport?.hasPendingEdits?.()) {
       $('workspace-dock-status').textContent = 'Save or revert your colour changes before restoring.';
       viewport.focusPendingEdits(); return;
     }
     if (!(await tray()?.restore(item.token))) return;
+    if (origin!==window.atelierProject?.()) return;
     restored.add(item.game_rel);
     viewport?.reloadMaterials?.();
   }
@@ -105,7 +108,7 @@
     $('workspace-dock').classList.toggle('empty', !items.length);
     $('workspace-dock-status').textContent = !items.length ? 'Save a colour change and it collects here.'
       : included === items.length ? 'Everything here goes into your mod.'
-      : `${included} of ${items.length} go into your mod. Choose which in the Library's Mod tray.`;
+      : `${included} of ${items.length} go into your mod. Choose which in Library’s Mod tray.`;
     $('workspace-review').disabled = !included;
   }
 

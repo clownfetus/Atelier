@@ -503,9 +503,13 @@ ends without landing. The dialog's own ink replaces the working-panel border cha
 Colours are the identity roles in `../identity.css` (energy, its core, done, caution
 and fault), so Light draws Lamp Black ink and Dark draws Smalt Light.
 
-# Project ink
+# Project ink (archived presentation)
 
-Projects are portfolios: `app.js` draws each card as the folder itself (a back panel and
+The app now uses a compact project picker and no longer loads `project-ink.js`.
+The module is retained for motion studies; the following describes its former
+portfolio presentation.
+
+Projects were portfolios: `app.js` draws each card as the folder itself (a back panel and
 tab on a flat foot, the newest edited texture inside as a loose sheet, the front panel
 behind a paper halo carrying the name, a punched clasp and the Smalt drop). Each part is
 followed by an empty `.pp-live` slot that `project-ink.js` draws liquid outlines into,

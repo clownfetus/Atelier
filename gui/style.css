@@ -838,7 +838,13 @@ body {
   padding: 20px 24px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  gap: 12px;
 }
+.proj-modal-header h2 { flex:1; display:flex; align-items:center; gap:8px; margin:0; }
+#proj-close[hidden] { display:none; }
+#proj-status { flex-shrink:0; margin:0; padding:12px 24px 0; color:var(--muted); font-size:var(--studio-text-detail); }
+#proj-status:empty { display:none; }
+#proj-status[data-kind="fault"] { color:var(--md-sys-color-error); }
 #proj-toolbar {
   display: flex;
   align-items: center;

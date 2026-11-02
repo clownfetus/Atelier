@@ -304,7 +304,9 @@ function setWorkspaceMode(mode, animate = false) {
   assembly?.setActive(mode === 'assembly');
   for (const value of ['inspect','assembly','showcase']) $('viewport-'+value).setAttribute('aria-pressed',String(value === mode));
   $('viewport-workspace-label').textContent = mode === 'assembly' ? 'Assembly View' : 'Model Studio';
-  try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
+  if (!$('viewport-overlay').classList.contains('mounted')) {
+    try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
+  }
   requestAnimationFrame(onResize);
   if (animate && changed) window.AtelierMotion?.workflow?.workspace($('viewport-modes'), mode);
 }
@@ -1346,6 +1348,7 @@ function filterMaterials() {
 
 function buildMaterialInspector(names = Object.keys(matData)) {
   const editor = $('viewport-material-editor'), info = matData[selectedMaterial];
+  const guided = $('viewport-overlay').classList.contains('mounted');
   const advancedOpen = editor.querySelector('.vp-advanced')?.open && editor.dataset.material === selectedMaterial;
   editor.replaceChildren(); editor.hidden = !info; $('viewport-material-empty').hidden = !!info;
   editor.dataset.material = selectedMaterial || '';
@@ -1376,7 +1379,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   const common = new Set([primary,info.emiIdx].filter(index=>index >= 0));
   if (!common.size) {
     const hint = document.createElement('p'); hint.className = 'vp-inspector-hint';
-    hint.textContent = 'This material uses shader-specific colours. Open Advanced parameters to edit them.'; editor.append(hint);
+    hint.textContent = guided ? 'More colour options are available below. Some colours only appear in the game.' : 'This material uses shader-specific colours. Open Advanced parameters to edit them.'; editor.append(hint);
   }
   for (const index of common) {
     const label = index === info.emiIdx ? 'Glow colour' : index === info.baseIdx ? 'Main colour' : colors[index].name.replace(/\s*-\s*ColorA$/i,' colour');
@@ -1385,8 +1388,8 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   const recolourSection = recolour.section(name, info);
   if (recolourSection) editor.append(recolourSection);
   const advanced = document.createElement('details'); advanced.className = 'vp-advanced'; advanced.open = !!advancedOpen;
-  const summary = document.createElement('summary'); summary.innerHTML = 'Advanced parameters <i data-lucide="chevron-right" size="18"></i>'; advanced.append(summary);
-  const hint = document.createElement('p'); hint.textContent = 'Exact shader parameters. Some colours are saved for the game and may not have a faithful live preview.'; advanced.append(hint);
+  const summary = document.createElement('summary'); summary.innerHTML = `${guided?'More colour options':'Advanced parameters'} <i data-lucide="chevron-right" size="18"></i>`; advanced.append(summary);
+  const hint = document.createElement('p'); hint.textContent = guided ? 'Extra colours for this part. Some changes only appear in the game.' : 'Exact shader parameters. Some colours are saved for the game and may not have a faithful live preview.'; advanced.append(hint);
   for (const [index,color] of colors.entries()) if (!common.has(index)) advanced.append(colorField(name,color,color.name,false));
   const source = document.createElement('p'); source.className = 'vp-source-name'; source.textContent = name; source.title = info.game_rel;
   advanced.append(source);
@@ -1838,6 +1841,18 @@ function mount(host) {
   overlay.classList.toggle('mounted',!!host); overlay.classList.toggle('overlay',!host);
   box.setAttribute('role',host?'region':'dialog');
   if(host)box.removeAttribute('aria-modal');else box.setAttribute('aria-modal','true');
+  // Guided editing always opens the editable model; keep the full editor's preference.
+  if(host) {
+    workspaceMode='inspect';
+    if($('viewport-uv-toggle').getAttribute('aria-expanded')==='true')$('viewport-uv-toggle').click();
+  } else {
+    try { workspaceMode=localStorage.getItem('atelier.assembly')==='1'?'assembly':'inspect'; } catch(_) {workspaceMode='inspect';}
+  }
+  $('viewport-mat-head').querySelector('h3').textContent=host?'Choose a part':'Materials';
+  $('viewport-material-search').placeholder=host?'Find a part':'Find a material';
+  $('viewport-material-search').setAttribute('aria-label',host?'Find a part':'Find a material');
+  $('viewport-mat-list').setAttribute('aria-label',host?'Choose a part':'Choose a material');
+  $('viewport-material-empty').querySelector('p').textContent=host?'Click a part on the model or choose one above to see its colours.':'Click the model or choose a material above. Its controls will appear here.';
   requestAnimationFrame(()=>{if(inited)onResize();});
 }
 

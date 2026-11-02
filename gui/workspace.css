@@ -1,4 +1,4 @@
-#app-pages { display:flex; gap:4px; }
+#app-pages { display:flex; gap:4px; flex:none; }
 #app-pages button { min-height:36px; padding:0 12px; border:0; border-radius:8px; background:transparent; color:var(--muted); font:600 13px var(--studio-font); cursor:pointer; }
 #app-pages button[aria-current=page] { background:var(--bg3); color:var(--text); }
 #app-pages button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
@@ -9,9 +9,25 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace[hidden], #body[hidden] { display:none; }
 .workspace-heading { display:flex; align-items:center; justify-content:space-between; flex:none; gap:20px; }
 .workspace-heading h1 { font:650 28px/1.15 var(--font-display); letter-spacing:-.02em; margin:4px 0 0; overflow-wrap:anywhere; }
+.workspace-heading p { margin:7px 0 0; color:var(--text-muted); font-size:14px; }
+.workspace-heading-actions { display:flex; flex:none; gap:8px; }
+.workspace-heading-actions [hidden] { display:none; }
 .workspace-heading .at-btn { min-height:40px; }
+.workspace-steps { display:flex; flex:none; gap:24px; padding:12px 18px; margin:0; list-style:none; background:var(--surface-panel); border:1px solid var(--line); border-radius:12px; }
+.workspace-steps[hidden] { display:none; }
+.workspace-steps li { flex:1; display:flex; align-items:center; gap:10px; color:var(--text-muted); }
+.workspace-steps li > span { flex:none; display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--line); border-radius:50%; font-size:12px; font-weight:600; }
+.workspace-steps strong,.workspace-steps small { display:block; }
+.workspace-steps strong { font:600 13px/1.4 var(--font-ui); }
+.workspace-steps small { margin-top:2px; font:400 12px/1.4 var(--font-ui); }
+.workspace-steps [aria-current=step] { color:var(--text); }
+.workspace-steps [aria-current=step] > span { background:var(--drop); border-color:var(--drop); color:var(--on-drop); }
 #workspace-stage { flex:1; min-height:500px; display:flex; }
 #workspace-stage[hidden], #workspace-choice[hidden] { display:none; }
+.workspace-opening { padding:28px; border:1px solid var(--line); border-radius:12px; background:var(--surface-panel); }
+.workspace-opening p { margin:0; }
+.workspace-opening .at-btn { margin-top:16px; }
+.workspace-opening[hidden], #workspace-retry[hidden] { display:none; }
 #workspace-choice { flex:1; padding:28px; background:var(--surface-panel); border:1px solid var(--line); border-radius:16px; }
 .workspace-choice-heading { display:flex; justify-content:space-between; align-items:center; gap:24px; }
 .workspace-choice-heading h2 { font:650 28px/1.15 var(--font-display); margin:0 0 8px; }
@@ -25,6 +41,7 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace-costumes { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:16px; padding-top:16px; border-top:1px solid var(--line); }
 .workspace-costume { text-align:left; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--surface); color:var(--text); cursor:pointer; font:600 14px/1.4 var(--font-ui); }
 .workspace-costume img { display:block; width:100%; height:130px; object-fit:contain; margin-bottom:12px; }
+.workspace-hero img[hidden], .workspace-costume img[hidden] { display:none; }
 .workspace-costume span { display:block; color:var(--text-muted); font-weight:400; font-size:12px; margin-top:4px; }
 #workspace-choice button:focus-visible { outline:2px solid var(--drop); outline-offset:3px; }
 #viewport-overlay.mounted { position:relative; inset:auto; display:none; width:100%; padding:0; background:none; backdrop-filter:none; z-index:auto; }
@@ -33,6 +50,10 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 :root[data-theme=dark] #workspace #viewport-box { --text:var(--at-gesso); --vp-stage-top:var(--at-charcoal); --vp-stage-bottom:var(--at-lamp-black); }
 #workspace #viewport-head { min-height:60px; padding:8px 14px; }
 #workspace :is(#viewport-close,#viewport-back,#viewport-expand,.vp-workspace-label) { display:none; }
+/* Workspace exposes colour editing and comparison. The full model tools are in Library. */
+#workspace :is(#viewport-modes,.vp-uv-toggle,#viewport-skin-card,#viewport-mesh-edit,#viewport-blender-send,#viewport-blender-btn,.vp-blender-help,.vp-source-name,.vp-material-edit,.vp-mat-dl,#viewport-wireframe,#viewport-regions) { display:none; }
+#workspace #viewport-playback:has(#viewport-play:disabled) { display:none; }
+#workspace #viewport-status { margin-left:auto; }
 #workspace #viewport-head #viewport-mat-save { background:var(--drop); border-color:var(--drop); color:var(--on-drop); }
 #workspace #viewport-head #viewport-mat-save:hover:not(:disabled) { background:var(--at-smalt-deep); }
 #workspace #viewport-box.expanded { width:100%; height:100%; }
@@ -59,3 +80,20 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace-dock button:focus-visible { outline:2px solid var(--drop); outline-offset:2px; }
 @media(max-width:1100px) { #workspace { padding:16px; gap:14px; } #workspace #viewport-head { flex-wrap:wrap; } #workspace #viewport-modes { order:3; } .workspace-choice-heading { align-items:flex-start; flex-direction:column; } }
 @media(max-height:800px) { #workspace { padding-top:14px; gap:14px; } .workspace-heading h1 { font-size:24px; } }
+@media(max-width:800px) {
+  .workspace-heading { align-items:flex-start; flex-wrap:wrap; gap:12px; }
+  .workspace-steps { gap:12px; padding:12px; }
+  .workspace-steps small { display:none; }
+  .workspace-dock-head { flex-wrap:wrap; }
+  #workspace-dock-status { flex-basis:50%; }
+}
+@media(max-width:600px) {
+  #app-pages { gap:0; }
+  #app-pages button { padding-inline:8px; font-size:12px; }
+  .project-chip { max-width:100px; padding-inline:6px; margin-right:4px; }
+  .workspace-steps li { align-items:flex-start; gap:6px; }
+  .workspace-steps strong { font-size:12px; }
+  .workspace-choice-heading input { width:100%; }
+}
+
+.workspace-heading .proj-eyebrow { font:600 11px/1.4 var(--font-ui); letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); }

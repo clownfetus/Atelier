@@ -2552,7 +2552,7 @@ class _PNGHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith(".png"):
-            if project_trash.DIRECTORY in event.src_path.replace('\\', '/').split('/'):
+            if any(part in ('.atelier', project_trash.DIRECTORY) for part in event.src_path.replace('\\', '/').split('/')):
                 return
             import_root = get_import_root().replace("\\", "/")
             evt_path    = event.src_path.replace("\\", "/")
@@ -2577,7 +2577,7 @@ class _PNGHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         p = event.src_path
-        if project_trash.DIRECTORY in p.replace('\\', '/').split('/'):
+        if any(part in ('.atelier', project_trash.DIRECTORY) for part in p.replace('\\', '/').split('/')):
             return
         if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
             return

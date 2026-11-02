@@ -20,7 +20,7 @@
   const FOUND={key:'key',map:'file',game:'folder'};   // each row's found glyph: the ink key, the code file, the folder
   let initialized=false, settings=true, page='checking', outcome='busy', error='';
   let valid={}, validated=false, editing={}, prefill={}, fetched={}, retrieval={}, awaiting={};
-  let overlay, modal, hero, pageEl, line=null, lineHost=null, projectLine=null, moved=[], glyphs={};
+  let overlay, modal, hero, pageEl, line=null, lineHost=null, moved=[], glyphs={};
   let drop=null, dropFrame=0;
 
   const join=items=>items.length<2?items.join(''):items.slice(0,-1).join(', ')+' and '+items[items.length-1];
@@ -31,9 +31,6 @@
   function init() {
     if(initialized)return; initialized=true;
     overlay=$('setup-overlay');modal=overlay.querySelector('.setup-modal');hero=$('setup-hero');pageEl=$('setup-page');
-    // The page stands on the same header as Projects.
-    const source=document.querySelector('#project-overlay .at-proj-hero');
-    if(source)for(const child of source.children)hero.append(child.cloneNode(true));
     for(const name of NAMES) {
       const row=ROWS[name], el=pageEl.querySelector(`[data-row="${name}"]`);
       Object.assign(row,{el,glyph:el.querySelector('.at-setup-glyph'),what:el.querySelector('.at-setup-what'),
@@ -202,27 +199,10 @@
     if(state==='ready'){fetched[name]=String(fetchedValue||'').trim();awaiting[name]=true;}
     render();
   }
-  // Configured: Projects takes the page over with the same header, and the latch's starburst lands
-  // on its rule. The result is never held back for the ink.
-  function handover(projectsOpen) {
+  // Release the launch animation as the Library or first project picker opens.
+  function handover() {
     init();
-    const visible=!settings&&overlay.classList.contains('active');
     destroyLine();
-    if(!projectsOpen||!visible)return;
-    const projects=$('project-overlay'), rule=projects?.querySelector('.at-proj-hero');
-    if(!rule)return;
-    projects.classList.add('at-handover');
-    projectLine?.destroy();
-    const host=document.createElement('span');rule.append(host);
-    try{projectLine=window.AtelierMotion.setupCheck.mount(host,{state:'success',play:true});rule.classList.add('at-has-line');}
-    catch(_){host.remove();projectLine=null;}
-    const watch=new MutationObserver(()=>{
-      if(projects.classList.contains('active'))return;
-      watch.disconnect();projects.classList.remove('at-handover');rule.classList.remove('at-has-line');
-      projectLine?.destroy();projectLine=null;host.remove();
-      const status=$('proj-status');if(status?.textContent==='Setup checked')status.textContent='';
-    });
-    watch.observe(projects,{attributes:true,attributeFilter:['class']});
   }
   window.AtelierSetup=Object.freeze({mode,checking,found,failed,validation,retrieval:retrieval_,handover});
 })();
