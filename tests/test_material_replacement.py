@@ -48,6 +48,12 @@ def document(gr, red=.2, parent=PARENT, parent_class="Material"):
                              {"Name": "TextureParameterValues", "Value": [parameter("BaseColor", -5)]}]}]}
 
 
+def undecoded(d):
+    export = {k: v for k, v in d["Exports"][0].items() if k != "Data"}
+    export.update({"$type": "UAssetAPI.ExportTypes.RawExport, UAssetAPI", "Data": "AAECAwQF"})
+    return {**d, "Exports": [export]}
+
+
 class ReplacementTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="atelier-replacement-case-")
@@ -229,6 +235,36 @@ class ReplacementTests(unittest.TestCase):
         self.docs[intermediate] = document(intermediate, parent=TARGET, parent_class="MaterialInstanceConstant")
         with self.assertRaisesRegex(ValueError, "inherits from the target"):
             M.replace_material(TARGET, SOURCE)
+
+    def test_out_of_date_mapping_refuses_save_and_export(self):
+        # to_json falls back to an opaque RawExport when the mapping is older than the game.
+        self.path(TARGET).unlink()
+        self.docs[TARGET] = undecoded(document(TARGET))
+        with self.assertRaisesRegex(M.UndecodedMaterial, "older than this game update"):
+            M.save_material(TARGET, {"Tint": [.8, .1, .2, 1]}, {})
+        self.assertFalse(self.path(TARGET).exists())
+        status, result = self.call("/api/material_save", {"game_rel": TARGET, "colors": {"Tint": [.8, .1, .2, 1]}})
+        self.assertFalse(result["ok"])
+        self.assertIn("mapping file", result["error"])
+        with self.assertRaises(M.UndecodedMaterial):
+            M.stage_material(str(self.stage), TARGET, {"Tint": [.8, .1, .2, 1]}, {})
+        self.assertFalse(list(self.stage.rglob("*.uasset")))
+
+    def test_copies_written_under_an_old_mapping_are_read_again(self):
+        # Older versions kept the RawExport as the project copy and as the original's cache.
+        self.write_project(TARGET, undecoded(document(TARGET, .5)))
+        (self.cache / (TARGET + ".json")).parent.mkdir(parents=True, exist_ok=True)
+        (self.cache / (TARGET + ".json")).write_text(json.dumps(undecoded(document(TARGET))), encoding="utf-8")
+        self.assertEqual(M.read_material_original(TARGET)["colors"][0]["rgba"][0], .1)
+        M.stage_material(str(self.stage), TARGET, {}, {})  # no edits to carry, so vanilla ships
+        self.assertEqual(M._mat_params(self.compiled)[0][0]["rgba"][0], .1)
+        saved = M.save_material(TARGET, {"Tint": [.8, .1, .2, 1]}, {})
+        self.assertEqual(saved["colors"][0]["rgba"][0], .8)
+        self.assertFalse(M._undecoded(json.loads(self.path(TARGET).read_text())))
+        # A replacement's snapshot records its donor, so it is never silently re-read.
+        self.write_project(TARGET, {**undecoded(document(TARGET)), M._SOURCE_KEY: SOURCE})
+        with self.assertRaises(M.UndecodedMaterial):
+            M.save_material(TARGET, {"Tint": [.8, .1, .2, 1]}, {})
 
     def test_api_binds_project_and_clears_incompatible_texture_options(self):
         opts = {"custom_textures": {"OldSlot": {}}, "dye_off": True, "color_inten": {"Tint": 3}, "lq_twin": True}

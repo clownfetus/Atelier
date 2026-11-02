@@ -139,6 +139,28 @@ of a material exists:
 Whether UAssetTool decoded these before today's game patch is unknown: no older UAssetTool
 material JSON survives in this data to compare.
 
+**Checked (Nov 2): the mapping was out of date.** The patch moved the game to build 3984769, and
+the matching mapping arrived on Oct 30 at 23:01, after this spike. Decoding `MI_1031306_Equip_01`
+and `MI_1015001_Body` with each mapping on disk gives a `RawExport` (a 205–208 KB byte blob) for
+3922109, 3939753 and 3962284, and a `NormalExport` with every parameter list for 3984769. With the
+current mapping, a real `save_material` on both (BaseTint set to 0.16, 0.61, 0.37) reopened with
+the new colour in a fresh project.
+
+So saving is not broken today, but it breaks silently after every game update until a new mapping
+is downloaded and Atelier restarts, which can take days: the update check runs every three days,
+and a downloaded mapping applies only at the next launch. In that gap `save_material` wrote the
+blob back and reported success, export failed with "Current material no longer has saved
+parameters", and an undecoded project copy shipped vanilla colours. The installed app's 64 project
+materials and 117 cached ones are all decoded, so none were damaged here.
+
+Fixed the same day: `material.py` refuses an undecoded material on read, save and export with a
+message naming the out-of-date mapping, and never publishes one to a project or the cache. Copies
+that earlier versions wrote that way hold no edits, so they are read again from the game, unless
+they record a replacement donor or parent, which still refuse. The viewport's save toast now
+gives the reason instead of "retry Save". Still open: nothing compares the mapping's build with
+the game's (the container names carry it, `Patch_-Windows_1.1.3984769_P.utoc`), so the gap is
+found only when a read fails.
+
 ### C. Child materials inherit everything, but not dye
 
 47 skins' `Equip_01` read empty even on a good reader. Each has another material instance as its
@@ -167,9 +189,8 @@ worth bringing back.
 
 ## Next
 
-- Before the workspace: find A's root cause (empty reads are no longer cached), and check B in
-  the shipped app: edit and save a material colour, then reopen it. If B is real, saving
-  material edits is broken for current game files, which matters well beyond the workspace.
+- Before the workspace: find A's root cause (empty reads are no longer cached). B is checked
+  (Nov 2): an out-of-date mapping, now refused instead of dropped; see B above.
 - Then make the three speed changes in `viewport.js` and `dye.py`. Small effort.
 - Run the in-game fidelity check: install a Kumiho recolour, capture the same three materials in
   game and compare against the bakes. It needs the game, so it is the owner's step.

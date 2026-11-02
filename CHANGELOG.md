@@ -47,6 +47,12 @@ The app, installers and update checker identify each release by its full number,
   uses. Its textures and materials can be added to your Mod tray as edits of
   the game assets they replace; everything else can be saved as JSON. A mod
   its author locked asks for the password first.
+- Fixed material colour saves that could be lost without a word right after a
+  game update. Until Atelier has a mapping file for the new game version, it
+  can't read some materials' colours, and a save used to report success while
+  changing nothing. It now says the mapping is out of date and keeps your edits
+  unsaved, and materials saved that way by earlier versions are read again once
+  the new mapping is in use.
 
 ## 1.1.4
 

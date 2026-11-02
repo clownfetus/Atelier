@@ -24,6 +24,37 @@ def _gn(lst, n):
 
 def _ex_props(e): return e.get("Data") or e.get("Value") or []
 
+class UndecodedMaterial(RuntimeError):
+    pass
+
+def _undecoded(d):
+    """When the mapping file is older than the game (after each update, until a newer mapping is
+    downloaded and Atelier restarts), to_json falls back to an opaque RawExport whose parameter
+    lists are unreadable: edits to it were dropped while the save reported success."""
+    exports = d.get("Exports") or [{}]
+    return "RawExport" in str(exports[0].get("$type", ""))
+
+def _holds_nothing(d):
+    """An undecoded copy carries no edits, only vanilla bytes, unless it records a replacement."""
+    return _undecoded(d) and not d.get(_SOURCE_KEY) and not d.get(_PARENT_KEY)
+
+def _stale_copy(path):
+    try:
+        with open(path, encoding="utf-8-sig") as stream:
+            return _holds_nothing(json.load(stream))
+    except (OSError, ValueError):
+        return False  # Unreadable copies keep reporting their own error to the caller.
+
+def _require_decoded(d, game_rel):
+    """Refuse a material UAssetTool could not decode, instead of editing or shipping nothing."""
+    if _undecoded(d):
+        raise UndecodedMaterial(
+            f"{os.path.basename(game_rel)} can't be read with the current mapping file "
+            f"({os.path.basename(USMAP) or 'none'}), which is older than this game update, so nothing "
+            "was changed. Atelier downloads a newer mapping when one is published; restart Atelier "
+            "after it has.")
+    return d
+
 def _mat_pname(entry):
     pinfo = _gn(entry["Value"], "ParameterInfo")
     return (_gn(pinfo["Value"], "Name") or {}).get("Value") if pinfo else None
@@ -150,21 +181,24 @@ def _mat_json(game_rel, out_dir=None, prefer_exact=False):
     from atelier.handlers.texture import ensure_work_base
     import_root = get_import_root()
     # Project copy wins. Unique subfolder path (no basename collisions); fall back to the legacy flat
-    # layout so pre-existing projects still load.
-    project_jp  = project_base(game_rel, import_root) + ".json"
-    if os.path.exists(project_jp): return project_jp
-    legacy_jp   = project_base_legacy(game_rel, import_root) + ".json"
-    if os.path.exists(legacy_jp): return legacy_jp
-    out_dir = out_dir or import_root
-    jp = project_base(game_rel, out_dir) + ".json"
-    if os.path.exists(jp): return jp
-    if out_dir != CACHE_3DVIEW:
-        # reuse the vanilla copy the viewport already cached instead of re-extracting from paks
-        cached_jp = project_base(game_rel, CACHE_3DVIEW) + ".json"
-        if os.path.exists(cached_jp):
-            os.makedirs(os.path.dirname(jp), exist_ok=True)
-            shutil.copyfile(cached_jp, jp)
-            return jp
+    # layout so pre-existing projects still load. A copy written while the mapping was out of date
+    # holds no edits, so it is read again from the game in place.
+    for jp in (project_base(game_rel, import_root) + ".json",
+               project_base_legacy(game_rel, import_root) + ".json"):
+        if os.path.exists(jp):
+            if not _stale_copy(jp): return jp
+            break
+    else:
+        out_dir = out_dir or import_root
+        jp = project_base(game_rel, out_dir) + ".json"
+        if os.path.exists(jp) and not _stale_copy(jp): return jp
+        if out_dir != CACHE_3DVIEW:
+            # reuse the vanilla copy the viewport already cached instead of re-extracting from paks
+            cached_jp = project_base(game_rel, CACHE_3DVIEW) + ".json"
+            if os.path.exists(cached_jp) and not _stale_copy(cached_jp):
+                os.makedirs(os.path.dirname(jp), exist_ok=True)
+                shutil.copyfile(cached_jp, jp)
+                return jp
     # One extractor for every handler: it picks retoc or UAssetTool per host and records the
     # asset cache itself (texture.ensure_work_base).
     work_base = ensure_work_base(game_rel,**({'prefer_exact':True} if prefer_exact else {}))
@@ -178,7 +212,7 @@ def _mat_json(game_rel, out_dir=None, prefer_exact=False):
         converted = os.path.join(scratch, os.path.basename(jp))
         if not os.path.exists(converted): raise RuntimeError("to_json produced no JSON")
         with open(converted, encoding='utf-8-sig') as stream:
-            json.load(stream)
+            _require_decoded(json.load(stream), game_rel)
         jobs.checkpoint()
         os.replace(converted, jp)
     return jp
@@ -193,6 +227,7 @@ def read_material(game_rel, cache_only=False):
             return native
     d = json.load(open(mat_json(game_rel, out_dir=CACHE_3DVIEW if cache_only else None,
         **({'prefer_exact':True} if cache_only else {})), encoding="utf-8-sig"))
+    _require_decoded(d, game_rel)
     colors, scalars = _mat_params(d)
     return {"colors": colors, "scalars": scalars, "textures": _mat_textures(d), "surface": _mat_surface(d),
             "texture_classes": _mat_texture_classes(d), "material_source": d.get(_SOURCE_KEY, ""),
@@ -238,6 +273,7 @@ def _original_document(game_rel):
     def read(path):
         with open(path, encoding="utf-8-sig") as stream:
             data = json.load(stream)
+        _require_decoded(data, game_rel)
         _mat_params(data)  # validate before cache publication
         _mat_textures(data)
         return data
@@ -248,8 +284,8 @@ def _original_document(game_rel):
         if os.path.isfile(jp):
             try:
                 return read(jp)
-            except (json.JSONDecodeError, KeyError, IndexError, TypeError):
-                pass  # An incomplete old cache can be repaired after a successful decode.
+            except (json.JSONDecodeError, KeyError, IndexError, TypeError, UndecodedMaterial):
+                pass  # An incomplete or undecoded old cache can be repaired after a successful decode.
         with tex_semaphore:
             work_base = ensure_work_base(game_rel)
             if not work_base or not os.path.isfile(work_base + ".uasset"):
@@ -535,7 +571,7 @@ def _publish_replacement(game_rel, d):
 def save_material(game_rel, colors, scalars):
     """Apply color/scalar edits and PERSIST them into the material's on-disk JSON."""
     jp = mat_json(game_rel)
-    d  = json.load(open(jp, encoding="utf-8-sig"))
+    d  = _require_decoded(json.load(open(jp, encoding="utf-8-sig")), game_rel)
     _apply_mat_edits(d, colors or {}, scalars or {})
     atomic_json(jp, d)
     cols, scals = _mat_params(d)
@@ -563,6 +599,8 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
         if os.path.isfile(base + ".json"):
             with open(base + ".json", encoding="utf-8-sig") as stream:
                 saved = json.load(stream)
+                if not _holds_nothing(saved):  # one saved while the mapping was out of date has no edits
+                    _require_decoded(saved, game_rel)
                 cols, scals = _mat_params(saved, precision=None)
                 if saved.get(_SOURCE_KEY):
                     source = _material_path(saved[_SOURCE_KEY])
@@ -590,7 +628,7 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
         if not os.path.isfile(jp):
             raise RuntimeError("Current material conversion produced no JSON")
         with open(jp, encoding="utf-8-sig") as stream:
-            d = json.load(stream)
+            d = _require_decoded(json.load(stream), source)
         if source != game_rel:
             if not parent:
                 _check_replacement_parents(d, source, game_rel)

@@ -77,8 +77,9 @@ Effort: Small.
 Warm clicks take 500–550 ms as shipped and about 300–330 ms with three small fixes, so a shader
 port is no longer a prerequisite. Fidelity has not been checked in-game. Reading materials has
 two faults: a native reader that sometimes starts unable to read some materials (it no longer
-caches those empty results, but the root cause is open), and UAssetTool JSON with no properties
-(which may drop saved edits). No current material inherits its dye from a parent, so dye checks
+caches those empty results, but the root cause is open), and UAssetTool JSON with no properties.
+The second was an out-of-date mapping after the Oct 29 patch: saves work with the current one,
+and since Nov 2 a stale mapping is refused with a reason instead of silently dropping edits. No current material inherits its dye from a parent, so dye checks
 read only the material itself. With a trusted reader, 186 of 674 skins (28%) dye, and 40% of sampled costumes
 have at least one dyeable material.
 

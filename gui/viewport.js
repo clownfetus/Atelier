@@ -1571,6 +1571,7 @@ async function saveEdits() {
   } catch (_) { /* Optional presentation never blocks saving. */ }
   let ok = 0;
   const failed = [];
+  let reason = '';
   try {
     for (const name of names) {
       const d = targets[name];
@@ -1594,7 +1595,7 @@ async function saveEdits() {
             if (!Object.keys(edited[key] || {}).length) delete edited[key];
           }
         }
-      } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
+      } catch (e) { failed.push(name); reason ||= e?.message || ''; console.warn('viewport: material_save failed', name, e); }
     }
   } finally {
     const newer = gen === generation && edited === draft && Object.values(edited).some(params => Object.keys(params).length);
@@ -1603,7 +1604,8 @@ async function saveEdits() {
   const ownsView = gen === generation && edited === draft && project === viewportProject;
   const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);
   const message = failed.length
-    ? `Saved ${ok}; ${failed.length} material(s) could not be saved. Unsaved recolors are retained; retry Save.`
+    ? `Saved ${ok}; ${failed.length} material(s) could not be saved. ` +
+      (reason && reason !== 'Save failed' ? `${reason.replace(/\.?$/, '.')} Unsaved recolors are retained.` : 'Unsaved recolors are retained; retry Save.')
     : newerEdits ? 'Submitted changes saved; newer edits remain unsaved.'
     : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`;
   const state = failed.length || newerEdits ? 'warning' : 'success';
