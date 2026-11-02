@@ -1470,7 +1470,7 @@ _usmap_check_lock    = threading.Lock()
 def api_usmap_update_check():
     global _usmap_check_running
     last = _c.get_usmap_checked_at()
-    if time.time() - last < _THREE_DAYS:
+    if time.time() - last < _THREE_DAYS and not _c._stale_usmap_builds():
         response.content_type = "application/json"
         return json.dumps({"ok": True, "updated": False})
     with _usmap_check_lock:

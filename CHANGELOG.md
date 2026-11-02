@@ -5,6 +5,9 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Atelier now warns when the game's update is newer than its mapping file and
+  checks for a replacement straight away. A downloaded mapping takes effect
+  after restarting Atelier, so you know when colour edits can be saved again.
 - Building a mod now shows the Krackle ink-well: bubbles form, circulate, crowd
   and burst while your mod cooks, and a few of them carry colours averaged from
   the original costume's textures. When the build finishes, a successful export
