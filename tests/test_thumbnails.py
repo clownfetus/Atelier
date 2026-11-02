@@ -191,6 +191,9 @@ class Thumbnails(unittest.TestCase):
         self.assertCountEqual(self.completed([a, b, c])["cached"], [a, b, c])
         self.extract.assert_called_once_with([a, b])
         self.assertEqual(self.decode.call_count, 2)
+        # Cached files become visible before their decoder's temporary directory
+        # is removed. Join the batch before asserting that cleanup has finished.
+        self.executor.shutdown(wait=True)
         self.assertFalse(list(self.thumbs.glob(".decode-*")))
         self.assertFalse(list(self.thumbs.rglob(".thumb-*")))
 
