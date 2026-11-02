@@ -5,6 +5,10 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Models with 16-bit bone indices and sections using more than 256 bones can now
+  be edited and rebuilt. Replacement reports preserve line breaks and show each
+  warning separately in a scrollable panel.
+
 - Recolour texture: select a part that doesn't dye and blend a colour into its texture with Colour, Hue, Multiply, Screen, Overlay or Soft light at any strength. The model previews it as you go, Cancel preview puts the part back, and Apply recolour saves an ordinary edited texture into Your mod, so it ships, compares and restores like any other texture edit. Adjusting a recolour starts again from the game's texture instead of stacking, and replacing a texture you edited another way asks first.
   A Curve control adjusts brightness after the colour: one click for Lighter, Darker, More
   contrast or Less contrast, or open Edit curve by hand to drag points on the line (arrow keys

@@ -7,13 +7,22 @@
   const skinOf=path=>/^Characters\/\d{4}\/(\d{7})(?:\/|$)/i.exec(path||'')?.[1];
   const importControls={};
   const el=(...args)=>AtelierJobDialogs.el(...args);
+  function showStatus(message,notes=[]){
+    status.replaceChildren(el('p',message));
+    if(notes.length){
+      const list=el('ul',undefined,'mesh-edit-notes');
+      for(const note of notes)list.append(el('li',note));
+      status.append(list);
+    }
+    status.scrollTop=0;
+  }
   function hide(){if(busy&&returnContext.preserveViewport){status.textContent='Wait for the replacement to finish, or cancel it before returning to Assembly.';return;}targetGeneration++;targetRequest?.abort();if(busy){overlay.classList.remove('active');return;}overlay.classList.remove('active');if(opener?.isConnected)opener.focus();}
   function selectTarget(target){
     if(busy)return;
     item={...target};title.textContent='Replace '+(target.name||'model');description.textContent=target.game_rel;
     choose.textContent=target.kind==='weapon'?'Choose weapon replacement…':'Choose replacement…';input.value='';
     if(importControls.fit_weapon){importControls.fit_weapon.checked=target.kind==='weapon';fitRow.hidden=target.kind!=='weapon';}
-    status.textContent='Choose a replacement for '+(target.name||'this model')+'.';
+    showStatus('Choose a replacement for '+(target.name||'this model')+'.');
     for(const button of targets.querySelectorAll('button[data-mesh]'))button.setAttribute('aria-pressed',String(button.dataset.mesh===target.game_rel));
   }
   function targetButton(target){
@@ -84,7 +93,7 @@
     }
     const invertRow=el('label','Invert AO','mesh-import-option'),invert=el('input');invert.type='checkbox';invert.id='mesh-import-ao_invert';importControls.ao_invert=invert;invertRow.prepend(invert);textures.append(invertRow);
     const companions=el('p','PSK files contain geometry and material names; their texture images are separate. For cooked Unreal files, select the .uasset and its matching .uexp together, plus .ubulk when present. All available detail levels are rebuilt and checked before saving. Missing vertex colours and secondary UVs are transferred from the original.');
-    status=el('p','Choose a replacement model.');status.id='mesh-edit-status';status.setAttribute('role','status');
+    status=el('div');status.id='mesh-edit-status';status.setAttribute('role','status');status.setAttribute('aria-atomic','true');status.tabIndex=0;status.setAttribute('aria-label','Replacement status and warnings');showStatus('Choose a replacement model.');
     input=el('input');input.type='file';input.multiple=true;input.accept='.zip,.blend,.fbx,.glb,.psk,.pskx,.uasset,.uexp,.ubulk,.json,.png';input.hidden=true;
     choose=el('button','Choose replacement…','btn primary');choose.id='mesh-replace-choose';choose.addEventListener('click',()=>input.click());
     input.addEventListener('change',()=>{if(input.files.length)replace([...input.files]);});
@@ -96,7 +105,7 @@
     const footer=el('div',undefined,'mesh-edit-footer');footer.append(status,actions);
     panel.append(title,description,content,input,footer);overlay.append(panel);document.body.append(overlay);
     AtelierJobDialogs.trap(overlay,panel,hide);
-    window.addEventListener('atelier-job',event=>{const job=event.detail;if(busy&&job.kind==='mesh-replace')status.textContent=job.stage;});
+    window.addEventListener('atelier-job',event=>{const job=event.detail;if(busy&&job.kind==='mesh-replace')showStatus(job.stage);});
   }
   async function open(target, context={}){
     if(!overlay)init();
@@ -129,13 +138,19 @@
     for(const control of Object.values(importControls))if(!control.checkValidity()){control.reportValidity();return;}
     const project=atelierProject(),target={...item},form=new FormData();form.append('game_rel',target.game_rel);for(const file of files)form.append('files',file,file.name);
     form.append('options',JSON.stringify(Object.fromEntries(Object.entries(importControls).map(([key,control])=>[key,control.tagName==='SELECT'?control.value:control.type==='number'?control.valueAsNumber:control.checked]))));
-    busy=true;choose.disabled=preview.disabled=true;for(const control of [...Object.values(importControls),...targets.querySelectorAll('button')])control.disabled=true;cancel.hidden=false;status.textContent='Uploading replacement files…';
+    busy=true;choose.disabled=preview.disabled=true;for(const control of [...Object.values(importControls),...targets.querySelectorAll('button')])control.disabled=true;cancel.hidden=false;showStatus('Uploading replacement files…');
     try{
       const result=await AtelierJobs.run('/api/mesh_replace',{method:'POST',body:form,project});
       if(!result.ok)throw Error(result.error||(result.cancelled?'Replacement cancelled; existing edits were kept.':'Replacement failed'));
-      const info=result.validation;status.textContent=`Model saved · ${info.lods} LODs checked · ${info.retained_weight_vertices} vertices kept their weights · ${info.transferred_weight_vertices} received transferred weights.${info.repaired_weight_vertices ? ' Incompatible weights were fitted to their original game sections.' : ''}${info.preserved_parts?.length ? ' Kept '+info.preserved_parts.length+' untouched part(s).' : ''}${info.morph_targets ? ' '+info.morph_targets+' original morph targets retained.' : ''}${info.material_bundle ? ' '+info.material_bundle.textures+' textures connected. '+info.material_bundle.notes.join(' ') : ''}${info.warnings?.length ? ' '+info.warnings.join('. ')+'.' : ''}`;
+      const info=result.validation,notes=[];
+      if(info.repaired_weight_vertices)notes.push('Incompatible weights were fitted to their original game sections.');
+      if(info.preserved_parts?.length)notes.push('Kept '+info.preserved_parts.length+' untouched part(s).');
+      if(info.morph_targets)notes.push(info.morph_targets+' original morph targets retained.');
+      if(info.material_bundle){notes.push(info.material_bundle.textures+' textures connected.');notes.push(...(info.material_bundle.notes||[]));}
+      notes.push(...(info.warnings||[]));
+      showStatus(`Model saved · ${info.lods} LODs checked\n${info.retained_weight_vertices} vertices kept their weights · ${info.transferred_weight_vertices} received transferred weights.`,notes);
       if(project===atelierProject()){refreshSidebarEntry(target.game_rel,target.name,'');renderGrid();returnContext.onChanged?.(target.game_rel);}
-    }catch(error){status.textContent=error.message;}
+    }catch(error){showStatus(error.message);}
     finally{busy=false;choose.disabled=preview.disabled=false;for(const control of [...Object.values(importControls),...targets.querySelectorAll('button')])control.disabled=false;cancel.hidden=true;input.value='';}
   }
   window.AtelierMeshEdit=Object.freeze({add,open,replace});

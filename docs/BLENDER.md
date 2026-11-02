@@ -835,6 +835,21 @@ longer treats this as `UNSUPPORTED`; it is a `WARNINGS` entry. Verified end-to-e
 `SK_1024_1024307` (LOD0: 100,777 verts, declared max 12 influences, every decoded section-
 local bone index landed inside its section's BoneMap, weight sums exactly 255).
 
+### 5.3c 16-bit bone indices — **done**
+Rebuilds retain `bUse16BitBoneIndex` and automatically use it when any section's
+unchanged BoneMap contains more than 256 entries. Each fixed-eight vertex stores
+eight little-endian `uint16` indices followed by eight `uint8` weights (24 bytes).
+The streamed availability mirror carries the same index-precision flag; its
+`NumBones` remains the influence-slot count, `NumVertices * 8`, rather than a byte
+count. BoneMap contents and section order stay fixed.
+
+`SK_1038_1038502_Lobby` is the regression case: 686 skeleton bones and a largest
+section palette of 274. Preflight now accepts it for editing and rebuilding.
+`tests/test_mesh_bone_indices.py` checks the 256/257 boundary, a 274-entry palette,
+the largest 16-bit local index, mixed palettes, retained source precision, and
+streamed metadata/tail agreement. Sixteen-bit **bone weights** remain unsupported
+for rebuilds and are still refused before editing.
+
 ### 5.4 Cloth — **0.8% of characters, detect and refuse; do not build more**
 No section of the reference asset has cloth (`CorrespondClothAssetIndex == -1` on all 34),
 and the survey found cloth on only 4 body meshes game-wide. `mesh.py` cannot even walk a
@@ -849,8 +864,8 @@ Each raises rather than guessing. Survey share of body meshes in brackets:
   `Mesh.uvs`.
 - `FSkinWeightProfilesData` non-empty **[0 of 514 — never occurs]** —
   `NotImplementedError` in `_locate_tail`. Keep the guard, never implement it.
-- `bUse16BitBoneIndex` **[0.6%]** / `bUse16BitBoneWeight` **[0.2%]** — read but assumed 0
-  on write.
+- `bUse16BitBoneWeight` **[0.2%]** — decoded for previews and refused for rebuilds.
+  Sixteen-bit bone indices are supported; see §5.3c.
 - `bVariableBonesPerVertex` **[44%]** — read but the writer always emits fixed 8
   influences. Promoted to §5.3b; this is the top priority.
 - `bUseHighPrecisionTangentBasis` **[1.2%]** — read, writer hardcodes 0.

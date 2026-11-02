@@ -781,8 +781,8 @@ class Mesh:
         (export SerialSize + package BulkDataStartOffset shift; only valid because
         SkeletalMesh is confirmed the LAST export, so nothing else needs to move)."""
         lod = self.lods[lod_index]
-        if lod.get('bone_index_16') or lod.get('bone_weight_16'):
-            raise NotImplementedError('16-bit skin weights can be previewed but cannot yet be rebuilt safely')
+        if lod.get('bone_weight_16'):
+            raise NotImplementedError('16-bit bone weights can be previewed but cannot yet be rebuilt safely')
         orig_sections = lod["sections"]
         if len(sections_in) != len(orig_sections):
             raise ValueError("section count must match the original (BoneMaps/section "
@@ -790,6 +790,8 @@ class Mesh:
         for si, osec in zip(sections_in, orig_sections):
             if si["mat"] != osec["mat"]:
                 raise ValueError("section order/materials must match the original")
+        bone_index_16 = bool(lod.get('bone_index_16')) or any(
+            len(section['bonemap']) > 256 for section in sections_in)
 
         morph_tail=lod.get('tail_morph',struct.pack('<i',0));morph_count=morph_vertices=0;mode='none'
         if lod.get('had_morphs'):
@@ -805,7 +807,8 @@ class Mesh:
                 morph_tail=struct.pack('<i',0);mode='removed'
                 if original['targets']:morph.patch_metadata(self,lod,[],sum(len(section['positions']) for section in sections_in))
         new_blob, new_secs, total_nv, idx_stride, n_idx = rebuild_lod_buffers(
-            sections_in, lod["tail_prefix"], lod["tail_suffix"],morph_tail=morph_tail)
+            sections_in, lod["tail_prefix"], lod["tail_suffix"], morph_tail=morph_tail,
+            bone_index_16=bone_index_16)
 
         blob_start = lod["idx_off"] - 11      # index buffer's own strip+dts+bulk header
         old_nv, old_n_idx = lod["num_verts"], lod["n_indices"]
@@ -822,7 +825,8 @@ class Mesh:
             for later in self._drm_entries[entry_i + 1:]:
                 (o,) = struct.unpack_from("<q", self.uasset, later["rec_off"] + 4)
                 struct.pack_into("<q", self.uasset, later["rec_off"] + 4, o + delta)
-            self._patch_mirror(lod, old_size, len(new_blob), old_n_idx, n_idx, old_nv, total_nv)
+            self._patch_mirror(lod, old_size, len(new_blob), old_n_idx, n_idx, old_nv, total_nv,
+                               bone_index_16=bone_index_16)
         else:
             old_size = self._lod_blob_end(lod_index,lod) - blob_start
             self.uexp[blob_start:blob_start + old_size] = new_blob
@@ -862,11 +866,10 @@ class Mesh:
                 'morph_targets':morph_count,'morph_vertices':morph_vertices,'morph_mode':mode,
                 'repaired_weight_vertices':sum(section.get('weights_repaired',0) for section in sections_in)}
 
-    def _patch_mirror(self, lod, old_size, new_size, old_n_idx, new_n_idx, old_nv, new_nv):
-        """The .uexp carries small mirrors of a streamed LOD's blob size + derived counts
-        (index count, vertex count, NumBones=NumVerts*8) near that LOD's own section
-        table -- find+replace within a bounded window starting right after this LOD's own
-        sections, so an edit to one LOD can't accidentally match another LOD's mirror."""
+    def _patch_mirror(self, lod, old_size, new_size, old_n_idx, new_n_idx, old_nv, new_nv,
+                      *, bone_index_16=False):
+        """Update the streamed LOD's size and availability metadata to match its new
+        buffers, including the independent bone index and bone weight precision flags."""
         record=lod.get('layout')
         if record:
             # The rebuilder writes full-precision UVs and fixed eight-influence
@@ -874,24 +877,17 @@ class Mesh:
             # replacing matching integers corrupts fields when counts coincide
             # and misses a source that used four or variable influences.
             size_offset=record['size_offset']
-            if struct.unpack_from('<I',self.uexp,size_offset)[0]!=old_size:
-                raise ValueError('Streamed LOD size metadata changed during rebuild')
-            struct.pack_into('<I',self.uexp,size_offset,new_size)
-            struct.pack_into('<B16I',self.uexp,size_offset+8,2 if new_nv<=65536 else 4,new_n_idx,
-                lod['num_tex_coords'],new_nv,1,0,12,new_nv,4,new_nv if lod['col_off'] is not None else 0,
-                0,8,new_nv*8,new_nv,0,0,0)
-            return
-        near = max(s["after"] for s in lod["sections"])
-        mir = self.uexp.find(struct.pack("<I", old_size), near)
-        if mir < 0:
-            raise ValueError("could not find this LOD's metadata mirror in .uexp")
-        seg = bytearray(self.uexp[mir:mir + 0x50])
-        for old, new in ((old_size, new_size), (old_n_idx, new_n_idx),
-                         (old_nv * 8, new_nv * 8), (old_nv, new_nv)):
-            op, npv, j = struct.pack("<I", old), struct.pack("<I", new), 0
-            while (j := seg.find(op, j)) >= 0:
-                seg[j:j + 4] = npv; j += 4
-        self.uexp[mir:mir + 0x50] = seg
+        else:
+            near = max(s["after"] for s in lod["sections"])
+            size_offset = self.uexp.find(struct.pack("<I", old_size), near)
+            if size_offset < 0:
+                raise ValueError("could not find this LOD's metadata mirror in .uexp")
+        if struct.unpack_from('<I',self.uexp,size_offset)[0]!=old_size:
+            raise ValueError('Streamed LOD size metadata changed during rebuild')
+        struct.pack_into('<I',self.uexp,size_offset,new_size)
+        struct.pack_into('<B16I',self.uexp,size_offset+8,2 if new_nv<=65536 else 4,new_n_idx,
+            lod['num_tex_coords'],new_nv,1,0,12,new_nv,4,new_nv if lod['col_off'] is not None else 0,
+            0,8,new_nv*8,new_nv,int(bone_index_16),0,0)
 
     def _reindex_after_resize(self):
         """Re-locate every LOD's buffer offsets after a blob splice -- a resized LOD can
@@ -1117,7 +1113,8 @@ def map_to_fixed_bonemap(global_idx, weight, bonemap, section_label=""):
     return np.where(local < 0, 0, local).astype(global_idx.dtype)
 
 
-def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_stride=None, *, morph_tail=None):
+def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_stride=None, *,
+                        morph_tail=None, bone_index_16=False):
     """Build a complete LOD blob + section metadata from PER-SECTION-LOCAL vertex data --
     each section owns its own vertex arrays (indices 0..Ni-1), not a shared cross-section
     pool. This matches how real glTF exporters (Blender included) actually emit a multi-
@@ -1147,11 +1144,20 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
     supported under this constraint -- only reweighting onto a genuinely new bone is not.
 
     idx_stride: force 4 or 2; None picks 2 when the rebuilt vertex count fits (<65536), else 4.
+    bone_index_16: retain the source's 16-bit bone indices even for a small palette.
+    Palettes larger than 256 entries automatically use 16-bit indices for the entire
+    LOD. Bone weights remain 8-bit, with eight influences per vertex.
     """
     ntc = np.asarray(sections_in[0]["uv"]).shape[1]
     has_color = sections_in[0]["color"] is not None
+    if any(len(section['bonemap']) > 65536 for section in sections_in):
+        raise ValueError('A section BoneMap exceeds the 16-bit bone index range')
+    bone_index_16 = bool(bone_index_16) or any(
+        len(section['bonemap']) > 256 for section in sections_in)
+    bone_index_type = '<u2' if bone_index_16 else 'u1'
+    bone_index_bytes = 16 if bone_index_16 else 8
 
-    sections, all_pos, all_tan8, all_uv, all_col, all_sw16, all_idx = [], [], [], [], [], [], []
+    sections, all_pos, all_tan8, all_uv, all_col, all_sw, all_idx = [], [], [], [], [], [], []
     base_vertex = base_index = 0
     for si in sections_in:
         mat, bonemap = si["mat"], si["bonemap"]
@@ -1171,13 +1177,17 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
         nrm_full = encode_packed_normal(np.concatenate([normal, tan_w[:, None]], 1))
         local_idx = map_to_fixed_bonemap(gidx, w, bonemap, section_label=f"mat{mat}")
         qw = quantize_weights(w)
-        sw_bytes = np.concatenate([local_idx.astype(np.uint8), qw], axis=1)
+        # FSkinWeightInfo stores all indices, then all weights, PER VERTEX.
+        # The index and weight precision are independent: 16-bit indices with
+        # 8-bit weights occupy 24 bytes per vertex, not 16 or 32.
+        index_bytes = local_idx.astype(bone_index_type).view(np.uint8).reshape(n_verts, bone_index_bytes)
+        sw_bytes = np.concatenate([index_bytes, qw], axis=1)
 
         all_pos.append(pos)
         all_tan8.append(np.concatenate([tan_full, nrm_full], axis=1))
         all_uv.append(uv)
         if has_color: all_col.append(np.asarray(si["color"], "f4"))
-        all_sw16.append(sw_bytes)
+        all_sw.append(sw_bytes)
         all_idx.append(tris + base_vertex)
 
         sections.append({"mat": mat, "base_vertex": base_vertex, "num_verts": n_verts,
@@ -1186,7 +1196,7 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
         base_vertex += n_verts; base_index += n_tris * 3
 
     pos = np.concatenate(all_pos); tan8 = np.concatenate(all_tan8)
-    uvs = np.concatenate(all_uv); sw16 = np.concatenate(all_sw16)
+    uvs = np.concatenate(all_uv); skin_weights = np.concatenate(all_sw)
     col = np.concatenate(all_col) if has_color else None
     idx = np.concatenate(all_idx)
     total_nv = base_vertex
@@ -1209,8 +1219,8 @@ def rebuild_lod_buffers(sections_in, tail_prefix=b"", tail_suffix=b"", idx_strid
     o += bulk(8, tan8.astype(np.uint8).tobytes())
     o += bulk(8, uvs.astype("<f4").tobytes())
     o += b"\x01\x00"
-    o += struct.pack("<IIIIII", 0, 8, total_nv * 8, total_nv, 0, 0)   # fixed 8 influences, 8-bit
-    o += bulk(1, sw16.astype(np.uint8).tobytes())
+    o += struct.pack("<IIIIII", 0, 8, total_nv * 8, total_nv, int(bone_index_16), 0)
+    o += bulk(1, skin_weights.tobytes())
     o += b"\x01\x00" + struct.pack("<I", 0) + bulk(4, b"")            # empty lookup buffer
     o += b"\x01\x00" + struct.pack("<II", 4, total_nv if has_color else 0)
     if has_color:
