@@ -124,6 +124,7 @@ def main():
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
     parser.add_argument('--workspace-only', action='store_true', help='Check Projects, embedded workspace, costume persistence and twenty skin switches')
+    parser.add_argument('--navigation-only', action='store_true', help='Check project form recovery, selection focus and interruptible Workspace loading')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -174,6 +175,13 @@ def main():
                                               device_scale_factor=args.device_scale_factor)
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
+                if args.navigation_only:
+                    from navigation_checks import run_navigation_checks
+                    run_navigation_checks(context, url, report, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
                 if args.workspace_only:
                     from workspace_checks import run_workspace_checks
                     run_workspace_checks(context, url, report, checks)
@@ -599,6 +607,9 @@ def main():
 
                 from release_interface_checks import run_release_interface_checks
                 run_release_interface_checks(page, context, browser, url, report, checks)
+
+                from navigation_checks import run_navigation_checks
+                run_navigation_checks(context, url, report, checks)
 
                 # Real backend CRUD, with encoded project header rather than a mock bridge.
                 result = page.evaluate("""async () => {

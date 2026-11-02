@@ -1,46 +1,71 @@
 (() => {
   const $ = id => document.getElementById(id);
   let catalogue, loading, creating=false, choosing=false, busy=false, session=0, selectedHero='';
+  function opening(state=null) {
+    $('workspace-opening').hidden=!state;
+    if(state==='loading')$('workspace').setAttribute('aria-busy','true');
+    else $('workspace').removeAttribute('aria-busy');
+    document.querySelector('.workspace-steps').hidden=!!state;
+    if(!state)return;
+    $('workspace-stage').hidden=$('workspace-choice').hidden=$('workspace-choose').hidden=true;
+    $('workspace-retry').hidden=state!=='error';
+    $('workspace-opening-status').textContent=state==='error'
+      ? 'Could not open your saved workspace. Try again, or return to Library.'
+      : 'Opening your saved workspace…';
+    $('workspace-help').textContent=state==='error'
+      ? 'Your saved edits are still in this project.' : 'Loading the costume you last worked on.';
+  }
   function page(name) {
     document.body.dataset.page=name;
-    $('workspace').hidden=name!=='workspace'; $('body').hidden=name==='workspace';
-    for(const item of ['projects','workspace','library']) $('page-'+item).setAttribute('aria-current',item===name?'page':'false');
-    $('page-workspace').disabled=!window.atelierProject?.();
+    $('workspace').hidden=name!=='workspace'; $('body').hidden=name!=='library';
+    for(const item of ['library','workspace']) $('page-'+item).setAttribute('aria-current',item===name?'page':'false');
     $('page-library').disabled=!window.atelierProject?.();
     $('workspace-title').textContent=creating?'Start a recolour':window.atelierProject?.() || 'Your next creation';
+    $('workspace-advanced').hidden=!window.atelierProject?.();
+    $('workspace-step-choose').toggleAttribute('aria-current',choosing);
+    $('workspace-step-edit').toggleAttribute('aria-current',!choosing);
+    if(choosing)$('workspace-step-choose').setAttribute('aria-current','step');
+    else $('workspace-step-edit').setAttribute('aria-current','step');
+    $('workspace-help').textContent=choosing?'Choose a hero below, then pick the costume you want to change.':'Click a part on the model or in the list. Pick a colour, then save your changes.';
   }
   function present() {
+    opening();
     creating=false; choosing=false; page('workspace');
     $('project-overlay').classList.remove('active');
     $('workspace-choice').hidden=true; $('workspace-stage').hidden=false; $('workspace-choose').hidden=false;
     window.AtelierViewport.mount($('workspace-stage'));
   }
   async function library({closed=false}={}) {
-    if(!window.atelierProject?.())return;
-    if(!closed && await window.AtelierViewport?.close({navigate:false})===false)return;
+    if(!window.atelierProject?.())return false;
+    if(!closed && await window.AtelierViewport?.close({navigate:false})===false)return false;
     session++; choosing=false; creating=false;
+    opening();
     window.AtelierViewport?.mount(null);
     $('project-overlay').classList.remove('active'); page('library');
     $('search-input').focus();
-  }
-  async function projects() {
-    if(await window.AtelierViewport?.close({navigate:false})===false)return;
-    session++; choosing=false;
-    window.AtelierViewport?.mount(null); page('projects');
-    await openProjectPicker();
+    return true;
   }
   async function resume() {
     const project=window.atelierProject?.(), ticket=++session;
     if(!project)return start();
-    const response=await window.atelierFetch('/api/project/workspace',{},project).then(r=>r.json()).catch(()=>({}));
-    if(ticket!==session || project!==window.atelierProject?.())return;
-    const state=response.workspace || {};
-    if(!state.skin_id)return choose();
-    present();
-    await window.AtelierViewport.open(state.skin_id,state.title,state.model || null,state.material_set || null);
+    creating=false; choosing=false; page('workspace'); opening('loading');
+    try {
+      const response=await window.atelierFetch('/api/project/workspace',{},project);
+      if(!response.ok)throw Error('Workspace could not be loaded.');
+      const data=await response.json();
+      if(data.ok===false)throw Error('Workspace could not be loaded.');
+      if(ticket!==session || project!==window.atelierProject?.())return;
+      const state=data.workspace || {};
+      if(!state.skin_id)return choose();
+      present();
+      await window.AtelierViewport.open(state.skin_id,state.title,state.model || null,state.material_set || null);
+    } catch(error) {
+      if(ticket===session && project===window.atelierProject?.())opening('error');
+    }
   }
   async function choose(fresh=false) {
     if(await window.AtelierViewport?.close({navigate:false})===false)return;
+    opening();
     const ticket=++session; creating=fresh; choosing=true; page('workspace');
     $('project-overlay').classList.remove('active');
     $('workspace-stage').hidden=true; $('workspace-choice').hidden=false; $('workspace-choose').hidden=true;
@@ -111,8 +136,11 @@
   }
   function start() {return choose(true);}
   window.addEventListener('atelier:catalogue-updated',()=>{catalogue=null;if(choosing&&!busy)choose(creating);});
-  $('page-projects').onclick=projects; $('page-library').onclick=()=>library(); $('proj-library-btn').onclick=()=>library();
+  $('page-library').onclick=()=>library();
+  $('workspace-advanced').onclick=()=>library();
+  $('workspace-retry').onclick=resume;
   $('page-workspace').onclick=()=>document.body.dataset.page==='workspace'?null:resume();
   $('workspace-choose').onclick=()=>choose(); $('workspace-search').oninput=render;
-  window.AtelierWorkspace={start,resume,present,library,projects,remember};
+  window.AtelierWorkspace={start,resume,present,library,remember};
+  page('library');
 })();

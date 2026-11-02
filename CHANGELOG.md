@@ -5,6 +5,24 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Queued Workspace comparisons stay with their original project, and a Restore
+  finishing after switching projects no longer refreshes the new project's model.
+  Rename and Duplicate save recent build-selection changes before moving or
+  copying the project, with a retry if that save fails.
+  Metadata and backup writes no longer trigger unrelated asset-list refreshes.
+
+- Library Home hides folders with no browsable assets, including empty Maps,
+  Text and Nameplates sections. Project-added folders stay available.
+- Project naming keeps your text and shows errors in the form so you can retry.
+  Renaming the active project updates its name throughout the app, and project
+  selection keeps keyboard focus. Workspace shows loading and retry states,
+  respects navigation while loading, and hides unavailable costume artwork.
+
+- Atelier opens directly in Library with your active project. Projects is back
+  to a compact picker, available from the project name or menu. New projects open
+  immediately in Library. Workspace remains a separate tab for guided costume
+  and colour editing, with its saved costume and edits preserved.
+
 - Passing main updates now queue automatic patch releases. UI hotfixes use focused
   browser checks in parallel, and Windows reuses verified checks from the same
   commit while retaining packaged app and update verification before publication.

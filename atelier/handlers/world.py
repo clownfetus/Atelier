@@ -12,7 +12,7 @@ All patches are same-size (doubles/floats/color bytes) -> no SerialSize fix, no 
 Reads still use to_json. Patch-resilient: config.USMAP is auto-updated."""
 import os, re, glob, json, struct, hashlib, shutil, subprocess
 from atelier.config import WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, TOOLS, CNW, ROOT, get_aes_key, \
-    project_base, project_base_legacy
+    project_base, project_base_legacy, dir_glob
 from atelier.tools import uat
 from atelier.paths import pak_game_path
 import io_lib

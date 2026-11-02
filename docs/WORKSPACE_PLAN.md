@@ -135,12 +135,10 @@ Valorant.
 
 1. **Home.** Does the character workspace become the landing view, with the file library as
    "Explore game assets", or sit beside the library as a mode? The prototype assumes the former.
-   **Decided (Nov 1): neither; Atelier opens on Projects.** The last opened project is the
-   largest thing on the page and one click from its workspace; the rest of the portfolio sits
-   below it. The workspace is where a project opens, not the landing view, and the file library
-   stays reachable as it is today. With no projects yet, the same spot holds the way in for a
-   first recolour (pick a hero and costume, land in the workspace), so the milestone's newcomer
-   still starts in one click.
+   **Revised (Nov 2): Atelier opens in Library.** Feedback on the Projects landing
+   page led to restoring the compact project picker. The active project opens directly
+   in Library; creating or switching projects also lands there. Workspace remains a
+   clearly named, optional tab and restores the project's saved costume and edits.
 2. **Non-dye materials.** Do they get sets through base tint, or only the Texture tab?
    **Decided (Nov 1): Texture tab only.** A base tint washes the whole texture in one colour,
    which is the crude overlay the current editor already has. Non-dye parts are recoloured in
@@ -170,14 +168,14 @@ The character stays on screen; the mod collects below it.
 - Your mod dock is derived from project state: edited materials and textures, grouped by part.
   Each slot has a name, before → after swatch and Restore, and the count drop. The project's
   autosave already exists; surface it as the saved dot.
-- Atelier opens on Projects (Decision 1): the last opened project leads the page as a large card,
-  one click into its workspace. An empty portfolio shows Start a recolour in that place.
+- Atelier opens in Library (revised Decision 1), with Workspace available beside it.
+  Projects uses the compact picker; new projects open immediately in Library.
 - **Review & install** opens the existing export review; install keeps `_install_to_mods`.
 - The library, Edit All import and Projects stay reachable unchanged.
 
-**Done when** Atelier opens on Projects with the last project one click away, a project opened
-from Projects lands in the workspace, edits made in the existing
-material editor appear in the dock, and Review & install installs through the current path.
+**Done when** Atelier opens in Library with the active project, Workspace remains available
+with its saved costume, edits made in the existing material editor appear in the dock,
+and Review & install installs through the current path.
 Effort: Medium–Large. Gate: no GPU stalls after twenty skin switches in one session.
 
 ## Phase 2 — Parts list and stage tools

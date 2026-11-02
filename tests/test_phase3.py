@@ -212,7 +212,8 @@ def t_all_three_nameplate_paths_are_listed():
 def t_the_section_is_pinned_at_the_root():
     """Nameplates is where someone looking for nameplates would look: the root."""
     with sandbox() as sb:
-        write_asset(sb.paks, "pakchunkMain-Windows.utoc", "../../../Marvel/Content/Marvel", "UI", "T_X.uasset")
+        write_asset(sb.paks, "pakchunkMain-Windows.utoc", "../../../Marvel/Content/Marvel",
+                    "UI/Textures/Show/NameplateFrame", "T_X.uasset")
         import atelier.web.browse as B
         root = B.browse_dispatch("")
         assert [r for r in root if r["rel_path"] == "Nameplates"], [r["name"] for r in root]
