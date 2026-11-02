@@ -23,7 +23,7 @@ def run(browser, args, report, errors, mode, custom):
         else:
             route.fulfill(status=404)
 
-    context, page = boot(browser, args.base_url, errors, mode, custom, artwork)
+    context, page = boot(browser, args.base_url, errors, mode, custom, artwork, heroes_open=False)
     label = ('custom-' if custom else '') + mode
     try:
         folders = [dict(type='folder', name='Folder '+str(i), label='Folder '+str(i),
@@ -42,16 +42,16 @@ def run(browser, args, report, errors, mode, custom):
         page.reload()
         toggle = page.get_by_role('button', name='Heroes', exact=True)
         page.wait_for_selector('#grid-area .card')
-        assert toggle.get_attribute('aria-expanded') == 'true'
-        assert page.locator('#settings-home-heroes').is_checked()
-        assert page.locator('#grid-area .card').count() == 10  # Eight folders and both assets.
-        more = page.locator('.home-category-more')
-        assert more.inner_text() == '+4 more folders'
-        more.click()
+        assert toggle.get_attribute('aria-expanded') == 'false'
+        assert not page.locator('#settings-home-heroes').is_checked()
         assert page.locator('#grid-area .card').count() == 14
+        assert page.locator('.home-category-more').count() == 0
+        toggle.click()
+        assert page.locator('.roster-content').is_visible()
+        assert page.locator('#settings-home-heroes').is_checked()
         toggle.click()
         assert page.locator('.roster-content').is_hidden()
-        closed_space = page.locator('#grid-area').evaluate('el=>el.clientHeight')
+        assert page.evaluate("localStorage.getItem('atelier.homeHeroesOpen')") == '0'
 
         for width, height in [(1024, 768), (1400, 900)]:
             page.set_viewport_size({'width': width, 'height': height})
@@ -73,12 +73,15 @@ def run(browser, args, report, errors, mode, custom):
         nav(page, '')
         assert toggle.get_attribute('aria-expanded') == 'false'
         page.reload()
-        page.wait_for_selector('.roster-portrait')
-        assert toggle.get_attribute('aria-expanded') == 'true'  # Manual collapse does not change the startup choice.
-        assert page.locator('#grid-area').evaluate('el=>el.clientHeight') < closed_space
+        page.wait_for_selector('#grid-area .card')
+        assert toggle.get_attribute('aria-expanded') == 'false'
+        assert page.locator('#grid-area .card').count() == 14
+        assert not page.locator('#settings-home-heroes').is_checked()
 
         page.evaluate('openPaths()')
         setting = page.get_by_role('checkbox', name='Open Heroes on Home by default', exact=True)
+        setting.check()
+        assert toggle.get_attribute('aria-expanded') == 'true'
         setting.uncheck()
         page.locator('#setup-cancel').click()
         assert page.evaluate("localStorage.getItem('atelier.homeHeroesOpen')") == '0'
@@ -90,10 +93,11 @@ def run(browser, args, report, errors, mode, custom):
         toggle.focus()
         page.keyboard.press('Enter')
         assert toggle.get_attribute('aria-expanded') == 'true'
-        assert page.evaluate("localStorage.getItem('atelier.homeHeroesOpen')") == '0'
+        assert page.evaluate("localStorage.getItem('atelier.homeHeroesOpen')") == '1'
         page.reload()
         page.wait_for_selector('#grid-area .card')
-        assert toggle.get_attribute('aria-expanded') == 'false'
+        assert toggle.get_attribute('aria-expanded') == 'true'
+        assert page.locator('#settings-home-heroes').is_checked()
 
         other = context.new_page()
         other.goto(args.base_url + '/static/roster.css')
@@ -118,10 +122,12 @@ def run(browser, args, report, errors, mode, custom):
             })();""")
             page.reload()
             page.wait_for_selector('#grid-area .card')
-            assert toggle.get_attribute('aria-expanded') == 'true'
-            page.evaluate("()=>{const el=document.getElementById('settings-home-heroes');el.checked=false;el.dispatchEvent(new Event('change'));}")
             assert toggle.get_attribute('aria-expanded') == 'false'
-        return {'palette': label, 'check': 'Folders and assets share all four card sizes at both desktop widths; the Heroes preference persists, keyboard expansion works, tabs synchronize, and missing catalogue/storage remain usable'}
+            toggle.click()
+            assert toggle.get_attribute('aria-expanded') == 'true'
+            toggle.click()
+            assert toggle.get_attribute('aria-expanded') == 'false'
+        return {'palette': label, 'check': 'Home starts with all folders accessible; opening/closing Heroes persists across reloads, settings and tabs stay synchronized, keyboard and blocked storage remain usable'}
     except Exception:
         page.screenshot(path=str(report / f'failure-{label}.png'), animations='disabled')
         raise

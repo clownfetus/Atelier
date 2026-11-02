@@ -14,7 +14,7 @@
   const colourCache = new Map();
   const host = () => document.getElementById('hero-roster');
   const homeHeroesKey='atelier.homeHeroesOpen';
-  const openByDefault=()=>{try{return localStorage.getItem(homeHeroesKey)!=='0';}catch(_){return true;}};
+  const openByDefault=()=>{try{return localStorage.getItem(homeHeroesKey)==='1';}catch(_){return false;}};
   let heroesOpen=openByDefault();
   function expandHeroes(open) {
     heroesOpen=open;
@@ -23,13 +23,16 @@
     if(content)content.hidden=!open;
     toggle?.setAttribute('aria-expanded',String(open));
   }
+  function rememberHeroes(open) {
+    try{localStorage.setItem(homeHeroesKey,open?'1':'0');}catch(_){}
+    const control=document.getElementById('settings-home-heroes');
+    if(control)control.checked=open;
+    expandHeroes(open);
+  }
   document.addEventListener('DOMContentLoaded',()=>{
     const control=document.getElementById('settings-home-heroes');if(!control)return;
     control.checked=openByDefault();
-    control.addEventListener('change',()=>{
-      try{localStorage.setItem(homeHeroesKey,control.checked?'1':'0');}catch(_){}
-      expandHeroes(control.checked);
-    });
+    control.addEventListener('change',()=>rememberHeroes(control.checked));
   });
   window.addEventListener('storage',event=>{
     if(event.key!==homeHeroesKey&&event.key!==null)return;
@@ -140,7 +143,7 @@
     const heading=document.createElement('h2');heading.className='roster-heading';
     const toggle=document.createElement('button');toggle.type='button';toggle.className='roster-toggle';toggle.setAttribute('aria-controls','home-heroes-content');
     toggle.innerHTML='<span class="roster-disclosure" aria-hidden="true">▸</span> Heroes';
-    toggle.addEventListener('click',()=>{fold(false,false);expandHeroes(!heroesOpen);});heading.append(toggle);
+    toggle.addEventListener('click',()=>{fold(false,false);rememberHeroes(!heroesOpen);});heading.append(toggle);
     const content=document.createElement('div');content.className='roster-content';content.id='home-heroes-content';
     details.append(heading,content);root.append(details);expandHeroes(heroesOpen);
     if (!data.heroes?.length) { window.AtelierPolish?.empty(content,'Catalogue unavailable','Browse the library folders below. Saved artwork will return when available.'); return; }

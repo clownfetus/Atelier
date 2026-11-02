@@ -5,6 +5,11 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- UI hotfix: material controls scroll at their full height in shorter Model Studio
+  windows, with more room for the material list and no clipped recolour inputs.
+  Home shows every asset folder, starts with Heroes collapsed unless previously
+  enabled, and remembers opening or closing Heroes across restarts.
+
 - Models with 16-bit bone indices and sections using more than 256 bones can now
   be edited and rebuilt. Replacement reports preserve line breaks and show each
   warning separately in a scrollable panel.

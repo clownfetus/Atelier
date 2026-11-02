@@ -18,6 +18,10 @@ HOOK = r"""
       const geometry=new THREE.BoxGeometry(w,h,d);geometry.addEventListener('dispose',()=>disposed++);
       const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,0);group.add(mesh);
     }
+    for(let i=1;i<=8;i++){
+      const part=material.clone();part.name='MI_Equip_'+String(i).padStart(2,'0');
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(.04,.04,.04),part);mesh.position.set(0,1+i*.05,.2);group.add(mesh);
+    }
     return {scene:group};
   };
   window.__workspace={
@@ -49,11 +53,12 @@ def run_workspace_checks(context, url, report, checks):
         {'name': '1029001', 'materials': 1, 'meshes': 1}, {'name': '1029002', 'materials': 1, 'meshes': 0}]}))
     def materials(route):
         skin = route.request.post_data_json['skin_id']
-        route.fulfill(json={'ok': True, 'materials': {'MI_Body': {
-            'game_rel': f'Characters/1029/{skin}/Materials/MI_Body',
+        route.fulfill(json={'ok': True, 'materials': {name: {
+            'game_rel': f'Characters/1029/{skin}/Materials/{name}',
             'colors': [{'name': 'BaseTint', 'rgba': [.6, .6, .9, 1]}], 'scalars': [],
             'textures': {'BaseColor': f'Characters/1029/{skin}/Textures/T_Body'},
-            'texture_roles': {'basecolor': f'Characters/1029/{skin}/Textures/T_Body'}, 'tex_ver': {}}}})
+            'texture_roles': {'basecolor': f'Characters/1029/{skin}/Textures/T_Body'}, 'tex_ver': {}}
+            for name in ['MI_Body'] + [f'MI_Equip_{i:02}' for i in range(1, 9)]}})
     page.route('**/api/skin_materials', materials)
     def texture(route):
         texture_reads.append(route.request.url)
@@ -105,13 +110,37 @@ def run_workspace_checks(context, url, report, checks):
         assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
         assert page.locator('#workspace-review').is_disabled()
         page.locator('.vp-material-select').first.click()
-        for width, height in [(1400, 900), (1024, 768)]:
+        for width, height in [(1400, 900), (1280, 720), (1024, 768), (900, 600)]:
             page.set_viewport_size({'width': width, 'height': height})
             for theme in ['light', 'dark']:
                 page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
                 page.screenshot(path=str(report / f'workspace-{theme}-{width}.png'), animations='disabled')
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                 assert page.locator('#viewport-mat-save').is_visible()
+                # The screenshot regression: nine materials and the complete recolour
+                # form must remain usable in the shorter embedded panel, in both themes.
+                assert page.locator('#viewport-mat-count').inner_text() == '9'
+                assert page.locator('#viewport-mat-list').evaluate('el=>el.clientHeight') >= 200
+                assert page.locator('#viewport-skin-card').is_hidden()
+                assert page.locator('#viewport-material-editor').evaluate('el=>el.scrollWidth<=el.clientWidth+1')
+                for selector in ('.vp-recolour .vp-hex', '.vp-recolour select', '.vp-recolour-strength input',
+                                 '.vp-curve-custom > summary', '.vp-advanced > summary'):
+                    control = page.locator(selector)
+                    control.scroll_into_view_if_needed()
+                    bounds = control.evaluate('''el=>{
+                      const r=el.getBoundingClientRect(),p=document.getElementById('viewport-mat-section').getBoundingClientRect();
+                      return {fits:r.left>=p.left-1 && r.right<=p.right+1 && r.top>=p.top-1 && r.bottom<=p.bottom+1,
+                        control:r.toJSON(),panel:p.toJSON()};
+                    }''')
+                    if not bounds['fits']:
+                        page.screenshot(path=str(report / 'inspector-layout-failure.png'))
+                    assert bounds['fits'], (width, height, theme, selector, bounds)
+                page.locator('.vp-editor-dismiss').click()
+                page.locator('.vp-section-select').last.click()
+                assert page.get_by_label('Material part', exact=True).input_value() == 'MI_Equip_08'
+                page.locator('.vp-editor-dismiss').click()
+                page.locator('.vp-material-select').first.click()
+        checks.append('Nine-material inspector keeps full-sized controls, reachable advanced settings and selectable last sections at 900x600 through 1400x900 in both themes')
         page.set_viewport_size({'width': 1400, 'height': 900})
         page.locator('.vp-hex').first.fill('#9644CC')
         page.locator('.vp-hex').first.press('Tab')

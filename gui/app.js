@@ -505,7 +505,6 @@ function renderHomePins() {
   });
 }
 
-let _homeCategoriesExpanded=false;
 function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs?.destroy();
   _gridThumbs = null;
@@ -527,12 +526,6 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
   }
   filtered = AtelierLibraryTools.sort(filtered);
-  const categoryCount=filtered.filter(card=>card.type==='folder').length;
-  const moreCategories=!nav.path&&!q&&!AtelierLibraryTools.hasFilters()&&categoryCount>8;
-  if(moreCategories&&!_homeCategoriesExpanded) {
-    let shownFolders=0;
-    filtered=filtered.filter(card=>card.type!=='folder'||shownFolders++<8);
-  }
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -646,10 +639,6 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
 
   area.innerHTML = "";
   area.appendChild(grid);
-  if(moreCategories) {
-    const more=document.createElement('button');more.className='btn home-category-more';more.textContent=_homeCategoriesExpanded?'Fewer folders':`+${categoryCount-8} more folders`;more.setAttribute('aria-expanded',String(_homeCategoriesExpanded));
-    more.addEventListener('click',()=>{_homeCategoriesExpanded=!_homeCategoriesExpanded;buildGrid(allItems.map(_makeCard));area.querySelector('.home-category-more')?.focus();});grid.append(more);
-  }
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
   _gridThumbs?.start(retryThumbs);

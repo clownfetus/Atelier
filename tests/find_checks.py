@@ -49,8 +49,7 @@ def run_find_checks(page,context,url,report,checks):
         tab.wait_for_function("document.querySelectorAll('.roster-portrait').length===2")
         tab.get_by_role('button',name='All',exact=True).click();tab.locator('.roster-portrait').first.focus();tab.keyboard.press('ArrowRight')
         assert tab.locator('.roster-portrait').nth(1).evaluate('el=>el===document.activeElement')
-        assert tab.locator('#grid-area .card').count()==8
-        tab.locator('.home-category-more').click();assert tab.locator('#grid-area .card').count()==10
+        assert tab.locator('#grid-area .card').count()==10
         checks.append('Home leads with hero costume/edit counts, per-project recent/edited filters, keyboard movement, category chips and a Continue ribbon from actual edit time')
         tab.evaluate("() => {window.studioOpens=[];AtelierViewport.open=async (...args)=>studioOpens.push(args);}")
         tab.locator('.roster-portrait').first.click();tab.locator('.roster-skin').click()
@@ -79,7 +78,7 @@ def run_find_checks(page,context,url,report,checks):
         checks.append('Everywhere supports debounced keyboard navigation and asset focus, rejects stale responses, and This folder keeps local filtering')
         tab.evaluate("pushNav({path:''})");tab.wait_for_selector('.roster-portrait')
         tab.locator('#search-scope').click()
-        tab.evaluate('_homeCategoriesExpanded=false;buildGrid(allItems.map(_makeCard))')
+        tab.evaluate('buildGrid(allItems.map(_makeCard))')
         for theme in ('dark','light'):
             tab.locator('#settings-theme').select_option(theme,force=True)
             tab.screenshot(path=str(report/f'find-home-{theme}.png'),animations='disabled')

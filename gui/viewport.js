@@ -888,7 +888,13 @@ function pickMaterial(name, openEditor = true, surface = null, textureSlot = nul
   buildPanel();
   const row = [...document.querySelectorAll('#viewport-mat-list .vp-mat')].find(row => row.dataset.material === name);
   row?.scrollIntoView({block:'nearest', inline:'nearest'});
-  if (!openEditor) return;
+  if (!openEditor) {
+    if (!assembly?.active() && !matchMedia('(max-width:720px)').matches) {
+      const section=$('viewport-mat-section'), editor=$('viewport-material-editor');
+      section.scrollTop += editor.getBoundingClientRect().top-section.getBoundingClientRect().top;
+    }
+    return;
+  }
   const info = matData[name];
   if (!info?.game_rel) { note('Material parameters are unavailable for this section.', 'warning'); return; }
   if (assembly?.active() && !verifiedBinding(info)) { note('This material assignment is unverified. Inspect mode retains the preview controls.', 'warning'); return; }
@@ -1349,7 +1355,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   const title = document.createElement('h3'); title.textContent = materialGroup(name);
   const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'vp-editor-dismiss';
   dismiss.setAttribute('aria-label','Deselect material'); dismiss.title = 'Deselect material'; dismiss.innerHTML = '<i data-lucide="x" size="17"></i>';
-  dismiss.addEventListener('click',()=>{selectedMaterial=null;buildPanel();$('viewport-canvas').focus();});
+  dismiss.addEventListener('click',()=>{selectedMaterial=null;buildPanel();$('viewport-mat-section').scrollTop=0;$('viewport-canvas').focus();});
   heading.append(title,dismiss); editor.append(heading);
   if (info.surface?.preview_omitted) {
     const hint=document.createElement('p');hint.className='vp-inspector-hint';

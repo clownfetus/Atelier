@@ -80,5 +80,3 @@
 #hero-roster.roster-compact .roster-portrait strong { display:block; min-height:0; padding:4px 6px 5px; font-size:var(--studio-text-micro); white-space:nowrap; text-overflow:ellipsis; }
 #hero-roster.roster-compact .roster-portrait.has-edits::after { width:12px; height:12px; }
 #explorer:has(> #hero-roster.roster-compact:not([hidden])) > .library-content { flex:1 1 auto; max-height:none; }
-/* Home folders and assets share the normal card sizing, pin and preview controls. */
-.home-category-more { flex:0 0 var(--card-w,156px);align-self:flex-start;min-height:36px;font-size:var(--studio-text-detail); }
