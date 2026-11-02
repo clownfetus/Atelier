@@ -2,7 +2,10 @@
 .mesh-edit-modal { width:min(620px,94vw);padding:24px;display:flex;flex-direction:column;gap:18px; }
 .mesh-edit-modal h2 { font-size:19px; }
 .mesh-edit-modal p { font-size:var(--studio-text-label);line-height:1.6;color:var(--muted);overflow-wrap:anywhere; }
-.mesh-edit-modal #mesh-edit-status { color:var(--text); }
+.mesh-edit-modal #mesh-edit-status { color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;scrollbar-gutter:stable; }
+.mesh-edit-modal #mesh-edit-status p { margin:0;color:inherit; }
+.mesh-edit-notes { margin:10px 0 0;padding-left:20px; }
+.mesh-edit-notes li + li { margin-top:8px; }
 .mesh-edit-path { font-size:var(--studio-text-micro)!important; }
 .mesh-edit-actions { display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap; }
 .mesh-edit-actions [hidden] { display:none; }

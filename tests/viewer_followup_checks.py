@@ -31,7 +31,9 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
     tab.route('**/api/mesh_add',lambda route:(added.append(route.request.post_data_json),route.fulfill(json={'ok':True}))[-1])
     def replacement(route):
         replaced.append(route.request.post_data_buffer)
-        route.fulfill(json={'ok':True,'validation':{'lods':2,'retained_weight_vertices':20,'transferred_weight_vertices':10}})
+        route.fulfill(json={'ok':True,'validation':{'lods':2,'retained_weight_vertices':20,'transferred_weight_vertices':10,
+            'warnings':['Variable bone weights: vertices with more than 8 influences may deform differently.',
+                        'Review the imported model’s size in 3D.']}})
     tab.route('**/api/mesh_replace',replacement)
     try:
         tab.goto(url);tab.wait_for_function('window.AtelierMeshEdit && window.atelierProject?.()')
@@ -63,7 +65,29 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         tab.wait_for_function("document.getElementById('mesh-edit-status').textContent.includes('Model saved')")
         assert len(replaced)==1 and b'model.psk' in replaced[0] and b'game_rel' in replaced[0]
         assert b'"keep_morphs":false' in replaced[0] and b'"keep_skeleton":true' in replaced[0] and b'"keep_weights":true' in replaced[0]
+        assert tab.locator('#mesh-edit-status .mesh-edit-notes li').count()==2
+        assert tab.locator('#mesh-edit-status').evaluate('el=>getComputedStyle(el).whiteSpace')=='pre-wrap'
         tab.screenshot(path=str(report/'model-replacement-dialog.png'))
+        # A failed preflight arrives as plain multiline text. Keep every line,
+        # keyboard scrolling and the retry/close buttons reachable on a small screen.
+        tab.unroute('**/api/mesh_replace')
+        error_report='SK_Test: NOT SUPPORTED\n  - cloth: sections carry cloth mapping data\n\n'+'\n'.join(f'LOD{i}: fixture format details' for i in range(12))
+        tab.route('**/api/mesh_replace',lambda route:route.fulfill(json={'ok':False,'error':error_report}))
+        original_viewport=tab.viewport_size
+        tab.set_viewport_size({'width':420,'height':700})
+        tab.locator('#mesh-edit-overlay input[type=file]').set_input_files({'name':'unsupported.glb','mimeType':'model/gltf-binary','buffer':b'preflight fixture'})
+        tab.wait_for_function("document.getElementById('mesh-edit-status').textContent.includes('NOT SUPPORTED')")
+        status=tab.locator('#mesh-edit-status')
+        assert status.text_content()==error_report
+        assert status.evaluate('el=>el.scrollHeight>el.clientHeight')
+        status.focus();tab.keyboard.press('End')
+        tab.wait_for_function("document.getElementById('mesh-edit-status').scrollTop>0")
+        button=tab.locator('#mesh-replace-choose').bounding_box()
+        assert button and button['y']+button['height']<=700,button
+        assert tab.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        tab.screenshot(path=str(report/'model-replacement-readable-error.png'))
+        tab.set_viewport_size(original_viewport)
+        checks.append('Replacement warnings use separate list items; multiline preflight errors wrap and scroll by keyboard without hiding retry or Close')
         tab.get_by_role('button',name='Close',exact=True).last.click()
         imported=[];browse_requests=[]
         textures=[{'type':'asset','file_type':'texture','name':name,'game_rel':'Fixture/'+name,'imported':False} for name in ('T_One','T_Two')]
