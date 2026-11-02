@@ -5,6 +5,72 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Recolour texture: select a part that doesn't dye and blend a colour into its texture with Colour, Hue, Multiply, Screen, Overlay or Soft light at any strength. The model previews it as you go, Cancel preview puts the part back, and Apply recolour saves an ordinary edited texture into Your mod, so it ships, compares and restores like any other texture edit. Adjusting a recolour starts again from the game's texture instead of stacking, and replacing a texture you edited another way asks first.
+  A Curve control adjusts brightness after the colour: one click for Lighter, Darker, More
+  contrast or Less contrast, or open Edit curve by hand to drag points on the line (arrow keys
+  move a focused point, Delete removes it). Every recolour control now has an icon.
+
+- Your mod sits under the model in the workspace. Each saved edit shows its colour before and after, and Restore puts it back to the game's original with Undo, the same as deleting it from the Mod tray. Review & install opens the usual export review without leaving the workspace.
+
+- Atelier opens on Projects. Open a project into its workspace, return to its last costume, or start a recolour by choosing a hero and costume. The model sits in the page, with Projects and the full Library always reachable. Colour changes still use the existing Save changes button.
+
+- Projects puts your last opened project up front, with a large card to pick up where you left off and a clear starting point for your first recolour.
+
+- Colour previews reuse prepared textures and save preview images faster.
+  Restoring colours or entering a hex colour updates the model immediately;
+  dragging the colour picker still groups rapid changes together.
+- Atelier now warns when the game's update is newer than its mapping file and
+  checks for a replacement straight away. A downloaded mapping takes effect
+  after restarting Atelier, so you know when colour edits can be saved again.
+- Building a mod now shows the Krackle ink-well: bubbles form, circulate, crowd
+  and burst while your mod cooks, and a few of them carry colours averaged from
+  the original costume's textures. When the build finishes, a successful export
+  bursts cleanly from the top and settles calm, an export with warnings strains
+  under pressure without breaking, and a failed export ruptures and leaks. Calm,
+  Off and reduced motion show a still pose.
+- Edit All has a redesigned progress dialog, the first part of Atelier to use its
+  new identity: Gesso and Lamp Black surfaces (Charcoal in Dark), Instrument Sans
+  and Fragment Mono beside Bricolage, and one dot per texture. Ink gathers on the
+  textures you chose, pours into the dialog, charges while they import and leaves
+  for the Mod tray as each one lands. The dialog now stays open with the result
+  (imported, imported with warnings, failed or cancelled) until you choose Done;
+  hiding it still reports through a notification. Calm, Off and reduced motion
+  show still poses and nothing travels.
+- The Projects screen is now Atelier's front page in the new identity: the mark
+  stands in for the A of the wordmark, each project is an ink portfolio with your
+  latest edited texture tucked inside, and with no projects yet a single drop of
+  ink waits on the baseline. Creating a project adds it to the list instead of
+  opening it straight away: ink runs in along the floor from the edge of the
+  screen and the portfolio rises out of it. Open it when you're ready. Deleting
+  a project plays it backwards: the portfolio melts and drains away, and the
+  projects beside it glide into the gap.
+- The setup check at launch now happens on the Projects page itself, and only
+  shows when it takes longer than a moment: a drop of ink pours along the header
+  rule to a latch while Atelier looks for Marvel Rivals, its unlock key and its
+  mapping file. First-time setup is now one page that says what was found and
+  asks only for what's missing, instead of three steps. A drop of ink runs down
+  past each thing that's ready, waits at the first one that isn't, and once
+  everything is in, the ink-well labelled Open Atelier opens its lid and the drop
+  falls in. Appearance and motion
+  are in Settings. If the check can't finish, the page shows the real error with
+  Try again.
+- Fixed costumes that could stay unpainted in the viewer, Assembly and the
+  material editor until the next game update. The game reader sometimes
+  started up unable to read some materials and returned them empty without an
+  error, and Atelier kept those empty results. It no longer saves an empty
+  material read, and materials saved empty by earlier versions are read again.
+- Menu → Open a mod… reads a cooked mod (.pak, .utoc/.ucas or a .zip of them)
+  and shows what each asset really is, where it lives in the game and what it
+  uses. Its textures and materials can be added to your Mod tray as edits of
+  the game assets they replace; everything else can be saved as JSON. A mod
+  its author locked asks for the password first.
+- Fixed material colour saves that could be lost without a word right after a
+  game update. Until Atelier has a mapping file for the new game version, it
+  can't read some materials' colours, and a save used to report success while
+  changing nothing. It now says the mapping is out of date and keeps your edits
+  unsaved, and materials saved that way by earlier versions are read again once
+  the new mapping is in use.
+
 ## 1.1.4
 
 To get the new updater, use the 1.1.4 Windows installer or replace your Linux

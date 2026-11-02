@@ -11,27 +11,52 @@ def _imported_exists(game_rel, ext):
     return (ext == '.blend' and os.path.exists(project_base(game_rel)+'.mesh.json')) or (os.path.exists(project_base(game_rel) + ext)
             or os.path.exists(project_base_legacy(game_rel) + ext))
 
-def _edited_swatches(game_rel, limit=6):
-    """An edited material's colours for its card, as the editor shows them: each stored value
-    divided by its HDR intensity, max(rgb, 1). Distinct colours only, in parameter order."""
+def _swatch_hex(rgba):
+    """A colour as the editor shows it: the stored value divided by its HDR intensity, max(rgb, 1)."""
+    r, g, b = rgba[:3]
+    scale = max(r, g, b, 1)
+    return '#' + ''.join(f'{round(min(1, max(0, v / scale)) * 255):02x}' for v in (r, g, b))
+
+def _edited_colors(game_rel):
+    """The project copy's colour parameters, read from its JSON (None when there is no copy)."""
     from atelier.handlers.material import _mat_params
     for base in (project_base(game_rel), project_base_legacy(game_rel)):
         try:
             with open(base + '.json', encoding='utf-8-sig') as f:
-                colors, _ = _mat_params(json.load(f))
+                return _mat_params(json.load(f))[0]
         except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
             continue
-        out = []
-        for color in colors:
-            r, g, b = color['rgba'][:3]
-            scale = max(r, g, b, 1)
-            value = '#' + ''.join(f'{round(min(1, max(0, v / scale)) * 255):02x}' for v in (r, g, b))
-            if value not in out:
-                out.append(value)
-            if len(out) == limit:
-                break
-        return out
-    return []
+    return None
+
+def _edited_swatches(game_rel, limit=6):
+    """An edited material's colours for its card. Distinct colours only, in parameter order."""
+    out = []
+    for color in _edited_colors(game_rel) or []:
+        value = _swatch_hex(color['rgba'])
+        if value not in out:
+            out.append(value)
+        if len(out) == limit:
+            break
+    return out
+
+def edited_colour_changes(game_rel, limit=6):
+    """The colours an edit changed, as {name, before, after} in parameter order. Parameters are
+    matched by name against the game's original, so a colour the edit left alone never shows as a
+    change; one the original lacks has no before. Raises when the original cannot be read."""
+    from atelier.handlers.material import read_material_original
+    edited = _edited_colors(game_rel)
+    if edited is None:
+        return []
+    original = {c['name']: _swatch_hex(c['rgba']) for c in read_material_original(game_rel).get('colors', [])}
+    out = []
+    for color in edited:
+        after = _swatch_hex(color['rgba'])
+        before = original.get(color['name'])
+        if before != after:
+            out.append({'name': color['name'], 'before': before, 'after': after})
+        if len(out) == limit:
+            break
+    return out
 
 _REMOTE_MD_URL   = "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/refs/heads/main/MarvelRivalsCharacterIDs.md"
 _update_callback = None   # set by routes.py to _push_sse after it's defined

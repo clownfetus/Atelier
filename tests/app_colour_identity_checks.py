@@ -122,6 +122,8 @@ def controls(page):
 
 def boot(browser, url, errors, mode='dark', custom=False, fixture=None):
     context = browser.new_context(viewport={'width': 1400, 'height': 900}, reduced_motion='reduce')
+    from browser_startup import enter_library_on_startup
+    enter_library_on_startup(context)
     context.route('https://**', lambda route: route.abort())
     page = context.new_page()
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -147,6 +149,7 @@ def boot(browser, url, errors, mode='dark', custom=False, fixture=None):
     page.goto(url)
     page.wait_for_selector('.roster-portrait')
     page.wait_for_function("window.AtelierPolish&&window.AtelierContinuity&&window.atelierProject?.()&&!document.querySelector('.overlay.active')")
+    page.evaluate('document.activeElement?.blur()')
     return context, page
 
 

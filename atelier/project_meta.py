@@ -31,7 +31,7 @@ Nothing here warns or blocks on version. The texture/material/curve/vfx project 
 unchanged from 0.2.3 and pre-Noobs builds, so those projects load as-is; this only records
 provenance so a LATER version has the facts it needs to decide.
 """
-import os, json, threading
+import os, json, threading, time
 
 from atelier.config import VERSION_FILE
 
@@ -92,8 +92,12 @@ def load(project_dir):
         "version":         d.get("version", _VERSION),
         "created_version": d.get("created_version", _UNKNOWN),
         "last_version":    d.get("last_version", _UNKNOWN),
+        "last_opened_at":  d.get("last_opened_at", 0) if isinstance(d.get("last_opened_at", 0), (int, float)) else 0,
+        "workspace":       d.get("workspace") if isinstance(d.get("workspace"), dict) else {},
         "deselected":      [s for s in (d.get("deselected") or []) if isinstance(s, str)],
         "asset_opts":      {k: v for k, v in (d.get("asset_opts") or {}).items()
+                            if isinstance(k, str) and isinstance(v, dict)},
+        "recolours":       {k: v for k, v in (d.get("recolours") or {}).items()
                             if isinstance(k, str) and isinstance(v, dict)},
     }
 
@@ -122,6 +126,36 @@ def stamp_new(project_dir):
 def get_deselected(project_dir):
     """Set of game_rels the user has switched OFF for export in this project."""
     return set(load(project_dir)["deselected"])
+
+
+def mark_opened(project_dir, *, reset=False):
+    with _lock:
+        data = load(project_dir)
+        data["last_opened_at"] = 0 if reset else time.time()
+        _write(project_dir, data)
+
+
+def set_workspace(project_dir, workspace):
+    with _lock:
+        data = load(project_dir)
+        data["workspace"] = workspace
+        _write(project_dir, data)
+
+
+def workspace(project_dir):
+    saved = load(project_dir)["workspace"]
+    if saved.get("skin_id"):
+        return saved
+    import re
+    skins = set()
+    for root, dirs, files in os.walk(project_dir):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        if not any(f.endswith((".json", ".png")) for f in files):
+            continue
+        match = re.match(r"Characters/\d{4}/(\d{6,10})(?:/|$)", os.path.relpath(root, project_dir).replace("\\", "/"), re.I)
+        if match:
+            skins.add(match[1])
+    return {"skin_id": skins.pop()} if len(skins) == 1 else {}
 
 
 def set_deselected(project_dir, game_rels):
@@ -191,6 +225,7 @@ def forget_asset(project_dir, game_rel, selection=False):
     with _lock:
         d = load(project_dir)
         changed = d["asset_opts"].pop(game_rel, None) is not None or (selection and game_rel in d['deselected'])
+        changed = d["recolours"].pop(game_rel, None) is not None or changed
         if selection:
             d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
         if changed:
@@ -205,7 +240,28 @@ def restore_asset(project_dir, game_rel, saved):
             d['asset_opts'][game_rel] = saved['opts']
         else:
             d['asset_opts'].pop(game_rel, None)
+        if saved.get('recolour'):
+            d['recolours'][game_rel] = saved['recolour']
+        else:
+            d['recolours'].pop(game_rel, None)
         d['deselected'] = [gr for gr in d['deselected'] if gr != game_rel]
         if saved.get('deselected'):
             d['deselected'].append(game_rel)
+        _write(project_dir, d)
+
+
+def get_recolour(project_dir, game_rel):
+    """The blend recipe a texture was last baked with, and the PNG stamp it produced (or None)."""
+    saved = load(project_dir)["recolours"].get(game_rel)
+    return dict(saved) if saved else None
+
+
+def set_recolour(project_dir, game_rel, recolour):
+    """Record (or with None, drop) the recipe behind a texture's recolour bake."""
+    with _lock:
+        d = load(project_dir)
+        if recolour:
+            d["recolours"][game_rel] = recolour
+        elif d["recolours"].pop(game_rel, None) is None:
+            return
         _write(project_dir, d)

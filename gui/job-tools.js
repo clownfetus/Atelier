@@ -185,7 +185,8 @@
   };
   window.AtelierJobs = {
     async run(path, options = {}) {
-      const {project = window.atelierProject(), ...opts} = options;
+      // onUpdate receives each job snapshot, for a page that shows the stage in its own status line.
+      const {project = window.atelierProject(), onUpdate, ...opts} = options;
       const form=opts.body instanceof FormData;
       const input = form ? null : JSON.parse(opts.body || '{}');
       const result = await request(path, {...opts, body:form ? opts.body : JSON.stringify({...input, background: true})}, project);
@@ -200,6 +201,7 @@
           const job = payload.job;
           if (!job) throw new Error('Job status is unavailable');
           notify(job); failures = 0;
+          try { onUpdate?.(job); } catch (_) {}
           if (!active.has(job.state)) return job.result || {ok: false, interrupted: job.state === 'interrupted', error: job.error || job.stage};
         } catch (error) {
           // Reconnect to the same job; never resubmit a build after a dropped response.

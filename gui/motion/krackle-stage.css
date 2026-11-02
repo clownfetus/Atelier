@@ -14,12 +14,28 @@
 [data-atelier-motion="krackle-stage"] .am-krackle-stage-canvas { display: block; }
 [data-atelier-motion="krackle-stage"] .am-krackle-stage-filter { position: absolute; width: 0; height: 0; overflow: hidden; }
 
+/* The ink-well (export review build): rift body, charge ink, holes; tints carry skin colours inline. */
+[data-atelier-motion="ink-well"] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  line-height: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.am-ink-well { display: block; overflow: visible; }
+.am-ink-well-charge { fill: var(--krackle-charge); }
+.am-ink-well-rift { fill: var(--krackle-rift); }
+.am-ink-well-hole { fill: var(--krackle-hole); }
+.am-ink-well-success { fill: var(--krackle-success); }
+.am-ink-well-warn { fill: var(--krackle-warn); }
+.am-ink-well-fault { fill: var(--krackle-fault); }
+
 .export-review-stage { position: relative; margin: -6px auto -4px; flex-shrink: 0; }
 /* With the stage in the dialog, long reports scroll inside the body so the outcome
    heading and the actions stay visible together. */
 .export-review-modal:has(.export-review-stage:not(:empty)) .export-review-body { overflow-y: auto; overscroll-behavior: contain; }
 .export-review-stage:empty, .export-review-stage[hidden] { display: none; }
 @media (max-height: 700px) {
-  .export-review-stage .am-krackle-stage-canvas { width: 164px !important; height: 164px !important; }
-  .prog-krackle-stage .am-krackle-stage-canvas { width: 144px !important; height: 144px !important; }
+  .export-review-stage .am-krackle-stage-canvas, .export-review-stage .am-ink-well { width: 164px !important; height: 164px !important; }
 }

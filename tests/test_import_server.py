@@ -37,6 +37,8 @@ for line in sys.stdin:
   print('not JSON',flush=True);continue
  elif action=='asset_error':
   print(json.dumps(dict(id=r['id'],ok=False,error='Fixture asset is unsupported')),flush=True);continue
+ elif action=='material' and r['asset'].endswith('_Inherits'):
+  data={'colors':[],'scalars':[],'textures':{},'surface':{'parent':'MI_Parent','parent_path':'Characters/Test/MI_Parent'}}
  elif action=='material':
   data={'colors':[{'name':'Tint','rgba':[1,0,0,1]}],'scalars':[],'textures':{}}
  elif action=='texture':
@@ -187,6 +189,27 @@ class PersistentImports(unittest.TestCase):
         project=self.root/'project';project.mkdir()
         with config.project_context(str(project)):S.material('Characters/Test/MI_Body')
         self.assertFalse(list(project.iterdir()))
+
+    def test_empty_child_reads_are_held_per_reader_and_never_published(self):
+        asset='Characters/Test/MI_Inherits'
+        target=S._target(S._source()[1],'materials',S._asset(asset),'.json')
+        first=S.material(asset);pid=S._worker.pid
+        self.assertEqual(first['textures'],{});self.assertFalse(target.exists())
+        self.assertEqual(S.material(asset),first)
+        self.assertEqual(self.events.read_text().splitlines().count('material'),1)
+        self.children[-1].kill();self.children[-1].wait()
+        S.stats();self.assertNotEqual(S._worker.pid,pid)
+        S.material(asset)
+        self.assertEqual(self.events.read_text().splitlines().count('material'),2)
+        self.assertFalse(target.exists())
+
+    def test_an_empty_read_cached_by_an_older_version_is_read_again(self):
+        asset='Characters/Test/MI_Body'
+        target=S._target(S._source()[1],'materials',S._asset(asset),'.json')
+        target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_text(json.dumps({'colors':[],'scalars':[],'textures':{},'surface':{'parent_path':'Characters/Test/MI_Parent'}}))
+        self.assertEqual(S.material(asset)['colors'][0]['name'],'Tint')
+        self.assertEqual(json.loads(target.read_text())['colors'][0]['name'],'Tint')
 
     def test_parallel_requests_for_one_material_share_one_conversion(self):
         with ThreadPoolExecutor(max_workers=4) as pool:

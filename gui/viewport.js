@@ -12,6 +12,7 @@ import { createViewportFloor } from './viewport-effects.js';
 import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, applyEmissive } from './viewport-materials.js';
 import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials, weaponSide } from './viewport-attachments.js';
 import { createAssemblyView } from './assembly.js';
+import { createViewportRecolour } from './viewport-recolour.js';
 import { verifiedBinding } from './assembly-data.js';
 
 const $ = id => document.getElementById(id);
@@ -44,6 +45,14 @@ let meshSlots = [];
 let heroId = '';
 let selectedMaterial = null;
 let assembly, workspaceMode = 'inspect', connectedEditorPending = false, assemblyRefreshTimer = 0;
+const recolour = createViewportRecolour({
+  materials:name => matsByName[name] || [], baseline:name => baselineMaps.get(name), loader:texLoader,
+  fetch:(url, options) => projectFetch(url, options), retint:name => retint(name), note:(message, kind) => note(message, kind),
+  rebuild:() => buildPanel(), reload:() => reloadMaterials(),
+  // A saved recolour replaces the map on every part that draws this texture.
+  applied:(texture, ver) => Promise.all(Object.entries(matData).filter(([, info]) => info.texture_roles?.basecolor === texture)
+    .map(([name, info]) => { info.tex_ver = {...info.tex_ver, [texture]:ver}; return applyMatTexture(name, texture, 'map', ver); })),
+});
 let preserveAnimationCamera = false;
 try { if (localStorage.getItem('atelier.assembly') === '1') workspaceMode = 'assembly'; } catch (_) {}
 
@@ -274,7 +283,7 @@ function init() {
       }
       soloSnapshot = soloTarget = null;
       selectedMaterial = null;
-    },{automatic:true});
+    },{automatic:true}).then(rememberWorkspace);
     $('viewport-model-menu').open = false;
   });
   $('viewport-blender-btn').addEventListener('click', editInBlender);
@@ -1055,6 +1064,7 @@ async function buildChromaPicker(skinId, meshGameRel) {
     chromaSkin = sel.value;
     $('viewport-status').textContent = `Materials: ${sel.selectedOptions[0]?.textContent || chromaSkin}`;
     loadMaterials(chromaSkin);
+    rememberWorkspace();
   };
   row.style.display = '';
 }
@@ -1087,6 +1097,7 @@ async function loadMaterialSet(skinId, load, additions=null) {
   const matGen = additions ? materialGeneration : ++materialGeneration;
   if(!additions) {
     inspection?.clearMaterials();
+    recolour.discard();
     clearLiveDyes(); baselineMaps.clear();
     matData = {}; edited = {};
   }
@@ -1332,7 +1343,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   const advancedOpen = editor.querySelector('.vp-advanced')?.open && editor.dataset.material === selectedMaterial;
   editor.replaceChildren(); editor.hidden = !info; $('viewport-material-empty').hidden = !!info;
   editor.dataset.material = selectedMaterial || '';
-  if (!info) return;
+  if (!info) { recolour.discard(); return; }
   const name = selectedMaterial;
   const heading = document.createElement('div'); heading.className = 'vp-editor-title';
   const title = document.createElement('h3'); title.textContent = materialGroup(name);
@@ -1365,6 +1376,8 @@ function buildMaterialInspector(names = Object.keys(matData)) {
     const label = index === info.emiIdx ? 'Glow colour' : index === info.baseIdx ? 'Main colour' : colors[index].name.replace(/\s*-\s*ColorA$/i,' colour');
     editor.append(colorField(name,colors[index],label,true));
   }
+  const recolourSection = recolour.section(name, info);
+  if (recolourSection) editor.append(recolourSection);
   const advanced = document.createElement('details'); advanced.className = 'vp-advanced'; advanced.open = !!advancedOpen;
   const summary = document.createElement('summary'); summary.innerHTML = 'Advanced parameters <i data-lucide="chevron-right" size="18"></i>'; advanced.append(summary);
   const hint = document.createElement('p'); hint.textContent = 'Exact shader parameters. Some colours are saved for the game and may not have a faithful live preview.'; advanced.append(hint);
@@ -1396,7 +1409,7 @@ function colorField(name, color, label, references) {
   picker.addEventListener('input',()=>{hex.value=picker.value.toUpperCase();onColorInput(name,color.name,picker.value);});
   hex.addEventListener('change',()=>{
     const value = hex.value.startsWith('#') ? hex.value : '#'+hex.value;
-    if (/^#[0-9a-f]{6}$/i.test(value)) { hex.setCustomValidity('');picker.value=value;onColorInput(name,color.name,value);hex.value=value.toUpperCase(); }
+    if (/^#[0-9a-f]{6}$/i.test(value)) { hex.setCustomValidity('');picker.value=value;onColorInput(name,color.name,value,{immediate:true});hex.value=value.toUpperCase(); }
     else {hex.setCustomValidity('Enter a six-digit hex colour, such as #70459B.');hex.reportValidity();}
   });
   hex.addEventListener('input',()=>hex.setCustomValidity(''));
@@ -1415,7 +1428,7 @@ function colorField(name, color, label, references) {
           if (saving) return;
           for(const peer of materialPeers(name)) {
             if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
-            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer);
+            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer,{immediate:true});
           }
           picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
         });
@@ -1432,7 +1445,7 @@ function revertMaterial(name) {
   for(const peer of materialPeers(name)) {
     clearTimeout(_dyeMeshTimer[peer]); _dyeMeshRevision[peer] = (_dyeMeshRevision[peer] || 0) + 1;
     delete edited[peer]; retint(peer);
-    if (matData[peer].dyeable || matData[peer].eye_preview) dyeRebakeMesh(peer);
+    if (matData[peer].dyeable || matData[peer].eye_preview) dyeRebakeMesh(peer,{immediate:true});
   }
   buildPanel(); note('Material restored to saved colours','success');
 }
@@ -1442,13 +1455,13 @@ function materialPeers(name) {
   return path ? Object.keys(matData).filter(key=>matData[key].game_rel===path) : [name];
 }
 
-function onColorInput(matName, paramName, hex) {
+function onColorInput(matName, paramName, hex, options) {
   const [r, g, b] = hexToLin(hex);
   const d = matData[matName];
   const orig = (d.colors.find(c => c.name === paramName) || {}).rgba || [r, g, b, 1];
   for(const peer of materialPeers(matName)) {
     (edited[peer] ||= {})[paramName] = [r,g,b,orig[3] ?? 1];retint(peer);
-    if(matData[peer].eye_preview || matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer);
+    if(matData[peer].eye_preview || matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer,options);
   }
   // retint re-derives the mesh from the params, routing each to its real channel: EmissiveColor →
   // the emissive glow (through the emissive mask), a base/albedo tint → material.color. Editing the
@@ -1471,14 +1484,14 @@ function _dyeOverridesFor(matName) {
   }
   return ov;
 }
-function dyeRebakeMesh(matName) {
+function dyeRebakeMesh(matName, {immediate=false}={}) {
   const d = matData[matName];
   if (!d || (!d.dyeable && !d.eye_preview) || !d.game_rel) return;
   clearTimeout(_dyeMeshTimer[matName]);
   const gen = generation, matGen = materialGeneration, load = materialLoad;
   const revision = (_dyeMeshRevision[matName] || 0) + 1;
   _dyeMeshRevision[matName] = revision;
-  _dyeMeshTimer[matName] = setTimeout(async () => {
+  const bake = async () => {
     let blobUrl;
     try {
       const r = await materialFetch(d.eye_preview ? '/api/eye_preview' : '/api/dye_preview', {
@@ -1502,7 +1515,9 @@ function dyeRebakeMesh(matName) {
       liveDyeTextures.set(matName, tex);
     } catch (e) { /* keep the last good bake */ }
     finally { if (blobUrl) URL.revokeObjectURL(blobUrl); }
-  }, 160);
+  };
+  if (immediate) bake();
+  else _dyeMeshTimer[matName] = setTimeout(bake, 160);
 }
 
 async function dyeDownloadMesh(matName) {
@@ -1571,6 +1586,7 @@ async function saveEdits() {
   } catch (_) { /* Optional presentation never blocks saving. */ }
   let ok = 0;
   const failed = [];
+  let reason = '';
   try {
     for (const name of names) {
       const d = targets[name];
@@ -1594,7 +1610,7 @@ async function saveEdits() {
             if (!Object.keys(edited[key] || {}).length) delete edited[key];
           }
         }
-      } catch (e) { failed.push(name); console.warn('viewport: material_save failed', name, e); }
+      } catch (e) { failed.push(name); reason ||= e?.message || ''; console.warn('viewport: material_save failed', name, e); }
     }
   } finally {
     const newer = gen === generation && edited === draft && Object.values(edited).some(params => Object.keys(params).length);
@@ -1603,7 +1619,8 @@ async function saveEdits() {
   const ownsView = gen === generation && edited === draft && project === viewportProject;
   const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);
   const message = failed.length
-    ? `Saved ${ok}; ${failed.length} material(s) could not be saved. Unsaved recolors are retained; retry Save.`
+    ? `Saved ${ok}; ${failed.length} material(s) could not be saved. ` +
+      (reason && reason !== 'Save failed' ? `${reason.replace(/\.?$/, '.')} Unsaved recolors are retained.` : 'Unsaved recolors are retained; retry Save.')
     : newerEdits ? 'Submitted changes saved; newer edits remain unsaved.'
     : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`;
   const state = failed.length || newerEdits ? 'warning' : 'success';
@@ -1642,7 +1659,7 @@ function revertEdits() {
     retint(name);
     // After a successful save the persisted dye may differ from the original cached map.
     // Rebuild with no draft overrides so Reset shows the last saved material.
-    if (matData[name].dyeable || matData[name].eye_preview) dyeRebakeMesh(name);
+    if (matData[name].dyeable || matData[name].eye_preview) dyeRebakeMesh(name,{immediate:true});
   }
   buildPanel();                                            // resets the pickers too
   note('Reverted unsaved changes', 'info');
@@ -1666,12 +1683,12 @@ function studioTitle(skinId, title) {
   return title && !/^3D Preview\b/i.test(title) ? title : skinId ? `Skin ${skinId}` : 'Mesh preview';
 }
 
-async function open(skinId, title, preferredMesh=null) {
+async function open(skinId, title, preferredMesh=null, materialSet=null) {
   if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
   loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
-  meshSkin = skinId; chromaSkin = null;                       // reset the material-set choice
+  meshSkin = skinId; chromaSkin = materialSet;
   updateHeroLogo(/^\d{4}/.exec(skinId)?.[0] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(skinId,title);
@@ -1737,7 +1754,8 @@ async function open(skinId, title, preferredMesh=null) {
     setViewportLoaderState('ready');
     destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
-    loadMaterials(skinId);
+    loadMaterials(chromaSkin || skinId);
+    rememberWorkspace();
     syncPreviewAnimation();
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
     buildChromaPicker(skinId, meshMeta[objects.indexOf(body)].game_rel);
@@ -1808,14 +1826,32 @@ async function openMesh(gameRel, name, skinId) {
   }
 }
 
-async function close() {
-  if (!(await canLeave())) return;
+function mount(host) {
+  const overlay=$('viewport-overlay'), box=$('viewport-box');
+  (host || document.body).append(overlay);
+  overlay.classList.toggle('mounted',!!host); overlay.classList.toggle('overlay',!host);
+  box.setAttribute('role',host?'region':'dialog');
+  if(host)box.removeAttribute('aria-modal');else box.setAttribute('aria-modal','true');
+  requestAnimationFrame(()=>{if(inited)onResize();});
+}
+
+function rememberWorkspace() {
+  if(!meshSkin)return;
+  const body=objects.findIndex(object=>object.kind!=='weapon'&&object.root.visible);
+  window.AtelierWorkspace?.remember({skin_id:meshSkin,title:$('viewport-title').textContent,
+    model:meshMeta[body]?.game_rel || '',material_set:chromaSkin || ''});
+}
+
+async function close({navigate=true}={}) {
+  if (!(await canLeave())) return false;
   if (inited) clearModel();
   window.AtelierMotion?.viewportPoster?.end();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
   inspection?.closed();
   window.AtelierViewportIdentity?.clear();
+  if(navigate && $('viewport-overlay').classList.contains('mounted'))window.AtelierWorkspace?.library({closed:true});
+  return true;
 }
 
 $('viewport-close').addEventListener('click', close);
@@ -1828,7 +1864,7 @@ window.addEventListener('keydown', e => {
     if (menu) {menu.open=false;menu.querySelector('summary').focus();return;}
     close();
   }
-  else inspection?.keydown(e);
+  else if(!$('viewport-overlay').classList.contains('mounted') || $('viewport-box').contains(e.target)) inspection?.keydown(e);
 });
 
 window.addEventListener('beforeunload', event => {
@@ -1866,4 +1902,12 @@ function captureModPoster(context){
   if(!inited||hasPendingEdits()||context.project!==viewportProject||!context.skin||context.skin!==(currentSkin||meshSkin))return null;
   return inspection.cardPoster();
 }
-window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits,captureModPoster };
+// After an edit leaves the project (the dock's Restore, or its Undo), show the costume's colours
+// as they now are. Drafts win: a reload would discard them, so the caller is told it didn't run.
+function reloadMaterials() {
+  if (!inited || !meshSkin || modelLoading || hasPendingEdits()) return false;
+  loadMaterials(chromaSkin || meshSkin);
+  return true;
+}
+
+window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, label:materialLabel };

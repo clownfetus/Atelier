@@ -29,7 +29,7 @@ before the formation settles. A busy state that follows another busy state (a
 destination check running straight into a build) continues the current animation
 rather than dropping new ink. Only busy states loop; results animate once and hold
 still, and a settled or hidden stage stops drawing. The large Krackle stage belongs
-to the dialog the user has open (export review or edit import); other jobs that
+to the dialog the user has open (export review or the Edit All import); other jobs that
 finish or fail meanwhile report through their own toasts and Activity rows and
 never take over that stage.
 
@@ -46,7 +46,11 @@ never take over that stage.
 | Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
 | Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
 | Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
-| Krackle stage | Export review and edit import dialogs | 184-216px canvas particle formations; smaller in short windows |
+| Krackle stage | Export review | 184-216px canvas particle formations; smaller in short windows |
+| Import ink | Edit All import dialog (`import-ink.js`, styled in `../identity.css`) | 176px SVG stage (140px in short windows); ink gathers on the chosen asset cards, pours into the stage's well, charges a six-dot ring and leaves for the Mod tray header per finished asset; burst, cracked ring, splat or a still muted drop for the result |
+| Setup check | Launch check and first-run setup page (`setup-check.js`, styled in `../identity.css`) | 72px band on the page header's rule: a drop pours along the channel to a latch while the check runs; starburst, cracked ring or splat on the latch for the result; 20px Krackle glyphs on the rows |
+| Setup ink-well | First-run setup page (`setup-drop.js`, styled in `setup-drop.css` and `../identity.css`) | The Grand pour: one drop on a dotted line down the rows' centre column into a 240px ink-well (cooking, then its success) whose paper label is the Open Atelier button and whose lid is its status; the drop advances only past valid rows and falls in when all are |
+| Ink-well | Export review: checking, building and the result; the first-run page's receiving well | 216px SVG vessel of living bubbles (164px in short windows); a few carry the cooked skin's colours; success releases, warning strains in a loop, failure ruptures |
 | Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
 | Workflow accents | Pin/unpin, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
@@ -475,10 +479,154 @@ playback is introduced. Browser and native viewer checks include rendering,
 interruption, alpha captures and target disposal. Native automation intercepts
 only the final download click to inspect real encoded bytes before an OS dialog.
 
+# Import ink
+
+`import-ink.js` draws the Edit All dialog's stage and the ink that joins the real
+asset cards, the stage and the Mod tray. `../import-dialog.js` maps the job to it;
+`app.js` still owns the request, SSE progress and the library refresh, and
+`AtelierPolish.importStart/importProgress` still own the result dots.
+
+| Real event | Ink |
+| --- | --- |
+| Edit All confirmed | A drop gathers on each visible chosen card (up to five, 85ms apart) and pours into the stage; the first splashes and is drawn out into the six-dot ring. With no visible card, the stage charges at once. |
+| Extracting / decoding | The crest steps once per sixth of the 1040ms beat: a count, not a spin. |
+| One texture finished | The crest pops a starburst (imported) or a splat (failed); imported ink leaves for the Mod tray header, coalesced to one flight per 320ms. |
+| Job done | Success bursts, a partial import cracks the ring and drops its chunk, failure splats and drips. Kept work rides a blue core to the tray header and spreads a seam along it. A cancel with nothing imported settles to a still, muted drop. |
+
+Results interrupt inbound ink at once; the status text, dots and Done button are
+already written. Flights are hidden over the dialog panel except inside the stage
+well, so ink never crosses text or controls. The stage redraws on twos (12 fps) and
+re-seeds its boil each drawn frame; flights step at 24 fps. Full motion only: Calm,
+Off and reduced motion show each state's final pose and nothing travels. Hidden
+stages and documents stop drawing, and a flight whose endpoint leaves the screen
+ends without landing. The dialog's own ink replaces the working-panel border charge.
+Colours are the identity roles in `../identity.css` (energy, its core, done, caution
+and fault), so Light draws Lamp Black ink and Dark draws Smalt Light.
+
+# Project ink
+
+Projects are portfolios: `app.js` draws each card as the folder itself (a back panel and
+tab on a flat foot, the newest edited texture inside as a loose sheet, the front panel
+behind a paper halo carrying the name, a punched clasp and the Smalt drop). Each part is
+followed by an empty `.pp-live` slot that `project-ink.js` draws liquid outlines into,
+so a formation sits in the right layer without copying the artwork.
+
+`form(card)` runs once after `/api/project/create` succeeds and the list has re-rendered
+with the new card focused. Ink enters from the far edge of the screen and runs along the
+row's baseline, beneath the picker's content, so it never crosses text. It pools in the
+new card's slot, and the front panel rises out of it as liquid whose wavy lip settles
+flat. The back panel and tab follow, then the clasp opens and the drop pops in. The sheet
+slides up and the name prints on the panel in two steps. About 1.5s. The run keeps a
+fixed, position-seeded edge and is drawn every display frame, so it flows rather than
+flickers.
+
+`snapshot(grid)` and `dissolve(snapshot, deletedNames)` play it backwards for deleted
+cards: inert, `aria-hidden` ghosts beneath the already-updated list (up to six, 70ms
+apart). The name goes in two steps, the sheet slides in and the drop lifts off. The panels
+melt into a puddle at the foot, which drains along the baseline to the nearer edge.
+Surviving cards hold for 700ms, then glide into the gap with a small overshoot.
+
+Both read the card's own geometry and computed colours, so their last frame is the static
+artwork. They claim the `new-project` / `delete-project` stage, but while the Projects
+page is open a stage busy behind it (the startup loader) cannot refuse them: the page is
+opaque and the moment is the picker's. They end at once when the card leaves the screen,
+the picker closes or the document hides, and do nothing in Calm, Off or reduced motion.
+The picker reports results in its header status line (`#proj-status`, a polite live
+region), not in a toast.
+
+# Setup check
+
+The launch check stands on the same page as Projects: the same ink surface, wordmark and
+tagline, and a channel exactly where the Projects header rule is. `app.js` owns the
+`/api/setup_status` request, the key and mapping retrievals, validation and the save;
+`../setup-wizard.js` (`AtelierSetup`) presents them and `setup-check.js` draws the band.
+
+| Real event | Ink and page |
+| --- | --- |
+| Check starts | Nothing for 400ms. If `/api/setup_status` is still out, the page appears with three waiting rows, and a drop on the left pours along the channel to the latch on the right, once per two beats (2080ms). A quick answer never shows the page. |
+| Configured | Results are never held for the ink. If the page was showing, Projects takes it over: the latch's starburst throws four flecks on the Projects rule, the channel settles into the 1px rule and the status line reads "Setup checked". With an active project the library opens directly. |
+| First run | The rows fill from the real answer together. Found rows get a 20px found glyph (the ink key, the code file, the folder: see **Krackle glyphs**), what was found and the path or file in Fragment Mono, and a quiet Change. The key and mapping charge a six-dot ring while they are fetched. Missing rows get the cracked ring in the caution colour, an instruction and the field. The latch shows a starburst if the game was found, otherwise the cracked ring. One drop runs down past the valid rows into the ink-well below them (see **Setup ink-well**); "Open Atelier", the well's label, stays disabled until every row is valid. |
+| Check failed | The latch squeezes and splats. The page says the check couldn't finish, shows the real error in a mono box and offers Try again, Open settings and Get help. |
+
+`AtelierMotion.setupCheck.mount(host, {state, play})` returns `setState` and idempotent
+`destroy`; states are `busy`, `success`, `warning` and `error`. Only `busy` loops, on the
+1040ms beat, and only in Full motion with the document visible; results play once. Calm,
+Off and reduced motion show each state's final pose (the busy pose is the drop resting at
+the start of the channel). The band measures its host on resize; it is `aria-hidden` and
+the heading, lede and row text carry every outcome. Artwork comes from
+`scripts/krackle_art.py` (`setup-check.svg`), colours from the identity roles: energy for
+the drop and latch, done, caution and fault for the results.
+
+The page reuses the Settings controls (one set of IDs, validators and save payloads): it
+moves the game, key and mapping rows and the save button into its own rows while it is
+showing and puts them back for Settings, which keeps its dialog, its loading cover and
+configuration discovery unchanged. Appearance and motion are chosen in Settings, not
+during first run.
+
+## Setup ink-well
+
+The first-run page is the Grand pour: each row names its thing on the left, the drop's
+column runs down the middle through the glyphs, and what was found sits on the right. The
+page ends on the export review's ink-well (**Ink-well**, below), mounted as it is, standing
+prominent under the column with the page's Open Atelier button as its paper label and the
+note beneath. One drop of ink follows one dotted line down the column, in the page's order:
+Unlock key, Mapping file, Game folder. The glyphs sit on the line like beads (the dots part
+around them, and the drop passes behind each glyph). The source is the top of the rows, the
+path is the line, the receiving point is the well's mouth. The well's lid is a status, not
+decoration: shut in the energy ink while a row needs the person, open in the done colour
+once every row is valid.
+
+| Real event | Ink |
+| --- | --- |
+| The page shows its first answer | The drop forms on the rows' top rule (200ms pop). The well is alive: it cooks as it does in the export review, sparse (a few large bubbles, no small ones), its lid shut. |
+| Rows become valid, from the top | The drop runs down the line to the rule under the last row that is valid in an unbroken run from the top (260–520ms a row), stretching as it runs and inking the dots behind it. It waits at the first row that isn't valid; if it continues while moving, it carries on rather than starting again. |
+| The row it waits at is being fetched | The drop charges on the beat (Full motion only). A row that needs the person leaves it still. The well keeps cooking either way; hidden or off-screen, it stops drawing. |
+| Every row is valid (Open Atelier turns on) | As the drop gathers at its station (140ms) the lid takes the done colour (260ms) and swings open about its left cap (620ms, overshooting: -150°, -132°, resting at -138°). The drop leaves the column, falls into the mouth from above (360ms, gathering speed), and plunges in, shrinking into the hole (90ms). The well's success starts as the drop crosses the rim: its ink washes through the bubbles, it squeezes, a clean burst leaps from the mouth and floats away, and it settles calm (1.6s, once). |
+| A row stops being valid | The drop is placed at once under the last valid row above it, the lid shuts in the energy ink, and a landed well cooks again (busy after a result). |
+
+`AtelierMotion.setupDrop.mount(host, {layer, size})` returns `setProgress(reached, {rows,
+glyphs, waiting})` and idempotent `destroy`. `host` is the well's slot; the controller mounts
+`AtelierMotion.inkWell` in it (`state: 'busy'`, `fixedFrame: true`, `sparse: true`, 240px) and moves it between
+`busy` and `success`, and lays the lid over its mouth (`data-am-lid` shut or open on the host). `setup-wizard.js` passes how many rows are valid in an unbroken run from
+the top, the rows and their glyph hosts in page order, and `busy` when the next row is being
+fetched. `layer` is the positioned page (`#setup-page`); the line and drop are drawn above the
+rows and beneath the well, and are re-measured when any part of the page resizes or fonts load.
+The button's state is the page's and is never held for the drop. Travel is Full motion only:
+Calm, Off, reduced motion, a hidden document or missing Web Animations place the drop, and the
+well is told to show its still poses. Without the ink-well the drop still travels and lands.
+The host exposes `data-am-reached`, `data-am-full`, `data-am-moving` and `data-am-lid`. The
+drop, dot and lid come from `scripts/krackle_art.py` (`setup-drop.svg`; the lid is a pill 8px
+past the rim on each side and 4px above it with a 24×10 knob, drawn for the 240px well and
+scaled with it); the mouth is the ink-well's rim centre.
+Colours are the identity roles: `setup-drop.css` maps the well's rift body to `--line` (the
+glass), its charge to `--energy`, its holes to `--energy-hole` and its success to `--done`;
+plain dots are `--line`, inked dots and the drop `--energy`, specks `--energy-glint`. The label
+sits on the glass of the lower belly (`identity.css`) in `--surface` with `--text` (muted while
+disabled), so no text ever sits on ink.
+
 # Krackle glyphs, empty states and the stage
 
 `krackle-glyph.js` (`AtelierMotion.krackleGlyph`) renders the micro shapes for job
-outcomes: `busy`, `info` (a drop), `success`, `warning` and `error`.
+outcomes: `busy`, `info` (a drop), `success`, `warning` and `error`. Mounted with `found`
+(the setup page's rows), success shows a found glyph in place of the starburst, with the
+starburst's pop and four flecks; other states are unchanged, and Calm, Off and reduced
+motion show each final pose (green key, code file with all its lines, closed green folder).
+
+- `'key'`, the ink key (Unlock key): a key whose bow is the Krackle drop on its side, its
+  point running into the blade, with a bow hole, one bubble and a glint, leaning 8°. It pops
+  in the energy ink and takes the done colour 290ms in (260ms, ease-out). It is 2:1, so it
+  runs 20% past the glyph's sides (24×12px in a 20px glyph, inside the rows' glyph column).
+- `'file'`, the code file (Mapping file): a sheet with its top-right corner cut off, done
+  from the start, with four code lines in the surface colour that draw left to right one
+  after another (240ms each, from 180ms, 90ms apart).
+- `'folder'`, the folder (Game folder): a back with a tab and a front panel on a
+  surface-coloured halo, so it reads as a flap without an outline. It pops in the energy ink;
+  at 160ms the front flips open and settles, hinged at its bottom (560ms, overshooting:
+  skewX(-16°) scaleY(.62) at 35%, skewX(3°) scaleY(1.06) at 70%); at 380ms it takes the done
+  colour and at 400ms its flecks burst.
+
+Their geometry is `micro_key`, `micro_file` and `micro_folder` in `scripts/krackle_art.py`;
+only the notification glyph carries them.
 Operation toasts (`toastSpinner(...)`) are owned by the export-feedback set, which
 charges and then resolves into the same result shapes. When that controller is
 absent, `AtelierKrackleGlyph.toastIcon(toast, type)` swaps the resolved toast's icon
@@ -508,11 +656,65 @@ unsupported or slow (WebKitGTK). Settled results stop the frame loop
 (`data-am-sleeping="true"`), and an IntersectionObserver stops a stage whose
 dialog is hidden. Hidden documents pause; reduced motion jumps to each formation.
 `mount` throws without canvas, so callers keep their static progress UI. The export
-review shows a 216px stage while checking and building, then the result formation
-(cancelled exports hide it) under a heading that names the outcome ("Mod exported
-with warnings"); long reports scroll inside the dialog so the heading and actions
-stay visible. The edit import dialog shows a 184px stage while open. Short windows
-use 164px and 144px respectively so actions remain reachable.
+review's stage host holds the ink-well instead (below) for checking, building and the
+result, under a heading that names the outcome ("Mod exported with warnings");
+cancelled exports hide it, and the canvas stage remains its fallback when the
+ink-well cannot mount. Long reports scroll inside the dialog so the heading and
+actions stay visible.
+
+`ink-well.js` (`AtelierMotion.inkWell`) is the build's busy voice, an SVG vessel
+traced from the approved concept: rift body, charge ink and rim, with holes for its
+bubbles. Each bubble runs its own life (nucleate, grow, circulate round a central
+void, then dissolve or merge into the bubble ahead) on lanes that follow the cavity
+and turn at different rates. A 3.4s pressure cycle crowds the field (contact faces
+flatten, a few pairs fuse through metaball necks), then releases it: pairs split, a
+bud pinches off the void, climbs the neck and bursts into the mouth, throwing the
+splash, and the walls rebound once. Collisions carry over between frames with a speed
+limit, so crowded bubbles slide round each other rather than hop.
+
+Results interrupt the cook where it is: it coasts to a stop and its pressure relaxes,
+and the outcome ink washes out from the void with a small pop per bubble (skin tints
+keep their colours).
+
+- **Failure, ruptured** (`--krackle-fault`, 1.75s): subtle cracks run from the void
+  and widen; the vessel breaks into seven wedge pieces (`<use>` copies of it, each
+  clipped to its wedge) that drift apart while the split rim, neck and shoulders slump
+  and tip; red ink leaks from the low cracks, runs to the ground and pools, and drops
+  splash out and flatten where they land. It settles on the broken pose.
+- **Warning, overpressurised** (`--krackle-warn`): the body swells and wobbles slowly,
+  the bubbles swell and fuse under held pressure, the rim stretches and an amber bulge
+  strains up out of the mouth, spitting a drop that falls back now and then. It never
+  breaks. By request it holds in this tense loop, the one result that loops: Full motion
+  only, stopped when hidden, and still after 15s so a dialog left open stops drawing.
+- **Success, clean release** (`--krackle-success`, 1.6s): the bubbles rise and gather
+  under the neck, the mouth brims and a burst of tendrils leaps and curls outward; their
+  tips break into drops that float up and dissipate with a spray of small bubbles, and
+  the well settles calm back in its cooking frame.
+
+The artboard eases out while released ink needs room, so it stays inside the stage and
+clear of the heading; `fixedFrame` keeps it still instead, for a well with something laid
+over it (the first-run label), and released ink spills past the SVG. `sparse` keeps every
+other bubble of the inner ring, the large satellites and two neck risers, and drops the small
+lanes and secondary pockets: a well people watch while waiting (the first-run page), where a
+dense field of small holes reads as a cluster rather than ink.
+`mount(host, {size, kind, state, settled, palette, fixedFrame, sparse})` returns `setState`
+(`busy`, `success`, `warning`, `error`), `setPalette`, `setReducedMotion`, `frames` and an
+idempotent `destroy`; a reopened result mounts `settled`. It claims the
+moment like the stage (refused, it shows the 48px glyph for its state), Calm/Off/reduced
+motion draw each state's still pose, and hidden documents or off-screen hosts stop
+drawing. Success plays the `pop` foley and failure the `splat`, under the same rules as
+the stage.
+
+The palette is up to four colours averaged from the cooked skins' original `_D` /
+`BaseColor` maps. `export-review.js` asks `/api/diffuse_palette?skin=…` once per
+review for the skins in the included paths; the server reads cached library
+thumbnails or decoded viewport PNGs only (never decoding), weights coloured texels
+over grey ones in linear light and lifts a near-black result along its hue so it
+cannot pass for a hole. Two to four inner-ring bubbles carry the colours, rotating
+between lives so the hues mix through the well; they never merge or fuse. No answer
+leaves plain holes. `tests/ink_well_checks.py` (in `--working-panels-only`) covers the
+palette, busy-after-busy continuity, failure and success performing once and settling,
+the warning loop and its reduced-motion pose, hiding and teardown; `tests/test_diffuse_palette.py` covers selection, averaging and the route. Short windows use 164px so actions remain reachable.
 
 `working-panels.js` observes real `aria-busy` and controller states, plus explicit
 request leases from editor saves/loads. An animated SVG paints the native border
@@ -542,7 +744,8 @@ receive a warning. Model geometry appears as soon as it is ready while the
 surrounding frame receives the completion.
 
 Configuration discovery connects the actual panel edges through a scanner and
-configuration latch. `configDiscovery.begin(setupOverlay)` follows the real
+configuration latch when Settings opens (the launch check uses the setup check
+band instead). `configDiscovery.begin(setupOverlay)` follows the real
 setup-status request and hands its result to the native frame after the loading
 cover disappears. Closing/reopening Settings invalidates old discoveries. The
 local conduit is measured again on resize; status text remains outside the ink.
@@ -593,9 +796,10 @@ OS/Atelier reduced motion skips the drain. Detached snapshots and their effects
 are disposed after completion. Undo itself is ordinary focusable UI, with the
 existing hover-paused toast timer.
 
-First-run validation uses `krackleGlyph` at 24 px beside the step heading. A
-validation change destroys the previous mount; it does not decorate input fields
-or delay Next. The first-run and Settings dials share Full/Calm/Off preferences.
+First-run validation uses `krackleGlyph` at 20 px at the start of each setup row
+(see **Setup check**). A row reuses its mount across states; it does not decorate
+input fields or delay Open Atelier. The glyphs are the stops on the **Setup ink-well**
+drop's line. The motion dial lives in Settings.
 
 Viewport `canLeave` and `close` now return promises. Every dependent action awaits
 them before clearing geometry or changing skin. A cancelled answer retains the
@@ -631,7 +835,7 @@ particle frames on a still formation. Off keeps static feedback.
 
 `AtelierMotion.moment.claim(kind,tier)` returns an idempotent release or null.
 Only one Tier 2/3 formation owns the screen; refused stages render a hand-drawn
-48 px glyph. Export review, edit import and the model loader release ownership
+48 px glyph. Export review and the model loader release ownership
 on completion, hiding or disposal. A Tier 3 kind can claim only once per page
 session. Result states interrupt work immediately. Theme changes repaint still
 formations without replaying a result. Tests cover the colour guard, every

@@ -750,6 +750,88 @@ def api_texture_png():
     response.status = 404
     return b""
 
+# ── texture recolour (bake a colour into a part's base-colour map) ─────────────
+
+def _recolour_state(gr):
+    """What the recolour panel needs to know about one texture in the active project."""
+    from atelier.handlers import texture_recolour, hdr_texture
+    base = _import_base(gr)
+    png = base + ".png"
+    saved = _project_meta.get_recolour(get_import_root(), gr)
+    edited = os.path.isfile(png)
+    current = edited and saved and saved.get("stamp") == texture_recolour.stamp(png)
+    return {"recipe": {k: saved[k] for k in ("colour", "mode", "strength", "curve") if k in saved} if current else None,
+            "edited": edited, "hand_edited": bool(edited and not current), "token": token(gr),
+            "hdr": bool(hdr_texture.project_info(base))}
+
+
+@app.get("/api/texture_recolour")
+def api_texture_recolour_state():
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    try:
+        _c.validate_game_rel(gr)
+        return json.dumps({"ok": True, "game_rel": gr, **_recolour_state(gr)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+def _recolour_request():
+    from atelier.handlers import texture_recolour
+    body = request.json or {}
+    gr = body.get("game_rel", "")
+    _c.validate_game_rel(gr)
+    spec = texture_recolour.recipe(body.get("colour"), body.get("mode"), body.get("strength"), body.get("curve"))
+    source = _texture_png(gr, original=True)
+    if not source or not os.path.isfile(source):
+        raise ValueError("The original texture could not be read.")
+    return gr, spec, source, body
+
+
+@app.post("/api/texture_recolour/preview")
+def api_texture_recolour_preview():
+    from atelier.handlers import texture_recolour
+    try:
+        gr, spec, source, _ = _recolour_request()
+        path = texture_recolour.preview(source, spec, os.path.join(CACHE_3DVIEW, "recolour"))
+    except Exception as e:
+        response.status = 400
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": str(e)})
+    response.set_header("Cache-Control", "no-store")
+    return static_file(os.path.basename(path), root=os.path.dirname(path), mimetype="image/png")
+
+
+@app.post("/api/texture_recolour")
+def api_texture_recolour_save():
+    from atelier.handlers import texture_recolour
+    response.content_type = "application/json"
+    try:
+        gr, spec, source, body = _recolour_request()
+        state = _recolour_state(gr)
+        if state["hdr"]:
+            raise ValueError("HDR textures can't be recoloured here.")
+        if state["hand_edited"] and body.get("replace") is not True:
+            return json.dumps({"ok": False, "needs_replace": True,
+                               "error": "This texture has other edits. Recolouring replaces them."})
+        cb = ensure_work_base(gr)
+        if not cb or not os.path.exists(cb + ".uasset"):
+            raise ValueError("The game texture could not be extracted, so it can't ship in a mod.")
+        target = _import_base(gr) + ".png"
+        stamp = texture_recolour.save(source, target, spec)
+        _project_meta.set_recolour(get_import_root(), gr, {**spec, "stamp": stamp})
+        thumb = os.path.join(THUMBS_DIR, *gr.split("/")) + ".png"
+        try:
+            if os.path.exists(thumb): os.remove(thumb)
+        except OSError:
+            pass
+        items = _imported_items(gr)
+        return json.dumps({"ok": True, "token": token(gr), "game_rel": gr, "ver": _tex_version(gr),
+                           "imported": items[0] if items else None})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
 @app.get('/api/eye_texture')
 @app.post('/api/eye_preview')
 def api_eye_texture():
@@ -834,7 +916,7 @@ def api_dye_texture():
         from atelier.handlers.dye import dye_preview
         png = dye_preview(gr, size=int(request.query.get("size") or 1024),
                           dye_off=request.query.get("dye_off") == "1",
-                          original=request.query.get("original") == "1")
+                          original=request.query.get("original") == "1", fast_png=True)
     except Exception as e:
         print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
         response.status = 404
@@ -880,9 +962,9 @@ def api_dye_info():
         response.status = 500
         return json.dumps({"error": str(e)})
 
-def _dye_png(gr, overrides, size, dye_off=False):
+def _dye_png(gr, overrides, size, dye_off=False, *, fast_png=False):
     from atelier.handlers.dye import dye_preview
-    return dye_preview(gr, overrides=overrides, size=size, dye_off=dye_off)
+    return dye_preview(gr, overrides=overrides, size=size, dye_off=dye_off, fast_png=fast_png)
 
 @app.post("/api/dye_preview")
 def api_dye_preview():
@@ -899,7 +981,7 @@ def api_dye_preview():
         return json.dumps({"error": "game_rel required"})
     try:
         png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 1024),
-                       bool(body.get("dye_off")))
+                       bool(body.get("dye_off")), fast_png=True)
     except Exception as e:
         response.status = 500
         response.content_type = "application/json"
@@ -1470,7 +1552,7 @@ _usmap_check_lock    = threading.Lock()
 def api_usmap_update_check():
     global _usmap_check_running
     last = _c.get_usmap_checked_at()
-    if time.time() - last < _THREE_DAYS:
+    if time.time() - last < _THREE_DAYS and not _c._stale_usmap_builds():
         response.content_type = "application/json"
         return json.dumps({"ok": True, "updated": False})
     with _usmap_check_lock:
@@ -1635,6 +1717,33 @@ def api_thumb():
     response.status = 404
     response.set_header("Cache-Control", "no-store")
     return b""
+
+
+@app.get("/api/diffuse_palette")
+def api_diffuse_palette():
+    """Average colours of a few original diffuse textures of the skins being exported, for the
+    export review's ink-well. Reads cached thumbnails/viewport PNGs only and never decodes, so a
+    skin nobody has browsed yet returns no colours. Not project-scoped: originals are shared."""
+    from atelier.diffuse_palette import skin_palette
+    from atelier.index import prefix_entries
+    skins = list(dict.fromkeys(s for s in request.query.getall("skin") if re.fullmatch(r"\d{7}", s)))[:3]
+
+    def folder(skin_id):
+        return [virt for virt, _cont, _mount in prefix_entries(f"Characters/{skin_id[:4]}/{skin_id}/")]
+
+    def cached(game_rel):
+        thumb = _thumb_path(game_rel)
+        if _valid_thumb(thumb):
+            return thumb
+        decoded = project_base(game_rel, CACHE_3DVIEW) + ".png"
+        return decoded if os.path.isfile(decoded) else None
+
+    response.content_type = "application/json"
+    response.set_header("Cache-Control", "no-store")
+    try:
+        return json.dumps(skin_palette(skins, folder, cached) if skins else {"colors": [], "sources": []})
+    except Exception as exc:  # decorative: an unreadable index or cache only costs the colours
+        return json.dumps({"colors": [], "sources": [], "error": str(exc)})
 
 
 def _requested_thumbs(body):
@@ -2105,6 +2214,20 @@ def api_material_original():
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
+@app.get("/api/material_changes")
+def api_material_changes():
+    """The colours a saved material edit changed, for the workspace's Your mod dock."""
+    from atelier.web.browse import edited_colour_changes
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr or not is_material(gr):
+        return json.dumps({"ok": False, "error": "missing material"})
+    try:
+        _c.validate_game_rel(gr)
+        return json.dumps({"ok": True, "game_rel": gr, "changes": edited_colour_changes(gr)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
 @app.post("/api/material_save")
 def api_material_save():
     body = request.json or {}
@@ -2518,7 +2641,9 @@ def _list_projects():
         if not mtime:
             try: mtime = os.path.getmtime(path)
             except Exception: pass
-        projects.append({"name": name, "mtime": int(mtime), "asset_count": asset_count})
+        meta = _project_meta.load(path)
+        projects.append({"name": name, "mtime": int(mtime), "asset_count": asset_count,
+                         "last_opened_at": meta["last_opened_at"]})
     projects.sort(key=lambda p: p["mtime"], reverse=True)
     return projects
 
@@ -2545,6 +2670,7 @@ def api_project_select():
         return json.dumps({"ok": False, "error": "project not found"})
     with operations.project_use(project_dir, write=True):
         project_trash.purge(project_dir)
+        _project_meta.mark_opened(project_dir)
     set_active_project(name)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
@@ -2565,6 +2691,31 @@ def api_project_create():
     set_active_project(name)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
+
+@app.get("/api/project/workspace")
+def api_project_workspace():
+    return {"ok": True, "workspace": _project_meta.workspace(get_import_root())}
+
+@app.post("/api/project/workspace")
+def api_project_workspace_save():
+    body = request.json or {}
+    skin = body.get("skin_id", "")
+    material_set = body.get("material_set", "")
+    model = body.get("model", "")
+    title = body.get("title", "")
+    if not isinstance(skin, str) or not re.fullmatch(r"\d{6,10}", skin):
+        raise ValueError("invalid costume")
+    if not isinstance(material_set, str) or (material_set and not re.fullmatch(r"[\w-]{1,80}", material_set)):
+        raise ValueError("invalid colour set")
+    if not isinstance(model, str):
+        raise ValueError("invalid model")
+    if model:
+        _c.validate_game_rel(model)
+    if not isinstance(title, str) or len(title) > 160:
+        raise ValueError("invalid costume name")
+    _project_meta.set_workspace(get_import_root(), {"skin_id": skin, "model": model,
+                                "material_set": material_set, "title": title})
+    return {"ok": True}
 
 @app.post("/api/project/rename")
 def api_project_rename():
@@ -2606,6 +2757,7 @@ def api_project_duplicate():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "name already taken"})
     shutil.copytree(src_dir, dst_dir)
+    _project_meta.mark_opened(dst_dir, reset=True)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
@@ -3269,6 +3421,70 @@ def _repatch_payload(body):
         if work:
             shutil.rmtree(work, ignore_errors=True)
         _build_lock.release()
+
+# ── open a mod ────────────────────────────────────────────────────────────────
+
+@app.post("/api/mod_open/pick")
+def api_mod_open_pick():
+    """Native picker for a cooked mod to read. Reports whether it is password-locked."""
+    try:
+        path = hostos.pick_file("Open a mod", ("*.pak", "*.utoc", "*.ucas", "*.zip"))
+        locked = False
+        if path:
+            from atelier.handlers import modlock
+            locked = modlock.is_locked(path)
+        return {"ok": True, "path": path, "locked": locked}
+    except Exception as e:
+        return {"ok": False, "path": "", "error": str(e)}
+
+
+@app.post("/api/mod_open/read")
+def api_mod_open_read():
+    """Read a picked mod into the assets it contains. body: {path, unlock}."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    path = (body.get("path") or "").strip()
+    def work(job):
+        result = mod_open.read_mod(path, body.get("unlock") or None)
+        if not result.get("ok"):
+            return result
+        return {"ok": True, "mod": mod_open.present(result["manifest"])}
+    if body.get("background"):
+        return _submit_job("mod-read", "Read " + (os.path.basename(path) or "mod"), work)
+    return work(None)
+
+
+@app.post("/api/mod_open/add")
+def api_mod_open_add():
+    """Add chosen assets from a read mod to the Mod tray. body: {key, ids}."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    def work(job):
+        result = mod_open.add_to_tray(body.get("key"), body.get("ids") or [])
+        result["mod_state"] = mod_open.present(mod_open.load(body.get("key")))
+        return result
+    if body.get("background"):
+        return _submit_job("mod-add", "Add mod assets", work)
+    return work(None)
+
+
+@app.post("/api/mod_open/save_json")
+def api_mod_open_save_json():
+    """Save a read mod's JSON (all assets, or body.ids) into a folder the user picks."""
+    from atelier.handlers import mod_open
+    body = request.json or {}
+    try:
+        manifest = mod_open.load(body.get("key"))
+        dest = hostos.pick_folder(title="Choose where to save the JSON")
+        if not dest:
+            return {"ok": False, "cancelled": True}
+        ids = body.get("ids")
+        result = mod_open.save_json(manifest["key"], dest, ids if isinstance(ids, list) else None)
+        hostos.reveal(result["path"])
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 
 @app.get("/api/open_export_folder")
 def api_open_export_folder():

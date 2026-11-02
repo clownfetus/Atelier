@@ -269,6 +269,18 @@ def _usmap_build(p):
     m = re.search(r"-(\d{6,})", os.path.basename(p))
     return int(m.group(1)) if m else -1
 
+def _pak_build(p):
+    name = os.path.basename(os.fspath(p).replace("\\", "/"))
+    m = re.fullmatch(r"(?:Patch_|pakchunk.*)-Windows_\d+\.\d+\.(\d+)(?:_P)?\.utoc", name, re.I)
+    return int(m.group(1)) if m else -1
+
+def _game_build():
+    return max((_pak_build(p) for p in dir_glob(PAKS, "*.utoc") if os.path.isfile(p)), default=-1)
+
+def _stale_usmap_builds():
+    mapping, game = _usmap_build(USMAP), _game_build()
+    return (mapping, game) if 0 <= mapping < game else None
+
 # Mappings are NEVER bundled with the installer — they are game-derived data and shipping them is a
 # copyright risk. Tools/Mappings is therefore empty on a fresh install and every .usmap in it got
 # there remotely: Setup pulls the newest from GitHub (routes.api_download_usmap) and the 3-day
@@ -445,6 +457,12 @@ def _prereq_issues(need_tool=True):
             issues.append((level, msg))
     if need_tool and not USMAP:
         issues.append(("error", f"No .usmap mapping file found in: {os.path.join(TOOLS, 'Mappings')}"))
+    builds = _stale_usmap_builds()
+    if builds:
+        mapping, game = builds
+        issues.append(("warning", f"The mapping file is for game build {mapping}, but the game is build {game}. "
+                       "Colour edits can't be saved until a newer mapping is downloaded. "
+                       "Restart Atelier after the download to use it."))
     if not os.path.exists(os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")):
         issues.append(("warning", "MarvelRivalsCharacterIDs.md not found — character names will show as IDs"))
     return issues

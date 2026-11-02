@@ -32,6 +32,37 @@ window.__vp = {
   save: saveEdits, revert: revertEdits, canLeave,
   renderStats: () => ({geometries: renderer?.info.memory.geometries,
                        textures: renderer?.info.memory.textures, animating: !!raf}),
+  async dyeTiming() {
+    const fetchSaved = materialFetch, loadSaved = texLoader.loadAsync;
+    const dataSaved = matData, matsSaved = matsByName;
+    const calls = [], textures = [];
+    let release;
+    matData = {Timing: {game_rel:'fixture/Timing', dyeable:true}};
+    matsByName = {Timing:[{color:new THREE.Color()}]};
+    materialFetch = () => { calls.push(1); return Promise.resolve({ok:true,blob:async()=>new Blob()}); };
+    texLoader.loadAsync = async () => {
+      const tex = new THREE.Texture();
+      tex.addEventListener('dispose',()=>tex.userData.disposed=true); textures.push(tex);
+      if (textures.length === 1) await new Promise(resolve=>release=resolve);
+      return tex;
+    };
+    try {
+      dyeRebakeMesh('Timing'); dyeRebakeMesh('Timing');
+      const queued = calls.length === 0;
+      dyeRebakeMesh('Timing',{immediate:true});
+      const immediate = calls.length === 1;
+      await new Promise(resolve=>setTimeout(resolve,0));
+      dyeRebakeMesh('Timing',{immediate:true});
+      await new Promise(resolve=>setTimeout(resolve,0));
+      release(); await new Promise(resolve=>setTimeout(resolve,200));
+      return {queued,immediate,count:calls.length,staleDisposed:textures[0].userData.disposed,
+              latestKept:matsByName.Timing[0].map === textures[1]};
+    } finally {
+      clearTimeout(_dyeMeshTimer.Timing); textures.forEach(tex=>tex.dispose());
+      liveDyeTextures.delete('Timing'); delete _dyeMeshRevision.Timing;
+      materialFetch=fetchSaved; texLoader.loadAsync=loadSaved; matData=dataSaved; matsByName=matsSaved;
+    }
+  },
   async staleTexture() {
     const original = materialTexture;
     const fresh = new THREE.Texture();
@@ -92,6 +123,7 @@ def main():
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
+    parser.add_argument('--workspace-only', action='store_true', help='Check Projects, embedded workspace, costume persistence and twenty skin switches')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -142,6 +174,15 @@ def main():
                                               device_scale_factor=args.device_scale_factor)
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
+                if args.workspace_only:
+                    from workspace_checks import run_workspace_checks
+                    run_workspace_checks(context, url, report, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+                from browser_startup import enter_library_on_startup
+                enter_library_on_startup(context)
                 page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(error.stack or str(error)))
                 page.add_init_script("""
@@ -169,6 +210,8 @@ def main():
                 page.wait_for_selector('#grid-area .folder-card, #grid-area .card')
                 page.wait_for_function("!document.querySelector('.overlay.active')")
                 assert page.evaluate('__remoteCalls.length') == 0
+                assert page.evaluate('__vp.dyeTiming()') == dict(queued=True, immediate=True, count=2, staleDisposed=True, latestKept=True)
+                checks.append('Discrete dye changes start immediately, cancel pending debounce and discard stale bakes')
                 for width, height in ((1400, 900), (1280, 800), (1920, 1080)):
                     page.set_viewport_size({'width': width, 'height': height})
                     page.screenshot(path=str(report / f'current-{width}x{height}.png'))
@@ -264,6 +307,8 @@ def main():
                     run_material_save_motion_checks(page, context, url, report, checks)
                     run_export_motion_checks(page, context, url, report, checks)
                     run_export_review_checks(page, context, url, report, checks)
+                    from ink_well_checks import run_ink_well_checks
+                    run_ink_well_checks(context, url, report, checks)
                     run_viewport_loading_checks(page, context, url, report, checks)
                     run_viewport_motion_checks(page, context, url, report, checks)
                     assert not errors, errors
@@ -549,6 +594,8 @@ def main():
                 run_logo_motion_checks(page, context, url, report, checks)
                 from krackle_motion_checks import run_krackle_motion_checks
                 run_krackle_motion_checks(page, context, url, report, checks)
+                from ink_well_checks import run_ink_well_checks
+                run_ink_well_checks(context, url, report, checks)
 
                 from release_interface_checks import run_release_interface_checks
                 run_release_interface_checks(page, context, browser, url, report, checks)

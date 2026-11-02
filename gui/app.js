@@ -796,7 +796,7 @@ document.getElementById("search-input").addEventListener("input", () => {
 });
 
 document.addEventListener("keydown", e => {
-  if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
+  if (e.altKey && document.body.dataset.page!=='workspace' && !document.querySelector('.overlay.active, dialog[open]') &&
       !e.target.closest('input, textarea, select, [contenteditable="true"]')) {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault(); document.getElementById(e.key === 'ArrowLeft' ? 'btn-back' : 'btn-forward').click();
@@ -804,7 +804,9 @@ document.addEventListener("keydown", e => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && !document.querySelector('.overlay.active, dialog[open]')) {
     e.preventDefault();
-    const si = document.getElementById("search-input");
+    const si = document.getElementById(document.body.dataset.page==='workspace'
+      ? document.getElementById('workspace-choice').hidden ? 'viewport-material-search' : 'workspace-search'
+      : 'search-input');
     si.focus();
     si.select();
   }
@@ -2578,6 +2580,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
   window.AtelierPolish?.importStart(items);
   showProgress(0, items.length);
   document.getElementById("prog-overlay").classList.add("active");
+  window.AtelierImportDialog?.begin(items);
 
   const res = await (window.AtelierJobs?.run || api)("/api/import_all", {
     method: "POST",
@@ -2585,6 +2588,7 @@ document.getElementById("confirm-all-ok").addEventListener("click", async () => 
     body: JSON.stringify({ items }),
   });
   if (!res.ok && importing) {
+    window.AtelierImportDialog?.abandon();
     document.getElementById("prog-overlay").classList.remove("active");
     importing = false;
     toast(`Edit failed: ${res.error}`, "warning");
@@ -2800,16 +2804,21 @@ function handleSSE(d) {
   }
   if (!d.done && importing) {
     showProgress(d.current, d.total);
+    window.AtelierImportDialog?.progress(d);
     return;
   }
   if (d.done && importing) {
     importing = false;
     suppressChangeToastUntil = Date.now() + 2500;
-    document.getElementById("prog-overlay").classList.remove("active");
-    if (d.error) {
-      toast(`Edit All failed: ${d.error}`, "warning", 8000);
-    } else {
-      toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
+    // An open dialog keeps the result as its receipt; a hidden one reports through a toast.
+    const shown = window.AtelierImportDialog?.finish(d);
+    if (!shown) {
+      document.getElementById("prog-overlay").classList.remove("active");
+      if (d.error) {
+        toast(`Edit All failed: ${d.error}`, "warning", 8000);
+      } else {
+        toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
+      }
     }
     setStatus("");
     loadSidebar();
@@ -3396,6 +3405,17 @@ document.getElementById("confirm-overwrite-ok").addEventListener("click", async 
 document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
+// The workspace's Your mod dock is another view of this tray: same edits, same Delete-to-trash
+// with Undo, same export review. It never keeps a list of its own.
+window.AtelierModTray = {
+  items: () => Object.values(sidebarData).map(item => ({...item})),
+  // Resolves true once the edit has left the project (the user can still cancel the confirm).
+  restore: async token => { await clearImported(token); return !sidebarData[token]; },
+  review: doInstallMod,
+  preview: item => handlerFor(item.file_type).preview
+    ? `/api/preview?token=${encodeURIComponent(item.token)}&game_rel=${encodeURIComponent(item.game_rel)}` : '',
+};
+
 // ── clear individual / clear all ──────────────────────────────────────────────
 
 function _trashUndo(result, project, message) {
@@ -3561,17 +3581,34 @@ async function _fetchUsmapPath() {
   } catch (_) { return null; }
 }
 
-let _setupLoadingFinish = null, _setupLoadingRevision = 0;
+// The launch check shares the setup overlay with Settings. In Settings the old cover and its
+// configuration discovery run as before; at launch the check is the setup page itself, and it
+// only appears when /api/setup_status is slow, so a quick check goes straight to Projects.
+const SETUP_COVER_DELAY = 400;
+let _setupLoadingFinish = null, _setupLoadingRevision = 0, _setupCoverTimer = 0;
+function _setupPresent(call) {
+  try { call(window.AtelierSetup); } catch (_) { /* The check and setup work without the page's presentation. */ }
+}
 function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevision) {
   if (!on && revision !== _setupLoadingRevision) return;
-  const loading = document.getElementById('setup-loading');
+  const loading = document.getElementById('setup-loading'), overlay = document.getElementById('setup-overlay');
+  clearTimeout(_setupCoverTimer);
   if (on) {
     _setupLoadingFinish?.dispose?.();
-    ++_setupLoadingRevision;
+    const current = ++_setupLoadingRevision;
     loading.classList.add('active');
     loading.setAttribute('aria-busy', 'true');
-    try { _setupLoadingFinish = window.AtelierMotion?.configDiscovery?.begin(document.getElementById('setup-overlay')); }
-    catch (_) { _setupLoadingFinish = null; }
+    if (_pathsMode) {
+      overlay.classList.add('active');
+      try { _setupLoadingFinish = window.AtelierMotion?.configDiscovery?.begin(overlay); }
+      catch (_) { _setupLoadingFinish = null; }
+    } else {
+      _setupPresent(setup => setup?.checking());
+      // Results are never delayed by this: only the cover's appearance waits.
+      if (!overlay.classList.contains('active')) _setupCoverTimer = setTimeout(() => {
+        if (current === _setupLoadingRevision && !_pathsMode) overlay.classList.add('active');
+      }, SETUP_COVER_DELAY);
+    }
   } else {
     try { _setupLoadingFinish?.(outcome); } catch (_) { /* Keep setup usable without presentation. */ }
     _setupLoadingFinish = null;
@@ -3581,45 +3618,78 @@ function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevisi
   return _setupLoadingRevision;
 }
 
+// Resolves false when the setup is configured (launch continues; the page, if it showed, stays
+// until _finishLaunchCheck hands it to Projects) and true when the first-run page needs the person.
+// A failed check waits on the page for Try again, or for Settings to close.
+let _setupRetry = null;
 async function checkSetup() {
-  document.getElementById("setup-overlay").classList.add("active");
-  const revision = _setSetupLoading(true);
-  try {
-    const statusRes = await api("/api/setup_status");
+  const overlay = document.getElementById("setup-overlay");
+  for (;;) {
+    _pathsMode = false;
+    _applySetupMode();
+    const revision = _setSetupLoading(true);
+    let statusRes = null, failure = "";
+    try {
+      statusRes = await api("/api/setup_status");
+      if (statusRes.error) failure = String(statusRes.error);
+    } catch (e) { failure = e?.message || String(e); }
     if (revision !== _setupLoadingRevision) return false;
+    if (failure) {
+      _setSetupLoading(false, 'error', revision);
+      _setupPresent(setup => setup?.failed(failure));
+      overlay.classList.add("active");
+      await new Promise(resolve => { _setupRetry = resolve; });
+      continue;
+    }
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
     _protectionPassword = statusRes.password_prefill || "";
     document.getElementById("toggle-copy").checked = _modsFolderSet;
     if (statusRes.configured) {
       _setSetupLoading(false, 'success', revision);
-      document.getElementById("setup-overlay").classList.remove("active");
       return false;
     }
-    _pathsMode = false;
-    _applySetupMode();
-    document.getElementById("setup-path").value  = statusRes.paks_prefill  || "";
-    document.getElementById("setup-aes").value   = statusRes.aes_prefill || "";
-    document.getElementById("setup-usmap").value = statusRes.usmap_prefill || "";
-    window.AtelierSetup?.detected(statusRes.paks_prefill || '');
-    _setSetupLoading(false, statusRes.error ? 'error' : statusRes.paks_prefill ? 'success' : 'warning', revision);
+    const prefill = { game: statusRes.paks_prefill || "", key: statusRes.aes_prefill || "", map: statusRes.usmap_prefill || "" };
+    document.getElementById("setup-path").value  = prefill.game;
+    document.getElementById("setup-aes").value   = prefill.key;
+    document.getElementById("setup-usmap").value = prefill.map;
+    _setSetupLoading(false, prefill.game ? 'success' : 'warning', revision);
+    _setupPresent(setup => setup?.found({ outcome: prefill.game ? 'success' : 'warning', prefill }));
+    overlay.classList.add("active");
     for (const [kind, fetchValue] of [['aes', _fetchAesKeyValue], ['usmap', _fetchUsmapPath]]) {
       const field = document.getElementById('setup-' + kind), initial = field.value;
-      window.AtelierSetup?.retrieval(kind, 'pending');
+      _setupPresent(setup => setup?.retrieval(kind, 'pending'));
       fetchValue().then(value => {
-        if (_pathsMode || !document.getElementById('setup-overlay').classList.contains('active')) return;
+        if (_pathsMode || revision !== _setupLoadingRevision || !overlay.classList.contains('active')) return;
         if (value && field.value === initial) field.value = value;
-        window.AtelierSetup?.retrieval(kind, value ? 'ready' : 'failed');
+        _setupPresent(setup => setup?.retrieval(kind, value ? 'ready' : 'failed', value));
         validateSetup();
       });
     }
     await validateSetup();
     return true;
-  } catch (e) {
-    _setSetupLoading(false, 'error', revision);
-    return false;
   }
 }
+
+// Launch continues past a configured check: Projects (or the library) takes over from the page.
+function _finishLaunchCheck() {
+  const projects = document.getElementById("project-overlay").classList.contains("active");
+  if (projects) {
+    const status = document.getElementById("proj-status");
+    if (!status.textContent) { status.dataset.kind = ""; status.textContent = "Setup checked"; }
+  }
+  _setupPresent(setup => setup?.handover(projects));
+  if (!_pathsMode) document.getElementById("setup-overlay").classList.remove("active");
+}
+
+function _resumeLaunchCheck() {
+  const resume = _setupRetry;
+  _setupRetry = null;
+  resume?.();
+  return !!resume;
+}
+document.getElementById("setup-retry").addEventListener("click", _resumeLaunchCheck);
+document.getElementById("setup-open-settings").addEventListener("click", () => openPaths());
 
 function _applySetupMode() {
   const paths = _pathsMode;
@@ -3634,8 +3704,8 @@ function _applySetupMode() {
   document.getElementById("setup-tools-row").style.display       = paths ? "" : "none";
   document.getElementById("setup-cancel").style.display   = paths ? "" : "none";
   document.getElementById("setup-close").style.display    = paths ? "" : "none";
-  document.getElementById("setup-save-label").textContent = paths ? "Save" : "Save & Continue";
-  window.AtelierSetup?.mode(paths);
+  document.getElementById("setup-save-label").textContent = paths ? "Save" : "Open Atelier";
+  _setupPresent(setup => setup?.mode(paths));
 }
 
 async function openPaths() {
@@ -3728,15 +3798,18 @@ document.getElementById("tools-check").addEventListener("click", () => loadToolS
 document.getElementById("tools-update").addEventListener("click", () => _toolAction("/api/tools_update", "Downloading and verifying…"));
 document.getElementById("tools-repair").addEventListener("click", () => _toolAction("/api/tools_repair", "Checking every tool…"));
 
+// Settings opened from a failed launch check returns to the check when it closes.
 document.getElementById("setup-cancel").addEventListener("click", () => {
   _setSetupLoading(false); ++_setupLoadingRevision;
   document.getElementById("setup-overlay").classList.remove("active");
   _pathsMode = false;
+  _resumeLaunchCheck();
 });
 document.getElementById("setup-close").addEventListener("click", () => {
   _setSetupLoading(false); ++_setupLoadingRevision;
   document.getElementById("setup-overlay").classList.remove("active");
   _pathsMode = false;
+  _resumeLaunchCheck();
 });
 
 document.getElementById("toggle-import-open").checked = _openAfterImport;
@@ -3864,7 +3937,7 @@ async function validateSetup() {
     blenderEl.classList.toggle("setup-valid",   blenderOk);
     blenderEl.classList.toggle("setup-invalid", blenderBad);
   }
-  window.AtelierSetup?.validation({pakOk, usmapOk, keyOk});
+  _setupPresent(setup => setup?.validation({pakOk, usmapOk, keyOk, pakBad, usmapBad, keyBad}));
 }
 
 document.getElementById("setup-path").addEventListener("input", validateSetup);
@@ -4004,7 +4077,9 @@ document.getElementById("setup-save").addEventListener("click", async () => {
         toast(`Mods folder re-pointed to the game's own ~mods:\n${res.mods_folder}`, "info", 9000);
       }
       if (!wasModsSet && _modsFolderSet) document.getElementById("toggle-copy").checked = true;
-      if (wasPaths) {
+      if (wasPaths && _resumeLaunchCheck()) {
+        toast("Settings saved", "success");
+      } else if (wasPaths) {
         toast("Settings saved", "success");
         await renderGrid();
         await loadSidebar();
@@ -4582,7 +4657,8 @@ async function checkProject(onReady = () => {}) {
   const res = await api("/api/projects");
   if (res.active && res.projects.find(p => p.name === res.active)) {
     _applyActiveProject(res.active);
-    toast(`Project: ${res.active}`, "success");
+    _renderProjectPicker(res.projects || []);
+    document.getElementById("project-overlay").classList.add("active");
     onReady();
     return;
   }
@@ -4707,9 +4783,51 @@ async function _projRefresh() {
   return res;
 }
 
+// A project is a portfolio: the card is the folder itself, drawn in the identity's moves. Solid
+// ink on a flat foot (a back panel with its tab), the newest edited texture inside as a loose sheet,
+// unaltered, then the front panel behind a paper halo carrying the project's name. A punched
+// clasp cuts right through, beside the Smalt drop (the project is yours). project-ink.js forms
+// and dissolves these parts; its liquid outlines follow the same geometry.
+let _projFolderSeq = 0;
+const _PROJ_PORTFOLIO = {
+  back:  "M6 236V16Q6 6 16 6H80Q88 6 92 12L100 24H184Q194 24 194 34V236Z",
+  halo:  "M3 236V109Q3 97 16 97H184Q197 97 197 109V236Z",
+  front: "M6 236V110Q6 100 16 100H184Q194 100 194 110V236Z",
+};
+function _projPortfolioSvg(thumbUrl) {
+  const id = `pp-${++_projFolderSeq}`, f = _PROJ_PORTFOLIO;
+  const image = thumbUrl ? `<image class="pp-image" href="${_esc(thumbUrl)}" x="22" y="36" width="156" height="100"
+      preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}-sheet)" onerror="this.remove()"/>` : "";
+  return `<svg class="proj-portfolio" viewBox="0 0 200 240" aria-hidden="true" focusable="false">
+    <defs><clipPath id="${id}-sheet"><rect x="22" y="36" width="156" height="100" rx="4"/></clipPath></defs>
+    <path class="pp-back" d="${f.back}"/><g class="pp-live" data-slot="back"></g>
+    <g class="pp-sheet-slide"><g class="pp-sheet" transform="rotate(-2.5 100 86)">
+      <rect class="pp-sheet-ground" x="22" y="36" width="156" height="100" rx="4"/>${image}</g></g>
+    <path class="pp-halo" d="${f.halo}"/><path class="pp-front" d="${f.front}"/><g class="pp-live" data-slot="front"></g>
+    <circle class="pp-punch" cx="170" cy="124" r="9.5"/>
+    <circle class="pp-drop-halo" cx="146" cy="127" r="8"/><circle class="pp-drop" cx="146" cy="127" r="6"/>
+    <g class="pp-live" data-slot="top"></g>
+  </svg>`;
+}
+
+// The picker reports its own results in its header, in the identity's voice, not as a toast.
+// The project name is set as text, never markup.
+function _projStatus(name, rest = "", kind = "") {
+  const el = document.getElementById("proj-status");
+  if (!el) return;
+  el.dataset.kind = kind;
+  el.textContent = "";
+  if (!name && !rest) return;
+  if (name) { const strong = document.createElement("b"); strong.textContent = name; el.appendChild(strong); }
+  const tail = document.createElement("span");
+  tail.textContent = rest;
+  el.appendChild(tail);
+}
+
 function _renderProjectPicker(projects, keepQuery) {
   const grid = document.getElementById("proj-grid");
   if (!keepQuery) {
+    _projStatus("");
     _projAll = projects;
     _projSel.clear();
     _projLastName = null;
@@ -4719,9 +4837,22 @@ function _renderProjectPicker(projects, keepQuery) {
   grid.innerHTML = "";
   const q = _projSearchValue();
   const all = _projAll.length ? _projAll : projects;
+  document.getElementById('proj-library-btn').hidden=!_activeProjectName;
+  document.getElementById('proj-toolbar').style.display=all.length?'':'none';
+  const lead = document.getElementById("proj-lead");
+  lead.hidden = !!q;
+  const recent = [...all].sort((a,b) => (b.last_opened_at || 0) - (a.last_opened_at || 0))[0];
+  const latest = recent?.last_opened_at ? recent : all.find(p=>p.name===_activeProjectName) || recent;
+  lead.innerHTML = latest
+    ? `<div class="proj-lead-copy"><span class="proj-eyebrow">Pick up where you left off</span><h3>${_esc(latest.name)}</h3><p>${latest.asset_count} saved asset${latest.asset_count===1?'':'s'} · Your next idea starts here.</p><button class="at-btn at-btn--primary" type="button">Open workspace <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg(latest.asset_count ? `/api/project/thumb?project=${encodeURIComponent(latest.name)}&_t=${latest.mtime}` : '')}</div>`
+    : `<div class="proj-lead-copy"><span class="proj-eyebrow">Your first creation</span><h3>A favourite skin.<br>A little more you.</h3><p>Choose a hero, pick a costume, and make it your own.</p><button class="at-btn at-btn--primary" type="button">Start a recolour <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg('')}</div>`;
+  lead.querySelector('button').onclick = () => latest ? _selectProject(latest.name) : window.AtelierWorkspace ? window.AtelierWorkspace.start() : document.getElementById('proj-new-btn').click();
+  lucide.createIcons({nodes:[lead]});
   projects = q ? all.filter(p => (p.name || "").toLowerCase().includes(q)) : all;
   const search = document.getElementById("proj-search-row");
   if (search) search.style.display = all.length > 1 ? "" : "none";   // pointless with one project
+  const count = document.getElementById("proj-count");
+  if (count) { count.textContent = String(all.length); count.hidden = !all.length; }
   for (const v of ["grid", "list"]) {
     const btn = document.getElementById("proj-view-" + v);
     if (btn) btn.classList.toggle("on", _projView === v);
@@ -4731,28 +4862,24 @@ function _renderProjectPicker(projects, keepQuery) {
   [..._projSel].forEach(n => { if (!visible.has(n)) _projSel.delete(n); });
   _renderProjSelBar();
   grid.className = _projView === "list" ? "proj-list-mode" : "proj-grid-mode";
-  if (!projects.length) {
-    grid.innerHTML = q
-      ? `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`
-      : '<div class="proj-empty"><i data-lucide="folder-plus" size="40"></i><div>No projects yet. Create one to get started.</div></div>';
+  if (!projects.length && q) {
+    grid.innerHTML = `<div class="proj-empty"><i data-lucide="search-x" size="40"></i><div>No project matches “${_esc(q)}”.</div></div>`;
     lucide.createIcons({ nodes: [grid] });
-    window.AtelierPolish?.empty(grid.firstElementChild, q ? 'No project matches your search' : 'No projects yet', q ? 'Try another project name.' : 'Create one to get started.');
-    if(!q)window.AtelierSurfaces?.emptyProjects(grid.firstElementChild);
+    window.AtelierPolish?.empty(grid.firstElementChild, 'No project matches your search', 'Try another project name.');
     return;
   }
+  if (!projects.length) return;
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
     card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "");
     card.dataset.name = proj.name;
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `${proj.name}, ${proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`}`);
     const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
     const check = `<div class="proj-check" title="Select"><input type="checkbox" ${sel ? "checked" : ""}></div>`;
-    const thumb = `
-      <div class="proj-thumb">
-        <img src="${thumbUrl}" alt="" onload="this.nextElementSibling.style.display='none'" onerror="this.style.display='none'">
-        <i data-lucide="folder" size="${_projView === "list" ? 18 : 40}" class="proj-thumb-icon"></i>
-      </div>`;
+    const thumb = `<div class="proj-thumb">${_projPortfolioSvg(proj.asset_count ? thumbUrl : "")}</div>`;
     const actions = `
       <div class="proj-actions">
         <button class="proj-action-btn" title="Rename" data-action="rename"><i data-lucide="pencil" size="13"></i></button>
@@ -4784,6 +4911,11 @@ function _renderProjectPicker(projects, keepQuery) {
       // clears the ticks so the two modes can never be confused for one another.
       if (e.ctrlKey || e.metaKey || (e.shiftKey && _projLastName)) { _projSelClick(proj.name, e); return; }
       if (_projSel.size) { projSelClear(); return; }
+      _selectProject(proj.name);
+    });
+    card.addEventListener("keydown", e => {
+      if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
       _selectProject(proj.name);
     });
     card.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsProject(proj)));
@@ -4902,13 +5034,23 @@ function _applyActiveProject(name) {
 }
 
 async function openProjectPicker() {
+  if (document.getElementById('viewport-overlay').classList.contains('mounted')) {
+    if (await window.AtelierViewport.close({navigate:false})===false)return;
+    window.AtelierViewport.mount(null);
+    document.getElementById('workspace').hidden=true;
+    document.getElementById('body').hidden=false;
+  }
   const res = await api("/api/projects");
   _renderProjectPicker(res.projects || []);
   document.getElementById("project-overlay").classList.add("active");
 }
 document.getElementById("project-chip").addEventListener("click", openProjectPicker);
 
-async function _selectProject(name) {
+let _projectOpening=false;
+async function _selectProject(name, workspace=null) {
+  if(_projectOpening)return;
+  _projectOpening=true;
+  try {
   const previousProject = _activeProjectName;
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
                      "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay", "bulk-overlay"];
@@ -4944,6 +5086,11 @@ async function _selectProject(name) {
   }
   if (previousProject && previousProject !== name && _activeProjectName === name)
     window.AtelierMotion?.workflow?.project(document.getElementById('project-chip'));
+  if(workspace) {
+    window.AtelierWorkspace.present();
+    await window.AtelierViewport.open(workspace.skin_id,workspace.title);
+  } else await window.AtelierWorkspace?.resume();
+  } finally {_projectOpening=false;}
 }
 
 function _showProjNameModal(ctx) {
@@ -4961,7 +5108,6 @@ function _showProjNameModal(ctx) {
 }
 
 document.getElementById("proj-new-btn").addEventListener("click", () => {
-  window.AtelierSurfaces?.newProjectMoment();
   _showProjNameModal({
     title: "New Project", value: "", okLabel: "Create",
     action: async name => {
@@ -4969,8 +5115,19 @@ document.getElementById("proj-new-btn").addEventListener("click", () => {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (r.ok) await _selectProject(name);
-      else toast(`Create failed: ${r.error}`, "warning");
+      if (!r.ok) { _projStatus("", `Couldn't create the project: ${r.error}`, "fault"); return; }
+      // The new project joins the list (it opens when you choose it), so it must not be filtered out.
+      const search = document.getElementById("proj-search");
+      if (search && search.value && !name.toLowerCase().includes(search.value.trim().toLowerCase())) search.value = "";
+      await _projRefresh();
+      const card = [...document.querySelectorAll("#proj-grid [data-name]")].find(node => node.dataset.name === name);
+      if (!card) return;
+      card.scrollIntoView({ block: "nearest" });
+      card.focus({ preventScroll: true });
+      card.classList.add("is-new");
+      _projStatus(name, " is ready. Open it to start editing.");
+      try { window.AtelierMotion?.projectInk?.form(card); }
+      catch (_) { /* the folder is already drawn; the ink is optional */ }
     },
   });
 });
@@ -5001,19 +5158,26 @@ document.getElementById("proj-delete-ok").addEventListener("click", async () => 
   document.getElementById("proj-delete-overlay").classList.remove("active");
   const names = _projDeleteNames; _projDeleteNames = null;
   if (!names || !names.length) return;
-  const failed = [];
+  // Where every card stood before the delete, so the ones that go can leave as ink.
+  const before = window.AtelierMotion?.projectInk?.snapshot(document.getElementById("proj-grid"));
+  const failed = [], deleted = [];
   for (const name of names) {
     const r = await api("/api/project/delete", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
     if (!r.ok) failed.push(`${name} (${r.error})`);
-    else _projSel.delete(name);
+    else { _projSel.delete(name); deleted.push(name); }
   }
-  const done = names.length - failed.length;
-  if (done) toast(done === 1 ? `Deleted project "${names[0]}"` : `Deleted ${done} projects`, "info");
-  if (failed.length) toast(`Delete failed: ${failed.join("; ")}`, "warning", 6000);
+  const done = deleted.length;
   const res = await _projRefresh();
+  if (failed.length) _projStatus("", `Couldn't delete ${failed.join("; ")}`, "fault");
+  else if (done === 1) _projStatus(deleted[0], " was deleted.");
+  else if (done) _projStatus("", `Deleted ${done} projects.`);
+  if (deleted.length) {
+    try { window.AtelierMotion?.projectInk?.dissolve(before, deleted); }
+    catch (_) { /* the list is already up to date; the ink is optional */ }
+  }
   if (!res.active || !(res.projects || []).find(p => p.name === res.active)) {
     document.getElementById("project-overlay").classList.add("active");
   }
@@ -5041,6 +5205,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
       { icon: "package-open", label: "Open Export Folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
       "sep",
+      { icon: "scan-box", label: "Open a mod…", action: () => window.AtelierModOpen?.open() },
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
@@ -5134,6 +5299,7 @@ async function init() {
     return;
   }
   await checkProject(() => {
+    _finishLaunchCheck();
     checkUpdate(update);
     if (document.getElementById("project-overlay").classList.contains("active")) {
       acknowledgeUpdateStartup();

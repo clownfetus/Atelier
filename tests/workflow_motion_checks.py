@@ -119,6 +119,8 @@ def run_workflow_motion_checks(context, url, report, checks):
         formation('project'); finished()
         checks.append('Successful project handoffs form ink under the committed project chip; reselecting and failed switches stay still and retain the active project')
 
+        tab.locator('#page-library').click()
+
         tab.locator('#grid-area .card').first.click()
         tab.wait_for_function("nav.path==='Characters' && document.getElementById('grid-area').getAttribute('aria-busy')==='false'")
         formation('navigation', 'workflow-navigation.png')

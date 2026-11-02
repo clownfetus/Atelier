@@ -71,7 +71,7 @@ Native buttons, selects and inputs provide keyboard behavior. Asset cards and br
 
 ## Theme and motion
 
-Appearance lives in first-run configuration and Menu → Settings. The toolbar ends with Activity and Menu; it has no dedicated theme selector. The header logo and wordmark are black in Light and white in Dark, including the optional logo animation and its fallback.
+Appearance lives in Menu → Settings; first-run setup only points there. The toolbar ends with Activity and Menu; it has no dedicated theme selector. The header logo and wordmark are black in Light and white in Dark, including the optional logo animation and its fallback.
 
 Light, Dark and System are saved under the existing `atelier.theme` key. Atelier (stored as `studio` for compatibility), Darcula and Repak X display four adjacent color circles for background, surface, foreground and accent. Each preset has light/dark variants. The final + Custom button restores a custom draft or starts from the selected palette. Four native HTML color pickers edit its colors. Name and save up to 24 reusable custom palettes; each contains both light/dark variants and can be selected or deleted independently. Names render as literal text. Editing a saved palette starts a custom draft without overwriting it.
 
@@ -236,6 +236,65 @@ follows the system light/dark appearance, keeps installation progress native,
 and leaves installation, upgrade and data-preservation behavior unchanged.
 `scripts/installer_art.py --check` verifies the deterministic high-resolution
 plates and transparent header mark.
+
+### Identity v1.0 (first use: the import dialog)
+
+The Atelier identity sheet (v1.0, 28 Oct 2026) introduces pigment primitives
+(`--at-gesso`, `--at-lamp-black`, `--at-smalt` and their family), role tokens that
+components read (`--surface`, `--text`, `--action`, `--drop`, `--done`, `--caution`,
+`--fault`, `--energy`…), the drop spacing scale (`--space-1`…`--space-8`, ×1.6),
+flat-footed radii, a 2px halo, and the motion beat and curves. `gui/identity.css`
+holds them. Pigments sit on `:root`; roles live under `.at-identity` and switch to
+the ink surface in Dark (`:root[data-theme="dark"]`) or with `data-surface="ink"`,
+so nothing outside an opted-in surface changes.
+
+Type: Bricolage Grotesque (display, 760–800 at 84–86% width, never below 18px),
+Instrument Sans (interface) and Fragment Mono (asset names and paths), all bundled
+under the SIL OFL in `gui/vendor/`. Components: `.at-label`, `.at-btn` with
+`--primary`, `--quiet` and `--danger`. Smalt marks only what is yours: focus, the
+asset at the head of the queue, the core that rides into the Mod tray.
+
+Three surfaces have opted in so far. The Projects screen (`#project-overlay`) is a
+full page on the identity ground. Its lockup reads "Rivals Atelier" as one mark: "RIVALS" is
+bespoke lettering (inline SVG in `index.html`) on a 100-unit cap height that fills the
+x-height band of "telier" (0.53em) on the shared baseline. Its stems are 24 units on flat
+feet with sharp chamfers, one 18° slant is baked into the outlines, the V and A nest on
+parallel diagonals, and the R and A counters are punched true circles like the mark's.
+The S tucks under the mark's empty upper left, its foot a halo clear of the orb. It is
+filled with `--rivals` (Cadmium `#B0611B` on paper, 4.3:1 on Gesso; Cadmium
+Light `#F0A93C` on ink, 7:1 on Charcoal), kept apart from Ochre so it never reads as a
+warning, then the mark standing in for the wordmark's A at cap height on the baseline,
+beside the tagline. The i of "telier" is set dotless with a Smalt tittle (0.168em) at
+Bricolage's own tittle height; this departs from the sheet's rule that a lockup shows
+only the mark's drop. Each project card is a portfolio: the card is the folder itself,
+Lamp Black on paper and Gesso on ink, with the newest edited texture inside as a loose
+sheet, unaltered, the name printed on the front panel, and a punched clasp beside the
+Smalt drop. A selected portfolio turns Smalt. Creating a project adds it to the list
+(it no longer opens at once) and focuses its card. The Edit All import dialog
+(`#prog-box`) keeps its IDs, job wiring and Activity behaviour; it now holds its
+result until Done. Custom palettes and the Darcula/Repak X presets do not yet recolour it. See
+the motion README's **Import ink** section for its animation contract.
+
+The launch check and first-run setup (`#setup-overlay` with `data-setup-page`) are the
+third surface. They stand on the Projects page itself: the same ground, lockup and
+tagline, with the check's channel drawn exactly on the header rule, so a configured
+launch hands over to Projects without a change of scene. The page appears only when
+the check takes longer than 400ms. First run is one page, not a wizard: three rows (Unlock
+key `AES`, Mapping file `USMAP`, Game folder) say what the check found, with the path
+or file in Fragment Mono and a quiet Change, and open a field with Browse or Paste only
+for what is missing. Missing rows use the caution colour (Ochre) and the instruction
+text; Smalt stays for focus. The page is the Grand pour: each row names its thing on the
+left, the drop's column runs down the middle through the glyphs, and what was found sits on
+the right. "Open Atelier" is the one primary action and the paper label of the export
+review's ink-well, which stands prominent under the column and cooks until the drop lands.
+One drop follows a dotted line down the column, past each row that is valid, waits at the
+first that isn't, and falls into the well when Open Atelier turns on; the well's lid, shut in
+the brand ink while a row needs you, turns done green and swings open before it, and landing
+is the well's success, a clean burst that settles calm. The label sits on the well's glass
+and stays paper (`--surface`, `--text`, muted while disabled) so text never sits on ink. A failed check
+shows the real error in a mono box with Try again, Open settings and Get help.
+Appearance and motion moved to Settings, which keeps its existing dialog, IDs,
+validators and save payloads. See the motion README's **Setup check** section.
 
 ## Symbols and brand assets
 
@@ -473,12 +532,15 @@ Launch dialogs take turns: an available update waits until first-run setup close
 new waits for any open dialog, so only one launch dialog is ever on screen. A dismissed update
 stays reachable from its reminder in the toolbar row, beside Activity.
 
-First-run setup validates Find the game, Unlock the paks and Make it yours in
-order. Existing controls are reparented, retaining their IDs and save contract;
-Settings restores the complete form. Automatic retrieval runs behind the first
-panel and never replaces manually entered values. A 24 px success formation
-marks validated steps. Presets and the motion dial lead the final panel; advanced
-appearance controls are available under More appearance options.
+First-run setup is one page that lists what the launch check found and asks only
+for what is missing (see Identity v1.0). Existing controls are reparented, retaining
+their IDs and save contract; Settings restores the complete form. Automatic key and
+mapping retrieval runs while the page shows and never replaces manually entered
+values. A 20 px Krackle glyph marks each row: the charge ring while fetching, the cracked
+ring when missing, and when found a glyph of the thing itself in the done colour: the ink
+key (a key whose bow is the Krackle drop lying on its side, its point running into the
+blade), the code file (its lines draw in) and the folder (its front flips open). The key and
+folder pop in the brand ink and turn done green; each takes the starburst's four flecks.
 
 Home leads with a keyboard-accessible roster wall. Portraits have a quiet sampled
 accent behind the image; names and counts keep a plain panel surface. Edited

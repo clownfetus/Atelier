@@ -1,0 +1,895 @@
+/*
+ * Atelier identity tokens · v1.0, first applied to the Edit All import dialog.
+ * Pigments are primitives; components read only the role tokens, so the ink
+ * surface (dark theme) is a token swap. Roles live under `.at-identity` so they
+ * never reach the rest of the interface until it adopts the identity too.
+ * Source: the Atelier identity sheet; see docs/DESIGN_SYSTEM.md → Identity.
+ */
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/static/vendor/instrument-sans/InstrumentSans-Latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fragment Mono';
+  src: url('/static/vendor/fragment-mono/FragmentMono-Latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Pigments */
+  --at-gesso: #FAF7F0;          /* ground, from the master artwork */
+  --at-linen: #F1ECE2;          /* panels on paper */
+  --at-chalk: #E2DBCD;          /* hairlines, empty slots, off tracks */
+  --at-ash: #A9A49A;            /* muted text on ink */
+  --at-graphite: #5C5A54;       /* muted text on paper */
+  --at-slate: #3A3935;          /* raised on ink */
+  --at-charcoal: #2B2A28;       /* ink panels */
+  --at-lamp-black: #1F1F1E;     /* the ink, from the master artwork */
+  --at-smalt: #5165A9;          /* the drop, from the master artwork */
+  --at-smalt-deep: #3F5190;     /* drop pressed, drop text on paper */
+  --at-smalt-light: #95A5DD;    /* the drop on ink */
+  --at-smalt-wash: #E1E5F2;     /* selected, on paper */
+  --at-smalt-dusk: #343A52;     /* selected, on ink */
+  --at-terre-verte: #4C7556;    /* done */
+  --at-terre-verte-light: #8DB59A;
+  --at-ochre: #C08A28;          /* caution energy */
+  --at-ochre-ink: #855E12;      /* caution text on paper */
+  --at-ochre-light: #D4A24A;
+  --at-madder: #B03F4B;         /* failed */
+  --at-madder-light: #E0848D;
+  --at-cadmium: #B0611B;        /* the Rivals name on paper; never a state */
+  --at-cadmium-light: #F0A93C;  /* the Rivals name on ink */
+}
+
+/* Roles: paper surface (light theme) */
+.at-identity {
+  --surface: var(--at-gesso);
+  --surface-panel: var(--at-linen);
+  --surface-sunk: var(--at-chalk);
+  --line: var(--at-chalk);
+  --text: var(--at-lamp-black);
+  --text-muted: var(--at-graphite);
+  --action: var(--at-lamp-black);
+  --action-hover: var(--at-charcoal);
+  --on-action: var(--at-gesso);
+  --drop: var(--at-smalt);              /* yours: selection, focus, owned work */
+  --drop-text: var(--at-smalt-deep);
+  --on-drop: var(--at-gesso);
+  --drop-wash: var(--at-smalt-wash);
+  --done: var(--at-terre-verte);
+  --caution: var(--at-ochre);
+  --caution-text: var(--at-ochre-ink);
+  --fault: var(--at-madder);
+  --energy: var(--at-lamp-black);       /* Krackle ink */
+  --energy-hole: var(--surface);        /* bubbles show the surface */
+  --energy-glint: var(--at-gesso);      /* crisp specks, never a glow */
+  --energy-core: var(--at-smalt);       /* the drop the ink carries to the Mod tray */
+  --rivals: var(--at-cadmium);          /* the game's name in the lockup, kept apart from caution */
+
+  /* Type */
+  --font-display: 'Bricolage Grotesque', 'Arial Narrow', sans-serif;
+  --font-ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Fragment Mono', 'Cascadia Code', ui-monospace, monospace;
+  --stretch-display: 86%;
+  --type-display: 780 64px/0.94 var(--font-display);
+  --type-headline: 760 36px/1 var(--font-display);
+  --type-title: 600 20px/26px var(--font-ui);
+  --type-body: 400 14px/21px var(--font-ui);
+  --type-label: 600 11px/14px var(--font-ui);   /* uppercase, 0.09em */
+  --type-data: 400 12px/18px var(--font-mono);
+
+  /* Space: the drop scale, x1.6 */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 16px;
+  --space-5: 26px;
+  --space-6: 42px;
+  --space-7: 68px;
+  --space-8: 110px;
+
+  /* Shape: containers are flat-footed, meaning is round */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-panel: 14px;
+  --radius-drop: 999px;
+  --halo: 2px;                  /* paper gap between touching forms */
+  --control-height: 32px;
+
+  /* Motion */
+  --beat: 1040ms;               /* the only loop: busy */
+  --dur-form: 200ms;
+  --dur-transform: 500ms;
+  --dur-resolve: 400ms;
+  --ease-gather: cubic-bezier(.55, 0, .8, .35);
+  --ease-pour: cubic-bezier(.25, .1, .15, 1);
+  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-settle: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* Roles: ink surface (dark theme and explicit ink panels) */
+:root[data-theme="dark"] .at-identity, .at-identity[data-surface="ink"] {
+  --surface: var(--at-charcoal);
+  --surface-panel: var(--at-slate);
+  --surface-sunk: var(--at-lamp-black);
+  --line: var(--at-slate);
+  --text: var(--at-gesso);
+  --text-muted: var(--at-ash);
+  --action: var(--at-gesso);
+  --action-hover: var(--at-linen);
+  --on-action: var(--at-lamp-black);
+  --drop: var(--at-smalt-light);
+  --drop-text: var(--at-smalt-light);
+  --on-drop: var(--at-lamp-black);
+  --drop-wash: var(--at-smalt-dusk);
+  --done: var(--at-terre-verte-light);
+  --caution: var(--at-ochre-light);
+  --caution-text: var(--at-ochre-light);
+  --fault: var(--at-madder-light);
+  --energy: var(--at-smalt-light);
+  --energy-hole: var(--at-lamp-black);
+  --energy-glint: var(--at-gesso);
+  --energy-core: var(--at-gesso);
+  --rivals: var(--at-cadmium-light);
+}
+
+/* ── Shared components ─────────────────────────────────────── */
+.at-label {
+  font: var(--type-label);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+}
+.at-btn {
+  height: var(--control-height);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: 600 13px/1 var(--font-ui);
+  background: var(--surface-panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 120ms var(--ease-settle);
+}
+.at-btn:hover { background: var(--surface-sunk); }
+.at-btn--primary { background: var(--action); color: var(--on-action); }
+.at-btn--primary:hover { background: var(--action-hover); }
+.at-btn--quiet { background: transparent; }
+.at-btn--quiet:hover { background: var(--surface-panel); }
+.at-btn--danger { color: var(--fault); }
+.at-btn[disabled] { color: var(--text-muted); opacity: 0.55; cursor: not-allowed; }
+.at-btn[hidden] { display: none; }
+.at-identity :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop);
+}
+
+/* ── Edit All import dialog ─────────────────────────────────────── */
+#prog-box.at-import {
+  position: relative;
+  width: min(400px, calc(100% - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--studio-elevation-dialog, 0 16px 48px rgb(0 0 0 / 28%));
+  font: var(--type-body);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+.at-import-head { display: grid; gap: var(--space-2); }
+.at-import-head h2 {
+  margin: 0;
+  font: 760 30px/0.95 var(--font-display);
+  font-stretch: 84%;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+/* The stage well: a flat-footed Linen field the ink performs in. */
+.at-import-stage {
+  display: grid;
+  place-items: center;
+  height: 196px;
+  border-radius: var(--radius-card);
+  background: var(--surface-panel);
+  overflow: hidden;
+  --energy-hole: var(--surface-panel);
+}
+.at-import-stage > svg { display: block; width: 176px; height: 176px; overflow: visible; }
+.at-import-status { display: grid; gap: 3px; min-height: 58px; }
+.at-import-status b { font: 600 16px/22px var(--font-ui); color: var(--text); }
+#prog-counter { font: 400 13px/19px var(--font-ui); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.at-import-current {
+  font: var(--type-data);
+  color: var(--drop-text);
+  min-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#prog-box[data-import-state="warning"] .at-import-status b { color: var(--caution-text); }
+#prog-box[data-import-state="error"] .at-import-status b { color: var(--fault); }
+#prog-box[data-import-state="cancelled"] .at-import-status b { color: var(--text-muted); }
+
+/* One dot per asset. Circles carry meaning: the drop marks the asset at the head
+   of the queue, ink marks done, Madder marks the ones that did not import. */
+#prog-box.at-import #import-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 13px;
+  max-height: 58px;
+  margin: 0;
+  padding: 2px;
+  overflow: auto;
+}
+#prog-box.at-import #import-segments:empty { display: none; }
+#prog-box.at-import #import-segments span {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  min-width: 0;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  transition: background-color 120ms steps(2, end);
+}
+/* Done dots are ink (--text): on the ink surface Krackle energy and the drop share Smalt Light. */
+#prog-box.at-import #import-segments span[data-state="done"] { background: var(--text); }
+#prog-box.at-import #import-segments span[data-state="failed"] { background: var(--fault); }
+#prog-box.at-import[data-import-state="busy"] #import-segments span[data-state="pending"]:first-child,
+#prog-box.at-import[data-import-state="busy"] #import-segments span:not([data-state="pending"]) + span[data-state="pending"] {
+  width: 13px;
+  height: 13px;
+  margin: -2px 0;
+  background: var(--drop);
+  box-shadow: 0 0 0 var(--halo) var(--surface);
+}
+.at-import-note {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  font: 400 12.5px/1.45 var(--font-ui);
+  color: var(--text-muted);
+}
+.at-import-note[hidden] { display: none; }
+.at-import-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+@media (max-height: 700px) {
+  .at-import-stage { height: 152px; }
+  .at-import-stage > svg { width: 140px; height: 140px; }
+}
+
+/* ── Import ink ─────────────────────────────────────── */
+.am-import-ink-stage .e, .am-import-ink-stage .crisp, .am-import-ink-flight .e, .am-import-ink-flight .crisp { fill: var(--energy); }
+.am-import-ink-stage .r, .am-import-ink-stage .rc { fill: var(--ink-result, var(--done)); }
+.am-import-ink-stage .pop-ok { fill: var(--done); }
+.am-import-ink-stage .pop-fail { fill: var(--fault); }
+.am-import-ink-stage .core, .am-import-ink-flight .core { fill: var(--energy-core); }
+.am-import-ink-stage .glint, .am-import-ink-flight .glint { fill: var(--energy-glint); }
+[data-atelier-motion="import-ink"][data-am-state="success"] { --ink-result: var(--done); }
+[data-atelier-motion="import-ink"][data-am-state="warning"] { --ink-result: var(--caution); }
+[data-atelier-motion="import-ink"][data-am-state="error"] { --ink-result: var(--fault); }
+[data-atelier-motion="import-ink"][data-am-state="cancelled"] .e { fill: var(--text-muted); }
+/* Ink in flight sits above the dialog scrim; it never takes a pointer. */
+.am-import-ink-flight {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: calc(var(--studio-layer-overlay, 200) + 40);
+  pointer-events: none;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .at-btn, #prog-box.at-import #import-segments span { transition: none; }
+}
+
+/* ── Shared: fields, segmented controls, counts ─────────────────────────── */
+.at-field {
+  width: 100%;
+  height: var(--control-height);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  color: var(--text);
+  padding: 0 10px;
+  font: var(--type-data);
+}
+.at-field::placeholder { color: var(--text-muted); }
+.at-field:focus-visible { outline: none; box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop); }
+.at-seg { display: inline-flex; gap: 2px; padding: 3px; border: 0; border-radius: 9px; background: var(--surface-sunk); }
+.at-seg button {
+  height: 28px; min-width: 32px; padding: 0 9px; border: 0; border-radius: var(--radius-control);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.at-seg button:hover { color: var(--text); }
+.at-seg button.on { background: var(--action); color: var(--on-action); }
+.at-count {
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 7px;
+  border-radius: var(--radius-drop); background: var(--drop); color: var(--on-drop);
+  font: 600 12px/1 var(--font-ui); font-variant-numeric: tabular-nums; letter-spacing: 0;
+  box-shadow: 0 0 0 var(--halo) var(--surface);
+}
+.at-count[hidden] { display: none; }
+
+/* ── Projects: the first screen ─────────────────────────────────────────── */
+/* The picker is a page, not a dialog over a scrim: the ground is the identity's surface. */
+#project-overlay.at-identity { background: var(--surface); color: var(--text); }
+#project-overlay .proj-modal.at-projects {
+  width: calc(100% - 2 * var(--space-6));
+  max-width: 1120px;
+  height: calc(100vh - 2 * var(--space-5));
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+}
+.at-proj-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.at-proj-lockup {
+  display: inline-flex;
+  align-items: baseline;
+  font: 780 clamp(52px, 7.4vw, 96px)/1 var(--font-display);
+  font-stretch: var(--stretch-display);
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+/* The mark is the wordmark's A: cap height, sitting on the baseline, set as a letter. */
+.at-proj-mark { height: 0.76em; width: auto; margin-right: 0.015em; align-self: baseline; overflow: visible; }
+.at-proj-mark .mk-ink { fill: var(--text); }
+.at-proj-mark .mk-drop { fill: var(--drop); }
+.at-proj-wordmark { display: block; line-height: 0.8; }
+/* The i's tittle is the drop: a Smalt circle over a dotless ı, sized and set as the sheet's wordmark. */
+.at-proj-wordmark .at-i { position: relative; }
+.at-proj-wordmark .at-i::before {
+  content: ""; position: absolute; left: 50%; bottom: 0.79em;
+  width: 0.168em; height: 0.168em; margin-left: -0.084em;
+  border-radius: 50%; background: var(--drop);
+}
+/* "RIVALS" is bespoke lettering (index.html): its caps fill the x-height band of "telier"
+   (Bricolage's x-height is 0.53em) on the same baseline, so the three parts share one band.
+   Its own pigment, never a state colour. */
+.at-proj-rivals {
+  display: block;
+  height: 0.53em;
+  width: auto;
+  margin-right: -0.1em;   /* the S tucks under the mark's empty upper left; its foot stays a halo clear of the orb */
+  align-self: baseline;
+  fill: var(--rivals);
+  overflow: visible;
+}
+.at-projects .at-proj-tagline {
+  margin: 0 0 0.35em;
+  max-width: 15ch;
+  font: 700 clamp(22px, 2.4vw, 32px)/1.05 var(--font-display);
+  font-stretch: var(--stretch-display);
+  letter-spacing: -0.02em;
+  color: var(--text-muted);
+  text-wrap: balance;
+}
+.at-projects .proj-modal-header { padding: var(--space-5) 0 var(--space-4); border: 0; gap: var(--space-4); }
+.at-projects .proj-modal-header h2 {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0;
+  font: var(--type-headline);
+  font-stretch: 84%;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.at-projects .proj-modal-header .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
+.at-projects #proj-toolbar { padding: 0 0 var(--space-4); gap: var(--space-3); }
+.at-projects #proj-lead { display:flex; align-items:center; justify-content:space-between; gap:32px; min-height:230px; padding:28px 40px; margin:0 0 24px; background:var(--surface-panel); border:1px solid var(--line); border-radius:16px; flex-shrink:0; }
+.at-projects #proj-lead[hidden] { display:none; }
+.proj-lead-copy { min-width:0; }
+.proj-eyebrow { color:var(--drop-text); font:600 13px/1.4 var(--font-ui); }
+.proj-lead-copy h3 { font:650 clamp(28px,3vw,40px)/1.08 var(--font-display); letter-spacing:-.025em; margin:10px 0; overflow-wrap:anywhere; }
+.proj-lead-copy p { margin:0 0 20px; color:var(--text-muted); font:var(--type-body); }
+.proj-lead-copy .at-btn { min-height:40px; }
+.proj-lead-art { width:220px; flex:0 0 220px; }
+.proj-lead-art svg { width:100%; display:block; }
+@media(max-height:800px) { .at-projects #proj-lead { min-height:185px; padding:20px 32px; } .proj-lead-art { width:160px; flex-basis:160px; } }
+.at-projects #proj-selbar {
+  margin: 0 0 var(--space-3);
+  padding: 6px 6px 6px 14px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--drop-wash);
+  color: var(--drop-text);
+  font: 600 13px/1 var(--font-ui);
+}
+.at-projects #proj-selbar button {
+  height: 28px; padding: 0 12px; border: 0; border-radius: var(--radius-control);
+  background: var(--surface); color: var(--text); font: 600 12.5px/1 var(--font-ui);
+}
+.at-projects #proj-selbar button:hover { background: var(--surface-panel); border: 0; }
+.at-projects #proj-selbar button.danger, .at-projects #proj-selbar button.danger:hover { color: var(--fault); background: var(--surface); border: 0; }
+
+.at-projects #proj-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+  align-content: start;
+  gap: var(--space-4);
+  padding: 8px 8px var(--space-5);
+  margin: -8px -8px 0;
+  overflow-y: auto;
+}
+/* Deleted cards' ghosts are placed in the grid, beneath its live cards. */
+.at-projects #proj-grid { position: relative; isolation: isolate; }
+.at-projects #proj-grid.proj-list-mode { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* A project is a portfolio: the card is the folder itself (app.js draws it). Ink mass on a flat
+   foot, the latest artwork inside as a loose sheet, the name printed on the front panel. Paper
+   portfolios are Lamp Black; on ink they reverse to Gesso, as the mark does. */
+.at-projects {
+  --folder: var(--text);
+  --folder-hover: color-mix(in srgb, var(--text) 86%, var(--surface) 14%);
+  --on-folder: var(--surface);
+  --folder-meta: var(--at-ash);
+  --sheet-ground: var(--at-chalk);
+}
+:root[data-theme="dark"] .at-projects { --folder-meta: var(--at-graphite); --sheet-ground: var(--at-slate); }
+.at-projects #proj-grid:not(.proj-list-mode) { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--space-5) var(--space-4); }
+.at-projects .proj-card {
+  position: relative;
+  width: auto;
+  display: block;
+  aspect-ratio: 200 / 240;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  overflow: visible;
+}
+.at-projects .proj-card:hover { border: 0; background: transparent; --folder: var(--folder-hover); }
+.at-projects .proj-card.sel { border: 0; background: transparent; --folder: var(--drop); --on-folder: var(--on-drop); --folder-meta: var(--drop-wash); }
+.at-projects .proj-row.sel { border: 0; background: var(--drop-wash); }
+.at-projects .proj-card:focus-visible, .at-projects .proj-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop);
+}
+.at-projects .proj-card .proj-thumb {
+  position: absolute; inset: 0;
+  aspect-ratio: auto; width: auto; height: auto;
+  background: transparent; border-radius: 0; overflow: visible;
+}
+.proj-portfolio { display: block; width: 100%; height: 100%; overflow: visible; }
+.proj-portfolio .pp-back, .proj-portfolio .pp-front { fill: var(--folder, var(--text)); transition: fill 120ms var(--ease-settle); }
+.proj-portfolio .pp-halo, .proj-portfolio .pp-punch, .proj-portfolio .pp-drop-halo { fill: var(--surface); }
+.proj-portfolio .pp-sheet-ground { fill: var(--sheet-ground, var(--at-chalk)); }
+.proj-portfolio .pp-drop { fill: var(--drop); }
+.at-projects .proj-card.sel .pp-drop { fill: var(--on-drop); }
+.proj-portfolio .pp-image { image-rendering: pixelated; }
+/* While ink forms or dissolves a portfolio, its live outlines stand in for the drawn parts. */
+.proj-portfolio.is-live .pp-back, .proj-portfolio.is-live .pp-halo, .proj-portfolio.is-live .pp-front,
+.proj-portfolio.is-live .pp-punch, .proj-portfolio.is-live .pp-drop-halo, .proj-portfolio.is-live .pp-drop { visibility: hidden; }
+.at-projects .proj-card.is-forming .proj-body, .at-projects .proj-card.is-forming .proj-actions,
+.at-projects .proj-card.is-forming .proj-check { visibility: hidden; }
+.at-projects .proj-card.is-printing .proj-body { opacity: 0.5; }
+/* The name is printed on the front panel (y 100 to 236 of 240). */
+.at-projects .proj-card .proj-body {
+  position: absolute; left: 9%; right: 9%; bottom: 7%;
+  display: grid; gap: 4px; padding: 0; min-width: 0;
+  color: var(--on-folder);
+}
+.at-projects .proj-card .proj-name {
+  font: 760 clamp(18px, 1.7vw, 22px)/1.05 var(--font-display);
+  font-stretch: 84%; letter-spacing: -0.01em;
+  color: var(--on-folder);
+}
+.at-projects .proj-card .proj-meta { margin: 0; font: 400 11px/14px var(--font-mono); color: var(--folder-meta); }
+.at-projects .proj-row .proj-body { display: grid; gap: 3px; padding: 0 4px; min-width: 0; }
+.at-projects .proj-row .proj-name { font: 600 14px/1.3 var(--font-ui); color: var(--text); }
+.at-projects .proj-row .proj-meta { margin: 0; font: 400 11px/16px var(--font-mono); color: var(--text-muted); }
+.at-projects .proj-actions {
+  top: 12%; right: 6%; gap: 2px; padding: 3px;
+  border: 0; border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.at-projects .proj-action-btn { width: 26px; height: 26px; border-radius: var(--radius-control); color: var(--text-muted); }
+.at-projects .proj-action-btn:hover { background: var(--surface-panel); color: var(--text); }
+.at-projects .proj-action-btn.danger:hover { background: var(--surface-panel); color: var(--fault); }
+/* Selection is the drop: a Smalt circle behind a paper halo on the portfolio's tab. */
+.at-projects .proj-card .proj-check {
+  top: -6px; left: -6px;
+  width: 20px; height: 20px;
+  border: 0; border-radius: 50%;
+  background: var(--surface-sunk);
+  box-shadow: 0 0 0 var(--halo) var(--surface);
+}
+.at-projects .proj-card.sel .proj-check, .at-projects .proj-row.sel .proj-check { background: var(--drop); }
+.at-projects .proj-check input {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 100%; margin: 0;
+  border-radius: 50%; background: transparent; cursor: pointer;
+}
+.at-projects .proj-row .proj-check { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-sunk); }
+.at-projects .proj-row {
+  gap: var(--space-3);
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+.at-projects .proj-row:hover { border: 0; background: color-mix(in srgb, var(--surface-panel) 88%, var(--text) 12%); }
+.at-projects .proj-row .proj-thumb { width: 30px; height: 36px; aspect-ratio: auto; border-radius: 0; background: transparent; overflow: visible; flex-shrink: 0; }
+.at-projects .proj-row .proj-col-assets { width: 76px; }
+.at-projects .proj-row .proj-col-time { width: 84px; }
+.at-projects .proj-empty:not(.at-proj-empty) { color: var(--text-muted); grid-column: 1 / -1; }
+
+/* The empty first screen: one drop of ink standing on the baseline. */
+.at-projects .at-proj-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  min-height: 100%;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text);
+}
+.at-projects .k-project-drop {
+  position: relative;
+  display: block;
+  width: 120px;
+  height: 148px;
+  padding: 0 0 16px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  cursor: pointer;
+}
+.at-projects .k-project-drop svg { display: block; width: 120px; height: 132px; }
+.at-projects .k-project-drop::after {
+  content: ""; position: absolute; left: 50%; bottom: 14px; width: 240px; margin-left: -120px;
+  border-top: 1px solid var(--line);
+}
+.at-projects .k-project-drop .pe-ink { fill: var(--text); }
+.at-projects .k-project-drop .pe-core { fill: var(--drop); }
+.at-projects .k-project-drop .pe-glint { fill: var(--surface); }
+.at-projects .at-proj-empty h3 {
+  margin: var(--space-2) 0 0;
+  font: var(--type-display);
+  font-size: clamp(44px, 5vw, 64px);
+  font-stretch: var(--stretch-display);
+  letter-spacing: -0.03em;
+}
+.at-projects .at-proj-empty p { margin: 0; max-width: 46ch; font: 400 15px/1.6 var(--font-ui); color: var(--text-muted); }
+
+/* New project ink. The bleed creeps across the page beneath its content (the picker sits above
+   it), so it never crosses text; the folder forms in a layer above its card. Neither takes a pointer. */
+.am-project-bleed {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; overflow: visible;
+}
+#project-overlay .proj-modal.at-projects { position: relative; z-index: 1; }
+/* Picker results speak here, in the page's own voice, rather than in a toast. */
+.at-proj-status {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 400 13px/1.4 var(--font-ui);
+  color: var(--text-muted);
+  text-align: right;
+}
+.at-proj-status b { color: var(--text); font-weight: 600; }
+.at-proj-status[data-kind="fault"] { color: var(--fault); }
+.at-proj-status:empty { visibility: hidden; }
+.am-project-ink {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: calc(var(--studio-layer-overlay, 200) + 40);
+  pointer-events: none; overflow: visible;
+}
+
+/* ── Launch check and first-run setup (#setup-overlay outside Settings) ──────────────────── */
+/* The same page as Projects: its ground, its header, and the header's rule drawn by the check
+   (motion/setup-check.css). Settings keeps the Material dialog; setup-wizard.js moves the
+   controls between them, so IDs, validators and save payloads are shared. */
+#setup-overlay.at-identity { background: var(--surface); color: var(--text); backdrop-filter: none; }
+#setup-overlay[data-setup-page] .setup-modal {
+  width: calc(100% - 2 * var(--space-6));
+  max-width: 1120px;
+  height: calc(100vh - 2 * var(--space-5));
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+}
+#setup-overlay[data-setup-page] .setup-head,
+#setup-overlay[data-setup-page] .setup-body,
+#setup-overlay[data-setup-page] .setup-foot,
+#setup-overlay[data-setup-page] #setup-loading { display: none !important; }
+.at-setup-hero[hidden], .at-setup-page[hidden] { display: none; }
+.at-setup-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  /* Room below the rule for the check's result to land without touching the text. */
+  padding: var(--space-6) 0 var(--space-5);
+}
+.at-setup-page h1 {
+  margin: 0 0 var(--space-3);
+  font: var(--type-headline);
+  font-stretch: 84%;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.at-setup-page h1:focus:not(:focus-visible) { outline: none; }
+.at-setup-lede { margin: 0; max-width: 62ch; font: 400 15px/22px var(--font-ui); color: var(--text-muted); }
+.at-setup-rows { list-style: none; margin: var(--space-5) 0 0; padding: 0; border-top: 1px solid var(--line); }
+.at-setup-rows[hidden] { display: none; }
+.at-setup-row {
+  display: grid;
+  grid-template-columns: 28px minmax(140px, 240px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 68px;
+  padding: 0 var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.at-setup-row.is-editing { align-items: start; padding-top: 18px; padding-bottom: 18px; }
+.at-setup-glyph { position: relative; display: inline-flex; width: 20px; height: 20px; }
+.at-setup-row.is-editing .at-setup-glyph, .at-setup-row.is-editing .at-setup-name { margin-top: 1px; }
+/* Waiting: an empty slot, not a state. The heading says the check is running. */
+.at-setup-row[data-state="waiting"] .at-setup-glyph::before {
+  content: ""; position: absolute; left: 6.5px; top: 6.5px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--line);
+}
+.at-setup-name { font: 600 15px/20px var(--font-ui); color: var(--text); }
+.at-setup-row[data-state="waiting"] .at-setup-name { color: var(--text-muted); }
+.at-setup-code { margin-left: 6px; font: 400 11px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--text-muted); }
+.at-setup-detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.at-setup-what { color: var(--text); }
+.at-setup-row[data-state="pending"] .at-setup-what { color: var(--text-muted); }
+.at-setup-row[data-state="missing"] .at-setup-what { color: var(--caution-text); }
+.at-setup-what a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.at-setup-where { font: var(--type-data); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-setup-what:empty, .at-setup-where:empty { display: none; }
+.at-setup-field { margin-top: var(--space-3); }
+.at-setup-field[hidden], .at-setup-change[hidden] { display: none; }
+.at-setup-field .setup-row { display: flex; gap: var(--space-3); }
+#setup-page .setup-input {
+  flex: 1; min-width: 0; height: var(--control-height); min-height: 0; box-sizing: border-box;
+  padding: 0 12px; border: 0; border-radius: var(--radius-control);
+  background: var(--surface-sunk); color: var(--text); font: var(--type-data);
+}
+#setup-page .setup-input::placeholder { color: var(--text-muted); font-weight: 400; }
+#setup-page .setup-input:focus { outline: none; box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop); }
+#setup-page .setup-input.setup-invalid:not(:focus) { box-shadow: inset 0 0 0 1px var(--caution); }
+#setup-page .setup-row .btn {
+  height: var(--control-height); padding: 0 14px; border: 0; border-radius: var(--radius-control);
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-panel); color: var(--text); font: 600 13px/1 var(--font-ui); cursor: pointer;
+}
+#setup-page .setup-row .btn:hover:not(:disabled) { background: var(--surface-sunk); }
+#setup-page .setup-row .btn:disabled { opacity: 0.55; cursor: progress; }
+/* The Grand pour: each row names the thing on the left, the drop's column runs down the middle
+   through the glyphs, and what was found sits on the right. The ink-well stands under the
+   column, prominent, with the note beneath it. */
+#setup-page .at-setup-row { grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr) auto; gap: 0 var(--space-4); }
+#setup-page .at-setup-name { grid-column: 1; text-align: right; }
+#setup-page .at-setup-glyph { grid-column: 2; justify-self: center; }
+#setup-page .at-setup-detail { grid-column: 3; }
+#setup-page .at-setup-change { grid-column: 4; }
+/* Room for the open lid to clear the last row. */
+.at-setup-foot { display: grid; grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr) auto; gap: var(--space-4); margin-top: 60px; }
+.at-setup-foot[hidden] { display: none; }
+.at-setup-foot .at-setup-note { grid-column: 2; grid-row: 2; justify-self: center; white-space: nowrap; text-align: center; }
+/* The drop's dotted line runs beneath the rows and the ink-well (setup-drop.css). */
+#setup-page { position: relative; }
+#setup-page > :not(.am-setup-drop-flight) { position: relative; z-index: 1; }
+#setup-page > .at-setup-foot { z-index: 3; }
+/* Open Atelier is the ink-well's paper label, across the glass of its lower belly (the 240px
+   ink-well of setup-drop.js). */
+.at-setup-well { grid-column: 2; grid-row: 1; justify-self: center; position: relative; flex: none; width: 240px; height: 240px; }
+.at-setup-well .at-setup-save-slot { position: absolute; left: 49px; top: 152px; width: 142px; height: 40px; }
+#setup-page #setup-save {
+  width: 100%; height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-control);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text); font: 600 15px/1 var(--font-ui); white-space: nowrap; cursor: pointer;
+}
+#setup-page #setup-save > :not(#setup-save-label) { display: none; }
+/* A paper label: the ink never carries the text; the landed drop says it is ready. */
+#setup-page #setup-save:hover:not(:disabled) { background: var(--surface-panel); }
+#setup-page #setup-save:disabled { opacity: 1; color: var(--text-muted); font-weight: 500; cursor: not-allowed; }
+.at-setup-note { font: 400 13px/1.4 var(--font-ui); color: var(--text-muted); }
+.at-setup-failure { display: grid; justify-items: start; gap: var(--space-5); margin-top: var(--space-5); }
+.at-setup-failure[hidden] { display: none; }
+/* The service's own words, as it said them. */
+.at-setup-error {
+  width: 100%; max-width: 720px; box-sizing: border-box; margin: 0; padding: 14px 16px;
+  border-radius: var(--radius-card); background: var(--surface-panel);
+  font: var(--type-data); color: var(--fault); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+:root[data-theme="dark"] .at-setup-error { background: var(--surface-sunk); }
+.at-setup-error:empty { display: none; }
+.at-setup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.at-setup-actions .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
+.at-setup-help { margin-left: var(--space-2); font: 400 13px/1 var(--font-ui); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+#setup-page [data-atelier-motion="krackle-glyph"] { color: var(--energy); --krackle-hole: var(--energy-hole); --krackle-glint: var(--energy-glint); }
+#setup-page [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
+#setup-page [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
+/* Projects takes over from the check without its dialog entrance, standing on the same rule;
+   the extra room under the rule matches the check page while the result sits on it. */
+#project-overlay.at-handover > :first-child { animation: none; }
+.at-proj-hero.at-has-line + .proj-modal-header { padding-top: var(--space-6); }
+@media (max-width: 640px) {
+  .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 24px minmax(0, 1fr) auto; gap: var(--space-4); }
+  .at-setup-row .at-setup-detail, #setup-page .at-setup-detail { grid-column: 2 / -1; }
+  #setup-page .at-setup-glyph { grid-column: 1; }
+  #setup-page .at-setup-name { grid-column: 2; text-align: left; }
+  #setup-page .at-setup-change { grid-column: 3; }
+  .at-setup-foot { display: flex; flex-direction: column; align-items: center; }
+  .at-setup-foot .at-setup-note { white-space: normal; }
+}
+
+/* ── Open a mod (#mod-open-overlay) ───────────────────────────────────────────────────── */
+/* The setup page's model on the same ground: one page that says what the mod holds, asks only
+   for what is missing (a locked mod's password) and has one primary action. The mod and password
+   rows are .at-setup-row; each asset says what it is, where it lives and what it references. */
+#mod-open-overlay.at-identity { background: var(--surface); color: var(--text); backdrop-filter: none; }
+#mod-open-overlay .at-modopen {
+  width: calc(100% - 2 * var(--space-6));
+  max-width: 1120px;
+  height: calc(100vh - 2 * var(--space-5));
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+}
+.at-modopen-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-4); border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.at-modopen-head h1 { margin: 0; font: var(--type-headline); font-stretch: 84%; letter-spacing: -0.02em; color: var(--text); }
+.at-modopen-head h1:focus:not(:focus-visible) { outline: none; }
+.at-modopen-lede { margin: var(--space-2) 0 0; max-width: 70ch; font: 400 15px/22px var(--font-ui); color: var(--text-muted); }
+.at-modopen-head .at-btn { height: 36px; padding: 0 18px; font-size: 14px; flex: none; }
+.at-modopen-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-5); }
+.at-modopen-rows.at-setup-rows { margin-top: 0; border-top: 0; }
+.at-modopen-rows .at-setup-row[hidden] { display: none; }
+.at-modopen-rows .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
+.at-modopen-rows .at-setup-glyph { width: 24px; height: 24px; }
+#mod-open-password-field { display: flex; gap: var(--space-3); }
+#mod-open-password {
+  flex: 1; min-width: 0; max-width: 360px; height: var(--control-height); box-sizing: border-box;
+  padding: 0 12px; border: 0; border-radius: var(--radius-control);
+  background: var(--surface-sunk); color: var(--text); font: var(--type-data);
+}
+#mod-open-password:focus { outline: none; box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop); }
+.at-modopen-problems { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-1); }
+.at-modopen-problems:empty { display: none; }
+.at-modopen-problems li { font: 400 13px/1.45 var(--font-ui); color: var(--caution-text); overflow-wrap: anywhere; }
+.at-modopen-problems code { font: var(--type-data); color: var(--text); }
+.at-modopen-group { margin-top: var(--space-5); }
+.at-modopen-group-head {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1) var(--space-3);
+  padding: 0 var(--space-1) var(--space-2); border-bottom: 1px solid var(--line);
+}
+.at-modopen-group-head h2 { margin: 0; font: var(--type-title); color: var(--text); }
+.at-modopen-n { font: var(--type-data); color: var(--text-muted); }
+.at-modopen-group-note { flex: 1 1 36ch; margin: 0; font: 400 13px/1.45 var(--font-ui); color: var(--text-muted); }
+.at-modopen-group-head .at-btn { height: 28px; padding: 0 10px; font-size: 12px; }
+.at-modopen-assets { list-style: none; margin: 0; padding: 0; }
+.at-modopen-asset {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start;
+  gap: var(--space-3); padding: var(--space-3) var(--space-1); border-bottom: 1px solid var(--line);
+}
+.at-modopen-check { display: flex; justify-content: center; padding-top: 1px; }
+.at-modopen-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--drop); cursor: pointer; }
+.at-modopen-detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.at-modopen-name { font: 500 13px/18px var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
+.at-modopen-path { font: var(--type-data); color: var(--text-muted); overflow-wrap: anywhere; }
+.at-modopen-status { font: 400 13px/1.45 var(--font-ui); color: var(--text-muted); }
+.at-modopen-asset[data-state="replace"] .at-modopen-status,
+.at-modopen-asset[data-state="problem"] .at-modopen-status { color: var(--caution-text); }
+.at-modopen-asset[data-state="yours"] .at-modopen-status { color: var(--text); }
+/* Owned work: the drop marks what is now in your Mod tray. */
+.at-modopen-asset[data-state="yours"] .at-modopen-status::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 1px;
+  border-radius: 50%; background: var(--drop);
+}
+.at-modopen-refs { margin-top: 2px; }
+.at-modopen-refs summary { width: fit-content; font: 400 13px/1.45 var(--font-ui); color: var(--text); cursor: pointer; }
+.at-modopen-refs ul {
+  list-style: none; margin: var(--space-2) 0 var(--space-1); padding: 0 0 0 var(--space-3);
+  border-left: 1px solid var(--line); display: grid; gap: 2px;
+}
+.at-modopen-refs li { font: var(--type-data); color: var(--text); overflow-wrap: anywhere; }
+.at-modopen-refs li span { margin-left: 6px; font: 400 12px/18px var(--font-ui); color: var(--text-muted); }
+.at-modopen-asset .at-btn { height: 28px; padding: 0 10px; font-size: 12px; }
+.at-modopen-foot {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
+  padding: var(--space-4) 0; border-top: 1px solid var(--line); flex-shrink: 0;
+}
+.at-modopen-foot[hidden] { display: none; }
+.at-modopen-foot .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
+.at-modopen-outcome { display: inline-flex; width: 24px; height: 24px; flex: none; }
+.at-modopen-outcome:empty { display: none; }
+#mod-open-overlay [data-atelier-motion="krackle-glyph"] { color: var(--energy); --krackle-hole: var(--energy-hole); --krackle-glint: var(--energy-glint); }
+#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
+#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
+#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="error"] { color: var(--fault); }
+@media (max-width: 640px) {
+  #mod-open-overlay .at-modopen { width: calc(100% - 2 * var(--space-4)); }
+  .at-modopen-head { flex-wrap: wrap; }
+  .at-modopen-asset { grid-template-columns: 24px minmax(0, 1fr); }
+  .at-modopen-asset > .at-btn { grid-column: 2; justify-self: start; }
+}
+
+/* Project dialogs: naming, deleting and exporting */
+.modal.at-dialog {
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--text);
+  font: var(--type-body);
+}
+.modal.at-dialog h2 { margin: 0 0 var(--space-2); font: 760 28px/1 var(--font-display); font-stretch: 84%; letter-spacing: -0.02em; }
+.modal.at-proj-name .at-field { height: 36px; font: 400 14px/1 var(--font-ui); }
+.modal.at-dialog p { margin: 0; font: 400 14px/1.55 var(--font-ui); color: var(--text-muted); }
+.modal.at-dialog .modal-row { margin-top: var(--space-3); gap: var(--space-2); }
+
+@media (max-height: 760px) {
+  .at-proj-hero { padding: var(--space-4) 0; }
+  .at-projects .proj-modal-header { padding: var(--space-4) 0 var(--space-3); }
+}

@@ -591,18 +591,7 @@ body {
 .notice-banner > svg { color: var(--acc); flex-shrink: 0; }
 .notice-banner .btn { flex-shrink: 0; }
 #usmap-update-name { color: var(--muted); }
-#prog-box {
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: var(--studio-shape-dialog);
-  padding: 28px 32px 26px;
-  max-width: 420px;
-  width: calc(100% - 40px);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-#prog-box h2 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+/* #prog-box (the Edit All import dialog) is styled by identity.css. */
 #prog-label { font-size: var(--studio-text-detail); color: var(--muted); min-height: 18px; }
 .progress-bar-bg {
   width: 100%;
@@ -618,7 +607,6 @@ body {
   transition: width 200ms linear;
   width: 0%;
 }
-#prog-counter { font-size: var(--studio-text-label); color: var(--muted); }
 
 /* â”€â”€ toast â”€â”€ */
 #toast-area {

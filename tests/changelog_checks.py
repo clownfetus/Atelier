@@ -99,7 +99,7 @@ def run_changelog_checks(context, url, report, checks):
         upgraded('0.4.1')
         tab.route('**/api/setup_status', lambda route: route.fulfill(json={'configured': False}))
         tab.reload()
-        tab.wait_for_selector('#setup-step-1')
+        tab.wait_for_selector('#setup-overlay.active[data-setup-page=first-run]')
         assert tab.locator('#changelog-overlay.active').count() == 0
         assert C._load_config()['changelog_version'] == '0.4.1'
         checks.append('First-run setup keeps priority and does not acknowledge notes the user has not seen')

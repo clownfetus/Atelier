@@ -92,11 +92,12 @@ def oodle_decompress(comp, raw_len):
 _aes_fn = None
 
 def _load_aes():
-    """Returns f(data: bytes) -> bytes (decrypt)."""
+    """Returns f(data: bytes, key: bytes | None) -> bytes (decrypt; key defaults to AES_KEY)."""
     if IS_WINDOWS:
         _bcrypt = ctypes.windll.bcrypt
-        def _aes_ecb(data, decrypt):
-            if not AES_KEY:
+        def _aes_ecb(data, decrypt, key=None):
+            key = key or AES_KEY
+            if not key:
                 raise RuntimeError("AES key not configured")
             BCRYPT_AES_ALGORITHM = ctypes.c_wchar_p("AES")
             hAlg = ctypes.c_void_p()
@@ -106,7 +107,7 @@ def _load_aes():
                                       ctypes.cast(chain, ctypes.c_void_p), (len(chain.value)+1)*2, 0)
             hKey = ctypes.c_void_p()
             _bcrypt.BCryptGenerateSymmetricKey(hAlg, ctypes.byref(hKey), None, 0,
-                                               AES_KEY, len(AES_KEY), 0)
+                                               key, len(key), 0)
             out = ctypes.create_string_buffer(len(data))
             cb = ctypes.c_ulong(0)
             fn = _bcrypt.BCryptDecrypt if decrypt else _bcrypt.BCryptEncrypt
@@ -114,25 +115,26 @@ def _load_aes():
             _bcrypt.BCryptDestroyKey(hKey); _bcrypt.BCryptCloseAlgorithmProvider(hAlg, 0)
             if st != 0: raise RuntimeError(f"BCrypt status {st:#x}")
             return out.raw[:cb.value]
-        return lambda data: _aes_ecb(data, True)
+        return lambda data, key=None: _aes_ecb(data, True, key)
 
     try:
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     except ImportError:
         raise RuntimeError("the `cryptography` package is required to read paks on Linux "
                            "(pip install cryptography)")
-    def _decrypt(data):
-        if not AES_KEY:
+    def _decrypt(data, key=None):
+        key = key or AES_KEY
+        if not key:
             raise RuntimeError("AES key not configured")
-        d = Cipher(algorithms.AES(AES_KEY), modes.ECB()).decryptor()
+        d = Cipher(algorithms.AES(key), modes.ECB()).decryptor()
         return d.update(data) + d.finalize()
     return _decrypt
 
-def aes_decrypt(data):
+def aes_decrypt(data, key=None):
     global _aes_fn
     if _aes_fn is None:
         _aes_fn = _load_aes()
-    return _aes_fn(data)
+    return _aes_fn(data, key)
 
 FLAGBITS = {1:"Compressed",2:"Encrypted",4:"Signed",8:"Indexed",16:"OnDemand"}
 

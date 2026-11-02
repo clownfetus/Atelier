@@ -268,8 +268,9 @@
     for (const node of document.querySelectorAll('.modal[aria-busy="true"], #grid-area[aria-busy="true"], #viewport-stage canvas[aria-busy="true"]')) {
       automatic.add(node.id === 'grid-area' ? document.getElementById('explorer') : node.closest('#viewport-box') || node);
     }
-    for (const node of document.querySelectorAll('[data-atelier-motion="viewport-loader"][data-am-state="loading"], .prog-krackle-stage[data-am-state="busy"]')) {
-      automatic.add(node.closest('#viewport-box, #prog-box'));
+    // The import dialog's own ink carries its job, so its border stays plain.
+    for (const node of document.querySelectorAll('[data-atelier-motion="viewport-loader"][data-am-state="loading"]')) {
+      automatic.add(node.closest('#viewport-box'));
     }
     for (const node of document.querySelectorAll('.job-state-glyph[data-am-state="busy"]')) automatic.add(node.closest('.modal'));
     for (const panel of automatic) if (panel) entry(panel);

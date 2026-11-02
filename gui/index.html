@@ -47,6 +47,10 @@
 <link rel="stylesheet" href="/static/motion/krackle-stage.css">
 <link rel="stylesheet" href="/static/motion/working-panels.css">
 <link rel="stylesheet" href="/static/motion/config-discovery.css">
+<link rel="stylesheet" href="/static/motion/setup-check.css">
+<link rel="stylesheet" href="/static/motion/setup-drop.css">
+<link rel="stylesheet" href="/static/identity.css">
+<link rel="stylesheet" href="/static/workspace.css">
 </head>
 <body>
 
@@ -54,6 +58,7 @@
 <div id="topbar">
   <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
   <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
+  <nav id="app-pages" aria-label="Main navigation"><button id="page-projects" type="button">Projects</button><button id="page-workspace" type="button">Workspace</button><button id="page-library" type="button">Library</button></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
     <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets, IDs…" aria-keyshortcuts="Control+f Meta+f">
@@ -65,6 +70,24 @@
 </div>
 
 <!-- ── body ── -->
+<main id="workspace" class="at-identity" aria-label="Project workspace" hidden>
+  <header class="workspace-heading"><div><span class="proj-eyebrow">Your workspace</span><h1 id="workspace-title"></h1></div><button class="at-btn" id="workspace-choose" type="button">Change costume</button></header>
+  <section id="workspace-choice" aria-labelledby="workspace-choice-title" hidden>
+    <div class="workspace-choice-heading"><div><h2 id="workspace-choice-title">Who will you make yours?</h2><p>Choose a hero, then a costume to start colouring.</p></div><input class="at-field" id="workspace-search" type="search" placeholder="Find a hero or costume…" aria-label="Find a hero or costume"></div>
+    <p id="workspace-choice-status" role="status"></p>
+    <div id="workspace-heroes" aria-label="Heroes"></div>
+    <div id="workspace-costumes" aria-label="Costumes"></div>
+  </section>
+  <div id="workspace-stage" hidden></div>
+  <section id="workspace-dock" aria-labelledby="workspace-dock-title">
+    <header class="workspace-dock-head">
+      <h2 id="workspace-dock-title">Your mod</h2><span class="at-count" id="workspace-dock-count" aria-label="0 edits">0</span>
+      <p id="workspace-dock-status" role="status"></p>
+      <button class="at-btn at-btn--primary" id="workspace-review" type="button" disabled>Review &amp; install</button>
+    </header>
+    <ul id="workspace-dock-list" aria-labelledby="workspace-dock-title"></ul>
+  </section>
+</main>
 <div id="body">
 
   <!-- explorer -->
@@ -198,15 +221,24 @@
 
 <!-- ── progress overlay (un-closable) ── -->
 <div class="overlay" id="prog-overlay">
-  <div id="prog-box">
-    <h2><div class="spinner"></div> Editing Assets…</h2>
-    <div id="prog-counter" style="font-size:13px;color:var(--muted)">Preparing 0 / 0 assets for editing…</div>
-    <div id="import-segments" aria-label="Import results"></div>
-    <div class="warning" style="margin-top:4px">
-      <i data-lucide="shield-alert" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>Completed assets are retained if cancelled. Check Activity after reopening this view.</span>
+  <div id="prog-box" class="at-identity at-import" role="dialog" aria-modal="true" aria-labelledby="import-title" aria-describedby="import-status" data-import-state="idle">
+    <header class="at-import-head">
+      <span class="at-label" id="import-kicker">Import</span>
+      <h2 id="import-title">Editing assets</h2>
+    </header>
+    <div class="at-import-stage" id="import-stage" aria-hidden="true"></div>
+    <div class="at-import-status" id="import-status" aria-live="polite">
+      <b id="import-status-title">Extracting from game</b>
+      <span id="prog-counter">Preparing 0 / 0 assets for editing…</span>
+      <span class="at-import-current" id="import-current"></span>
     </div>
-    <div class="bulk-actions"><button class="btn" id="import-hide" type="button">Hide</button><button class="btn" id="import-cancel" type="button">Cancel import</button></div>
+    <div id="import-segments" aria-label="Import results"></div>
+    <p class="at-import-note" id="import-note">Completed assets are kept if you cancel. Hide this view to keep working; Activity shows the result.</p>
+    <div class="at-import-actions">
+      <button class="at-btn at-btn--quiet" id="import-hide" type="button">Hide</button>
+      <button class="at-btn at-btn--danger" id="import-cancel" type="button">Cancel import</button>
+      <button class="at-btn at-btn--primary" id="import-done" type="button" hidden>Done</button>
+    </div>
   </div>
 </div>
 
@@ -453,9 +485,63 @@
   </section>
 </div>
 
-<!-- ── first-run setup / editable Paths panel ── -->
+<!-- ── launch check and first-run setup page / editable Settings panel ── -->
 <div class="overlay" id="setup-overlay">
   <div class="modal setup-modal">
+    <!-- The launch check and first-run setup: a page on the Projects ground (setup-wizard.js copies
+         the Projects header in). Settings keeps the dialog below; the controls move between them. -->
+    <header class="at-proj-hero at-setup-hero" id="setup-hero" hidden></header>
+    <section class="at-setup-page" id="setup-page" aria-labelledby="setup-page-title" hidden>
+      <h1 id="setup-page-title" tabindex="-1">Checking your setup</h1>
+      <p class="at-setup-lede" id="setup-page-lede" role="status" aria-live="polite">Looking for Marvel Rivals, its unlock key and its mapping file.</p>
+      <ul class="at-setup-rows" id="setup-rows">
+        <li class="at-setup-row" data-row="key" data-state="waiting">
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <label class="at-setup-name" for="setup-aes">Unlock key <span class="at-setup-code">AES</span></label>
+          <div class="at-setup-detail">
+            <span class="at-setup-what"></span>
+            <span class="at-setup-where"></span>
+            <div class="at-setup-field" hidden></div>
+          </div>
+          <button type="button" class="at-btn at-btn--quiet at-setup-change" aria-label="Change the unlock key" hidden>Change</button>
+        </li>
+        <li class="at-setup-row" data-row="map" data-state="waiting">
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <label class="at-setup-name" for="setup-usmap">Mapping file <span class="at-setup-code">USMAP</span></label>
+          <div class="at-setup-detail">
+            <span class="at-setup-what"></span>
+            <span class="at-setup-where"></span>
+            <div class="at-setup-field" hidden></div>
+          </div>
+          <button type="button" class="at-btn at-btn--quiet at-setup-change" aria-label="Change the mapping file" hidden>Change</button>
+        </li>
+        <li class="at-setup-row" data-row="game" data-state="waiting">
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <label class="at-setup-name" for="setup-path">Game folder</label>
+          <div class="at-setup-detail">
+            <span class="at-setup-what"></span>
+            <span class="at-setup-where"></span>
+            <div class="at-setup-field" hidden></div>
+          </div>
+          <button type="button" class="at-btn at-btn--quiet at-setup-change" aria-label="Change the game folder" hidden>Change</button>
+        </li>
+      </ul>
+      <div class="at-setup-failure" id="setup-failure" hidden>
+        <pre class="at-setup-error" id="setup-page-error"></pre>
+        <div class="at-setup-actions">
+          <button type="button" class="at-btn at-btn--primary" id="setup-retry">Try again</button>
+          <button type="button" class="at-btn at-btn--quiet" id="setup-open-settings">Open settings</button>
+          <a class="at-setup-help" href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener">Get help</a>
+        </div>
+      </div>
+      <div class="at-setup-foot" id="setup-page-foot" hidden>
+        <span class="at-setup-well" id="setup-well">
+          <span class="at-setup-well-art" id="setup-well-art"></span>
+          <span class="at-setup-save-slot"></span>
+        </span>
+        <span class="at-setup-note" id="setup-page-note"></span>
+      </div>
+    </section>
     <div class="setup-head">
       <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
       <button class="sb-clear" id="setup-close" title="Close"><i data-lucide="x" size="16"></i></button>
@@ -628,24 +714,36 @@
 </div>
 
 <!-- ── project picker ── -->
-<div class="overlay" id="project-overlay">
-  <div class="modal proj-modal">
+<div class="overlay at-identity" id="project-overlay">
+  <div class="modal proj-modal at-projects" role="dialog" aria-modal="true" aria-labelledby="proj-title">
+    <header class="at-proj-hero">
+      <div class="at-proj-lockup" role="img" aria-label="Rivals Atelier">
+        <!-- RIVALS: bespoke lettering on a 100-unit cap height, flat-footed, sharing one 18° slant baked into the outlines; the R and A counters are punched true circles. -->
+        <svg class="at-proj-rivals" viewBox="0 0 411 100" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M32.5 0L70.5 0C90.5 0 96.28 13 90.75 30C86.2 44 75.95 54 63.65 58L70 100L44 100L40.35 62L36.35 62L24 100L0 100ZM48.75 30a10 10 0 1 0 20 0a10 10 0 1 0 -20 0ZM110.5 0L134.5 0L102 100L78 100ZM142.5 0L167.5 0L159.35 62L191.5 0L216.5 0L160 100L134 100ZM224.5 0L250.5 0L242 100L218 100L219.85 82L201.85 82L192 100L168 100ZM211.6 52a9 9 0 1 0 18 0a9 9 0 1 0 -18 0ZM282.5 0L306.5 0L281.8 76L313.8 76L306 100L250 100ZM358.5 0L410.5 0L403.35 22L367.35 22L361.82 39L385.82 39L393.93 51L381.9 88L366 100L314 100L321.15 78L357.15 78L362.68 61L338.68 61L330.57 49L342.6 12Z"/></svg>
+        <svg class="at-proj-mark" viewBox="-6 -6 1012 865" aria-hidden="true" focusable="false"><path class="mk-ink" fill-rule="evenodd" d="M305.2 859.7C303.8 859.1 304.6 857.6 308.7 853.1C322.3 838.2 330.5 817.4 330.8 797.0C331.3 754.6 287.4 718.3 245.0 726.0C232.0 728.4 223.4 731.5 213.6 737.6C209.9 739.8 208.6 739.6 207.8 736.7C207.6 735.7 206.6 731.7 205.7 728.0C197.4 694.2 172.7 666.8 139.3 654.1C131.1 651.0 116.1 647.4 111.2 647.4C102.6 647.4 103.0 645.5 113.2 637.8C141.8 616.3 170.7 587.9 195.5 557.2C207.8 541.9 220.5 524.2 228.5 511.2C229.6 509.3 231.9 505.7 233.4 503.2C238.1 495.8 243.6 486.6 245.8 482.8C246.9 480.8 248.9 477.4 250.1 475.3C254.8 467.1 257.9 461.4 263.4 450.9C266.5 444.8 269.7 438.7 270.5 437.2C277.8 423.3 292.1 390.5 297.6 375.0C299.0 371.0 300.8 366.0 301.6 363.8C302.4 361.6 303.7 357.4 304.6 354.4C305.5 351.5 306.9 346.7 307.7 343.8C312.1 328.8 316.4 309.6 318.4 295.1C320.7 278.8 321.2 271.8 321.2 254.3C321.2 237.4 320.9 232.2 318.5 217.1C317.3 209.8 313.3 195.9 309.8 186.8C303.7 170.9 301.9 162.9 301.5 148.8C301.2 140.1 301.3 138.4 303.4 127.1C316.9 54.7 425.7 -17.9 487.1 4.5C506.9 11.7 518.3 28.6 524.6 60.3C530.1 88.4 536.8 105.4 550.3 126.3C554.6 133.0 566.4 151.5 570.5 158.1C581.3 175.3 598.8 201.9 663.5 299.1C694.6 345.7 720.6 384.7 721.3 385.7C723.8 389.4 727.5 394.8 742.5 417.2C774.3 464.4 796.9 497.7 808.7 514.8C811.9 519.6 817.3 527.4 820.6 532.2C823.9 537.0 830.6 546.8 835.5 554.0C840.3 561.2 845.6 568.8 847.1 571.0C851.5 577.3 851.3 577.6 840.0 580.1C784.5 592.6 756.9 654.8 785.8 702.0C814.7 749.1 879.5 757.0 919.7 718.4C925.9 712.4 926.6 712.0 928.0 713.5C928.5 714.1 941.4 739.5 956.7 770.0C972.0 800.6 988.0 832.3 992.3 840.5C999.9 855.4 1000.6 857.1 999.4 858.3C997.8 859.9 749.2 859.2 743.9 857.6C731.3 854.0 727.3 849.2 719.0 827.5C716.6 821.1 713.2 812.4 711.4 808.0C709.7 803.6 706.3 795.1 704.1 789.3C701.8 783.4 697.7 773.1 695.1 766.3C692.4 759.5 688.1 748.4 685.4 741.6C682.7 734.8 678.4 723.6 675.7 716.7C669.7 701.4 657.1 669.0 652.4 656.8C644.5 636.3 640.1 629.0 628.7 617.7C588.8 578.1 520.6 591.3 494.4 643.7C492.5 647.5 491.4 650.2 485.6 666.7C484.2 670.6 482.0 676.6 480.8 680.0C479.5 683.4 477.1 690.1 475.4 695.0C471.4 706.3 467.6 717.2 464.7 724.9C463.5 728.3 461.3 734.3 459.9 738.2C458.5 742.2 456.1 748.9 454.6 753.1C453.1 757.3 450.7 764.0 449.3 768.0C447.9 772.1 445.7 778.0 444.5 781.2C437.8 799.7 438.1 798.9 430.1 821.3C421.6 845.2 421.2 846.0 415.9 851.4C411.8 855.7 408.1 857.9 402.9 859.2C399.8 860.0 307.1 860.5 305.2 859.7ZM361.9 422.6a146.6 146.6 0 1 0 293.3 0a146.6 146.6 0 1 0 -293.3 0Z"/><path class="mk-ink" d="M-0.1 766.6a91.9 91.9 0 1 0 183.7 0a91.9 91.9 0 1 0 -183.7 0Z"/><path class="mk-drop" d="M195.6 802.8a56.1 56.1 0 1 0 112.2 0a56.1 56.1 0 1 0 -112.2 0Z"/></svg>
+        <span class="at-proj-wordmark" aria-hidden="true">tel<span class="at-i">ı</span>er</span>
+      </div>
+      <p class="at-proj-tagline">Every skin starts as a drop&nbsp;of&nbsp;ink.</p>
+    </header>
     <div class="proj-modal-header">
-      <h2><i data-lucide="folder-open" size="18" style="color:var(--acc)"></i> Projects</h2>
-      <button class="btn primary" id="proj-new-btn">
-        <i data-lucide="plus" size="14"></i> New Project
+      <h2 id="proj-title">Projects <span class="at-count" id="proj-count" hidden>0</span></h2>
+      <p class="at-proj-status" id="proj-status" role="status" aria-live="polite"></p>
+      <button class="at-btn" id="proj-library-btn" type="button">Library</button>
+      <button class="at-btn at-btn--primary" id="proj-new-btn" type="button">
+        <i data-lucide="plus" size="14"></i> New project
       </button>
     </div>
+    <section id="proj-lead" aria-label="Continue creating"></section>
     <div id="proj-toolbar">
       <div id="proj-search-row">
-        <input id="proj-search" class="setup-input" type="text" spellcheck="false"
-               placeholder="Search projects…" oninput="projSearch()">
+        <input id="proj-search" class="at-field" type="text" spellcheck="false"
+               placeholder="Search projects…" aria-label="Search projects" oninput="projSearch()">
       </div>
-      <div class="proj-view-toggle">
-        <button id="proj-view-grid" title="Grid view" onclick="setProjView('grid')">
+      <div class="proj-view-toggle at-seg" role="group" aria-label="Project view">
+        <button id="proj-view-grid" type="button" title="Grid view" aria-label="Grid view" onclick="setProjView('grid')">
           <i data-lucide="layout-grid" size="14"></i>
         </button>
-        <button id="proj-view-list" title="List view" onclick="setProjView('list')">
+        <button id="proj-view-list" type="button" title="List view" aria-label="List view" onclick="setProjView('list')">
           <i data-lucide="list" size="14"></i>
         </button>
       </div>
@@ -656,13 +754,14 @@
 </div>
 
 <!-- ── project name input ── -->
-<div class="overlay" id="proj-name-overlay">
-  <div class="modal">
+<div class="overlay at-identity" id="proj-name-overlay">
+  <div class="modal at-dialog at-proj-name" role="dialog" aria-modal="true" aria-labelledby="proj-name-title">
     <h2 id="proj-name-title">New Project</h2>
-    <input id="proj-name-input" type="text" class="setup-input" placeholder="Project name" maxlength="80" spellcheck="false">
+    <label class="at-label" for="proj-name-input">Project name</label>
+    <input id="proj-name-input" type="text" class="at-field" placeholder="My first skin" maxlength="80" spellcheck="false">
     <div class="modal-row">
-      <button class="btn" id="proj-name-cancel">Cancel</button>
-      <button class="btn primary" id="proj-name-ok">
+      <button class="at-btn at-btn--quiet" id="proj-name-cancel" type="button">Cancel</button>
+      <button class="at-btn at-btn--primary" id="proj-name-ok" type="button">
         <i data-lucide="check" size="14"></i> Create
       </button>
     </div>
@@ -670,14 +769,13 @@
 </div>
 
 <!-- ── project delete confirm ── -->
-<div class="overlay" id="proj-delete-overlay">
-  <div class="modal">
-    <h2><i data-lucide="trash-2" size="18" style="color:var(--acc)"></i>
-      <span id="proj-delete-title">Delete Project?</span></h2>
+<div class="overlay at-identity" id="proj-delete-overlay">
+  <div class="modal at-dialog" role="alertdialog" aria-modal="true" aria-labelledby="proj-delete-title" aria-describedby="proj-delete-msg">
+    <h2 id="proj-delete-title">Delete Project?</h2>
     <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
     <div class="modal-row">
-      <button class="btn" id="proj-delete-cancel">Cancel</button>
-      <button class="btn primary danger" id="proj-delete-ok">
+      <button class="at-btn at-btn--quiet" id="proj-delete-cancel" type="button">Cancel</button>
+      <button class="at-btn at-btn--danger" id="proj-delete-ok" type="button">
         <i data-lucide="trash-2" size="14"></i> Delete
       </button>
     </div>
@@ -685,14 +783,13 @@
 </div>
 
 <!-- ── project export confirm ── -->
-<div class="overlay" id="proj-export-overlay">
-  <div class="modal">
-    <h2><i data-lucide="package" size="18" style="color:var(--acc)"></i>
-      <span id="proj-export-title">Export Project?</span></h2>
+<div class="overlay at-identity" id="proj-export-overlay">
+  <div class="modal at-dialog" role="dialog" aria-modal="true" aria-labelledby="proj-export-title" aria-describedby="proj-export-msg">
+    <h2 id="proj-export-title">Export Project?</h2>
     <p id="proj-export-msg">This packs the project folder into a .zip you can save anywhere.</p>
     <div class="modal-row">
-      <button class="btn" id="proj-export-cancel">Cancel</button>
-      <button class="btn primary" id="proj-export-ok">
+      <button class="at-btn at-btn--quiet" id="proj-export-cancel" type="button">Cancel</button>
+      <button class="at-btn at-btn--primary" id="proj-export-ok" type="button">
         <i data-lucide="download" size="14"></i> Export
       </button>
     </div>
@@ -753,6 +850,51 @@
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
       <div id="repatch-result" style="display:none;font-size:12.5px;line-height:1.6"></div>
     </div>
+  </div>
+</div>
+
+<!-- ── Open a mod: a page on the identity ground (mod-open.js) ── -->
+<div class="overlay at-identity" id="mod-open-overlay">
+  <div class="modal at-modopen" role="dialog" aria-modal="true" aria-labelledby="mod-open-title">
+    <header class="at-modopen-head">
+      <div>
+        <h1 id="mod-open-title" tabindex="-1">Open a mod</h1>
+        <p class="at-modopen-lede" id="mod-open-lede" role="status" aria-live="polite">Choose a cooked mod. Atelier shows what each asset is, where it lives in the game and what it uses, and adds what you can edit to your Mod tray.</p>
+      </div>
+      <button type="button" class="at-btn at-btn--quiet" id="mod-open-close">Close</button>
+    </header>
+    <div class="at-modopen-scroll">
+      <ul class="at-setup-rows at-modopen-rows">
+        <li class="at-setup-row" id="mod-open-file-row" data-state="waiting">
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <span class="at-setup-name">Mod file</span>
+          <div class="at-setup-detail">
+            <span class="at-setup-what" id="mod-open-what">A .pak, .utoc, .ucas or .zip.</span>
+            <span class="at-setup-where" id="mod-open-where"></span>
+            <ul class="at-modopen-problems" id="mod-open-problems"></ul>
+          </div>
+          <button type="button" class="at-btn at-btn--primary" id="mod-open-pick">Choose mod…</button>
+        </li>
+        <li class="at-setup-row is-editing" id="mod-open-password-row" data-state="missing" hidden>
+          <span class="at-setup-glyph" aria-hidden="true"></span>
+          <label class="at-setup-name" for="mod-open-password">Password</label>
+          <div class="at-setup-detail">
+            <span class="at-setup-what" id="mod-open-password-what">Its author locked this mod. Enter the password they gave you.</span>
+            <div class="at-setup-field" id="mod-open-password-field">
+              <input id="mod-open-password" type="password" autocomplete="off" spellcheck="false">
+              <button type="button" class="at-btn at-btn--primary" id="mod-open-unlock">Open</button>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <div id="mod-open-groups"></div>
+    </div>
+    <footer class="at-modopen-foot" id="mod-open-foot" hidden>
+      <button type="button" class="at-btn at-btn--primary" id="mod-open-add" disabled>Add to Mod tray</button>
+      <button type="button" class="at-btn at-btn--quiet" id="mod-open-save-all">Save all as JSON…</button>
+      <span class="at-modopen-outcome" id="mod-open-outcome" aria-hidden="true"></span>
+      <span class="at-setup-note" id="mod-open-note" role="status" aria-live="polite"></span>
+    </footer>
   </div>
 </div>
 
@@ -893,11 +1035,15 @@
 <script src="/static/motion/krackle-glyph.js"></script>
 <script src="/static/motion/empty-state.js"></script>
 <script src="/static/motion/krackle-stage.js"></script>
+<script src="/static/motion/ink-well.js"></script>
 <script src="/static/motion/working-panels.js"></script>
 <script src="/static/motion/config-discovery.js"></script>
+<script src="/static/motion/setup-check.js"></script>
+<script src="/static/motion/setup-drop.js"></script>
 <script src="/static/motion/workflow-krackle.js"></script>
 <script src="/static/motion/motion-preview.js"></script>
-<script src="/static/motion/krackle-surfaces.js"></script>
+<script src="/static/motion/import-ink.js"></script>
+<script src="/static/motion/project-ink.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>
 <script src="/static/library-pins.js"></script>
@@ -911,8 +1057,10 @@
 <script src="/static/mesh-edit.js"></script>
 <script src="/static/s-maps.js"></script>
 <script src="/static/add-asset.js"></script>
+<script src="/static/mod-open.js"></script>
 <script src="/static/tooltips.js"></script>
 <script src="/static/polish.js"></script>
+<script src="/static/import-dialog.js"></script>
 <script src="/static/roster.js"></script>
 <script src="/static/catalogue-art.js"></script>
 <script src="/static/continuity.js"></script>
@@ -928,6 +1076,8 @@
 <script src="/static/vfx-motionboard-data.js"></script>
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/workspace.js"></script>
+<script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>
