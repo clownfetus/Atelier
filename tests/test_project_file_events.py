@@ -55,6 +55,13 @@ class ProjectFileEvents(unittest.TestCase):
         self.push.assert_called_once_with({'file_changed': True,
                                           'token': R.token('Fixture/T_Body'), 'game_rel': 'Fixture/T_Body'})
 
+    def test_project_location_can_itself_be_named_like_a_metadata_directory(self):
+        self.root = Path(_data.name, '.atelier', 'project')
+        with patch.object(R, 'get_import_root', return_value=str(self.root)):
+            self.handler.on_modified(self.event('Fixture/T_Elsewhere.png'))
+            self.handler.on_deleted(self.event('Fixture/MI_Elsewhere.json'))
+        self.assertEqual(self.push.call_count, 2)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

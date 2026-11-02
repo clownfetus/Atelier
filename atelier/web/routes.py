@@ -2552,11 +2552,11 @@ class _PNGHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith(".png"):
-            if any(part in ('.atelier', project_trash.DIRECTORY) for part in event.src_path.replace('\\', '/').split('/')):
-                return
             import_root = get_import_root().replace("\\", "/")
             evt_path    = event.src_path.replace("\\", "/")
             if not evt_path.startswith(import_root + "/"):
+                return
+            if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
                 return
             now = time.monotonic()
             if now - self._last.get(event.src_path, 0) < 0.5:
@@ -2577,13 +2577,13 @@ class _PNGHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         p = event.src_path
-        if any(part in ('.atelier', project_trash.DIRECTORY) for part in p.replace('\\', '/').split('/')):
-            return
         if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
             return
         import_root = get_import_root().replace("\\", "/")
         evt_path    = p.replace("\\", "/")
         if not evt_path.startswith(import_root + "/"):
+            return
+        if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
             return
         _push_sse({"asset_removed": True})
 
