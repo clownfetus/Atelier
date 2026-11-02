@@ -93,6 +93,7 @@ def load(project_dir):
         "created_version": d.get("created_version", _UNKNOWN),
         "last_version":    d.get("last_version", _UNKNOWN),
         "last_opened_at":  d.get("last_opened_at", 0) if isinstance(d.get("last_opened_at", 0), (int, float)) else 0,
+        "workspace":       d.get("workspace") if isinstance(d.get("workspace"), dict) else {},
         "deselected":      [s for s in (d.get("deselected") or []) if isinstance(s, str)],
         "asset_opts":      {k: v for k, v in (d.get("asset_opts") or {}).items()
                             if isinstance(k, str) and isinstance(v, dict)},
@@ -125,11 +126,34 @@ def get_deselected(project_dir):
     return set(load(project_dir)["deselected"])
 
 
-def mark_opened(project_dir):
+def mark_opened(project_dir, *, reset=False):
     with _lock:
         data = load(project_dir)
-        data["last_opened_at"] = time.time()
+        data["last_opened_at"] = 0 if reset else time.time()
         _write(project_dir, data)
+
+
+def set_workspace(project_dir, workspace):
+    with _lock:
+        data = load(project_dir)
+        data["workspace"] = workspace
+        _write(project_dir, data)
+
+
+def workspace(project_dir):
+    saved = load(project_dir)["workspace"]
+    if saved.get("skin_id"):
+        return saved
+    import re
+    skins = set()
+    for root, dirs, files in os.walk(project_dir):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        if not any(f.endswith((".json", ".png")) for f in files):
+            continue
+        match = re.match(r"Characters/\d{4}/(\d{6,10})(?:/|$)", os.path.relpath(root, project_dir).replace("\\", "/"), re.I)
+        if match:
+            skins.add(match[1])
+    return {"skin_id": skins.pop()} if len(skins) == 1 else {}
 
 
 def set_deselected(project_dir, game_rels):

@@ -2596,6 +2596,31 @@ def api_project_create():
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 
+@app.get("/api/project/workspace")
+def api_project_workspace():
+    return {"ok": True, "workspace": _project_meta.workspace(get_import_root())}
+
+@app.post("/api/project/workspace")
+def api_project_workspace_save():
+    body = request.json or {}
+    skin = body.get("skin_id", "")
+    material_set = body.get("material_set", "")
+    model = body.get("model", "")
+    title = body.get("title", "")
+    if not isinstance(skin, str) or not re.fullmatch(r"\d{6,10}", skin):
+        raise ValueError("invalid costume")
+    if not isinstance(material_set, str) or (material_set and not re.fullmatch(r"[\w-]{1,80}", material_set)):
+        raise ValueError("invalid colour set")
+    if not isinstance(model, str):
+        raise ValueError("invalid model")
+    if model:
+        _c.validate_game_rel(model)
+    if not isinstance(title, str) or len(title) > 160:
+        raise ValueError("invalid costume name")
+    _project_meta.set_workspace(get_import_root(), {"skin_id": skin, "model": model,
+                                "material_set": material_set, "title": title})
+    return {"ok": True}
+
 @app.post("/api/project/rename")
 def api_project_rename():
     body     = request.json or {}
@@ -2636,6 +2661,7 @@ def api_project_duplicate():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "name already taken"})
     shutil.copytree(src_dir, dst_dir)
+    _project_meta.mark_opened(dst_dir, reset=True)
     response.content_type = "application/json"
     return json.dumps({"ok": True})
 

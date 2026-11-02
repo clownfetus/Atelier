@@ -63,11 +63,11 @@ def run_surfaces_checks(page,context,url,report,checks):
         checks.append('Unedited textures refuse image drops; an edited texture asks before replacing, Cancel keeps it, and confirmed drops in Full/Calm/Off upload File bytes with the originating project header and the existing refresh; non-images send no request')
         tab.evaluate("_renderProjectPicker([],false);document.getElementById('project-overlay').classList.add('active')")
         for value in ['full','calm','off']:
-            mode(value);tab.locator('.k-project-drop:not(.k-project-fall)').click();tab.wait_for_selector('#proj-name-overlay.active')
+            mode(value);tab.locator('#proj-new-btn').click();tab.wait_for_selector('#proj-name-overlay.active')
             assert tab.locator('#proj-name-input').input_value()==''
             tab.locator('#proj-name-cancel').click()
         tab.evaluate("document.getElementById('project-overlay').classList.remove('active')")
-        checks.append('The hanging No projects drop opens the original New Project dialog immediately in all dial modes')
+        checks.append('New project keeps the original naming dialog immediately available in all dial modes')
         mode('full')
         tab.evaluate("""async()=>{
           await document.querySelector('.studio-brand > img').decode();

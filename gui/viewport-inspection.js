@@ -594,6 +594,7 @@ export function createViewportInspection(api) {
   function keydown(event) {
     if (event.defaultPrevented || document.querySelector('#material-overlay.active')) return;
     if (event.key === 'Tab') {
+      if ($('viewport-overlay').classList.contains('mounted')) return;
       const focusable = [...$('viewport-box').querySelectorAll('button:not(:disabled), select:not(:disabled), input:not(:disabled), summary, [tabindex="0"]')].filter(el => el.checkVisibility() && !el.closest('[inert]'));
       const first = focusable[0], last = focusable.at(-1);
       if (event.shiftKey && document.activeElement === first) { last?.focus(); event.preventDefault(); }

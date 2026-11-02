@@ -39,6 +39,7 @@ def run_s_maps_checks(page, context, url, report, checks):
                 tab.route('**/api/prefetch_thumbs', prefetch)
                 tab.goto(url); tab.wait_for_function("window.atelierProject && !document.querySelector('.overlay.active')")
                 tab.evaluate("async name => { await _selectProject(name); document.documentElement.dataset.theme = 'dark'; }", name)
+                tab.locator('#page-library').click()
                 button = tab.locator('#process-s-maps')
                 assert button.is_enabled()
                 # Export selection has no effect on the all-edited-D processing scope.

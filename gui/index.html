@@ -50,6 +50,7 @@
 <link rel="stylesheet" href="/static/motion/setup-check.css">
 <link rel="stylesheet" href="/static/motion/setup-drop.css">
 <link rel="stylesheet" href="/static/identity.css">
+<link rel="stylesheet" href="/static/workspace.css">
 </head>
 <body>
 
@@ -57,6 +58,7 @@
 <div id="topbar">
   <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
   <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
+  <nav id="app-pages" aria-label="Main navigation"><button id="page-projects" type="button">Projects</button><button id="page-workspace" type="button">Workspace</button><button id="page-library" type="button">Library</button></nav>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
     <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets, IDs…" aria-keyshortcuts="Control+f Meta+f">
@@ -68,6 +70,16 @@
 </div>
 
 <!-- ── body ── -->
+<main id="workspace" class="at-identity" aria-label="Project workspace" hidden>
+  <header class="workspace-heading"><div><span class="proj-eyebrow">Your workspace</span><h1 id="workspace-title"></h1></div><button class="at-btn" id="workspace-choose" type="button">Change costume</button></header>
+  <section id="workspace-choice" aria-labelledby="workspace-choice-title" hidden>
+    <div class="workspace-choice-heading"><div><h2 id="workspace-choice-title">Who will you make yours?</h2><p>Choose a hero, then a costume to start colouring.</p></div><input class="at-field" id="workspace-search" type="search" placeholder="Find a hero or costume…" aria-label="Find a hero or costume"></div>
+    <p id="workspace-choice-status" role="status"></p>
+    <div id="workspace-heroes" aria-label="Heroes"></div>
+    <div id="workspace-costumes" aria-label="Costumes"></div>
+  </section>
+  <div id="workspace-stage" hidden></div>
+</main>
 <div id="body">
 
   <!-- explorer -->
@@ -708,6 +720,7 @@
     <div class="proj-modal-header">
       <h2 id="proj-title">Projects <span class="at-count" id="proj-count" hidden>0</span></h2>
       <p class="at-proj-status" id="proj-status" role="status" aria-live="polite"></p>
+      <button class="at-btn" id="proj-library-btn" type="button">Library</button>
       <button class="at-btn at-btn--primary" id="proj-new-btn" type="button">
         <i data-lucide="plus" size="14"></i> New project
       </button>
@@ -1055,6 +1068,7 @@
 <script src="/static/vfx-motionboard-data.js"></script>
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/workspace.js"></script>
 <script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

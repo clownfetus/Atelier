@@ -274,7 +274,7 @@ function init() {
       }
       soloSnapshot = soloTarget = null;
       selectedMaterial = null;
-    },{automatic:true});
+    },{automatic:true}).then(rememberWorkspace);
     $('viewport-model-menu').open = false;
   });
   $('viewport-blender-btn').addEventListener('click', editInBlender);
@@ -1055,6 +1055,7 @@ async function buildChromaPicker(skinId, meshGameRel) {
     chromaSkin = sel.value;
     $('viewport-status').textContent = `Materials: ${sel.selectedOptions[0]?.textContent || chromaSkin}`;
     loadMaterials(chromaSkin);
+    rememberWorkspace();
   };
   row.style.display = '';
 }
@@ -1670,12 +1671,12 @@ function studioTitle(skinId, title) {
   return title && !/^3D Preview\b/i.test(title) ? title : skinId ? `Skin ${skinId}` : 'Mesh preview';
 }
 
-async function open(skinId, title, preferredMesh=null) {
+async function open(skinId, title, preferredMesh=null, materialSet=null) {
   if (!(await canLeave())) return;
   init();
   viewportProject = window.atelierProject?.() || '';
   loader.setRequestHeader({ 'X-Atelier-Project': encodeURIComponent(viewportProject) });
-  meshSkin = skinId; chromaSkin = null;                       // reset the material-set choice
+  meshSkin = skinId; chromaSkin = materialSet;
   updateHeroLogo(/^\d{4}/.exec(skinId)?.[0] || '');
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(skinId,title);
@@ -1741,7 +1742,8 @@ async function open(skinId, title, preferredMesh=null) {
     setViewportLoaderState('ready');
     destroyViewportLoader();
     $('viewport-loading').style.display = 'none';
-    loadMaterials(skinId);
+    loadMaterials(chromaSkin || skinId);
+    rememberWorkspace();
     syncPreviewAnimation();
     // offer other material sets (chromas) for this mesh — keyed off the mesh's real path
     buildChromaPicker(skinId, meshMeta[objects.indexOf(body)].game_rel);
@@ -1812,14 +1814,32 @@ async function openMesh(gameRel, name, skinId) {
   }
 }
 
-async function close() {
-  if (!(await canLeave())) return;
+function mount(host) {
+  const overlay=$('viewport-overlay'), box=$('viewport-box');
+  (host || document.body).append(overlay);
+  overlay.classList.toggle('mounted',!!host); overlay.classList.toggle('overlay',!host);
+  box.setAttribute('role',host?'region':'dialog');
+  if(host)box.removeAttribute('aria-modal');else box.setAttribute('aria-modal','true');
+  requestAnimationFrame(()=>{if(inited)onResize();});
+}
+
+function rememberWorkspace() {
+  if(!meshSkin)return;
+  const body=objects.findIndex(object=>object.kind!=='weapon'&&object.root.visible);
+  window.AtelierWorkspace?.remember({skin_id:meshSkin,title:$('viewport-title').textContent,
+    model:meshMeta[body]?.game_rel || '',material_set:chromaSkin || ''});
+}
+
+async function close({navigate=true}={}) {
+  if (!(await canLeave())) return false;
   if (inited) clearModel();
   window.AtelierMotion?.viewportPoster?.end();
   $('viewport-overlay').classList.remove('active');
   if (raf) { cancelAnimationFrame(raf); raf = 0; }   // stop rendering while hidden (frees the GPU)
   inspection?.closed();
   window.AtelierViewportIdentity?.clear();
+  if(navigate && $('viewport-overlay').classList.contains('mounted'))window.AtelierWorkspace?.library({closed:true});
+  return true;
 }
 
 $('viewport-close').addEventListener('click', close);
@@ -1832,7 +1852,7 @@ window.addEventListener('keydown', e => {
     if (menu) {menu.open=false;menu.querySelector('summary').focus();return;}
     close();
   }
-  else inspection?.keydown(e);
+  else if(!$('viewport-overlay').classList.contains('mounted') || $('viewport-box').contains(e.target)) inspection?.keydown(e);
 });
 
 window.addEventListener('beforeunload', event => {
@@ -1870,4 +1890,4 @@ function captureModPoster(context){
   if(!inited||hasPendingEdits()||context.project!==viewportProject||!context.skin||context.skin!==(currentSkin||meshSkin))return null;
   return inspection.cardPoster();
 }
-window.AtelierViewport = { open, openMesh, close, hasPendingEdits, focusPendingEdits,captureModPoster };
+window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster };

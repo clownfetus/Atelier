@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Atelier opens on Projects. Open a project into its workspace, return to its last costume, or start a recolour by choosing a hero and costume. The model sits in the page, with Projects and the full Library always reachable. Colour changes still use the existing Save changes button.
+
 - Projects puts your last opened project up front, with a large card to pick up where you left off and a clear starting point for your first recolour.
 
 - Colour previews reuse prepared textures and save preview images faster.

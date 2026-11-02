@@ -36,6 +36,7 @@ def run_added_asset_checks(page, context, url, report, checks):
             tab.goto(url)
             tab.wait_for_function("window.atelierProject && !document.querySelector('.overlay.active')")
             tab.evaluate('async name => { await _selectProject(name); }', name)
+            tab.locator('#page-library').click()
             open_button = tab.locator('#add-asset-open')
             assert open_button.is_enabled() and tab.locator('#process-s-maps').is_disabled()
             bounds = [tab.locator(selector).bounding_box() for selector in ('#add-asset-open', '#process-s-maps')]

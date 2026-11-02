@@ -123,6 +123,7 @@ def main():
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
+    parser.add_argument('--workspace-only', action='store_true', help='Check Projects, embedded workspace, costume persistence and twenty skin switches')
     args = parser.parse_args()
     report = args.report_dir.resolve()
     report.mkdir(parents=True, exist_ok=True)
@@ -173,6 +174,15 @@ def main():
                                               device_scale_factor=args.device_scale_factor)
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
+                if args.workspace_only:
+                    from workspace_checks import run_workspace_checks
+                    run_workspace_checks(context, url, report, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
+                from browser_startup import enter_library_on_startup
+                enter_library_on_startup(context)
                 page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(error.stack or str(error)))
                 page.add_init_script("""

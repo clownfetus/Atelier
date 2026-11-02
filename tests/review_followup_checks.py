@@ -28,6 +28,7 @@ def run_review_followup_checks(context, url, report, checks):
         assert 'Preparing T_Shared for editing' in tab.locator('#tray-progress').inner_text()
         assert tab.locator('#toast-area [data-operation-state=busy]').count() == 0
         tab.evaluate("_selectProject('Smoke B')")
+        tab.locator('#page-library').click()
         tab.wait_for_function("atelierProject() === 'Smoke B'")
         assert tab.locator('#tray-progress').is_hidden()
         tab.evaluate('handleAssetClick(reviewItem)')
@@ -42,6 +43,7 @@ def run_review_followup_checks(context, url, report, checks):
         held[1].fulfill(json={'ok': True})
         tab.wait_for_function('_editsInFlight.size === 0 && suppressedImportGameRels.size === 0')
         tab.evaluate("_selectProject('Smoke A')")
+        tab.locator('#page-library').click()
         tab.wait_for_function("atelierProject() === 'Smoke A'")
         checks.append('Duplicate edit clicks deduplicate within a project; the same asset loads independently across projects and stale completion preserves current status')
         assert not errors, errors

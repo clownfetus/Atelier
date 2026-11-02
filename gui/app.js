@@ -796,7 +796,7 @@ document.getElementById("search-input").addEventListener("input", () => {
 });
 
 document.addEventListener("keydown", e => {
-  if (e.altKey && !document.querySelector('.overlay.active, dialog[open]') &&
+  if (e.altKey && document.body.dataset.page!=='workspace' && !document.querySelector('.overlay.active, dialog[open]') &&
       !e.target.closest('input, textarea, select, [contenteditable="true"]')) {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault(); document.getElementById(e.key === 'ArrowLeft' ? 'btn-back' : 'btn-forward').click();
@@ -804,7 +804,9 @@ document.addEventListener("keydown", e => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && !document.querySelector('.overlay.active, dialog[open]')) {
     e.preventDefault();
-    const si = document.getElementById("search-input");
+    const si = document.getElementById(document.body.dataset.page==='workspace'
+      ? document.getElementById('workspace-choice').hidden ? 'viewport-material-search' : 'workspace-search'
+      : 'search-input');
     si.focus();
     si.select();
   }
@@ -4644,7 +4646,8 @@ async function checkProject(onReady = () => {}) {
   const res = await api("/api/projects");
   if (res.active && res.projects.find(p => p.name === res.active)) {
     _applyActiveProject(res.active);
-    toast(`Project: ${res.active}`, "success");
+    _renderProjectPicker(res.projects || []);
+    document.getElementById("project-overlay").classList.add("active");
     onReady();
     return;
   }
@@ -4823,6 +4826,8 @@ function _renderProjectPicker(projects, keepQuery) {
   grid.innerHTML = "";
   const q = _projSearchValue();
   const all = _projAll.length ? _projAll : projects;
+  document.getElementById('proj-library-btn').hidden=!_activeProjectName;
+  document.getElementById('proj-toolbar').style.display=all.length?'':'none';
   const lead = document.getElementById("proj-lead");
   lead.hidden = !!q;
   const recent = [...all].sort((a,b) => (b.last_opened_at || 0) - (a.last_opened_at || 0))[0];
@@ -4852,21 +4857,7 @@ function _renderProjectPicker(projects, keepQuery) {
     window.AtelierPolish?.empty(grid.firstElementChild, 'No project matches your search', 'Try another project name.');
     return;
   }
-  if (!projects.length) {
-    // The first screen: one drop of ink, waiting to become your first project's folder.
-    grid.innerHTML = `<div class="proj-empty at-proj-empty" hidden>
-      <button type="button" class="k-project-drop" title="New project" aria-label="New project">
-        <svg viewBox="0 0 120 132" aria-hidden="true" focusable="false">
-          <path class="pe-ink" d="M60 6C60 6 20 52 20 82C20 105 38 122 60 122C82 122 100 105 100 82C100 52 60 6 60 6Z"/>
-          <circle class="pe-core" cx="66" cy="90" r="11"/><circle class="pe-glint" cx="42" cy="88" r="5.4"/>
-        </svg>
-      </button>
-      <h3>Make it yours.</h3>
-      <p>A project keeps the skins you edit and the mods you build from them. Start one, then open it to reach the library.</p>
-    </div>`;
-    grid.querySelector(".k-project-drop").addEventListener("click", () => document.getElementById("proj-new-btn").click());
-    return;
-  }
+  if (!projects.length) return;
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
@@ -5032,13 +5023,23 @@ function _applyActiveProject(name) {
 }
 
 async function openProjectPicker() {
+  if (document.getElementById('viewport-overlay').classList.contains('mounted')) {
+    if (await window.AtelierViewport.close({navigate:false})===false)return;
+    window.AtelierViewport.mount(null);
+    document.getElementById('workspace').hidden=true;
+    document.getElementById('body').hidden=false;
+  }
   const res = await api("/api/projects");
   _renderProjectPicker(res.projects || []);
   document.getElementById("project-overlay").classList.add("active");
 }
 document.getElementById("project-chip").addEventListener("click", openProjectPicker);
 
-async function _selectProject(name) {
+let _projectOpening=false;
+async function _selectProject(name, workspace=null) {
+  if(_projectOpening)return;
+  _projectOpening=true;
+  try {
   const previousProject = _activeProjectName;
   const editorIds = ["material-overlay", "curve-overlay", "vfx-overlay", "world-overlay",
                      "text-overlay", "texopt-overlay", "viewport-overlay", "add-asset-overlay", "bulk-overlay"];
@@ -5074,6 +5075,11 @@ async function _selectProject(name) {
   }
   if (previousProject && previousProject !== name && _activeProjectName === name)
     window.AtelierMotion?.workflow?.project(document.getElementById('project-chip'));
+  if(workspace) {
+    window.AtelierWorkspace.present();
+    await window.AtelierViewport.open(workspace.skin_id,workspace.title);
+  } else await window.AtelierWorkspace?.resume();
+  } finally {_projectOpening=false;}
 }
 
 function _showProjNameModal(ctx) {
