@@ -110,39 +110,48 @@ def run_ink_well_checks(context, url, report, checks):
         assert outcomes['success']['over'] >= 10 and outcomes['warning']['over'] >= 10 and outcomes['error']['over'] >= 10, outcomes
         assert outcomes['error']['cracks'] >= 7 and outcomes['error']['pieces'] == 7 and outcomes['warning']['cracks'] == 0, outcomes
         assert outcomes['warning']['bulge'] > 200 and outcomes['error']['bulge'] > 200 and outcomes['success']['pieces'] == 0, outcomes
-        tab.emulate_media(reduced_motion='reduce')
-        reduced = tab.evaluate("""async () => {
-          const host = document.createElement('div'); document.body.append(host);
-          const well = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-reduced'});
-          well.setState('warning');
-          const frames = well.frames(); await new Promise(r => setTimeout(r, 250));
-          const foam = (host.querySelector('path.am-ink-well-warn:last-of-type')?.getAttribute('d') || '').length;
-          const out = {frames: well.frames() - frames, sleeping: host.dataset.amSleeping, foam};
-          well.destroy(); host.remove(); return out;
-        }""")
-        assert reduced['frames'] == 0 and reduced['sleeping'] == 'true' and reduced['foam'] > 200, reduced
-        tab.emulate_media(reduced_motion='no-preference')
         checks.append('Ink-well failure breaks and leaks, success bursts and settles calm (both hold still); warning loops until hidden or reduced, which shows its pose without frames')
 
         # A fixed frame keeps the artboard still through the success, so a label laid over the
         # well stays on it; the released ink spills past the SVG instead. A sparse well keeps a
-        # few large bubbles and none of the small ones.
+        # few large bubbles and none of the small ones. Sample actual drawn frames:
+        # a delayed timer can observe the correctly completed outcome instead.
         fixed = tab.evaluate("""async () => {
           const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:40px;top:120px;z-index:9999';
           document.body.append(host);
+          const state = () => ({sleeping: host.dataset.amSleeping, reduced: host.dataset.amReduced,
+            micro: host.dataset.amMicro, motion: AtelierMotionPolicy.mode(), hidden: document.hidden});
+          const drawn = (well, count) => new Promise((resolve, reject) => {
+            const target = well.frames() + count;
+            let raf = 0;
+            const timeout = setTimeout(() => {
+              cancelAnimationFrame(raf);
+              reject(Error('Ink-well stopped before the sampled frame: ' + JSON.stringify(state())));
+            }, 5000);
+            const sample = () => {
+              if (well.frames() >= target) { clearTimeout(timeout); resolve(); }
+              else raf = requestAnimationFrame(sample);
+            };
+            raf = requestAnimationFrame(sample);
+          });
           const holes = () => (host.querySelector('.am-ink-well-hole')?.getAttribute('d') || '').split('M').length - 1;
-          const full = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-dense'});
-          await new Promise(r => setTimeout(r, 250));
-          const dense = holes(); full.destroy();
-          const well = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-fixed', fixedFrame: true, sparse: true});
-          await new Promise(r => setTimeout(r, 250));
-          const sparse = holes();
-          well.setState('success');
-          await new Promise(r => setTimeout(r, 400));
-          const out = [host.dataset.amSleeping, host.querySelector('svg').getAttribute('viewBox'), sparse <= 12 && dense > 3 * sparse].join();
-          well.destroy(); host.remove(); return out;
+          let full, well;
+          try {
+            full = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-dense'});
+            await drawn(full, 12);
+            const dense = holes(); full.destroy();
+            well = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-fixed', fixedFrame: true, sparse: true});
+            await drawn(well, 12);
+            const sparse = holes();
+            well.setState('success');
+            await drawn(well, 12);
+            return {...state(), view: host.querySelector('svg').getAttribute('viewBox'), sparse, dense};
+          } finally {
+            full?.destroy(); well?.destroy(); host.remove();
+          }
         }""")
-        assert fixed == 'false,10 10 236 236,true', fixed
+        assert fixed['sleeping'] == 'false' and fixed['view'] == '10 10 236 236', fixed
+        assert fixed['sparse'] <= 12 and fixed['dense'] > 3 * fixed['sparse'], fixed
         checks.append('Ink-well success in a fixed frame performs without moving its artboard; a sparse well keeps only a few large bubbles')
 
         # Hidden documents and reduced motion stop frames; reduced motion holds one still pose.
@@ -164,6 +173,21 @@ def run_ink_well_checks(context, url, report, checks):
         tab.evaluate('inkWell.destroy(); inkWell.destroy()')
         assert tab.evaluate("inkHost.childNodes.length === 0 && !inkHost.dataset.atelierMotion")
         checks.append('Ink-well stops drawing when hidden or reduced (one still pose, colours kept) and destroys cleanly')
+
+        # Keep the OS override last: Chromium can apply the preference before its
+        # media-change callback, leaving the rendered policy stale on a fast reset.
+        tab.emulate_media(reduced_motion='reduce')
+        reduced = tab.evaluate("""async () => {
+          const host = document.createElement('div'); document.body.append(host);
+          const well = AtelierMotion.inkWell.mount(host, {size: 160, kind: 'ink-reduced'});
+          well.setState('warning');
+          const frames = well.frames(); await new Promise(r => setTimeout(r, 250));
+          const foam = (host.querySelector('path.am-ink-well-warn:last-of-type')?.getAttribute('d') || '').length;
+          const out = {frames: well.frames() - frames, sleeping: host.dataset.amSleeping, foam};
+          well.destroy(); host.remove(); return out;
+        }""")
+        assert reduced['frames'] == 0 and reduced['sleeping'] == 'true' and reduced['foam'] > 200, reduced
+        checks.append('OS reduced motion mounts the ink-well in its still warning pose without drawing animation frames')
         assert not errors, errors
     finally:
         tab.close()
