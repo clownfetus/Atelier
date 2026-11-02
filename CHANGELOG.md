@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Projects puts your last opened project up front, with a large card to pick up where you left off and a clear starting point for your first recolour.
+
 - Colour previews reuse prepared textures and save preview images faster.
   Restoring colours or entering a hex colour updates the model immediately;
   dragging the colour picker still groups rapid changes together.

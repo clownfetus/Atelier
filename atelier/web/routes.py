@@ -2545,7 +2545,9 @@ def _list_projects():
         if not mtime:
             try: mtime = os.path.getmtime(path)
             except Exception: pass
-        projects.append({"name": name, "mtime": int(mtime), "asset_count": asset_count})
+        meta = _project_meta.load(path)
+        projects.append({"name": name, "mtime": int(mtime), "asset_count": asset_count,
+                         "last_opened_at": meta["last_opened_at"]})
     projects.sort(key=lambda p: p["mtime"], reverse=True)
     return projects
 
@@ -2572,6 +2574,7 @@ def api_project_select():
         return json.dumps({"ok": False, "error": "project not found"})
     with operations.project_use(project_dir, write=True):
         project_trash.purge(project_dir)
+        _project_meta.mark_opened(project_dir)
     set_active_project(name)
     response.content_type = "application/json"
     return json.dumps({"ok": True})

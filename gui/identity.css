@@ -413,6 +413,16 @@
 }
 .at-projects .proj-modal-header .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
 .at-projects #proj-toolbar { padding: 0 0 var(--space-4); gap: var(--space-3); }
+.at-projects #proj-lead { display:flex; align-items:center; justify-content:space-between; gap:32px; min-height:230px; padding:28px 40px; margin:0 0 24px; background:var(--surface-panel); border:1px solid var(--line); border-radius:16px; flex-shrink:0; }
+.at-projects #proj-lead[hidden] { display:none; }
+.proj-lead-copy { min-width:0; }
+.proj-eyebrow { color:var(--drop-text); font:600 13px/1.4 var(--font-ui); }
+.proj-lead-copy h3 { font:650 clamp(28px,3vw,40px)/1.08 var(--font-display); letter-spacing:-.025em; margin:10px 0; overflow-wrap:anywhere; }
+.proj-lead-copy p { margin:0 0 20px; color:var(--text-muted); font:var(--type-body); }
+.proj-lead-copy .at-btn { min-height:40px; }
+.proj-lead-art { width:220px; flex:0 0 220px; }
+.proj-lead-art svg { width:100%; display:block; }
+@media(max-height:800px) { .at-projects #proj-lead { min-height:185px; padding:20px 32px; } .proj-lead-art { width:160px; flex-basis:160px; } }
 .at-projects #proj-selbar {
   margin: 0 0 var(--space-3);
   padding: 6px 6px 6px 14px;

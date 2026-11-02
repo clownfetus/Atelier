@@ -31,7 +31,7 @@ Nothing here warns or blocks on version. The texture/material/curve/vfx project 
 unchanged from 0.2.3 and pre-Noobs builds, so those projects load as-is; this only records
 provenance so a LATER version has the facts it needs to decide.
 """
-import os, json, threading
+import os, json, threading, time
 
 from atelier.config import VERSION_FILE
 
@@ -92,6 +92,7 @@ def load(project_dir):
         "version":         d.get("version", _VERSION),
         "created_version": d.get("created_version", _UNKNOWN),
         "last_version":    d.get("last_version", _UNKNOWN),
+        "last_opened_at":  d.get("last_opened_at", 0) if isinstance(d.get("last_opened_at", 0), (int, float)) else 0,
         "deselected":      [s for s in (d.get("deselected") or []) if isinstance(s, str)],
         "asset_opts":      {k: v for k, v in (d.get("asset_opts") or {}).items()
                             if isinstance(k, str) and isinstance(v, dict)},
@@ -122,6 +123,13 @@ def stamp_new(project_dir):
 def get_deselected(project_dir):
     """Set of game_rels the user has switched OFF for export in this project."""
     return set(load(project_dir)["deselected"])
+
+
+def mark_opened(project_dir):
+    with _lock:
+        data = load(project_dir)
+        data["last_opened_at"] = time.time()
+        _write(project_dir, data)
 
 
 def set_deselected(project_dir, game_rels):

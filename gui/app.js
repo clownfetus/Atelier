@@ -4823,6 +4823,15 @@ function _renderProjectPicker(projects, keepQuery) {
   grid.innerHTML = "";
   const q = _projSearchValue();
   const all = _projAll.length ? _projAll : projects;
+  const lead = document.getElementById("proj-lead");
+  lead.hidden = !!q;
+  const recent = [...all].sort((a,b) => (b.last_opened_at || 0) - (a.last_opened_at || 0))[0];
+  const latest = recent?.last_opened_at ? recent : all.find(p=>p.name===_activeProjectName) || recent;
+  lead.innerHTML = latest
+    ? `<div class="proj-lead-copy"><span class="proj-eyebrow">Pick up where you left off</span><h3>${_esc(latest.name)}</h3><p>${latest.asset_count} saved asset${latest.asset_count===1?'':'s'} · Your next idea starts here.</p><button class="at-btn at-btn--primary" type="button">Open workspace <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg(latest.asset_count ? `/api/project/thumb?project=${encodeURIComponent(latest.name)}&_t=${latest.mtime}` : '')}</div>`
+    : `<div class="proj-lead-copy"><span class="proj-eyebrow">Your first creation</span><h3>A favourite skin.<br>A little more you.</h3><p>Choose a hero, pick a costume, and make it your own.</p><button class="at-btn at-btn--primary" type="button">Start a recolour <i data-lucide="arrow-right" size="16"></i></button></div><div class="proj-lead-art" aria-hidden="true">${_projPortfolioSvg('')}</div>`;
+  lead.querySelector('button').onclick = () => latest ? _selectProject(latest.name) : window.AtelierWorkspace ? window.AtelierWorkspace.start() : document.getElementById('proj-new-btn').click();
+  lucide.createIcons({nodes:[lead]});
   projects = q ? all.filter(p => (p.name || "").toLowerCase().includes(q)) : all;
   const search = document.getElementById("proj-search-row");
   if (search) search.style.display = all.length > 1 ? "" : "none";   // pointless with one project
@@ -4845,7 +4854,7 @@ function _renderProjectPicker(projects, keepQuery) {
   }
   if (!projects.length) {
     // The first screen: one drop of ink, waiting to become your first project's folder.
-    grid.innerHTML = `<div class="proj-empty at-proj-empty">
+    grid.innerHTML = `<div class="proj-empty at-proj-empty" hidden>
       <button type="button" class="k-project-drop" title="New project" aria-label="New project">
         <svg viewBox="0 0 120 132" aria-hidden="true" focusable="false">
           <path class="pe-ink" d="M60 6C60 6 20 52 20 82C20 105 38 122 60 122C82 122 100 105 100 82C100 52 60 6 60 6Z"/>
