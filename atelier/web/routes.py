@@ -2132,6 +2132,20 @@ def api_material_original():
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
 
+@app.get("/api/material_changes")
+def api_material_changes():
+    """The colours a saved material edit changed, for the workspace's Your mod dock."""
+    from atelier.web.browse import edited_colour_changes
+    gr = request.query.get("game_rel", "")
+    response.content_type = "application/json"
+    if not gr or not is_material(gr):
+        return json.dumps({"ok": False, "error": "missing material"})
+    try:
+        _c.validate_game_rel(gr)
+        return json.dumps({"ok": True, "game_rel": gr, "changes": edited_colour_changes(gr)})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
 @app.post("/api/material_save")
 def api_material_save():
     body = request.json or {}

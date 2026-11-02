@@ -57,7 +57,22 @@ def run_workspace_checks(context, url, report, checks):
         texture_reads.append(route.request.url)
         route.fulfill(body=png.getvalue(), content_type='image/png')
     page.route('**/api/texture_png?*', texture)
-    page.route('**/api/material_save', lambda route: route.fulfill(json={'ok': True}))
+    # The Mod tray's edits, as /api/imported reports them; a viewport save adds the material.
+    imported = []
+    body_edit = {'token': 'tok-body', 'game_rel': 'Characters/1029/1029001/Materials/MI_Body', 'name': 'MI_Body',
+                 'file_type': 'material', 'skin_id': '1029001', 'char_id': '1029', 'char_name': 'Magik',
+                 'skin_name': 'Original costume', 'mtime': 1, 'selected': True, 'opts': {}}
+    def save(route):
+        if not imported: imported.append(dict(body_edit))
+        route.fulfill(json={'ok': True})
+    def delete(route):
+        imported.clear()
+        route.fulfill(json={'ok': True, 'deleted': 1})
+    page.route('**/api/material_save', save)
+    page.route('**/api/imported', lambda route: route.fulfill(json=imported))
+    page.route('**/api/material_changes?*', lambda route: route.fulfill(json={'ok': True, 'changes': [
+        {'name': 'BaseTint', 'before': '#9999e6', 'after': '#9644cc'}, {'name': 'Trim', 'before': None, 'after': '#ffffff'}]}))
+    page.route('**/api/delete_imported', delete)
     try:
         page.goto(url)
         page.wait_for_selector('#proj-lead button')
@@ -72,6 +87,9 @@ def run_workspace_checks(context, url, report, checks):
         assert page.locator('#viewport-box').get_attribute('role') == 'region'
         assert page.locator('#viewport-box').get_attribute('aria-modal') is None
         assert page.locator('#page-library').is_visible()
+        assert page.locator('#workspace-dock').is_visible()
+        assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
+        assert page.locator('#workspace-review').is_disabled()
         page.locator('.vp-material-select').first.click()
         for width, height in [(1400, 900), (1024, 768)]:
             page.set_viewport_size({'width': width, 'height': height})
@@ -92,6 +110,38 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('#viewport-mat-save').click()
         page.wait_for_function('!AtelierViewport.hasPendingEdits()')
         checks.append('Projects opens an embedded workspace; explicit Save and cancelled navigation preserve colour drafts')
+
+        slot = page.locator('#workspace-dock-list .workspace-slot')
+        slot.wait_for()
+        page.wait_for_selector('.workspace-slot[data-changes="2"]')
+        assert slot.locator('strong').inner_text() == 'Body'
+        assert 'Magik / Original costume' in slot.inner_text()
+        swatches = slot.locator('.workspace-swatch')
+        assert swatches.nth(0).evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(153, 153, 230)'
+        assert swatches.nth(1).evaluate('e=>getComputedStyle(e).backgroundColor') == 'rgb(150, 68, 204)'
+        assert slot.locator('.workspace-swatch-more').inner_text() == '+1'
+        assert page.locator('#workspace-dock-count').inner_text() == '1'
+        assert page.locator('#workspace-review').is_enabled()
+        for theme in ['light', 'dark']:
+            page.evaluate('(theme)=>document.documentElement.dataset.theme=theme', theme)
+            page.locator('#workspace-dock').screenshot(path=str(report / f'dock-{theme}.png'), animations='disabled')
+        page.evaluate('document.documentElement.dataset.theme="light"')
+        page.screenshot(path=str(report / 'workspace-with-dock-1400.png'), animations='disabled')
+
+        page.locator('#workspace-review').click()
+        page.wait_for_selector('#export-review-overlay.active')
+        assert 'MI_Body' in page.locator('#export-review-overlay').inner_text()
+        page.keyboard.press('Escape')
+        page.wait_for_selector('#export-review-overlay.active', state='hidden')
+
+        slot.locator('.workspace-restore').click()
+        page.wait_for_selector('#atelier-confirm.active')
+        with page.expect_request('**/api/skin_materials'):
+            page.locator('#atelier-confirm-ok').click()
+        page.wait_for_function('!document.querySelector("#workspace-dock-list .workspace-slot")')
+        assert page.locator('#workspace-review').is_disabled()
+        assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
+        checks.append('Your mod dock lists saved edits with before and after colours, opens the export review, and Restore reloads the costume')
 
         page.locator('#viewport-model-menu > summary').click()
         page.locator('#viewport-chroma').select_option('1029002')

@@ -1890,4 +1890,12 @@ function captureModPoster(context){
   if(!inited||hasPendingEdits()||context.project!==viewportProject||!context.skin||context.skin!==(currentSkin||meshSkin))return null;
   return inspection.cardPoster();
 }
-window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster };
+// After an edit leaves the project (the dock's Restore, or its Undo), show the costume's colours
+// as they now are. Drafts win: a reload would discard them, so the caller is told it didn't run.
+function reloadMaterials() {
+  if (!inited || !meshSkin || modelLoading || hasPendingEdits()) return false;
+  loadMaterials(chromaSkin || meshSkin);
+  return true;
+}
+
+window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, label:materialLabel };

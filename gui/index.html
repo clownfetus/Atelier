@@ -79,6 +79,14 @@
     <div id="workspace-costumes" aria-label="Costumes"></div>
   </section>
   <div id="workspace-stage" hidden></div>
+  <section id="workspace-dock" aria-labelledby="workspace-dock-title">
+    <header class="workspace-dock-head">
+      <h2 id="workspace-dock-title">Your mod</h2><span class="at-count" id="workspace-dock-count" aria-label="0 edits">0</span>
+      <p id="workspace-dock-status" role="status"></p>
+      <button class="at-btn at-btn--primary" id="workspace-review" type="button" disabled>Review &amp; install</button>
+    </header>
+    <ul id="workspace-dock-list" aria-labelledby="workspace-dock-title"></ul>
+  </section>
 </main>
 <div id="body">
 
@@ -1069,6 +1077,7 @@
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/workspace.js"></script>
+<script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>
 <script type="module" src="/static/viewport.js"></script>
 </body>

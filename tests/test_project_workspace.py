@@ -55,5 +55,35 @@ class ProjectWorkspace(unittest.TestCase):
         self.assertFalse(Path(self.root, ".atelier").exists())
 
 
+class DockColourChanges(unittest.TestCase):
+    """The Your mod dock shows what an edit changed, matched to the original by parameter name."""
+    def changes(self, edited, original, **kwargs):
+        from atelier.web import browse
+        with patch.object(browse, "_edited_colors", return_value=edited), \
+             patch("atelier.handlers.material.read_material_original", return_value={"colors": original}):
+            return browse.edited_colour_changes("Characters/1029/1029001/Materials/MI_Body", **kwargs)
+
+    def test_only_changed_colours_are_reported_as_the_editor_shows_them(self):
+        original = [{"name": "Tint", "rgba": [1, 0, 0, 1]}, {"name": "Trim", "rgba": [0, 0, 1, 1]}]
+        edited = [{"name": "Tint", "rgba": [1, 0, 0, 1]}, {"name": "Trim", "rgba": [0, 4, 0, 1]}]
+        # HDR intensity is divided out, so a bright green reads as the green the picker shows.
+        self.assertEqual(self.changes(edited, original), [{"name": "Trim", "before": "#0000ff", "after": "#00ff00"}])
+
+    def test_a_colour_the_original_lacks_has_no_before(self):
+        edited = [{"name": "Added", "rgba": [.5, .5, .5, 1]}]
+        self.assertEqual(self.changes(edited, []), [{"name": "Added", "before": None, "after": "#808080"}])
+
+    def test_no_project_copy_means_no_changes_and_no_original_read(self):
+        from atelier.web import browse
+        with patch.object(browse, "_edited_colors", return_value=None), \
+             patch("atelier.handlers.material.read_material_original") as read:
+            self.assertEqual(browse.edited_colour_changes("Characters/1029/1029001/Materials/MI_Body"), [])
+        read.assert_not_called()
+
+    def test_changes_are_capped(self):
+        edited = [{"name": f"C{i}", "rgba": [i / 10, 0, 0, 1]} for i in range(1, 9)]
+        self.assertEqual(len(self.changes(edited, [], limit=3)), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

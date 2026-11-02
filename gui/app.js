@@ -3405,6 +3405,17 @@ document.getElementById("confirm-overwrite-ok").addEventListener("click", async 
 document.getElementById("install-btn").addEventListener("click", doInstallMod);
 document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
 
+// The workspace's Your mod dock is another view of this tray: same edits, same Delete-to-trash
+// with Undo, same export review. It never keeps a list of its own.
+window.AtelierModTray = {
+  items: () => Object.values(sidebarData).map(item => ({...item})),
+  // Resolves true once the edit has left the project (the user can still cancel the confirm).
+  restore: async token => { await clearImported(token); return !sidebarData[token]; },
+  review: doInstallMod,
+  preview: item => handlerFor(item.file_type).preview
+    ? `/api/preview?token=${encodeURIComponent(item.token)}&game_rel=${encodeURIComponent(item.game_rel)}` : '',
+};
+
 // ── clear individual / clear all ──────────────────────────────────────────────
 
 function _trashUndo(result, project, message) {
