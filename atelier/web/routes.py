@@ -834,7 +834,7 @@ def api_dye_texture():
         from atelier.handlers.dye import dye_preview
         png = dye_preview(gr, size=int(request.query.get("size") or 1024),
                           dye_off=request.query.get("dye_off") == "1",
-                          original=request.query.get("original") == "1")
+                          original=request.query.get("original") == "1", fast_png=True)
     except Exception as e:
         print(f"[dye_texture] {gr}: {e}", file=sys.stderr, flush=True)
         response.status = 404
@@ -880,9 +880,9 @@ def api_dye_info():
         response.status = 500
         return json.dumps({"error": str(e)})
 
-def _dye_png(gr, overrides, size, dye_off=False):
+def _dye_png(gr, overrides, size, dye_off=False, *, fast_png=False):
     from atelier.handlers.dye import dye_preview
-    return dye_preview(gr, overrides=overrides, size=size, dye_off=dye_off)
+    return dye_preview(gr, overrides=overrides, size=size, dye_off=dye_off, fast_png=fast_png)
 
 @app.post("/api/dye_preview")
 def api_dye_preview():
@@ -899,7 +899,7 @@ def api_dye_preview():
         return json.dumps({"error": "game_rel required"})
     try:
         png = _dye_png(gr, body.get("overrides") or None, int(body.get("size") or 1024),
-                       bool(body.get("dye_off")))
+                       bool(body.get("dye_off")), fast_png=True)
     except Exception as e:
         response.status = 500
         response.content_type = "application/json"

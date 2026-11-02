@@ -12,7 +12,7 @@ by the user on 1060300 (Coastal Kumiho).
 Preview only — nothing here ships into a mod. Region colours are ordinary VectorParameterValues and
 are edited/shipped through the normal material path (material.save_material / stage_material).
 """
-import os, json, collections
+import os, json, collections, threading
 import numpy as np
 from atelier import jobs
 from PIL import Image, ImageDraw, ImageFont
@@ -98,6 +98,11 @@ def dye_regions(game_rel, original=False):
 _IMCACHE = {}     # game_rel -> (stamp, PIL image). Live colour picking re-composites on every drag;
                   # decoding both textures each time costs ~1.3s and makes it unusable, while the
                   # numpy composite itself is milliseconds. Hold the decoded sources.
+_PREPARED = collections.OrderedDict()
+_PREPARING = {}
+_PREPARED_LOCK = threading.Lock()
+_PREPARED_LIMIT = 4
+_PREPARED_BYTES = 128 * 1024 * 1024
 
 
 def edited_png(game_rel):
@@ -115,23 +120,27 @@ def edited_png(game_rel):
     return None
 
 
-def _stamp(game_rel):
+def _file_stamp(path):
+    try:
+        stat = os.stat(path)
+        return (os.path.realpath(path), stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return (os.path.realpath(path), 0, 0)
+
+
+def _stamp(game_rel, original=False):
     """Cache identity for a decoded source: which file it came from and when it last changed."""
-    png = edited_png(game_rel)
+    png = None if original else edited_png(game_rel)
     if not png:
         from atelier import import_server
         return ("vanilla", import_server.source_version()) if import_server.available() else ("vanilla",)
-    try:
-        return ("edit", png, int(os.path.getmtime(png)))
-    except OSError:
-        return ("edit", png, 0)
+    return ("edit", *_file_stamp(png))
 
 
 def _tex_image(game_rel, original=False):
     """Extract + decode a texture to a PIL image. decode_dds first: MR strips the top mip, and
     UAssetTool maps mip[i]->DataResource[i], so with mip0 absent it degrades to the 4x4 tail."""
-    from atelier import import_server
-    stamp = (("vanilla", import_server.source_version()) if import_server.available() else ("vanilla",)) if original else _stamp(game_rel)
+    stamp = _stamp(game_rel, original=original)
     key = (game_rel, "original") if original else game_rel
     hit = _IMCACHE.get(key)
     if hit is not None and hit[0] == stamp:
@@ -174,7 +183,67 @@ def _tex_image_uncached(game_rel, original=False):
         return im
 
 
+def _prepare(mask_im, diff_im, size):
+    mask = np.asarray(mask_im.convert("RGBA").resize((size, size), Image.NEAREST), dtype=np.float32)
+    diff = np.asarray(diff_im.convert("RGB").resize((size, size), Image.BILINEAR), dtype=np.float32)
+    mask.flags.writeable = diff.flags.writeable = False
+    return mask, diff
+
+
+def _prepared_arrays(game_rel, mask_gr, diff_gr, size, original):
+    from atelier.handlers.custom_texture import image_path
+    def source(slot, texture):
+        custom = None if original else image_path(game_rel, slot)
+        if custom and os.path.isfile(custom):
+            return texture, custom, _file_stamp(custom)
+        return texture, None, _stamp(texture, original=original) if texture else None
+    sources = source(MASK_SLOT, mask_gr), source(DIFF_SLOT, diff_gr)
+    key = game_rel, original, size, sources
+    while True:
+        with _PREPARED_LOCK:
+            if key in _PREPARED:
+                _PREPARED.move_to_end(key)
+                return _PREPARED[key]
+            waiting = _PREPARING.get(key)
+            if waiting is None:
+                _PREPARING[key] = threading.Event()
+                break
+        while not waiting.wait(.1):
+            jobs.checkpoint()
+    try:
+        def read(source):
+            texture, custom, _ = source
+            if custom:
+                with Image.open(custom) as image:
+                    return image.copy()
+            if texture:
+                return _tex_image(texture, original=True) if original else _tex_image(texture)
+        mask_im, diff_im = map(read, sources)
+        if mask_im is None:
+            raise RuntimeError("could not decode the ColorID mask: " + mask_gr)
+        if diff_im is None:
+            diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
+        arrays = _prepare(mask_im, diff_im, size)
+        if sum(a.nbytes for a in arrays) <= _PREPARED_BYTES:
+            with _PREPARED_LOCK:
+                # A changed source replaces its old preparation, rather than keeping both versions.
+                for old in list(_PREPARED):
+                    if old[:3] == key[:3]:
+                        del _PREPARED[old]
+                _PREPARED[key] = arrays
+                while len(_PREPARED) > _PREPARED_LIMIT or sum(a.nbytes for pair in _PREPARED.values() for a in pair) > _PREPARED_BYTES:
+                    _PREPARED.popitem(last=False)
+        return arrays
+    finally:
+        with _PREPARED_LOCK:
+            _PREPARING.pop(key).set()
+
+
 def composite(mask_im, diff_im, regions, size=1024):
+    return _composite(*_prepare(mask_im, diff_im, size), regions)
+
+
+def _composite(mask, diff, regions):
     """The verified recipe:
          region = round(alpha / (255/7))
          target = lerp(ColorA, ColorB, R), blended toward ColorGChannel by G and ColorBChannel by B
@@ -186,8 +255,6 @@ def composite(mask_im, diff_im, regions, size=1024):
     normalising per region makes the diffuse contribute only its DEVIATION, so folds/weave/AO stay
     while the region's overall brightness comes from the dye where it belongs.
     """
-    mask = np.asarray(mask_im.convert("RGBA").resize((size, size), Image.NEAREST), dtype=np.float32)
-    diff = np.asarray(diff_im.convert("RGB").resize((size, size), Image.BILINEAR), dtype=np.float32)
     reg = np.rint(mask[..., 3] / STEP).astype(np.int32)
     R, G, B = mask[..., 0] / 255.0, mask[..., 1] / 255.0, mask[..., 2] / 255.0
     lum = (0.2126 * diff[..., 0] + 0.7152 * diff[..., 1] + 0.0722 * diff[..., 2]) / 255.0
@@ -265,7 +332,7 @@ def composite(mask_im, diff_im, regions, size=1024):
     return Image.fromarray(np.clip(srgb * 255.0, 0, 255).astype(np.uint8), "RGB")
 
 
-def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=False, original=False):
+def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=False, original=False, *, fast_png=False):
     """Composite a dye preview. `overrides` = {region_idx: {param: rgba}} applied over the MI's own
     values so the UI can preview an unsaved colour pick. Returns the PNG path.
 
@@ -275,33 +342,21 @@ def dye_preview(game_rel, overrides=None, size=1024, out_path=None, dye_off=Fals
     mask_gr, diff_gr = dye_slots(game_rel, original=True) if original else dye_slots(game_rel)
     if not mask_gr:
         raise RuntimeError("not a dyeing material (no %s slot): %s" % (MASK_SLOT, game_rel))
-    def source_image(slot, texture):
-        if not original:
-            from atelier.handlers.custom_texture import image_path
-            custom = image_path(game_rel, slot)
-            if custom and os.path.isfile(custom):
-                with Image.open(custom) as image:
-                    return image.copy()
-        return _tex_image(texture, original=True) if original else _tex_image(texture)
-    mask_im = source_image(MASK_SLOT, mask_gr)
-    if mask_im is None:
-        raise RuntimeError("could not decode the ColorID mask: " + mask_gr)
-    diff_im = source_image(DIFF_SLOT, diff_gr) if diff_gr else None
-    if diff_im is None:                                  # dye-only preview if the diffuse is missing
-        diff_im = Image.new("RGB", mask_im.size, (128, 128, 128))
+    mask, diff = _prepared_arrays(game_rel, mask_gr, diff_gr, size, original)
+    encoding = {"compress_level": 1} if fast_png else {}
     if dye_off:
-        im = diff_im.convert("RGB").resize((size, size), Image.BILINEAR)
+        im = Image.fromarray(diff.astype(np.uint8), "RGB")
         out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "undyed")) + ".png")
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        im.save(out)
+        im.save(out, **encoding)
         return out
     regions = dye_regions(game_rel, original=True) if original else dye_regions(game_rel)
     for k, v in (overrides or {}).items():
         regions.setdefault(int(k), {}).update(v)
-    im = composite(mask_im, diff_im, regions, size=size)
+    im = _composite(mask, diff, regions)
     out = out_path or (project_base(game_rel, os.path.join(_CACHE_DYE, "original" if original else "preview")) + ".png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    im.save(out)
+    im.save(out, **encoding)
     return out
 
 

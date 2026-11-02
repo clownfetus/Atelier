@@ -1396,7 +1396,7 @@ function colorField(name, color, label, references) {
   picker.addEventListener('input',()=>{hex.value=picker.value.toUpperCase();onColorInput(name,color.name,picker.value);});
   hex.addEventListener('change',()=>{
     const value = hex.value.startsWith('#') ? hex.value : '#'+hex.value;
-    if (/^#[0-9a-f]{6}$/i.test(value)) { hex.setCustomValidity('');picker.value=value;onColorInput(name,color.name,value);hex.value=value.toUpperCase(); }
+    if (/^#[0-9a-f]{6}$/i.test(value)) { hex.setCustomValidity('');picker.value=value;onColorInput(name,color.name,value,{immediate:true});hex.value=value.toUpperCase(); }
     else {hex.setCustomValidity('Enter a six-digit hex colour, such as #70459B.');hex.reportValidity();}
   });
   hex.addEventListener('input',()=>hex.setCustomValidity(''));
@@ -1415,7 +1415,7 @@ function colorField(name, color, label, references) {
           if (saving) return;
           for(const peer of materialPeers(name)) {
             if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
-            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer);
+            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer,{immediate:true});
           }
           picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
         });
@@ -1432,7 +1432,7 @@ function revertMaterial(name) {
   for(const peer of materialPeers(name)) {
     clearTimeout(_dyeMeshTimer[peer]); _dyeMeshRevision[peer] = (_dyeMeshRevision[peer] || 0) + 1;
     delete edited[peer]; retint(peer);
-    if (matData[peer].dyeable || matData[peer].eye_preview) dyeRebakeMesh(peer);
+    if (matData[peer].dyeable || matData[peer].eye_preview) dyeRebakeMesh(peer,{immediate:true});
   }
   buildPanel(); note('Material restored to saved colours','success');
 }
@@ -1442,13 +1442,13 @@ function materialPeers(name) {
   return path ? Object.keys(matData).filter(key=>matData[key].game_rel===path) : [name];
 }
 
-function onColorInput(matName, paramName, hex) {
+function onColorInput(matName, paramName, hex, options) {
   const [r, g, b] = hexToLin(hex);
   const d = matData[matName];
   const orig = (d.colors.find(c => c.name === paramName) || {}).rgba || [r, g, b, 1];
   for(const peer of materialPeers(matName)) {
     (edited[peer] ||= {})[paramName] = [r,g,b,orig[3] ?? 1];retint(peer);
-    if(matData[peer].eye_preview || matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer);
+    if(matData[peer].eye_preview || matData[peer].dyeable && /^Region\s+\d+\s*-/.test(paramName))dyeRebakeMesh(peer,options);
   }
   // retint re-derives the mesh from the params, routing each to its real channel: EmissiveColor →
   // the emissive glow (through the emissive mask), a base/albedo tint → material.color. Editing the
@@ -1471,14 +1471,14 @@ function _dyeOverridesFor(matName) {
   }
   return ov;
 }
-function dyeRebakeMesh(matName) {
+function dyeRebakeMesh(matName, {immediate=false}={}) {
   const d = matData[matName];
   if (!d || (!d.dyeable && !d.eye_preview) || !d.game_rel) return;
   clearTimeout(_dyeMeshTimer[matName]);
   const gen = generation, matGen = materialGeneration, load = materialLoad;
   const revision = (_dyeMeshRevision[matName] || 0) + 1;
   _dyeMeshRevision[matName] = revision;
-  _dyeMeshTimer[matName] = setTimeout(async () => {
+  const bake = async () => {
     let blobUrl;
     try {
       const r = await materialFetch(d.eye_preview ? '/api/eye_preview' : '/api/dye_preview', {
@@ -1502,7 +1502,9 @@ function dyeRebakeMesh(matName) {
       liveDyeTextures.set(matName, tex);
     } catch (e) { /* keep the last good bake */ }
     finally { if (blobUrl) URL.revokeObjectURL(blobUrl); }
-  }, 160);
+  };
+  if (immediate) bake();
+  else _dyeMeshTimer[matName] = setTimeout(bake, 160);
 }
 
 async function dyeDownloadMesh(matName) {
@@ -1644,7 +1646,7 @@ function revertEdits() {
     retint(name);
     // After a successful save the persisted dye may differ from the original cached map.
     // Rebuild with no draft overrides so Reset shows the last saved material.
-    if (matData[name].dyeable || matData[name].eye_preview) dyeRebakeMesh(name);
+    if (matData[name].dyeable || matData[name].eye_preview) dyeRebakeMesh(name,{immediate:true});
   }
   buildPanel();                                            // resets the pickers too
   note('Reverted unsaved changes', 'info');

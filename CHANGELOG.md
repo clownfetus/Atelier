@@ -5,6 +5,9 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Colour previews reuse prepared textures and save preview images faster.
+  Restoring colours or entering a hex colour updates the model immediately;
+  dragging the colour picker still groups rapid changes together.
 - Atelier now warns when the game's update is newer than its mapping file and
   checks for a replacement straight away. A downloaded mapping takes effect
   after restarting Atelier, so you know when colour edits can be saved again.
