@@ -1,6 +1,10 @@
 name: Release Atelier
 
 on:
+  workflow_run:
+    workflows: ['Checks']
+    types: [completed]
+    branches: [main]
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
@@ -37,11 +41,13 @@ on:
         type: boolean
 
 concurrency:
-  group: atelier-release
+  # Ignore failed/PR check events without displacing a pending release.
+  group: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')) && 'atelier-release' || format('atelier-ignore-{0}', github.run_id) }}
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: read
 
 env:
   PYTHON_VERSION: '3.15'
@@ -52,12 +58,16 @@ env:
 
 jobs:
   prepare:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       tag: ${{ steps.prepare.outputs.tag }}
       full_checks: ${{ steps.prepare.outputs.full_checks }}
       native_key: ${{ steps.prepare.outputs.native_key }}
+      release: ${{ steps.plan.outputs.release }}
+      source_commit: ${{ steps.plan.outputs.source_commit }}
+      checks_run: ${{ steps.plan.outputs.checks_run }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -66,13 +76,28 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - id: prepare
+      - id: plan
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: python scripts/release_automation.py
+      - name: Check out the exact verified release source
+        if: steps.plan.outputs.release == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.plan.outputs.source_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: prepare
+        if: steps.plan.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          ATELIER_CHECKS_RUN: ${{ steps.plan.outputs.checks_run }}
           ATELIER_FULL_BROWSER: ${{ inputs.full_browser }}
         run: python scripts/prepare_release.py --version "$RELEASE_VERSION"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: steps.plan.outputs.release == 'true'
         with:
           name: release-inputs
           path: _release
@@ -80,6 +105,7 @@ jobs:
 
   windows:
     needs: prepare
+    if: needs.prepare.outputs.release == 'true'
     runs-on: windows-2022
     timeout-minutes: 60
     env:
@@ -87,6 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -197,6 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -221,6 +249,7 @@ jobs:
 
   linux:
     needs: prepare
+    if: needs.prepare.outputs.release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -228,6 +257,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -323,6 +353,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -358,6 +389,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -397,9 +429,11 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -423,14 +457,20 @@ jobs:
           name: Atelier-${{ needs.prepare.outputs.version }}-release
           path: ${{ runner.temp }}/release
           compression-level: 0
+      - name: Skip automatic publication superseded by a newer main commit
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
+        run: python scripts/release_automation.py --publishable "$RELEASE_COMMIT"
       - name: Upload every asset before making the release visible to updaters
-        if: ${{ !inputs.verify_only }}
+        if: ${{ !inputs.verify_only && steps.current.outputs.publishable == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_COMMIT: ${{ github.sha }}
-          RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
+          RELEASE_PUBLISH: ${{ github.event_name == 'workflow_run' || github.event_name == 'push' || inputs.publish }}
         run: |
           gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft --title "Atelier ${RELEASE_TAG#v}" --notes-file "$RUNNER_TEMP/release/RELEASE_NOTES.md" "$RUNNER_TEMP/release/"*
           if [ "$RELEASE_PUBLISH" = true ]; then

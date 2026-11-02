@@ -5,6 +5,10 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Passing main updates now queue automatic patch releases. UI hotfixes use focused
+  browser checks in parallel, and Windows reuses verified checks from the same
+  commit while retaining packaged app and update verification before publication.
+
 - UI hotfix: material controls scroll at their full height in shorter Model Studio
   windows, with more room for the material list and no clipped recolour inputs.
   Home shows every asset folder, starts with Heroes collapsed unless previously

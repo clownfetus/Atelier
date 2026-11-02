@@ -93,6 +93,28 @@ game's Paks folder (detected from Steam) and, for Blender features, a Blender ex
 
 ## Build a release
 
+Successful `Checks` runs for pushes to `main` now queue an automatic patch release.
+The release lock combines pending pushes, resolves the latest passing main commit,
+and increments the latest published patch version. Every build job uses that exact
+commit. A final main-head check skips publication if a newer commit superseded it.
+Failed checks, pull requests, fork runs and an already published commit cannot publish.
+
+Known UI surfaces use the focused workflows in `scripts/release_check_scope.py`,
+running two isolated browser groups concurrently. Update/startup and workspace/save
+coverage remain mandatory. Changes outside the named UI regions, shared styles,
+dependencies, build infrastructure or backend code use full browser coverage.
+Packaged app, signed update, upgrade and rollback checks still gate publication.
+
+Windows releases reuse a successful main CI backend receipt only when the commit,
+run attempt, complete suite list, Python and installed packages match. Tests that
+consume the newly generated version/changelog run again. Missing or expired artifacts
+fall back to all backend tests. Linux continues to run its platform checks.
+
+For a manual release, run **Release Atelier** in GitHub Actions with the desired
+version. `full_browser` forces full coverage; `verify_only` builds and verifies
+without creating a tag or release; disabling `publish` leaves a draft. Manual,
+tag-triggered and automatic releases share the same serialized release queue.
+
 ```powershell
 .\BUILD.bat                    # Windows: dist\AtelierSetup.exe
 .\BUILD.bat --version 1.2.0     # set the version first

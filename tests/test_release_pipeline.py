@@ -32,7 +32,8 @@ class ReleasePlanning(unittest.TestCase):
         self.assertEqual(S.browser_mode(['atelier/handlers/mesh.py'], lambda _: '', lambda _: ''), 'full')
         self.assertEqual(S.browser_mode(['gui/app.js'], lambda _: 'unknown', lambda _: 'unknown'), 'full')
         self.assertEqual(S.browser_mode([], lambda _: '', lambda _: ''), 'full')
-        self.assertEqual(S.browser_mode(['atelier/updates.py', 'scripts/build.py'], lambda _: '', lambda _: ''), 'updates')
+        self.assertEqual(S.browser_mode(['atelier/updates.py', 'scripts/build.py'], lambda _: '', lambda _: ''), 'full')
+        self.assertEqual(S.browser_mode(['atelier/updates.py'], lambda _: '', lambda _: ''), 'updates')
 
     def test_updater_routes_do_not_hide_changes_to_other_api_functions(self):
         old = 'value = 1\n\ndef save():\n    return value\n'
@@ -130,7 +131,8 @@ class Assembly(unittest.TestCase):
         self.write(self.root / 'version', b'1.1.4\n')
         self.write(self.root / 'CHANGELOG.md', b'# Changelog\n\n## 1.1.4\n\n- Fixture improvement\n')
         self.write(self.root / '_release/inputs.json', {'previous_windows_sha256': 'd' * 64, 'previous_linux_sha256': 'e' * 64})
-        self.context = {'version': '1.1.4', 'source_commit': self.commit, 'full_checks': False}
+        self.context = {'version': '1.1.4', 'source_commit': self.commit, 'full_checks': False,
+                        'browser_mode': 'full', 'changed': ['gui/app.js']}
         self.windows = self.artifacts / 'release-windows'
         payload = Path(self.temp.name) / 'payload'
         self.write(payload / 'Atelier.exe', b'new executable')
@@ -152,8 +154,9 @@ class Assembly(unittest.TestCase):
                    'runtime_id': inventory['runtime_id'], 'installer': P.file_record(self.windows / 'AtelierSetup.exe')})
         self.image = self.artifacts / 'release-linux/Atelier-1.1.4-x86_64.AppImage'
         self.write(self.image, b'\x7fELF appimage fixture')
-        backend = {'results': [{'suite': 'test_updates.py', 'exit_code': 0}]}
-        browser = {'checks': ['real UI loaded'], 'page_errors': [], 'exe_sha256': P.digest(payload / 'Atelier.exe')}
+        backend = {'results': [{'suite': 'test_updates.py', 'exit_code': 0}], 'source_commit': self.commit}
+        browser = {'checks': ['real UI loaded'], 'page_errors': [], 'exe_sha256': P.digest(payload / 'Atelier.exe'),
+                   'source_commit': self.commit, 'selection': 'full', 'suites': ['full', 'workspace']}
         for name in ('windows', 'linux'):
             self.write(self.artifacts / f'release-{name}-reports/backend/results.json', backend)
             self.write(self.artifacts / f'release-{name}-reports/browser/results.json', browser)
@@ -225,6 +228,22 @@ class Assembly(unittest.TestCase):
     def test_changed_update_archive_is_rejected(self):
         self.full.write_bytes(b'wrong portable zip')
         with self.assertRaisesRegex(ValueError, 'Update package differs'):
+            self.assemble()
+
+    def test_focused_report_cannot_replace_full_required_coverage(self):
+        report = self.artifacts / 'release-windows-reports/browser/results.json'
+        data = json.loads(report.read_bytes())
+        data.update(selection='ui', suites=['updates', 'workspace'])
+        self.write(report, data)
+        with self.assertRaisesRegex(ValueError, 'browser gate'):
+            self.assemble()
+
+    def test_reused_backend_report_must_match_this_source_commit(self):
+        report = self.artifacts / 'release-windows-reports/backend/results.json'
+        data = json.loads(report.read_bytes())
+        data['source_commit'] = '0' * 40
+        self.write(report, data)
+        with self.assertRaisesRegex(ValueError, 'backend report belongs'):
             self.assemble()
 
     def native_results(self):

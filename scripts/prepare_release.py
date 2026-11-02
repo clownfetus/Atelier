@@ -118,6 +118,7 @@ def main():
     release_version = args.version.removeprefix('v') or (ROOT / 'version').read_text().strip()
     previous = json.loads(subprocess.check_output(['gh', 'api', f'repos/{REPOSITORY}/releases/latest'], text=True))
     context, inputs = prepare(release_version, previous)
+    context['checks_run'] = os.environ.get('ATELIER_CHECKS_RUN', '')
     from release_check_scope import select
     context['browser_mode'] = 'full' if os.environ.get('ATELIER_FULL_BROWSER') == 'true' else select(context)
     directory = ROOT / '_release'

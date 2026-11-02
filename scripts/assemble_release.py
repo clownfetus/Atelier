@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 from atelier import update_protocol as protocol
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from release_browser_checks import suites_for
 
 
 def read(path):
@@ -47,7 +48,11 @@ def assemble(artifacts, output, context, private_key):
         browser = read(folder / 'browser/results.json')
         if not backend.get('results') or any(row['exit_code'] for row in backend['results']):
             raise ValueError(name + ' backend gate failed.')
-        if browser.get('page_errors') or not browser.get('checks'):
+        if backend.get('source_commit') != commit:
+            raise ValueError(name + ' backend report belongs to another source commit.')
+        if (browser.get('page_errors') or not browser.get('checks') or browser.get('source_commit') != commit
+                or browser.get('selection') != context['browser_mode']
+                or browser.get('suites') != [suite for suite, _ in suites_for(context)]):
             raise ValueError(name + ' browser gate failed.')
         checks[name + '_backend'] = backend
         checks[name + '_browser'] = browser

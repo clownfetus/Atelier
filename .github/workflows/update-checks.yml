@@ -24,6 +24,7 @@ jobs:
     needs: updater
     permissions:
       contents: write
+      actions: read
     uses: ./.github/workflows/release.yml
     secrets: inherit
     with:

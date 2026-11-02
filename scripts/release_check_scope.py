@@ -6,11 +6,51 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Only surfaces with explicit workflow coverage get the faster path. Shared
+# palettes, renderer internals, backend, dependencies and unknown files stay full.
+UI_SUITES = {
+    'gui/viewport.css': ('viewport', 'workspace', 'assembly', 'model-export', 'showcase'),
+    'gui/roster.js': ('identity', 'find', 'library', 'viewport'),
+    'gui/roster.css': ('identity', 'find', 'library'),
+    'gui/workspace.js': ('workspace', 'assembly', 'viewport'),
+    'gui/workspace.css': ('workspace', 'assembly'),
+    'gui/workspace-dock.js': ('workspace',),
+    'gui/library-tools.js': ('library', 'find', 'material-bulk'),
+    'gui/library-tools.css': ('library', 'find', 'material-bulk'),
+    'gui/library-pins.js': ('library', 'identity'),
+    'gui/library-pins.css': ('library', 'identity'),
+    'gui/material-workflow.css': ('viewport', 'material-replacement', 'material-bulk'),
+    'tests/workspace_checks.py': ('workspace',),
+    'tests/home_layout_checks.py': ('identity',),
+    'tests/app_colour_home_checks.py': ('identity',),
+    'tests/app_colour_identity_checks.py': ('identity',),
+    'tests/find_checks.py': ('find',),
+    'tests/library_workflow_checks.py': ('library',),
+    'tests/library_pins_checks.py': ('library',),
+    'tests/assembly_browser_checks.py': ('assembly',),
+    'tests/viewport_inspection_checks.py': ('viewport',),
+    'tests/model_studio_export_browser_checks.py': ('model-export',),
+}
+SHARED_UI_SUITES = {
+    'gui/app.js': ('library', 'find', 'identity', 'material-bulk'),
+    'gui/viewport.js': ('viewport', 'workspace', 'assembly'),
+}
+
+
+def outside_ui(name, text):
+    if name == 'gui/app.js':
+        text = omit_region(text, 'function buildGrid(', 'function _editedDots(')
+        return text.replace('let _homeCategoriesExpanded=false;\n', '')
+    if name == 'gui/viewport.js':
+        text = omit_region(text, 'function pickMaterial(', 'async function openConnectedEditor(')
+        return omit_region(text, 'function buildMaterialInspector(', 'function colorField(')
+    raise ValueError('Unknown shared UI surface.')
+
 
 def omit_region(text, start, end):
     first = text.find(start)
     last = text.find(end, first + len(start)) if first >= 0 else -1
-    if first < 0 or last < 0:
+    if first < 0 or last < 0 or text.count(start) != 1 or text.count(end) != 1:
         raise ValueError('Unknown source layout; run the full browser suite.')
     return text[:first] + text[last:]
 
@@ -61,7 +101,18 @@ def browser_mode(changed, before, after):
     if not changed:
         return 'full'
     try:
+        ui = False
         for name in changed:
+            if name in UI_SUITES:
+                ui = True
+                continue
+            if name in SHARED_UI_SUITES:
+                try:
+                    if outside_ui(name, before(name)) == outside_ui(name, after(name)):
+                        ui = True
+                        continue
+                except ValueError:
+                    pass
             if name in {'gui/app.js', 'gui/index.html', 'window.py'}:
                 if gui_without_updates(name, before(name)) != gui_without_updates(name, after(name)):
                     return 'full'
@@ -73,9 +124,17 @@ def browser_mode(changed, before, after):
             elif name.startswith('atelier/') and name.endswith('.py') and name not in {
                     'atelier/updates.py', 'atelier/update_protocol.py', 'atelier/update_helper.py'}:
                 return 'full'
+            elif name.startswith(('scripts/', '.github/', 'packaging/', 'native/', 'toolchain/', 'requirements')):
+                return 'full'
+            elif name.startswith('tests/') and not Path(name).name.startswith('test_'):
+                return 'full'
+            elif name not in {'version', 'CHANGELOG.md', 'LICENSE', '.gitignore', 'update_keys.json',
+                              'atelier/updates.py', 'atelier/update_protocol.py', 'atelier/update_helper.py',
+                              'atelier/web/routes.py'} and not (name.endswith('.md') or name.startswith(('docs/', 'images/', 'tests/'))):
+                return 'full'
     except (OSError, ValueError, SyntaxError, subprocess.SubprocessError):
         return 'full'
-    return 'updates'
+    return 'ui' if ui else 'updates'
 
 
 def select(context):
