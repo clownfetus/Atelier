@@ -99,6 +99,20 @@ Why dye detection failed, found after the first write-up.
 
 ### A. The native reader comes up good or bad per process, silently
 
+**Resolved (Nov 5): tied patch priorities.** CUE4Parse assigned both
+`Patch_-Windows_1.1.3962284_P.utoc` and `Patch_-Windows_1.1.3984769_P.utoc`
+priority 103. Concurrent mounting randomly selected the older material; decoding
+its `BasePropertyOverrides` with the current mapping failed, leaving the typed
+parameter arrays empty. The same Cosmic Kumiho lobby material returned no
+parameters in two of four fresh installed-reader processes, and 7 textures / 9
+colours in the other two. `GameProvider.Open` now rebuilds the file and package-ID
+indexes from one deterministically ordered container selection before decoding.
+Six fresh patched processes returned identical complete reads for both outfit
+and head materials; the real lobby preview regained its body/outfit textures.
+`tests/native_material_stability.py` repeats this check without touching projects
+or installed caches. A separate isolated import/replace/reopen check retained the
+edited PNG bytes and the actual model texture through two reopens.
+
 The same read of `MI_1039507_Equip_01`, in eight identical fresh processes, returned 7 textures and
 50 colours five times, and nothing three times. Within one process the outcome holds for every
 affected material, and the tool writes nothing to stderr. It is decided when the reader starts.
@@ -189,8 +203,9 @@ worth bringing back.
 
 ## Next
 
-- Before the workspace: find A's root cause (empty reads are no longer cached). B is checked
-  (Nov 2): an out-of-date mapping, now refused instead of dropped; see B above.
+- A is resolved (Nov 5): deterministic native patch selection; see the reproduction and
+  regression check above. B is checked (Nov 2): an out-of-date mapping, now refused
+  instead of dropped; see B above.
 - Then make the three speed changes in `viewport.js` and `dye.py`. Small effort.
 - Run the in-game fidelity check: install a Kumiho recolour, capture the same three materials in
   game and compare against the bakes. It needs the game, so it is the owner's step.

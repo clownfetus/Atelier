@@ -1,5 +1,6 @@
 using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
+using CUE4Parse.FileProvider.Objects;
 using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
@@ -27,6 +28,21 @@ static class GameProvider
                     && !Path.GetFileNameWithoutExtension(file.Name).Equals(GalactaLoader, StringComparison.OrdinalIgnoreCase))
                     provider.RegisterVfs(file);
             provider.SubmitKey(new FGuid(), new FAesKey(aesHex));
+            // CUE4Parse mounts containers concurrently. Its generic patch parser
+            // gives Rivals' dotted build names (1.1.3962284, 1.1.3984769, ...)
+            // the same priority, so completion order can select an older asset.
+            // Its package-ID index also ignores read priority. Rebuild both from
+            // one deterministic set before any packages are decoded, matching
+            // atelier.index's filename ordering within each engine priority.
+            var files = new Dictionary<string, GameFile>(StringComparer.OrdinalIgnoreCase);
+            foreach (var reader in provider.MountedVfs.OrderBy(reader => reader.ReadOrder)
+                         .ThenBy(reader => reader.Name, StringComparer.OrdinalIgnoreCase))
+                foreach (var (path, file) in reader.Files)
+                    files[path] = file;
+            provider.Files.Clear();
+            // A single index gives path and package-ID lookups the same winner.
+            // Leave its priority at zero so VerifyCommand can mount a mod over it.
+            provider.Files.AddFiles(files);
             if (!string.IsNullOrEmpty(usmap))
                 provider.MappingsContainer = new FileUsmapTypeMappingsProvider(usmap);
             return provider;

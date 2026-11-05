@@ -5,6 +5,11 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Model previews consistently read the newest game patch. Native imports could
+  previously pick an older material at random after launch, leaving models white
+  even with the correct mapping file. Package and texture references now use the
+  same deterministic container selection.
+
 - Queued Workspace comparisons stay with their original project, and a Restore
   finishing after switching projects no longer refreshes the new project's model.
   Rename and Duplicate save recent build-selection changes before moving or
