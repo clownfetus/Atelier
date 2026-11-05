@@ -28,15 +28,44 @@ def asset_digest(asset):
     return value[7:]
 
 
+def split_changelog(document):
+    parts = re.split(r'(?m)(?=^## )', document)
+    sections = {}
+    for section in parts[1:]:
+        heading = section.splitlines()[0][3:].strip()
+        key = heading.split()[0]
+        if key != 'Unreleased':
+            version(key)
+        if key in sections:
+            raise ValueError('Duplicate changelog section: ' + key)
+        sections[key] = section.strip()
+    return parts[0].strip(), sections
+
+
+def render_changelog(intro, sections):
+    keys = sorted((key for key in sections if key != 'Unreleased'), key=version, reverse=True)
+    return '\n\n'.join([intro, sections.get('Unreleased', '## Unreleased'),
+                        *(sections[key] for key in keys)]) + '\n'
+
+
 def merge_changelog_history(current, historical):
-    pattern = r'(?m)(?=^## [0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}(?:\s|$))'
-    current_parts = re.split(pattern, current)
+    intro, sections = split_changelog(current)
     releases = {}
     for document in (historical, current):
-        for section in re.split(pattern, document)[1:]:
-            number = re.match(r'## ([0-9]+\.[0-9]+\.[0-9]+)', section)[1]
-            releases[number] = section.strip()
-    return current_parts[0].rstrip() + '\n\n' + '\n\n'.join(releases[number] for number in sorted(releases, key=version, reverse=True)) + '\n'
+        releases.update({key: section for key, section in split_changelog(document)[1].items()
+                         if key != 'Unreleased'})
+    releases['Unreleased'] = sections.get('Unreleased', '## Unreleased')
+    return render_changelog(intro, releases)
+
+
+def prepare_changelog(changelog, release_version, date, summaries):
+    intro, sections = split_changelog(changelog)
+    if release_version not in sections:
+        pending = sections.get('Unreleased', '').partition('\n')[2].strip()
+        notes = pending or '\n'.join('- ' + entry for entry in summaries)
+        sections[release_version] = f'## {release_version} — {date}\n\n{notes}'.strip()
+        sections['Unreleased'] = '## Unreleased'
+    return render_changelog(intro, sections)
 
 
 def release_summaries(log, previous_tree):
@@ -48,7 +77,7 @@ def release_summaries(log, previous_tree):
         if tree == previous_tree:
             continue
         title = body.strip().splitlines()[0] if subject.startswith('Merge pull request ') and body.strip() else subject
-        if title.startswith('Merge '):
+        if title.startswith('Merge ') or re.fullmatch(r'docs: record Atelier \d+\.\d+\.\d+ release in changelog \[skip ci\]', title):
             continue
         title = re.sub(r'\s*\[verify release\]', '', title).strip()
         if title and title not in entries:
@@ -133,18 +162,12 @@ def main():
         if len(raw) > 4 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != asset_digest(previous_changelog):
             raise ValueError('Published changelog failed its release digest.')
         changelog = merge_changelog_history(changelog, raw.decode('utf-8'))
-    heading = '## ' + release_version
-    if not any(line == heading or line.startswith(heading + ' ') for line in changelog.splitlines()):
-        log = subprocess.check_output(['git', 'log', '--first-parent', '--format=%T%x1f%s%x1f%b%x1e',
-                                       f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True, encoding='utf-8')
-        entries = release_summaries(log, git('rev-parse', context['previous_tag'] + '^{tree}'))
-        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-        section = f'## {release_version} — {today}\n\n' + '\n'.join('- ' + entry for entry in entries) + '\n\n'
-        first, separator, remainder = changelog.partition('\n')
-        changelog = first + '\n\n' + section + remainder.lstrip() if first.startswith('# ') else section + changelog
-        (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
-    else:
-        (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
+    log = subprocess.check_output(['git', 'log', '--first-parent', '--format=%T%x1f%s%x1f%b%x1e',
+                                   f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True, encoding='utf-8')
+    entries = release_summaries(log, git('rev-parse', context['previous_tag'] + '^{tree}'))
+    today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    changelog = prepare_changelog(changelog, release_version, today, entries)
+    (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
     # The prepared metadata is identical in both build jobs and the source ZIP.
     (directory / 'version').write_text(release_version + '\n', encoding='utf-8')
     (directory / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')

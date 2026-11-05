@@ -8,8 +8,10 @@ workflow. A version must be higher than the latest stable GitHub release.
 The action builds Windows and Linux, checks the actual packaged applications,
 tests upgrading from the current published version, and creates the release.
 It uploads every asset into a draft before publishing it as latest. Turning
-**Publish** off keeps the complete release as a draft. Nothing publishes on an
-ordinary branch push or pull request.
+**Publish** off keeps the complete release as a draft. Successful **Checks** for
+the latest `main` push queue the next patch release automatically; pull requests
+and other branches do not publish. Updates confined to `CHANGELOG.md` do not
+queue another patch release.
 
 Select **Verify only** to run the complete build and gates without creating a
 release or tag. The verified bundle stays in the workflow's artifacts.
@@ -19,8 +21,18 @@ does not combine unfinished feature branches. The release action generates the
 build's version and changelog entry automatically; the matching source ZIP contains
 those two generated files and records the original commit in `VERIFICATION.json`.
 Other source files must still match that commit.
-Release summaries use merged change titles, and the published changelog is carried
+Release preparation moves the authored **Unreleased** notes into the new numbered,
+dated section. If there are no pending notes, it uses merged change titles.
+The introduction stays above the sections, and the published changelog is carried
 into later builds so users who skip versions still receive the intervening notes.
+
+After publication, the action commits the release sections to `CHANGELOG.md` on
+`main` using its `GITHUB_TOKEN`. Drafts and verify-only runs leave `main` alone.
+The update removes only pending notes consumed by that release, preserving notes
+added or revised while the build ran and corrections to previous releases. A
+concurrent changelog edit causes a fresh read and retry rather than an overwrite.
+The commit uses `[skip ci]`, and writes made with `GITHUB_TOKEN` do not trigger
+another workflow run. The release planner also ignores changelog-only changes.
 
 ## What users receive
 

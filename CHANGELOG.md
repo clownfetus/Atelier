@@ -1,14 +1,21 @@
 # Changelog
 
 The app, installers and update checker identify each release by its full number, such as
-**1.1.4**.
+**1.1.8**.
 
 ## Unreleased
+
+- The full changelog groups shipped changes by version and stays up to date
+  automatically after each release.
+
+## 1.1.8 — 5 November 2026
 
 - Model previews consistently read the newest game patch. Native imports could
   previously pick an older material at random after launch, leaving models white
   even with the correct mapping file. Package and texture references now use the
   same deterministic container selection.
+
+## 1.1.7 — 2 November 2026
 
 - Queued Workspace comparisons stay with their original project, and a Restore
   finishing after switching projects no longer refreshes the new project's model.
@@ -18,6 +25,7 @@ The app, installers and update checker identify each release by its full number,
 
 - Library Home hides folders with no browsable assets, including empty Maps,
   Text and Nameplates sections. Project-added folders stay available.
+
 - Project naming keeps your text and shows errors in the form so you can retry.
   Renaming the active project updates its name throughout the app, and project
   selection keeps keyboard focus. Workspace shows loading and retry states,
@@ -28,6 +36,8 @@ The app, installers and update checker identify each release by its full number,
   immediately in Library. Workspace remains a separate tab for guided costume
   and colour editing, with its saved costume and edits preserved.
 
+## 1.1.6 — 2 November 2026
+
 - Passing main updates now queue automatic patch releases. UI hotfixes use focused
   browser checks in parallel, and Windows reuses verified checks from the same
   commit while retaining packaged app and update verification before publication.
@@ -36,6 +46,8 @@ The app, installers and update checker identify each release by its full number,
   windows, with more room for the material list and no clipped recolour inputs.
   Home shows every asset folder, starts with Heroes collapsed unless previously
   enabled, and remembers opening or closing Heroes across restarts.
+
+## 1.1.5 — 2 November 2026
 
 - Models with 16-bit bone indices and sections using more than 256 bones can now
   be edited and rebuilt. Replacement reports preserve line breaks and show each
@@ -55,15 +67,18 @@ The app, installers and update checker identify each release by its full number,
 - Colour previews reuse prepared textures and save preview images faster.
   Restoring colours or entering a hex colour updates the model immediately;
   dragging the colour picker still groups rapid changes together.
+
 - Atelier now warns when the game's update is newer than its mapping file and
   checks for a replacement straight away. A downloaded mapping takes effect
   after restarting Atelier, so you know when colour edits can be saved again.
+
 - Building a mod now shows the Krackle ink-well: bubbles form, circulate, crowd
   and burst while your mod cooks, and a few of them carry colours averaged from
   the original costume's textures. When the build finishes, a successful export
   bursts cleanly from the top and settles calm, an export with warnings strains
   under pressure without breaking, and a failed export ruptures and leaks. Calm,
   Off and reduced motion show a still pose.
+
 - Edit All has a redesigned progress dialog, the first part of Atelier to use its
   new identity: Gesso and Lamp Black surfaces (Charcoal in Dark), Instrument Sans
   and Fragment Mono beside Bricolage, and one dot per texture. Ink gathers on the
@@ -72,6 +87,7 @@ The app, installers and update checker identify each release by its full number,
   (imported, imported with warnings, failed or cancelled) until you choose Done;
   hiding it still reports through a notification. Calm, Off and reduced motion
   show still poses and nothing travels.
+
 - The Projects screen is now Atelier's front page in the new identity: the mark
   stands in for the A of the wordmark, each project is an ink portfolio with your
   latest edited texture tucked inside, and with no projects yet a single drop of
@@ -80,6 +96,7 @@ The app, installers and update checker identify each release by its full number,
   screen and the portfolio rises out of it. Open it when you're ready. Deleting
   a project plays it backwards: the portfolio melts and drains away, and the
   projects beside it glide into the gap.
+
 - The setup check at launch now happens on the Projects page itself, and only
   shows when it takes longer than a moment: a drop of ink pours along the header
   rule to a latch while Atelier looks for Marvel Rivals, its unlock key and its
@@ -90,16 +107,19 @@ The app, installers and update checker identify each release by its full number,
   falls in. Appearance and motion
   are in Settings. If the check can't finish, the page shows the real error with
   Try again.
+
 - Fixed costumes that could stay unpainted in the viewer, Assembly and the
   material editor until the next game update. The game reader sometimes
   started up unable to read some materials and returned them empty without an
   error, and Atelier kept those empty results. It no longer saves an empty
   material read, and materials saved empty by earlier versions are read again.
+
 - Menu → Open a mod… reads a cooked mod (.pak, .utoc/.ucas or a .zip of them)
   and shows what each asset really is, where it lives in the game and what it
   uses. Its textures and materials can be added to your Mod tray as edits of
   the game assets they replace; everything else can be saved as JSON. A mod
   its author locked asks for the password first.
+
 - Fixed material colour saves that could be lost without a word right after a
   game update. Until Atelier has a mapping file for the new game version, it
   can't read some materials' colours, and a save used to report success while
@@ -107,7 +127,7 @@ The app, installers and update checker identify each release by its full number,
   unsaved, and materials saved that way by earlier versions are read again once
   the new mapping is in use.
 
-## 1.1.4
+## 1.1.4 — 27 October 2026
 
 To get the new updater, use the 1.1.4 Windows installer or replace your Linux
 AppImage once. Your projects and settings carry over.

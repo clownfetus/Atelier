@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Release preparation changes only version/changelog. Recheck the consumers of
 # that metadata even when the other Windows suites already passed on this commit.
 METADATA_SUITES = {'test_changelog.py', 'test_packaging.py', 'test_release_bundle.py',
-                   'test_release_pipeline.py', 'test_updates.py', 'test_frontend_cache.py'}
+                   'test_release_pipeline.py', 'test_release_changelog.py', 'test_updates.py', 'test_frontend_cache.py'}
 
 
 def validate_reuse(report, run, commit, suites, packages):

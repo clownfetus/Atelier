@@ -95,7 +95,8 @@ class ReleasePlanning(unittest.TestCase):
     def test_release_notes_use_merge_titles_and_omit_rehearsal_markers(self):
         log = ('oldtree\x1fMerge pull request #34\x1fAlready released\x1e\n'
                'newtree\x1fMerge pull request #35\x1fIn-app updates\n\nDetails\x1e\n'
-               'othertree\x1fFix restart [verify release]\x1f\x1e\n')
+               'othertree\x1fFix restart [verify release]\x1f\x1e\n'
+               'metatree\x1fdocs: record Atelier 1.1.4 release in changelog [skip ci]\x1f\x1e\n')
         self.assertEqual(R.release_summaries(log, 'oldtree'), ['In-app updates', 'Fix restart'])
 
     def test_missing_published_asset_digest_is_refused(self):

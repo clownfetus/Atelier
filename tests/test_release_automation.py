@@ -62,6 +62,19 @@ class AutomaticReleases(unittest.TestCase):
     def test_already_published_commit_is_a_noop(self):
         self.assertFalse(self.plan(previous_commit=SHA)['release'])
 
+    def test_changelog_sync_commit_does_not_queue_another_patch_release(self):
+        for changed, expected in [('CHANGELOG.md\n', False), ('CHANGELOG.md\ngui/app.js\n', True)]:
+            with self.subTest(changed=changed), \
+                 patch.dict(A.os.environ, {'GITHUB_EVENT_NAME': 'workflow_run', 'GITHUB_EVENT_PATH': 'event.json'}), \
+                 patch.object(A.Path, 'read_bytes', return_value=json.dumps({'workflow_run': checks()}).encode()), \
+                 patch.object(A, 'api', side_effect=[{'object': {'sha': SHA}}, {'tag_name': 'v1.1.7'}, []]), \
+                 patch.object(A, 'latest_checks', return_value=checks()), \
+                 patch.object(A.subprocess, 'check_output', side_effect=['b' * 40, 'v1.1.7\n', changed]), \
+                 patch.object(A.subprocess, 'run'), patch.object(A.sys, 'argv', ['release_automation.py']), \
+                 patch.object(A, 'outputs') as output:
+                A.main()
+                self.assertEqual(output.call_args.args[0]['release'], expected)
+
     def test_latest_failed_rerun_does_not_reuse_an_older_success(self):
         with patch.object(A, 'api', return_value={'workflow_runs': [checks(), checks(id=43, conclusion='failure')]}):
             self.assertIsNone(A.latest_checks(SHA))

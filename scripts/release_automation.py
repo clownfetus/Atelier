@@ -117,6 +117,10 @@ def main():
         # Do not automatically downgrade to an unrelated or force-rewound history.
         subprocess.run(['git', 'fetch', '--no-tags', 'origin', commit], cwd=ROOT, check=True)
         subprocess.run(['git', 'merge-base', '--is-ancestor', previous_commit, commit], cwd=ROOT, check=True)
+        changed = subprocess.check_output(['git', 'diff', '--name-only', previous_commit, commit],
+                                          cwd=ROOT, text=True).splitlines()
+        if not set(changed) - {'CHANGELOG.md'}:
+            plan = {'release': False, 'reason': 'Only the published changelog changed.'}
     outputs(plan)
 
 

@@ -427,6 +427,8 @@ jobs:
     needs: [prepare, bundle, update]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
     permissions:
       contents: write
       actions: read
@@ -464,6 +466,7 @@ jobs:
           RELEASE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
         run: python scripts/release_automation.py --publishable "$RELEASE_COMMIT"
       - name: Upload every asset before making the release visible to updaters
+        id: publish
         if: ${{ !inputs.verify_only && steps.current.outputs.publishable == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -475,4 +478,32 @@ jobs:
           gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" --draft --title "Atelier ${RELEASE_TAG#v}" --notes-file "$RUNNER_TEMP/release/RELEASE_NOTES.md" "$RUNNER_TEMP/release/"*
           if [ "$RELEASE_PUBLISH" = true ]; then
             gh release edit "$RELEASE_TAG" --draft=false --latest
+            echo 'published=true' >> "$GITHUB_OUTPUT"
           fi
+
+  sync-changelog:
+    needs: [prepare, publish]
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: ${{ runner.temp }}/release
+      - name: Record the published release in main's changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
+        run: python scripts/sync_release_changelog.py --version "$RELEASE_VERSION" --source "$RELEASE_COMMIT" --changelog "$RUNNER_TEMP/release/CHANGELOG.md"
