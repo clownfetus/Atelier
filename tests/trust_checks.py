@@ -192,7 +192,15 @@ def _setup(context,url,report,checks):
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Current key retrieved'
                 # A passed row has its block and sentence and no glyph; the page's one glyph forms the A once every row is valid.
                 assert tab.locator('#setup-rows [data-atelier-motion=glyph]').count()==0
-                assert tab.locator('#setup-hero [data-atelier-motion=glyph][data-glyph-state=success]').count()==1
+                # The page's glyph stands in for the logo's mark, and the finished A lands exactly on it.
+                assert tab.locator('#setup-hero .at-proj-lockup > [data-atelier-motion=glyph][data-glyph-state=success]').count()==1
+                assert tab.locator('#setup-hero .at-proj-lockup > img').evaluate("el=>getComputedStyle(el).visibility")=='hidden'
+                tab.wait_for_function("""()=>{const h=document.querySelector('#setup-hero [data-atelier-motion=glyph]');
+                  const v=h.querySelector('svg').getAttribute('viewBox').split(' ').map(Number);return Math.abs(v[2]-440)<.01&&Math.abs(v[3]-300)<.01}""",timeout=8000)
+                mark=tab.evaluate("""()=>{const r=e=>e.getBoundingClientRect();const img=r(document.querySelector('#setup-hero .at-proj-lockup > img'));
+                  const h=r(document.querySelector('#setup-hero [data-atelier-motion=glyph]'));
+                  const s=h.height/300;return [h.left+19.79*s-img.left,h.top+20*s-img.top,400.39*s-img.width,260*s-img.height]}""")
+                assert all(abs(d)<.6 for d in mark),mark
                 assert tab.locator('#setup-page-title').inner_text()=='Ready to open Atelier'
                 assert tab.locator('#setup-path').is_hidden() and tab.locator('#setup-save').is_enabled()
                 tab.locator('[data-row=game] .at-setup-change').click()

@@ -512,6 +512,10 @@ Added at the P1.7 checkpoint, from Thiago's note on the first-run setup sheet.
   row has its block and its sentence and no glyph, because Thiago found the page held too many at
   P3.3. A block appearing is a kind of progress; SPEC §2 bans category colours on progress bars,
   which this isn't.
+- **The page's one glyph (P3.3):** it stands in for the logo's mark in the header, so working runs
+  beside the wordmark, the pieces become the logo once every row is valid, and `!` or X take the
+  mark's place otherwise. This keeps one A on the page. Thiago chose it over a glyph beside the logo
+  and a large one beside the heading.
 - **Status:** asked for and Condense chosen by Thiago, 7 Nov 2026; the page awaits his sign-off at P1.7.
 
 ## D19 · Small sizes, Calm and the logo entrance

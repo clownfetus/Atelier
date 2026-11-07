@@ -269,9 +269,9 @@
   flex-shrink: 0;
 }
 /* The bible's horizontal lockup (p.12): mark 2.7 x cap height, gap 1.3 x cap height. */
-.at-proj-lockup { display: inline-flex; align-items: center; gap: 31.2px; color: var(--text); }
-.at-proj-lockup img { display: block; width: auto; height: 64.8px; }
-.at-proj-lockup svg { display: block; width: calc(24px * 9265 / 1490); height: 24px; }
+.at-proj-lockup { --lockup-mark: 64.8px; position: relative; display: inline-flex; align-items: center; gap: 31.2px; color: var(--text); }
+.at-proj-lockup > img { display: block; width: auto; height: var(--lockup-mark); }
+.at-proj-lockup > svg { display: block; width: calc(24px * 9265 / 1490); height: 24px; }
 /* ── Launch check and first-run setup (#setup-overlay outside Settings) ──────────────────── */
 /* Setup has its own header and ground. Settings keeps the Material dialog; setup-wizard.js moves the
    controls between them, so IDs, validators and save payloads are shared. */
@@ -300,8 +300,16 @@
 #setup-overlay[data-setup-page] #setup-loading { display: none !important; }
 .at-setup-hero[hidden], .at-setup-page[hidden] { display: none; }
 .at-setup-hero, .at-setup-page { --glyph-halo: var(--surface); }
-.at-setup-hero { align-items: center; padding-top: var(--space-3); padding-bottom: var(--space-3); }
-.at-setup-check { width: 147px; height: 72px; flex: none; }
+/* The page's glyph stands in for the mark. Its host is the mark's box scaled up to the A's framed
+   440 x 300 units (the mark is 400.39 x 260), so the finished A lands exactly where the logo sits. */
+.at-proj-lockup:has(> .at-setup-check) > img { visibility: hidden; }
+.at-setup-check {
+  position: absolute;
+  left: calc(var(--lockup-mark) * (400.39 - 440) / 520);
+  top: calc(var(--lockup-mark) * (260 - 300) / 520);
+  width: calc(var(--lockup-mark) * 440 / 260);
+  height: calc(var(--lockup-mark) * 300 / 260);
+}
 .at-setup-page {
   flex: 1;
   min-height: 0;

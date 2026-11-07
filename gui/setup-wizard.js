@@ -210,7 +210,8 @@
     }
   }
 
-  // ── The page's one glyph: working while checks run, the A once every row is valid, ! or X otherwise ──
+  // ── The page's one glyph stands in for the logo's mark: working while checks run, the mark itself
+  // once every row is valid, ! or X otherwise ──
   function destroyCheck() {
     check?.destroy();check=null;checkHost?.remove();checkHost=null;
   }
@@ -224,7 +225,7 @@
     if(settings||!overlay.classList.contains('active')){destroyCheck();return;}
     const state=checkState();
     if(check){check.set(state);return;}
-    checkHost=document.createElement('span');checkHost.className='at-setup-check';hero.append(checkHost);
+    checkHost=document.createElement('span');checkHost.className='at-setup-check';hero.querySelector('.at-proj-lockup').append(checkHost);
     try{check=window.AtelierMotion.glyph.mount(checkHost,{state});}
     catch(_){destroyCheck();}
   }
