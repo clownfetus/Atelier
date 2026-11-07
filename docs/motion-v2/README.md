@@ -13,7 +13,7 @@ docs/motion-v2/
   START_HERE.md                            the prompt to paste into Claude Code
   HANDOFF.md                               the brief: phases, tasks, gates, checkpoints
   SPEC.md                                  every number: colours, geometry, poses, timings, easing, tiers, sound
-  DECISIONS.md                             seven open calls (D1–D7) to settle before any code
+  DECISIONS.md                             the calls to settle before any code
   SURFACE_MAP.md                           every Krackle surface, where it's mounted, what it becomes
   assets/                                  the new mark, small mark and wordmarks (SVG) + their generator
   reference/motion-prototype.html          the approved, working prototype
@@ -28,7 +28,7 @@ rather than replacing yours.
 
 Open Claude Code in the repo root and paste the prompt from
 `docs/motion-v2/START_HERE.md`. It starts with Phase 0: walking you through the
-seven decisions.
+decisions.
 
 ## Where you're needed
 

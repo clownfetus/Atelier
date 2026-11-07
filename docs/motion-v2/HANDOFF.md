@@ -21,7 +21,8 @@ the app, swap every Krackle surface over, then delete Krackle.
    approved behaviour. When in doubt, match it.
 3. `reference/PROTOTYPE_NOTES.md`: how the prototype's code maps onto modules,
    and what must change on the way in.
-4. `DECISIONS.md`: seven open calls. Phase 0 is getting them answered.
+4. `DECISIONS.md`: the calls the bible and the app disagree on, or that Phase 0
+   turned up. Phase 0 is getting them answered.
 5. `SURFACE_MAP.md`: every Krackle surface, where it's mounted, what it becomes.
 6. `../brand/Atelier_Brand_Bible_v1.2.pdf`: the visual identity, for context.
    Pages 9 and 10 cover motion.
@@ -55,13 +56,13 @@ The repo's own `docs/DESIGN_SYSTEM.md`, `docs/DEVELOPMENT.md` and
 
 ## Phase 0 · Decisions
 
-- [ ] **P0.1** Create branch `motion-v2`. Commit this pack as it is
+- [x] **P0.1** Create branch `motion-v2`. Commit this pack as it is
   (`docs/motion-v2/`, `docs/brand/`, `CLAUDE.md`).
-- [ ] **P0.2** ⏸ Walk Thiago through `DECISIONS.md` (D1–D7). Record each answer
-  and set its status to `confirmed`. Update `SPEC.md` wherever an answer differs
-  from the recommendation.
+- [x] **P0.2** ⏸ Walk Thiago through `DECISIONS.md`. Record each answer and set its
+  status to `confirmed`. Update `SPEC.md` wherever an answer differs from the
+  recommendation.
 
-**Gate:** all seven decisions confirmed. Nothing in Phase 1 starts before this.
+**Gate:** every decision confirmed. Nothing in Phase 1 starts before this.
 
 ## Phase 1 · Foundations
 
@@ -73,25 +74,45 @@ The repo's own `docs/DESIGN_SYSTEM.md`, `docs/DEVELOPMENT.md` and
 - [ ] **P1.2 Colour tokens (D2).** Add the roles in SPEC §2 to `tokens.css` as
   semantic tokens (`--atelier-texture`, `--atelier-mesh`, `--atelier-material`,
   `--status-complete`, `--status-warning`, `--status-error`, `--status-working`,
-  plus the neutrals). Remap `--studio-texture`, `--studio-mesh`,
-  `--studio-icon-texture`, `--studio-icon-mesh` and `--studio-icon-material`,
-  and re-pick the other category hues per D2. Keep the existing semantic error
-  roles.
-- [ ] **P1.3 Themes (D3).** In `gui/theme.js`: the three piece colours are
-  exempt from theming; expose the current surface colour for the halo; fit
-  status hues for contrast while keeping hue (and 30° from the user's accent).
+  plus the neutrals). Set `--studio-icon-texture`, `--studio-icon-mesh`,
+  `--studio-icon-material` and the matching `EMBLEM_INKS` per SPEC §2. Every other
+  category goes neutral per D2. Delete `--studio-texture`, `--studio-mesh` and
+  `--studio-vfx`, and rewrite `tests/category_icon_checks.py:100` and
+  `tests/surfaces_checks.py:152`. Keep the existing semantic error roles.
+  Replace the folder artwork with `assets/emblems/` and apply the name rules in
+  SPEC §3.5 (D9). Move the generator to `scripts/`, because P4.1 deletes
+  `scripts/krackle_art.py`. It imports the mark, so port `assets/brand_mark_v2.py`
+  to `scripts/brand_mark.py` in the same commit. Port the hue-holding colour fit from
+  `AtelierKrackleInks.fit`, and update the tests that assert the old emblem markup
+  or the dropped categories (`category_icon_checks.py`, `surfaces_checks.py`,
+  `library_pins_checks.py`).
+- [ ] **P1.3 Themes (D3).** In `gui/tokens.css` and `gui/theme.js`: apply the
+  Atelier preset values in SPEC §2; the three piece colours are exempt from
+  theming; expose the current surface colour for the halo; fit status hues for
+  contrast while keeping hue. Move the warning lines at `gui/viewport.css:123` and
+  `:243` to the warning colour. Atelier's accent is neutral, so where accent text
+  is the only cue, add an underline or heavier weight. Point the `.at-identity` roles
+  at the themed tokens and delete its pigments, per D13.
 - [ ] **P1.4 Brand assets.** Replace `gui/brand/atelier-mark.svg/.png` with
   `docs/motion-v2/assets/atelier-mark.svg`; add `atelier-mark-small.svg` and the
-  two wordmarks. Port `assets/brand_mark_v2.py` into `scripts/brand_mark.py`.
-  Regenerate `icon.png` and `icon.ico`, using the small mark for 16, 24 and
+  two wordmarks. Use these, not the drawing on bible v1.2 p.3 and p.4 (D14).
+  `scripts/brand_mark.py` already holds the generator (P1.2). Regenerate `icon.png` and `icon.ico`, using the small mark for 16, 24 and
   32 px and the master for 48 px and up, on a Charcoal rounded square (bible
   p.12). Regenerate installer art through `scripts/installer_art.py`.
-- [ ] **P1.5 Header logo (D6).** Full-colour mark; wordmark in Paper on dark and
-  Charcoal on light. Remove the monochrome filter.
+- [ ] **P1.5 Header logo (D6).** Full-colour mark and outlined wordmark, spaced as in
+  D6, with the letters in the theme's text colour. Remove the monochrome filter from
+  the header and the startup splash, and give the Library hero signature its own
+  token. Check the header still fits at the 1100 px breakpoint. Replace the start
+  page's lockup with the bible's, without RIVALS or the ink tagline, and update the
+  tests that assert the old logo (`appearance_checks.py`, `logo_motion_checks.py`,
+  `desktop_smoke.py`, `frozen_smoke.py`).
 - [ ] **P1.6 Docs.** Update the colour, type and brand sections of
   `docs/DESIGN_SYSTEM.md`.
-- [ ] **P1.7** ⏸ Screenshots of the library, an editor, Settings and the header,
-  in the Atelier, Darcula and Repak X presets, light and dark, to Thiago.
+- [ ] **P1.7** ⏸ Screenshots of the library, an editor, Settings, the header, the
+  project workspace, the Edit All import dialog, a project dialog, the mod-open dialog
+  and the first-run setup page, in all six presets (Atelier, Darcula, Repak X, High contrast, Blueprint and
+  Comic), light and dark, to Thiago. Include a hero with artwork tints in the
+  Library and the viewer (D5).
 
 **Gate:** library, editors and Settings read correctly in every preset, and the
 existing contrast checks pass.
@@ -101,47 +122,70 @@ existing contrast checks pass.
 - [ ] **P2.1 Modules.** Port the prototype into `gui/motion/assembly/`:
   `pieces.js`, `planner.js`, `engine.js`, `glyph.js` (plus `assembly.css`).
   Follow `reference/PROTOTYPE_NOTES.md`: one engine per glyph, one shared rAF
-  clock, cached paths, no globals.
+  clock, cached paths, no globals. The tile and mesh outlines come from
+  `assets/atelier-mark-pieces.json` (SPEC §3.2), generated with the mark. Include the
+  opening and the three loaders (SPEC §4.1, §4.7).
 - [ ] **P2.2 API.**
-  `AtelierMotion.glyph.mount(host, {state, size?, reducedMotion?, surface?})` →
-  `{set(state), replay(), destroy(), state}`. States: `busy`, `info`,
-  `success`, `warning`, `error`. Throw on a non-element host, exactly as
-  `krackleGlyph.mount` does today. Set `aria-hidden` on the SVG; the status
-  text next to it carries meaning.
+  `AtelierMotion.glyph.mount(host, {state, asset?, size?, reducedMotion?, surface?})` →
+  `{set(state, {asset?}), replay(), destroy(), state}`. States: `busy`, `info`,
+  `success`, `warning`, `error`. `asset` is `mesh`, `texture` or `material`, only
+  with `busy`, and only when the surface truly knows it (SPEC §7, D16). Throw on a
+  non-element host, exactly as `krackleGlyph.mount` does today. Set `aria-hidden` on the
+  SVG; the status text next to it carries meaning. A glyph freshly mounted in `busy`
+  starts in the row or a fit, and never shows an A first (SPEC §4.1).
 - [ ] **P2.3 Tiers.** Pick Stage, Inline or Micro from the host's rendered
   height (`ResizeObserver`), per SPEC §5.
 - [ ] **P2.4 Policy.** Read `AtelierMotionPolicy` (`gui/preferences.js:31`) for
   Full, Calm and Off, and honour OS reduced motion. Stop drawing when a glyph is
-  off screen (`IntersectionObserver`), hidden (`document.hidden`) or settled.
-- [ ] **P2.5 Precompute.** Plan the six fits and the three outcome routes in
-  `requestIdleCallback` after start-up; plan live only for unusual starting poses.
+  off screen (`IntersectionObserver`), hidden (`document.hidden`) or settled: a
+  settled glyph schedules no animation frames at all. A change to the Motion setting
+  or to OS reduced motion takes effect on a running animation: the piece in flight
+  lands (at most 640 ms), then the glyph follows the new setting. Test this.
+- [ ] **P2.5 Precompute.** Plan the two Head and Ramp moves, the assemblies to and from
+  Bench and the routes into the three outcomes in `requestIdleCallback` after start-up;
+  plan live only for unusual starting poses. The opening needs no plan. A live plan took
+  up to 146 ms in the prototype, on the main thread, so it needs a time budget.
 - [ ] **P2.6 Sound.** The success click (SPEC §6) in `gui/motion/foley.js`.
   Rename the setting "Motion sounds"; keep its storage key.
-- [ ] **P2.7 Preview.** Replace Settings → Try Krackle (`motion-preview.js`) with
-  "Preview motion": five state buttons driving glyphs at 16, 48 and 128 px side
-  by side, on the production engine.
-- [ ] **P2.8** ⏸ Design the parts that aren't in the prototype: the "at rest"
-  pose (D4), the Inline and Micro tiers, and Calm mode. Show them in the
-  preview, then get Thiago's sign-off.
+- [ ] **P2.7 Preview.** Add "Preview motion" to Settings, replacing Try Krackle
+  (`motion-preview.js`) if it's still there: five state buttons and the three loaders, driving glyphs at 16, 48
+  and 128 px side by side, on the production engine.
+- [ ] **P2.8** ⏸ Design the parts that aren't in the prototype: the Inline and Micro
+  tiers, the per-shape framing at small sizes (SPEC §5), the logo entrance at 32 px
+  (SPEC §4.8), and Calm mode, loaders included. Thiago also signs off the row's size and
+  spacing (D4, D16), which the prototype has. Check every state and loader at 24 and 32
+  px, and on light backgrounds, where the material's light may soften the disc's edge.
+  Show them in the preview, then get Thiago's sign-off.
 - [ ] **P2.9 Tests.**
   - `tests/assembly_planner_checks.py`, ported from `reference/checks/planner_check.py`
     and run against the preview. It fails if fully-clear moves drop below the
     prototype baseline.
+  - `tests/assembly_clearance_checks.py`, ported from
+    `reference/checks/clearance_check.py`: resting gaps on the drawn outlines stay at
+    their minimums (every wrong fit and the row at least 14u), and no piece overlaps
+    another while Working or a loader runs, after the opening.
   - `tests/assembly_state_checks.py`: success never fires without a
-    `succeeded` result; a result arriving mid-move lands within 640 ms; only
-    `busy` loops; busy after busy carries on; layer order never changes; text
-    updates before the glyph settles.
+    `succeeded` result; a result arriving mid-move, or during a loader, lands within
+    640 ms; only `busy` loops; busy after busy carries on; layer order never changes;
+    text updates before the glyph settles; the A returns to category colours after
+    success, except at Micro; a settled glyph schedules no frames; the logo entrance
+    runs once, in Full only, and never turns green or clicks; a glyph mounted in `busy`
+    never shows an A; a loader only runs when a surface names its asset type, and hands
+    over only on a real event.
   - A `--assembly-only` flag in `tests/browser_smoke.py`.
 
-**Gate:** Preview motion runs all five states at all three sizes; film strips
+**Gate:** Preview motion runs all five states and the loaders at all three sizes; film strips
 (`reference/checks/state_film.py`) match the prototype; 30 Micro glyphs cost
-under 2 ms of script per frame in WebView2.
+under 2 ms of script per frame in WebView2; a live plan never blocks the main thread
+for over 50 ms; settled glyphs cost nothing per frame.
 
 ## Phase 3 · Swap surfaces
 
 - [ ] **P3.1 Alias.** Point `AtelierMotion.krackleGlyph.mount` at
   `AtelierMotion.glyph.mount`. Same states, same handle shape, so every caller
-  listed in `SURFACE_MAP.md` row 8 switches with no change.
+  listed in `SURFACE_MAP.md` row 8 switches with no change. Cover
+  `AtelierKrackleGlyph.toastIcon` too (`gui/app.js:149`, `:201`), which doesn't go
+  through that mount.
 - [ ] **P3.2 to P3.11.** One surface per task and commit, in this order:
   export review (P3.2), first-run setup (P3.3), viewport loader (P3.4),
   material save (P3.5), Edit All import (P3.6), export button and notifications
@@ -152,11 +196,16 @@ under 2 ms of script per frame in WebView2.
   workflow gestures, ink transfers, halftone reconstruction, folder flap,
   contextual pigments). Swap in the replacements from the map. Leave the files
   in place for now.
+- [ ] **P3.12b Surfaces from D10 and D17.** One commit each: model appearance loading,
+  setup-status check, Showcase backdrop, thumbnail loading, cards being edited, deleting
+  a row, startup stage, index failure, first-export moment, theme change, toast captions,
+  toast repeat count, selection count, texture drop target and dot lattice. Follow
+  `SURFACE_MAP.md`. Don't change how materials or models render.
 - [ ] **P3.13 Interruption (D7).** Update the surfaces that replaced animations
   instantly on a result, so the move in flight lands first and the text
   updates immediately.
-- [ ] **P3.14** ⏸ Recording of a full walk-through to Thiago: first-run setup,
-  open a hero, edit a material and save, export with success, with warnings and
+- [ ] **P3.14** ⏸ Recording of a full walk-through to Thiago: launch with indexing,
+  first-run setup, change the theme, open a hero, edit a material and save, export with success, with warnings and
   with failure, cancel a job, and an empty folder.
 
 **Gate:** no visible Krackle anywhere in the running app. Confirm by
@@ -175,22 +224,34 @@ ever created.
   `krackle_motion_checks.py`, `logo_motion_checks.py`,
   `material_save_motion_checks.py`, `test_krackle_inks.py`,
   `viewport_motion_checks.py`, `workflow_motion_checks.py`,
-  `working_panels_checks.py`) and their `browser_smoke.py` flags.
+  `working_panels_checks.py`) and their `browser_smoke.py` flags. Clear the Krackle
+  references in `category_icon_checks.py`, `fluid_work_checks.py`, `frozen_smoke.py`,
+  `library_pins_checks.py`, `polish_checks.py`, `showcase_checks.py`,
+  `surfaces_checks.py` and `trust_checks.py` as well.
 - [ ] **P4.3** Remove the alias; rename callers to `AtelierMotion.glyph.mount`.
-  Rename `data-krackle-surface` to `data-glyph-surface`.
+  Rename `data-krackle-surface` to `data-glyph-surface`, `data-krackle`
+  (`gui/preferences.js:15` and the CSS) and the `--krackle-*` tokens.
 - [ ] **P4.4** Rewrite `gui/motion/README.md` for the new system, including the
-  D7 interruption rule. Update `docs/DESIGN_SYSTEM.md` and the Krackle notes in
-  `docs/DEVELOPMENT.md`.
+  D7 interruption rule. Update `docs/DESIGN_SYSTEM.md`, the Krackle notes in
+  `docs/DEVELOPMENT.md`, and `docs/WORKSPACE_PLAN.md`. Clear `README.md:77`,
+  `images/README.md`, `packaging/Atelier.iss:72` and `CLAUDE.md`. Remove
+  `images/krackle-examples.png` and its entry in `images/screenshots.json`, and capture
+  its replacement in P5.2.
 
-**Gate:** `grep -rli krackle gui tests scripts docs` returns nothing except
-CHANGELOG history; every suite passes on Windows (WebView2) and the Linux
-AppImage.
+**Gate (D11):** these both return nothing, because history stays as it was written;
+every suite passes on Windows (WebView2) and the Linux AppImage.
+
+```sh
+git grep -il krackle -- . ':!CHANGELOG.md' ':!docs/release-*' ':!docs/discord-*' ':!docs/announcements' ':!docs/*-verification-*.json' ':!docs/*checkpoint*' ':!docs/review' ':!docs/motion-v2'
+git ls-files | grep -i krackle | grep -vE '^(docs/review|docs/motion-v2)/'
+```
 
 ## Phase 5 · Release
 
 - [ ] **P5.1** ⏸ Thiago's timing pass on the real app. Tune only the durations
   and easing in one place (`pieces.js` or `easing.js`); don't touch the invariants.
-- [ ] **P5.2** Release screenshots (`scripts/release_screenshots.py`), README
+- [ ] **P5.2** Release screenshots (`scripts/release_screenshots.py`; any change to
+  `gui/` makes line 31 reject `images/screenshots.json` until they're recaptured), README
   "What's new", a `CHANGELOG.md` *Unreleased* entry, `docs/release-<version>.md`
   and a Discord draft in the style of `docs/discord-1.1.3.md`. Include one line
   on the category colour change.
@@ -201,6 +262,6 @@ AppImage.
 
 - Every surface in `SURFACE_MAP.md` is in its new state.
 - All ten invariants in SPEC §1 hold, with tests covering 2, 5, 6, 7 and 9.
-- No Krackle code, assets, tests or docs remain.
+- No Krackle code, assets, tests or docs remain outside history (D11).
 - The Full, Calm, Off and OS reduced-motion settings each behave per SPEC §5.
 - Thiago has signed off P1.7, P2.8, P3.14 and P5.1.

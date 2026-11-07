@@ -19,6 +19,6 @@ Everything you need is in `docs/motion-v2/`.
    me through `DECISIONS.md` one decision at a time. Give me the recommendation
    and what it changes, and record my answer before moving on.
 
-Don't start Phase 1 until all seven decisions are confirmed. After that, work
+Don't start Phase 1 until every decision is confirmed. After that, work
 through the phases in order, one commit per task, and stop at every ⏸
 checkpoint to show me the result.

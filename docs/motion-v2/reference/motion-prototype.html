@@ -48,9 +48,9 @@ code{font:500 12.5px/1.4 ui-monospace,Menlo,monospace;color:var(--paper);backgro
 </head>
 <body>
 <div class="wrap">
-<div class="lab">Atelier / Brand system 01 / Motion v1.2</div>
+<div class="lab">Atelier / Brand system 01 / Motion v2</div>
 <h1>Three pieces, four states</h1>
-<p class="sub">While a build is working, the pieces keep coming apart and trying to fit together in the wrong ways. On a confirmed success they click into the A and turn green. On a warning they balance into an exclamation mark, and on an error they cross into an X.</p>
+<p class="sub">While a build is working, the pieces keep coming apart and trying to fit together in the wrong ways. On a confirmed success they click into the A with a green pulse, then return to their own colours. On a warning they balance into an exclamation mark, and on an error they cross into an X.</p>
 
 <div class="grid">
 <section class="card stage">
@@ -62,6 +62,9 @@ code{font:500 12.5px/1.4 ui-monospace,Menlo,monospace;color:var(--paper);backgro
     <button data-s="warning">Warning</button>
     <button data-s="error">Error</button>
     <button data-s="idle">Brand mark</button>
+    <button data-s="mesh">Load mesh</button>
+    <button data-s="texture">Load textures</button>
+    <button data-s="material">Save material</button>
   </div>
   <div class="btns">
     <button id="simOk">Simulate build</button>
@@ -74,13 +77,14 @@ code{font:500 12.5px/1.4 ui-monospace,Menlo,monospace;color:var(--paper);backgro
 </section>
 
 <aside class="card side">
-  <div class="row"><h3><span class="sw" style="background:#778BA3"></span>Working</h3><p>The pieces keep trying to fit. They come apart, each swings round to the side it will dock from, the anchor settles in the middle, and the others come in one at a time, dock, tap twice to test the fit, and give up. There are six wrong fits: Head, Bench, Swap, Totem, Ramp and Tumble. None may look like an A, an exclamation mark or an X; those shapes are reserved for outcomes.</p></div>
-  <div class="row"><h3><span class="sw" style="background:#7CC47F"></span>Complete</h3><p>The tile settles, the mesh comes in from the right and the disc rises from below, all stopping just short. Then wind-up 120ms, (draw back 10u), snap 80ms (hard ease-in, presses 3u past the seat). On contact the disc squashes 12%, the glyph punches to 104.5%, a ripple leaves the disc and green spreads outwards: disc, then tile +60ms, then mesh +120ms. Recoil 110ms, rest 130ms. The optional sound is a tick, a thump, then a two-note chime.</p></div>
+  <div class="row"><h3><span class="sw" style="background:#778BA3"></span>Working</h3><p>The pieces keep trying to fit. There are three wrong fits: Head, Bench and Ramp. Between Head and Ramp the pieces go straight across, one at a time, in about two seconds. To or from Bench they come apart first and swing round, which takes about three. Out of an outcome, all three open together in one brisk 420ms move. Then they dock, tap once to test the fit, and give up. None may look like an A, an exclamation mark or an X; those shapes are reserved for outcomes.</p></div>
+  <div class="row"><h3><span class="sw" style="background:#7CC47F"></span>Complete</h3><p>About a second from the result to rest. All three move at once, 340ms: the tile and disc go to their seats while the mesh stands off. The mesh comes in, already wound up, 110ms, then snaps 80ms (hard ease-in, presses 3u past the seat). On contact the disc squashes 12%, the glyph punches to 104.5%, a ripple leaves the disc and green spreads outwards: disc, then tile +60ms, then mesh +120ms. Recoil 110ms, rest 130ms. When the effects have finished the pieces return to their own colours over 380ms, and the status sentence stays green. At 24px and under the mark stays green. The optional sound is a tick, a thump, then a two-note chime.</p></div>
   <div class="row"><h3><span class="sw" style="background:#E6C35C"></span>Warning</h3><p>A balancing act. The disc goes down as the dot, the mesh stands up on it, and the tile is set on top, a little off-centre. It turns amber, catches its balance in a few decaying sways with the tile lagging the stem, then wobbles gently for as long as the warning stands.</p></div>
-  <div class="row"><h3><span class="sw" style="background:#EC6A86"></span>Error</h3><p>Tile and mesh squeeze into matching bars and cross at ±42°, with the disc pinned at the crossing. The cross clamps with a 3° overshoot and turns rose. No shaking, no particles.</p></div>
-  <div class="row"><h3>Overlap rule</h3><p>Pieces can pass in front of each other, but every piece carries a background-coloured halo 14u wide. They never visually merge, even when all three are the same colour. In the A this halo is what cuts the bites.</p></div>
-  <div class="row"><h3>Physical, never faded</h3><p>Pieces move one at a time along planned curves that keep a 14u gap from everything else. The layer order is fixed (tile at the back, mesh in the middle, disc in front), so nothing ever re-stacks or fades. In the rare move with no clear path, one piece simply passes in front of another.</p></div>
-  <div class="row"><h3>Where it's allowed</h3><p>The status glyph only. The app icon, lockups and static brand mark always use the category colours and the master A.</p></div>
+  <div class="row"><h3><span class="sw" style="background:#EC6A86"></span>Error</h3><p>Tile and mesh squeeze into matching bars and cross at ±42°, with the disc pinned at the crossing. The cross clamps shut and turns rose. No shaking, no particles.</p></div>
+  <div class="row"><h3><span class="sw" style="background:#778BA3"></span>Loaders</h3><p>Where the real asset type is known, one piece does the work instead of the Working loop. The pieces lie in a row (mesh, tile, disc), and the other two stay still. Mesh: it steps up and snaps side to side as lines of halo gap cut it into a different structure each time. Texture: it steps up and splits into five bands that pop through colour plates out of line, then drop into register and close on its exact blue. Material: the disc rolls along the baseline and back while a flat lighter band sweeps across it. From the row, Complete has the mesh hop over the tile.</p></div>
+  <div class="row"><h3>Overlap rule</h3><p>Pieces can pass in front of each other, but every piece carries a background-coloured halo 14u wide. They never visually merge, even when all three are the same colour. The tile and mesh carry their notch and bites in the A and the wrong fits, so the animated A is the brand mark exactly. In the ! and X they flatten into plain bars.</p></div>
+  <div class="row"><h3>Physical, never faded</h3><p>Pieces move one at a time along planned curves that keep a 14u gap, measured on the outlines actually drawn. The exceptions are Complete and the opening out of an outcome, where all three move together to keep them brisk. The layer order is fixed (tile at the back, mesh in the middle, disc in front), so nothing ever re-stacks or fades. In the rare move with no clear path, one piece simply passes in front of another.</p></div>
+  <div class="row"><h3>Where it's allowed</h3><p>The status glyph, plus one entrance for the header logo on launch, in category colours, with no click. The app icon, lockups and static brand mark always use the category colours and the master A.</p></div>
 </aside>
 </div>
 
@@ -110,20 +114,56 @@ function roundedPoly(pts,k){
   }
   return d+'Z';
 }
-function bluePath(o){ // tile: vertical left edge, tapered right edge
-  const w=o.w,h=o.h,t=o.taper;
-  return roundedPoly([[-w/2,-h/2],[w/2,-h/2],[w/2-t,h/2],[-w/2,h/2]],o.k);
+// The brand pieces, from the mark's construction: local coordinates, cut into sections so a
+// piece can morph onto a plain bar section by section (notch and bite flatten as m goes to 0).
+const BRAND={"tile": [[-36.75, -130.0], [-25.05, -130.0], [-13.35, -130.0], [-1.65, -130.0], [10.05, -130.0], [21.75, -130.0], [33.45, -130.0], [45.15, -130.0], [56.85, -130.0], [68.55, -130.0], [80.25, -130.0], [81.62, -129.9], [82.96, -129.63], [84.26, -129.19], [85.49, -128.58], [86.64, -127.82], [87.67, -126.92], [88.57, -125.89], [89.33, -124.74], [89.94, -123.51], [90.38, -122.21], [90.65, -120.87], [90.75, -119.5], [90.75, -116.35], [90.75, -113.21], [90.75, -110.06], [90.75, -106.91], [90.75, -103.77], [90.75, -100.62], [90.75, -97.47], [90.75, -94.32], [90.75, -91.18], [90.75, -88.03], [90.75, -84.88], [90.75, -81.74], [90.75, -78.59], [90.75, -75.44], [90.75, -72.3], [90.75, -69.15], [90.75, -66.0], [90.75, -62.86], [90.75, -59.71], [90.75, -56.56], [90.63, -53.42], [90.09, -50.32], [89.16, -47.32], [87.83, -44.47], [86.13, -41.82], [84.09, -39.43], [81.76, -37.32], [79.21, -35.47], [76.73, -33.54], [74.34, -31.49], [72.06, -29.32], [69.89, -27.04], [67.83, -24.66], [65.89, -22.19], [64.08, -19.62], [62.39, -16.96], [60.84, -14.22], [59.42, -11.41], [58.14, -8.54], [57.01, -5.6], [56.02, -2.62], [55.18, 0.42], [54.49, 3.49], [53.95, 6.59], [53.56, 9.71], [53.33, 12.85], [53.25, 15.99], [53.33, 19.14], [53.56, 22.28], [53.95, 25.4], [54.48, 28.5], [55.17, 31.57], [56.01, 34.6], [57.0, 37.59], [58.14, 40.52], [59.41, 43.4], [60.83, 46.21], [62.38, 48.95], [64.07, 51.6], [65.88, 54.17], [67.82, 56.65], [69.88, 59.03], [72.05, 61.31], [74.29, 63.52], [76.3, 65.94], [77.99, 68.59], [79.35, 71.43], [80.35, 74.41], [80.97, 77.49], [81.21, 80.63], [81.06, 83.77], [80.53, 86.86], [79.69, 89.9], [78.67, 92.87], [77.49, 95.79], [76.16, 98.64], [74.66, 101.41], [73.02, 104.09], [71.23, 106.68], [69.3, 109.17], [67.24, 111.54], [65.05, 113.8], [62.74, 115.94], [60.31, 117.94], [57.78, 119.81], [55.14, 121.53], [52.42, 123.11], [49.61, 124.53], [46.73, 125.79], [43.79, 126.9], [40.79, 127.84], [37.74, 128.61], [34.65, 129.22], [31.53, 129.65], [28.4, 129.91], [25.25, 130.0], [17.7, 130.0], [10.15, 130.0], [2.6, 130.0], [-4.95, 130.0], [-12.5, 130.0], [-20.05, 130.0], [-27.6, 130.0], [-35.15, 130.0], [-42.7, 130.0], [-50.25, 130.0], [-53.43, 129.87], [-56.58, 129.5], [-59.7, 128.88], [-62.76, 128.02], [-65.75, 126.91], [-68.64, 125.58], [-71.41, 124.03], [-74.05, 122.26], [-76.55, 120.29], [-78.89, 118.14], [-81.04, 115.8], [-83.01, 113.3], [-84.78, 110.66], [-86.33, 107.89], [-87.66, 105.0], [-88.77, 102.01], [-89.63, 98.95], [-90.25, 95.83], [-90.62, 92.68], [-90.75, 89.5], [-90.75, 77.75], [-90.75, 66.0], [-90.75, 54.25], [-90.75, 42.5], [-90.75, 30.75], [-90.75, 19.0], [-90.75, 7.25], [-90.75, -4.5], [-90.75, -16.25], [-90.75, -28.0], [-90.75, -39.75], [-90.75, -51.5], [-90.75, -63.25], [-90.75, -75.0], [-90.61, -76.61], [-90.24, -78.18], [-89.64, -79.68], [-88.81, -81.06], [-87.78, -82.3], [-86.57, -83.37], [-85.21, -84.24], [-83.74, -84.9], [-82.18, -85.31], [-80.58, -85.48], [-78.96, -85.5], [-77.34, -85.5], [-75.73, -85.5], [-74.11, -85.5], [-72.5, -85.5], [-70.88, -85.5], [-69.26, -85.5], [-67.65, -85.5], [-66.03, -85.5], [-64.42, -85.5], [-62.8, -85.5], [-61.19, -85.5], [-59.57, -85.5], [-57.95, -85.5], [-56.34, -85.5], [-54.72, -85.5], [-53.11, -85.6], [-51.57, -86.06], [-50.15, -86.83], [-48.98, -87.93], [-48.06, -89.25], [-47.49, -90.76], [-47.26, -92.36], [-47.25, -93.97], [-47.25, -95.59], [-47.25, -97.2], [-47.25, -98.82], [-47.25, -100.44], [-47.25, -102.05], [-47.25, -103.67], [-47.25, -105.28], [-47.25, -106.9], [-47.25, -108.51], [-47.25, -110.13], [-47.25, -111.75], [-47.25, -113.36], [-47.25, -114.98], [-47.25, -116.59], [-47.25, -118.21], [-47.23, -119.83], [-47.06, -121.43], [-46.65, -122.99], [-45.99, -124.46], [-45.12, -125.82], [-44.05, -127.03], [-42.81, -128.06], [-41.43, -128.89], [-39.93, -129.49], [-38.36, -129.86]], "mesh": [[-85.25, -130.0], [-78.07, -130.0], [-70.89, -130.0], [-63.71, -130.0], [-56.54, -130.0], [-49.36, -130.0], [-42.18, -130.0], [-35.0, -130.0], [-27.82, -130.0], [-25.94, -129.95], [-24.06, -129.81], [-22.19, -129.58], [-20.33, -129.25], [-18.5, -128.84], [-16.68, -128.33], [-14.89, -127.73], [-13.14, -127.04], [-11.42, -126.27], [-9.74, -125.42], [-8.11, -124.48], [-6.52, -123.47], [-4.99, -122.37], [-3.51, -121.2], [-2.09, -119.96], [-0.74, -118.65], [0.55, -117.27], [1.77, -115.83], [2.92, -114.34], [3.98, -112.79], [4.98, -111.19], [5.89, -109.54], [6.71, -107.84], [7.46, -106.11], [12.85, -92.64], [18.24, -79.17], [23.63, -65.7], [29.01, -52.23], [34.4, -38.76], [39.79, -25.28], [45.18, -11.81], [50.57, 1.66], [55.96, 15.13], [61.35, 28.6], [66.73, 42.07], [72.12, 55.54], [77.51, 69.02], [82.9, 82.49], [88.29, 95.96], [93.68, 109.43], [94.31, 111.42], [94.66, 113.48], [94.73, 115.56], [94.51, 117.64], [94.0, 119.67], [93.21, 121.6], [92.16, 123.4], [90.88, 125.05], [89.38, 126.5], [87.68, 127.72], [85.84, 128.7], [83.87, 129.41], [81.83, 129.85], [79.75, 130.0], [69.0, 130.0], [58.25, 130.0], [47.5, 130.0], [36.75, 130.0], [26.0, 130.0], [15.25, 130.0], [4.51, 130.0], [-6.24, 130.0], [-7.38, 129.96], [-8.51, 129.82], [-9.62, 129.6], [-10.71, 129.29], [-11.78, 128.9], [-12.81, 128.43], [-13.8, 127.88], [-14.74, 127.25], [-15.64, 126.55], [-16.47, 125.78], [-17.24, 124.95], [-17.95, 124.06], [-18.58, 123.12], [-19.14, 122.13], [-20.57, 119.36], [-21.99, 116.58], [-23.42, 113.81], [-24.84, 111.04], [-26.27, 108.27], [-27.69, 105.49], [-29.12, 102.72], [-30.54, 99.95], [-31.97, 97.17], [-33.39, 94.4], [-34.82, 91.63], [-36.24, 88.86], [-37.67, 86.08], [-39.09, 83.31], [-40.52, 80.54], [-41.94, 77.77], [-43.37, 74.99], [-44.79, 72.22], [-46.22, 69.45], [-47.64, 66.67], [-48.83, 63.8], [-49.3, 60.73], [-48.98, 57.63], [-47.92, 54.71], [-46.24, 52.09], [-44.55, 49.47], [-42.98, 46.78], [-41.55, 44.01], [-40.25, 41.17], [-39.1, 38.28], [-38.08, 35.33], [-37.22, 32.34], [-36.49, 29.3], [-35.92, 26.24], [-35.5, 23.15], [-35.22, 20.05], [-35.1, 16.93], [-35.13, 13.81], [-35.31, 10.7], [-35.65, 7.6], [-36.13, 4.52], [-36.77, 1.47], [-37.55, -1.55], [-38.48, -4.52], [-39.55, -7.45], [-40.76, -10.32], [-42.11, -13.13], [-43.6, -15.87], [-45.11, -18.59], [-46.5, -21.38], [-47.89, -24.17], [-49.28, -26.96], [-50.67, -29.75], [-52.06, -32.55], [-53.45, -35.34], [-54.84, -38.13], [-56.23, -40.92], [-57.62, -43.71], [-59.01, -46.5], [-60.4, -49.29], [-61.79, -52.08], [-63.18, -54.87], [-64.57, -57.66], [-65.96, -60.45], [-67.35, -63.24], [-68.74, -66.03], [-70.13, -68.82], [-71.52, -71.61], [-72.91, -74.41], [-74.3, -77.2], [-75.69, -79.99], [-77.08, -82.78], [-78.47, -85.57], [-79.86, -88.36], [-81.25, -91.15], [-82.64, -93.94], [-84.03, -96.73], [-85.42, -99.52], [-86.81, -102.31], [-88.2, -105.1], [-89.59, -107.89], [-90.97, -110.68], [-92.36, -113.47], [-93.75, -116.27], [-94.42, -118.07], [-94.72, -119.97], [-94.64, -121.9], [-94.16, -123.76], [-93.31, -125.49], [-92.14, -127.02], [-90.69, -128.28], [-89.0, -129.21], [-87.17, -129.79]], "tw": 181.5, "mw": 189.5, "h": 260, "W": 401.84, "tcx": 90.75, "mcx": 307.09, "tn": [10, 12, 96, 10, 20, 14, 60], "mn": [8, 24, 16, 14, 8, 14, 84, 10], "cx": 208.0, "cy": 146.0, "r": 50.0};
+const quadOf=(id,o)=>{const w=o.w,h=o.h;if(id==='blue'){const t=o.taper;return [[-w/2,-h/2],[w/2,-h/2],[w/2-t,h/2],[-w/2,h/2]]}
+  const dx=o.dx;return [[-w/2-dx/2,-h/2],[w/2-dx/2,-h/2],[w/2+dx/2,h/2],[-w/2+dx/2,h/2]]};
+function cornerArc(p,v,q,k,n){ // n points along the rounded corner at v (the last is its far tangent point)
+  const a=[p[0]-v[0],p[1]-v[1]],b=[q[0]-v[0],q[1]-v[1]],la=Math.hypot(...a),lb=Math.hypot(...b);
+  const ua=[a[0]/la,a[1]/la],ub=[b[0]/lb,b[1]/lb],ang=Math.acos(Math.max(-1,Math.min(1,ua[0]*ub[0]+ua[1]*ub[1])));
+  const t=Math.min(k/Math.tan(ang/2),la/2,lb/2),r=t*Math.tan(ang/2);
+  const s=[v[0]+ua[0]*t,v[1]+ua[1]*t],e=[v[0]+ub[0]*t,v[1]+ub[1]*t],m=[ua[0]+ub[0],ua[1]+ub[1]],ml=Math.hypot(...m)||1,d=r/Math.sin(ang/2);
+  const c=[v[0]+m[0]/ml*d,v[1]+m[1]/ml*d];let a0=Math.atan2(s[1]-c[1],s[0]-c[0]),a1=Math.atan2(e[1]-c[1],e[0]-c[0]);
+  while(a1-a0>Math.PI)a1-=2*Math.PI;while(a1-a0<-Math.PI)a1+=2*Math.PI;
+  const out=[];for(let i=0;i<=n;i++){const u=i/n;out.push([c[0]+r*Math.cos(a0+(a1-a0)*u),c[1]+r*Math.sin(a0+(a1-a0)*u)])}return out;
 }
-function tealPath(o){ // parallelogram, lean dx over height
-  const w=o.w,h=o.h,dx=o.dx;
-  return roundedPoly([[-w/2-dx/2,-h/2],[w/2-dx/2,-h/2],[w/2+dx/2,h/2],[-w/2+dx/2,h/2]],o.k);
+function sampleOf(poly,n){ // n points by arc length, up to just before the end
+  const seg=[];let total=0;for(let i=0;i<poly.length-1;i++){const l=Math.hypot(poly[i+1][0]-poly[i][0],poly[i+1][1]-poly[i][1]);seg.push(l);total+=l}
+  const out=[];let i=0,run=0;for(let k=0;k<n;k++){const tg=total*k/n;while(i<seg.length-1&&run+seg[i]<tg){run+=seg[i];i++}
+    const u=seg[i]?(tg-run)/seg[i]:0;out.push([poly[i][0]+(poly[i+1][0]-poly[i][0])*u,poly[i][1]+(poly[i+1][1]-poly[i][1])*u])}return out;
 }
+function plainRing(id,o){ // the plain bar, sampled to line up with the brand piece's sections
+  const q=quadOf(id,o),A=(i)=>cornerArc(q[(i+3)%4],q[i],q[(i+1)%4],o.k,10),[TL,TR,BR,BL]=[A(0),A(1),A(2),A(3)],L=(a,b)=>[a,b];
+  if(id==='blue'){const n=BRAND.tn;return [...sampleOf(L(TL[10],TR[0]),n[0]),...sampleOf(TR,n[1]),...sampleOf([TR[10],...BR],n[2]),...sampleOf(L(BR[10],BL[0]),n[3]),...sampleOf(BL,n[4]),...sampleOf(L(BL[10],TL[0]),n[5]),...sampleOf(TL,n[6])]}
+  const n=BRAND.mn;return [...sampleOf(L(TL[10],TR[0]),n[0]),...sampleOf(TR,n[1]),...sampleOf(L(TR[10],BR[0]),n[2]),...sampleOf(BR,n[3]),...sampleOf(L(BR[10],BL[0]),n[4]),...sampleOf(BL,n[5]),...sampleOf(L(BL[10],TL[0]),n[6]),...sampleOf(TL,n[7])];
+}
+function brandRing(id,o){const pts=id==='blue'?BRAND.tile:BRAND.mesh,bw=id==='blue'?BRAND.tw:BRAND.mw,sx=o.w/bw,sy=o.h/BRAND.h;return pts.map(([x,y])=>[x*sx,y*sy])}
+const dOf=r=>'M'+r.map(p=>p[0].toFixed(2)+' '+p[1].toFixed(2)).join('L')+'Z';
+function piecePath(id,o){
+  const m=o.m??0;
+  if(m<=.001){const q=quadOf(id,o);return roundedPoly(q,o.k)}
+  const B=brandRing(id,o);if(m>=.999) return dOf(B);
+  const Q=plainRing(id,o);return dOf(B.map((p,i)=>[Q[i][0]+(p[0]-Q[i][0])*m,Q[i][1]+(p[1]-Q[i][1])*m]));
+}
+const bluePath=o=>piecePath('blue',o), tealPath=o=>piecePath('teal',o);
+const hullOf=(P,tol=1.5)=>{ // a coarse outline, within tol of the true one, to rule out far pieces: planning runs thousands of these
+  const sd=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};
+  const mid=P.length>>1,keep=new Set([0,mid,P.length-1]);
+  const go=(a,b)=>{let m=0,k=-1;for(let i=a+1;i<b;i++){const d=sd(P[i],P[a],P[b]);if(d>m){m=d;k=i}} if(m>tol){keep.add(k);go(a,k);go(k,b)}};
+  go(0,mid);go(mid,P.length-1);return P.filter((_,i)=>keep.has(i));
+};
+const HULL={blue:hullOf(BRAND.tile),teal:hullOf(BRAND.mesh)};
+// How far the coarse outline can sit inside the true one, either side, at full size.
+const SLACK=2*Math.max(...['blue','teal'].map(id=>{const H=HULL[id],F=id==='blue'?BRAND.tile:BRAND.mesh,sd=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy;let t=l?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};
+  return Math.max(...F.map(p=>{let m=1e9;for(let i=0;i<H.length;i++)m=Math.min(m,sd(p,H[i],H[(i+1)%H.length]));return m}))}));
+const DOCK=16; // a docked piece stops 2u outside the 14u halo, so a halo never touches its neighbour
 
 // ---------- poses (canvas 480x400, centre 240,200) ----------
 const Z=['blue','teal','disc'];      // fixed layer order: nothing ever changes layer
-const ox=51.5, oy=70;
-const B0={w:172,taper:26,h:248,k:24}, T0={w:96,h:260,dx:84,k:24};
-function P(blue,teal,disc,z,extra={}){return Object.assign({blue:Object.assign({},B0,blue),teal:Object.assign({},T0,teal),disc:Object.assign({r:46},disc),z,S:1,tilt:0},extra)}
+const ox=240-BRAND.W/2, oy=70;
+const B0={w:BRAND.tw,taper:0,h:260,k:10.5,m:1}, T0={w:BRAND.mw,h:260,dx:0,k:10.5,m:1};
+function P(blue,teal,disc,z,extra={}){return Object.assign({blue:Object.assign({},B0,blue),teal:Object.assign({},T0,teal),disc:Object.assign({r:BRAND.r},disc),z,S:1,tilt:0},extra)}
 const IDS=['blue','teal','disc'];
 function bake(p,S){ // bake a scale into the pieces themselves; the halo gap stays 14u
   for(const id of IDS){ p[id].x=240+(p[id].x-240)*S; p[id].y=200+(p[id].y-200)*S; }
@@ -133,22 +173,23 @@ function bake(p,S){ // bake a scale into the pieces themselves; the halo gap sta
 }
 // Warning: a balancing act. Disc is the dot, the mesh stands on it, the tile
 // balances on top. th sways the stem about the disc; ph tips the tile on the stem.
-const WB={w:128,taper:18,h:110,k:20}, WT={w:80,h:140,dx:0,k:20}, WR=40;
+const WB={w:128,taper:18,h:110,k:20,m:0}, WT={w:80,h:140,dx:0,k:20,m:0}, WR=40;
 const WREST={th:2.5,ph:-4.5,off:12}; // at rest it's already a little off true: precarious
 function warningPose(th=WREST.th,ph=WREST.ph,off=WREST.off){
   const rot=(v,a)=>{const c=Math.cos(a*Math.PI/180),s=Math.sin(a*Math.PI/180);return [v[0]*c-v[1]*s,v[0]*s+v[1]*c]};
-  const total=2*WR+G+WT.h+G+WB.h, top=200-total/2;
+  const WG=18; // the tile sits at an angle to the stem: this keeps the near corner clear of the stem's halo as it sways
+  const total=2*WR+G+WT.h+WG+WB.h, top=200-total/2;
   const dc=[240,top+total-WR], p1=[dc[0],dc[1]-WR-G];
   const tv=rot([0,-WT.h/2],th), tc=[p1[0]+tv[0],p1[1]+tv[1]];
   const tt=rot([0,-WT.h],th), p2=[p1[0]+tt[0],p1[1]+tt[1]];
-  const a2=th+ph, gv=rot([off,-G],a2), bb=[p2[0]+gv[0],p2[1]+gv[1]];  // tile sits off-centre on the stem
+  const a2=th+ph, gv=rot([off,-WG],a2), bb=[p2[0]+gv[0],p2[1]+gv[1]];  // tile sits off-centre on the stem
   const bv=rot([WB.taper/2,-WB.h/2],a2), bc=[bb[0]+bv[0],bb[1]+bv[1]];
   return P({...WB,x:bc[0],y:bc[1],rot:a2},{...WT,x:tc[0],y:tc[1],rot:th},{x:dc[0],y:dc[1],r:WR},Z);
 }
 const POSES={
-  master:P({x:86+ox,y:136+oy,rot:0},{x:296+ox,y:130+oy,rot:0},{x:203+ox,y:152+oy},Z),
+  master:P({x:BRAND.tcx+ox,y:130+oy,rot:0},{x:BRAND.mcx+ox,y:130+oy,rot:0},{x:BRAND.cx+ox,y:BRAND.cy+oy},Z),
   warning:warningPose(),
-  error:bake(P({x:240,y:200,rot:-42,w:96,taper:0,h:340},{x:240,y:200,rot:42,w:96,h:340,dx:0},{x:240,y:200},Z),.92),
+  error:bake(P({x:240,y:200,rot:-42,w:96,taper:0,h:340,k:24,m:0},{x:240,y:200,rot:42,w:96,h:340,dx:0,k:24,m:0},{x:240,y:200,r:46},Z),.92),
 };
 // Working: the pieces keep trying to fit together in the wrong ways.
 // Each attempt: an anchor piece, then each other piece slid in along a
@@ -156,10 +197,7 @@ const POSES={
 const ATTEMPT_SPECS=[
   {name:'Head',   rot:{blue:0,  teal:-28}, anchor:'blue', docks:[{id:'disc',dir:-90,to:['blue']},{id:'teal',dir:0,to:['blue']}],      drift:{blue:-5,teal:10,disc:0}},
   {name:'Bench',  rot:{blue:0,  teal:90},  anchor:'teal', docks:[{id:'blue',dir:-90,to:['teal']},{id:'disc',dir:180,to:['teal','blue']}], drift:{blue:8,teal:-6,disc:0}},
-  {name:'Swap',   rot:{blue:0,  teal:0},   anchor:'blue', docks:[{id:'teal',dir:180,to:['blue']},{id:'disc',dir:60,to:['blue']}],      drift:{blue:6,teal:-10,disc:0}},
-  {name:'Totem',  rot:{blue:90, teal:72},  anchor:'blue', docks:[{id:'disc',dir:-90,to:['blue']},{id:'teal',dir:-90,to:['disc']}],     drift:{blue:-6,teal:12,disc:0}},
   {name:'Ramp',   rot:{blue:0,  teal:-58}, anchor:'blue', docks:[{id:'teal',dir:25,to:['blue']},{id:'disc',dir:-70,to:['teal']}],      drift:{blue:5,teal:-10,disc:0}},
-  {name:'Tumble', rot:{blue:120,teal:-20}, anchor:'blue', docks:[{id:'teal',dir:200,to:['blue']},{id:'disc',dir:110,to:['blue','teal']}], drift:{blue:-8,teal:8,disc:0}},
 ];
 let ATT=[], WORK=[];
 
@@ -185,14 +223,19 @@ const rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
 // ---------- collision ----------
 function polyOf(id,o){
   let pts;
-  if(id==='blue'){const w=o.w,h=o.h,t=o.taper;pts=[[-w/2,-h/2],[w/2,-h/2],[w/2-t,h/2],[-w/2,h/2]]}
-  else {const w=o.w,h=o.h,dx=o.dx;pts=[[-w/2-dx/2,-h/2],[w/2-dx/2,-h/2],[w/2+dx/2,h/2],[-w/2+dx/2,h/2]]}
+  if((o.m??0)>=.5){const bw=id==='blue'?BRAND.tw:BRAND.mw,sx=o.w/bw,sy=o.h/BRAND.h;pts=HULL[id].map(([x,y])=>[x*sx,y*sy])}
+  else pts=quadOf(id,o);
   const c=Math.cos(o.rot*Math.PI/180),s=Math.sin(o.rot*Math.PI/180),sc=o.s||1;
   return pts.map(([x,y])=>[o.x+(x*c-y*s)*sc,o.y+(x*s+y*c)*sc]);
 }
 function segDist(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)}
 function inside(p,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
 function polyDist(A,B){
+  // far apart: the gap between bounding boxes is enough, and planning runs thousands of these
+  let ax0=1e9,ay0=1e9,ax1=-1e9,ay1=-1e9,bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;
+  for(const [x,y] of A){if(x<ax0)ax0=x;if(x>ax1)ax1=x;if(y<ay0)ay0=y;if(y>ay1)ay1=y}
+  for(const [x,y] of B){if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y}
+  const sep=Math.max(ax0-bx1,bx0-ax1,ay0-by1,by0-ay1); if(sep>30) return sep;
   if(A.some(p=>inside(p,B))||B.some(p=>inside(p,A))) return -1;
   let m=1e9; for(const [P,Q] of [[A,B],[B,A]]) for(const p of P) for(let i=0;i<Q.length;i++) m=Math.min(m,segDist(p,Q[i],Q[(i+1)%Q.length]));
   // edge crossings without contained vertices
@@ -200,15 +243,52 @@ function polyDist(A,B){
   return m;
 }
 function segX(a,b,c,d){const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b)}
+// The coarse outline cuts across rounded corners, so it only ever rules out pieces that are clearly far
+// apart. Anything near is measured on the outline actually drawn, or a halo could bite into a neighbour.
+const TRUE_CACHE=new WeakMap();
+function trueOf(id,o){
+  const hit=TRUE_CACHE.get(o); if(hit&&hit.x===o.x&&hit.y===o.y&&hit.rot===o.rot&&hit.s===o.s) return hit.pts;
+  const pts=buildTrue(id,o); TRUE_CACHE.set(o,{x:o.x,y:o.y,rot:o.rot,s:o.s,pts}); return pts;
+}
+function buildTrue(id,o){
+  const m=o.m??0, c=Math.cos(o.rot*Math.PI/180),s=Math.sin(o.rot*Math.PI/180),sc=o.s||1;
+  let r;
+  if(m<=.001) r=plainRing(id,o);
+  else{ const B=brandRing(id,o); if(m>=.999) r=B; else{ const Q=plainRing(id,o); r=B.map((p,i)=>[Q[i][0]+(p[0]-Q[i][0])*m,Q[i][1]+(p[1]-Q[i][1])*m]) } }
+  const out=[];for(const [x,y] of r) out.push([o.x+(x*c-y*s)*sc,o.y+(x*s+y*c)*sc]);
+  return out;
+}
+function discGap(d,poly){ const c=[d.x,d.y], r=d.r*(d.s||1);
+  if(inside(c,poly)) return -1;
+  let m=1e9; for(let k=0;k<poly.length;k++) m=Math.min(m,segDist(c,poly[k],poly[(k+1)%poly.length]));
+  return m-r; }
 function gap(pose,i,j){ // clearance between two pieces (negative = overlapping)
   if(j==='disc'){[i,j]=[j,i]}
   if(i==='disc'){
-    const d=pose.disc, poly=polyOf(j,pose[j]), c=[d.x,d.y], r=d.r*(d.s||1);
-    if(inside(c,poly)) return -1;
-    let m=1e9; for(let k=0;k<poly.length;k++) m=Math.min(m,segDist(c,poly[k],poly[(k+1)%poly.length]));
-    return m-r;
+    const far=discGap(pose.disc,polyOf(j,pose[j]));
+    return far>G+SLACK?far:discGap(pose.disc,trueOf(j,pose[j]));
   }
-  return polyDist(polyOf(i,pose[i]),polyOf(j,pose[j]));
+  const far=polyDist(polyOf(i,pose[i]),polyOf(j,pose[j]));
+  return (far<0||far>G+SLACK)?far:nearDist(trueOf(i,pose[i]),trueOf(j,pose[j]),G+SLACK+24);
+}
+function gapPath(pose,i,j){ // for costing paths: exact only where it decides whether a sample is charged
+  if(i==='disc'||j==='disc') return gap(pose,i,j);
+  const far=polyDist(polyOf(i,pose[i]),polyOf(j,pose[j]));
+  return Math.abs(far-(G-1))>SLACK?far:nearDist(trueOf(i,pose[i]),trueOf(j,pose[j]),G+SLACK+24);
+}
+// Exact distance between two drawn outlines, looking only at the stretches within lim of each other.
+function nearDist(A,B,lim){
+  const box=P=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const [x,y] of P){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}return [x0-lim,y0-lim,x1+lim,y1+lim]};
+  const ba=box(A),bb=box(B),near=(P,b)=>{const o=[];for(let i=0;i<P.length;i++){const [x,y]=P[i];if(x>b[0]&&x<b[2]&&y>b[1]&&y<b[3])o.push(i)}return o};
+  const ia=near(A,bb),ib=near(B,ba);
+  if(ia.some(i=>inside(A[i],B))||ib.some(i=>inside(B[i],A))) return -1;
+  let m=lim;
+  const nl=A.length,ml=B.length;
+  for(const i of ia){ const a0=A[i],a1=A[(i+1)%nl],a9=A[(i-1+nl)%nl];
+    for(const j of ib){ const b0=B[j],b1=B[(j+1)%ml],b9=B[(j-1+ml)%ml];
+      const d=Math.min(segDist(a0,b0,b1),segDist(a0,b9,b0),segDist(b0,a0,a1),segDist(b0,a9,a0)); if(d<m)m=d;
+      if(segX(a0,a1,b0,b1)) return -1; } }
+  return m;
 }
 const before=(z,i,j)=>z.indexOf(i)<z.indexOf(j);
 
@@ -233,13 +313,17 @@ function pathLen(path){ let L=0,p=curvePt(path,0); for(let k=1;k<=16;k++){const 
 // Cost of a path: its length, plus a heavy charge for every bit of undesigned
 // overlap along the way. Layer order is fixed, so an unavoidable crossing just
 // reads as one piece passing in front of another — it can never flicker.
-function pathCost(state,id,path,allowStart,allowEnd){
-  const tmp={...state}; let over=0;
+function pathCost(state,id,path,allowStart,allowEnd,limit=Infinity){
+  const tmp={...state}, len=pathLen(path); let over=0;
+  if(len>=limit) return {over,cost:Infinity};
   for(let k=1;k<=24;k++){ const u=k/24; tmp[id]=pieceAt(path,u);
+    const pc=tmp[id], ext=id==='disc'?[[pc.x-pc.r,pc.y-pc.r],[pc.x+pc.r,pc.y+pc.r]]:polyOf(id,pc);
+    let outby=0; for(const [x,y] of ext) outby=Math.max(outby,-x,-y,x-VB.w,y-VB.h);
+    if(outby>0) over+=Math.min(60,outby);
     for(const o of IDS){ if(o===id) continue;
       if(allowStart.has(o)&&u<.7) continue; if(allowEnd.has(o)&&u>.3) continue;
-      const g=gap(tmp,id,o); if(g<G-1) over+=Math.min(60,G-g); } }
-  return {over,cost:pathLen(path)+over*12};
+      const g=gapPath(tmp,id,o); if(g<G-1){ over+=Math.min(60,G-g); if(len+over*12>=limit) return {over,cost:Infinity}; } } }
+  return {over,cost:len+over*12};
 }
 const differs=(p,q)=>Object.keys(q).some(k=>typeof q[k]==='number'&&Math.abs((p[k]??q[k])-q[k])>.01);
 const perms=a=>a.length<2?[a]:a.flatMap((x,i)=>perms([...a.slice(0,i),...a.slice(i+1)]).map(p=>[x,...p]));
@@ -258,7 +342,7 @@ function planPiece(state,id,target,final,initial){
   for(const d of [90,150,210]) for(const sg of [1,-1]) cands.push([P3(.25,d*sg),P3(.75,d*sg)]);
   for(const d of [120,200]) for(const sg of [1,-1]) cands.push([P3(0,d*sg),P3(1,d*sg)]);
   let best=null;
-  for(const c of cands){ const path={a,b,c}, r=pathCost(state,id,path,allowStart,allowEnd);
+  for(const c of cands){ const path={a,b,c}, r=pathCost(state,id,path,allowStart,allowEnd,best?best.cost:Infinity);
     if(!best||r.cost<best.cost) best={path,...r}; }
   return best;
 }
@@ -268,7 +352,7 @@ function planSequence(from,to,prefer=IDS,stats){
   let best=null;
   perms(movers).forEach((order,oi)=>{
     let st=clone(from), steps=[], cost=oi?40:0, over=0;
-    for(const id of order){ const r=planPiece(st,id,to[id],to,from); steps.push({id,path:r.path}); cost+=r.cost; over+=r.over; st[id]=clone(to[id]); }
+    for(const id of order){ if(best&&cost>=best.cost) return; const r=planPiece(st,id,to[id],to,from); steps.push({id,path:r.path}); cost+=r.cost; over+=r.over; st[id]=clone(to[id]); }
     if(!best||cost<best.cost) best={steps,cost,over};
   });
   if(stats) return best||{over:0};
@@ -287,7 +371,7 @@ function buildAttempts(){
     for(const d of sp.docks){
       let cx=0,cy=0; d.to.forEach(t=>{cx+=p[t].x;cy+=p[t].y}); cx/=d.to.length; cy/=d.to.length;
       const u=[Math.cos(d.dir*Math.PI/180),Math.sin(d.dir*Math.PI/180)];
-      const clear=dd=>{ p[d.id].x=cx+u[0]*dd; p[d.id].y=cy+u[1]*dd; return placed.every(o=>gap(p,d.id,o)>=G) };
+      const clear=dd=>{ p[d.id].x=cx+u[0]*dd; p[d.id].y=cy+u[1]*dd; return placed.every(o=>gap(p,d.id,o)>=DOCK) };
       let dd=0; while(!clear(dd)&&dd<900) dd+=4;
       let lo=Math.max(0,dd-4), hi=dd; for(let k=0;k<14;k++){ const m=(lo+hi)/2; if(clear(m)) hi=m; else lo=m } clear(hi);
       dirs[d.id]=u; placed.push(d.id);
@@ -318,11 +402,12 @@ function placeAttempt(a,state){
 // the canvas on the side it will dock from, already turned to its new angle.
 // Come apart: every piece slides straight out from the middle, away from the
 // others, until it nears the edge. Moving apart along those lines can't collide.
-function spreadFor(a,state){
+function spreadFor(a,state,open){
   const q=clone(state), m=8;
   let cx=0,cy=0; IDS.forEach(id=>{cx+=state[id].x;cy+=state[id].y}); cx/=3; cy/=3;
   for(const id of IDS){
     let v=[state[id].x-cx,state[id].y-cy]; const l=Math.hypot(...v); v=l<1?[0,-1]:[v[0]/l,v[1]/l];
+    if(open&&id==='disc') v=[.45,.89];
     const piece={...state[id]}; let ok=0;
     for(let t=0;t<300;t+=4){ piece.x=state[id].x+v[0]*t; piece.y=state[id].y+v[1]*t;
       const pts=id==='disc'?[[piece.x-piece.r,piece.y-piece.r],[piece.x+piece.r,piece.y+piece.r]]:polyOf(id,piece);
@@ -337,11 +422,13 @@ function spreadFor(a,state){
 // keeping clear of everything that's still standing where it is.
 function slotsFor(a,state){
   const q=clone(state), m=8, anchor=a.order[0];
-  const movers=a.order.slice(1).sort((x,y)=>x==='disc'?-1:y==='disc'?1:0);
+  const fixed=a.fixed||[]; for(const id of fixed) q[id]=clone(a.contact[id]);   // these go straight to where they'll wait
+  const movers=a.order.slice(1).filter(id=>!fixed.includes(id)).sort((x,y)=>x==='disc'?-1:y==='disc'?1:0);
   const sep=(id,piece,oid,op)=>{ const t={[id]:piece,[oid]:op}; return gap(t,id,oid) };
   for(const id of movers){
-    const obst=[[anchor,state[anchor]],[anchor,a.contact[anchor]]];
-    for(const o of movers) if(o!==id) obst.push([o,q[o]]);
+    const hard=[[anchor,state[anchor]]], soft=[[anchor,a.contact[anchor]]];
+    for(const o of [...movers,...fixed]) if(o!==id){ hard.push([o,q[o]]); soft.push([o,a.contact[o]]) }
+    const clr=(L,piece)=>L.reduce((s,[oid,op])=>s+Math.min(sep(id,piece,oid,op),G+4),0);
     const pref=Math.atan2(a.dirs[id][1],a.dirs[id][0]); let best=null;
     for(const off of [0,.3,-.3,.6,-.6,.9,-.9,1.2,-1.2,1.6,-1.6,2,-2,2.5,-2.5,3.14]){
       const ang=pref+off, piece={...a.contact[id]}; let ok=0;
@@ -349,16 +436,18 @@ function slotsFor(a,state){
         const pts=id==='disc'?[[piece.x-piece.r,piece.y-piece.r],[piece.x+piece.r,piece.y+piece.r]]:polyOf(id,piece);
         if(pts.some(([x,y])=>x<m||x>480-m||y<m||y>400-m)) break; ok=t; }
       piece.x=CEN[0]+Math.cos(ang)*ok; piece.y=CEN[1]+Math.sin(ang)*ok;
-      const g=Math.min(...obst.map(([oid,op])=>sep(id,piece,oid,op)));
-      const score=Math.min(g,G+4)-Math.abs(off)*2;
+      const score=clr(hard,piece)+.5*clr(soft,piece)-Math.abs(off)*2;
       if(!best||score>best.score) best={piece,score};
     }
     q[id]=best.piece;
   }
   return q;
 }
+const seated=p=>(p.teal.m??0)>=.5&&gap(p,'teal','disc')<G+6&&gap(p,'blue','disc')<G+6;
 async function assemble(a,target,tk){
-  const sp=spreadFor(a,cur);                                                     // 1. everyone apart at once
+  const open=seated(cur);
+  if(open&&!await travelTo(standOff(cur),tk,['teal'])) return false;             // 0. out of the A: the mesh opens first
+  const sp=spreadFor(a,cur,open);                                                // 1. everyone apart at once
   if(simulClear(cur,sp)){ if(!await tweenTo(sp,380,E.move,tk)) return false }
   else if(!await travelTo(sp,tk,IDS)) return false;
   const sl=slotsFor(a,cur);                                                      // 2. dockers round to their sides
@@ -366,13 +455,49 @@ async function assemble(a,target,tk){
   return travelTo(target,tk,a.order);                                            // 3. anchor to the middle, others in
 }
 const OUT={ // how each outcome is built: anchor first, then who docks from which side
-  master:{order:['blue','teal','disc'],dirs:{teal:[1,0],disc:[0,1]}},     // disc rises into the bites from below: the top gap is too narrow
+  master:{order:['blue','teal','disc'],dirs:{teal:[1,0],disc:[0,1]}},     // the gap under the bites is narrower than the disc: buildA stands the mesh off first
   warning:{order:['disc','teal','blue'],dirs:{teal:[0,-1],blue:[0,-1]}},
   error:{order:['blue','teal','disc'],dirs:{teal:[1,0],disc:[0,-1]}},
 };
 
 // ---------- renderer ----------
 const NS='http://www.w3.org/2000/svg';
+// ---- per-asset loaders: overlays. Everything is flat and opaque, cut with the halo colour.
+let load=null, UID=0, vb=[0,0,480,400];
+const BN=5, CUTS=4;
+function mk(n,a,p){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function addOverlay(s,g,id,ov){
+  const u=++UID, defs=mk('defs',{},s);
+  if(id==='blue'){ ov.bands=mk('g',{display:'none'},g); ov.band=[];
+    for(let i=0;i<BN;i++){ const cp=mk('clipPath',{id:`bd${u}_${i}`},defs), rect=mk('rect',{},cp), outer=mk('g',{},ov.bands), inner=mk('g',{'clip-path':`url(#bd${u}_${i})`},outer);
+      const path=mk('path',{'stroke-width':2*G,'stroke-linejoin':'round','paint-order':'stroke'},inner); path.style.stroke='var(--halo)';
+      ov.band.push({rect,outer,path}); } }
+  if(id==='teal'){ const cp=mk('clipPath',{id:`mc${u}`},defs); ov.cutClip=mk('path',{},cp); ov.cuts=mk('g',{'clip-path':`url(#mc${u})`,display:'none'},g); ov.cut=[];
+    for(let i=0;i<CUTS;i++){ const l=mk('line',{'stroke-linecap':'butt'},ov.cuts); l.style.stroke='var(--halo)'; ov.cut.push(l); } }
+  if(id==='disc'){ const cp=mk('clipPath',{id:`dc${u}`},defs); ov.discClip=mk('circle',{cx:0,cy:0},cp); ov.shineG=mk('g',{'clip-path':`url(#dc${u})`,display:'none'},g); ov.shineR=mk('g',{},ov.shineG); ov.shine=mk('rect',{},ov.shineR); ov.shine2=mk('rect',{},ov.shineR); }
+}
+function drawLoad(inst,pose){
+  const {ov,parts}=inst, b=pose.blue,t=pose.teal,d=pose.disc;
+  if(inst.framed) inst.svg.setAttribute('viewBox',vb.map(v=>v.toFixed(1)).join(' '));
+  const tex=load&&load.kind==='texture', mesh=load&&load.kind==='mesh', mat=load&&load.kind==='material';
+  parts.blue.style.display=tex?'none':''; if(tex){ ov.bands.removeAttribute('display');
+    const bd=bluePath(b), H=b.h, EDGES=[0,.171,.378,.585,.792,1];
+    ov.band.forEach((o,i)=>{ const top=-H/2+EDGES[i]*H, sliceH=(EDGES[i+1]-EDGES[i])*H, g2=load.gap/2;
+      o.rect.setAttribute('x',-b.w*1.2);o.rect.setAttribute('width',b.w*2.4);
+      o.rect.setAttribute('y',top+(i?g2:-40));o.rect.setAttribute('height',sliceH-(i?g2:-40)-(i<BN-1?g2:-40));
+      o.outer.setAttribute('transform',`translate(${b.x+load.off[i]} ${b.y}) rotate(${b.rot})`);
+      o.path.setAttribute('d',bd); o.path.style.fill=rgb(load.tone[i]); }); }
+  else ov.bands.setAttribute('display','none');
+  if(mesh){ ov.cuts.removeAttribute('display'); const tr=`translate(${t.x} ${t.y}) rotate(${t.rot})`; ov.cuts.setAttribute('transform',tr); ov.cutClip.setAttribute('d',tealPath(t));
+    ov.cut.forEach((l,i)=>{ const c=load.lines[i]; if(!c||load.w<=.05){l.setAttribute('display','none');return} l.removeAttribute('display');
+      l.setAttribute('x1',(c[0]-.5)*t.w);l.setAttribute('y1',(c[1]-.5)*t.h);l.setAttribute('x2',(c[2]-.5)*t.w);l.setAttribute('y2',(c[3]-.5)*t.h);l.setAttribute('stroke-width',load.w); }); }
+  else ov.cuts.setAttribute('display','none');
+  if(mat){ ov.shineG.removeAttribute('display'); ov.shineG.setAttribute('transform',`translate(${d.x} ${d.y})`); ov.discClip.setAttribute('r',d.r);
+    ov.shineR.setAttribute('transform',`rotate(${load.ang})`); const w=d.r*.56, w2=d.r*.16, x=load.at*d.r;
+    ov.shine.setAttribute('x',x-w/2);ov.shine.setAttribute('y',-d.r*1.3);ov.shine.setAttribute('width',w);ov.shine.setAttribute('height',d.r*2.6);ov.shine.style.fill=rgb(SHINE);
+    ov.shine2.setAttribute('x',x+w/2+d.r*.14);ov.shine2.setAttribute('y',-d.r*1.3);ov.shine2.setAttribute('width',w2);ov.shine2.setAttribute('height',d.r*2.6);ov.shine2.style.fill=rgb(SHINE); }
+  else ov.shineG.setAttribute('display','none');
+}
 function makeSvg(px){
   const s=document.createElementNS(NS,'svg');
   s.setAttribute('viewBox',`0 0 ${VB.w} ${VB.h}`);
@@ -380,15 +505,15 @@ function makeSvg(px){
   s.setAttribute('role','img');
   const g=document.createElementNS(NS,'g'); s.appendChild(g);
   const ring=document.createElementNS(NS,'circle'); ring.setAttribute('fill','none'); g.appendChild(ring);
-  const parts={};
+  const parts={}, ov={};
   for(const id of IDS){
     const el=document.createElementNS(NS,id==='disc'?'circle':'path');
     el.setAttribute('stroke-width',2*G); el.setAttribute('stroke-linejoin','round');
     el.setAttribute('paint-order','stroke'); el.style.stroke='var(--halo)';
     if(id==='disc'){el.setAttribute('cx',0);el.setAttribute('cy',0)}
-    g.appendChild(el); parts[id]=el;
+    g.appendChild(el); parts[id]=el; addOverlay(s,g,id,ov);
   }
-  return {svg:s,g,ring,parts};
+  return {svg:s,g,ring,parts,ov};
 }
 const FX0=()=>({punch:1,dsx:1,dsy:1,ringR:0,ringW:0,ringOp:0,ringC:GREEN});
 function draw(inst,pose,cols,fx=FX0()){
@@ -401,6 +526,7 @@ function draw(inst,pose,cols,fx=FX0()){
   parts.blue.style.fill=rgb(cols.blue); parts.teal.style.fill=rgb(cols.teal); parts.disc.style.fill=rgb(cols.disc);
   ring.setAttribute('cx',d.x); ring.setAttribute('cy',d.y); ring.setAttribute('r',Math.max(0,fx.ringR));
   ring.setAttribute('stroke-width',Math.max(0,fx.ringW)); ring.style.stroke=rgb(fx.ringC); ring.style.opacity=fx.ringOp;
+  drawLoad(inst,pose);
   // layer order is fixed (Z); nothing ever re-stacks, so nothing can flicker
 }
 
@@ -409,14 +535,15 @@ const main=makeSvg(); document.getElementById('main').appendChild(main.svg);
 main.svg.setAttribute('aria-label','Atelier status glyph');
 const insts=[main];
 const sizesEl=document.getElementById('sizes');
-for(const px of [64,32,24]){
-  const i=makeSvg(px); const w=document.createElement('div'); w.appendChild(i.svg);
+for(const px of [48,32,24]){
+  const i=makeSvg(px); i.micro=px<=24; i.framed=px>24; if(i.framed) i.svg.setAttribute('width',px*440/216); const w=document.createElement('div'); w.appendChild(i.svg);
   const l=document.createElement('span'); l.className='lab'; l.textContent=px+'px'; w.appendChild(l);
   sizesEl.appendChild(w); insts.push(i);
 }
 const CAT={blue:BLUE,teal:TEAL,disc:COPPER};
+let microGreen=false; // set on the click, cleared by the next state
 let cur=clone(POSES.master), cols={...CAT}, fx=FX0(), token=0, reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-(function loop(){insts.forEach(i=>draw(i,cur,cols,fx)); requestAnimationFrame(loop)})();
+(function loop(){insts.forEach(i=>draw(i,cur,microGreen&&i.micro?all(GREEN):cols,fx)); requestAnimationFrame(loop)})();
 
 const sleep=(ms,tk)=>new Promise(r=>setTimeout(()=>r(tk===token),ms));
 function animate(ms,ease,fn,tk,alive){
@@ -463,7 +590,14 @@ async function jump(to,toCols,tk){ // reduced-motion path: fade out, swap, fade 
   insts.forEach(i=>i.svg.style.opacity=1);
   return sleep(150,tk);
 }
-function nudge(p,dTeal,dDisc){ const q=clone(p); q.teal.x+=dTeal; q.disc.y+=dDisc; return q; } // mesh waits to the right, disc just below its seat
+function nudge(p,d){ const q=clone(p); q.teal.x+=d; q.disc.x+=Math.max(0,d)/2; return q; } // mesh out to the right, disc centred in the room that leaves
+const STAND=[30,-60];
+function standOff(p){ const q=clone(p); q.teal.x+=STAND[0]; q.teal.y+=STAND[1]; return q; }
+async function buildA(end,tk){ // tile settles, mesh stands off, disc comes in, mesh closes
+  const wait=standOff(end);
+  if(!await assemble({...OUT.master,contact:wait,fixed:['teal']},wait,tk)) return false;
+  return travelTo(end,tk,['teal']);
+}
 
 // ---------- sound (optional) ----------
 let actx=null, soundOn=false;
@@ -495,7 +629,10 @@ const STATUS={
   success:{icon:'done',msg:'Build complete. 3 assets exported.',det:'hero_skin_v3 · 14:06'},
   warning:{icon:'warning',msg:'Exported with 2 warnings.',det:'Check material slots on hero_body.'},
   error:{icon:'error',msg:'Build failed. Mesh could not be read.',det:'Check hero_body.fbx exists and isn’t locked.'},
-  idle:{icon:null,msg:'',det:''}
+  idle:{icon:null,msg:'',det:''},
+  mesh:{icon:'working',msg:'Loading mesh',det:'hero_body · no estimate'},
+  texture:{icon:'working',msg:'Loading textures',det:'hero_body · no estimate'},
+  material:{icon:'working',msg:'Saving material',det:'hero_body · no estimate'}
 };
 function ico(k){
   const c={working:'#778BA3',done:'#7CC47F',warning:'#E6C35C',error:'#EC6A86'}[k];
@@ -507,52 +644,140 @@ function ico(k){
 }
 function setStatus(s){
   const st=STATUS[s], el=document.getElementById('status');
-  el.innerHTML=st.icon?`${ico(st.icon)}<div><div class="msg">${st.msg}</div><div class="det">${st.det}</div></div>`:'<div class="det">Static brand mark: category colours, master A. This is never animated.</div>';
+  el.innerHTML=st.icon?`${ico(st.icon)}<div><div class="msg">${st.msg}</div><div class="det">${st.det}</div></div>`:'<div class="det">Brand mark: category colours, master A. The header logo builds it like this once on launch; otherwise it stays still.</div>';
   document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
 }
 const isCat=()=>cols.blue+''===BLUE+''&&cols.teal+''===TEAL+''&&cols.disc+''===COPPER+'';
 
 // The click: wind-up, hard contact, squash + punch + ripple, colour spreads from the disc.
 async function impact(tk){
-  click();
-  fx.dsx=1.12; fx.dsy=.88; fx.punch=1; fx.ringC=GREEN;
+  click(); microGreen=true;
+  fx.dsx=.88; fx.dsy=1.12; fx.punch=1; fx.ringC=GREEN; // squeezed between tile and mesh, so it gives upwards and downwards
   const keep=()=>true; // impact effects always finish; cutting them off would pop
   const ripple=animate(620,E.out,(e,p)=>{ fx.ringR=60+e*140; fx.ringW=12*Math.pow(1-p,.6); fx.ringOp=Math.pow(1-p,1.4) },null,keep);
-  const squash=animate(300,E.punchBack,e=>{ fx.dsx=1.12+(1-1.12)*e; fx.dsy=.88+(1-.88)*e },null,keep);
+  const squash=animate(300,E.punchBack,e=>{ fx.dsx=.88+(1-.88)*e; fx.dsy=1.12+(1-1.12)*e },null,keep);
   const colour=colourTo(all(GREEN),220,tk,{disc:0,blue:60,teal:120});
   const punch=animate(70,E.punchOut,e=>{ fx.punch=1+.045*e },null,keep).then(()=>animate(260,E.punchBack,e=>{ fx.punch=1.045-.045*e },null,keep));
   return Promise.all([ripple,squash,colour,punch]);
 }
 
+// ---- at rest (D4): mesh, tile, disc on one baseline
+const SHINE=[240,190,166];
+const PLATES=[[108,152,202],[92,180,214],[150,134,214],[95,111,208],[181,127,208]]; // clear of the status and other category hues
+function restPose(){ const S=.66, R=30;
+  const p=P({x:0,y:200,rot:0,w:B0.w*S,h:260*S,k:10.5*S},{x:0,y:200,rot:0,w:T0.w*S,h:260*S,k:10.5*S},{x:0,y:200+130*S-BRAND.r*S,r:BRAND.r*S},Z);
+  p.teal.x=100; p.blue.x=100; while(gap(p,'teal','blue')<R) p.blue.x+=.5;
+  p.disc.x=p.blue.x; while(gap(p,'blue','disc')<R) p.disc.x+=.5;
+  const L=p.teal.x-p.teal.w/2, Rr=p.disc.x+p.disc.r, dx=240-(L+Rr)/2; for(const id of IDS) p[id].x+=dx;
+  return p; }
+const REST=restPose();
+const RISE=18;
+const atRest=p=>IDS.every(id=>Math.hypot(p[id].x-REST[id].x,p[id].y-REST[id].y)<1);
+function moveTo(to,ms,ease){ const from=clone(cur); return animate(ms,ease,e=>{cur=lerpPose(from,to,e)},null,()=>true).then(()=>{cur=clone(to)}); }
+const keep=()=>true;
+const raised=id=>{const q=clone(REST);q[id].y-=RISE;return q};
+// Lines of halo gap through the block, as fractions of its box. The block leans, so these follow it.
+const CONFIGS=[
+  [[.22,-.05,.72,1.05],[-.05,.52,1.05,.52]],                 // four quarters, on the lean
+  [[-.05,.36,1.05,.36],[-.05,.68,1.05,.68]],                 // three courses
+  [[-.05,.18,1.05,.86]],                                     // split corner to corner
+  [[.22,-.05,.72,1.05],[-.05,.26,.50,.26],[.48,.74,1.05,.74]], // staggered, like bonded blocks
+];
+async function loadMesh(tk){
+  await moveTo(raised('teal'),120,E.out);
+  let last=-1, flip=1;
+  while(tk===token){
+    let i; do{i=Math.floor(Math.random()*CONFIGS.length)}while(i===last); last=i; flip=-flip;
+    const to=raised('teal'); to.teal.rot=flip*3.5; to.teal.x+=flip*6;
+    load={kind:'mesh',lines:CONFIGS[i],w:0};
+    await Promise.all([moveTo(to,110,E.snap),animate(110,E.out,e=>{load.w=G*e},null,keep)]);
+    await sleep(250,tk);
+    await animate(70,E.windup,e=>{load.w=G*(1-e)},null,keep);
+  }
+  load=null; await moveTo(REST,100,E.rest);
+}
+const PATTERNS=[[-14,12,-6,14,-10],[10,-12,14,-8,6],[-8,14,-14,6,12],[12,-6,8,-14,14]];
+async function loadTexture(tk,tones){
+  await moveTo(raised('blue'),120,E.out);
+  let n=0;
+  while(tk===token){
+    load={kind:'texture',gap:0,off:[0,0,0,0,0],tone:Array(BN).fill(BLUE)};
+    await animate(60,E.out,e=>{load.gap=9*e},null,keep);
+    for(let r=0;r<2&&tk===token;r++){
+      const from=[...load.off], to=PATTERNS[n++%PATTERNS.length];
+      load.tone=load.tone.map((_,i)=>tones[(i+n+r*2)%tones.length]);      // a pop, never a blend
+      await animate(90,E.snap,e=>{load.off=from.map((f,i)=>f+(to[i]-f)*e)},null,keep);
+      if(!await sleep(170,tk)) break;
+    }
+    // fall into register, top to bottom, each band landing on the tile's own blue
+    const from=[...load.off];
+    await Promise.all(from.map((f,i)=>new Promise(res=>setTimeout(res,i*45)).then(()=>animate(90,E.snap,e=>{load.off[i]=f*(1-e)},null,keep)).then(()=>{load.tone[i]=BLUE})));
+    await animate(60,E.windup,e=>{load.gap=9*(1-e)},null,keep);
+    load=null; if(tk!==token||!await sleep(220,tk)) break;
+  }
+  load=null; await moveTo(REST,100,E.rest);
+}
+async function loadMaterial(tk){
+  const r=REST.disc.r, D=38, x0=REST.disc.x, base=25; let right=false;
+  while(tk===token){
+    const a=right?x0+D:x0, b=right?x0:x0+D;
+    load={kind:'material',at:-1.5,ang:base};
+    await animate(520,E.move,e=>{ const x=a+(b-a)*e; cur={...cur,disc:{...cur.disc,x}}; load.ang=base+(x-x0)/r*180/Math.PI; load.at=-1.5+2.9*e },null,keep);
+    right=!right; load=null;
+    if(!await sleep(right?110:240,tk)) break;
+  }
+}
+const LOADERS={mesh:loadMesh,texture:tk=>loadTexture(tk,PLATES),material:loadMaterial};
+// The first move out of an outcome: all three at once, like Complete in reverse. The mesh hops over the tile if they swap sides.
+function openTo(target,tk){ const from=clone(cur), swap=(from.teal.x>from.blue.x)!==(target.teal.x>target.blue.x);
+  moving=animate(420,E.move,e=>{ const q=lerpPose(from,target,e), s=Math.sin(Math.PI*e); if(swap){q.teal.y-=70*s;q.blue.y+=30*s} cur=q },null,keep).then(()=>{cur=clone(target);moving=null});
+  return moving.then(()=>tk===token); }
+const VB_ROW=[38,84,440,216], VB_A=[20,50,440,300], VB_ALL=[0,0,480,400];
+function frameTo(t,ms){ const from=[...vb]; return animate(ms,E.move,e=>{vb=from.map((v,i)=>v+(t[i]-v)*e)},null,keep); }
 let last=-1;
+const STRAIGHT=new Set(['Head','Ramp']); // the only fits with a clear straight move between them; every move to or from Bench crosses a piece
 async function run(state){
-  const tk=++token; setStatus(state);
+  const tk=++token; setStatus(state); microGreen=false;
   if(moving) await moving;          // let the piece in flight land first
   if(tk!==token) return;
+  frameTo(LOADERS[state]?VB_ROW:(state==='success'||state==='idle')?VB_A:VB_ALL,280);
+  if(LOADERS[state]){
+    if(reduced){ await jump(REST,CAT,tk); return }
+    if(!isCat()) colourTo(CAT,240,tk);
+    if(!atRest(cur)&&!await openTo(REST,tk)) return;
+    moving=LOADERS[state](tk).then(()=>{moving=null});
+    await moving; return;
+  }
   if(state==='working'){
     if(reduced){ await jump(ATT[0].contact,CAT,tk); return }
     if(!isCat()) colourTo(CAT,240,tk);
-    while(tk===token){
-      let i; do{i=Math.floor(Math.random()*ATT.length)}while(i===last); last=i; const a=ATT[i];
-      if(!await assemble(a,a.approach,tk)) return;                         // come apart, try a new way in
+    for(let first=true;tk===token;first=false){
+      let i; do{i=Math.floor(Math.random()*ATT.length)}while(i===last); const prev=ATT[last]; last=i; const a=ATT[i];
+      if(first){ if(!await openTo(a.approach,tk)) return; }                // out of an outcome: open in one brisk move
+      else if(!STRAIGHT.has(a.name)||!STRAIGHT.has(prev.name)){ if(!await assemble(a,a.approach,tk)) return; }   // to or from Bench: come apart first
+      else if(!await travelTo(a.approach,tk,a.order)) return;              // Head and Ramp go straight from one to the other
       if(!await tweenTo(a.contact,200,E.out,tk)) return;                   // dock
       if(!await tweenTo(a.tap,120,E.windup,tk)) return;                    // test the fit…
       if(!await tweenTo(a.contact,110,E.snap,tk)) return;                  // …tap
-      if(!await sleep(320,tk)) return;                                     // not it
+      if(!await sleep(180,tk)) return;                                     // not it
     }
   }
   if(state==='success'){
     const M=POSES.master;
-    if(reduced){ await jump(M,CAT,tk); if(!await sleep(120,tk))return; await colourTo(all(GREEN),240,tk); return }
+    if(reduced){ await jump(M,CAT,tk); if(!await sleep(120,tk))return; microGreen=true; await colourTo(all(GREEN),240,tk); if(!await sleep(160,tk))return; await colourTo(CAT,380,tk); return }
     if(!isCat()) colourTo(CAT,200,tk);
-    const pre=nudge(M,6,6);
-    if(!await assemble({...OUT.master,contact:pre},pre,tk)) return;      // tile settles, mesh and disc come in
-    if(!await tweenTo(nudge(M,16,16),120,E.windup,tk)) return;           // wind-up
-    if(!await tweenTo(nudge(M,-3,-3),80,E.snap,tk)) return;              // snap, pressing 3u past the seat
+    if(cur.teal.x<cur.blue.x){ const from=clone(cur), to=standOff(nudge(M,16));   // from the row: the mesh hops over the tile
+      moving=animate(380,E.move,e=>{ const q=lerpPose(from,to,e), s=Math.sin(Math.PI*e); q.teal.y-=70*s; q.blue.y+=30*s; cur=q },null,keep).then(()=>{cur=clone(to);moving=null});
+      await moving; if(tk!==token) return; }
+    else if(!await tweenTo(standOff(nudge(M,16)),340,E.move,tk)) return;      // tile and disc to their seats, mesh stands off
+    if(!await tweenTo(nudge(M,16),110,E.out,tk)) return;                 // the mesh comes in, already wound up
+    if(!await tweenTo(nudge(M,-3),80,E.snap,tk)) return;                 // snap: the mesh presses 3u past its seat
     const fxDone=impact(tk);
-    if(!await tweenTo(nudge(M,1,1),110,E.recoil,tk)) return;             // recoil
+    if(!await tweenTo(nudge(M,1),110,E.recoil,tk)) return;                // recoil
     if(!await tweenTo(M,130,E.rest,tk)) return;                          // rest
     await fxDone;
+    if(!await sleep(160,tk)) return;
+    await colourTo(CAT,380,tk);
   }
   if(state==='warning'){
     const W=POSES.warning;
@@ -582,7 +807,7 @@ async function run(state){
     const M=POSES.master;
     if(reduced){ await jump(M,CAT,tk); return }
     colourTo(CAT,240,tk);
-    await assemble({...OUT.master,contact:M},M,tk);
+    await buildA(M,tk);
   }
 }
 document.querySelectorAll('[data-s]').forEach(b=>b.addEventListener('click',()=>run(b.dataset.s)));
@@ -606,13 +831,13 @@ snB.onclick=async()=>{
 buildAttempts();
 // storyboard
 const fr=document.getElementById('frames');
-const board=[...ATT.map(a=>['Try: '+a.name,a.contact,CAT]),
+const board=[['At rest',REST,CAT],...ATT.map(a=>['Try: '+a.name,a.contact,CAT]),
   ['Complete',POSES.master,all(GREEN)],['Warning',POSES.warning,all(AMBER)],['Error',POSES.error,all(ROSE)],['Brand mark',POSES.master,CAT]];
 for(const [name,p,c] of board){
   const i=makeSvg(); draw(i,p,c); const f=document.createElement('figure'); f.appendChild(i.svg);
   const cap=document.createElement('figcaption'); cap.textContent=name; f.appendChild(cap); fr.appendChild(f);
 }
-window.__atelier={slotsFor,OUT,nudge,placeAttempt,spreadFor,POSES,get WORK(){return WORK},get ATT(){return ATT},planSequence,simulClear,pathLen,pieceAt,warningPose,draw,makeSvg,CAT,GREEN,AMBER,ROSE,all,E,lerpPose,gap,clone,run,state:()=>({cur,fx})};
+window.__atelier={REST,RISE,CONFIGS,atRest,slotsFor,OUT,nudge,standOff,seated,STRAIGHT,placeAttempt,spreadFor,POSES,get WORK(){return WORK},get ATT(){return ATT},planSequence,simulClear,pathLen,pieceAt,warningPose,draw,makeSvg,CAT,GREEN,AMBER,ROSE,all,E,lerpPose,gap,clone,run,state:()=>({cur,fx})};
 setStatus('idle');
 setTimeout(()=>sim(true),600);
 </script>
