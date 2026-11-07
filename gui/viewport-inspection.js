@@ -42,12 +42,11 @@ export function createViewportInspection(api) {
   const effects = createViewportEffects({renderer,scene,camera,modelRoot,grid,reduced:reducedMotion});
   let cameraMove = null;
   // Showcase keeps its own floor toggle so its default look stays floorless.
-  let showcaseMode=false,showcaseColors=null,showcaseBackdrop=null,showcaseGrid=false;
+  let showcaseMode=false,showcaseBackdrop=null,showcaseGrid=false;
   // Inspection overlays would leak into Showcase captures, so Showcase disables them with a reason.
   const inspectOnly=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
-  function showcaseInks(){return window.AtelierShowcaseArt.palette(showcaseColors||palette());}
   // The default backdrop is the mode's own; plain colour and transparent replace the art.
   const showcaseArt=()=>showcaseMode&&$('viewport-backdrop').value==='gradient';
   function drawShowcase(){
@@ -55,7 +54,7 @@ export function createViewportInspection(api) {
     if(!showcaseBackdrop){showcaseBackdrop=document.createElement('canvas');showcaseBackdrop.className='vp-showcase-backdrop';showcaseBackdrop.setAttribute('aria-hidden','true');$('viewport-stage').prepend(showcaseBackdrop);}
     const width=Math.max(1,$('viewport-stage').clientWidth),height=Math.max(1,$('viewport-stage').clientHeight-58);
     showcaseBackdrop.width=width;showcaseBackdrop.height=height;
-    const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height,showcaseInks());
+    const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height);
   }
   function setShowcase(value){
     showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));$('viewport-inspect').setAttribute('aria-pressed',String(!showcaseMode));
@@ -66,14 +65,13 @@ export function createViewportInspection(api) {
     $('viewport-uv-toggle').disabled = showcaseMode;
     $('viewport-uv-toggle').title = showcaseMode ? 'UV X-Ray is available in Inspect mode' : 'Inspect a surface\'s texture and mesh UV layout';
     if(showcaseMode){
-      clearHover();drawShowcase();const skin=api.context?.().skin,stamp=revision;
-      if(skin){const image=new Image();image.src='/api/catalogue/thumbnail/'+encodeURIComponent(skin);image.decode().then(()=>{if(stamp!==revision||!showcaseMode)return;showcaseColors=window.AtelierPolish?.samplePalette(image)||null;drawShowcase();}).catch(()=>{});}
+      clearHover();drawShowcase();
     }
     updateRegions();refresh();
     $('viewport-comparison').hidden=comparison!=='wipe' || showcaseMode;
   }
-  // The loaded appearance simply replaces the old one; Showcase redraws its backdrop from the costume.
-  function materialize() { if(showcaseMode){showcaseColors=null;setShowcase(true);} }
+  // The loaded appearance simply replaces the old one; Showcase rebuilds its toon variants from it.
+  function materialize() { if(showcaseMode)setShowcase(true); }
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) finishCamera(); });
   window.addEventListener('pagehide', () => {toonGradient.dispose();replacedCopy.dispose();}, {once:true});
 
@@ -449,7 +447,7 @@ export function createViewportInspection(api) {
     const context = output.getContext('2d');
     context.fillStyle = '#101217'; context.fillRect(0,size,size,footer);
     const mode = $('viewport-backdrop').value;
-    if(art)window.AtelierShowcaseArt.draw(context,size,size,showcaseInks());
+    if(art)window.AtelierShowcaseArt.draw(context,size,size);
     else if (mode !== 'checker') {
       const style = getComputedStyle($('viewport-stage'));
       const gradient = context.createLinearGradient(0,0,size,size);
@@ -572,7 +570,7 @@ export function createViewportInspection(api) {
       $('viewport-wireframe').setAttribute('aria-pressed', 'false');
     }
     if (uvOpen) openUV();
-    setShowcase(false);showcaseColors=null;
+    setShowcase(false);
     setLoading(false);
     capture?.abort(); clearMaterials(); view = 'perspective'; $('viewport-view').value = view;
     fitOnResize = true; $('viewport-capture-name').value = $('mod-name-input')?.value.trim() || $('viewport-title').textContent;

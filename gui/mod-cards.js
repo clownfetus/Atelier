@@ -24,8 +24,7 @@
       await document.fonts.load('600 58px Inter');if(disposed)return;
       const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1240;canvas.className='mod-card-preview';canvas.setAttribute('role','img');canvas.setAttribute('aria-label',snapshot.modName+' mod card');
       const ctx=canvas.getContext('2d');if(!ctx)return;
-      const colors=picture instanceof HTMLImageElement?window.AtelierPolish?.samplePalette(picture):[];
-      AtelierShowcaseArt.draw(ctx,1000,1000,AtelierShowcaseArt.palette(colors));
+      AtelierShowcaseArt.draw(ctx,1000,1000);
       const w=picture.naturalWidth||picture.width,h=picture.naturalHeight||picture.height,scale=Math.min(1000/w,1000/h);
       ctx.drawImage(picture,(1000-w*scale)/2,(1000-h*scale)/2,w*scale,h*scale);
       const heroes=new Set((snapshot.included||[]).map(item=>window.AtelierCatalogueArt?.heroId(item)).filter(Boolean));
