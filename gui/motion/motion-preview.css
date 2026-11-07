@@ -26,6 +26,15 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.motion-preview-logo-row {
+  align-items: center;
+}
+.motion-preview-logo {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  margin-left: 12px;
+}
 .motion-preview-buttons .btn[aria-pressed='true'] {
   border-color: var(--acc);
   box-shadow: inset 0 0 0 1px var(--acc);

@@ -5,6 +5,7 @@
 (() => {
   'use strict';
   const SIZES = [16, 48, 128];
+  const LOGO_SIZE = 32;
   const BUTTONS = {
     states: [['busy', 'Working'], ['info', 'At rest'], ['success', 'Complete'], ['warning', 'Warning'], ['error', 'Error']],
     loaders: [['mesh', 'Mesh'], ['texture', 'Texture'], ['material', 'Material']],
@@ -20,6 +21,17 @@
     }
     root.dataset.ready = 'true';
     return glyphs;
+  }
+  // The logo's entrance on its own small stage, because it isn't one of the glyph's states.
+  function playLogo(root) {
+    const stage = root.querySelector('.motion-preview-logo');
+    stage.replaceChildren();
+    const host = document.createElement('span');
+    stage.append(host);
+    if (!window.AtelierMotion.glyph.entrance(host, {size: LOGO_SIZE, preview: true})) {
+      host.style.cssText = '';
+      window.AtelierMotion.glyph.mount(host, {state: 'info', size: LOGO_SIZE});
+    }
   }
   function start(root) {
     let glyphs = null;
@@ -48,6 +60,7 @@
         buttons.push(button);
       }
     }
+    root.querySelector('[data-preview-logo]').addEventListener('click', () => playLogo(root));
     const firstSeen = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
       firstSeen.disconnect();

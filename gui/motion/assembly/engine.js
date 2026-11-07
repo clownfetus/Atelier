@@ -7,7 +7,7 @@
 (() => {
   'use strict';
   const assembly = window.AtelierMotion.assembly;
-  const {CAT, PLATES, G, IDS, E, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS, FRAME, clone, mixC, all, warningPose, standOff, nudge, fits, rest, atRest, raised, micro, frameOf} = assembly.pieces;
+  const {CAT, PLATES, G, IDS, E, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS, FRAME, clone, mixC, all, warningPose, standOff, nudge, fits, rest, atRest, raised, micro, logoStart, frameOf} = assembly.pieces;
   const {lerpPose, pieceAt, pathLen, known, planLive, simulClear, spreadFor, slotsFor, seated} = assembly.planner;
 
   // One clock for every glyph: 30 glyphs share one frame callback. Time stops when no glyph needs it,
@@ -38,8 +38,9 @@
   const JOSTLE_MS = 900;
 
   class Engine {
-    constructor(view, tier = 'inline', height = 48, reduced = false) {
+    constructor(view, tier = 'inline', height = 48, reduced = false, width = height * 1.5) {
       this.view = view;
+      this.width = width;
       this.reduced = reduced;
       this.visible = !document.hidden;
       this.modeNow = this.mode();
@@ -133,22 +134,24 @@
     // ---------- size ----------
     // The tier comes from the host's rendered height. Between Stage and Inline the running animation just
     // carries on in its new frame. Micro has its own poses, so crossing into or out of it starts the state again.
-    setSize(tier, height) {
+    setSize(tier, height, width) {
       const before = this.tier;
       this.tier = tier;
       this.height = height;
+      this.width = width;
       if ((before === 'micro') !== (tier === 'micro')) this.run(this.state, this.asset, 'place');
       else if (before !== tier || tier === 'micro') { this.box = this.frameFor(this.frameName || this.state); this.touch(); }
     }
+    scaleOf(box) { return Math.min(this.height / box[3], this.width / box[2]); }
     // Which part of the canvas the host shows for a shape.
     frameFor(name) {
+      if (name === 'entrance') return frameOf(POSES.master);
       if (this.tier === 'stage') return FRAME.canvas;
       if (this.tier === 'micro') {
         const pose = micro()[name] || micro().info;
         if (name !== 'busy') return frameOf(pose);
         // Room for the pieces to jostle, in units at the size they'll be drawn.
-        const box = frameOf(pose), scale = this.height / Math.max(box[3], box[2] * .65);
-        return frameOf(pose, JOSTLE_PX / scale);
+        return frameOf(pose, JOSTLE_PX / this.scaleOf(frameOf(pose)));
       }
       if (name === 'row' || name === 'info') return FRAME.row;
       if (name === 'success' || name === 'brand') return FRAME.a;
@@ -224,6 +227,7 @@
     // ---------- states ----------
     // How a shape looks once it has finished, in this glyph's geometry.
     heldPose(state) {
+      if (state === 'entrance') return POSES.master;
       if (this.tier === 'micro') return micro()[state] || micro().info;
       return {success: POSES.master, warning: POSES.warning, error: POSES.error}[state] || rest();
     }
@@ -257,6 +261,8 @@
       const fresh = this.fresh;
       this.fresh = false;
       if (how === 'hold') await this.runHold(tk);
+      else if (state === 'entrance' && this.modeNow !== 'full') { this.placeHeld(state); this.onEntrance?.(); }
+      else if (state === 'entrance') await this.runEntrance(tk, fresh);
       else if (this.modeNow === 'off') await this.runStill(tk, fresh);
       else if (this.tier === 'micro') await this.runMicro(tk, fresh);
       else if (state === 'busy') await (asset ? this.runLoader(asset, tk, fresh) : this.runWorking(tk, fresh));
@@ -322,9 +328,10 @@
       this.load = null;
       this.frameTo(name, true);
       const cx = (base.blue.x + base.teal.x + base.disc.x) / 3, cy = (base.blue.y + base.teal.y + base.disc.y) / 3;
-      const out = {};
+      const u = JOSTLE_PX / this.scaleOf(this.box), out = {};
       for (const id of IDS) {
-        const v = [base[id].x - cx, base[id].y - cy], l = Math.hypot(...v) || 1, u = JOSTLE_PX / (this.height / this.box[3]);
+        // In the row the ends move outwards and the tile lifts. Elsewhere each piece moves away from the middle.
+        const row = name === 'busy' || name === 'info', v = row ? {blue: [0, -1], teal: [-1, 0], disc: [1, 0]}[id] : [base[id].x - cx, base[id].y - cy], l = Math.hypot(...v) || 1;
         out[id] = [v[0] / l * u, v[1] / l * u];
       }
       const cur = this.cur = clone(base);
@@ -478,6 +485,20 @@
       this.colourTo(CAT, 240);
       if (!await this.assemble({...OUT.master, contact: wait, fixed: ['teal']}, wait, tk)) return;
       await this.travelTo(M, tk, ['teal']);
+    }
+
+    // The header logo's entrance at small sizes. A brand moment and not a status: category colours only,
+    // with no green, click, punch or ripple. It ends exactly on the master mark, so the still logo can take over.
+    async runEntrance(tk, fresh) {
+      const M = POSES.master, start = logoStart();
+      this.frameTo('entrance', true);
+      if (fresh) this.place(start);
+      this.pace = .8;
+      // The tile settles and the mesh goes to its stand-off, then the disc comes in and the mesh closes.
+      if (!await this.travelTo({blue: M.blue, teal: standOff(M).teal, disc: start.disc}, tk, ['blue', 'teal'])) return;
+      if (!await this.travelTo(M, tk, ['disc', 'teal'])) return;
+      this.place(clone(M));
+      this.onEntrance?.();
     }
 
     // ---------- loaders (SPEC section 4.7): flat and opaque, a pop and never a blend ----------

@@ -360,7 +360,7 @@
   }
   // Everything the working loop and the outcomes go through from a pose they're designed to rest in.
   function* commonRoutes() {
-    const {fits, rest, POSES, OUT, STRAIGHT, standOff, clone: copy} = assembly.pieces, F = fits(), W = POSES.warning, M = POSES.master;
+    const {fits, rest, POSES, OUT, STRAIGHT, standOff, logoStart, clone: copy} = assembly.pieces, F = fits(), W = POSES.warning, M = POSES.master;
     const X = copy(POSES.error);
     X.blue.rot -= 6; X.teal.rot += 6;
     for (const a of F) {
@@ -377,6 +377,10 @@
     }
     yield* assemblyRoutes({...OUT.master, contact: wait, fixed: ['teal']}, wait, rest());
     yield [wait, M, ['teal']];
+    // The logo's entrance.
+    const start = logoStart(), waiting = {blue: M.blue, teal: wait.teal, disc: start.disc};
+    yield [start, waiting, ['blue', 'teal']];
+    yield [waiting, M, ['disc', 'teal']];
   }
   let idle = null;
   const later = fn => (window.requestIdleCallback ? window.requestIdleCallback(fn) : setTimeout(() => fn({timeRemaining: () => 8}), 200));

@@ -210,7 +210,7 @@
     if (!window.AtelierMotionPolicy) window.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener('change', () => { for (const engine of live) engine.policyChanged(); });
   }
   const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => {
-    for (const entry of entries) resized.get(entry.target)?.(entry.contentRect.height);
+    for (const entry of entries) resized.get(entry.target)?.(entry.contentRect.height, entry.contentRect.width);
   }) : null;
   const motion = window.AtelierMotion;
 
@@ -234,7 +234,8 @@
     host.classList.add('atelier-glyph');
     if (opts.surface) host.style.setProperty('--glyph-halo', opts.surface);
     if (opts.size) { host.style.height = `${opts.size}px`; host.style.width = `${Math.round(opts.size * ASPECT[tierFor(opts.size)])}px`; }
-    let height = host.getBoundingClientRect().height || opts.size || 48;
+    const rect = host.getBoundingClientRect();
+    let height = rect.height || opts.size || 48, width = rect.width || height * 1.5;
     let tier = tierFor(height);
     const sync = () => {
       host.setAttribute('data-glyph-tier', tier);
@@ -243,8 +244,9 @@
       else host.removeAttribute('data-glyph-asset');
     };
     sync();
-    const engine = new assembly.Engine(createView(host), tier, height, opts.reducedMotion === 'reduce');
-    engine.run(state, asset);
+    const engine = new assembly.Engine(createView(host), tier, height, opts.reducedMotion === 'reduce', width);
+    if (opts.onEntrance) { engine.onEntrance = opts.onEntrance; engine.run('entrance'); }
+    else engine.run(state, asset);
     engine.flush();
     listen();
     live.add(engine);
@@ -282,12 +284,13 @@
       },
       get state() { return state; },
     };
-    resized.set(host, next => {
-      if (destroyed || next <= 0 || next === height) return;
+    resized.set(host, (next, nextWidth) => {
+      if (destroyed || next <= 0 || (next === height && nextWidth === width)) return;
       height = next;
+      width = nextWidth;
       tier = tierFor(next);
       sync();
-      engine.setSize(tier, height);
+      engine.setSize(tier, height, width);
     });
     if (window.__ATELIER_GLYPH_TEST__) handle.engine = engine;
     mounted.set(host, handle);
@@ -296,6 +299,25 @@
     return handle;
   }
 
+  // The header logo's entrance (SPEC section 4.8): once per launch, in Full motion only, never while the
+  // window is hidden. It isn't a status, so it stays out of mount's states. onDone hands over to the still
+  // logo; where the entrance doesn't play, onDone runs straight away and nothing is mounted.
+  let entered = false;
+  function entrance(host, options) {
+    const opts = options || {};
+    let told = false;
+    const onDone = () => { if (!told) { told = true; opts.onDone?.(); } };
+    const mode = window.AtelierMotionPolicy ? window.AtelierMotionPolicy.mode() : 'full';
+    if ((entered && !opts.preview) || mode !== 'full' || document.hidden) { onDone(); return null; }
+    if (!opts.preview) entered = true;
+    const size = opts.size || 32, frame = assembly.pieces.frameOf(assembly.pieces.POSES.master);
+    host.style.height = `${size}px`;
+    host.style.width = `${Math.ceil(size * frame[2] / frame[3])}px`; // whole pixels, like the still logo's image
+    const handle = mount(host, {onEntrance: onDone});
+    host.setAttribute('data-glyph-entrance', '');
+    return handle;
+  }
+
   assembly.createView = createView;
-  motion.glyph = Object.freeze({mount});
+  motion.glyph = Object.freeze({mount, entrance});
 })();

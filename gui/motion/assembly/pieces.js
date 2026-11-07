@@ -296,10 +296,8 @@
     const tile = {w: s.tw, taper: 0, h: 260, k: 14, m: 1, small: true}, mesh = {w: s.mw, h: 260, dx: 0, k: 14, m: 1, small: true};
     const pose = (t, m, d) => ({blue: {...tile, ...t}, teal: {...mesh, ...m}, disc: {r: s.r, ...d}});
     const success = pose({x: s.tcx + left, y: 130 + top, rot: 0}, {x: s.mcx + left, y: 130 + top, rot: 0}, {x: s.cx + left, y: s.cy + top});
-    // Working: a fit that reads as none of the outcomes, with the small mark's wider gaps.
-    const busy = pose({x: 240, y: 200, rot: 0}, {x: 240, y: 200, rot: -28}, {x: 240, y: 200});
-    dockAll(busy, ATTEMPT_SPECS[0], SMALL_GAP);
-    // At rest: mesh, tile, disc on one baseline.
+    // At rest, and working: mesh, tile, disc on one baseline. It keeps the pieces largest at this size,
+    // and no other order avoids reading as an A.
     const info = pose({x: 240, y: 200, rot: 0}, {x: 0, y: 200, rot: 0}, {x: 0, y: 330 - s.r});
     const {gap} = assembly.planner;
     info.teal.x = info.blue.x - 300;
@@ -310,8 +308,18 @@
     const warning = clone(POSES.warning);
     warning.blue.y -= 18;
     warning.disc.y += 18;
-    microCache = {busy, info, success, warning, error: clone(POSES.error)};
+    microCache = {busy: info, info, success, warning, error: clone(POSES.error)};
     return microCache;
+  }
+  // The logo's entrance (SPEC section 4.8) starts from small pieces inside the mark's own frame, so it
+  // never shifts the header: the tile on the left, the disc in the middle, the mesh on the right.
+  function logoStart() {
+    const S = .66, M = POSES.master, baseline = 330;
+    const shrink = (o, k) => { const q = {...o}; for (const name of k) q[name] *= S; return q; };
+    const tile = shrink(M.blue, ['w', 'h', 'k']), mesh = shrink(M.teal, ['w', 'h', 'k']);
+    tile.x = 39.08 + tile.w / 2; tile.y = baseline - tile.h / 2;
+    mesh.x = 39.08 + BRAND.W - mesh.w / 2; mesh.y = baseline - mesh.h / 2;
+    return {blue: tile, teal: mesh, disc: {...M.disc, r: BRAND.r * S, x: 262, y: baseline - BRAND.r * S}};
   }
   // Framing (SPEC sections 4.7 and 5). Stage stays on the whole canvas.
   const FRAME = Object.freeze({canvas: [0, 0, 480, 400], row: [38, 84, 440, 216], a: [20, 50, 440, 300]});
@@ -332,6 +340,6 @@
 
   assembly.pieces = Object.freeze({
     CAT, STATUS, PLATES, SHINE, VB, G, DOCK, IDS, SMALL_GAP, BRAND, BRAND_SMALL, E, RISE, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS,
-    lerp, lerpObj, clone, mixC, all, quadOf, plainRing, brandRing, ringOf, shapeKey, piecePath, P, bake, warningPose, standOff, nudge, dockAll, boundsOf, fits, rest, atRest, raised, micro, FRAME, frameOf,
+    lerp, lerpObj, clone, mixC, all, quadOf, plainRing, brandRing, ringOf, shapeKey, piecePath, P, bake, warningPose, standOff, nudge, dockAll, boundsOf, fits, rest, atRest, raised, micro, logoStart, FRAME, frameOf,
   });
 })();
