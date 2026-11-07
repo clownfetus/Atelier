@@ -273,8 +273,7 @@
 .at-proj-lockup img { display: block; width: auto; height: 64.8px; }
 .at-proj-lockup svg { display: block; width: calc(24px * 9265 / 1490); height: 24px; }
 /* ── Launch check and first-run setup (#setup-overlay outside Settings) ──────────────────── */
-/* Setup has its own header and ground, with the header's rule drawn by the check
-   (motion/setup-check.css). Settings keeps the Material dialog; setup-wizard.js moves the
+/* Setup has its own header and ground. Settings keeps the Material dialog; setup-wizard.js moves the
    controls between them, so IDs, validators and save payloads are shared. */
 #setup-overlay.at-identity { background: var(--surface); color: var(--text); backdrop-filter: none; }
 #setup-overlay[data-setup-page] .setup-modal {
@@ -300,13 +299,15 @@
 #setup-overlay[data-setup-page] .setup-foot,
 #setup-overlay[data-setup-page] #setup-loading { display: none !important; }
 .at-setup-hero[hidden], .at-setup-page[hidden] { display: none; }
+.at-setup-hero, .at-setup-page { --glyph-halo: var(--surface); }
+.at-setup-hero { align-items: center; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.at-setup-check { width: 147px; height: 72px; flex: none; }
 .at-setup-page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  /* Room below the rule for the check's result to land without touching the text. */
   padding: var(--space-6) 0 var(--space-5);
 }
 .at-setup-page h1 {
@@ -320,7 +321,7 @@
 .at-setup-rows[hidden] { display: none; }
 .at-setup-row {
   display: grid;
-  grid-template-columns: 28px minmax(140px, 240px) minmax(0, 1fr) auto;
+  grid-template-columns: 37px minmax(140px, 240px) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-4);
   min-height: 68px;
@@ -328,7 +329,7 @@
   border-bottom: 1px solid var(--line);
 }
 .at-setup-row.is-editing { align-items: start; padding-top: 18px; padding-bottom: 18px; }
-.at-setup-glyph { position: relative; display: inline-flex; width: 20px; height: 20px; }
+.at-setup-glyph { position: relative; display: inline-flex; width: 31px; height: 20px; }
 .at-setup-row.is-editing .at-setup-glyph, .at-setup-row.is-editing .at-setup-name { margin-top: 1px; }
 /* Waiting: an empty slot, not a state. The heading says the check is running. */
 .at-setup-row[data-state="waiting"] .at-setup-glyph::before {
@@ -381,7 +382,7 @@
 #setup-page .at-setup-glyph { grid-column: 3; grid-row: 1; justify-self: start; }
 #setup-page .at-setup-row.is-editing .at-setup-glyph { align-self: start; }
 #setup-page .at-setup-row[data-state="waiting"] .at-setup-glyph::before { content: none; }
-#setup-page .at-setup-detail { grid-column: 3; grid-row: 1; padding-left: 32px; }
+#setup-page .at-setup-detail { grid-column: 3; grid-row: 1; padding-left: 43px; }
 #setup-page .at-setup-row:not(.is-editing) .at-setup-detail { padding-right: 88px; }
 #setup-page .at-setup-change { grid-column: 3; grid-row: 1; justify-self: end; }
 .at-setup-foot { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
@@ -413,9 +414,9 @@
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
 @media (max-width: 640px) {
-  .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 24px minmax(0, 1fr) auto; gap: var(--space-4); }
+  .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 37px minmax(0, 1fr) auto; gap: var(--space-4); }
   .at-setup-row .at-setup-detail, #setup-page .at-setup-detail { grid-column: 2 / -1; }
-  #setup-page .at-setup-row { grid-template-columns: 36px minmax(0, 1fr) auto; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+  #setup-page .at-setup-row { grid-template-columns: 37px minmax(0, 1fr) auto; padding-top: var(--space-3); padding-bottom: var(--space-3); }
   #setup-page .at-setup-block { grid-column: 1; grid-row: 1 / span 2; width: 36px; height: 36px; }
   #setup-page .at-setup-name { grid-column: 2; grid-row: 1; text-align: left; }
   #setup-page .at-setup-change { grid-column: 3; grid-row: 1; }

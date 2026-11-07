@@ -508,8 +508,10 @@ Added at the P1.7 checkpoint, from Thiago's note on the first-run setup sheet.
   three prototypes (Condense, Swell, Lines). Rows pass independently, so the disc can arrive
   first. Blocks settling together take turns.
 - **Limits:** the block always uses the exact piece colour and the three never form an A here
-  (invariant 5). Each row's status stays in a 20 px glyph and its sentence. A block appearing
-  is a kind of progress; SPEC §2 bans category colours on progress bars, which this isn't.
+  (invariant 5). A row shows a 20 px glyph only while it's working or needs something: a passed
+  row has its block and its sentence and no glyph, because Thiago found the page held too many at
+  P3.3. A block appearing is a kind of progress; SPEC §2 bans category colours on progress bars,
+  which this isn't.
 - **Status:** asked for and Condense chosen by Thiago, 7 Nov 2026; the page awaits his sign-off at P1.7.
 
 ## D19 · Small sizes, Calm and the logo entrance

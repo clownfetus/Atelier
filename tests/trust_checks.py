@@ -190,9 +190,9 @@ def _setup(context,url,report,checks):
                 assert all(abs(b['x']-centre)<1 for b in blocks),(blocks,centre)
                 assert tab.locator('[data-row=game] .at-setup-what').inner_text()=='Found on this PC'
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Current key retrieved'
-                # Each row's found glyph: the ink key, the code file, the folder.
-                for row,found in (('key','key'),('map','file'),('game','folder')):
-                    assert tab.locator(f'[data-row={row}] [data-atelier-motion=krackle-glyph][data-am-found={found}][data-am-state=success]').count()==1
+                # A passed row has its block and sentence and no glyph; the page's one glyph forms the A once every row is valid.
+                assert tab.locator('#setup-rows [data-atelier-motion=glyph]').count()==0
+                assert tab.locator('#setup-hero [data-atelier-motion=glyph][data-glyph-state=success]').count()==1
                 assert tab.locator('#setup-page-title').inner_text()=='Ready to open Atelier'
                 assert tab.locator('#setup-path').is_hidden() and tab.locator('#setup-save').is_enabled()
                 tab.locator('[data-row=game] .at-setup-change').click()
@@ -267,7 +267,7 @@ def _launch_check(context,url,report,checks):
                 held.pop().fulfill(status=500, body='Traceback: boom')
                 tab.wait_for_selector('#setup-overlay.active[data-setup-page=failed]')
                 assert tab.locator('#setup-page-error').inner_text() == 'server error (500)'
-                assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=error]').count() == 1
+                assert tab.locator('#setup-hero [data-atelier-motion=glyph][data-glyph-state=error]').count() == 1
                 tab.screenshot(path=str(report / 'trust-launch-failed.png'), animations='disabled')
                 tab.unroute('**/api/setup_status')
                 tab.route('**/api/setup_status', lambda route: route.fulfill(json={'configured': True}))
@@ -278,7 +278,7 @@ def _launch_check(context,url,report,checks):
             assert shown_while_pending is False, 'Setup opened while its status was still pending'
             tab.wait_for_selector('#grid-area .card')
             assert tab.locator('#setup-overlay.active').count() == 0
-            assert tab.locator('#setup-hero [data-atelier-motion=setup-check]').count() == 0
+            assert tab.locator('#setup-hero [data-atelier-motion=glyph]').count() == 0
             if not fails:
                 assert tab.evaluate('window.__setupShown') is False
             assert not errors, errors

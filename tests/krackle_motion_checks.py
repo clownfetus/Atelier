@@ -206,53 +206,6 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         }""")
         checks.append('Activity shows its running-jobs ring as six Krackle dots with a counting crest')
 
-        # Found glyphs (the setup rows): the ink key pops in the energy ink and takes the done
-        # colour 290ms in; the code file is done from the start and draws its four lines left to
-        # right from 180ms, 90ms apart; the folder pops in the energy ink, its front flips open at
-        # 160ms, it takes the done colour at 380ms and its flecks burst at 400ms. Other states are
-        # unchanged, plain glyphs keep the starburst, and reduced motion holds every final pose.
-        found = tab.evaluate("""() => {
-          const page = document.createElement('section'); page.className = 'at-identity';
-          page.style.cssText = 'position:fixed;left:20px;top:20px;z-index:9999;display:flex;gap:8px';
-          document.body.append(page);
-          const shown = (host, sel) => getComputedStyle(host.querySelector(sel)).display !== 'none';
-          const delays = (el, dur) => el.getAnimations().filter(a => a.effect.getTiming().duration === dur).map(a => a.effect.getTiming().delay);
-          const out = {};
-          for (const kind of ['key', 'file', 'folder']) {
-            const host = document.createElement('span'); host.style.cssText = 'display:inline-flex;width:20px;height:20px'; page.append(host);
-            const glyph = AtelierMotion.krackleGlyph.mount(host, {state: 'busy', found: kind});
-            glyph.setState('success');
-            const part = host.querySelector('.am-krackle-glyph-' + kind);
-            const o = {found: host.dataset.amFound, shown: shown(host, '.am-krackle-glyph-' + kind), burst: shown(host, '.am-krackle-glyph-burst'),
-              pop: delays(part, 380).length === 1, tint: delays(part, 260),
-              flecks: [...host.querySelectorAll('.am-krackle-glyph-fleck')].map(f => delays(f, 420)[0])};
-            if (kind === 'file') o.lines = [...host.querySelectorAll('.am-krackle-glyph-file-line')].map(l => delays(l, 240)[0]);
-            if (kind === 'folder') o.flap = delays(host.querySelector('.am-krackle-glyph-folder-flap'), 560);
-            glyph.setState('warning');
-            o.ring = getComputedStyle(host.querySelector('.am-krackle-glyph-outcome-warning')).opacity === '1';
-            glyph.setReducedMotion('reduce'); glyph.setState('success');
-            o.still = [...host.querySelectorAll('*')].every(el => el.getAnimations().length === 0);
-            const box = part.getBoundingClientRect(); o.size = [Math.round(box.width), Math.round(box.height)];
-            o.rest = [...host.querySelectorAll('.am-krackle-glyph-file-line, .am-krackle-glyph-folder-flap')].every(el => getComputedStyle(el).transform === 'none');
-            glyph.destroy(); o.cleaned = !host.hasAttribute('data-am-found');
-            out[kind] = o;
-          }
-          const plain = document.createElement('span'); page.append(plain);
-          const other = AtelierMotion.krackleGlyph.mount(plain, {state: 'success'});
-          out.plain = plain.dataset.glyphState === 'success' && !plain.hasAttribute('data-am-found');
-          other.destroy(); page.remove();
-          return out;
-        }""")
-        for kind, o in ((k, found[k]) for k in ('key', 'file', 'folder')):
-            assert o['found'] == kind and o['shown'] and not o['burst'] and o['pop'] and o['ring'] and o['still'] and o['rest'] and o['cleaned'], (kind, o)
-        assert found['key']['tint'] == [290] and found['key']['flecks'] == [0] * 4 and found['key']['size'] == [23, 11], found['key']
-        assert found['file']['tint'] == [] and found['file']['lines'] == [180, 270, 360, 450] and found['file']['flecks'] == [0] * 4, found['file']
-        assert 12 <= found['file']['size'][0] <= 14 and 17 <= found['file']['size'][1] <= 19, found['file']
-        assert found['folder']['tint'] == [380] and found['folder']['flap'] == [160] and found['folder']['flecks'] == [400] * 4, found['folder']
-        assert 15 <= found['folder']['size'][0] <= 17 and 13 <= found['folder']['size'][1] <= 15, found['folder']
-        assert found['plain'], found
-        checks.append('Found glyphs: the ink key and folder pop in the energy ink and take the done colour, the code file draws its lines, the folder flips open, flecks keep their times, plain glyphs keep the starburst, and reduced motion holds the final poses')
-
         # The setup check band loops only while busy. The setup drop runs down a dotted line only as
         # far as the rows are valid and falls into the export review's ink-well once all are; the
         # well cooks until then and lands as its success. A row stopping being valid, or

@@ -16,12 +16,11 @@
     map:{prefill:'Mapping file found',fetched:'Latest mapping downloaded',user:'Mapping file chosen'},
   };
   const NOUN={game:'the game folder',key:'the key',map:'the mapping file'};
-  const GLYPH={pending:'busy',done:'success',missing:'warning'};
-  const FOUND={key:'key',map:'file',game:'folder'};   // each row's found glyph: the ink key, the code file, the folder
+  const GLYPH={pending:'busy',missing:'warning'};   // a passed row has its block and its sentence, and no glyph
   const BLOCK={key:'texture',map:'mesh',game:'material'};   // one block to a stage, in the mark's order: tile, mesh, disc
-  let initialized=false, settings=true, page='checking', outcome='busy', error='';
+  let initialized=false, settings=true, page='checking', error='';
   let valid={}, validated=false, editing={}, prefill={}, fetched={}, retrieval={}, awaiting={};
-  let overlay, modal, hero, pageEl, line=null, lineHost=null, moved=[], glyphs={};
+  let overlay, modal, hero, pageEl, check=null, checkHost=null, moved=[], glyphs={};
   let nextBlock=0;
 
   const join=items=>items.length<2?items.join(''):items.slice(0,-1).join(', ')+' and '+items[items.length-1];
@@ -40,8 +39,7 @@
       row.change.addEventListener('click',()=>{editing[name]=true;render();$(row.input).focus();});
       row.block.dataset.piece=BLOCK[name];
     }
-    new MutationObserver(syncLine).observe(overlay,{attributes:true,attributeFilter:['class']});
-    window.addEventListener('atelier:preferences',()=>{for(const glyph of Object.values(glyphs))glyph?.setReducedMotion(full()?'system':'reduce');});
+    new MutationObserver(syncCheck).observe(overlay,{attributes:true,attributeFilter:['class']});
   }
   function move(node,into) {
     if(!node)return;
@@ -54,7 +52,7 @@
       for(const {node,marker} of moved)marker.after(node);
       overlay.classList.remove('at-identity');modal.classList.remove('at-projects');delete overlay.dataset.setupPage;
       hero.hidden=pageEl.hidden=true;
-      destroyLine();resetBlocks();
+      destroyCheck();resetBlocks();
     } else {
       for(const name of NAMES)move(ROWS[name].controls,ROWS[name].field);
       move($('setup-save'),pageEl.querySelector('.at-setup-save-slot'));
@@ -111,8 +109,8 @@
   function setGlyph(name,state) {
     const row=ROWS[name], kind=GLYPH[state];
     if(!kind){glyphs[name]?.destroy();glyphs[name]=null;row.glyph.replaceChildren();return;}
-    if(glyphs[name]){glyphs[name].setState(kind);return;}
-    try{glyphs[name]=window.AtelierMotion.krackleGlyph.mount(row.glyph,{state:kind,found:FOUND[name],reducedMotion:full()?'system':'reduce'});}
+    if(glyphs[name]){glyphs[name].set(kind);return;}
+    try{glyphs[name]=window.AtelierMotion.glyph.mount(row.glyph,{state:kind});}
     catch(_){glyphs[name]=null;row.glyph.replaceChildren();}
   }
   function render() {
@@ -120,7 +118,7 @@
     overlay.dataset.setupPage=page;
     const states=Object.fromEntries(NAMES.map(n=>[n,rowState(n)]));
     for(const name of NAMES) {
-      const row=ROWS[name], state=states[name], open=state==='missing'||(state!=='waiting'&&editing[name]);
+      const row=ROWS[name], state=states[name], open=state==='missing'||(state!=='waiting'&&!!editing[name]);
       row.el.dataset.state=state;row.el.classList.toggle('is-editing',open);
       setGlyph(name,state);
       row.what.replaceChildren();
@@ -139,6 +137,7 @@
     $('setup-rows').hidden=page==='failed';$('setup-failure').hidden=page!=='failed';$('setup-page-foot').hidden=page!=='first-run';
     setText($('setup-page-error'),error);
     for(const name of NAMES){ROWS[name].wanted=states[name]==='done';syncBlock(ROWS[name]);}
+    syncCheck();
   }
   function arrive() {
     // A result moves focus to its heading unless the person is already working in the page.
@@ -211,31 +210,37 @@
     }
   }
 
-  // ── The line the page stands on ──
-  function destroyLine() {
-    line?.destroy();line=null;lineHost?.remove();lineHost=null;hero?.classList.remove('at-has-line');
+  // ── The page's one glyph: working while checks run, the A once every row is valid, ! or X otherwise ──
+  function destroyCheck() {
+    check?.destroy();check=null;checkHost?.remove();checkHost=null;
   }
-  function syncLine() {
-    if(settings||!overlay.classList.contains('active')){destroyLine();return;}
-    const state=page==='checking'?'busy':outcome;
-    if(line){line.setState(state);return;}
-    lineHost=document.createElement('span');hero.append(lineHost);
-    try{line=window.AtelierMotion.setupCheck.mount(lineHost,{state,play:true});hero.classList.add('at-has-line');}
-    catch(_){destroyLine();}
+  function checkState() {
+    if(page==='checking')return 'busy';
+    if(page==='failed')return 'error';
+    const states=NAMES.map(rowState);
+    return states.every(state=>state==='done')?'success':states.includes('missing')?'warning':'busy';
+  }
+  function syncCheck() {
+    if(settings||!overlay.classList.contains('active')){destroyCheck();return;}
+    const state=checkState();
+    if(check){check.set(state);return;}
+    checkHost=document.createElement('span');checkHost.className='at-setup-check';hero.append(checkHost);
+    try{check=window.AtelierMotion.glyph.mount(checkHost,{state});}
+    catch(_){destroyCheck();}
   }
 
   // ── Requests, as app.js reports them ──
   function checking() {
-    init();page='checking';outcome='busy';error='';valid={};validated=false;editing={};prefill={};fetched={};retrieval={};awaiting={};
-    render();syncLine();
+    init();page='checking';error='';valid={};validated=false;editing={};prefill={};fetched={};retrieval={};awaiting={};
+    render();
   }
   function found(result) {
-    init();page='first-run';outcome=result?.outcome||'warning';prefill=result?.prefill||{};
-    render();syncLine();arrive();
+    init();page='first-run';prefill=result?.prefill||{};
+    render();arrive();
   }
   function failed(message) {
-    init();page='failed';outcome='error';error=String(message||'No answer from the service.');
-    render();syncLine();arrive();
+    init();page='failed';error=String(message||'No answer from the service.');
+    render();arrive();
   }
   function validation(state) {
     valid=state||{};validated=true;awaiting={};render();
@@ -249,7 +254,7 @@
   // Release the launch animation as the Library or first project picker opens.
   function handover() {
     init();
-    destroyLine();
+    destroyCheck();
   }
   window.AtelierSetup=Object.freeze({mode,checking,found,failed,validation,retrieval:retrieval_,handover});
 })();
