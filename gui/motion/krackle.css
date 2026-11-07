@@ -127,10 +127,10 @@
 }
 
 /* ── Krackle on the 0.4 polish surfaces ────────────────────────────────────── */
-/* Edited sidebar rows: the corner of energy carries a bubble. */
+/* Edited rows, cards and portraits: a plain corner triangle in the charge colour. */
 .sb-item::after,.card.imported::after,.roster-portrait.has-edits::after {
   content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
-  background:var(--krackle-charge);clip-path:none;mask:var(--krackle-edited-mask) center/contain no-repeat;
+  background:var(--krackle-charge);clip-path:polygon(0 0,100% 0,100% 100%);
 }
 /* Import result dots live with the import dialog in ../identity.css. */
 

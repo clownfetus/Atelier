@@ -70,6 +70,15 @@ def run_retired_surfaces_checks(context, url, report, checks):
         assert bubble in ('none', 'normal'), bubble
         checks.append('The selection count is the number alone')
 
+        # The edited corner is a plain triangle, with no bubbles cut into it.
+        corners = tab.evaluate("""() => ['sb-item', 'card imported'].map(cls => {
+          const el = document.createElement('div'); el.className = cls; el.style.position = 'relative'; document.body.append(el);
+          const after = getComputedStyle(el, '::after'), result = {mask: after.maskImage || after.webkitMaskImage || 'none', clip: after.clipPath};
+          el.remove(); return result;
+        })""")
+        assert all(c['mask'] == 'none' and c['clip'].startswith('polygon') for c in corners), corners
+        checks.append('The edited corner is a plain triangle with no bubbles')
+
         # The plain folder stands still.
         folder = tab.evaluate("""() => {
           const card = document.createElement('button'); card.className = 'card'; card.type = 'button';
