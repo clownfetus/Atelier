@@ -54,10 +54,10 @@
       ring.style.opacity = fx.ringOp.toFixed(3);
     }
     function drawShape(id, o) {
-      const part = parts[id], key = shapeKey(id, o);
-      if (key !== part.key) {
-        part.key = key;
-        part.d = piecePath(id, o, key);
+      const part = parts[id], side = id === 'blue' ? o.taper : o.dx;
+      if (o.w !== part.w || o.h !== part.h || o.k !== part.k || o.m !== part.m || side !== part.side || o.small !== part.small) {
+        part.w = o.w; part.h = o.h; part.k = o.k; part.m = o.m; part.side = side; part.small = o.small;
+        part.d = piecePath(id, o, shapeKey(id, o));
         part.el.setAttribute('d', part.d);
       }
       if (o.x !== part.x || o.y !== part.y || o.rot !== part.rot) {
@@ -187,7 +187,14 @@
   // ---------- the public glyph ----------
   const STATES = new Set(['busy', 'info', 'success', 'warning', 'error']);
   const ASSETS = new Set(['mesh', 'texture', 'material']);
-  const mounted = new WeakMap();
+  const mounted = new WeakMap(), resized = new WeakMap();
+  // Width for each tier when the glyph sets its own size: the frame it shows most (SPEC section 5).
+  const ASPECT = {stage: VB.w / VB.h, inline: 440 / 216, micro: 37 / 24};
+  const tierFor = height => (height >= 96 ? 'stage' : height >= 32 ? 'inline' : 'micro');
+  // One observer for every glyph.
+  const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => {
+    for (const entry of entries) resized.get(entry.target)?.(entry.contentRect.height);
+  }) : null;
   const motion = window.AtelierMotion;
 
   // mount(host, {state, asset?, size?, reducedMotion?, surface?})
@@ -209,14 +216,17 @@
     host.setAttribute('data-atelier-motion', 'glyph');
     host.classList.add('atelier-glyph');
     if (opts.surface) host.style.setProperty('--glyph-halo', opts.surface);
-    if (opts.size) { host.style.height = `${opts.size}px`; host.style.width = `${opts.size * VB.w / VB.h}px`; }
+    if (opts.size) { host.style.height = `${opts.size}px`; host.style.width = `${Math.round(opts.size * ASPECT[tierFor(opts.size)])}px`; }
+    let height = host.getBoundingClientRect().height || opts.size || 48;
+    let tier = tierFor(height);
     const sync = () => {
+      host.setAttribute('data-glyph-tier', tier);
       host.setAttribute('data-glyph-state', state);
       if (asset) host.setAttribute('data-glyph-asset', asset);
       else host.removeAttribute('data-glyph-asset');
     };
     sync();
-    const engine = new assembly.Engine(createView(host));
+    const engine = new assembly.Engine(createView(host), tier, height);
     engine.run(state, asset);
 
     const handle = {
@@ -239,17 +249,26 @@
         if (destroyed) return;
         destroyed = true;
         engine.destroy();
+        sizes?.unobserve(host);
         mounted.delete(host);
         host.replaceChildren();
         host.classList.remove('atelier-glyph');
-        for (const name of ['data-atelier-motion', 'data-glyph-state', 'data-glyph-asset']) host.removeAttribute(name);
+        for (const name of ['data-atelier-motion', 'data-glyph-state', 'data-glyph-asset', 'data-glyph-tier']) host.removeAttribute(name);
         if (opts.surface) host.style.removeProperty('--glyph-halo');
         if (opts.size) { host.style.height = ''; host.style.width = ''; }
       },
       get state() { return state; },
     };
+    resized.set(host, next => {
+      if (destroyed || next <= 0 || next === height) return;
+      height = next;
+      tier = tierFor(next);
+      sync();
+      engine.setSize(tier, height);
+    });
     if (window.__ATELIER_GLYPH_TEST__) handle.engine = engine;
     mounted.set(host, handle);
+    sizes?.observe(host);
     return handle;
   }
 

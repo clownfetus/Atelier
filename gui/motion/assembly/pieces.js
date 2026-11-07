@@ -287,6 +287,39 @@
   const atRest = p => { const R = rest(); return IDS.every(id => Math.hypot(p[id].x - R[id].x, p[id].y - R[id].y) < 1); };
   const raised = id => { const q = clone(rest()); q[id].y -= RISE; return q; };
 
+  // Micro (under 32 px): the small mark's outlines, drawn large and framed to their own bounds, so the
+  // gaps come from the drawing and survive at 16 px. The pieces don't travel here, so nothing is planned.
+  let microCache = null;
+  function micro() {
+    if (microCache) return microCache;
+    const s = BRAND_SMALL, left = 240 - s.W / 2, top = 70;
+    const tile = {w: s.tw, taper: 0, h: 260, k: 14, m: 1, small: true}, mesh = {w: s.mw, h: 260, dx: 0, k: 14, m: 1, small: true};
+    const pose = (t, m, d) => ({blue: {...tile, ...t}, teal: {...mesh, ...m}, disc: {r: s.r, ...d}});
+    const success = pose({x: s.tcx + left, y: 130 + top, rot: 0}, {x: s.mcx + left, y: 130 + top, rot: 0}, {x: s.cx + left, y: s.cy + top});
+    // Working: a fit that reads as none of the outcomes, with the small mark's wider gaps.
+    const busy = pose({x: 240, y: 200, rot: 0}, {x: 240, y: 200, rot: -28}, {x: 240, y: 200});
+    dockAll(busy, ATTEMPT_SPECS[0], SMALL_GAP);
+    // At rest: mesh, tile, disc on one baseline.
+    const info = pose({x: 240, y: 200, rot: 0}, {x: 0, y: 200, rot: 0}, {x: 0, y: 330 - s.r});
+    const {gap} = assembly.planner;
+    info.teal.x = info.blue.x - 300;
+    while (gap(info, 'teal', 'blue') > SMALL_GAP) info.teal.x += 1;
+    info.disc.x = info.blue.x + 300;
+    while (gap(info, 'blue', 'disc') > SMALL_GAP) info.disc.x -= 1;
+    // The ! opens its gaps at this size: tile up, disc down. A wider halo would break the X into diamonds, so it stays.
+    const warning = clone(POSES.warning);
+    warning.blue.y -= 18;
+    warning.disc.y += 18;
+    microCache = {busy, info, success, warning, error: clone(POSES.error)};
+    return microCache;
+  }
+  // Framing (SPEC sections 4.7 and 5). Stage stays on the whole canvas.
+  const FRAME = Object.freeze({canvas: [0, 0, 480, 400], row: [38, 84, 440, 216], a: [20, 50, 440, 300]});
+  function frameOf(p, margin = 0) {
+    const [x0, y0, x1, y1] = boundsOf(p);
+    return [x0 - margin, y0 - margin, x1 - x0 + 2 * margin, y1 - y0 + 2 * margin];
+  }
+
   // Mesh loader: lines of halo gap through the block, as fractions of its box. The block leans, so these follow it.
   const CONFIGS = [
     [[.22, -.05, .72, 1.05], [-.05, .52, 1.05, .52]],
@@ -299,6 +332,6 @@
 
   assembly.pieces = Object.freeze({
     CAT, STATUS, PLATES, SHINE, VB, G, DOCK, IDS, SMALL_GAP, BRAND, BRAND_SMALL, E, RISE, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS,
-    lerp, lerpObj, clone, mixC, all, quadOf, plainRing, brandRing, ringOf, shapeKey, piecePath, P, bake, warningPose, standOff, nudge, dockAll, boundsOf, fits, rest, atRest, raised,
+    lerp, lerpObj, clone, mixC, all, quadOf, plainRing, brandRing, ringOf, shapeKey, piecePath, P, bake, warningPose, standOff, nudge, dockAll, boundsOf, fits, rest, atRest, raised, micro, FRAME, frameOf,
   });
 })();

@@ -41,7 +41,7 @@
         return m;
       }));
     }));
-    hulls = {blue, teal, slack};
+    hulls = {blue, teal, slack, small: {blue: hullOf(BRAND_SMALL.tile), teal: hullOf(BRAND_SMALL.mesh)}};
     return hulls;
   }
   function place(pts, o) {
@@ -53,7 +53,7 @@
     let pts;
     if ((o.m ?? 0) >= .5) {
       const brand = o.small ? BRAND_SMALL : BRAND, bw = id === 'blue' ? brand.tw : brand.mw, sx = o.w / bw, sy = o.h / brand.h;
-      pts = (o.small ? (id === 'blue' ? brand.tile : brand.mesh) : coarse()[id]).map(([x, y]) => [x * sx, y * sy]);
+      pts = (o.small ? coarse().small : coarse())[id].map(([x, y]) => [x * sx, y * sy]);
     } else pts = quadOf(id, o);
     return place(pts, o);
   }
