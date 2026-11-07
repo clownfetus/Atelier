@@ -191,7 +191,24 @@
   // Width for each tier when the glyph sets its own size: the frame it shows most (SPEC section 5).
   const ASPECT = {stage: VB.w / VB.h, inline: 440 / 216, micro: 37 / 24};
   const tierFor = height => (height >= 96 ? 'stage' : height >= 32 ? 'inline' : 'micro');
-  // One observer for every glyph.
+  // One of each observer and listener for every glyph.
+  const live = new Set();
+  const seen = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const engine = visible.get(entry.target);
+      if (engine) { engine.onScreen = entry.isIntersecting; engine.setVisible(entry.isIntersecting && !document.hidden); }
+    }
+  }) : null;
+  const visible = new WeakMap();
+  let listening = false;
+  function listen() {
+    if (listening) return;
+    listening = true;
+    document.addEventListener('visibilitychange', () => { for (const engine of live) engine.setVisible(engine.onScreen !== false && !document.hidden); });
+    window.addEventListener('atelier:preferences', () => { for (const engine of live) engine.policyChanged(); });
+    window.addEventListener('atelier:inks', () => { for (const engine of live) engine.themeChanged(); });
+    if (!window.AtelierMotionPolicy) window.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener('change', () => { for (const engine of live) engine.policyChanged(); });
+  }
   const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => {
     for (const entry of entries) resized.get(entry.target)?.(entry.contentRect.height);
   }) : null;
@@ -226,8 +243,12 @@
       else host.removeAttribute('data-glyph-asset');
     };
     sync();
-    const engine = new assembly.Engine(createView(host), tier, height);
+    const engine = new assembly.Engine(createView(host), tier, height, opts.reducedMotion === 'reduce');
     engine.run(state, asset);
+    engine.flush();
+    listen();
+    live.add(engine);
+    visible.set(host, engine);
 
     const handle = {
       // A busy state that follows the same busy state carries on, and a result doesn't animate twice.
@@ -250,6 +271,8 @@
         destroyed = true;
         engine.destroy();
         sizes?.unobserve(host);
+        seen?.unobserve(host);
+        live.delete(engine);
         mounted.delete(host);
         host.replaceChildren();
         host.classList.remove('atelier-glyph');
@@ -269,6 +292,7 @@
     if (window.__ATELIER_GLYPH_TEST__) handle.engine = engine;
     mounted.set(host, handle);
     sizes?.observe(host);
+    seen?.observe(host);
     return handle;
   }
 

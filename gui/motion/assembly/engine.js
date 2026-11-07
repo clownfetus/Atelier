@@ -38,8 +38,12 @@
   const JOSTLE_MS = 900;
 
   class Engine {
-    constructor(view, tier = 'inline', height = 48) {
+    constructor(view, tier = 'inline', height = 48, reduced = false) {
       this.view = view;
+      this.reduced = reduced;
+      this.visible = !document.hidden;
+      this.modeNow = this.mode();
+      this.formed = false;
       this.tier = tier;
       this.height = height;
       this.time = 0;
@@ -64,7 +68,35 @@
     }
 
     // ---------- the clock ----------
-    wake() { if (!this.destroyed) clock.add(this); }
+    // Time stops for a glyph nobody can see, so a state set meanwhile plays when it comes back into view.
+    wake() { if (!this.destroyed && this.visible && (this.dirty || this.tasks.length)) clock.add(this); }
+    setVisible(visible) {
+      if (visible === this.visible) return;
+      this.visible = visible;
+      if (visible) this.wake();
+      else clock.remove(this);
+    }
+    // Paint now, not on the next frame, so a new glyph is never blank.
+    flush() { this.dirty = false; this.view.render(this); if (!this.tasks.length) clock.remove(this); }
+    mode() {
+      if (this.reduced) return 'off';
+      const policy = window.AtelierMotionPolicy;
+      if (policy) return policy.mode();
+      return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'off' : 'full';
+    }
+    // A change to the Motion setting or to system reduced motion: the piece in flight lands, then the
+    // glyph follows the new setting. A shape that has already formed just holds, in the new setting's way.
+    policyChanged() {
+      const next = this.mode();
+      if (next === this.modeNow || !this.state) return;
+      this.modeNow = next;
+      if (this.state === 'busy' || !this.formed) this.run(this.state, this.asset);
+      else if (!this.settled || this.state === 'warning') this.run(this.state, this.asset, 'hold');
+    }
+    themeChanged() {
+      if (!this.settled && this.state !== 'warning') return;
+      if (this.state !== 'busy') { this.cols = this.heldColours(this.state); this.touch(); }
+    }
     touch() { this.dirty = true; this.wake(); }
     place(pose) { this.cur = pose; this.touch(); }
     tick(dt) {
@@ -127,9 +159,9 @@
     frameTo(name, fresh) {
       this.frameName = name;
       const to = this.frameFor(name), ft = ++this.frameTok;
-      if (fresh || this.tier === 'stage') { this.box = to; this.touch(); return; }
+      if (fresh || this.tier === 'stage') { this.box = to; this.touch(); return Promise.resolve(true); }
       const from = [...this.box];
-      this.animate(280, E.move, e => { this.box = from.map((v, i) => v + (to[i] - v) * e); }, () => ft === this.frameTok);
+      return this.animate(280, E.move, e => { this.box = from.map((v, i) => v + (to[i] - v) * e); }, () => ft === this.frameTok);
     }
 
     // ---------- moves ----------
@@ -212,24 +244,76 @@
       this.state = state;
       this.asset = asset;
       this.settled = false;
+      this.formed = false;
       if (this.moving) await this.moving; // let the piece in flight land first
       if (tk !== this.token) return;
       this.pace = 1;
+      this.modeNow = this.mode();
       if (how === 'place') {
-        if (state !== 'busy') { this.placeHeld(state); this.settled = true; return; }
+        if (state !== 'busy') { this.placeHeld(state); this.formed = this.settled = true; return; }
         this.fresh = true;
       }
       const fresh = this.fresh;
       this.fresh = false;
-      if (this.tier === 'micro') { await this.runMicro(tk, fresh); if (tk === this.token) this.settled = true; return; }
-      if (state === 'busy') await (asset ? this.runLoader(asset, tk, fresh) : this.runWorking(tk, fresh));
+      if (how === 'hold') await this.runHold(tk);
+      else if (this.modeNow === 'off') await this.runStill(tk, fresh);
+      else if (this.tier === 'micro') await this.runMicro(tk, fresh);
+      else if (state === 'busy') await (asset ? this.runLoader(asset, tk, fresh) : this.runWorking(tk, fresh));
       else if (state === 'success') await this.runSuccess(tk);
       else if (state === 'warning') await this.runWarning(tk);
       else if (state === 'error') await this.runError(tk);
       else if (state === 'brand') await this.runBrand(tk);
-      else await this.runInfo(tk);
-      if (tk === this.token) this.settled = true;
+      else await this.runInfo(tk, fresh);
+      if (tk === this.token) { this.formed = state !== 'busy'; this.settled = true; }
     }
+    // Off, or system reduced motion: no travel. Each state is a still pose, and the whole glyph
+    // cross-fades between them. This is the only fade allowed, and only for accessibility.
+    async crossFade(tk, change) {
+      const from = this.opacity ?? 1;
+      this.moving = this.animate(150 * from, E.linear, e => { this.opacity = from * (1 - e); }).then(() => { this.moving = null; });
+      await this.moving;
+      if (tk !== this.token) return false;
+      change();
+      this.moving = this.animate(150, E.linear, e => { this.opacity = e; }).then(() => { this.opacity = 1; this.touch(); this.moving = null; });
+      await this.moving;
+      return tk === this.token;
+    }
+    stillPose() {
+      if (this.state !== 'busy') return this.heldPose(this.state);
+      if (this.tier === 'micro') return micro().busy;
+      return this.asset ? rest() : fits()[0].contact;
+    }
+    async runStill(tk, fresh) {
+      const state = this.state, pose = this.stillPose();
+      const change = () => {
+        this.load = null;
+        this.fx = {punch: 1, dsx: 1, dsy: 1, ringR: 0, ringW: 0, ringOp: 0};
+        this.cols = this.heldColours(state);
+        this.frameName = state === 'busy' ? (this.asset ? 'row' : 'busy') : state === 'warning' || state === 'error' ? `${state}-formed` : state;
+        this.box = this.frameFor(this.frameName);
+        this.place(clone(pose));
+      };
+      if (fresh) change();
+      else if (!await this.crossFade(tk, change)) return;
+      if (state !== 'success' || this.tier === 'micro') return;
+      // Complete still changes colour: green after a beat, then home.
+      if (!await this.sleep(120, tk)) return;
+      await this.colourTo(all(this.view.status().complete), 240);
+      if (!await this.sleep(160, tk)) return;
+      await this.colourTo(CAT, 380);
+    }
+    // The shape is already formed and the setting changed: stay on it, in the new setting's way.
+    async runHold(tk) {
+      const state = this.state, pose = this.heldPose(state), cols = this.heldColours(state);
+      if (this.modeNow === 'off') {
+        await this.crossFade(tk, () => { this.cols = cols; this.place(clone(pose)); });
+        return;
+      }
+      this.colourTo(cols, 200);
+      if (!await this.tweenTo(pose, 240, E.rest, tk)) return;
+      if (state === 'warning' && this.wobbles()) await this.wobble(tk);
+    }
+    wobbles() { return this.tier === 'stage' && this.modeNow === 'full'; }
     // Micro: a static shape with one short settle, and a small jostle while busy (SPEC section 5).
     async runMicro(tk, fresh) {
       const name = this.state === 'brand' ? 'success' : this.state, base = micro()[name], status = this.view.status();
@@ -265,10 +349,11 @@
         }, () => tk === this.token)) return;
       }
     }
-    async runInfo(tk) {
-      this.frameTo('info');
+    async runInfo(tk, fresh) {
+      const framed = this.frameTo('info', fresh);
       if (!this.isCat()) this.colourTo(CAT, 240);
       if (!atRest(this.cur)) await this.openTo(rest(), tk);
+      await framed;
     }
     async runWorking(tk, fresh) {
       this.frameTo('busy', fresh);
@@ -295,13 +380,15 @@
       if (!this.isCat()) this.colourTo(CAT, 240);
       if (fresh) this.place(clone(rest()));
       else if (!atRest(this.cur) && !await this.openTo(rest(), tk)) return;
-      const loaders = {mesh: this.loadMesh, texture: this.loadTexture, material: this.loadMaterial};
+      const loaders = this.modeNow === 'calm'
+        ? {mesh: this.calmMesh, texture: this.calmTexture, material: this.calmMaterial}
+        : {mesh: this.loadMesh, texture: this.loadTexture, material: this.loadMaterial};
       this.moving = loaders[asset].call(this, tk).then(() => { this.moving = null; });
       await this.moving;
     }
     async runSuccess(tk) {
       const M = POSES.master;
-      this.frameTo('success');
+      const framed = this.frameTo('success');
       if (!this.isCat()) this.colourTo(CAT, 200);
       if (this.cur.teal.x < this.cur.blue.x) { // from the row: the mesh hops over the tile
         const from = clone(this.cur), to = standOff(nudge(M, 16));
@@ -315,21 +402,22 @@
       } else if (!await this.tweenTo(standOff(nudge(M, 16)), 340, E.move, tk)) return; // tile and disc to their seats, mesh stands off
       if (!await this.tweenTo(nudge(M, 16), 110, E.out, tk)) return; // the mesh comes in, already wound up
       if (!await this.tweenTo(nudge(M, -3), 80, E.snap, tk)) return; // snap: the mesh presses 3u past its seat
+      this.formed = true;
       const effects = this.impact();
       if (!await this.tweenTo(nudge(M, 1), 110, E.recoil, tk)) return; // recoil
       if (!await this.tweenTo(M, 130, E.rest, tk)) return; // rest
-      await effects;
+      await Promise.all([effects, framed]);
       if (!await this.sleep(160, tk)) return;
       await this.colourTo(CAT, 380);
     }
     // The click: hard contact, squash and punch and ripple, colour spreading from the disc.
     // Impact effects always finish: cutting them off would pop.
     impact() {
-      const {fx} = this, green = this.view.status().complete;
+      const {fx} = this, green = this.view.status().complete, colour = this.colourTo(all(green), 220, {disc: 0, blue: 60, teal: 120});
+      if (this.modeNow !== 'full') return colour; // Calm: the shape and the colour, without the flourish
       fx.dsx = .88; fx.dsy = 1.12; fx.punch = 1; fx.ringC = green;
       const ripple = this.tier !== 'stage' ? null : this.animate(620, E.out, (e, p) => { fx.ringR = 60 + e * 140; fx.ringW = 12 * Math.pow(1 - p, .6); fx.ringOp = Math.pow(1 - p, 1.4); });
       const squash = this.animate(300, E.punchBack, e => { fx.dsx = .88 + (1 - .88) * e; fx.dsy = 1.12 + (1 - 1.12) * e; });
-      const colour = this.colourTo(all(green), 220, {disc: 0, blue: 60, teal: 120});
       const punch = this.animate(70, E.punchOut, e => { fx.punch = 1 + .045 * e; })
         .then(() => this.animate(260, E.punchBack, e => { fx.punch = 1.045 - .045 * e; }));
       return Promise.all([ripple, squash, colour, punch]);
@@ -339,25 +427,30 @@
       this.frameTo('warning');
       if (!this.isCat()) this.colourTo(CAT, 200); // back to their own colours first
       if (!await this.assemble({...OUT.warning, contact: W}, W, tk)) return; // dot down, stem on the dot, tile on top
+      this.formed = true;
       this.colourTo(all(this.view.status().warning), 200);
       // Catch the balance: a few decaying sways, the tile lagging the stem.
       const sway = t => 5 * Math.exp(-2.4 * t) * Math.sin(2 * Math.PI * 1.3 * t);
-      if (this.tier !== 'stage') {
-        // At this size, one sway and then still.
+      if (!this.wobbles()) {
+        // One sway and then still.
         const swayMs = 1000 / 1.3 * .8;
         if (!await this.animate(swayMs, E.linear, (e, p) => {
           const t = p / 1.3, w = (1 - p) * (1 - p);
           this.cur = warningPose(WREST.th + sway(t) * w, WREST.ph - .6 * sway(Math.max(0, t - .1)) * w);
         }, alive)) return;
         this.place(clone(W));
-        this.frameTo('warning-formed');
+        await this.frameTo('warning-formed');
         return;
       }
       if (!await this.animate(1600, E.linear, (e, p) => {
         const t = p * 1.6, w = (1 - p) * (1 - p);
         this.cur = warningPose(WREST.th + sway(t) * w, WREST.ph - .6 * sway(Math.max(0, t - .1)) * w);
       }, alive)) return;
-      // Then keep wobbling gently for as long as the warning stands.
+      await this.wobble(tk);
+    }
+    // Keep wobbling gently for as long as the warning stands.
+    async wobble(tk) {
+      const alive = () => tk === this.token;
       for (let n = 0; tk === this.token; n++) {
         if (!await this.animate(2600, E.linear, (e, p) => {
           const a = 2 * Math.PI * p, amp = n ? 1 : p;
@@ -372,8 +465,8 @@
       if (!this.isCat()) this.colourTo(CAT, 200);
       if (!await this.assemble({...OUT.error, contact: open}, open, tk)) return; // bar down, bar across, disc pins them
       if (!await this.tweenTo(X, 150, E.out, tk)) return; // clamp shut
-      this.frameTo('error-formed');
-      await this.colourTo(all(this.view.status().error), 200);
+      this.formed = true;
+      await Promise.all([this.frameTo('error-formed'), this.colourTo(all(this.view.status().error), 200)]);
     }
 
     // The brand mark's route (the logo's entrance): the tile settles, the mesh waits, the disc comes in, the mesh closes.
@@ -429,6 +522,49 @@
       }
       this.load = null;
       await this.moveTo(rest(), 100, E.rest);
+    }
+    // Calm's loaders: nothing lifts, leans, slides or changes colour, and the rhythm is slow. One piece
+    // shows it's working with its own quietest gesture, and a new state lands within a step.
+    async calmMesh(tk) {
+      let last = -1;
+      while (tk === this.token) {
+        let i;
+        do { i = Math.floor(Math.random() * CONFIGS.length); } while (i === last);
+        last = i;
+        const load = this.load = {kind: 'mesh', lines: CONFIGS[i], w: 0};
+        await this.animate(240, E.windup, e => { load.w = G * e; });
+        await this.sleep(700, tk);
+        await this.animate(240, E.windup, e => { load.w = G * (1 - e); });
+        this.load = null;
+        this.touch();
+        if (!await this.sleep(420, tk)) break;
+      }
+      this.load = null;
+      this.touch();
+    }
+    async calmTexture(tk) {
+      while (tk === this.token) {
+        const load = this.load = {kind: 'texture', gap: 0, off: [0, 0, 0, 0, 0], tone: Array(BANDS).fill(CAT.blue)};
+        await this.animate(240, E.windup, e => { load.gap = 9 * e; });
+        await this.sleep(700, tk);
+        await this.animate(240, E.windup, e => { load.gap = 9 * (1 - e); });
+        this.load = null;
+        this.touch();
+        if (!await this.sleep(420, tk)) break;
+      }
+      this.load = null;
+      this.touch();
+    }
+    async calmMaterial(tk) {
+      while (tk === this.token) {
+        const load = this.load = {kind: 'material', at: -1.5, ang: 25};
+        await this.animate(620, E.move, e => { load.at = -1.5 + 2.9 * e; });
+        this.load = null;
+        this.touch();
+        if (!await this.sleep(980, tk)) break;
+      }
+      this.load = null;
+      this.touch();
     }
     async loadMaterial(tk) {
       const R = rest(), r = R.disc.r, D = 38, x0 = R.disc.x, base = 25;
