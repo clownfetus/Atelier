@@ -7,7 +7,7 @@
 .at-identity {
   --surface: var(--md-sys-color-surface);
   --surface-panel: var(--md-sys-color-surface-container);
-  --surface-sunk: var(--md-sys-color-surface-container-lowest);
+  --surface-sunk: var(--md-sys-color-surface-container-high);
   --line: var(--md-sys-color-outline-variant);
   --text: var(--md-sys-color-on-surface);
   --text-muted: var(--md-sys-color-on-surface-variant);

@@ -123,7 +123,9 @@ def assert_theme_tokens(page, mode, preset):
     # The identity's surfaces use the same theme.
     roles = page.evaluate("""() => { const host = document.createElement('div'); host.className = 'at-identity'; document.body.append(host);
       const css = getComputedStyle(host), read = name => { host.style.color = `var(${name})`; return css.color; };
-      const roles = {text: read('--text'), surface: (host.style.background = 'var(--surface)', css.backgroundColor)}; host.remove(); return roles; }""")
+      const roles = {text: read('--text'), surface: (host.style.background = 'var(--surface)', css.backgroundColor)};
+      host.style.background = 'var(--surface-sunk)'; roles.sunk = css.backgroundColor; host.remove(); return roles; }""")
+    assert roles.pop('sunk') != roles['surface'], (mode, preset, 'fields and pending dots need a fill that differs from the surface')
     plain = page.evaluate("""() => { const host = document.createElement('div'); document.body.append(host);
       host.style.color = 'var(--text)'; host.style.background = 'var(--bg)'; const css = getComputedStyle(host);
       const roles = {text: css.color, surface: css.backgroundColor}; host.remove(); return roles; }""")

@@ -34,8 +34,8 @@
 #viewport-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hero-emblem { width:24px; height:24px; object-fit:contain; flex:none; filter:brightness(0) invert(1); }
 :root[data-theme=light] .hero-emblem { filter:brightness(0); opacity:.8; }
-#viewport-head #viewport-mat-save { background:#3769aa; border-color:#3769aa; color:#fff; font-weight:600; padding:9px 18px; white-space:nowrap; }
-#viewport-head #viewport-mat-save:hover:not(:disabled) { background:#2b568e; }
+#viewport-head #viewport-mat-save { background:var(--md-sys-color-primary); border-color:var(--md-sys-color-primary); color:var(--md-sys-color-on-primary); font-weight:600; padding:9px 18px; white-space:nowrap; }
+#viewport-head #viewport-mat-save:hover:not(:disabled) { background:var(--studio-primary-hover); }
 #viewport-unsaved { width:auto; flex:none; color:var(--muted); font-size:var(--studio-text-detail); white-space:nowrap; }
 #viewport-unsaved.is-dirty { color:var(--acc); }
 #viewport-body { flex:1; display:flex; min-height:0; }
@@ -57,7 +57,7 @@
 #viewport-inspect-tools > button { border-color:transparent; background:transparent; }
 .vp-segment { display:flex; border:1px solid var(--border2); border-radius:var(--studio-shape-small); background:var(--bg2); overflow:hidden; }
 #viewport-box .vp-segment button { border:0; border-radius:0; min-width:78px; background:transparent; }
-#viewport-box .vp-segment button[aria-pressed=true] { background:#3769aa; color:#fff; }
+#viewport-box .vp-segment button[aria-pressed=true] { background:var(--md-sys-color-primary); color:var(--md-sys-color-on-primary); }
 .vp-menu { position:relative; }
 #viewport-box .vp-menu > summary { display:flex; align-items:center; justify-content:center; gap:8px; list-style:none; user-select:none; white-space:nowrap; }
 #viewport-box summary::-webkit-details-marker { display:none; }
