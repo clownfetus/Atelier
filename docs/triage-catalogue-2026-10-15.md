@@ -1,10 +1,10 @@
 # Atelier triage catalogue — 15 October 2026
 
-Source: https://claude.ai/artifact/Ng5HzAGKBEbQP2yYMCXPbF
+Source: historical engineering triage board. Raw conversation research is excluded from this repository.
 
 Transcribed from the user-supplied Chrome accessibility snapshot and screenshot, not a live browser sweep. The snapshot exposes full notes for 24 active proposals and titles/statuses for 25 closed proposals. Source claims are preserved here separately from the [current-code audit](triage-code-audit-2026-10-15.md).
 
-The board cites 29,871 messages, 6 DMs and 2 user logs, cross-referenced against code, covering 20 March–15 October 2026. Mesh editing and 3D preview are excluded. Reports count distinct reports per proposal and overlap; do not sum them. There are 49 proposals, 25 closed, 7 active with high/critical value, 12 new since the prior sweep and 1 fixed on main awaiting release.
+The board summarises historical issue reports and user logs, cross-referenced against code, covering 20 March–15 October 2026. Mesh editing and 3D preview are excluded. Reports count distinct reports per proposal and overlap; do not sum them. There are 49 proposals, 25 closed, 7 active with high/critical value, 12 new since the prior sweep and 1 fixed on main awaiting release.
 
 ## Active proposals
 
@@ -27,7 +27,7 @@ Unless specified otherwise, source status is Open. “Active” includes fixed-o
 |47|Hide an entire material part using MI_Hide|Medium|Medium|4|
 |31|Show export/download destination|Medium|Trivial|3|
 |32|Label dye preview as approximate|Medium|Trivial|1|
-|33|Review cartbuddy’s reproduction ZIP and reply|Medium|Trivial|1|
+|33|Review a supplied reproduction ZIP and record the outcome|Medium|Trivial|1|
 |36|Real texture-injection and pak-path regression suite|Medium|Large|0|
 |24|Copy material parameters to an instance|Low|Medium|2|
 |25|LUT support for recolour preview|Low|Large|1|
