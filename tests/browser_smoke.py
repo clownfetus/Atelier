@@ -98,6 +98,7 @@ def main():
     parser.add_argument('--motionboard-only', action='store_true', help='Run the VFX Motionboard timeline, proxy and persistence checks')
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
+    parser.add_argument('--glyph-only', action='store_true', help='Run only the assembly glyph checks: planner, clearance, states and Preview motion')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
@@ -502,6 +503,19 @@ def main():
                     browser.close()
                     return
 
+                if args.glyph_only:
+                    from assembly_planner_checks import run_assembly_planner_checks
+                    from assembly_clearance_checks import run_assembly_clearance_checks
+                    from assembly_state_checks import run_assembly_state_checks
+                    run_assembly_planner_checks(context, url, report, checks)
+                    run_assembly_clearance_checks(context, url, report, checks)
+                    run_assembly_state_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
                 if args.category_icons_only:
                     from category_icon_checks import run_category_icon_checks
                     run_category_icon_checks(page, context, url, report, checks)
@@ -530,6 +544,12 @@ def main():
                 from context_ink_checks import run_context_ink_checks
                 run_context_ink_checks(context, url, report, checks)
                 run_workflow_motion_checks(context, url, report, checks)
+                from assembly_planner_checks import run_assembly_planner_checks
+                from assembly_clearance_checks import run_assembly_clearance_checks
+                from assembly_state_checks import run_assembly_state_checks
+                run_assembly_planner_checks(context, url, report, checks)
+                run_assembly_clearance_checks(context, url, report, checks)
+                run_assembly_state_checks(context, url, report, checks)
                 from working_panels_checks import run_working_panels_checks
                 run_working_panels_checks(context, url, report, checks)
                 from fluid_work_checks import run_fluid_work_checks
