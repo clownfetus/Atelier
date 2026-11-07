@@ -174,54 +174,17 @@ def main():
                            for row in appearance['rows']), appearance
                 result['appearance'] = appearance
                 motion = window.evaluate_js("""(() => {
-                  const host = document.createElement('span'); document.body.append(host);
-                  const instance = AtelierMotion.exportFeedback.mount(host, {state:'busy', reducedMotion:'reduce'});
-                  const busy = host.dataset.amState;
-                  instance.setState('success');
-                  const success = host.dataset.amState;
-                  const opacity = getComputedStyle(host.querySelector('.am-export-feedback-outcome-success')).opacity;
-                  const animations = host.getAnimations({subtree:true}).length;
-                  instance.destroy(); instance.destroy();
-                  const clean = !host.querySelector('svg') && !host.dataset.amState;
-                  host.remove(); return {busy, success, opacity, animations, clean};
+                  const host = document.createElement('span'); host.style.cssText = 'display:block;width:73px;height:36px';
+                  document.body.append(host);
+                  const glyph = AtelierMotion.glyph.mount(host, {state:'busy', reducedMotion:'reduce'});
+                  const tier = host.dataset.glyphTier;
+                  const states = ['busy', 'success', 'warning', 'error', 'info'].map(state => { glyph.set(state); return host.dataset.glyphState; });
+                  glyph.destroy(); glyph.destroy();
+                  const clean = !host.children.length && !host.hasAttribute('data-atelier-motion');
+                  host.remove(); return {tier, states, clean};
                 })()""")
-                assert motion == {'busy': 'busy', 'success': 'success', 'opacity': '1',
-                                  'animations': 0, 'clean': True}, motion
-                result['export_motion'] = motion
-                loader_motion = window.evaluate_js("""(() => {
-                  const host = document.createElement('span'); document.body.append(host);
-                  const instance = AtelierMotion.viewportLoader.mount(host, {state:'loading', reducedMotion:'reduce'});
-                  const width = host.getBoundingClientRect().width;
-                  const states = ['loading', 'empty', 'error', 'ready'].map(state => {
-                    instance.setState(state);
-                    return {state:host.dataset.amState, animations:host.getAnimations({subtree:true}).length};
-                  });
-                  instance.destroy(); instance.destroy();
-                  const clean = !host.querySelector('svg') && !host.dataset.amState;
-                  host.remove(); return {width, states, clean};
-                })()""")
-                assert loader_motion['width'] == 72 and loader_motion['clean'], loader_motion
-                assert [s['state'] for s in loader_motion['states']] == ['loading', 'empty', 'error', 'ready'], loader_motion
-                assert all(s['animations'] == 0 for s in loader_motion['states']), loader_motion
-                result['viewport_motion'] = loader_motion
-                material_motion = window.evaluate_js("""(() => {
-                  const host = document.createElement('span'); document.body.append(host);
-                  const instance = AtelierMotion.materialSave.mount(host, {state:'saving', reducedMotion:'reduce'});
-                  const width = host.getBoundingClientRect().width;
-                  const states = ['saving', 'success', 'warning', 'error'].map(state => {
-                    instance.setState(state);
-                    const visible = state === 'saving' ? '.am-material-save-saving-ring' : '.am-material-save-outcome-' + state;
-                    return {state:host.dataset.amState, opacity:getComputedStyle(host.querySelector(visible)).opacity,
-                      animations:host.getAnimations({subtree:true}).length};
-                  });
-                  instance.destroy(); instance.destroy();
-                  const clean = !host.querySelector('svg') && !host.dataset.amState;
-                  host.remove(); return {width, states, clean};
-                })()""")
-                assert material_motion['width'] == 24 and material_motion['clean'], material_motion
-                assert [s['state'] for s in material_motion['states']] == ['saving', 'success', 'warning', 'error'], material_motion
-                assert all(float(s['opacity']) > .9 and s['animations'] == 0 for s in material_motion['states']), material_motion
-                result['material_save_motion'] = material_motion
+                assert motion == {'tier': 'inline', 'states': ['busy', 'success', 'warning', 'error', 'info'], 'clean': True}, motion
+                result['glyph_motion'] = motion
                 # Hidden desktop startup may intentionally skip the logo entrance.
                 # Exercise the component independently, preserving the real fallback.
                 window.evaluate_js("""(() => {

@@ -81,73 +81,10 @@ def run_material_save_motion_checks(page, context, url, report, checks):
 
     try:
         material_page.goto(url)
-        material_page.wait_for_function('window.__materialSaveViewport && window.AtelierMotion?.materialSave && window.AtelierMaterialSaveFeedback && window.atelierProject?.()')
+        material_page.wait_for_function('window.__materialSaveViewport && window.AtelierMotion?.glyph && window.AtelierMaterialSaveFeedback && window.atelierProject?.()')
         material_page.wait_for_selector('#grid-area .card')
         material_page.emulate_media(reduced_motion='no-preference')
-        material_page.evaluate(r"""() => {
-          window.materialMotionHost=document.createElement('span'); document.body.append(materialMotionHost);
-          window.materialMotion=AtelierMotion.materialSave.mount(materialMotionHost,{state:'saving'});
-          window.materialEffects=materialMotionHost.getAnimations({subtree:true});
-          if (!materialEffects.length) throw Error('Saving did not animate');
-          materialMotion.setState('saving');
-          if (!materialEffects.every(a=>materialMotionHost.getAnimations({subtree:true}).includes(a)))
-            throw Error('Repeated saving restarted the loop');
-          materialMotion.setState('success');
-          if (!materialEffects.every(a=>a.playState==='idle')) throw Error('Saving survived success');
-        }""")
-        for state in ('success', 'warning', 'error'):
-            material_page.evaluate('state=>materialMotion.setState(state)', state)
-            material_page.wait_for_function('!materialMotionHost.getAnimations({subtree:true}).length')
-            assert material_page.evaluate(f'getComputedStyle(materialMotionHost.querySelector(".am-material-save-outcome-{state}")).opacity') == '1'
-        material_page.evaluate(r"""() => {
-          materialMotion.setState('saving');
-          const previous=materialMotion, effects=materialMotionHost.getAnimations({subtree:true});
-          materialMotion=AtelierMotion.materialSave.mount(materialMotionHost,{state:'saving'});
-          previous.destroy(); previous.setState('error');
-          if (!effects.every(a=>a.playState==='idle') || materialMotionHost.querySelectorAll('svg').length!==1)
-            throw Error('Duplicate mount retained old effects/artwork');
-          if (materialMotionHost.dataset.amState!=='saving') throw Error('Old handle modified replacement');
-        }""")
-        material_page.emulate_media(reduced_motion='reduce')
-        material_page.wait_for_function("materialMotionHost.dataset.amReduced==='true' && !materialMotionHost.getAnimations({subtree:true}).length")
-        material_page.evaluate("materialMotion.setState('success'); materialMotion.replay()")
-        assert material_page.evaluate('materialMotionHost.getAnimations({subtree:true}).length') == 0
-        material_page.emulate_media(reduced_motion='no-preference')
-        material_page.evaluate("materialMotion.setReducedMotion('reduce'); materialMotion.setState('saving')")
-        assert material_page.evaluate('materialMotionHost.getAnimations({subtree:true}).length') == 0
-        material_page.evaluate(r"""() => {
-          materialMotion.setReducedMotion('system');
-          Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.materialHidden});
-          window.materialHidden=true; document.dispatchEvent(new Event('visibilitychange'));
-          if (materialMotionHost.getAnimations({subtree:true}).length) throw Error('Hidden save still animates');
-          materialHidden=false; document.dispatchEvent(new Event('visibilitychange'));
-          if (!materialMotionHost.getAnimations({subtree:true}).length) throw Error('Pending save did not resume');
-          materialHidden=true; document.dispatchEvent(new Event('visibilitychange'));
-          materialMotion.setState('success');
-          materialHidden=false; document.dispatchEvent(new Event('visibilitychange'));
-          if (materialMotionHost.getAnimations({subtree:true}).length) throw Error('Hidden completion replayed');
-          delete document.hidden;
-          materialMotion.destroy(); materialMotion.destroy(); materialMotion.setState('saving');
-          if (materialMotionHost.querySelector('svg')) throw Error('Destroy left save SVG');
-          const original=Element.prototype.animate;
-          try {
-            for (const mode of ['missing','throwing','partial']) {
-              let calls=0;
-              Element.prototype.animate=mode==='missing' ? undefined : function(...args) {
-                if (mode==='throwing' || ++calls===2) throw Error('Fixture WAAPI failure');
-                return original.apply(this,args);
-              };
-              const instance=AtelierMotion.materialSave.mount(materialMotionHost,{state:'saving'});
-              instance.setState('success');
-              if (!materialMotionHost.querySelector('svg')) throw Error('WAAPI failure lost static result');
-              instance.destroy();
-              if (materialMotionHost.getAnimations({subtree:true}).length) throw Error('WAAPI failure leaked effects');
-            }
-          } finally { Element.prototype.animate=original; }
-          materialMotionHost.remove();
-          window.materialOriginalProject=_activeProjectName; _activeProjectName='Save Ω';
-        }""")
-        checks.append('Material-save SVG settles outcomes, handles remounts/reduced motion/visibility and survives absent or partially failing WAAPI')
+        material_page.evaluate("() => { window.materialOriginalProject=_activeProjectName; _activeProjectName='Save Ω'; }")
 
         clear_toasts()
         open_editor()

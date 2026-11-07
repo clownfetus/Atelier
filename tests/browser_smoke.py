@@ -99,7 +99,7 @@ def main():
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
     parser.add_argument('--glyph-only', action='store_true', help='Run only the assembly glyph checks: planner, clearance, states and Preview motion')
-    parser.add_argument('--krackle-motion-only', action='store_true', help='Run only the motion checks in krackle_motion_checks.py')
+    parser.add_argument('--glyph-surfaces-only', action='store_true', help='Run only the checks in glyph_surfaces_checks.py')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
@@ -113,7 +113,7 @@ def main():
     parser.add_argument('--find-only', action='store_true', help='Check global search, roster home and Continue')
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
-    parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
+    parser.add_argument('--surfaces-only',action='store_true',help='Check startup, the index failure notice and the update button')
     parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--logo-only', action='store_true', help="Check the header logo's entrance")
     parser.add_argument('--empty-assets-only', action='store_true', help="Check the Mod tray's empty state")
@@ -340,8 +340,6 @@ def main():
                     run_material_save_motion_checks(page, context, url, report, checks)
                     run_export_motion_checks(page, context, url, report, checks)
                     run_export_review_checks(page, context, url, report, checks)
-                    from ink_well_checks import run_ink_well_checks
-                    run_ink_well_checks(context, url, report, checks)
                     run_viewport_loading_checks(page, context, url, report, checks)
                     run_viewport_motion_checks(page, context, url, report, checks)
                     assert not errors, errors
@@ -520,9 +518,9 @@ def main():
                     browser.close()
                     return
 
-                if args.krackle_motion_only:
-                    from krackle_motion_checks import run_krackle_motion_checks
-                    run_krackle_motion_checks(page, context, url, report, checks)
+                if args.glyph_surfaces_only:
+                    from glyph_surfaces_checks import run_glyph_surfaces_checks
+                    run_glyph_surfaces_checks(page, context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks: print('PASS '+check)
@@ -625,10 +623,8 @@ def main():
                 run_empty_assets_motion_checks(page, context, url, report, checks)
                 from logo_motion_checks import run_logo_motion_checks
                 run_logo_motion_checks(page, context, url, report, checks)
-                from krackle_motion_checks import run_krackle_motion_checks
-                run_krackle_motion_checks(page, context, url, report, checks)
-                from ink_well_checks import run_ink_well_checks
-                run_ink_well_checks(context, url, report, checks)
+                from glyph_surfaces_checks import run_glyph_surfaces_checks
+                run_glyph_surfaces_checks(page, context, url, report, checks)
 
                 from release_interface_checks import run_release_interface_checks
                 run_release_interface_checks(page, context, browser, url, report, checks)

@@ -1,4 +1,4 @@
-"""Export SVG/controller and real frontend export hooks, using local API fixtures."""
+"""The real frontend export hooks and their feedback, using local API fixtures."""
 from urllib.parse import quote
 
 
@@ -9,106 +9,9 @@ def run_export_motion_checks(page, context, url, report, checks):
     motion_page.on('pageerror', lambda error: errors.append(str(error)))
     try:
         motion_page.goto(url)
-        motion_page.wait_for_function("window.AtelierMotion?.exportFeedback && window.AtelierExportFeedback && window.atelierProject?.()")
+        motion_page.wait_for_function("window.AtelierMotion?.glyph && window.AtelierExportFeedback && window.atelierProject?.()")
         motion_page.wait_for_selector('#grid-area .card')
         motion_page.emulate_media(reduced_motion='no-preference')
-        motion_page.evaluate("""() => {
-          window.motionHost = document.createElement('span');
-          document.body.append(motionHost);
-          window.motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'busy'});
-          window.motionAnimations = motionHost.getAnimations({subtree:true});
-          if (!motionAnimations.length) throw Error('Busy state did not animate');
-          if (motionAnimations.some(a=>a.effect.getTiming().iterations === Infinity && a.effect.getTiming().duration !== AtelierMotion.beatMs))
-            throw Error('Export ring lost the shared busy beat');
-          motionInstance.setState('busy');
-          const repeated = motionHost.getAnimations({subtree:true});
-          if (!motionAnimations.every(a => repeated.includes(a))) throw Error('Repeated busy restarted motion');
-          motionInstance.setState('success');
-          if (!motionAnimations.every(a => a.playState === 'idle')) throw Error('Old busy loop survived success');
-        }""")
-        motion_page.wait_for_function('motionHost.getAnimations({subtree:true}).length === 0')
-        assert motion_page.evaluate("getComputedStyle(motionHost.querySelector('.am-export-feedback-outcome-success')).opacity") == '1'
-        motion_page.evaluate("""() => {
-          motionInstance.destroy();
-          motionInstance.destroy();
-          motionInstance.setState('busy');
-          if (motionHost.querySelector('svg')) throw Error('Destroy left owned SVG');
-          motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'success'});
-          if (!motionHost.getAnimations({subtree:true}).length) throw Error('Fresh success toast did not animate');
-          motionInstance.setState('busy');
-        }""")
-        checks.append('Export motion handles repeated states, terminal mounting, interruption and finished-effect cleanup')
-
-        motion_page.emulate_media(reduced_motion='reduce')
-        motion_page.wait_for_function("motionHost.dataset.amReduced === 'true' && !motionHost.getAnimations({subtree:true}).length")
-        motion_page.evaluate("motionInstance.setReducedMotion('system'); motionInstance.setState('success')")
-        assert motion_page.evaluate('motionHost.getAnimations({subtree:true}).length') == 0
-        motion_page.emulate_media(reduced_motion='no-preference')
-        motion_page.evaluate("motionInstance.setReducedMotion('reduce'); motionInstance.setState('warning')")
-        assert motion_page.evaluate('motionHost.getAnimations({subtree:true}).length') == 0
-        assert motion_page.evaluate("getComputedStyle(motionHost.querySelector('.am-export-feedback-well')).transitionDuration") == '0s'
-        motion_page.evaluate("""() => {
-          motionInstance.setReducedMotion('system'); motionInstance.setState('busy');
-          Object.defineProperty(document, 'hidden', {configurable:true, get:()=>window.motionHidden});
-          window.motionHidden = true;
-          document.dispatchEvent(new Event('visibilitychange'));
-          const runningMotion = () => motionHost.getAnimations({subtree:true}).filter(a=>a.constructor.name === 'Animation');
-          if (runningMotion().length) throw Error('Hidden document kept animating');
-          motionInstance.setState('success');
-          window.motionHidden = false;
-          document.dispatchEvent(new Event('visibilitychange'));
-          if (runningMotion().length) throw Error('Hidden one-shot replayed on return');
-          motionInstance.setState('busy');
-          motionHidden = true; document.dispatchEvent(new Event('visibilitychange'));
-          motionHidden = false; document.dispatchEvent(new Event('visibilitychange'));
-          if (!motionHost.getAnimations({subtree:true}).length) throw Error('Busy motion did not resume');
-          delete document.hidden;
-          motionInstance.destroy();
-        }""")
-        checks.append('OS/forced reduced motion stop CSS and WAAPI; hidden work pauses and completed one-shots stay settled')
-
-        motion_page.evaluate("""() => {
-          const original = Element.prototype.animate;
-          try {
-            for (const unavailable of [undefined, () => {throw Error('WAAPI unavailable')}]) {
-              Element.prototype.animate = unavailable;
-              const instance = AtelierMotion.exportFeedback.mount(motionHost, {state:'busy'});
-              instance.setState('success');
-              if (!motionHost.querySelector('svg') || motionHost.dataset.amState !== 'success')
-                throw Error('Missing animation support lost static feedback');
-              instance.destroy();
-            }
-          } finally { Element.prototype.animate = original; }
-          motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'busy'});
-          window.detachedAnimations = motionHost.getAnimations({subtree:true});
-          motionHost.remove();
-        }""")
-        motion_page.wait_for_function("detachedAnimations.every(a => a.playState === 'idle') && !motionHost.querySelector('svg')")
-        motion_page.evaluate("""() => {
-          motionInstance.setState('success'); motionInstance.destroy();
-          document.body.append(motionHost);
-          motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'idle'});
-          if (motionHost.querySelectorAll('svg').length !== 1) throw Error('Remount duplicated artwork');
-          motionInstance.setState('busy');
-          const old = motionInstance, oldSvg = motionHost.querySelector('svg');
-          const oldAnimations = motionHost.getAnimations({subtree:true});
-          motionInstance = AtelierMotion.exportFeedback.mount(motionHost, {state:'busy'});
-          old.setState('error'); old.destroy();
-          if (oldSvg.isConnected || !oldAnimations.every(a=>a.playState === 'idle'))
-            throw Error('Duplicate mount kept old artwork or animation');
-          if (motionHost.dataset.amState !== 'busy' || motionHost.querySelectorAll('svg').length !== 1)
-            throw Error('Old controller interfered with replacement mount');
-          window.removedSvgAnimations = motionHost.getAnimations({subtree:true});
-          motionHost.querySelector('svg').remove();
-        }""")
-        motion_page.wait_for_function("removedSvgAnimations.every(a=>a.playState === 'idle') && !motionHost.dataset.amState")
-        motion_page.evaluate("""() => {
-          motionInstance.setState('success');
-          if (motionHost.dataset.amState) throw Error('Removed SVG controller still changed host');
-          motionInstance.destroy(); motionHost.remove();
-        }""")
-        checks.append('Missing/throwing WAAPI preserves feedback; host/SVG removal and duplicate mounting clean up motion')
-
         response = {'value': {'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}}
         requests = []
 

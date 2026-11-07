@@ -92,29 +92,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert not tab.locator('.startup-glyph').is_visible()
         assert tab.evaluate("getComputedStyle(document.querySelector('#startup-splash > img')).display")=='block'
         tab.evaluate("AtelierSurfaces.startupDone();document.getElementById('startup-splash').remove()")
-        mode('full')
-        tab.evaluate("window.perfHost=document.createElement('div');perfHost.style='position:fixed;top:100px;left:300px;z-index:1000';document.body.append(perfHost);window.perfStage=AtelierMotion.krackleStage.mount(perfHost,{state:'busy',size:224})")
-        tab.wait_for_timeout(1800)
-        perf=tab.evaluate('perfStage.perf()');(report/'krackle-frame-perf.json').write_text(json.dumps(perf,indent=2))
-        assert perf['samples']>=10 and perf['medianMs']<8,perf
-        print(f"Krackle frame CPU median: {perf['medianMs']:.2f} ms ({perf['samples']} samples; filter={perf['filter']})",flush=True)
-        for value in ['calm','off']:
-            mode(value);tab.wait_for_function("perfHost.dataset.amSleeping==='true'")
-            frames=tab.evaluate('perfStage.frames()');tab.wait_for_timeout(120);assert frames==tab.evaluate('perfStage.frames()')
-        mode('full');tab.emulate_media(reduced_motion='reduce');tab.wait_for_timeout(100)
-        assert tab.evaluate('AtelierMotionPolicy.tier()')==0
-        tab.evaluate('perfStage.destroy();perfHost.remove()');tab.emulate_media(reduced_motion='no-preference')
-        mode('full')
-        fallback=tab.evaluate("""() => {
-          const nativeRAF=requestAnimationFrame,nativeCancel=cancelAnimationFrame;let next;
-          window.requestAnimationFrame=fn=>{next=fn;return 987654;};window.cancelAnimationFrame=()=>{};
-          const host=document.createElement('div');document.body.append(host);let stage;
-          try{stage=AtelierMotion.krackleStage.mount(host,{state:'busy',size:156});let now=100;
-            for(let i=0;i<30;i++){const fn=next;now+=i<10?8:40;fn(now);}return stage.perf();
-          }finally{stage?.destroy();host.remove();window.requestAnimationFrame=nativeRAF;window.cancelAnimationFrame=nativeCancel;}
-        }""")
-        assert fallback['filter'] is False,fallback
-        checks.append('Startup shows the working glyph at Stage beside the counted bar in Full and the still logo in Calm; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline')
+        checks.append('Startup shows the working glyph at Stage beside the counted bar in Full and the still logo in Calm')
         mode('full')
         failure=tab.evaluate("""() => {
           document.getElementById('toast-area').replaceChildren();

@@ -1,22 +1,16 @@
-"""Krackle animations added across the app, using the real frontend and local fixtures only."""
-import subprocess
-import sys
+"""The glyph where the app shows it: spinners, bars, captions, empty grids and Activity. Real frontend, local fixtures."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run_krackle_motion_checks(page, context, url, report, checks):
-    art = subprocess.run([sys.executable, str(ROOT / 'scripts/krackle_art.py'), '--check'],
-                         capture_output=True, text=True)
-    assert art.returncode == 0, art.stdout + art.stderr
-
+def run_glyph_surfaces_checks(page, context, url, report, checks):
     tab = context.new_page()
     errors = []
     tab.on('pageerror', lambda error: errors.append(str(error)))
     try:
         tab.goto(url)
-        tab.wait_for_function("window.AtelierMotion?.krackleGlyph && window.AtelierEmptyGlyph && window.AtelierMotion?.krackleStage && window.atelierProject?.()")
+        tab.wait_for_function("window.AtelierMotion?.glyph && window.AtelierEmptyGlyph && window.atelierProject?.()")
         tab.wait_for_selector('#grid-area .card')
         tab.emulate_media(reduced_motion='no-preference')
 
@@ -85,7 +79,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         assert bars['fillImage'] == 'none' and bars['trackImage'] == 'none', bars
         checks.append('A bar shows only counted steps in plain colour; with nothing to count there is no bar')
 
-        # Job toasts resolve from the charge ring into a Krackle result that pops once, then holds still.
+        # Job toasts resolve from the charge ring into a glyph result that pops once, then holds still.
         # The export-feedback set owns operation toasts; without it, app.js falls back to the small toast glyph.
         # Ordinary informational and warning toasts keep their Material icons.
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
@@ -178,40 +172,6 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.wait_for_selector('#grid-area .card')
         checks.append('Empty folder and no-match grids keep their text with a still glyph at rest, a failed load shows the X, and the drawing is the fallback')
 
-        # The Krackle stage: busy keeps drawing, a result settles and stops, destroy cleans up.
-        tab.evaluate("""() => {
-          window.stageHost = document.createElement('div'); document.body.append(stageHost);
-          stageHost.style.cssText='position:fixed;top:20px;left:20px;width:160px;height:160px';
-          window.stage = AtelierMotion.krackleStage.mount(stageHost, {state:'busy', size:160});
-        }""")
-        tab.wait_for_timeout(400)
-        first = tab.evaluate('stage.frames()')
-        tab.wait_for_function('first=>stage.frames()>first&&stageHost.dataset.amSleeping==="false"', arg=first, timeout=8000)
-        tab.evaluate("stage.setState('success')")
-        tab.wait_for_function("stageHost.dataset.amSleeping === 'true'", timeout=8000)
-        settled = tab.evaluate('stage.frames()')
-        tab.wait_for_timeout(300)
-        assert tab.evaluate('stage.frames()') == settled
-        tab.evaluate("stage.setState('error')")
-        tab.wait_for_function("stageHost.dataset.amSleeping === 'true'", timeout=10000)
-        tab.evaluate("stage.setReducedMotion('reduce'); stage.setState('busy')")
-        assert tab.evaluate("stageHost.dataset.amSleeping") == 'true'
-        tab.evaluate("stage.destroy(); stage.destroy()")
-        assert tab.evaluate("!stageHost.querySelector('canvas, svg') && !stageHost.dataset.atelierMotion")
-        checks.append('Krackle stage loops only while busy, stops drawing once a result settles, honours reduced motion and cleans up')
-
-        # A stage in a hidden dialog stops drawing; a busy-after-busy does not restart the drop.
-        tab.evaluate("""() => {
-          window.hiddenHost = document.createElement('div'); hiddenHost.style.display = 'none'; document.body.append(hiddenHost);
-          window.hiddenStage = AtelierMotion.krackleStage.mount(hiddenHost, {state:'busy', size:120});
-        }""")
-        tab.wait_for_timeout(500)
-        assert tab.evaluate('hiddenStage.frames()') <= 2 and tab.evaluate("hiddenHost.dataset.amSleeping") == 'true'
-        tab.evaluate("hiddenHost.style.display = ''")
-        tab.wait_for_function("hiddenHost.dataset.amSleeping === 'false'", timeout=3000)
-        tab.evaluate("hiddenStage.destroy(); hiddenHost.remove()")
-        checks.append('Hidden Krackle stages stop drawing and resume when their dialog is shown')
-
         # Activity: a counted ring in plain colour; work that can't be counted is the Micro glyph.
         tab.evaluate("""async () => {
           const ring = document.createElement('span'); ring.className = 'activity-ring indeterminate spinner';
@@ -225,59 +185,10 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           document.getElementById('job-activity').prepend(counted);
           const after = getComputedStyle(counted, '::after').content, mask = getComputedStyle(counted).maskImage || '';
           counted.remove();
-          if (after !== 'none' || mask.startsWith('url(')) throw Error('The counted ring still has Krackle dots: ' + [after, mask]);
+          if (after !== 'none' || mask.startsWith('url(')) throw Error('The counted ring still has dots: ' + [after, mask]);
         }""")
         checks.append('Activity shows a counted ring in plain colour, and the Micro glyph for work it cannot count')
 
-        # The setup check band loops only while busy. The setup drop runs down a dotted line only as
-        # far as the rows are valid and falls into the export review's ink-well once all are; the
-        # well cooks until then and lands as its success. A row stopping being valid, or
-        # reduced motion, settles at once.
-        tab.evaluate("""() => {
-          const page = window.wellPage = document.createElement('section');
-          page.className = 'at-identity'; page.style.cssText = 'position:fixed;left:40px;top:40px;width:400px;height:460px;z-index:9999';
-          page.innerHTML = [0, 1, 2].map(i => '<div class="fixture-row" style="position:absolute;left:0;right:0;top:' + (20 + i * 68) + 'px;height:68px">' +
-            '<span class="fixture-glyph" style="position:absolute;left:0;top:24px;width:20px;height:20px"></span></div>').join('') +
-            '<span id="fixture-well" style="position:absolute;left:0;top:250px"></span><span id="fixture-line" style="position:absolute;left:0;right:0;top:0;height:72px"></span>';
-          document.body.append(page);
-          window.wellInfo = waiting => ({rows: page.querySelectorAll('.fixture-row'), glyphs: page.querySelectorAll('.fixture-glyph'), waiting});
-          window.well = AtelierMotion.setupDrop.mount(page.querySelector('#fixture-well'), {layer: page, size: 176});
-          window.line = AtelierMotion.setupCheck.mount(page.querySelector('#fixture-line'), {state: 'busy'});
-          well.setProgress(0, wellInfo('busy'));
-        }""")
-        host = "document.getElementById('fixture-well').dataset"
-        state = f"[{host}.amReached, {host}.amFull, {host}.amMoving].join()"
-        ink = "document.querySelector('#fixture-well [data-atelier-motion=ink-well]').dataset"
-        tab.wait_for_function(f"[{ink}.amState, {ink}.amSleeping].join() === 'busy,false'", timeout=3000)
-        lid = "document.querySelector('#fixture-well .am-setup-drop-lid-swing')"
-        assert tab.evaluate(f"{host}.amLid") == 'shut' and tab.evaluate(f"getComputedStyle({lid}).transform") == 'none'
-        assert tab.evaluate(state) == '0,false,false' and tab.evaluate("document.getElementById('fixture-line').dataset.amRunning") == 'true'
-        assert tab.locator('.am-setup-drop-flight .am-setup-drop-flier').count() == 1
-        assert tab.locator('.am-setup-drop-flight[data-am-waiting=busy]').count() == 1
-        dots = tab.locator('.am-setup-drop-line .am-setup-drop-dot')
-        assert dots.count() > 12 and tab.locator('.am-setup-drop-line .is-inked').count() <= 1
-        tab.evaluate("well.setProgress(2, wellInfo('still'))")
-        assert tab.evaluate(f"{host}.amMoving") == 'true'
-        tab.wait_for_function(f"{state} === '2,false,false'", timeout=3000)
-        inked = tab.locator('.am-setup-drop-line .is-inked').count()
-        assert 1 < inked < dots.count() and tab.locator('.am-setup-drop-flight[data-am-waiting=still]').count() == 1
-        tab.evaluate("well.setProgress(3, wellInfo('still'))")
-        tab.wait_for_function(f"{state} === '3,true,false'", timeout=3000)
-        assert tab.locator('.am-setup-drop-line .is-inked').count() == dots.count()
-        # Landed: the well performed its success and its lid swung open in the done colour.
-        assert tab.evaluate(f"{ink}.amState") == 'success' and tab.evaluate(f"{host}.amLid") == 'open'
-        assert tab.evaluate(f"getComputedStyle({lid}).transform") != 'none'
-        tab.evaluate("well.setProgress(1, wellInfo('still'))")
-        assert tab.evaluate(state) == '1,false,false' and tab.evaluate(f"{ink}.amState") == 'busy' and tab.evaluate(f"{host}.amLid") == 'shut'
-        tab.evaluate("line.setState('success'); document.documentElement.dataset.motion = 'reduce'; well.setProgress(3, wellInfo('still'))")
-        assert tab.evaluate(state) == '3,true,false'
-        assert tab.evaluate(f"[{ink}.amState, {ink}.amReduced, {ink}.amSleeping].join()") == 'success,true,true'
-        assert tab.evaluate(f"{host}.amLid") == 'open' and tab.evaluate(f"getComputedStyle({lid}).transform") != 'none'
-        assert tab.evaluate("document.getElementById('fixture-line').dataset.amRunning") == 'false'
-        tab.evaluate("delete document.documentElement.dataset.motion; well.destroy(); well.destroy(); line.destroy(); line.destroy()")
-        assert tab.evaluate("!wellPage.querySelector('svg') && !document.getElementById('fixture-well').hasAttribute('data-atelier-motion')")
-        tab.evaluate("wellPage.remove()")
-        checks.append('Setup check loops only while busy; the setup drop travels its dotted line only as far as rows are valid and lands in the cooking ink-well as its success with its lid swung open, settles at once on regression or reduced motion, and cleans up')
         assert not errors, errors
     finally:
         tab.close()

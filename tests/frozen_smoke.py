@@ -177,11 +177,11 @@ def main():
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'font')), info
-            assert {'emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader', 'krackleGlyph', 'krackleStage'}.issubset(info['motions']), info
+            assert {'glyph', 'polish', 'viewportPoster'}.issubset(info['motions']), info
             assert info['beatMs'] == 1040 and info['exitMs'] == 120 and info['modernFeedback'], info
             assert info['logo'] > 0 and info['emptyTray'] == 130 and info['singleMark'] == 1, info
             result['interface'] = info
-            result['checks'].append('All workflow modules, shared timing, Krackle controllers, local font and latest logo load from the frozen bundle')
+            result['checks'].append('All workflow modules, shared timing, the glyph, local font and latest logo load from the frozen bundle')
             # WebView2 throttles rendering in hidden native windows, including
             # screenshots. Show only this isolated test window, without focus.
             stop_hiding.set(); hider.join(timeout=2)

@@ -218,7 +218,7 @@ ever created.
 - [x] **P4.1** Delete the Krackle files in `gui/motion/` (everything not used
   by the new system), their `<script>` and `<link>` lines in `gui/index.html`,
   `scripts/krackle_art.py`, and the folder-flap SVG in `index.html`.
-- [ ] **P4.2** Delete or rewrite the 15 Krackle test files
+- [x] **P4.2** Delete or rewrite the 15 Krackle test files
   (`context_ink_checks.py`, `empty_assets_motion_checks.py`,
   `export_motion_checks.py`, `folder_motion_checks.py`, `ink_flow_checks.py`,
   `ink_well_checks.py`, `inks_dial_checks.py`, `krackle_inks_checks.js`,
@@ -228,7 +228,9 @@ ever created.
   `working_panels_checks.py`) and their `browser_smoke.py` flags. Clear the Krackle
   references in `category_icon_checks.py`, `fluid_work_checks.py`, `frozen_smoke.py`,
   `library_pins_checks.py`, `polish_checks.py`, `showcase_checks.py`,
-  `surfaces_checks.py` and `trust_checks.py` as well.
+  `surfaces_checks.py` and `trust_checks.py` as well. (Done; `krackle_motion_checks.py` is now
+  `glyph_surfaces_checks.py` behind `--glyph-surfaces-only`. The ink tests cover a live
+  module, so P4.3 renames them with it.)
 - [ ] **P4.3** Remove the alias; rename callers to `AtelierMotion.glyph.mount`.
   Rename `data-krackle-surface` to `data-glyph-surface`, `data-krackle`
   (`gui/preferences.js:15` and the CSS) and the `--krackle-*` tokens.

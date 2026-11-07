@@ -9,23 +9,6 @@
     if(context.state==='suspended')context.resume().catch(()=>{});return context;
   }
   document.addEventListener('pointerdown',()=>{if(allowed())try{audio();}catch(_){}},{capture:true,passive:true});
-  function play(kind){
-    if(!allowed()||!['drop','pop','splat'].includes(kind))return false;
-    if(!context)return false;
-    try{
-      const ctx=audio();if(!ctx||ctx.state!=='running')return false;
-      const time=ctx.currentTime,duration=kind==='pop'?.09:.14,gain=ctx.createGain();
-      gain.gain.setValueAtTime(.0001,time);gain.gain.exponentialRampToValueAtTime(.055,time+.008);gain.gain.exponentialRampToValueAtTime(.0001,time+duration);gain.connect(ctx.destination);
-      let source;
-      if(kind==='splat'){
-        const buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*duration),ctx.sampleRate),samples=buffer.getChannelData(0);
-        for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*(1-i/samples.length);
-        source=ctx.createBufferSource();source.buffer=buffer;
-      }else{source=ctx.createOscillator();source.type=kind==='pop'?'triangle':'sine';source.frequency.setValueAtTime(kind==='pop'?350:220,time);source.frequency.exponentialRampToValueAtTime(kind==='pop'?650:65,time+duration);}
-      const sound={source,gain};active.add(sound);
-      source.connect(gain);source.onended=()=>{active.delete(sound);source.disconnect();gain.disconnect();};source.start(time);source.stop(time+duration);return true;
-    }catch(_){return false;}
-  }
   // The success click (SPEC section 6): a tick, a thump and a two-note chime, once per moment,
   // however many glyphs reach the same success together.
   let lastClick=-1;
@@ -64,5 +47,5 @@
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
   AtelierMotionPolicy.query().addEventListener('change',()=>{if(!allowed())stop();});
   window.addEventListener('pagehide',()=>{stop();context?.close().catch(()=>{});context=null;});
-  window.AtelierFoley=Object.freeze({play,click,enabled:()=>enabled});
+  window.AtelierFoley=Object.freeze({click,enabled:()=>enabled});
 })();

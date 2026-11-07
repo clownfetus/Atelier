@@ -32,8 +32,9 @@ window.__showcase={
       class Audio {
         constructor(){__audio.created++;this.state='running';this.currentTime=0;this.sampleRate=8000;this.destination={};}
         resume(){this.state='running';return Promise.resolve();}suspend(){this.state='suspended';__audio.suspended++;return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}
-        createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
-        createOscillator(){return {frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){},start(){__audio.started++;},stop(){this.onended?.();}};}
+        createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(n){return n;},disconnect(){}};}
+        createBiquadFilter(){return {frequency:{},Q:{},connect(n){return n;},disconnect(){}};}
+        createOscillator(){return {frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(n){return n;},disconnect(){},start(){__audio.started++;},stop(){this.onended?.();}};}
         createBuffer(){return {getChannelData:()=>new Float32Array(1120)};}createBufferSource(){return this.createOscillator();}
       }window.AudioContext=Audio;
     })()""")
@@ -114,17 +115,25 @@ window.__showcase={
         assert tab.evaluate('__audio.created')==0 and not tab.evaluate('AtelierFoley.enabled()')
         motion('full')
         tab.evaluate("const c=document.getElementById('settings-foley');c.checked=true;c.dispatchEvent(new Event('change'));document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));")
-        motion('full')
-        tab.evaluate("window.soundHost=document.createElement('div');soundHost.style='position:fixed;top:120px;left:350px;z-index:9999';document.body.append(soundHost);window.soundStage=AtelierMotion.krackleStage.mount(soundHost,{state:'busy',size:156});soundStage.setState('success');soundStage.setState('error')")
-        assert tab.evaluate('__audio.started')==3,tab.evaluate('({audio:__audio,micro:soundHost.dataset.amMicro,sleeping:soundHost.dataset.amSleeping})')
+        motion('full');tab.bring_to_front()
+        sound = tab.evaluate("""async () => {
+          const host = document.createElement('span'); host.style.cssText = 'position:fixed;top:120px;left:350px;width:144px;height:120px;z-index:9999';
+          document.body.append(host);
+          const glyph = AtelierMotion.glyph.mount(host, {state: 'busy'});
+          await new Promise(r => setTimeout(r, 300)); glyph.set('success');
+          await new Promise(r => setTimeout(r, 2200));
+          const out = {started: __audio.started, state: host.dataset.glyphState, tier: host.dataset.glyphTier, hidden: document.hidden, foley: AtelierFoley.enabled()};
+          glyph.destroy(); host.remove(); return out;
+        }""")
+        assert sound['started'] == 4, (sound, tab.evaluate('__audio'))
         for value in ['calm','off']:
-            motion(value);assert tab.evaluate("AtelierFoley.play('pop')") is False
-        motion('full');tab.emulate_media(reduced_motion='reduce');assert tab.evaluate("AtelierFoley.play('drop')") is False
+            motion(value);assert tab.evaluate("AtelierFoley.click()") is False
+        motion('full');tab.emulate_media(reduced_motion='reduce');assert tab.evaluate("AtelierFoley.click()") is False
         tab.emulate_media(reduced_motion='no-preference');motion('full')
         tab.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
-        assert tab.evaluate("AtelierFoley.play('splat')") is False
-        tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));soundStage.destroy();soundHost.remove();document.getElementById('settings-foley').checked=false;document.getElementById('settings-foley').dispatchEvent(new Event('change'))")
-        checks.append('Formation sounds create no audio by default; opt-in drop/pop/splat synthesis follows actual stage transitions and stays silent in Calm, Off, OS reduced motion and hidden documents')
+        assert tab.evaluate("AtelierFoley.click()") is False
+        tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));document.getElementById('settings-foley').checked=false;document.getElementById('settings-foley').dispatchEvent(new Event('change'))")
+        checks.append('Sound is off by default; opted in, a success plays its click once and stays silent in Calm, Off, OS reduced motion and hidden documents')
         tab.evaluate("""() => {
           window.cardReveal=0;window.cardSnapshot={project:'Smoke A',modName:'Fixture <card>',included:[{game_rel:'Characters/1029/1029001/Textures/T_A',file_type:'texture',name:'T_A'}],excluded:[],skipped:0,copyToMods:false,protected:false};
           const callbacks={confirm(){},refresh(){},settings(){},reveal(){cardReveal++;}};
