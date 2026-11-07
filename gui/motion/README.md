@@ -24,8 +24,9 @@ names the colour behind the glyph if it isn't the page background.
 launch, in Full motion, while the window is visible. It ends on the still mark and then calls
 `onDone`. Where it doesn't play, it mounts nothing, calls `onDone` at once and returns `null`.
 
-The tier comes from the host's height: Stage from 96 px, Inline from 32 px, Micro below. A
-glyph's time stops while it's off screen, while the document is hidden and once it has settled,
+The tier comes from the host's height: Stage from 96 px, Inline from 32 px, Micro below. Below
+48 px, Working is the row with each piece nudging 1.5 px, because the moving fits need the whole
+canvas and draw too small there; loaders still run from 32 px. A glyph's time stops while it's off screen, while the document is hidden and once it has settled,
 and a settled glyph asks for no frames. A state set meanwhile plays when the glyph comes back.
 
 Settings has Preview motion (`motion-preview.js`): real glyphs at 16, 48 and 128 px, the five

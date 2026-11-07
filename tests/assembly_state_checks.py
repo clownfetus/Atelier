@@ -79,6 +79,47 @@ def _earned(context, url, report, checks):
     checks.append('Glyph: busy never shows an A at any tier, loaders only when named, busy after busy carries on')
 
 
+def _compact(context, url, report, checks):
+    tab, errors = open_glyph_page(context, url, clock=True)
+    tab.evaluate(HELPERS)
+    # Working from 32 to 47 px is the row and a nudge: no fit, and every piece within about 1.5 px of its seat.
+    for size in (32, 47):
+        r = tab.evaluate("""async([size,dt])=>{const g=__mount(size,{state:'busy'}),e=g.engine,R=AtelierMotion.assembly.pieces.rest();let far=0,moved=0,A=0;
+          const each=()=>{let most=0;for(const id of ['blue','teal','disc'])most=Math.max(most,Math.hypot(e.cur[id].x-R[id].x,e.cur[id].y-R[id].y));return most};
+          for(let i=0;i<200;i++){await __step(dt);const m=each();far=Math.max(far,m);if(m>0)moved++;if(__isA(e.cur))A++}
+          const scale=Math.min(size/e.box[3],e.width/e.box[2]);const out={px:far*scale,moved,A,fit:e.lastFit,settled:e.settled,tier:e.tier,box:e.box.join()};g.destroy();return out}""", [size, FRAME])
+        assert r['tier'] == 'inline' and r['fit'] == -1 and not r['settled'] and r['A'] == 0, (size, r)
+        assert r['moved'] > 100 and 1.2 < r['px'] < 1.6 and r['box'] == '38,84,440,216', (size, r)
+    moves = tab.evaluate("""async dt=>{const out={};
+      const a=__mount(48,{state:'busy'});await __step(dt,60);out.fits=a.engine.lastFit!==-1;a.destroy();
+      const b=__mount(40,{state:'busy',asset:'mesh'});await __step(dt,20);out.loader=b.engine.load&&b.engine.load.kind;b.destroy();
+      const c=__mount(40,{state:'busy'});await __step(dt,30);c.set('success');let t=0;while(!c.engine.settled&&t<6000){await __step(dt);t+=dt}out.A=__isA(c.engine.cur);out.cat=__cat(c.engine);c.set('busy');t=0;await __step(dt,40);out.back=!__isA(c.engine.cur)&&c.engine.lastFit===-1;c.destroy();
+      const d=__mount(40,{state:'busy'});await __step(dt,10);const before=d.engine.lastFit;d.engine.setSize('inline',64,130);await __step(dt,60);out.grown=[before,d.engine.lastFit!==-1];d.destroy();
+      return out}""", FRAME)
+    assert moves['fits'] and moves['loader'] == 'mesh' and moves['A'] and moves['cat'] and moves['back'], moves
+    assert moves['grown'] == [-1, True], moves
+    assert not errors, errors
+    tab.close()
+    tab, errors = open_glyph_page(context, url, clock=True, motion='off')
+    still = tab.evaluate("""async dt=>{const g=__mount(40,{state:'busy'}),R=JSON.stringify(AtelierMotion.assembly.pieces.rest());await __step(dt,30);return {row:JSON.stringify(g.engine.cur)===R,settled:g.engine.settled}}""", FRAME)
+    assert still['row'] and still['settled'], still
+    assert not errors, errors
+    tab.close()
+    checks.append('Glyph: Working from 32 to 47 px is the row and a nudge, loaders and results still run, and it follows the host across 48 px')
+
+
+def _rim(context, url, report, checks):
+    # Material's light stays inside the disc, on every surface, so the rim stays whole.
+    tab, errors = open_glyph_page(context, url, clock=True)
+    tab.evaluate(HELPERS)
+    r = tab.evaluate("""async dt=>{const g=__mount(128,{state:'busy',asset:'material'});await __step(dt,40);const e=g.engine;
+      return {clip:+[...e.view.svg.querySelectorAll('clipPath circle')][0].getAttribute('r'),disc:e.cur.disc.r}}""", FRAME)
+    assert r['clip'] <= r['disc'] * .85, r
+    assert not errors, errors
+    tab.close()
+    checks.append("Glyph: Material's band stays inside the disc's rim")
+
+
 def _lands(context, url, report, checks):
     tab, errors = open_glyph_page(context, url, clock=True)
     tab.evaluate(HELPERS)
@@ -277,6 +318,8 @@ def _preview(context, url, report, checks):
 def run_assembly_state_checks(context, url, report, checks):
     _api(context, url, report, checks)
     _earned(context, url, report, checks)
+    _compact(context, url, report, checks)
+    _rim(context, url, report, checks)
     _lands(context, url, report, checks)
     _settles(context, url, report, checks)
     _policy(context, url, report, checks)

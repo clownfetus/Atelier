@@ -29,6 +29,8 @@
     return m ? [+m[1], +m[2], +m[3]] : fallback;
   }
 
+  const SHINE_RIM = .18;
+
   function createView(host) {
     const svg = mk('svg', {viewBox: `0 0 ${VB.w} ${VB.h}`, 'aria-hidden': 'true', focusable: 'false'});
     const g = mk('g', {}, svg), defs = mk('defs', {}, svg);
@@ -141,7 +143,7 @@
         shine ||= makeShine();
         shine.group.removeAttribute('display');
         shine.group.setAttribute('transform', `translate(${f(d.x)} ${f(d.y)})`);
-        shine.circle.setAttribute('r', f(d.r));
+        shine.circle.setAttribute('r', f(d.r * (1 - SHINE_RIM))); // the light stays inside the rim, so the disc's edge stays whole
         shine.turn.setAttribute('transform', `rotate(${f(load.ang)})`);
         const w = d.r * .56, w2 = d.r * .16, x = load.at * d.r;
         shine.wide.setAttribute('x', f(x - w / 2)); shine.wide.setAttribute('y', f(-d.r * 1.3));

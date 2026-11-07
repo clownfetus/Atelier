@@ -511,3 +511,21 @@ Added at the P1.7 checkpoint, from Thiago's note on the first-run setup sheet.
   (invariant 5). Each row's status stays in a 20 px glyph and its sentence. A block appearing
   is a kind of progress; SPEC §2 bans category colours on progress bars, which this isn't.
 - **Status:** asked for and Condense chosen by Thiago, 7 Nov 2026; the page awaits his sign-off at P1.7.
+
+## D19 · Small sizes, Calm and the logo entrance
+
+From the P2.8 checkpoint.
+
+- **Working below 48 px:** the row, with each piece nudging 1.5 px out and back in turn. The
+  moving fits need the whole canvas to come apart, so from 32 to 47 px they drew smaller than
+  the row does at 24 px, and under 32 px they turned to thin strips. It's the same pose as At
+  rest, so only the nudge tells them apart, and in Off the status text carries it. Loaders still
+  run from 32 px.
+- **Material's band:** it stays inside the disc's rim, because on light surfaces it looked like
+  a bite out of the edge.
+- **Logo entrance, Calm, Inline and Micro:** as built and written in SPEC §4.7, §4.8 and §5. The
+  row's size and spacing (D4, D16) stay as they are.
+- **Also settled:** a result set while a glyph is off screen plays when it comes back, and a
+  glyph mounted straight into a result starts from the row. The click plays once per moment,
+  and never at Micro or in Calm.
+- **Status:** approved by Thiago, 7 Nov 2026, with both recommended changes.

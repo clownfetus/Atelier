@@ -367,7 +367,8 @@ piece is flat and opaque, a pop and never a blend. Lifted pieces rise 18u.
   (−.05, .26, .50, .26) and (.48, .74, 1.05, .74).
 - **Texture bands:** cut through the tile's outline at 0, .171, .378, .585, .792 and 1
   of its height. The first cut sits on the notch's shoulder, so no sliver forms.
-- **Material band:** shine, with a thin second glint, clipped to the disc.
+- **Material band:** shine, with a thin second glint, clipped to a circle 18% inside the
+  disc's radius, so the rim stays whole on every surface (P2.8).
 - **Leaving:** a new state lets the current step land, then the mesh or tile drops back
   to the row in 100 ms `rest`. The disc stops where it is. A result reaches the next
   state within 640 ms (invariant 6). Median from result to click: mesh 980 ms, texture
@@ -376,8 +377,9 @@ piece is flat and opaque, a pop and never a blend. Lifted pieces rise 18u.
   lowest measured is 26.36u, not counting the bands' slide).
 
 Framing at Inline: the row is framed at 440 × 216u from (38, 84), the
-A at 440 × 300u from (20, 50), and anything else on the whole canvas. The frame moves
-over 280 ms `move`, alongside the opening. Stage stays on the whole canvas.
+A at 440 × 300u from (20, 50), and anything else on the whole canvas. At Inline, `!` and
+X tighten to their own bounds plus 8u over 280 ms once formed. The frame moves over
+280 ms `move`, alongside the opening. Stage stays on the whole canvas.
 
 ### 4.8 Logo entrance (D8)
 
@@ -388,14 +390,15 @@ priority over bible p.10 and p.14 here.
 
 - It's a brand moment, not a status. It isn't the `success` state: category colours
   only, with no green, click, punch, ripple or sound.
+- At 32 px it's a shorter route, in about 1.2 s inside the mark's own 50 × 32 px box, so
+  nothing shifts. The pieces start at 66% on one baseline (tile left, disc in the middle, mesh
+  right) and grow as they arrive, one at a time on planned curves, at durations × 0.8. It ends
+  on the master mark exactly.
 - Full motion only, and never while the window is hidden. In Calm and Off the still
   logo is simply there.
 - Once per launch. It can't be replayed, and the logo isn't a button.
 - It waits for the startup splash to clear, never delays start-up, and doesn't shift
   the header's layout.
-
-_Not in the prototype at this size; design its timing and framing at 32 px in Phase 2
-and show Thiago (P2.8)._
 
 ### 4.9 Easing curves (cubic-bezier)
 
@@ -418,18 +421,17 @@ The tier is picked from the host's rendered height, with no gaps (D12).
 | Tier | Height | Working | Outcomes |
 | --- | --- | --- | --- |
 | Stage | ≥ 96 px | Head, Bench, Ramp (§4.2) | Full (§4) |
-| Inline | 32–95 px | The same fits; durations × 0.8 | Same shapes; no ripple; one sway instead of the wobble loop |
-| Micro | < 32 px | Small-mark geometry; pieces jostle 1.5 px apart and back, never forming a shape | Static result shape, one 200 ms settle. The A stays green (D15), because three colours at this size read as the logo |
+| Inline | 32–95 px | The same fits, durations × 0.8, from 48 px. From 32 to 47 px, the row with Micro's nudge (D19) | Same shapes; no ripple; one sway of about 600 ms instead of the wobble loop |
+| Micro | < 32 px | Small-mark geometry. The row, with each piece nudging 1.5 px out and back in turn, never forming a shape (D19) | Static result shape, one 200 ms settle, with the colour arriving from 100 ms. The A stays green (D15), because three colours at this size read as the logo |
 
-The Inline and Micro behaviours are **new**: they aren't in the prototype, apart from
-Micro's green. Prototype them on the Settings preview page and show Thiago before
-wiring them in.
+Thiago signed off these behaviours at P2.8. They aren't in the prototype, apart from Micro's
+green.
 
-Loaders (§4.7) run at Stage and Inline, down to 32 px. Micro keeps its jostle whatever
+Loaders (§4.7) run at Stage and Inline, down to 32 px. Micro keeps its nudge whatever
 the asset type.
 
-Small sizes (taste sign-off at P2.8). The 480 × 400 canvas wastes a small host: the
-A comes out only 15.6 px tall at 24 px and 20.8 px at 32 px.
+Small sizes. The 480 × 400 canvas wastes a small host: the A comes out only 15.6 px tall
+at 24 px and 20.8 px at 32 px.
 
 - Frame each shape to its own bounds, not the whole canvas. The poses are 260u (A),
   365u (`!`) and 292u (X) tall.
@@ -440,7 +442,7 @@ A comes out only 15.6 px tall at 24 px and 20.8 px at 32 px.
 | Motion setting | Behaviour |
 | --- | --- |
 | Full | Each glyph uses its tier |
-| Calm | At most Inline; no punch, ripple or wobble loop. Loaders in Calm get designed at P2.8 |
+| Calm | At most Inline; durations as the host's size gives them; no punch, ripple, squash, wobble loop or sound. Loaders don't lift, lean, slide or change colour: mesh cuts open 240 ms, hold 700 ms, close 240 ms, rest 420 ms; texture bands part in the same rhythm; material's band crosses a still disc in 620 ms, rest 980 ms |
 | Off, or OS reduced motion | No travel. Each state is a still pose, and a loader is the still row; the whole glyph cross-fades between poses (150 ms out, 150 ms in). This is the only fade allowed, and only for accessibility. Complete still changes colour: it cross-fades to the A in category colours, turns green over 240 ms after 120 ms, then returns as in §4.3. |
 
 ## 6. Sound (optional, off by default, Full motion only)

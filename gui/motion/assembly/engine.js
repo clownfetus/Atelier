@@ -36,6 +36,7 @@
   const BANDS = 5;
   const JOSTLE_PX = 1.5;
   const JOSTLE_MS = 900;
+  const COMPACT_BELOW = 48; // Working needs the whole canvas to come apart, which draws it too small under this.
 
   class Engine {
     constructor(view, tier = 'inline', height = 48, reduced = false, width = height * 1.5) {
@@ -135,13 +136,15 @@
     // The tier comes from the host's rendered height. Between Stage and Inline the running animation just
     // carries on in its new frame. Micro has its own poses, so crossing into or out of it starts the state again.
     setSize(tier, height, width) {
-      const before = this.tier;
+      const before = this.tier, wasCompact = this.compact();
       this.tier = tier;
       this.height = height;
       this.width = width;
       if ((before === 'micro') !== (tier === 'micro')) this.run(this.state, this.asset, 'place');
+      else if (this.state === 'busy' && !this.asset && wasCompact !== this.compact()) this.run('busy', null, 'place');
       else if (before !== tier || tier === 'micro') { this.box = this.frameFor(this.frameName || this.state); this.touch(); }
     }
+    compact() { return this.tier === 'inline' && this.height < COMPACT_BELOW; }
     scaleOf(box) { return Math.min(this.height / box[3], this.width / box[2]); }
     // Which part of the canvas the host shows for a shape.
     frameFor(name) {
@@ -153,7 +156,7 @@
         // Room for the pieces to jostle, in units at the size they'll be drawn.
         return frameOf(pose, JOSTLE_PX / this.scaleOf(frameOf(pose)));
       }
-      if (name === 'row' || name === 'info') return FRAME.row;
+      if (name === 'row' || name === 'info' || (name === 'busy' && this.compact())) return FRAME.row;
       if (name === 'success' || name === 'brand') return FRAME.a;
       if (name === 'warning-formed') return frameOf(POSES.warning, 8);
       if (name === 'error-formed') return frameOf(POSES.error, 8);
@@ -252,6 +255,8 @@
       this.formed = false;
       if (this.moving) await this.moving; // let the piece in flight land first
       if (tk !== this.token) return;
+      // A nudge isn't a move in flight: the pieces just step back to their seats, at most 1.5 px.
+      if (this.nudging) { this.place(clone(this.nudging)); this.nudging = null; }
       this.pace = 1;
       this.modeNow = this.mode();
       if (how === 'place') {
@@ -265,7 +270,7 @@
       else if (state === 'entrance') await this.runEntrance(tk, fresh);
       else if (this.modeNow === 'off') await this.runStill(tk, fresh);
       else if (this.tier === 'micro') await this.runMicro(tk, fresh);
-      else if (state === 'busy') await (asset ? this.runLoader(asset, tk, fresh) : this.runWorking(tk, fresh));
+      else if (state === 'busy') await (asset ? this.runLoader(asset, tk, fresh) : this.compact() ? this.runCompact(tk, fresh) : this.runWorking(tk, fresh));
       else if (state === 'success') await this.runSuccess(tk);
       else if (state === 'warning') await this.runWarning(tk);
       else if (state === 'error') await this.runError(tk);
@@ -288,7 +293,7 @@
     stillPose() {
       if (this.state !== 'busy') return this.heldPose(this.state);
       if (this.tier === 'micro') return micro().busy;
-      return this.asset ? rest() : fits()[0].contact;
+      return this.asset || this.compact() ? rest() : fits()[0].contact;
     }
     async runStill(tk, fresh) {
       const state = this.state, pose = this.stillPose();
@@ -327,14 +332,7 @@
       const target = {success: all(status.complete), warning: all(status.warning), error: all(status.error)}[name] || CAT;
       this.load = null;
       this.frameTo(name, true);
-      const cx = (base.blue.x + base.teal.x + base.disc.x) / 3, cy = (base.blue.y + base.teal.y + base.disc.y) / 3;
-      const u = JOSTLE_PX / this.scaleOf(this.box), out = {};
-      for (const id of IDS) {
-        // In the row the ends move outwards and the tile lifts. Elsewhere each piece moves away from the middle.
-        const row = name === 'busy' || name === 'info', v = row ? {blue: [0, -1], teal: [-1, 0], disc: [1, 0]}[id] : [base[id].x - cx, base[id].y - cy], l = Math.hypot(...v) || 1;
-        out[id] = [v[0] / l * u, v[1] / l * u];
-      }
-      const cur = this.cur = clone(base);
+      const cur = this.cur = clone(base), out = this.outward(base, name === 'busy' || name === 'info');
       const offset = (id, by) => { cur[id].x = base[id].x + out[id][0] * by; cur[id].y = base[id].y + out[id][1] * by; };
       if (name !== 'busy') {
         // Shape first, then colour: the status colour only arrives once the shape has come together.
@@ -346,16 +344,40 @@
       }
       this.cols = {...CAT};
       this.touch();
-      // Each piece moves out and back in turn, so they never line up into a shape.
-      const windows = {blue: 0, teal: .16, disc: .32}, width = .5;
+      await this.nudge(base, tk);
+    }
+    // Which way each piece moves in a nudge, as units at the size it's drawn. In the row the ends move
+    // outwards and the tile lifts. Elsewhere each piece moves away from the middle.
+    outward(base, row) {
+      const cx = (base.blue.x + base.teal.x + base.disc.x) / 3, cy = (base.blue.y + base.teal.y + base.disc.y) / 3;
+      const u = JOSTLE_PX / this.scaleOf(this.box), out = {};
+      for (const id of IDS) {
+        const v = row ? {blue: [0, -1], teal: [-1, 0], disc: [1, 0]}[id] : [base[id].x - cx, base[id].y - cy], l = Math.hypot(...v) || 1;
+        out[id] = [v[0] / l * u, v[1] / l * u];
+      }
+      return out;
+    }
+    // Each piece moves out and back in turn, so they never line up into a shape.
+    async nudge(base, tk) {
+      const cur = this.cur = clone(base), out = this.outward(base, true), windows = {blue: 0, teal: .16, disc: .32}, width = .5;
+      this.nudging = base;
       while (tk === this.token) {
         if (!await this.animate(JOSTLE_MS, E.linear, (e, p) => {
           for (const id of IDS) {
             const u = (p - windows[id]) / width, s = u > 0 && u < 1 ? Math.sin(Math.PI * u) : 0;
-            offset(id, s * s);
+            cur[id].x = base[id].x + out[id][0] * s * s;
+            cur[id].y = base[id].y + out[id][1] * s * s;
           }
         }, () => tk === this.token)) return;
       }
+    }
+    // Working at 32 to 47 px: the row and a nudge, as under 32 px, in the row's own geometry.
+    async runCompact(tk, fresh) {
+      this.frameTo('busy', fresh);
+      if (!this.isCat()) this.colourTo(CAT, 240);
+      if (fresh) this.place(clone(rest()));
+      else if (!atRest(this.cur) && !await this.openTo(rest(), tk)) return;
+      await this.nudge(rest(), tk);
     }
     async runInfo(tk, fresh) {
       const framed = this.frameTo('info', fresh);

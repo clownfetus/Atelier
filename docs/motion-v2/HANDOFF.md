@@ -66,12 +66,12 @@ The repo's own `docs/DESIGN_SYSTEM.md`, `docs/DEVELOPMENT.md` and
 
 ## Phase 1 · Foundations
 
-- [ ] **P1.1 Type (D1).** Vendor Inter and Inter Display under
+- [x] **P1.1 Type (D1).** Vendor Inter and Inter Display under
   `gui/vendor/inter/` (woff2, `OFL.txt`, a README matching
   `gui/vendor/instrument-sans/`), add them to `gui/vendor/THIRD_PARTY_NOTICES.md`,
   and update the `@font-face` rules and type tokens in `gui/tokens.css`. Only
   uppercase labels get letter-spacing (+9%). Remove Bricolage if D1 says so.
-- [ ] **P1.2 Colour tokens (D2).** Add the roles in SPEC §2 to `tokens.css` as
+- [x] **P1.2 Colour tokens (D2).** Add the roles in SPEC §2 to `tokens.css` as
   semantic tokens (`--atelier-texture`, `--atelier-mesh`, `--atelier-material`,
   `--status-complete`, `--status-warning`, `--status-error`, `--status-working`,
   plus the neutrals). Set `--studio-icon-texture`, `--studio-icon-mesh`,
@@ -86,29 +86,29 @@ The repo's own `docs/DESIGN_SYSTEM.md`, `docs/DEVELOPMENT.md` and
   `AtelierKrackleInks.fit`, and update the tests that assert the old emblem markup
   or the dropped categories (`category_icon_checks.py`, `surfaces_checks.py`,
   `library_pins_checks.py`).
-- [ ] **P1.3 Themes (D3).** In `gui/tokens.css` and `gui/theme.js`: apply the
+- [x] **P1.3 Themes (D3).** In `gui/tokens.css` and `gui/theme.js`: apply the
   Atelier preset values in SPEC §2; the three piece colours are exempt from
   theming; expose the current surface colour for the halo; fit status hues for
   contrast while keeping hue. Move the warning lines at `gui/viewport.css:123` and
   `:243` to the warning colour. Atelier's accent is neutral, so where accent text
   is the only cue, add an underline or heavier weight. Point the `.at-identity` roles
   at the themed tokens and delete its pigments, per D13.
-- [ ] **P1.4 Brand assets.** Replace `gui/brand/atelier-mark.svg/.png` with
+- [x] **P1.4 Brand assets.** Replace `gui/brand/atelier-mark.svg/.png` with
   `docs/motion-v2/assets/atelier-mark.svg`; add `atelier-mark-small.svg` and the
   two wordmarks. Use these, not the drawing on bible v1.2 p.3 and p.4 (D14).
   `scripts/brand_mark.py` already holds the generator (P1.2). Regenerate `icon.png` and `icon.ico`, using the small mark for 16, 24 and
   32 px and the master for 48 px and up, on a Charcoal rounded square (bible
   p.12). Regenerate installer art through `scripts/installer_art.py`.
-- [ ] **P1.5 Header logo (D6).** Full-colour mark and outlined wordmark, spaced as in
+- [x] **P1.5 Header logo (D6).** Full-colour mark and outlined wordmark, spaced as in
   D6, with the letters in the theme's text colour. Remove the monochrome filter from
   the header and the startup splash, and give the Library hero signature its own
   token. Check the header still fits at the 1100 px breakpoint. Replace the start
   page's lockup with the bible's, without RIVALS or the ink tagline, and update the
   tests that assert the old logo (`appearance_checks.py`, `logo_motion_checks.py`,
   `desktop_smoke.py`, `frozen_smoke.py`).
-- [ ] **P1.6 Docs.** Update the colour, type and brand sections of
+- [x] **P1.6 Docs.** Update the colour, type and brand sections of
   `docs/DESIGN_SYSTEM.md`.
-- [ ] **P1.7** ⏸ Screenshots of the library, an editor, Settings, the header, the
+- [x] **P1.7** ⏸ Screenshots of the library, an editor, Settings, the header, the
   project workspace, the Edit All import dialog, a project dialog, the mod-open dialog
   and the first-run setup page, in all six presets (Atelier, Darcula, Repak X, High contrast, Blueprint and
   Comic), light and dark, to Thiago. Include a hero with artwork tints in the
@@ -119,13 +119,13 @@ existing contrast checks pass.
 
 ## Phase 2 · Engine
 
-- [ ] **P2.1 Modules.** Port the prototype into `gui/motion/assembly/`:
+- [x] **P2.1 Modules.** Port the prototype into `gui/motion/assembly/`:
   `pieces.js`, `planner.js`, `engine.js`, `glyph.js` (plus `assembly.css`).
   Follow `reference/PROTOTYPE_NOTES.md`: one engine per glyph, one shared rAF
   clock, cached paths, no globals. The tile and mesh outlines come from
   `assets/atelier-mark-pieces.json` (SPEC §3.2), generated with the mark. Include the
   opening and the three loaders (SPEC §4.1, §4.7).
-- [ ] **P2.2 API.**
+- [x] **P2.2 API.**
   `AtelierMotion.glyph.mount(host, {state, asset?, size?, reducedMotion?, surface?})` →
   `{set(state, {asset?}), replay(), destroy(), state}`. States: `busy`, `info`,
   `success`, `warning`, `error`. `asset` is `mesh`, `texture` or `material`, only
@@ -133,30 +133,30 @@ existing contrast checks pass.
   non-element host, exactly as `krackleGlyph.mount` does today. Set `aria-hidden` on the
   SVG; the status text next to it carries meaning. A glyph freshly mounted in `busy`
   starts in the row or a fit, and never shows an A first (SPEC §4.1).
-- [ ] **P2.3 Tiers.** Pick Stage, Inline or Micro from the host's rendered
+- [x] **P2.3 Tiers.** Pick Stage, Inline or Micro from the host's rendered
   height (`ResizeObserver`), per SPEC §5.
-- [ ] **P2.4 Policy.** Read `AtelierMotionPolicy` (`gui/preferences.js:31`) for
+- [x] **P2.4 Policy.** Read `AtelierMotionPolicy` (`gui/preferences.js:31`) for
   Full, Calm and Off, and honour OS reduced motion. Stop drawing when a glyph is
   off screen (`IntersectionObserver`), hidden (`document.hidden`) or settled: a
   settled glyph schedules no animation frames at all. A change to the Motion setting
   or to OS reduced motion takes effect on a running animation: the piece in flight
   lands (at most 640 ms), then the glyph follows the new setting. Test this.
-- [ ] **P2.5 Precompute.** Plan the two Head and Ramp moves, the assemblies to and from
+- [x] **P2.5 Precompute.** Plan the two Head and Ramp moves, the assemblies to and from
   Bench and the routes into the three outcomes in `requestIdleCallback` after start-up;
   plan live only for unusual starting poses. The opening needs no plan. A live plan took
   up to 146 ms in the prototype, on the main thread, so it needs a time budget.
-- [ ] **P2.6 Sound.** The success click (SPEC §6) in `gui/motion/foley.js`.
+- [x] **P2.6 Sound.** The success click (SPEC §6) in `gui/motion/foley.js`.
   Rename the setting "Motion sounds"; keep its storage key.
-- [ ] **P2.7 Preview.** Add "Preview motion" to Settings, replacing Try Krackle
+- [x] **P2.7 Preview.** Add "Preview motion" to Settings, replacing Try Krackle
   (`motion-preview.js`) if it's still there: five state buttons and the three loaders, driving glyphs at 16, 48
   and 128 px side by side, on the production engine.
-- [ ] **P2.8** ⏸ Design the parts that aren't in the prototype: the Inline and Micro
+- [x] **P2.8** ⏸ Design the parts that aren't in the prototype: the Inline and Micro
   tiers, the per-shape framing at small sizes (SPEC §5), the logo entrance at 32 px
   (SPEC §4.8), and Calm mode, loaders included. Thiago also signs off the row's size and
   spacing (D4, D16), which the prototype has. Check every state and loader at 24 and 32
   px, and on light backgrounds, where the material's light may soften the disc's edge.
   Show them in the preview, then get Thiago's sign-off.
-- [ ] **P2.9 Tests.**
+- [x] **P2.9 Tests.**
   - `tests/assembly_planner_checks.py`, ported from `reference/checks/planner_check.py`
     and run against the preview. It fails if fully-clear moves drop below the
     prototype baseline.
