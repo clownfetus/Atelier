@@ -7,29 +7,17 @@
   document.addEventListener('visibilitychange',syncVisibility);
   const disposals=new MutationObserver(()=>{for(const [host,glyph] of emptyGlyphs)if(!host.isConnected){glyph.destroy();emptyGlyphs.delete(host);}});
   disposals.observe(document.documentElement,{childList:true,subtree:true});
-  let startupStage=null,startupHost=null,launchAttempted=false;
+  // Startup: the working glyph at Stage beside the counted bar, in Full only. The A never forms here;
+  // the logo entrance follows once the library opens (D8). Calm and Off keep the still logo and the bar.
+  let startupGlyph=null,startupHost=null;
   api.startupProgress=data=>{
-    const splash=document.getElementById('startup-splash');if(!splash||!Number(data.total)||!AtelierMotionPolicy.allows(2))return;
-    if(!startupHost){
-      startupHost=document.createElement('div');startupHost.className='k-startup-stage';splash.prepend(startupHost);
-      try{
-        let mask=null;
-        const image=document.querySelector('.studio-brand > img');
-        if(!launchAttempted&&image?.complete&&image.naturalWidth){
-          launchAttempted=true;const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
-          const ctx=canvas.getContext('2d');const tall=128*image.naturalHeight/image.naturalWidth;ctx.drawImage(image,0,(128-tall)/2,128,tall);mask=ctx.getImageData(0,0,128,128);
-        }
-        startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:mask?224:156,kind:mask?'launch':'index-load',tier:mask?3:2,mask});
-        if(mask&&startupHost.dataset.amMicro!=='true') {
-          splash.dataset.launch='true';
-          if(AtelierMotionPolicy.allows(3)&&!document.hidden)window.AtelierLogoEntranceUI?.holdStartup();
-        }
-      }catch(_){startupHost.remove();startupHost=null;}
-    }
-    if(startupHost)startupHost.setAttribute('aria-label',`Container ${data.current} of ${data.total}`);
-    startupStage?.setProgress(Number(data.current)/Number(data.total));
+    const splash=document.getElementById('startup-splash');if(!splash||!Number(data.total)||!AtelierMotionPolicy.allows(2)||startupHost)return;
+    startupHost=document.createElement('span');startupHost.className='startup-glyph';startupHost.setAttribute('aria-hidden','true');splash.prepend(startupHost);
+    try{startupGlyph=AtelierMotion.glyph.mount(startupHost,{state:'busy'});}catch(_){startupGlyph=null;startupHost.remove();startupHost=null;return;}
+    splash.dataset.launch='true';
+    if(AtelierMotionPolicy.allows(3)&&!document.hidden)window.AtelierLogoEntranceUI?.holdStartup();
   };
-  api.startupDone=()=>{startupStage?.destroy();startupStage=null;startupHost?.remove();startupHost=null;window.AtelierLogoEntranceUI?.startupDone();};
+  api.startupDone=()=>{try{startupGlyph?.destroy();}catch(_){}startupGlyph=null;startupHost?.remove();startupHost=null;window.AtelierLogoEntranceUI?.startupDone();};
   api.indexFailure=notice=>{
     const host=document.createElement('div');host.className='k-index-failure';notice.prepend(host);
     let stage;try{stage=AtelierMotion.krackleStage.mount(host,{state:'error',size:112,kind:'index-load'});}catch(_){host.remove();}

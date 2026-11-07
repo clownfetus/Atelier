@@ -74,11 +74,18 @@ def run_surfaces_checks(page,context,url,report,checks):
           const splash=document.createElement('div');splash.id='startup-splash';splash.style='position:fixed;top:80px;left:300px;z-index:1000;background:var(--bg2)';splash.innerHTML='<img><span>Reading containers</span><progress id="startup-progress" max="10" value="2"></progress>';document.body.append(splash);
           AtelierSurfaces.startupProgress({total:10,current:2});
         }""")
-        tab.wait_for_function("document.querySelector('.k-startup-stage')?.dataset.amSleeping==='false'")
+        tab.wait_for_selector('#startup-splash > .startup-glyph[data-glyph-state="busy"][data-glyph-tier="stage"]')
         assert tab.locator('#startup-splash').get_attribute('data-launch')=='true'
         tab.evaluate('AtelierSurfaces.startupProgress({total:10,current:7})')
-        assert '7 of 10' in tab.locator('.k-startup-stage').get_attribute('aria-label')
-        mode('calm');assert not tab.locator('.k-startup-stage').is_visible()
+        launch=tab.evaluate("""() => {
+          const splash=document.getElementById('startup-splash'),bar=document.getElementById('startup-progress');
+          return {glyphs:splash.querySelectorAll('.startup-glyph').length,mask:!!splash.querySelector('canvas'),
+            bar:getComputedStyle(bar).position!=='absolute'&&bar.getBoundingClientRect().width>=100,logo:getComputedStyle(splash.querySelector('img')).display};
+        }""")
+        assert launch=={'glyphs':1,'mask':False,'bar':True,'logo':'none'},launch
+        mode('calm')
+        assert not tab.locator('.startup-glyph').is_visible()
+        assert tab.evaluate("getComputedStyle(document.querySelector('#startup-splash > img')).display")=='block'
         tab.evaluate("AtelierSurfaces.startupDone();document.getElementById('startup-splash').remove()")
         mode('full')
         tab.evaluate("window.perfHost=document.createElement('div');perfHost.style='position:fixed;top:100px;left:300px;z-index:1000';document.body.append(perfHost);window.perfStage=AtelierMotion.krackleStage.mount(perfHost,{state:'busy',size:224})")
@@ -102,7 +109,7 @@ def run_surfaces_checks(page,context,url,report,checks):
           }finally{stage?.destroy();host.remove();window.requestAnimationFrame=nativeRAF;window.cancelAnimationFrame=nativeCancel;}
         }""")
         assert fallback['filter'] is False,fallback
-        checks.append('Launch energy follows real progress; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline')
+        checks.append('Startup shows the working glyph at Stage beside the counted bar in Full and the still logo in Calm; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline')
         mode('full')
         tab.evaluate("window.openedDrop=0;AtelierSurfaces.updateDrop('fixture',()=>openedDrop++)")
         tab.locator('.k-update-drop').click();assert tab.evaluate('openedDrop')==1
@@ -113,7 +120,7 @@ def run_surfaces_checks(page,context,url,report,checks):
           buildDone('warning');if(host.dataset.glyphState!=='warning')throw Error('The result did not reach the glyph');
           const splash=document.createElement('div');splash.id='startup-splash';splash.innerHTML='<progress id="startup-progress" max="10" value="2"></progress>';document.body.append(splash);
           const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=()=>null;
-          try{AtelierSurfaces.startupProgress({total:10,current:2});if(splash.querySelector('canvas'))throw Error('Canvas fallback lost');}finally{HTMLCanvasElement.prototype.getContext=original;AtelierSurfaces.startupDone();splash.remove();}
+          try{AtelierSurfaces.startupProgress({total:10,current:2});if(splash.querySelector('canvas'))throw Error('A canvas reached the startup splash');}finally{HTMLCanvasElement.prototype.getContext=original;AtelierSurfaces.startupDone();splash.remove();}
           const animate=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI fixture');};
           try{AtelierSurfaces.updateDrop('fallback',()=>window.fallbackOpened=true);}finally{Element.prototype.animate=animate;}
         }""")
