@@ -8,6 +8,10 @@ The app, installers and update checker identify each release by its full number,
 - The full changelog groups shipped changes by version and stays up to date
   automatically after each release.
 
+- Library folders with nothing to list no longer appear at any level, so opening
+  a folder always leads somewhere. Folders holding assets your project has
+  imported or added stay visible, and existing pins still open.
+
 ## 1.1.8 — 5 November 2026
 
 - Model previews consistently read the newest game patch. Native imports could
