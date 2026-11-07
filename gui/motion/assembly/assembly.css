@@ -1,0 +1,15 @@
+/*
+ * Atelier motion system: the glyph. The halo is a stroke in the colour of the surface behind the
+ * piece (SPEC invariant 3). --glyph-halo defaults to the page background; a host on another
+ * surface sets it to that surface.
+ */
+.glyph-piece {
+  stroke: var(--glyph-halo);
+  stroke-width: 28;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+.glyph-cut {
+  stroke: var(--glyph-halo);
+  stroke-linecap: butt;
+}
