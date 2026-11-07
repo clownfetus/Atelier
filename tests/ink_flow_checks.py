@@ -3,12 +3,9 @@ import base64
 
 
 def run_ink_flow_checks(tab, report, checks):
-    handoff = tab.get_by_role('button', name='Replay ink handoff', exact=True)
-    handoff.scroll_into_view_if_needed()
     tab.wait_for_function("!document.querySelector('.k-workflow-svg,.k-workflow-link')")
     frames = tab.evaluate("""async () => {
-        const hosts=[...document.querySelectorAll('.k-motion-handoff .k-motion-sample-art')];
-        const [source,destination]=hosts;
+        const [source,destination]=document.querySelectorAll('#workflow-fixture > div');
         const originalStyle=destination.getAttribute('style');
         destination.style.transform='translateY(12px)';
         destination.style.setProperty('--roster-skin-accent','#d85b8c');

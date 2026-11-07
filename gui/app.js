@@ -401,6 +401,10 @@ let _gridRequest = 0;
 let _gridThumbs = null;
 let _gridStatus = 'ready';
 let _gridRenderedPath = '';
+const libraryLoading = document.querySelector('#grid-area > .library-loading');
+function showLibraryLoading(area) {
+  if (!area.querySelector('.library-loading')) area.replaceChildren(libraryLoading.cloneNode(true));
+}
 async function renderGrid(focusPath = null, direction = 'forward') {
   window.AtelierContinuity?.cancelWorkflow();
   window.AtelierSearch?.reset();
@@ -419,7 +423,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
   window.AtelierTextureReconstruction?.disposeWithin(area);
   // Retain the old grid until the response can be committed in one transition.
   area.setAttribute('aria-busy', 'true');
-  if (!area.querySelector('.grid')) area.innerHTML = '<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
+  if (!area.querySelector('.grid')) showLibraryLoading(area);
   document.getElementById("library-count").textContent = "Loading…";
   document.getElementById("import-all-btn").disabled = true;
 
@@ -761,7 +765,7 @@ function applyLibraryView() {
   else if (_gridStatus === 'loading') {
     const area=document.getElementById('grid-area');
     window.AtelierTextureReconstruction?.disposeWithin(area);
-    area.innerHTML='<div id="empty-state"><div class="spinner" style="margin:0 auto 12px"></div><div>Loading…</div></div>';
+    showLibraryLoading(area);
   }
   renderSidebar();
 }
@@ -3113,7 +3117,8 @@ const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "t
 function updateInstallBtn() {
   const sel = Object.values(sidebarData).filter(i => i.selected).length;
   const badge = document.getElementById("sel-count");
-  if (window.AtelierPolish) window.AtelierPolish.count(badge, sel); else badge.textContent = `${sel}`;
+  const count = document.getElementById("sel-count-value");
+  if (window.AtelierPolish) window.AtelierPolish.count(count, sel); else count.textContent = `${sel}`;
   badge.classList.toggle("active", sel > 0);
   const edited = Object.keys(sidebarData).length;
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
@@ -3591,21 +3596,18 @@ async function _fetchUsmapPath() {
   } catch (_) { return null; }
 }
 
-// The launch check shares the setup overlay with Settings. In Settings the old cover and its
-// configuration discovery run as before; at launch the check is the setup page itself, and it
-// only appears when /api/setup_status is slow, so a quick check goes straight to the Library.
-const SETUP_COVER_DELAY = 400;
-let _setupLoadingFinish = null, _setupLoadingRevision = 0, _setupCoverTimer = 0;
+// Settings has its own loading cover. At launch, the setup page opens only when
+// configuration is needed or the check fails and needs a retry.
+let _setupLoadingFinish = null, _setupLoadingRevision = 0;
 function _setupPresent(call) {
   try { call(window.AtelierSetup); } catch (_) { /* The check and setup work without the page's presentation. */ }
 }
 function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevision) {
   if (!on && revision !== _setupLoadingRevision) return;
   const loading = document.getElementById('setup-loading'), overlay = document.getElementById('setup-overlay');
-  clearTimeout(_setupCoverTimer);
   if (on) {
     _setupLoadingFinish?.dispose?.();
-    const current = ++_setupLoadingRevision;
+    ++_setupLoadingRevision;
     loading.classList.add('active');
     loading.setAttribute('aria-busy', 'true');
     if (_pathsMode) {
@@ -3614,10 +3616,6 @@ function _setSetupLoading(on, outcome = 'cancel', revision = _setupLoadingRevisi
       catch (_) { _setupLoadingFinish = null; }
     } else {
       _setupPresent(setup => setup?.checking());
-      // Results are never delayed by this: only the cover's appearance waits.
-      if (!overlay.classList.contains('active')) _setupCoverTimer = setTimeout(() => {
-        if (current === _setupLoadingRevision && !_pathsMode) overlay.classList.add('active');
-      }, SETUP_COVER_DELAY);
     }
   } else {
     try { _setupLoadingFinish?.(outcome); } catch (_) { /* Keep setup usable without presentation. */ }

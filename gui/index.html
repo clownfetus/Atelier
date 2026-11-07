@@ -56,14 +56,16 @@
 
 <!-- ── top bar ── -->
 <div id="topbar">
-  <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
-  <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
-  <nav id="app-pages" aria-label="Main navigation"><button id="page-library" type="button" aria-current="page">Library</button><button id="page-workspace" type="button" title="Guided costume and colour editing">Workspace</button></nav>
+  <div class="topbar-navigation">
+    <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
+    <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
+    <nav id="app-pages" aria-label="Main navigation"><button id="page-library" type="button" aria-current="page">Library</button><button id="page-workspace" type="button" title="Guided costume and colour editing">Workspace</button></nav>
+  </div>
   <div id="searchbar">
     <i data-lucide="search" size="15"></i>
-    <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets, IDs…" aria-keyshortcuts="Control+f Meta+f">
+    <input id="search-input" type="search" aria-label="Search heroes, skins, assets and IDs" placeholder="Search heroes, skins, assets or IDs" aria-keyshortcuts="Control+f Meta+f">
     <button id="search-scope" class="search-scope" type="button" aria-label="Search scope: Everywhere">Everywhere</button>
-    <kbd>Ctrl F</kbd>
+    <kbd>Ctrl+F</kbd>
     <div id="search-results" role="listbox" aria-label="Search results" hidden></div>
   </div>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
@@ -116,8 +118,10 @@
       <div class="library-filter-group" role="group" aria-label="Filter assets">
       <label>Type <select id="library-type" aria-label="Asset type"><option value="all">All types</option><option value="folder">Folders</option><option value="texture">Textures</option><option value="material">Materials</option><option value="mesh">Meshes</option><option value="vfx">VFX</option><option value="curve">Curves</option><option value="text">Text</option><option value="world">Worlds</option><option value="other">Other assets</option></select></label>
       <label>Status <select id="library-status" aria-label="Edited status"><option value="all">All assets</option><option value="edited">Edited</option><option value="unedited">Not edited</option></select></label>
-      <button class="btn" id="library-clear" type="button" hidden>Clear filters</button>
-      <button class="btn" id="bulk-material-open" type="button" hidden>Bulk edit materials</button>
+      <div class="library-filter-actions">
+        <button class="btn" id="library-clear" type="button" hidden>Clear filters</button>
+        <button class="btn" id="bulk-material-open" type="button" hidden>Bulk edit materials</button>
+      </div>
       </div>
       <div class="library-view-group" role="group" aria-label="Library display">
       <label>Sort <select id="library-sort" aria-label="Sort assets"><option value="recommended">Recommended</option><option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="type">Asset type</option><option value="edited">Edited first</option></select></label>
@@ -130,9 +134,9 @@
     <div class="library-content">
     <div id="library-corner-art" aria-hidden="true" hidden></div>
     <div id="grid-area">
-      <div id="empty-state">
-        <i data-lucide="loader" size="32" style="color:var(--muted)"></i>
-        <div>Loading index…</div>
+      <div id="empty-state" class="library-loading" role="status">
+        <span class="library-loading-indicator" aria-hidden="true"></span>
+        <span>Loading assets…</span>
       </div>
     </div>
     </div>
@@ -151,12 +155,12 @@
   <!-- sidebar -->
   <aside id="sidebar" aria-label="Mod tray and build controls">
     <div id="sidebar-header">
-      <div style="display:flex;align-items:center;gap:6px">
-        <i data-lucide="package" size="13"></i>
-        Mod tray
+      <div class="mod-tray-title">
+        <i data-lucide="package" size="16"></i>
+        <span>Mod tray</span>
       </div>
-      <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear All</button>
-      <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets">0</button>
+      <button class="clear-all-btn" id="clear-all-btn" title="Delete all edited assets" style="display:none">Clear all</button>
+      <button id="sel-count" title="Toggle select all/none" aria-label="Toggle selection of all edited assets"><span id="sel-count-value">0</span></button>
     </div>
     <div class="mod-tray-tools">
     <button class="btn" id="bulk-edit-open" type="button" hidden>Bulk VFX / curves</button>
@@ -1047,7 +1051,6 @@
 <script src="/static/motion/setup-check.js"></script>
 <script src="/static/motion/setup-drop.js"></script>
 <script src="/static/motion/workflow-krackle.js"></script>
-<script src="/static/motion/motion-preview.js"></script>
 <script src="/static/motion/import-ink.js"></script>
 <script src="/static/folder-icons.js"></script>
 <script src="/static/motion/category-emblems.js"></script>

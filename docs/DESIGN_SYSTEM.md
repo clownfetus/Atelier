@@ -282,14 +282,14 @@ beside the tagline. The i of "telier" is set dotless with a Smalt tittle (0.168e
 Bricolage's own tittle height; this departs from the sheet's rule that a lockup shows
 only the mark's drop.
 
-A configured launch continues into Library; the setup page appears only when
-the check takes longer than 400ms. First run is one page, not a wizard: three rows (Unlock
-key `AES`, Mapping file `USMAP`, Game folder) say what the check found, with the path
-or file in Fragment Mono and a quiet Change, and open a field with Browse or Paste only
-for what is missing. Missing rows use the caution colour (Ochre) and the instruction
-text; Smalt stays for focus. The page is the Grand pour: each row names its thing on the
-left, the drop's column runs down the middle through the glyphs, and what was found sits on
-the right. "Open Atelier" is the one primary action and the paper label of the export
+A configured launch continues into Library or the project picker. The setup page
+opens when configuration is incomplete. A failed check offers a retry. On first run,
+three rows (Unlock key `AES`, Mapping file `USMAP`, Game folder) say what the check
+found. Found rows show the path or file in Fragment Mono and a quiet Change. Missing
+rows open a field with Browse or Paste, use the caution colour (Ochre) and explain
+what to provide. Smalt stays for focus. On the Grand pour page, each row names its
+item on the left, the drop's column runs down the middle through the glyphs, and
+the result sits on the right. "Open Atelier" is the primary action and the paper label of the export
 review's ink-well, which stands prominent under the column and cooks until the drop lands.
 One drop follows a dotted line down the column, past each row that is valid, waits at the
 first that isn't, and falls into the well when Open Atelier turns on; the well's lid, shut in

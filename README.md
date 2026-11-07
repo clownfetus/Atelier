@@ -28,7 +28,7 @@ See the [patch notes](docs/release-1.1.4.md) for update instructions and details
 ## Included from 1.1.3
 
 - **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
-  costume colours along the app's borders. Try the examples in **Settings → Try Krackle**.
+  costume colours along the app's borders.
 - **Quieter Windows pickers.** File and folder selection opens without a PowerShell console.
 - **Textures match the game's brightness.** Exports keep their mip chain and build mips the way
   the game does, so textures no longer look brighter or glarey at a distance.

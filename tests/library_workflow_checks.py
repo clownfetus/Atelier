@@ -74,13 +74,51 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert target.locator('#library-size').input_value() == '196'
         assert target.locator('#library-sort').input_value() == 'name-desc'
         seed()
+        toolbar = target.locator('.library-controls')
+        field_widths = 'fields => fields.map(field => field.offsetWidth)'
+        widths = toolbar.locator('select').evaluate_all(field_widths)
+        target.locator('#library-type').select_option('material')
+        target.locator('#library-status').select_option('edited')
+        active_widths = toolbar.locator('select').evaluate_all(field_widths)
+        assert active_widths == widths, (widths, active_widths)
+        assert target.locator('#library-clear').is_visible() and target.locator('#bulk-material-open').is_visible()
         for theme in ('light', 'dark'):
             target.locator('#settings-theme').select_option(theme, force=True)
             target.set_viewport_size({'width': 1024, 'height': 768})
             assert target.evaluate('document.documentElement.scrollWidth<=innerWidth')
-            target.screenshot(path=str(report / f'library-workflow-{theme}.png'), animations='disabled')
-        checks.append('Natural sorting and adjustable thumbnail size persist across reload; controls fit both themes at 1024px')
+            for tray_width in (260, 500):
+                target.evaluate("width => document.getElementById('sidebar').style.width = width + 'px'", tray_width)
+                layout = toolbar.evaluate("""bar => {
+                  const box = bar.getBoundingClientRect();
+                  const [type, status, sort, size] = [...bar.querySelectorAll('select')].map(field => field.getBoundingClientRect());
+                  const view = bar.querySelector('.library-view-group');
+                  return {fits: [...bar.querySelectorAll('select, button, .library-scope')].every(field => {
+                            const rect = field.getBoundingClientRect();
+                            return rect.left >= box.left && rect.right <= box.right + 1;
+                          }), aligned: type.top === status.top && sort.top === size.top &&
+                                       [status, sort, size].every(rect => rect.height === type.height),
+                          stacked: sort.top > type.top,
+                          divider: getComputedStyle(view, '::before').content !== 'none'};
+                }""")
+                assert layout == {'fits': True, 'aligned': True, 'stacked': tray_width == 500,
+                                  'divider': tray_width == 260}, (theme, tray_width, layout)
+                if tray_width == 260:
+                    target.screenshot(path=str(report / f'library-workflow-{theme}.png'), animations='disabled')
+        target.evaluate("document.getElementById('sidebar').style.width = ''")
+        target.set_viewport_size({'width': 540, 'height': 768})
+        assert search.bounding_box()['width'] >= 100
+        menu = target.locator('#menu-btn').bounding_box()
+        assert menu['x'] + menu['width'] <= 540
+        assert target.locator('#sel-count-value').evaluate("""count => {
+          AtelierPolish.count(count, 10);
+          const [first, second] = count.querySelectorAll('.rolling-digit');
+          const gap = second.getBoundingClientRect().left - first.getBoundingClientRect().right;
+          updateInstallBtn();
+          return Math.abs(gap) < .5 && getComputedStyle(count).overflow === 'hidden';
+        }""")
+        checks.append('Library dropdowns keep their widths and alignment in both themes, the toolbar wraps beside a wide Mod tray, and narrow search and tray counts remain readable')
 
+        seed()
         target.locator('#library-sort').select_option('name')
         target.locator('#library-size').select_option('156')
         target.set_viewport_size({'width': 1400, 'height': 900})
@@ -135,6 +173,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
         search.fill('Texture')
         assert cards.count() == 0
         assert target.locator('#library-count').inner_text() == 'Loading…'
+        assert target.locator('#grid-area .library-loading[role=status]').inner_text() == 'Loading assets…'
         target.evaluate("finishLibraryBrowse({error:'Folder unavailable'})")
         target.wait_for_function("_gridStatus === 'error'")
         target.locator('#library-status').select_option('edited')

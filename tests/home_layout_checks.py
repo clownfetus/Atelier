@@ -27,8 +27,10 @@ def run_home_layout_checks(page, context, url, report, checks):
     tab.route('**/api/preview?*', lambda route: route.fulfill(body=raw.getvalue(), content_type='image/png'))
     tab.route('**/api/catalogue/library', lambda route: route.fulfill(json={'heroes': heroes}))
     tab.route('**/api/imported', lambda route: route.fulfill(json=imported))
+    saved = None
     try:
         tab.goto(url)
+        saved = tab.evaluate("Object.fromEntries(['atelier.homeHeroesOpen', 'atelier.libraryView.v1'].map(key => [key, localStorage.getItem(key)]))")
         tab.wait_for_function("document.querySelectorAll('.roster-portrait').length===54 && window.atelierProject?.()")
         tab.wait_for_selector('#continue-ribbon:not([hidden])')
         for theme in ('light', 'dark'):
@@ -104,4 +106,6 @@ def run_home_layout_checks(page, context, url, report, checks):
         assert not errors, errors
         checks.append('A full 54-hero Home keeps complete portrait rows, costumes and categories separated at all four card sizes in both themes; short windows scroll and Heroes still collapses')
     finally:
+        if saved is not None:
+            tab.evaluate("settings => { for (const [key, value] of Object.entries(settings)) value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); }", saved)
         tab.close()

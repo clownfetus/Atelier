@@ -78,9 +78,6 @@ def main():
         page.locator('#setup-overlay .setup-body').evaluate('el=>el.scrollTop=0')
         assert page.locator('#setup-aes').evaluate("el=>el.getBoundingClientRect().top >= el.closest('.setup-body').getBoundingClientRect().bottom"), 'Keep credential fields outside the captured viewport'
         page.wait_for_timeout(600);shot('appearance-settings.png')
-        page.locator('.k-motion-preview').scroll_into_view_if_needed()
-        assert page.locator('#setup-aes').evaluate("el=>{const a=el.getBoundingClientRect(),b=el.closest('.setup-body').getBoundingClientRect();return a.bottom<=b.top||a.top>=b.bottom;}"), 'Keep credential fields outside the captured viewport'
-        page.wait_for_timeout(600);shot('krackle-examples.png')
         page.locator('#settings-blender-project-textures').scroll_into_view_if_needed()
         assert page.locator('#setup-aes').evaluate("el=>{const a=el.getBoundingClientRect(),b=el.closest('.setup-body').getBoundingClientRect();return a.bottom<=b.top||a.top>=b.bottom;}"), 'Keep credential fields outside the captured viewport'
         page.wait_for_timeout(300);shot('blender-settings.png')

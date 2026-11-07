@@ -280,7 +280,7 @@ def run_workflow_motion_checks(context, url, report, checks):
         mode('full')
         checks.append('Opening a dialog cancels active workspace ink immediately in Full and Calm')
 
-        # Preview the production formations from the real Settings surface. No job or project writes.
+        # Exercise the production formations on plain targets inside Settings.
         writes = []
         tab.on('request', lambda request: writes.append(request.url)
                if request.method not in ('GET', 'HEAD', 'OPTIONS') and '/api/' in request.url else None)
@@ -288,38 +288,48 @@ def run_workflow_motion_checks(context, url, report, checks):
             _pathsMode = true; _applySetupMode(); _setSetupLoading(false);
             document.getElementById('setup-overlay').classList.add('active');
         }""")
-        preview = tab.get_by_role('group', name='Krackle motion preview')
-        preview.get_by_role('button', name='Replay ink handoff', exact=True).click()
-        tab.wait_for_selector('.k-workflow-link', state='attached', timeout=2500)
-        assert tab.locator('.k-motion-sample').count() == 4
-        tab.wait_for_timeout(130)
-        tab.screenshot(path=str(report / 'workflow-handoff-demo.png'))
-        formation('arrival'); finished()
-        checks.append('Try Krackle includes an accessible connected Edit to Mod tray handoff alongside the four local gestures')
-        for _ in range(2):
-            tab.locator('#setup-close').click()
-            tab.evaluate("document.getElementById('setup-overlay').classList.add('active')")
-            preview.get_by_role('button', name='Replay ink handoff', exact=True).click()
-            tab.wait_for_selector('.k-workflow-link', state='attached', timeout=2500)
-            formation('arrival'); finished()
-        checks.append('Repeated immediate open-and-replay gives ownership to the handoff rather than a late panel entrance')
+        formation('panel'); finished()
+        assert tab.get_by_text('Try Krackle', exact=True).count() == 0
+        assert tab.locator('#settings-motion').is_enabled()
+        tab.evaluate("""() => {
+            const fixture = document.createElement('div');
+            fixture.id = 'workflow-fixture';
+            fixture.style.cssText = 'position:fixed;left:24px;top:96px;display:flex;gap:28px';
+            for (let i = 0; i < 5; i++) {
+                const host = document.createElement('div');
+                host.style.cssText = 'display:grid;place-items:center;width:64px;height:52px;border-radius:6px;background:var(--bg2)';
+                fixture.append(host);
+            }
+            const art = document.createElement('img');
+            art.src = '/fixture/workflow.png';
+            art.width = art.height = 28;
+            fixture.firstElementChild.append(art);
+            document.getElementById('setup-overlay').append(fixture);
+        }""")
+        host = tab.locator('#workflow-fixture > :first-child')
+
+        def replay(kind):
+            return host.evaluate("""(host, kind) => {
+                AtelierMotion.workflow.stop();
+                return AtelierMotion.workflow[kind](host);
+            }""", kind)
+
         for theme in ('dark', 'light'):
             tab.locator('#settings-theme').select_option(theme, force=True)
-            preview.scroll_into_view_if_needed()
             for kind in ('arrive', 'trace', 'seal', 'release'):
-                tab.locator(f'[data-motion-sample="{kind}"]').click()
-                formation(kind, f'workflow-preview-{kind}-{theme}.png')
+                assert replay(kind)
+                formation(kind, f'workflow-{kind}-{theme}.png')
                 finished()
-        checks.append('Settings replays all four production gestures in both themes, without jobs or project writes')
+        checks.append('Settings offers the Motion control and the four production gestures render in both themes')
 
         # Rasterize the real native SVG to verify the entire protected interior.
-        tab.locator('[data-motion-sample=arrive] .k-motion-sample-art').evaluate("""host => {
+        host.evaluate("""host => {
             host.style.position='relative';
             const text=document.createElement('span');text.id='workflow-mask-label';text.textContent='M';
             text.style.cssText='position:absolute;left:6px;top:0;font:10px/10px sans-serif';
             host.append(text);
         }""")
-        tab.locator('[data-motion-sample=arrive]').click()
+        assert replay('arrive')
         formation('arrive')
         tab.wait_for_timeout(100)
         raster = tab.evaluate("""async () => {
@@ -335,7 +345,7 @@ def run_workflow_motion_checks(context, url, report, checks):
             const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
             const all=ctx.getImageData(0,0,w,h).data;
             const inside=ctx.getImageData(inset,inset,w-2*inset,h-2*inset).data;
-            const host=document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art');
+            const host=document.querySelector('#workflow-fixture > :first-child');
             const origin=svg.getBoundingClientRect(),regions=[];
             for(const node of host.querySelectorAll('svg,img')) regions.push(node.getBoundingClientRect());
             const range=document.createRange();range.selectNodeContents(document.getElementById('workflow-mask-label'));
@@ -353,12 +363,12 @@ def run_workflow_motion_checks(context, url, report, checks):
         assert raster['regions'] >= 2 and raster['displayed'], raster
         finished()
         tab.locator('#workflow-mask-label').evaluate('node=>node.remove()')
-        tab.locator('[data-motion-sample=arrive] .k-motion-sample-art').evaluate("host=>host.style.removeProperty('position')")
+        host.evaluate("host=>host.style.removeProperty('position')")
         checks.append('Visible native SVG has edge ink, a transparent interior, and transparent full glyph/text bounds including a label touching its seam')
 
         # Artwork palette changes repaint the existing gesture without restarting it.
         pigment = tab.evaluate("""async () => {
-            const host=document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art');
+            const host=document.querySelector('#workflow-fixture > :first-child');
             const semantic=getComputedStyle(host).getPropertyValue('--krackle-charge');
             host.style.setProperty('--roster-skin-accent','#e84f8a');
             AtelierMotion.workflow.hero(host);
@@ -379,7 +389,7 @@ def run_workflow_motion_checks(context, url, report, checks):
         checks.append('Hero and skin pigment changes repaint the active gesture while semantic control colours remain unchanged')
 
         stable = tab.evaluate("""() => {
-            const hosts=[...document.querySelectorAll('.k-motion-sample-art')].slice(0,5);
+            const hosts=[...document.querySelectorAll('#workflow-fixture > div')];
             const native=Math.random;let first,second,count;
             try {
                 Math.random=()=>{throw Error('workflow must not sample random geometry');};
@@ -427,15 +437,12 @@ def run_workflow_motion_checks(context, url, report, checks):
         run_ink_flow_checks(tab, report, checks)
 
         mode('calm')
-        tab.locator('[data-motion-sample=arrive]').click()
+        assert replay('seal')
         assert not tab.locator('.k-workflow-svg').count()
-        assert preview.locator('.k-motion-preview-mode').inner_text() == 'Calm'
-        tab.wait_for_function("!document.querySelector('[data-motion-sample=arrive] .k-motion-sample-art').getAnimations().length")
-        tab.locator('[data-motion-sample=seal]').click()
-        assert tab.evaluate("document.querySelector('[data-motion-sample=seal] .k-motion-sample-art').getAnimations().length > 0")
-        tab.evaluate("document.querySelector('.k-motion-preview').style.visibility='hidden'")
-        tab.wait_for_function("!document.querySelector('[data-motion-sample=seal] .k-motion-sample-art').getAnimations().length")
-        tab.evaluate("document.querySelector('.k-motion-preview').style.removeProperty('visibility')")
+        assert host.evaluate('node => node.getAnimations().length > 0')
+        tab.evaluate("document.getElementById('workflow-fixture').style.visibility='hidden'")
+        tab.wait_for_function("!document.querySelector('#workflow-fixture > :first-child').getAnimations().length")
+        tab.evaluate("document.getElementById('workflow-fixture').style.removeProperty('visibility')")
         for system in (False, True):
             if system:
                 mode('full')
@@ -443,51 +450,37 @@ def run_workflow_motion_checks(context, url, report, checks):
                 media('reduce')
             else:
                 mode('off')
-            tab.wait_for_function("AtelierMotionPolicy.mode()==='off' && document.querySelector('.k-motion-preview-mode').textContent==='Still'", timeout=2500)
-            assert preview.locator('.k-motion-preview-mode').inner_text() == 'Still'
-            assert preview.get_by_role('button').evaluate_all('(buttons)=>buttons.every(button=>button.disabled)')
+            tab.wait_for_function("AtelierMotionPolicy.mode()==='off'", timeout=2500)
+            assert not replay('arrive')
             assert not tab.locator('.k-workflow-svg').count()
         media('no-preference')
         mode('full')
-        tab.wait_for_function("document.documentElement.dataset.krackle==='full' && document.querySelector('.k-motion-preview-mode').textContent==='Full'")
-        checks.append('Preview follows Calm, Off and OS reduced motion, with disabled replay controls for still presentation')
+        tab.wait_for_function("document.documentElement.dataset.krackle==='full'")
+        checks.append('Calm shows a brief local response. Off and OS reduced motion keep gesture targets still')
 
-        # Rapid replay, dismissal, palette changes and unsupported graphics remain disposable.
-        tab.locator('[data-motion-sample=arrive]').scroll_into_view_if_needed()
-        tab.evaluate("""() => {
-            const buttons = [...document.querySelectorAll('[data-motion-sample]')].slice(0,3);
-            for (let i=0; i<20; i++) buttons[i%buttons.length].click();
-        }""")
-        assert tab.locator('.k-workflow-svg').count() == 1
+        # Dismissal, palette changes and unsupported graphics remain disposable.
+        assert replay('arrive')
         tab.locator('#setup-close').click()
         finished()
         tab.evaluate("document.getElementById('setup-overlay').classList.add('active')")
         formation('panel'); finished()
-        preview.scroll_into_view_if_needed()
         assert not tab.locator('.k-workflow-svg').count()
-        tab.locator('[data-motion-sample=trace]').click()
+        assert replay('trace')
         formation('trace')
         tab.locator('#settings-theme').select_option('dark', force=True)
         finished()
         # SVG gestures do not require Canvas support.
-        tab.evaluate("""() => {
+        host.evaluate("""host => {
             const native = HTMLCanvasElement.prototype.getContext;
             try {
                 HTMLCanvasElement.prototype.getContext = () => null;
-                document.querySelector('[data-motion-sample=arrive]').click();
+                AtelierMotion.workflow.arrive(host);
             } finally { HTMLCanvasElement.prototype.getContext = native; }
         }""")
         formation('arrive'); finished()
         assert tab.locator('#settings-motion').is_enabled()
-        checks.append('Rapid replay owns one sample; dismissal and palette changes dispose it; SVG continues without Canvas')
-
-        for width in (720, 360):
-            tab.set_viewport_size({'width': width, 'height': 640})
-            preview.scroll_into_view_if_needed()
-            assert preview.evaluate("p=>p.scrollWidth<=p.clientWidth && p.getBoundingClientRect().right<=innerWidth")
-            tab.screenshot(path=str(report / f'workflow-preview-{width}.png'))
+        checks.append('Dismissing Settings or changing palette disposes active gestures. SVG gestures work without Canvas')
         assert not writes, writes
-        checks.append('Motion samples fit smaller Settings windows and never write to project or job endpoints')
         assert not errors, errors
         checks.append('Dial changes, resize, hidden documents and detached targets remove their SVG overlays and cancel pending drawing')
     finally:

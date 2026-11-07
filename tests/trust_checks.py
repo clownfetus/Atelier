@@ -221,42 +221,46 @@ def _setup(context,url,report,checks):
 
 
 def _launch_check(context,url,report,checks):
-    # The checking page appears only when the status request is slow, a failure offers Try again,
-    # and a quick configured launch never shows the cover at all.
-    watch="""window.__setupCheck={};const previous=window.fetch;window.fetch=(url,opts)=>{const result=previous(url,opts);if(String(url).includes('/api/setup_status')&&!window.__setupCheck.asked){window.__setupCheck.asked=performance.now();result.finally(()=>{window.__setupCheck.answered=performance.now()}).catch(()=>{})}return result};
-      document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{if(document.getElementById('setup-overlay').classList.contains('active'))window.__setupCheck.shown=window.__setupCheck.shown||performance.now()}).observe(document.getElementById('setup-overlay'),{attributes:true,attributeFilter:['class']}));"""
-    tab=context.new_page();errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
-    try:
-        tab.add_init_script(watch)
-        held=[];tab.route('**/api/setup_status',lambda route:held.append(route))
-        tab.goto(url);tab.wait_for_selector('#setup-overlay.active[data-setup-page=checking]')
-        timing=tab.evaluate('window.__setupCheck')
-        assert timing['shown']-timing['asked']>=380,timing
-        assert tab.locator('#setup-page-title').inner_text()=='Checking your setup'
-        assert tab.locator('#setup-rows [data-state=waiting]').count()==3
-        assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=busy]').count()==1
-        held.pop(0).fulfill(status=500,body='Traceback: boom')
-        tab.wait_for_selector('#setup-overlay.active[data-setup-page=failed]')
-        assert tab.locator('#setup-page-error').inner_text()=='server error (500)'
-        assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=error]').count()==1
-        tab.screenshot(path=str(report/'trust-launch-failed.png'),animations='disabled')
-        tab.unroute('**/api/setup_status');tab.route('**/api/setup_status',lambda route:route.fulfill(json={'configured':True}))
-        tab.locator('#setup-retry').click()
-        tab.wait_for_function("!document.getElementById('setup-overlay').classList.contains('active')")
-        assert not tab.locator('#setup-hero [data-atelier-motion=setup-check]').count()
-        assert not errors,errors
-    finally:tab.close()
-    tab=context.new_page();errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
-    try:
-        tab.add_init_script(watch)
-        tab.route('**/api/setup_status',lambda route:route.fulfill(json={'configured':True}))
-        tab.goto(url);tab.wait_for_function("!!window.__setupCheck.answered")
-        tab.wait_for_timeout(700)
-        timing=tab.evaluate('window.__setupCheck')
-        # A busy machine can take longer than 400 ms to answer; the cover may then appear, never sooner.
-        if timing['answered']-timing['asked']<350:assert 'shown' not in timing,timing
-        else:assert 'shown' not in timing or timing['shown']-timing['asked']>=380,timing
-        assert tab.locator('#setup-overlay.active').count()==0
-        assert not errors,errors
-    finally:tab.close()
-    checks.append('The launch check shows its page only after 400 ms, reports a failed check with Try again, and a quick configured launch never shows it')
+    watch = """document.addEventListener('DOMContentLoaded', () => {
+      const overlay = document.getElementById('setup-overlay');
+      window.__setupShown = overlay.classList.contains('active');
+      new MutationObserver(() => {
+        if (overlay.classList.contains('active')) window.__setupShown = true;
+      }).observe(overlay, {attributes: true, attributeFilter: ['class']});
+    });"""
+    for fails in (False, True):
+        tab = context.new_page()
+        errors = []
+        tab.on('pageerror', lambda error: errors.append(str(error)))
+        try:
+            tab.add_init_script(watch)
+            held = []
+            tab.route('**/api/setup_status', lambda route: held.append(route))
+            with tab.expect_request('**/api/setup_status'):
+                tab.goto(url)
+            # Hold the answer beyond the former 400 ms cover delay.
+            tab.wait_for_timeout(700)
+            shown_while_pending = tab.evaluate('window.__setupShown')
+
+            if fails:
+                held.pop().fulfill(status=500, body='Traceback: boom')
+                tab.wait_for_selector('#setup-overlay.active[data-setup-page=failed]')
+                assert tab.locator('#setup-page-error').inner_text() == 'server error (500)'
+                assert tab.locator('#setup-hero [data-atelier-motion=setup-check][data-am-state=error]').count() == 1
+                tab.screenshot(path=str(report / 'trust-launch-failed.png'), animations='disabled')
+                tab.unroute('**/api/setup_status')
+                tab.route('**/api/setup_status', lambda route: route.fulfill(json={'configured': True}))
+                tab.locator('#setup-retry').click()
+            else:
+                held.pop().fulfill(json={'configured': True})
+
+            assert shown_while_pending is False, 'Setup opened while its status was still pending'
+            tab.wait_for_selector('#grid-area .card')
+            assert tab.locator('#setup-overlay.active').count() == 0
+            assert tab.locator('#setup-hero [data-atelier-motion=setup-check]').count() == 0
+            if not fails:
+                assert tab.evaluate('window.__setupShown') is False
+            assert not errors, errors
+        finally:
+            tab.close()
+    checks.append('Slow configured launches open the Library without showing setup. Failed checks show a retry that can recover')

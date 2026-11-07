@@ -1,5 +1,19 @@
 #app-pages { display:flex; gap:4px; flex:none; }
-#app-pages button { min-height:36px; padding:0 12px; border:0; border-radius:8px; background:transparent; color:var(--muted); font:600 13px var(--studio-font); cursor:pointer; }
+#app-pages button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:var(--studio-control-height);
+  padding:0 12px;
+  border:0;
+  border-radius:var(--studio-shape-small);
+  background:transparent;
+  color:var(--muted);
+  font:var(--studio-type-label);
+  font-weight:600;
+  cursor:pointer;
+}
+#app-pages button:where(:not(:disabled):hover) { background:var(--studio-hover); color:var(--text); }
 #app-pages button[aria-current=page] { background:var(--bg3); color:var(--text); }
 #app-pages button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
 #app-pages button:disabled { opacity:.45; cursor:default; }

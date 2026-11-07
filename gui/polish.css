@@ -66,8 +66,7 @@
 #startup-splash img { width:48px; height:48px; object-fit:contain; filter:var(--studio-brand-filter); }
 #startup-progress { width:180px; height:3px; accent-color:var(--acc); }
 [data-theme=dark] #explorer { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' opacity='.022' filter='url(%23n)' d='M0 0h120v120H0z'/%3E%3C/svg%3E"); }
-[data-density=compact] .btn, [data-density=compact] .menu-btn, [data-density=compact] .setup-input, [data-density=compact] .library-controls select { min-height:30px; height:30px; padding-top:4px; padding-bottom:4px; }
-[data-density=compact] .library-controls { padding:8px 12px; gap:8px; }
+[data-density=compact] .btn, [data-density=compact] .menu-btn, [data-density=compact] .setup-input { min-height:30px; height:30px; padding-top:4px; padding-bottom:4px; }
 [data-density=compact] .sb-item { padding:7px 10px; }
 [data-density=compact] .mat-row { padding-top:5px; padding-bottom:5px; }
 [data-motion=reduce] *, [data-motion=reduce] *::before, [data-motion=reduce] *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }

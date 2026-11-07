@@ -142,10 +142,11 @@
     const details=document.createElement('div'); details.className='roster-section';
     const heading=document.createElement('h2');heading.className='roster-heading';
     const toggle=document.createElement('button');toggle.type='button';toggle.className='roster-toggle';toggle.setAttribute('aria-controls','home-heroes-content');
-    toggle.innerHTML='<span class="roster-disclosure" aria-hidden="true">▸</span> Heroes';
+    toggle.innerHTML='<span>Heroes</span><i data-lucide="chevron-right" size="16" class="roster-disclosure" aria-hidden="true"></i>';
     toggle.addEventListener('click',()=>{fold(false,false);rememberHeroes(!heroesOpen);});heading.append(toggle);
     const content=document.createElement('div');content.className='roster-content';content.id='home-heroes-content';
     details.append(heading,content);root.append(details);expandHeroes(heroesOpen);
+    window.AtelierIcons?.createIcons({nodes:[heading]});
     if (!data.heroes?.length) { window.AtelierPolish?.empty(content,'Catalogue unavailable','Browse the library folders below. Saved artwork will return when available.'); return; }
     const filters=document.createElement('div');filters.className='roster-filters';filters.setAttribute('role','group');filters.setAttribute('aria-label','Filter heroes');
     for(const [value,label] of [['all','All'],['edited','Edited'],['recent','Recently opened']]) {
@@ -185,12 +186,22 @@
       const artwork=document.createElement('div');artwork.className='roster-art';artwork.append(image(hero));button.append(artwork);
       const label=document.createElement('strong');label.className='roster-hero-name';label.textContent=hero.name;
       const costumes=hero.skins?.length||0;
-      const counts=document.createElement('span');counts.className='roster-counts';counts.textContent=`${costumes} costume${costumes===1?'':'s'} · ${count} edit${count===1?'':'s'}`;button.append(label,counts);
+      const counts = document.createElement('span');
+      counts.className = 'roster-counts';
+      const costumeCount = document.createElement('span');
+      costumeCount.textContent = `${costumes} costume${costumes === 1 ? '' : 's'}`;
+      counts.append(costumeCount);
+      if (count) {
+        const editLabel = document.createElement('span');
+        editLabel.className = 'roster-edit-count';
+        editLabel.textContent = `${count} edit${count === 1 ? '' : 's'}`;
+        counts.append(editLabel);
+      }
+      button.append(label, counts);
       button.addEventListener('click',()=>choose(hero,button,true));
       button.addEventListener('dblclick',()=>navigate?.(hero.path));
       heroes.append(button);
     }
-    heroes.classList.add('k-screen');
     heroes.addEventListener('keydown',event=>{
       if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
       const buttons=[...heroes.children],index=buttons.indexOf(document.activeElement);if(index<0)return;
@@ -239,12 +250,42 @@
       const sources=item.file_type==='texture'?[`/api/preview?game_rel=${encodeURIComponent(item.game_rel)}&_project=${encodeURIComponent(project)}`]:
         ['/api/catalogue/badge/'+item.skin_id,'/api/catalogue/icon/'+item.skin_id,'/api/catalogue/thumbnail/'+item.skin_id];
       window.AtelierCatalogueArt.load(img,sources);root.append(img);}
-    const copy=document.createElement('div'),title=document.createElement('strong');title.textContent='Pick up where you left off';
-    const detail=document.createElement('p'),seconds=Math.max(0,Date.now()/1000-(item.modified||item.mtime||0));
-    const ago=seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+' min ago':seconds<86400?Math.floor(seconds/3600)+' h ago':Math.floor(seconds/86400)+' d ago';
-    detail.textContent=[item.char_name,item.skin_name,item.name].filter(Boolean).join(' · ')+', edited '+ago;
-    const heroChip=window.AtelierCatalogueArt?.heroChip(item);if(heroChip)detail.prepend(heroChip);
-    copy.append(title,detail);root.append(copy);
+    const copy = document.createElement('div');
+    copy.className = 'continue-copy';
+    const caption = document.createElement('p');
+    caption.className = 'continue-caption';
+    caption.textContent = 'Pick up where you left off';
+    const asset = document.createElement('strong');
+    asset.className = 'continue-asset';
+    asset.textContent = item.name || item.game_rel.split('/').at(-1);
+    asset.title = asset.textContent;
+    copy.append(caption, asset);
+
+    const detail = document.createElement('p');
+    detail.className = 'continue-meta';
+    const identityText = [item.char_name, item.skin_name].filter(Boolean).join(' · ');
+    if (identityText) {
+      const identity = document.createElement('span');
+      identity.className = 'continue-identity';
+      const heroChip = window.AtelierCatalogueArt?.heroChip(item);
+      if (heroChip) identity.append(heroChip);
+      const name = document.createElement('span');
+      name.textContent = name.title = identityText;
+      identity.append(name);
+      detail.append(identity);
+    }
+    const edited = Number(item.modified || item.mtime);
+    if (Number.isFinite(edited) && edited > 0) {
+      const seconds = Math.max(0, Date.now() / 1000 - edited);
+      const ago = seconds < 60 ? 'just now' : seconds < 3600 ? Math.floor(seconds / 60) + ' min ago'
+        : seconds < 86400 ? Math.floor(seconds / 3600) + ' h ago' : Math.floor(seconds / 86400) + ' d ago';
+      const time = document.createElement('span');
+      time.className = 'continue-time';
+      time.textContent = 'Edited ' + ago;
+      detail.append(time);
+    }
+    if (detail.childElementCount) copy.append(detail);
+    root.append(copy);
     const button=document.createElement('button');button.className='btn primary';button.textContent='Continue editing';button.addEventListener('click',()=>options.continue?.(item,editorFor(item)));root.append(button);
     // Match the library/roster identity art; an asset path also works when sidebar IDs are absent.
     const path=/^Characters\//i.test(item.game_rel) ? item.game_rel : ['Characters',item.char_id||item.skin_id?.slice(0,4),item.skin_id].filter(Boolean).join('/');

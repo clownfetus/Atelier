@@ -70,6 +70,26 @@ def run_catalogue_identity_checks(context, url, report, checks):
         tab.wait_for_selector('#mod-tray-heroes .hero-chip-art')
         assert tab.locator('#mod-tray-heroes').inner_text() == 'Magik'
         assert tab.locator('#mod-tray-heroes img').get_attribute('src') == '/api/catalogue/hero/1029/lord'
+        chips = tab.locator('#mod-tray-heroes .tray-hero-chip')
+        measure = """chip => {
+          const divider = getComputedStyle(chip, '::before');
+          return {size: parseFloat(getComputedStyle(chip).fontSize), height: chip.offsetHeight,
+                  divider: divider.content === 'none' ? 0 : parseFloat(divider.height)};
+        }"""
+        single = chips.first.evaluate(measure)
+        assert single['divider'] == 0
+        imported.append({**imported[1], 'token': 'thor-helmet', 'name': 'MI_ThorHelmet', 'selected': True,
+                         'game_rel': 'Characters/1035/1035001/Materials/MI_ThorHelmet'})
+        tab.evaluate('loadSidebar()')
+        assert chips.all_text_contents() == ['Magik', 'Thor']
+        first, second = chips.first.evaluate(measure), chips.last.evaluate(measure)
+        assert first['size'] == second['size'] < single['size'], (single, first, second)
+        assert first['divider'] == 0 and 0 < second['divider'] < second['height'], (first, second)
+        imported.pop()
+        tab.evaluate('loadSidebar()')
+        assert chips.all_text_contents() == ['Magik']
+        assert chips.first.evaluate(measure) == single
+        checks.append('Mod tray uses a larger name for one included hero, adds a short divider between compact names, and restores the larger name when the other hero is removed')
         tab.wait_for_selector('#continue-ribbon p .hero-chip-art')
         assert tab.locator('#continue-ribbon > img').get_attribute('src') == '/api/catalogue/badge/1029100'
         tab.evaluate("pushNav({path:'Characters/1029/1029100'})")

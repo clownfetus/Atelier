@@ -106,14 +106,8 @@ the chosen theme accent. Pigments retain their hue and are fitted for readable
 contrast against the actual surface, including translucent and color-mix paint.
 Theme controls, ownership markers and semantic result inks retain their roles.
 
-`motion-preview.js` adds **Try Krackle** beside the Motion dial in Settings.
-**Replay ink handoff** connects two real sample surfaces from Edit to Mod tray.
-Its four gesture buttons use the production formations directly, without
-starting jobs or writing project state. Calm previews the same local pulse;
-Off and system reduced motion show still artwork and disable replay. Samples
-never play automatically, and rapid replay replaces the previous sample.
-Opening a dialog cancels workspace formations, including Calm pulses; closing
-Settings cancels its preview without replaying it when reopened.
+The Motion dial in Settings controls the volume of these gestures. Opening a
+dialog cancels workspace formations, including Calm pulses.
 
 Run `tests/browser_smoke.py --workflow-motion-only --report-dir <folder>` for the
 selection/navigation/editor/tray integration, reduced-motion, ownership and
@@ -547,8 +541,8 @@ tagline, and a channel exactly where the Projects header rule is. `app.js` owns 
 
 | Real event | Ink and page |
 | --- | --- |
-| Check starts | Nothing for 400ms. If `/api/setup_status` is still out, the page appears with three waiting rows, and a drop on the left pours along the channel to the latch on the right, once per two beats (2080ms). A quick answer never shows the page. |
-| Configured | Results are never held for the ink. If the page was showing, Projects takes it over: the latch's starburst throws four flecks on the Projects rule, the channel settles into the 1px rule and the status line reads "Setup checked". With an active project the library opens directly. |
+| Check starts | The normal startup splash stays visible while `/api/setup_status` is pending. |
+| Configured | The Library opens with the active project. Without an active project, the project picker opens. |
 | First run | The rows fill from the real answer together. Found rows get a 20px found glyph (the ink key, the code file, the folder: see **Krackle glyphs**), what was found and the path or file in Fragment Mono, and a quiet Change. The key and mapping charge a six-dot ring while they are fetched. Missing rows get the cracked ring in the caution colour, an instruction and the field. The latch shows a starburst if the game was found, otherwise the cracked ring. One drop runs down past the valid rows into the ink-well below them (see **Setup ink-well**); "Open Atelier", the well's label, stays disabled until every row is valid. |
 | Check failed | The latch squeezes and splats. The page says the check couldn't finish, shows the real error in a mono box and offers Try again, Open settings and Get help. |
 
