@@ -458,7 +458,7 @@
 .at-modopen-rows.at-setup-rows { margin-top: 0; border-top: 0; }
 .at-modopen-rows .at-setup-row[hidden] { display: none; }
 .at-modopen-rows .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
-.at-modopen-rows .at-setup-glyph { width: 24px; height: 24px; }
+.at-modopen-rows .at-setup-glyph { width: 37px; height: 24px; }
 #mod-open-password-field { display: flex; gap: var(--space-3); }
 #mod-open-password {
   flex: 1; min-width: 0; max-width: 360px; height: var(--control-height); box-sizing: border-box;

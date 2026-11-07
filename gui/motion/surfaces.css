@@ -27,7 +27,7 @@
 /* Update drops sit in the topbar row before Activity, so toolbar labels never collide with them. */
 .k-update-drop {flex:0 0 auto;width:36px;height:36px;margin-left:8px;padding:0;border:1px solid var(--border);border-radius:var(--studio-shape-small);background:transparent;color:var(--krackle-charge);cursor:pointer;display:grid;place-items:center;}
 .k-update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}
-.k-update-drop > span {width:22px;height:22px;}
+.k-update-drop > span {width:28px;height:18px;}
 [data-density=compact] .k-update-drop {width:30px;height:30px;}
 .k-startup-stage {margin:auto;}
 #startup-splash[data-launch=true] > img {display:none;}

@@ -86,7 +86,8 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         # Ordinary informational and warning toasts keep their Material icons.
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
         tab.evaluate("toast('Plain warning', 'warning', 60000)")
-        assert tab.locator('#toast-area .toast.warning [data-atelier-motion=krackle-glyph]').count() == 1
+        assert tab.locator('#toast-area .toast.warning [data-atelier-motion=glyph][data-glyph-state=warning]').count() == 1
+        assert tab.evaluate("(()=>{const r=document.querySelector('#toast-area .toast.warning [data-atelier-motion=glyph]').getBoundingClientRect();return [r.width,r.height]})()") == [31, 20]
         assert tab.locator('#toast-area .toast.warning svg.lucide').count() == 1
         for state in ('success', 'warning', 'error'):
             tab.evaluate("state => { const t = toastSpinner('Working ' + state); t.resolve('Finished ' + state, state, 60000); }", state)
@@ -97,7 +98,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           try { const t = toastSpinner('Working glyph'); t.resolve('Finished glyph', 'warning', 60000); }
           finally { window.AtelierExportFeedback = feedback; }
         }""")
-        assert tab.locator('#toast-area .toast',has_text='Finished glyph').locator('[data-atelier-motion=krackle-glyph][data-am-state=warning]').count() == 1
+        assert tab.locator('#toast-area .toast',has_text='Finished glyph').locator('[data-atelier-motion=glyph][data-glyph-state=warning]').count() == 1
         tab.wait_for_function("!document.querySelector('#toast-area').getAnimations({subtree:true}).some(a=>a.effect?.target?.closest?.('[data-atelier-motion]'))", timeout=8000)
         assert tab.evaluate("[...document.querySelectorAll('#toast-area .toast')].map(t=>t.innerText.trim())") == [
             'Plain warning', 'Finished success', 'Finished warning', 'Finished error', 'Finished glyph']
@@ -119,25 +120,21 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           const host = document.createElement('span'); document.body.append(host);
           const glyph = AtelierMotion.krackleGlyph.mount(host, {state:'busy'});
           try {
-            for (const state of ['success','warning','error']) {
-              glyph.setState('busy');
-              const loops = host.getAnimations({subtree:true});
+            if (host.dataset.atelierMotion !== 'glyph' || host.dataset.glyphState !== 'busy') throw Error('The old mount did not reach the new glyph');
+            for (const state of ['success','warning','error','info']) {
               glyph.setState(state);
-              const ring = host.querySelector('.am-krackle-glyph-busy');
-              const fade = ring.getAnimations()[0];
-              if (!fade || fade.effect.getTiming().duration !== 140 || !loops.every(a=>a.playState==='idle'))
-                throw Error('Busy glyph hard-cut or retained its old loop');
-              fade.pause(); fade.currentTime = 70;
-              const opacity = Number(getComputedStyle(ring).opacity);
-              if (!(opacity > 0 && opacity < 1)) throw Error('Ring fade is not visible');
-              glyph.setState('busy');
-              if (fade.playState !== 'idle') throw Error('New work retained a stale result fade');
+              if (host.dataset.glyphState !== state) throw Error('setState did not reach the new glyph: ' + state);
             }
+            const svg = host.querySelector('svg');
             glyph.setReducedMotion('reduce'); glyph.setState('success');
-            if (host.getAnimations({subtree:true}).length) throw Error('Reduced glyph faded');
+            if (host.querySelector('svg') === svg) throw Error('setReducedMotion did nothing');
+            if (host.dataset.glyphState !== 'success') throw Error('setReducedMotion lost the state');
+            glyph.replay();
+            if (host.getAnimations({subtree:true}).length) throw Error('The glyph used a CSS or WAAPI animation');
           } finally { glyph.destroy(); host.remove(); }
+          if (host.childNodes.length || host.hasAttribute('data-atelier-motion')) throw Error('destroy left the glyph behind');
         }""")
-        checks.append('Activity glyph rings fade into real results for 140ms, cancel on new work, and stay still under reduced motion')
+        checks.append('The old glyph mount reaches the assembly glyph with the same handle: setState, replay, setReducedMotion and destroy')
 
         # Grid empty states keep their text; the art is decorative and settles.
         tab.evaluate("buildGrid([])")
@@ -242,7 +239,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           }
           const plain = document.createElement('span'); page.append(plain);
           const other = AtelierMotion.krackleGlyph.mount(plain, {state: 'success'});
-          out.plain = shown(plain, '.am-krackle-glyph-burst') && !['key', 'file', 'folder'].some(k => shown(plain, '.am-krackle-glyph-' + k));
+          out.plain = plain.dataset.glyphState === 'success' && !plain.hasAttribute('data-am-found');
           other.destroy(); page.remove();
           return out;
         }""")

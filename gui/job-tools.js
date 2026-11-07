@@ -4,7 +4,7 @@
   const active = new Set(['queued', 'running', 'cancelling']);
   const live = new Map();
   let timer, hidden = false, overlay, body, activityButton, rendered = '';
-  // Krackle row glyphs: a job's glyph animates only when its state changes.
+  // Row glyphs: a job's glyph animates only when its state changes.
   const shownStates = new Map();
   const rowGlyphs=new Set();
   function jobGlyph(job) {
@@ -20,11 +20,7 @@
     shownStates.set(job.id, state);
     try {
       row.querySelector('.job-state').prepend(host);
-      const glyph=window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});rowGlyphs.add(glyph);
-      if(job.state==='cancelled'&&!seen&&AtelierMotionPolicy.allows(1)&&!document.hidden) {
-        try{host.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(10px) scale(.3)',opacity:0}],{duration:240,fill:'forwards'});}catch(_){}
-        setTimeout(()=>{glyph.destroy();rowGlyphs.delete(glyph);host.remove();},260);
-      }
+      rowGlyphs.add(window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'}));
     } catch (_) { host.remove(); }
   }
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

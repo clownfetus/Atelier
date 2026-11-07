@@ -183,8 +183,8 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 }
 .toast > .am-krackle-glyph-slot {
   display: inline-flex;
-  flex: 0 0 20px;
-  width: 20px;
+  flex: 0 0 31px;
+  width: 31px;
   height: 20px;
   line-height: 0;
 }

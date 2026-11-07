@@ -18,6 +18,13 @@
 .atelier-glyph[data-glyph-entrance] > svg {
   overflow: visible;
 }
+/* The old glyph's hosts: the surface behind each, and the toast's slot gives its host a size. */
+.toast { --glyph-halo: #eee5cf; }
+.job-row { --glyph-halo: var(--md-sys-color-surface-container); }
+.at-modopen-rows { --glyph-halo: var(--surface); }
+.k-update-drop { --glyph-halo: var(--bg2); }
+.am-krackle-glyph-slot > .atelier-glyph { width: 100%; height: 100%; }
+
 .glyph-piece {
   stroke: var(--glyph-halo);
   stroke-width: 28;

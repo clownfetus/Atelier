@@ -99,6 +99,7 @@ def main():
     parser.add_argument('--appearance-only', action='store_true', help='Run only interface appearance and dropdown workflows')
     parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
     parser.add_argument('--glyph-only', action='store_true', help='Run only the assembly glyph checks: planner, clearance, states and Preview motion')
+    parser.add_argument('--krackle-motion-only', action='store_true', help='Run only the motion checks in krackle_motion_checks.py')
     parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
@@ -510,6 +511,15 @@ def main():
                     run_assembly_planner_checks(context, url, report, checks)
                     run_assembly_clearance_checks(context, url, report, checks)
                     run_assembly_state_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
+                    for check in checks: print('PASS '+check)
+                    browser.close()
+                    return
+
+                if args.krackle_motion_only:
+                    from krackle_motion_checks import run_krackle_motion_checks
+                    run_krackle_motion_checks(page, context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks: print('PASS '+check)

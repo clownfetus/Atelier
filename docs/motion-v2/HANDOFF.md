@@ -182,7 +182,7 @@ for over 50 ms; settled glyphs cost nothing per frame.
 
 ## Phase 3 · Swap surfaces
 
-- [ ] **P3.1 Alias.** Point `AtelierMotion.krackleGlyph.mount` at
+- [x] **P3.1 Alias.** Point `AtelierMotion.krackleGlyph.mount` at
   `AtelierMotion.glyph.mount`. Same states, same handle shape, so every caller
   listed in `SURFACE_MAP.md` row 8 switches with no change. Cover
   `AtelierKrackleGlyph.toastIcon` too (`gui/app.js:149`, `:201`), which doesn't go
