@@ -416,6 +416,7 @@
     impact() {
       const {fx} = this, green = this.view.status().complete, colour = this.colourTo(all(green), 220, {disc: 0, blue: 60, teal: 120});
       if (this.modeNow !== 'full') return colour; // Calm: the shape and the colour, without the flourish
+      window.AtelierFoley?.click();
       fx.dsx = .88; fx.dsy = 1.12; fx.punch = 1; fx.ringC = green;
       const ripple = this.tier !== 'stage' ? null : this.animate(620, E.out, (e, p) => { fx.ringR = 60 + e * 140; fx.ringW = 12 * Math.pow(1 - p, .6); fx.ringOp = Math.pow(1 - p, 1.4); });
       const squash = this.animate(300, E.punchBack, e => { fx.dsx = .88 + (1 - .88) * e; fx.dsy = 1.12 + (1 - 1.12) * e; });
