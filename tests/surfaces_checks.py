@@ -20,9 +20,9 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert 'Build mod' in tab.locator('#install-btn').inner_text()
         tab.evaluate("document.getElementById('toast-area').replaceChildren();toast('Caption fixture','success',60000);for(let i=0;i<4;i++)toast('Caption fixture','success',60000)")
         assert tab.locator('.toast-repeat').inner_text()=='×5'
-        assert tab.locator('.toast-repeat').evaluate("n=>getComputedStyle(n).fontSize")=='0px'
+        assert tab.locator('.toast-repeat').evaluate("n=>getComputedStyle(n).fontSize")!='0px'
         tab.evaluate("toast('Caption fixture','success',60000)")
-        assert tab.locator('.toast-repeat-number').inner_text()=='×6'
+        assert tab.locator('.toast-repeat').inner_text()=='×6' and not tab.locator('.toast-repeat-number').count()
         for theme in ['dark','light']:
             tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
             caption=tab.locator('.toast').evaluate("""n=>{const probe=document.createElement('span');probe.style.cssText='background:var(--bg2);color:var(--text);border-left:4px solid var(--status-complete)';document.body.append(probe);
@@ -30,7 +30,7 @@ def run_surfaces_checks(page,context,url,report,checks):
                 rule:style.borderLeftColor===want.borderLeftColor&&style.borderLeftWidth==='4px',comic:/\b4px 4px 0px\b/.test(style.boxShadow)};probe.remove();return result;}""")
             assert caption=={'surface':True,'text':True,'rule':True,'comic':False},(theme,caption)
             tab.screenshot(path=str(report/f'surfaces-caption-{theme}.png'),animations='disabled')
-        checks.append('Local Latin display lettering loads; panels use 6px roles; captions use the theme\'s Card surface and text with a status-coloured left rule, and repeats use five bubbles then a number')
+        checks.append('Local Latin display lettering loads; panels use 6px roles; captions use the theme\'s Card surface and text with a status-coloured left rule, and repeats always read as a number such as ×3')
         tab.evaluate("document.getElementById('toast-area').replaceChildren();window.replaced=[];window.oldRefresh=refreshEditedTexture;refreshEditedTexture=(...args)=>replaced.push(args);nav={path:'Texture fixture'};buildGrid([_makeCard({type:'asset',name:'T_Fixture',file_type:'texture',game_rel:'Fixture/T_Fixture',imported:true}),_makeCard({type:'asset',name:'T_Plain',file_type:'texture',game_rel:'Fixture/T_Plain'})]);")
         def replace(route):
             uploads.append((route.request.headers.get('x-atelier-project'),route.request.post_data_buffer))

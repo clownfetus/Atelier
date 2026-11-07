@@ -189,7 +189,7 @@ function toast(msg, type = "info", duration = 3200, instance = '') {
     let badge = el.querySelector('.toast-repeat');
     if (!badge) { badge = document.createElement('span'); badge.className = 'toast-repeat'; el.append(badge); }
     badge.textContent = '×' + (++repeats);badge.setAttribute('aria-label',repeats+' repeats');
-    badge.style.setProperty('--repeat-count',Math.min(5,repeats));badge.classList.toggle('toast-repeat-number',repeats>5); reset();
+    reset();
     window.AtelierPolish?.play(badge,[{transform:'scale(.85)'},{transform:'scale(1)'}],120);
   }});
   reset();
