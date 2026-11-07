@@ -1,4 +1,4 @@
-/* Material 3 workspace surfaces; Krackle belongs to the particle silhouette, not every control. */
+/* Material 3 workspace surfaces; motion belongs to the particle silhouette, not every control. */
 #vfx-overlay.has-motionboard .mat-modal { width: calc(100vw - 40px); max-width: 1500px; height: calc(100vh - 40px); max-height: none; }
 #vfx-overlay.has-motionboard .mat-head, #vfx-overlay.has-motionboard .mat-foot { flex-shrink: 0; }
 #vfx-overlay.has-motionboard .mat-head { padding: 12px 18px; }

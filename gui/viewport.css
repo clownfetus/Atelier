@@ -266,7 +266,7 @@
   filter:drop-shadow(0 14px 28px rgb(0 0 0 / 45%)); }
 /* The loader moves below the poster. */
 #viewport-stage.vp-has-poster > #viewport-loading { justify-content:flex-end; padding-bottom:84px; }
-:root:not([data-krackle=full]):not([data-krackle=calm]) .vp-poster { transition:none; }
+:root:not([data-motion-mode=full]):not([data-motion-mode=calm]) .vp-poster { transition:none; }
 #viewport-stage:has(#viewport-loading[style*="display: flex"]) > #viewport-inspect-tools,
 #viewport-stage:has(#viewport-loading[style*="display: flex"]) > #viewport-tools { visibility:hidden; }
 #viewport-hidden { position:absolute; inset:70px 0 0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; color:var(--text); pointer-events:none; }

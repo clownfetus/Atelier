@@ -176,7 +176,7 @@
   background: var(--surface-sunk);
   transition: background-color 120ms steps(2, end);
 }
-/* Done dots are ink (--text): on the ink surface Krackle energy and the drop share Smalt Light. */
+/* Done dots are ink (--text), which reads on the ink surface. */
 #prog-box.at-import #import-segments span[data-state="done"] { background: var(--text); }
 #prog-box.at-import #import-segments span[data-state="failed"] { background: var(--fault); }
 #prog-box.at-import[data-import-state="busy"] #import-segments span[data-state="pending"]:first-child,
@@ -397,8 +397,6 @@
 .at-setup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .at-setup-actions .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
 .at-setup-help { margin-left: var(--space-2); font: 400 13px/1 var(--font-ui); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-#setup-page [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
-#setup-page [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
 @media (max-width: 640px) {
   .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 37px minmax(0, 1fr) auto; gap: var(--space-4); }
   .at-setup-row .at-setup-detail, #setup-page .at-setup-detail { grid-column: 2 / -1; }
@@ -502,9 +500,6 @@
 .at-modopen-foot .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
 .at-modopen-outcome { display: inline-flex; width: 24px; height: 24px; flex: none; }
 .at-modopen-outcome:empty { display: none; }
-#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
-#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
-#mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="error"] { color: var(--fault); }
 @media (max-width: 640px) {
   #mod-open-overlay .at-modopen { width: calc(100% - 2 * var(--space-4)); }
   .at-modopen-head { flex-wrap: wrap; }

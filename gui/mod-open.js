@@ -29,11 +29,22 @@
     ? window.AtelierJobs.run(url, {method: 'POST', body: JSON.stringify(body), project, onUpdate})
     : post(url, body);
 
+  const reducedNow = () => (full() ? 'system' : 'reduce');
   function glyph(host, name, state) {
-    if (!state) { glyphs[name]?.destroy(); glyphs[name] = null; host.replaceChildren(); return; }
-    if (glyphs[name]) { glyphs[name].setState(state); return; }
-    try { glyphs[name] = window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: full() ? 'system' : 'reduce'}); }
+    if (!state) { glyphs[name]?.glyph.destroy(); glyphs[name] = null; host.replaceChildren(); return; }
+    if (glyphs[name]) { glyphs[name].glyph.set(state); return; }
+    try { const reduced = reducedNow(); glyphs[name] = {host, reduced, glyph: window.AtelierMotion.glyph.mount(host, {state, reducedMotion: reduced})}; }
     catch (_) { glyphs[name] = null; host.replaceChildren(); }
+  }
+  // A glyph's reducedMotion is fixed when it's mounted, so a change of motion setting mounts it again.
+  function remountGlyphs() {
+    for (const kept of Object.values(glyphs)) {
+      if (!kept || kept.reduced === reducedNow()) continue;
+      const state = kept.glyph.state;
+      kept.glyph.destroy(); kept.reduced = reducedNow();
+      try { kept.glyph = window.AtelierMotion.glyph.mount(kept.host, {state, reducedMotion: kept.reduced}); }
+      catch (_) { kept.glyph = {set() {}, destroy() {}, state}; kept.host.replaceChildren(); }
+    }
   }
   function lede(text) { if ($('mod-open-lede').textContent !== text) $('mod-open-lede').textContent = text; }
 
@@ -46,7 +57,7 @@
     $('mod-open-add').addEventListener('click', add);
     $('mod-open-save-all').addEventListener('click', () => saveJson(null));
     overlay.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } });
-    window.addEventListener('atelier:preferences', () => { for (const g of Object.values(glyphs)) g?.setReducedMotion?.(full() ? 'system' : 'reduce'); });
+    window.addEventListener('atelier:preferences', remountGlyphs);
   }
 
   function open() {

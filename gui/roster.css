@@ -68,7 +68,7 @@
 .roster-counts { display:flex; flex-wrap:wrap; gap:2px 6px; padding:0 8px 8px; font:var(--studio-type-detail); color:var(--muted); }
 .roster-counts > span { white-space:nowrap; }
 .roster-edit-count { font-weight:600; color:var(--text); }
-.roster-portrait.has-edits::after { content:''; position:absolute; top:0; right:0; width:20px; height:20px; background:var(--krackle-charge,var(--acc)); clip-path:polygon(0 0,100% 0,100% 100%); }
+.roster-portrait.has-edits::after { content:''; position:absolute; top:0; right:0; width:20px; height:20px; background:var(--charge,var(--acc)); clip-path:polygon(0 0,100% 0,100% 100%); }
 .roster-filters { display:flex; align-items:center; flex-wrap:wrap; gap:3px; width:fit-content; max-width:100%; padding:3px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--studio-shape-small); }
 .roster-heading { margin:0 0 8px; }
 .roster-toggle {

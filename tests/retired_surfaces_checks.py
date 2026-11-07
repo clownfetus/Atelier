@@ -11,18 +11,17 @@ def run_retired_surfaces_checks(context, url, report, checks):
         tab.wait_for_selector('#grid-area .card')
 
         gone = tab.evaluate("""() => {
-          const scripts = ['working-panels', 'workflow-krackle', 'workflow-surfaces', 'texture-reconstruction', 'krackle-context'];
-          const styles = ['working-panels', 'workflow-krackle', 'texture-reconstruction', 'folder-flap'];
+          const scripts = ['working-panels', 'workflow-surfaces', 'texture-reconstruction'];
+          const styles = ['working-panels', 'texture-reconstruction', 'folder-flap'];
           return {
             api: [AtelierMotion.working, AtelierMotion.workflow, AtelierMotion.energy, window.AtelierTextureReconstruction].filter(Boolean).length,
             scripts: scripts.filter(name => document.querySelector(`script[src$="/${name}.js"]`)),
             styles: styles.filter(name => document.querySelector(`link[href$="/${name}.css"]`)),
-            pigment: getComputedStyle(document.documentElement).getPropertyValue('--krackle-energy').trim(),
             lattice: [getComputedStyle(document.documentElement).getPropertyValue('--screen-dot').trim(),
               [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules]; } catch (_) { return []; } }).some(rule => rule.selectorText?.includes('.k-screen'))],
           };
         }""")
-        assert gone == {'api': 0, 'scripts': [], 'styles': [], 'pigment': '', 'lattice': ['', False]}, gone
+        assert gone == {'api': 0, 'scripts': [], 'styles': [], 'lattice': ['', False]}, gone
         checks.append('Working panels, workflow gestures, ink transfers, halftone reconstruction, the folder flap, contextual pigments and the dot lattice no longer load')
 
         # A row arriving in the Mod tray fades and rises for 200 ms, and no ink is drawn across the screen.

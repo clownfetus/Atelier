@@ -114,26 +114,6 @@ def run_glyph_surfaces_checks(page, context, url, report, checks):
         }""")
         checks.append('Caption notifications use micro formations; job results settle after one pop and controller failures keep the original icon')
 
-        tab.evaluate(r"""() => {
-          const host = document.createElement('span'); document.body.append(host);
-          const glyph = AtelierMotion.krackleGlyph.mount(host, {state:'busy'});
-          try {
-            if (host.dataset.atelierMotion !== 'glyph' || host.dataset.glyphState !== 'busy') throw Error('The old mount did not reach the new glyph');
-            for (const state of ['success','warning','error','info']) {
-              glyph.setState(state);
-              if (host.dataset.glyphState !== state) throw Error('setState did not reach the new glyph: ' + state);
-            }
-            const svg = host.querySelector('svg');
-            glyph.setReducedMotion('reduce'); glyph.setState('success');
-            if (host.querySelector('svg') === svg) throw Error('setReducedMotion did nothing');
-            if (host.dataset.glyphState !== 'success') throw Error('setReducedMotion lost the state');
-            glyph.replay();
-            if (host.getAnimations({subtree:true}).length) throw Error('The glyph used a CSS or WAAPI animation');
-          } finally { glyph.destroy(); host.remove(); }
-          if (host.childNodes.length || host.hasAttribute('data-atelier-motion')) throw Error('destroy left the glyph behind');
-        }""")
-        checks.append('The old glyph mount reaches the assembly glyph with the same handle: setState, replay, setReducedMotion and destroy')
-
         # Grid empty states keep their text; the glyph is decorative and never moves.
         still_glyph = '#empty-state > .empty-state-glyph[data-atelier-motion=glyph]'
         tab.evaluate("buildGrid([])")

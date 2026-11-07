@@ -8,7 +8,7 @@
     const amount = parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
     return Number.isFinite(amount) && amount > 0 ? amount : fallback;
   }
-  motion.beatMs = milliseconds('--krackle-beat', 1040);
+  motion.beatMs = milliseconds('--motion-beat', 1040);
   motion.exitMs = milliseconds('--studio-motion-exit', 120);
   motion.springMs = Object.freeze({
     snappy: milliseconds('--studio-spring-snappy-duration', 340),

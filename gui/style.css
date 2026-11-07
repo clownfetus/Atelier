@@ -1514,7 +1514,7 @@ select:focus-visible { border-color: var(--acc); }
 .search-result { display: flex; flex-direction: column; width: 100%; padding: 8px; gap: 3px; text-align: left; border: 0; border-radius: var(--studio-shape-xs); color: var(--text); background: transparent; font: inherit; cursor: pointer; }
 .search-result span { color: var(--muted); font-size: var(--studio-text-micro); overflow-wrap: anywhere; }
 .search-result:hover, .search-active { background: var(--bg3); outline: 1px solid var(--acc); }
-.search-no-results { display: block; margin: 8px; color: var(--krackle-charge); }
+.search-no-results { display: block; margin: 8px; color: var(--charge); }
 :root[data-motion=reduce] .search-no-results { display: none; }
 :focus-visible { outline: 2px solid var(--acc) !important; outline-offset: 3px; }
 .seg-btn:focus-visible { outline-offset: -3px; }

@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const K=require('../gui/motion/krackle-inks.js');
+const K=require('../gui/motion/inks.js');
 const skins=[['pink','#ff5c9a','#8a6cff'],['gold','#ffd700','#8a6cff'],['amber','#ffbf00','#8a6cff'],
   ['orange','#ff6a00','#8a6cff'],['coral','#ff7f50','#8a6cff'],['red','#e92929','#8a6cff'],
   ['deep red','#a20d0d','#8a6cff'],['pink and blue','#f062a4','#2a9fd6']];

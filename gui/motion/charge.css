@@ -1,0 +1,21 @@
+/*
+ * Measured charge colour for the edited corner, the update button and the no-results line.
+ * theme.js fits it to the surface; these are the unmeasured defaults.
+ */
+:root {
+  --charge: #2a9fd6;
+  /* Charge for raised surfaces (--bg3); theme.js measures it, this is the unmeasured default. */
+  --charge-raised: var(--charge);
+}
+
+[data-glyph-surface='dark'] { --charge:#2a9fd6; }
+[data-glyph-surface='light'] { --charge:#2693c6; }
+/* Thumbs, and hovered card bodies, paint --bg3. No var(--charge) fallback here: a self-reference is a cycle and voids the property. */
+.card-thumb, .card:hover { --charge: var(--charge-raised); }
+:root[data-motion-mode='calm'] .search-no-results { display:none; }
+
+/* Edited rows, cards and portraits: a plain corner triangle in the charge colour. */
+.sb-item::after,.card.imported::after,.roster-portrait.has-edits::after {
+  content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
+  background:var(--charge);clip-path:polygon(0 0,100% 0,100% 100%);
+}

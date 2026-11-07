@@ -231,9 +231,11 @@ ever created.
   `surfaces_checks.py` and `trust_checks.py` as well. (Done; `krackle_motion_checks.py` is now
   `glyph_surfaces_checks.py` behind `--glyph-surfaces-only`. The ink tests cover a live
   module, so P4.3 renames them with it.)
-- [ ] **P4.3** Remove the alias; rename callers to `AtelierMotion.glyph.mount`.
+- [x] **P4.3** Remove the alias; rename callers to `AtelierMotion.glyph.mount`.
   Rename `data-krackle-surface` to `data-glyph-surface`, `data-krackle`
-  (`gui/preferences.js:15` and the CSS) and the `--krackle-*` tokens.
+  (`gui/preferences.js:15` and the CSS) and the `--krackle-*` tokens. (Done: `data-motion-mode`,
+  `--charge`, `--charge-raised`, `--motion-beat`, `charge.css`, `inks.js` / `AtelierInks`,
+  `update-drop`. The rift and the per-button charge had no reader left and are gone.)
 - [ ] **P4.4** Rewrite `gui/motion/README.md` for the new system, including the
   D7 interruption rule. Update `docs/DESIGN_SYSTEM.md`, the Krackle notes in
   `docs/DEVELOPMENT.md`, and `docs/WORKSPACE_PLAN.md`. Clear `README.md:77`,

@@ -16,19 +16,19 @@
     return 'error';
   }
   function decorateState(row, job) {
-    if (!window.AtelierMotion?.krackleGlyph) return;
+    if (!window.AtelierMotion?.glyph) return;
     const state = jobGlyph(job), seen = shownStates.get(job.id) === state, target = row.querySelector('.job-state');
     shownStates.set(job.id, state);
     const kept = rowGlyphs.get(job.id);
     if (kept) {
       target.prepend(kept.host); kept.used = true;
-      try { kept.glyph.setState(state); } catch (_) { /* The label carries the state. */ }
+      try { kept.glyph.set(state); } catch (_) { /* The label carries the state. */ }
       return;
     }
     const host = el('span', undefined, 'job-state-glyph'); host.setAttribute('aria-hidden', 'true');
     try {
       target.prepend(host);
-      const glyph = window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});
+      const glyph = window.AtelierMotion.glyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});
       rowGlyphs.set(job.id, {host, glyph, used: true});
     } catch (_) { host.remove(); }
   }

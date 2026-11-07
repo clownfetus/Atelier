@@ -2,9 +2,6 @@
 (() => {
   'use strict';
   const api=window.AtelierSurfaces||={},transients=new Set(),emptyGlyphs=new Map();
-  function syncVisibility(){document.documentElement.toggleAttribute('data-krackle-hidden',document.hidden);}
-  syncVisibility();
-  document.addEventListener('visibilitychange',syncVisibility);
   const disposals=new MutationObserver(()=>{for(const [host,glyph] of emptyGlyphs)if(!host.isConnected){glyph.destroy();emptyGlyphs.delete(host);}});
   disposals.observe(document.documentElement,{childList:true,subtree:true});
   // Startup: the working glyph at Stage beside the counted bar, in Full only. The A never forms here;
@@ -29,11 +26,11 @@
   const drops=new Map();
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
-    const button=document.createElement('button');button.className='k-update-drop';button.type='button';button.title=kind==='usmap'?'Mapping update available':'Atelier update available';button.setAttribute('aria-label',button.title);
+    const button=document.createElement('button');button.className='update-drop';button.type='button';button.title=kind==='usmap'?'Mapping update available':'Atelier update available';button.setAttribute('aria-label',button.title);
     const host=document.createElement('span');button.append(host);
     const topbar=document.getElementById('topbar');
     if(topbar)topbar.insertBefore(button,document.getElementById('job-activity')||document.getElementById('menu-btn'));else document.body.append(button);
-    let glyph;try{glyph=AtelierMotion.krackleGlyph.mount(host,{state:'info',reducedMotion:'reduce'});}catch(_){button.textContent='Update';}
+    let glyph;try{glyph=AtelierMotion.glyph.mount(host,{state:'info',reducedMotion:'reduce'});}catch(_){button.textContent='Update';}
     const remove=button.remove.bind(button);button.remove=()=>{glyph?.destroy();button.getAnimations().forEach(a=>a.cancel());remove();if(drops.get(kind)===button)drops.delete(kind);};
     drops.set(kind,button);
     button.addEventListener('click',()=>{button.remove();open();});

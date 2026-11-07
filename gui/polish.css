@@ -4,7 +4,7 @@
 #ctx-menu, .studio-tooltip { box-shadow: var(--studio-elevation-menu); }
 .overlay > :first-child { box-shadow: var(--studio-elevation-dialog); }
 .overlay { backdrop-filter: blur(5px); }
-#explorer .library-heading h1, .overlay > :first-child h2, h1,h2,.modal-title,.mod-card-name,.k-event-title { font-family:var(--studio-display); font-weight:600; }
+#explorer .library-heading h1, .overlay > :first-child h2, h1,h2,.modal-title,.mod-card-name { font-family:var(--studio-display); font-weight:600; }
 .library-heading { position:relative; }
 #library-category-line { position:absolute; inset:auto 0 0; width:100%; height:2px; background:currentColor; border:0; margin:0; padding:0; }
 .sb-item::after { content:''; position:absolute; top:0; right:0; width:10px; height:10px; background:var(--acc); clip-path:polygon(0 0,100% 100%,100% 0); pointer-events:none; }
@@ -60,8 +60,8 @@
 /* In Full the working glyph, at Stage, stands in for the still logo while containers are read. */
 .startup-glyph { display:block; width:144px; height:120px; --glyph-halo:var(--md-sys-color-surface-container-lowest); }
 #startup-splash[data-launch=true] > img { display:none; }
-:root:not([data-krackle=full]) .startup-glyph { display:none; }
-:root:not([data-krackle=full]) #startup-splash[data-launch=true] > img { display:block; }
+:root:not([data-motion-mode=full]) .startup-glyph { display:none; }
+:root:not([data-motion-mode=full]) #startup-splash[data-launch=true] > img { display:block; }
 [data-theme=dark] #explorer { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' opacity='.022' filter='url(%23n)' d='M0 0h120v120H0z'/%3E%3C/svg%3E"); }
 [data-density=compact] .btn, [data-density=compact] .menu-btn, [data-density=compact] .setup-input { min-height:30px; height:30px; padding-top:4px; padding-bottom:4px; }
 [data-density=compact] .sb-item { padding:7px 10px; }

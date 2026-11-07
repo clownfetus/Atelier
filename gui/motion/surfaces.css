@@ -1,10 +1,10 @@
 .roster-portrait strong,.roster-portrait .roster-counts { width:100%; background:var(--bg2); }
 
 /* Update drops sit in the topbar row before Activity, so toolbar labels never collide with them. */
-.k-update-drop {flex:0 0 auto;width:36px;height:36px;margin-left:8px;padding:0;border:1px solid var(--border);border-radius:var(--studio-shape-small);background:transparent;color:var(--krackle-charge);cursor:pointer;display:grid;place-items:center;}
-.k-update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}
-.k-update-drop > span {width:28px;height:18px;}
-[data-density=compact] .k-update-drop {width:30px;height:30px;}
+.update-drop {flex:0 0 auto;width:36px;height:36px;margin-left:8px;padding:0;border:1px solid var(--border);border-radius:var(--studio-shape-small);background:transparent;color:var(--charge);cursor:pointer;display:grid;place-items:center;}
+.update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}
+.update-drop > span {width:28px;height:18px;}
+[data-density=compact] .update-drop {width:30px;height:30px;}
 .hdr-ring {position:absolute;inset:calc(-1 * var(--hdr-radius,4px));border:2px solid var(--swatch-color);border-radius:var(--studio-shape-medium);pointer-events:none;}
 .hdr-ring i {position:absolute;width:4px;height:4px;margin:-2px;background:#121216;border-radius:50%;}
 .mod-card {margin-top:18px;border:1px solid var(--border);padding:12px;background:var(--bg2);border-radius:var(--studio-shape-large);}

@@ -167,21 +167,14 @@
     }
     const surface=getComputedStyle(root).getPropertyValue('--bg2').trim()||p.surface;
     const raised=getComputedStyle(root).getPropertyValue('--bg3').trim()||p.surface;
-    const K=window.AtelierKrackleInks;
-    root.dataset.krackleSurface=K?K.surfaceKind(surface):(luminance(p.surface)<.179?'dark':'light');
+    const K=window.AtelierInks;
+    root.dataset.glyphSurface=K?K.surfaceKind(surface):(luminance(p.surface)<.179?'dark':'light');
     if(K) {
       const defaults=K.defaults(surface);
-      set('--krackle-charge',K.fit(defaults.charge,surface));set('--krackle-rift',defaults.rift);
-      // Card thumbs paint --bg3, not the card's --bg2; .card-thumb reads this charge (krackle.css).
+      set('--charge',K.fit(defaults.charge,surface));
+      // Card thumbs paint --bg3, not the card's --bg2; .card-thumb reads this charge (charge.css).
       const lifted=K.defaults(raised);
-      set('--krackle-charge-raised',K.fit(lifted.charge,raised));
-      for(const button of document.querySelectorAll('.btn.primary,#viewport-loading-motion-host')) {
-        const background=button.id==='viewport-loading-motion-host'?'#14161b':getComputedStyle(button).backgroundColor;
-        try {
-          const local=K.defaults(background);
-          button.dataset.krackleSurface=K.surfaceKind(background);button.style.setProperty('--krackle-charge',K.fit(local.charge,background));button.style.setProperty('--krackle-rift',local.rift);
-        }catch(_){}
-      }
+      set('--charge-raised',K.fit(lifted.charge,raised));
     }
     window.dispatchEvent(new Event('atelier:inks'));
     document.querySelectorAll('[data-theme-picker]').forEach(picker => { picker.value = preference; });

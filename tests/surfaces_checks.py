@@ -105,7 +105,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert failure=={'state':'error','tier':'stage','slot':'none','text':True,'left':0},failure
         checks.append('An index failure shows the still X at Stage in place of the notice\'s small glyph, with its text unchanged')
         tab.evaluate("window.openedDrop=0;AtelierSurfaces.updateDrop('fixture',()=>openedDrop++)")
-        tab.locator('.k-update-drop').click();assert tab.evaluate('openedDrop')==1
+        tab.locator('.update-drop').click();assert tab.evaluate('openedDrop')==1
         tab.evaluate("""() => {
           window.buildDone=beginExportFeedback(atelierProject());
           const host=document.getElementById('install-btn-motion-host');
@@ -117,7 +117,7 @@ def run_surfaces_checks(page,context,url,report,checks):
           const animate=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI fixture');};
           try{AtelierSurfaces.updateDrop('fallback',()=>window.fallbackOpened=true);}finally{Element.prototype.animate=animate;}
         }""")
-        tab.locator('.k-update-drop').click();assert tab.evaluate('fallbackOpened')
+        tab.locator('.update-drop').click();assert tab.evaluate('fallbackOpened')
         checks.append('Real results reach the Build glyph immediately, and missing Canvas/WAAPI retain usable controls')
         assert tab.evaluate("AtelierFolderEmblems.names.length===17")
         checks.append('Update drops stay nonblocking; primary actions fire immediately while SVG edge gestures are Full-only; all 17 folder icons are available')
@@ -142,7 +142,7 @@ def run_surfaces_checks(page,context,url,report,checks):
             return tab.evaluate("""() => [...document.querySelectorAll('#grid-area .card svg.card-icon')].map(svg=>{
               const fill=getComputedStyle(svg.querySelector('path,circle')).fill,cls=svg.getAttribute('data-emblem'),probe=document.createElement('i');
               svg.after(probe);probe.style.color='var(--studio-emblem-'+AtelierFolderEmblems.roles[cls]+')';const ink=getComputedStyle(probe).color;
-              probe.style.color='var(--krackle-charge-raised)';const raised=getComputedStyle(probe).color;probe.remove();
+              probe.style.color='var(--charge-raised)';const raised=getComputedStyle(probe).color;probe.remove();
               const against=node=>AtelierColourFit.contrast(fill,getComputedStyle(node).backgroundColor);
               // The card body is --bg2 and the thumb behind the emblem --bg3; each ink is fitted to both.
               return {cls,fill,ink,raised,contrast:against(svg.closest('.card')),thumbContrast:against(svg.closest('.card-thumb'))};

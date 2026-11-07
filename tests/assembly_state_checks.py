@@ -31,7 +31,7 @@ def _step(tab, ms):
 def _api(context, url, report, checks):
     tab, errors = open_glyph_page(context, url)
     tab.evaluate(HELPERS)
-    # A non-element host throws, like krackleGlyph; a busy host needs emptying; a remount replaces the last glyph.
+    # A non-element host throws; a busy host needs emptying; a remount replaces the last glyph.
     assert tab.evaluate("(()=>{try{AtelierMotion.glyph.mount(null);return false}catch(e){return /DOM host/.test(e.message)}})()")
     assert tab.evaluate("(()=>{const h=document.createElement('div');h.append('x');try{AtelierMotion.glyph.mount(h);return false}catch(e){return /empty host/.test(e.message)}})()")
     # A result that has already played mounts finished; busy can't be still, and a later state plays as usual.

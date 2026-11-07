@@ -114,7 +114,7 @@
   --studio-spring-bouncy: cubic-bezier(.34, 1.56, .64, 1);
   --studio-spring-snappy-duration: 340ms;
   --studio-spring-bouncy-duration: 610ms;
-  --krackle-beat: 1040ms;
+  --motion-beat: 1040ms;
   /* Global stacking bands, lowest first. Neighbours inside a band are offsets from it; stacking
      within one component keeps small local numbers. Model Studio is its own band above the library. */
   --studio-layer-float: 150;

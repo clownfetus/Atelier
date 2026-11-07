@@ -22,7 +22,7 @@
 .toast { --glyph-halo: var(--bg2); }
 .job-row { --glyph-halo: var(--md-sys-color-surface-container); }
 .at-modopen-rows { --glyph-halo: var(--surface); }
-.k-update-drop { --glyph-halo: var(--bg2); }
+.update-drop { --glyph-halo: var(--bg2); }
 
 .glyph-piece {
   stroke: var(--glyph-halo);

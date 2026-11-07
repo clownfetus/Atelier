@@ -10,13 +10,13 @@ def run_inks_dial_checks(page,context,url,report,checks):
     def thumb_ink(guard=None):
         # A real .card-thumb in the live cascade: its charge must be the raised ink fitted (or guarded) to --bg3.
         return tab.evaluate("""guard => {
-          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),bg3=cs.getPropertyValue('--bg3').trim();
+          const K=AtelierInks,cs=getComputedStyle(document.documentElement),bg3=cs.getPropertyValue('--bg3').trim();
           const thumb=document.createElement('div'),probe=document.createElement('i');thumb.className='card-thumb';thumb.append(probe);document.body.append(thumb);
           const color=value=>{probe.style.color=value;return getComputedStyle(probe).color;};
           try{
-            const ink=color('var(--krackle-charge)'),surface=getComputedStyle(thumb).backgroundColor;
+            const ink=color('var(--charge)'),surface=getComputedStyle(thumb).backgroundColor;
             const expected=color(guard?K.guard(guard[0],guard[1],bg3,{candidates:[]}).charge:K.fit(K.defaults(bg3).charge,bg3));
-            return {ink,expected,surface,raised:color(cs.getPropertyValue('--krackle-charge-raised').trim()),
+            return {ink,expected,surface,raised:color(cs.getPropertyValue('--charge-raised').trim()),
               bg3:color(bg3),contrast:K.contrast(ink,surface)};
           }finally{thumb.remove();}
         }""",guard)
@@ -29,14 +29,14 @@ def run_inks_dial_checks(page,context,url,report,checks):
           card.style='position:fixed;top:80px;left:320px;z-index:1000;transition:none';document.body.append(card);
         }""")
         measure="""() => {
-          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),card=document.getElementById('ink-card-fixture');
+          const K=AtelierInks,cs=getComputedStyle(document.documentElement),card=document.getElementById('ink-card-fixture');
           const probe=document.createElement('i');card.append(probe);
           const color=value=>{probe.style.color=value;return getComputedStyle(probe).color;};
           try{
             const ink=getComputedStyle(card,'::after').backgroundColor,surface=getComputedStyle(card).backgroundColor;
             const bg2=color(cs.getPropertyValue('--bg2').trim()),bg3=color(cs.getPropertyValue('--bg3').trim());
-            return {ink,surface,bg2,bg3,hover:card.matches(':hover'),charge:color(cs.getPropertyValue('--krackle-charge').trim()),
-              raised:color(cs.getPropertyValue('--krackle-charge-raised').trim()),contrast:K.contrast(ink,surface),onBg2:K.contrast(ink,bg2)};
+            return {ink,surface,bg2,bg3,hover:card.matches(':hover'),charge:color(cs.getPropertyValue('--charge').trim()),
+              raised:color(cs.getPropertyValue('--charge-raised').trim()),contrast:K.contrast(ink,surface),onBg2:K.contrast(ink,bg2)};
           }finally{probe.remove();}
         }"""
         try:
@@ -50,7 +50,7 @@ def run_inks_dial_checks(page,context,url,report,checks):
     def root_ink():
         # Unguarded, the root charge is the resting card body's ink, fitted to --bg2.
         return tab.evaluate("""() => {
-          const K=AtelierKrackleInks,cs=getComputedStyle(document.documentElement),bg2=cs.getPropertyValue('--bg2').trim(),charge=cs.getPropertyValue('--krackle-charge').trim();
+          const K=AtelierInks,cs=getComputedStyle(document.documentElement),bg2=cs.getPropertyValue('--bg2').trim(),charge=cs.getPropertyValue('--charge').trim();
           return {charge,bg2,expected:K.fit(K.defaults(bg2).charge,bg2),contrast:K.contrast(charge,bg2)};
         }""")
     raised={};cards={}
@@ -59,15 +59,15 @@ def run_inks_dial_checks(page,context,url,report,checks):
         stored=tab.evaluate("Object.fromEntries(['motion','adaptiveAccent','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
         for previous,expected in [('system','full'),('reduce','off')]:
             tab.evaluate("value=>localStorage.setItem('atelier.motion',value)",previous);tab.reload();tab.wait_for_selector('#grid-area .card')
-            assert tab.evaluate("[localStorage.getItem('atelier.motion'),document.documentElement.dataset.krackle]")==[expected,expected]
+            assert tab.evaluate("[localStorage.getItem('atelier.motion'),document.documentElement.dataset.motionMode]")==[expected,expected]
         checks.append('Motion migrates system to Full and reduce to Off, preserving the legacy data-motion contract')
         for mode in ['dark','light']:
             tab.evaluate("mode=>{const picker=document.getElementById('settings-theme');picker.value=mode;picker.dispatchEvent(new Event('change'));}",mode)
             for preset in ['studio','darcula','repak','contrast','blueprint','comic']:
                 tab.evaluate("preset=>document.querySelector('[data-theme-preset='+preset+']').click()",preset)
                 result=tab.evaluate("""() => {
-                  const root=document.documentElement,cs=getComputedStyle(root),K=AtelierKrackleInks;
-                  return {surface:root.dataset.krackleSurface,expected:K.surfaceKind(cs.getPropertyValue('--bg2').trim())};
+                  const root=document.documentElement,cs=getComputedStyle(root),K=AtelierInks;
+                  return {surface:root.dataset.glyphSurface,expected:K.surfaceKind(cs.getPropertyValue('--bg2').trim())};
                 }""")
                 assert result['surface']==result['expected'],(mode,preset,result)
                 ink=root_ink();assert ink['charge']==ink['expected'] and ink['contrast']>=3,(mode,preset,ink)
@@ -80,13 +80,13 @@ def run_inks_dial_checks(page,context,url,report,checks):
                 const control=document.querySelector('[data-theme-color='+key+']');control.value=value;control.dispatchEvent(new Event('input'));
               }
             }""",mode)
-            assert tab.locator('html').get_attribute('data-krackle-surface')==mode
+            assert tab.locator('html').get_attribute('data-glyph-surface')==mode
             ink=root_ink();assert ink['charge']==ink['expected'] and ink['contrast']>=3,(mode,'custom',ink)
             rest,hovered=card_ink();cards[f'{mode}/custom']={'rest':round(rest['contrast'],2),'hover':round(hovered['contrast'],2)}
             thumb=thumb_ink();raised[f'{mode}/custom']=round(thumb['contrast'],2)
             assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['surface']==thumb['bg3'] and thumb['contrast']>=3,(mode,'custom',thumb)
-        (report/'krackle-raised-inks.json').write_text(json.dumps(raised,indent=2))
-        (report/'krackle-card-inks.json').write_text(json.dumps(cards,indent=2))
+        (report/'raised-inks.json').write_text(json.dumps(raised,indent=2))
+        (report/'card-inks.json').write_text(json.dumps(cards,indent=2))
         print('Raised charge on card thumbs (--bg3): '+', '.join(f'{key} {value}:1' for key,value in raised.items()),flush=True)
         print('Edited corner on card bodies (rest --bg2 / hover --bg3): '+', '.join(f"{key} {value['rest']}/{value['hover']}:1" for key,value in cards.items()),flush=True)
         checks.append('The surface kind follows the measured surface on all six presets in both themes and custom dark/light palettes; card thumbs take a charge fitted to --bg3 (3:1) on every one')
@@ -97,17 +97,13 @@ def run_inks_dial_checks(page,context,url,report,checks):
           window.dispatchEvent(new StorageEvent('storage',{key:'atelier.adaptiveAccent',newValue:'1'}));
           window.dispatchEvent(new CustomEvent('atelier:artwork',{detail:{accent:'#ff5c9a',colors:['#ff5c9a','#2a9fd6']}}));
         }""")
-        assert tab.evaluate("""() => {
-          const host=document.getElementById('viewport-loading-motion-host'),cs=getComputedStyle(host);
-          return host.dataset.krackleSurface==='dark'&&AtelierKrackleInks.contrast(cs.getPropertyValue('--krackle-charge'),'#14161b')>=3;
-        }""")
         thumb=thumb_ink()
         assert thumb['ink']==thumb['expected']==thumb['raised'] and thumb['contrast']>=3,('guarded thumb',thumb)
         card_ink()
         tab.evaluate("document.getElementById('library-hero').hidden=true;window.dispatchEvent(new Event('atelier:preferences'))")
-        assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--krackle-charge').trim()")=='#2693c6'
+        assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--charge').trim()")=='#2693c6'
         thumb=thumb_ink();assert thumb['ink']==thumb['expected']=='rgb(37, 143, 193)',('studio light thumb',thumb)
-        checks.append('Hero artwork and legacy adaptive settings preserve theme inks on cards, selection markers and the readable model loader')
+        checks.append('Hero artwork and legacy adaptive settings preserve theme inks on cards and selection markers')
         motion('full');tab.bring_to_front();tab.emulate_media(reduced_motion='reduce')
         tab.wait_for_timeout(100)
         state=tab.evaluate("[AtelierMotionPolicy.mode(),AtelierMotionPolicy.tier(),document.documentElement.dataset.motion]")

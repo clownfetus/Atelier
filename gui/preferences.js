@@ -12,7 +12,7 @@
     addEventListener:(...args) => changes.addEventListener(...args), removeEventListener:(...args) => changes.removeEventListener(...args)};
   function apply() {
     document.documentElement.dataset.motion = query.matches ? 'reduce' : 'full';
-    document.documentElement.dataset.krackle = mode();
+    document.documentElement.dataset.motionMode = mode();
     document.documentElement.dataset.density = density === 'compact' ? 'compact' : 'comfortable';
     const event = new Event('change'); Object.defineProperty(event, 'matches', {value:query.matches}); changes.dispatchEvent(event);
     window.dispatchEvent(new Event('atelier:preferences'));

@@ -148,7 +148,7 @@
 #viewport-box.is-assembly.assembly-geometry-collapsed .assembly-geometry-reopen { display:block; }
 .assembly-textures-collapsed #assembly-texture-cards,.assembly-textures-collapsed #assembly-texture-actions { display:none; }
 .assembly-textures-collapsed #assembly-textures-collapse svg { transform:rotate(180deg); }
-:root[data-krackle=off] #assembly-links,:root[data-motion=reduce] #assembly-links { display:none; }
+:root[data-motion-mode=off] #assembly-links,:root[data-motion=reduce] #assembly-links { display:none; }
 @media (max-width:1400px) {
   #viewport-box.is-assembly,:root[data-theme] #viewport-box.is-assembly { --assembly-geometry-width:190px; --assembly-material-width:292px; }
   .is-assembly #viewport-tools { right:10px; }

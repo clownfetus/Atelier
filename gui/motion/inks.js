@@ -96,5 +96,5 @@
   }
   const api=Object.freeze({fit,guard,defaults,contrast,deltaE,hueDistance,lab,surfaceKind});
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
-  else globalThis.AtelierKrackleInks=api;
+  else globalThis.AtelierInks=api;
 })();
