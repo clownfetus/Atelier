@@ -247,6 +247,23 @@ git grep -il krackle -- . ':!CHANGELOG.md' ':!docs/release-*' ':!docs/discord-*'
 git ls-files | grep -i krackle | grep -vE '^(docs/review|docs/motion-v2)/'
 ```
 
+## Phase 4b · Identity follow-ups
+
+Added by Thiago on 7 November 2026, after signing off P3.14. These come after the Krackle
+removal and before the timing pass, because P5.1 tunes motion these steps change. Each
+one is a set of taste calls: prototype the options, show them, and wait for his choice.
+
+- [ ] **P4b.1** ⏸ Piece behaviour. Give the tile, mesh and disc each a way of moving as
+  distinctive as its shape, tied to what it stands for: textures, meshes and materials.
+  Keep the ten invariants in SPEC §1; if an idea needs one bent, stop and ask.
+- [ ] **P4b.2** ⏸ Progress bars. A bespoke treatment for the update download bar and every
+  other loading bar in the app, in the same language as the glyph.
+- [ ] **P4b.3** ⏸ Alignment and sizing pass across the whole app, text included: things
+  line up, share edges and baselines, and sit at the sizes the type and spacing scales set.
+  Show before and after for each fix.
+- [ ] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
+  same identity. Packaging only: no change to what it installs or where.
+
 ## Phase 5 · Release
 
 - [ ] **P5.1** ⏸ Thiago's timing pass on the real app. Tune only the durations
