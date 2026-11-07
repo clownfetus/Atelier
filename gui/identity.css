@@ -363,16 +363,27 @@
 }
 #setup-page .setup-row .btn:hover:not(:disabled) { background: var(--surface-sunk); }
 #setup-page .setup-row .btn:disabled { opacity: 0.55; cursor: progress; }
-/* The Grand pour: each row names the thing on the left, the drop's column runs down the middle
-   through the glyphs, and what was found sits on the right. The ink-well stands under the
-   column, prominent, with the note beneath it. */
-#setup-page .at-setup-row { grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr) auto; gap: 0 var(--space-4); }
+/* Three stages, one block each, and no rules: the blocks are what splits the page. Each row
+   names the thing on the left and says what was found on the right, with the row's status glyph
+   beside its sentence. The rows and the foot share one grid, so the blocks and the ink-well
+   stand on one centred column. */
+#setup-page .at-setup-rows { border-top: 0; }
+#setup-page .at-setup-row { grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr); gap: 0 var(--space-4); min-height: 76px; border-bottom: 0; }
+#setup-page .at-setup-row.is-editing { align-items: center; }
 #setup-page .at-setup-name { grid-column: 1; text-align: right; }
-#setup-page .at-setup-glyph { grid-column: 2; justify-self: center; }
-#setup-page .at-setup-detail { grid-column: 3; }
-#setup-page .at-setup-change { grid-column: 4; }
+#setup-page .at-setup-block { grid-column: 2; grid-row: 1; justify-self: center; display: block; width: 44px; height: 44px; }
+.at-setup-block svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.at-setup-block[data-piece="texture"] { color: var(--atelier-texture); }
+.at-setup-block[data-piece="mesh"] { color: var(--atelier-mesh); }
+.at-setup-block[data-piece="material"] { color: var(--atelier-material); }
+#setup-page .at-setup-glyph { grid-column: 3; grid-row: 1; justify-self: start; }
+#setup-page .at-setup-row.is-editing .at-setup-glyph { align-self: start; }
+#setup-page .at-setup-row[data-state="waiting"] .at-setup-glyph::before { content: none; }
+#setup-page .at-setup-detail { grid-column: 3; grid-row: 1; padding-left: 32px; }
+#setup-page .at-setup-row:not(.is-editing) .at-setup-detail { padding-right: 88px; }
+#setup-page .at-setup-change { grid-column: 3; grid-row: 1; justify-self: end; }
 /* Room for the open lid to clear the last row. */
-.at-setup-foot { display: grid; grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr) auto; gap: var(--space-4); margin-top: 60px; }
+.at-setup-foot { display: grid; grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr); gap: var(--space-4); margin-top: 60px; }
 .at-setup-foot[hidden] { display: none; }
 .at-setup-foot .at-setup-note { grid-column: 2; grid-row: 2; justify-self: center; white-space: nowrap; text-align: center; }
 /* The drop's dotted line runs beneath the rows and the ink-well (setup-drop.css). */
@@ -412,9 +423,12 @@
 @media (max-width: 640px) {
   .at-setup-row, #setup-page .at-setup-row { grid-template-columns: 24px minmax(0, 1fr) auto; gap: var(--space-4); }
   .at-setup-row .at-setup-detail, #setup-page .at-setup-detail { grid-column: 2 / -1; }
-  #setup-page .at-setup-glyph { grid-column: 1; }
-  #setup-page .at-setup-name { grid-column: 2; text-align: left; }
-  #setup-page .at-setup-change { grid-column: 3; }
+  #setup-page .at-setup-row { grid-template-columns: 36px minmax(0, 1fr) auto; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+  #setup-page .at-setup-block { grid-column: 1; grid-row: 1 / span 2; width: 36px; height: 36px; }
+  #setup-page .at-setup-name { grid-column: 2; grid-row: 1; text-align: left; }
+  #setup-page .at-setup-change { grid-column: 3; grid-row: 1; }
+  #setup-page .at-setup-glyph { grid-column: 2; grid-row: 2; }
+  #setup-page .at-setup-detail, #setup-page .at-setup-row:not(.is-editing) .at-setup-detail { grid-column: 2 / -1; grid-row: 2; padding-right: 0; }
   .at-setup-foot { display: flex; flex-direction: column; align-items: center; }
   .at-setup-foot .at-setup-note { white-space: normal; }
 }

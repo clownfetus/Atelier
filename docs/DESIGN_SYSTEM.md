@@ -493,7 +493,10 @@ First-run setup is one page that lists what the launch check found and asks only
 for what is missing (see Identity v1.0). Existing controls are reparented, retaining
 their IDs and save contract; Settings restores the complete form. Automatic key and
 mapping retrieval runs while the page shows and never replaces manually entered
-values. A 20 px Krackle glyph marks each row: the charge ring while fetching, the cracked
+values. The three blocks split the page's three stages: the tile for the key, the mesh block
+for the mapping file and the disc for the game folder, in the mark's order and with no rules
+between the rows. They mark the stages and don't report on them, so their colours never change.
+A 20 px Krackle glyph beside each row's sentence gives its status: the charge ring while fetching, the cracked
 ring when missing, and when found a glyph of the thing itself in the done colour: the ink
 key (a key whose bow is the Krackle drop lying on its side, its point running into the
 blade), the code file (its lines draw in) and the folder (its front flips open). The key and

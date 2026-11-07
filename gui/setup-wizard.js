@@ -18,6 +18,7 @@
   const NOUN={game:'the game folder',key:'the key',map:'the mapping file'};
   const GLYPH={pending:'busy',done:'success',missing:'warning'};
   const FOUND={key:'key',map:'file',game:'folder'};   // each row's found glyph: the ink key, the code file, the folder
+  const BLOCK={key:'texture',map:'mesh',game:'material'};   // one block to a stage, in the mark's order: tile, mesh, disc
   let initialized=false, settings=true, page='checking', outcome='busy', error='';
   let valid={}, validated=false, editing={}, prefill={}, fetched={}, retrieval={}, awaiting={};
   let overlay, modal, hero, pageEl, line=null, lineHost=null, moved=[], glyphs={};
@@ -33,13 +34,22 @@
     overlay=$('setup-overlay');modal=overlay.querySelector('.setup-modal');hero=$('setup-hero');pageEl=$('setup-page');
     for(const name of NAMES) {
       const row=ROWS[name], el=pageEl.querySelector(`[data-row="${name}"]`);
-      Object.assign(row,{el,glyph:el.querySelector('.at-setup-glyph'),what:el.querySelector('.at-setup-what'),
+      Object.assign(row,{el,block:el.querySelector('.at-setup-block'),glyph:el.querySelector('.at-setup-glyph'),what:el.querySelector('.at-setup-what'),
         where:el.querySelector('.at-setup-where'),field:el.querySelector('.at-setup-field'),change:el.querySelector('.at-setup-change'),
         controls:$(row.input).closest('.setup-row')});
       row.change.addEventListener('click',()=>{editing[name]=true;render();$(row.input).focus();});
+      drawBlock(row.block,BLOCK[name]);
     }
     new MutationObserver(syncLine).observe(overlay,{attributes:true,attributeFilter:['class']});
     window.addEventListener('atelier:preferences',()=>{for(const glyph of Object.values(glyphs))glyph?.setReducedMotion(full()?'system':'reduce');});
+  }
+  // The blocks mark the stages and never report on them: their colours don't change with a row's state.
+  function drawBlock(host,piece) {
+    host.dataset.piece=piece;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 24 24');
+    svg.innerHTML=window.AtelierFolderEmblems.markup(piece+'-folder-icon',48);
+    host.replaceChildren(svg);
   }
   function move(node,into) {
     if(!node)return;
@@ -160,7 +170,7 @@
         try{drop=window.AtelierMotion.setupDrop.mount($('setup-well-art'),{layer:pageEl,size:240});}
         catch(_){drop=null;return;}
       }
-      drop.setProgress(reached,{rows:NAMES.map(n=>ROWS[n].el),glyphs:NAMES.map(n=>ROWS[n].glyph),waiting});
+      drop.setProgress(reached,{rows:NAMES.map(n=>ROWS[n].el),glyphs:NAMES.map(n=>ROWS[n].block),waiting});
     });
   }
 

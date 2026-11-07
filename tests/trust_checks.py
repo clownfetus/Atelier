@@ -177,6 +177,15 @@ def _setup(context,url,report,checks):
                 assert tab.evaluate(ink+".amState")=='success'
                 assert tab.locator('#setup-rows > li').evaluate_all('rows=>rows.map(r=>r.dataset.row).join()')=='key,map,game'
                 assert tab.locator('#setup-well .at-setup-save-slot #setup-save').count()==1
+                # One block to a stage, in the mark's order and exact colours, on one column with the well.
+                blocks=tab.evaluate("""()=>[...document.querySelectorAll('#setup-rows > li')].map(row=>{
+                  const block=row.querySelector('.at-setup-block'),box=block.getBoundingClientRect(),css=getComputedStyle(row);
+                  return {piece:block.dataset.piece,color:getComputedStyle(block.querySelector('svg').firstElementChild).fill,x:box.left+box.width/2,rule:css.borderBottomWidth};})""")
+                assert [b['piece'] for b in blocks]==['texture','mesh','material'],blocks
+                assert [b['color'] for b in blocks]==['rgb(108, 152, 202)','rgb(90, 170, 154)','rgb(223, 143, 107)'],blocks
+                assert all(b['rule']=='0px' for b in blocks),blocks
+                centre=tab.evaluate("()=>{const box=document.getElementById('setup-well').getBoundingClientRect();return box.left+box.width/2}")
+                assert all(abs(b['x']-centre)<1 for b in blocks),(blocks,centre)
                 assert tab.locator('[data-row=game] .at-setup-what').inner_text()=='Found on this PC'
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Current key retrieved'
                 # Each row's found glyph: the ink key, the code file, the folder; the well's lid is open.
