@@ -1,79 +1,14 @@
-"""Ink-well build stage: skin palette, lifecycle and handover, using the real frontend only."""
-from urllib.parse import parse_qs, urlparse
-
-SNAPSHOT = """{project:'Smoke A', modName:'Ink fixture', copyToMods:false, modsPath:'', protected:false, skipped:0, excluded:[],
-  included:[{name:'Body', game_rel:'Characters/1015/1015101/Materials/MI_1015101_Body', file_type:'material'},
-            {name:'Equip', game_rel:'Characters/1015/1015101/Texture/T_1015101_Equip_01_D', file_type:'texture'},
-            {name:'Other', game_rel:'Characters/1014/1014100/Textures/T_1014100_Body_D', file_type:'texture'},
-            {name:'Sound', game_rel:'Audio/Sound', file_type:'audio'}]}"""
-
-TINTS = ['#c8243a', '#e8c25a', '#3f6b2a']
-
+"""Ink-well lifecycle, using the real frontend only. Nothing mounts it now; it goes with Krackle."""
 
 def run_ink_well_checks(context, url, report, checks):
     tab = context.new_page()
-    errors, asked = [], []
+    errors = []
     tab.on('pageerror', lambda error: errors.append(str(error)))
-
-    def palette(route):
-        asked.append(parse_qs(urlparse(route.request.url).query).get('skin', []))
-        route.fulfill(json={'colors': TINTS, 'sources': []})
-
-    tab.route('**/api/diffuse_palette?**', palette)
     try:
         tab.goto(url)
-        tab.wait_for_function('window.AtelierExportReview && window.AtelierMotion?.inkWell && window.atelierProject?.()')
+        tab.wait_for_function('window.AtelierMotion?.inkWell && window.atelierProject?.()')
         tab.emulate_media(reduced_motion='no-preference')
         assert tab.evaluate("AtelierMotionPolicy.mode()") == 'full'
-
-        # The review asks once for the included skins' colours (in order, deduplicated); the build
-        # cooks them into a few inner bubbles.
-        tab.evaluate(f"""() => {{
-          window.inkSnapshot = Object.freeze({SNAPSHOT});
-          AtelierExportReview.open(inkSnapshot, {{confirm(){{}}, refresh(){{}}, settings(){{}}, reveal(){{}}}});
-          AtelierExportReview.checking(inkSnapshot);
-        }}""")
-        # The tint paths exist as soon as the palette answers; wait for their first drawn frame.
-        tab.wait_for_function("[...document.querySelectorAll('.export-review-stage .am-ink-well-tint')].some(el => (el.getAttribute('d') || '').includes('M'))")
-        assert asked == [['1015101', '1014100']], asked
-        tints = tab.evaluate("""() => [...document.querySelectorAll('.export-review-stage .am-ink-well-tint')]
-          .map(el => ({fill: getComputedStyle(el).fill, shapes: (el.getAttribute('d')||'').split('M').length - 1}))""")
-        assert [t['fill'] for t in tints] == ['rgb(200, 36, 58)', 'rgb(232, 194, 90)', 'rgb(63, 107, 42)'], tints
-        # Three colours ride four inner slots; a slot between lives is briefly empty.
-        assert 2 <= sum(t['shapes'] for t in tints) <= 4, tints
-        tab.wait_for_timeout(600)
-        tab.locator('.export-review-stage').screenshot(path=str(report / 'ink-well-busy.png'))
-        moving = tab.evaluate("""async () => {
-          const holes = document.querySelector('.export-review-stage .am-ink-well-hole'), a = holes.getAttribute('d');
-          await new Promise(r => setTimeout(r, 120));
-          return {changed: holes.getAttribute('d') !== a, sleeping: document.querySelector('.export-review-stage').dataset.amSleeping};
-        }""")
-        assert moving == {'changed': True, 'sleeping': 'false'}, moving
-        checks.append('Export build cooks in the ink-well; a few inner bubbles carry the included skins\' diffuse colours')
-
-        # Busy after busy keeps the same well; the result performs in it at once, then settles.
-        tab.evaluate("window.inkSvg = document.querySelector('.am-ink-well'); AtelierExportReview.start(inkSnapshot)")
-        assert tab.evaluate("document.querySelector('.am-ink-well') === inkSvg")
-        assert tab.evaluate("AtelierExportReview.staging('busy')")
-        tab.evaluate("AtelierExportReview.finish(inkSnapshot, {ok:true, pak_path:'D:/Fixture/Ink.pak', applied:[], skipped:[]})")
-        result = tab.evaluate("""() => ({same: document.querySelector('.am-ink-well') === inkSvg, canvas: !!document.querySelector('.export-review-stage canvas'),
-          state: document.querySelector('.export-review-stage').dataset.amState, staging: AtelierExportReview.staging('success')})""")
-        assert result == {'same': True, 'canvas': False, 'state': 'success', 'staging': True}, result
-        tab.wait_for_function("document.querySelector('.export-review-stage').dataset.amSleeping === 'true'")
-        settled = tab.evaluate("""async () => {
-          const svg = document.querySelector('.am-ink-well'), d = svg.innerHTML;
-          await new Promise(r => setTimeout(r, 250));
-          const released = [...document.querySelectorAll('.export-review-stage path.am-ink-well-success')].map(p => (p.getAttribute('d')||'').split('M').length - 1);
-          return {still: svg.innerHTML === d, released, view: svg.getAttribute('viewBox')};
-        }""")
-        # The clean release floats away: the settled well is back in the cooking frame, calm.
-        assert settled['still'] and max(settled['released']) >= 10 and settled['view'] == '10 10 236 236', settled
-        tab.locator('.export-review-stage').screenshot(path=str(report / 'ink-well-success.png'))
-        checks.append('Busy-after-busy keeps the ink-well; the result performs in it immediately, then settles and stops drawing')
-
-        # Closing releases the screen's moment; reopening the last result shows its settled pose.
-        tab.keyboard.press('Escape')
-        tab.locator('#export-review-overlay').wait_for(state='hidden')
 
         # Failure breaks into pieces that leak and pool, and success releases a clean burst; both
         # perform once and hold. Warning holds in a tense loop until hidden or reduced.

@@ -1,7 +1,7 @@
 /* Export review and latest session result. No build logic or credentials live here. */
 (function () {
   'use strict';
-  let overlay, panel, body, title, actions, lastButton, opener, stageHost, stage = null, well = null;
+  let overlay, panel, body, title, actions, lastButton, opener, stageHost, glyph = null;
   let current = null, busy = false, lastResult = null, preferredFormat = 'standard';
 
   function el(tag, text, className) {
@@ -67,55 +67,29 @@
     else document.getElementById('install-btn').focus();
   }
   let disposeCard=null;
-  function reset(heading, state) {
+  function reset(heading, state, stageState = state) {
     disposeCard?.();disposeCard=null;
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
-    showStage(state === 'review' ? 'idle' : state);
+    showStage(stageState);
   }
-  // The build cooks in the ink-well, which then releases, boils over or cracks with the result.
-  // Decorative only; the progress bar and status text stay the accessible record of the build.
+  // The build runs in the glyph, which then forms its result. Decorative only; the progress bar and
+  // status text stay the accessible record of the build.
   function showStage(state) {
-    if (/^(busy|success|warning|error)$/.test(state) && window.AtelierMotion?.inkWell) {
-      try {
-        // Busy after busy (checking straight into the build) keeps the same well cooking, and a
-        // result interrupts it where it is. Only a just-finished build performs its result; a
-        // reopened one shows the settled pose.
-        if (!well) {
-          stage?.destroy(); stage = null; stageHost.replaceChildren();
-          well = window.AtelierMotion.inkWell.mount(stageHost, {size: 216, kind: 'export-review', palette: current?.palette,
-            state, settled: state !== 'busy' && !current?.fresh});
-        } else well.setState(state);
-        return;
-      } catch (_) {
-        well = null; stageHost.replaceChildren();
-      }
+    if (!/^(busy|success|warning|error|info)$/.test(state) || !window.AtelierMotion?.glyph) {
+      glyph?.destroy(); glyph = null;
+      return;
     }
-    if (well) { well.destroy(); well = null; stageHost.replaceChildren(); }
+    // Busy after busy (checking straight into the build) carries on, and a result takes over from
+    // wherever the pieces are. Only a just-finished build performs its result; a reopened one is still.
+    const still = state !== 'busy' && !current?.fresh;
     try {
-      if (!stage && state !== 'idle' && window.AtelierMotion?.krackleStage) {
-        stage = window.AtelierMotion.krackleStage.mount(stageHost, {state: 'idle', size: 216, kind:'export-review'});
-      }
-      stage?.setState(state);
+      if (glyph && (!still || glyph.state === state)) { if (!still) glyph.set(state); return; }
+      glyph?.destroy();
+      glyph = window.AtelierMotion.glyph.mount(stageHost, {state, size: 216, still});
     } catch (_) {
-      stage = null; stageHost.replaceChildren();
+      glyph = null; stageHost.replaceChildren();
     }
-  }
-  // A few of the cooked skins' original colours swirl through the well's bubbles. The server
-  // averages cached diffuse previews only; no answer, or a slow one, just leaves plain bubbles.
-  function requestPalette(entry) {
-    entry.palette = [];
-    const skins = [...new Set(entry.snapshot.included
-      .map(item => /^Characters\/\d{4}\/(\d{7})(?:\/|$)/i.exec(item.game_rel || '')?.[1]).filter(Boolean))].slice(0, 3);
-    if (!skins.length) return;
-    fetch('/api/diffuse_palette?' + skins.map(id => 'skin=' + id).join('&'))
-      .then(response => response.ok ? response.json() : null)
-      .then(data => {
-        const colours = (data?.colors || []).filter(colour => /^#[0-9a-f]{6}$/i.test(colour)).slice(0, 4);
-        if (current !== entry || !colours.length) return;
-        entry.palette = colours; well?.setPalette(colours);
-      })
-      .catch(() => {});
   }
   function metadata(snapshot) {
     const dl = el('dl', undefined, 'export-review-meta');
@@ -259,8 +233,7 @@
     // The heading carries the outcome; the stage only gives it a physical character.
     const suffix = warning && result.ok ? ' with warnings' : '';
     reset(built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
-      built ? warning ? 'warning' : 'success' : 'error');
-    if (result.cancelled && !built) showStage('idle');
+      built ? warning ? 'warning' : 'success' : 'error', result.cancelled && !built ? 'info' : undefined);
     metadata(snapshot);
     const status = el('p', result.error || (warning ? 'Review the skipped items below before testing this mod.' : 'The build has finished.'), 'export-review-summary');
     status.setAttribute('role', 'status'); body.append(status);
@@ -289,7 +262,7 @@
     open(snapshot, callbacks, note) {
       ensure(); if (busy) return;
       const swapper = callbacks.skinSwapper?.status?.available && preferredFormat === 'skin-swapper';
-      current = { snapshot, callbacks, format: swapper ? 'skin-swapper' : 'standard' }; requestPalette(current); renderReview(note); show();
+      current = { snapshot, callbacks, format: swapper ? 'skin-swapper' : 'standard' }; renderReview(note); show();
     },
     checking(snapshot) {
       if (current?.snapshot !== snapshot) return;
@@ -339,7 +312,7 @@
     // True when the large stage will draw `state` for the current job: busy only while the dialog
     // is open (it can be hidden mid-build), results always (finish() reopens the dialog).
     staging(state) {
-      if (!(stage || well) || !stageHost?.isConnected || stageHost.dataset.amMicro === 'true') return false;
+      if (!glyph || !stageHost?.isConnected) return false;
       if (!window.AtelierMotionPolicy?.allows(2)) return false;
       return state !== 'busy' || overlay.classList.contains('active');
     },

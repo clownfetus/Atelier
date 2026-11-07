@@ -145,17 +145,17 @@ def run_export_review_checks(page, context, url, report, checks):
         overlay.locator('.am-working-border').wait_for()
         assert overlay.locator('.am-working-dot').count() == 0
         assert overlay.locator('.am-working-border').evaluate("el=>getComputedStyle(el).backgroundImage.includes('data:image/svg+xml')")
-        # The build cooks in the ink-well; its bubbles are drawn geometry, not a static image.
-        assert overlay.locator('.am-ink-well').evaluate('el=>el.style.width') == '216px'
-        assert overlay.locator('.export-review-stage').get_attribute('data-atelier-motion') == 'ink-well'
-        review.wait_for_function("""() => {
-          const holes=document.querySelector('.export-review-stage .am-ink-well-hole');
-          return holes && (holes.getAttribute('d')||'').split('M').length > 30;
-        }""")
+        # The build runs in the glyph, at the Stage tier.
+        stage = overlay.locator('.export-review-stage')
+        assert stage.get_attribute('data-atelier-motion') == 'glyph'
+        assert stage.get_attribute('data-glyph-state') == 'busy' and stage.get_attribute('data-glyph-tier') == 'stage'
+        assert stage.get_attribute('data-glyph-asset') is None, 'A build handles several asset types, so it shows Working'
+        assert stage.bounding_box()['height'] == 216
         review.wait_for_timeout(900)
         review.screenshot(path=str(report / 'working-export-busy.png'))
         review.set_viewport_size({'width': 1024, 'height': 640})
-        assert overlay.locator('.am-ink-well').bounding_box()['height'] == 164
+        assert stage.bounding_box()['height'] == 164
+        assert stage.locator('svg').bounding_box()['height'] == 164
         action_box = overlay.locator('.export-review-actions').bounding_box()
         assert action_box['y'] >= 0 and action_box['y'] + action_box['height'] <= 640
         review.screenshot(path=str(report / 'working-export-compact.png'))
@@ -253,3 +253,90 @@ def run_export_review_checks(page, context, url, report, checks):
             except Exception:
                 pass
         review.close()
+    run_export_review_glyph_checks(context, url, report, checks)
+
+
+SNAPSHOT = """{project:'Smoke A', modName:'Glyph fixture', copyToMods:false, modsPath:'', protected:false, skipped:0, excluded:[],
+  included:[{name:'Body', game_rel:'Characters/1015/1015101/Materials/MI_1015101_Body', file_type:'material'},
+            {name:'Equip', game_rel:'Characters/1015/1015101/Texture/T_1015101_Equip_01_D', file_type:'texture'}]}"""
+
+
+def run_export_review_glyph_checks(context, url, report, checks):
+    """The stage through a build: carries on, forms the real result, and a reopened result is still."""
+    tab = context.new_page()
+    errors = []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    stage = "document.querySelector('.export-review-stage')"
+    settled = """async () => {
+      const svg = document.querySelector('.export-review-stage svg'), a = svg.innerHTML;
+      await new Promise(r => setTimeout(r, 250));
+      return svg.innerHTML === a;
+    }"""
+    try:
+        tab.goto(url)
+        tab.wait_for_function('window.AtelierExportReview && window.AtelierMotion?.glyph && window.atelierProject?.()')
+        tab.emulate_media(reduced_motion='no-preference')
+        tab.evaluate(f"""() => {{
+          window.reviewSnapshot = Object.freeze({SNAPSHOT});
+          document.getElementById('update-overlay')?.remove();
+          AtelierExportReview.open(reviewSnapshot, {{confirm(){{}}, refresh(){{}}, settings(){{}}, reveal(){{}}}});
+        }}""")
+        assert tab.evaluate(f"{stage}.childNodes.length") == 0, 'The review itself shows no glyph'
+
+        # Busy after busy carries on in the same glyph, and only a real result changes it.
+        tab.evaluate(f"AtelierExportReview.checking(reviewSnapshot); window.reviewSvg = {stage}.querySelector('svg')")
+        tab.evaluate("AtelierExportReview.start(reviewSnapshot)")
+        tab.wait_for_timeout(1500)
+        busy = tab.evaluate(f"({{same: {stage}.querySelector('svg') === reviewSvg, state: {stage}.dataset.glyphState, tier: {stage}.dataset.glyphTier, staging: AtelierExportReview.staging('busy')}})")
+        assert busy == {'same': True, 'state': 'busy', 'tier': 'stage', 'staging': True}, busy
+        assert not tab.evaluate(settled), 'Working should keep moving'
+        tab.evaluate("AtelierExportReview.finish(reviewSnapshot, {ok:true, pak_path:'D:/Fixture/Glyph.pak', applied:[], skipped:[]})")
+        done = tab.evaluate(f"({{same: {stage}.querySelector('svg') === reviewSvg, state: {stage}.dataset.glyphState, staging: AtelierExportReview.staging('success')}})")
+        assert done == {'same': True, 'state': 'success', 'staging': True}, done
+        # Complete has short holds of its own, so wait until nothing has changed for longer than any of them.
+        for _ in range(12):
+            if tab.evaluate(settled.replace('250', '800')):
+                break
+        else:
+            raise AssertionError('The result never settled')
+        halo = tab.evaluate(f"(()=>{{const p={stage}.querySelector('.glyph-piece'),m=document.querySelector('.export-review-modal');return [getComputedStyle(p).stroke,getComputedStyle(m).backgroundColor]}})()")
+        probe = tab.evaluate("(c)=>{const d=document.createElement('div');d.style.color=c;document.body.append(d);const v=getComputedStyle(d).color;d.remove();return v}", halo[0])
+        assert probe == tab.evaluate("(c)=>{const d=document.createElement('div');d.style.color=c;document.body.append(d);const v=getComputedStyle(d).color;d.remove();return v}", halo[1]), halo
+        tab.locator('.export-review-modal').screenshot(path=str(report / 'export-review-glyph-success.png'))
+        checks.append('Export review: busy carries on through checking and building, and the same glyph forms the real result on the dialog\'s own surface')
+
+        # A reopened result is still.
+        tab.keyboard.press('Escape')
+        tab.locator('#export-review-overlay').wait_for(state='hidden')
+        tab.locator('#export-last-result').click(force=True)
+        assert tab.evaluate(f"{stage}.dataset.glyphState") == 'success'
+        assert tab.evaluate(settled)
+        # From the review, which has no glyph, the result mounts already finished.
+        tab.evaluate("""() => {
+          document.querySelector('#export-review-overlay').classList.remove('active');
+          AtelierExportReview.open(reviewSnapshot, {confirm(){}, refresh(){}, settings(){}, reveal(){}});
+        }""")
+        assert tab.evaluate(f"{stage}.childNodes.length") == 0
+        tab.evaluate("document.getElementById('export-last-result').click()")
+        assert tab.evaluate(f"{stage}.dataset.glyphState") == 'success'
+        assert tab.evaluate(settled), 'A reopened result should not play again'
+
+        # Each outcome maps as SPEC section 7 says.
+        for result, want, title in (
+            ("{ok:true, pak_path:'D:/F.pak', applied:[], skipped:['Missing optional texture']}", 'warning', 'Mod exported with warnings'),
+            ("{ok:false, built:true, pak_path:'D:/F.pak', error:'Copy failed', applied:[], skipped:[]}", 'warning', 'Export built; copy failed'),
+            ("{ok:false, error:'The build failed. Check the export folder is writable.', applied:[], skipped:[]}", 'error', 'Export failed'),
+            ("{ok:false, cancelled:true, error:'Export cancelled.', applied:[], skipped:[]}", 'info', 'Export cancelled'),
+        ):
+            tab.evaluate("AtelierExportReview.start(reviewSnapshot)")
+            assert tab.evaluate(f"{stage}.dataset.glyphState") == 'busy'
+            assert not tab.evaluate(settled), 'A new build after a still result moves again'
+            tab.evaluate(f"AtelierExportReview.finish(reviewSnapshot, {result})")
+            got = tab.evaluate(f"({{state: {stage}.dataset.glyphState, title: document.getElementById('export-review-title').textContent}})")
+            assert got == {'state': want, 'title': title}, got
+            tab.wait_for_timeout(1500)
+            tab.locator('.export-review-modal').screenshot(path=str(report / f'export-review-glyph-{want}-{title.split()[1].strip(";")}.png'))
+        checks.append('Export review: a reopened result is still; warnings, a failed copy, failure and cancelling each draw their own state, and a new build moves again')
+        assert not errors, errors
+    finally:
+        tab.close()

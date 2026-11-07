@@ -216,11 +216,12 @@
   }) : null;
   const motion = window.AtelierMotion;
 
-  // mount(host, {state, asset?, size?, reducedMotion?, surface?})
+  // mount(host, {state, asset?, size?, reducedMotion?, surface?, still?})
   //   state: busy, info, success, warning or error. Defaults to info.
   //   asset: mesh, texture or material, only with busy, and only when the surface truly knows it.
   //   size: the host's height in pixels, if the host doesn't set its own.
   //   surface: the colour behind the glyph, if it isn't the page background (a CSS colour or var()).
+  //   still: a result that has already played, such as a reopened one: its finished shape, with no movement.
   // Success forms the A, so call it only for a real succeeded result (SPEC invariant 5).
   function mount(host, options) {
     if (!host || host.nodeType !== 1) throw new Error('AtelierMotion.glyph.mount requires a DOM host.');
@@ -237,7 +238,7 @@
     if (opts.surface) host.style.setProperty('--glyph-halo', opts.surface);
     if (opts.size) { host.style.height = `${opts.size}px`; host.style.width = `${Math.round(opts.size * ASPECT[tierFor(opts.size)])}px`; }
     const rect = host.getBoundingClientRect();
-    let height = rect.height || opts.size || 48, width = rect.width || height * 1.5;
+    let height = rect.height || opts.size || 48, width = rect.width || height * ASPECT[tierFor(height)];
     let tier = tierFor(height);
     const sync = () => {
       host.setAttribute('data-glyph-tier', tier);
@@ -248,7 +249,7 @@
     sync();
     const engine = new assembly.Engine(createView(host), tier, height, opts.reducedMotion === 'reduce', width);
     if (opts.onEntrance) { engine.onEntrance = opts.onEntrance; engine.run('entrance'); }
-    else engine.run(state, asset);
+    else engine.run(state, asset, opts.still && state !== 'busy' ? 'place' : null);
     engine.flush();
     listen();
     live.add(engine);

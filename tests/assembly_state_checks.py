@@ -34,6 +34,10 @@ def _api(context, url, report, checks):
     # A non-element host throws, like krackleGlyph; a busy host needs emptying; a remount replaces the last glyph.
     assert tab.evaluate("(()=>{try{AtelierMotion.glyph.mount(null);return false}catch(e){return /DOM host/.test(e.message)}})()")
     assert tab.evaluate("(()=>{const h=document.createElement('div');h.append('x');try{AtelierMotion.glyph.mount(h);return false}catch(e){return /empty host/.test(e.message)}})()")
+    # A result that has already played mounts finished; busy can't be still, and a later state plays as usual.
+    still = tab.evaluate("""()=>{const g=__mount(128,{state:'success',still:true}),done=[g.engine.settled,g.engine.formed];g.set('busy');const after=g.engine.settled;g.destroy();
+      const b=__mount(128,{state:'busy',still:true}),busy=b.engine.settled;b.destroy();document.getElementById('root').replaceChildren();return {done,after,busy};}""")
+    assert still == {'done': [True, True], 'after': False, 'busy': False}, still
     facts = tab.evaluate("""()=>{const g=__mount(48,{state:'info'}),host=document.querySelector('#root>div'),svg=host.querySelector('svg');
       const out={keys:['set','replay','destroy'].every(k=>typeof g[k]==='function'),state:g.state,hidden:svg.getAttribute('aria-hidden'),tier:host.dataset.glyphTier,attr:host.dataset.glyphState};
       g.set('warning');out.after=g.state;out.attr2=host.dataset.glyphState;g.set('nonsense');out.ignored=g.state;

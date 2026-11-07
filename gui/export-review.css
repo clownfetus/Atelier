@@ -1,5 +1,13 @@
 .export-review-overlay { z-index: calc(var(--studio-layer-overlay) + 10); }
-.export-review-modal { max-width: 720px !important; gap: 18px; }
+.export-review-modal { max-width: 720px !important; gap: 18px; --glyph-halo: var(--md-sys-color-surface-container); }
+.export-review-stage { position: relative; margin: -6px auto -4px; flex-shrink: 0; }
+/* With the stage in the dialog, long reports scroll inside the body so the outcome
+   heading and the actions stay visible together. */
+.export-review-modal:has(.export-review-stage:not(:empty)) .export-review-body { overflow-y: auto; overscroll-behavior: contain; }
+.export-review-stage:empty, .export-review-stage[hidden] { display: none; }
+@media (max-height: 700px) {
+  .export-review-stage.atelier-glyph { width: 197px !important; height: 164px !important; }
+}
 .export-review-modal:focus { outline: none; }
 .export-review-body { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 .export-review-meta { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: var(--studio-text-label); }
@@ -15,8 +23,8 @@
 .export-review-actions { flex-wrap: wrap; }
 .export-review-body progress { width: 100%; height: 5px; accent-color: var(--acc); }
 /* While the stage draws the build it is the busy voice. The bar stays in the accessibility tree, as the
-   launch splash's does (surfaces.css); Calm, Off and a refused (micro) stage keep it on screen. */
-:root[data-krackle='full'] .export-review-modal:has(> .export-review-stage[data-am-state='busy']:not([data-am-micro='true'])) .export-review-body progress:not([value]) {
+   launch splash's does (surfaces.css); Calm and Off keep it on screen. */
+:root[data-krackle='full'] .export-review-modal:has(> .export-review-stage[data-glyph-state='busy']) .export-review-body progress:not([value]) {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
 }
 .export-format { margin: 0; padding: 10px 12px 12px; display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); }
@@ -39,6 +47,7 @@
   --border:color-mix(in srgb,var(--studio-success) 48%,var(--md-sys-color-outline-variant));
   --bg:color-mix(in srgb,var(--studio-success) 7%,var(--md-sys-color-surface));
   background:color-mix(in srgb,var(--studio-success) 12%,var(--md-sys-color-surface-container));
+  --glyph-halo:color-mix(in srgb,var(--studio-success) 12%,var(--md-sys-color-surface-container));
   border:2px solid var(--studio-success);
 }
 .export-review-modal[data-state='success'] h2 { color:var(--studio-success); }
