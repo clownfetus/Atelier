@@ -13,15 +13,8 @@
   width: 64%; height: 64%; padding: 14%; box-sizing: border-box;
   border-radius: var(--studio-shape-medium); background: color-mix(in srgb, currentColor 14%, transparent);
 }
-/* Loading previews show the Krackle 45° screen, breathing on the shared beat; the image replaces it. */
+/* Loading previews sit on a still tonal plate; the image fades in over it. */
 .card-thumb[data-preview-state="loading"]::before {
   content: ''; position: absolute; inset: 10px; border-radius: var(--studio-shape-xs);
-  --lattice-dot: color-mix(in srgb, var(--text) 24%, transparent);
-  background-image: radial-gradient(circle, var(--lattice-dot) 1.3px, transparent 1.7px), radial-gradient(circle, var(--lattice-dot) 1.3px, transparent 1.7px);
-  background-size: 8px 8px; background-position: 0 0, 4px 4px;
-  opacity: .6; animation: thumbnail-lattice calc(var(--krackle-beat) * 2) ease-in-out infinite alternate;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
-.card-thumb[data-preview-state="loading"] > .spinner { opacity: 0; }
-@keyframes thumbnail-lattice { from { opacity: .3; } to { opacity: .85; } }
-:root:not([data-krackle=full]) .card-thumb[data-preview-state="loading"]::before { animation: none; }
-@media (prefers-reduced-motion: reduce) { .card-thumb[data-preview-state="loading"]::before { animation: none; } }

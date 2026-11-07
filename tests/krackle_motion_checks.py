@@ -61,14 +61,13 @@ def run_krackle_motion_checks(page, context, url, report, checks):
           const border = getComputedStyle(plain).borderTopWidth;
           plain.remove();
           if (border === '0px') throw Error('A spinner with no glyph lost its plain ring');
-          const thumb = document.createElement('div'); thumb.className = 'card-thumb'; thumb.innerHTML = '<div class="spinner"></div>';
+          const thumb = document.createElement('div'); thumb.className = 'card-thumb'; thumb.dataset.previewState = 'loading';
           document.body.append(thumb);
-          await new Promise(resolve => setTimeout(resolve, 50));
-          const mounted = thumb.firstChild.hasAttribute('data-atelier-motion');
+          const plate = getComputedStyle(thumb, '::before'), still = [plate.animationName, plate.backgroundImage, plate.content];
           thumb.remove();
-          if (mounted) throw Error('A thumbnail spinner, which is never seen, got a glyph');
+          if (still[0] !== 'none' || still[1] !== 'none' || still[2] === 'none') throw Error('A loading thumbnail is not a still plate: ' + still);
         }""")
-        checks.append('Every spinner is the Micro glyph at work, a copy gets its own, it leaves with its spinner, and with no glyph the plain ring shows')
+        checks.append('Every spinner is the Micro glyph at work, a copy gets its own, it leaves with its spinner, and with no glyph the plain ring shows; a loading thumbnail is a still plate')
 
         # Bars show counted steps only.
         bars = tab.evaluate("""() => {

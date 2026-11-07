@@ -11,7 +11,6 @@
       clearTimeout(entry.imageTimer);
       entry.reading = false;
       entry.failed = true;
-      entry.spin.hidden = true;
       entry.img.style.display = 'none';
       entry.thumb.dataset.previewState = 'error';
       entry.thumb.title = message;
@@ -30,10 +29,7 @@
       entry.cacheAttempt = fresh;
       clearTimeout(entry.imageTimer);
       entry.imageTimer = setTimeout(() => fail(entry, 'Preview timed out — right-click to retry'), 30000);
-      if (!entry.loaded) {
-        entry.spin.hidden = false;
-        entry.thumb.dataset.previewState = 'loading';
-      }
+      if (!entry.loaded) entry.thumb.dataset.previewState = 'loading';
       if (usesArtwork(entry)) {
         entry.img.src = entry.card.thumbnail;
       } else {
@@ -44,24 +40,20 @@
     }
 
     function attach(card, img, thumb) {
-      const spin = document.createElement('div');
-      spin.className = 'spinner';
-      spin.setAttribute('aria-hidden', 'true');
-      const entry = {card, img, thumb, spin, loaded: false, failed: false,
+      const entry = {card, img, thumb, loaded: false, failed: false,
         reading: false, cacheAttempt: false, imageTimer: null, fallback: null};
       entries.set(card.game_rel, entry);
       thumb.dataset.previewState = 'loading';
-      thumb.appendChild(spin);
       img.style.display = 'none';
       img.onload = () => {
         if (destroyed) return;
         clearTimeout(entry.imageTimer); entry.reading = false;
         entry.loaded = true; entry.failed = false;
-        img.style.display = ''; spin.hidden = true;
+        img.style.display = '';
         entry.fallback?.remove(); entry.fallback = null;
         thumb.dataset.previewState = 'ready';
         thumb.removeAttribute('title');
-        window.AtelierPolish?.play(img,[{opacity:0},{opacity:1}],120);
+        window.AtelierPolish?.play(img,[{opacity:0},{opacity:1}],200);
         if (!remaining().length) clearTimeout(timer);
       };
       img.onerror = () => {

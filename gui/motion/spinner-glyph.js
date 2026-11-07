@@ -3,7 +3,7 @@
 // a glyph of its own beside it, so those two stay as they are.
 (() => {
   'use strict';
-  const SKIP = '.card-thumb > .spinner, .export-feedback-fallback';
+  const SKIP = '.export-feedback-fallback';
   const live = new Map();
 
   function upgrade(spinner) {
