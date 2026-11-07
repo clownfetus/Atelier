@@ -358,6 +358,15 @@ def main():
                         page = next(p for p in context.pages if p.url.startswith('http://127.0.0.1:'))
                         page_errors = []
                         page.on('pageerror', lambda error: page_errors.append(str(error)))
+                        # 30 Micro glyphs in real WebView2, which needs the window shown to draw frames.
+                        glyph_cost = page.evaluate("""async()=>{const motion=document.getElementById('settings-motion'),setting=motion.value;motion.value='full';motion.dispatchEvent(new Event('change'));
+                          const raf=window.requestAnimationFrame;let sum=0,n=0,max=0;window.requestAnimationFrame=fn=>raf.call(window,t=>{const a=performance.now();fn(t);const d=performance.now()-a;sum+=d;n++;max=Math.max(max,d)});
+                          const box=document.createElement('div');box.style.cssText='position:fixed;left:0;top:0;width:400px;display:flex;flex-wrap:wrap;z-index:99999';document.body.append(box);const glyphs=[];
+                          for(let i=0;i<30;i++){const host=document.createElement('span');box.append(host);glyphs.push(AtelierMotion.glyph.mount(host,{state:'busy',size:i%2?16:24}))}
+                          await new Promise(r=>setTimeout(r,1500));sum=0;n=0;max=0;await new Promise(r=>setTimeout(r,2000));const out={avg:sum/n,max,frames:n};
+                          glyphs.forEach(g=>g.destroy());box.remove();window.requestAnimationFrame=raf;motion.value=setting;motion.dispatchEvent(new Event('change'));return out}""")
+                        assert glyph_cost['frames'] > 0 and glyph_cost['avg'] < 2, glyph_cost
+                        result['glyph_cost'] = glyph_cost
                         page.evaluate('openPaths()')
                         page.wait_for_function('!document.getElementById("setup-loading").classList.contains("active")')
                         picker = page.locator('#settings-theme')

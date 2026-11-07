@@ -1,3 +1,41 @@
+# Assembly glyph
+
+Motion system v2 replaces Krackle with three opaque pieces: texture tile, mesh block and
+material disc. They come apart and try to fit while work runs, click into an A on a real
+success, balance into a `!` on a warning and cross into an X on a failure. The rules are in
+`docs/motion-v2/SPEC.md`. Surfaces move to it in Phase 3; until then, what follows this
+section still describes what's on screen.
+
+| File | Job |
+| --- | --- |
+| `assembly/pieces.js` | Geometry and poses: the mark's outlines, the fits, the row, Micro's small-mark poses, framing |
+| `assembly/planner.js` | Clear routes between poses, planned in short slices, with common routes planned in idle time |
+| `assembly/engine.js` | One engine per glyph on one shared clock: each state's choreography, tiers, Calm and Off |
+| `assembly/glyph.js` | The renderer and the public API |
+| `assembly/assembly.css` | The halo and the glyph's box |
+
+`AtelierMotion.glyph.mount(host, {state, asset, size, reducedMotion, surface})` returns
+`{set(state, {asset}), replay(), destroy(), state}`. States are `busy`, `info`, `success`,
+`warning` and `error`. `asset` is `mesh`, `texture` or `material`, only with `busy`, and only
+when the surface truly knows it. Call `success` only for a real `succeeded` result. `surface`
+names the colour behind the glyph if it isn't the page background.
+
+`AtelierMotion.glyph.entrance(host, {size, onDone})` is the header logo's entrance: once per
+launch, in Full motion, while the window is visible. It ends on the still mark and then calls
+`onDone`. Where it doesn't play, it mounts nothing, calls `onDone` at once and returns `null`.
+
+The tier comes from the host's height: Stage from 96 px, Inline from 32 px, Micro below. A
+glyph's time stops while it's off screen, while the document is hidden and once it has settled,
+and a settled glyph asks for no frames. A state set meanwhile plays when the glyph comes back.
+
+Settings has Preview motion (`motion-preview.js`): real glyphs at 16, 48 and 128 px, the five
+states, the three loaders and the logo's entrance. `AtelierFoley.click()` is the optional success
+click. It plays at Stage and Inline in Full motion, and glyphs finishing together click once.
+
+Run `tests/browser_smoke.py --glyph-only --report-dir <folder>` for the planner and clearance
+baselines, the glyph's promises and Preview motion. `tests/glyph_fixture.py` is their bare page:
+the production files, a stand-in for the Motion setting and a clock stepped by hand.
+
 # Motion inventory
 
 Atelier's job feedback, ownership markers, empty states and brand moments speak
