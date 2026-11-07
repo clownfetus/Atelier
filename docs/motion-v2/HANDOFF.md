@@ -187,7 +187,7 @@ for over 50 ms; settled glyphs cost nothing per frame.
   listed in `SURFACE_MAP.md` row 8 switches with no change. Cover
   `AtelierKrackleGlyph.toastIcon` too (`gui/app.js:149`, `:201`), which doesn't go
   through that mount.
-- [ ] **P3.2 to P3.11.** One surface per task and commit, in this order:
+- [x] **P3.2 to P3.11.** One surface per task and commit, in this order:
   export review (P3.2), first-run setup (P3.3), viewport loader (P3.4),
   material save (P3.5), Edit All import (P3.6), export button and notifications
   (P3.7), header logo entrance (P3.8), empty states (P3.9), spinners and
