@@ -205,7 +205,7 @@ for over 50 ms; settled glyphs cost nothing per frame.
 - [x] **P3.13 Interruption (D7).** Update the surfaces that replaced animations
   instantly on a result, so the move in flight lands first and the text
   updates immediately.
-- [ ] **P3.14** ⏸ Recording of a full walk-through to Thiago: launch with indexing,
+- [x] **P3.14** ⏸ Recording of a full walk-through to Thiago: launch with indexing,
   first-run setup, change the theme, open a hero, edit a material and save, export with success, with warnings and
   with failure, cancel a job, and an empty folder.
 
