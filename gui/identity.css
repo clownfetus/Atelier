@@ -127,7 +127,7 @@
   font: 600 30px/1.2 var(--font-display);
   color: var(--text);
 }
-/* The stage well: a flat-footed Linen field the ink performs in. */
+/* The stage well: a flat Linen field the glyph works in. */
 .at-import-stage {
   display: grid;
   place-items: center;
@@ -135,9 +135,9 @@
   border-radius: var(--radius-card);
   background: var(--surface-panel);
   overflow: hidden;
-  --energy-hole: var(--surface-panel);
+  --glyph-halo: var(--surface-panel);
 }
-.at-import-stage > svg { display: block; width: 176px; height: 176px; overflow: visible; }
+.at-import-glyph { width: 211px; height: 176px; }
 .at-import-status { display: grid; gap: 3px; min-height: 58px; }
 .at-import-status b { font: 600 16px/22px var(--font-ui); color: var(--text); }
 #prog-counter { font: 400 13px/19px var(--font-ui); color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -199,29 +199,7 @@
 
 @media (max-height: 700px) {
   .at-import-stage { height: 152px; }
-  .at-import-stage > svg { width: 140px; height: 140px; }
-}
-
-/* ── Import ink ─────────────────────────────────────── */
-.am-import-ink-stage .e, .am-import-ink-stage .crisp, .am-import-ink-flight .e, .am-import-ink-flight .crisp { fill: var(--energy); }
-.am-import-ink-stage .r, .am-import-ink-stage .rc { fill: var(--ink-result, var(--done)); }
-.am-import-ink-stage .pop-ok { fill: var(--done); }
-.am-import-ink-stage .pop-fail { fill: var(--fault); }
-.am-import-ink-stage .core, .am-import-ink-flight .core { fill: var(--energy-core); }
-.am-import-ink-stage .glint, .am-import-ink-flight .glint { fill: var(--energy-glint); }
-[data-atelier-motion="import-ink"][data-am-state="success"] { --ink-result: var(--done); }
-[data-atelier-motion="import-ink"][data-am-state="warning"] { --ink-result: var(--caution); }
-[data-atelier-motion="import-ink"][data-am-state="error"] { --ink-result: var(--fault); }
-[data-atelier-motion="import-ink"][data-am-state="cancelled"] .e { fill: var(--text-muted); }
-/* Ink in flight sits above the dialog scrim; it never takes a pointer. */
-.am-import-ink-flight {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: calc(var(--studio-layer-overlay, 200) + 40);
-  pointer-events: none;
-  overflow: visible;
+  .at-import-glyph { width: 168px; height: 140px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

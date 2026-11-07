@@ -1,24 +1,35 @@
 // Edit All import dialog, in the identity v1.0 design language.
 // app.js owns the request, SSE progress and the library refresh; AtelierPolish owns the
 // result dots. This file writes the dialog's status text and, once the job ends, holds
-// its result until the user dismisses it. Text renders first: the Krackle import ink only
-// shows where the work went (asset cards → stage → Mod tray) and may be missing entirely.
+// its result until the user dismisses it. Text renders first: the glyph only repeats what the
+// status line says and may be missing entirely. The count stays in the text.
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
   const overlay = $('prog-overlay'), box = $('prog-box');
   if (!overlay || !box) return;
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const tray = () => $('sidebar-header');
-  let total = 0, imported = 0, held = false, ink = null;
+  const GLYPH = {success: 'success', warning: 'warning', error: 'error', cancelled: 'info'};
+  let total = 0, imported = 0, held = false, glyph = null;
 
-  function inkStage() {
-    if (ink) return ink;
-    try { ink = window.AtelierMotion?.importInk?.mount($('import-stage'), {shield: box, window: $('import-stage')}) || null; }
-    catch (_) { ink = null; $('import-stage').replaceChildren(); }
-    return ink;
+  function clearGlyph() {
+    try { glyph?.destroy(); } catch (_) { /* presentation is optional */ }
+    glyph = null;
+    $('import-stage').replaceChildren();
   }
-  const play = (method, ...args) => { try { inkStage()?.[method](...args); } catch (_) { /* presentation is optional */ } };
+  // Every import starts its own glyph, so it never opens out of the last import's result.
+  function startGlyph() {
+    clearGlyph();
+    if (!window.AtelierMotion?.glyph) return;
+    const host = document.createElement('span');
+    host.className = 'at-import-glyph';
+    $('import-stage').append(host);
+    try { glyph = window.AtelierMotion.glyph.mount(host, {state: 'busy'}); }
+    catch (_) { clearGlyph(); }
+  }
+  function showResult(kind) {
+    try { glyph?.set(GLYPH[kind]); } catch (_) { clearGlyph(); }
+  }
 
   function status(title, detail = null, current = '') {
     $('import-status-title').textContent = title;
@@ -42,13 +53,6 @@
     note.textContent = NOTES[kind] || '';
     note.style.visibility = note.textContent ? '' : 'hidden';
   }
-  // The ink leaves from the actual cards being imported; the Edit All button stands in for them.
-  function sources(items) {
-    // Library cards are keyed by rel_path, falling back to game_rel (library-tools.js).
-    const wanted = new Set(items.flatMap(item => [item.rel_path, item.game_rel]).filter(Boolean));
-    const cards = [...document.querySelectorAll('#grid-area .card')].filter(card => wanted.has(card.dataset.libraryPath));
-    return cards.length ? cards : [$('import-all-btn')].filter(Boolean);
-  }
 
   function begin(items) {
     total = items.length; imported = 0; held = false;
@@ -57,14 +61,13 @@
     $('import-kicker').textContent = `Import · ${plural(total, 'texture')}`;
     status('Extracting from game');
     actions('busy');
-    play('begin', sources(items));
+    startGlyph();
   }
   function progress(data) {
     if (held || data.done) return;
     if (data.game_rel) {
       if (data.ok !== false) imported++;
       status('Importing', null, data.name || '');
-      play('item', data.ok !== false, tray());
     } else if (data.name) {
       status(String(data.name).replace(/…$/, '').replace(/^Decoding$/, 'Decoding textures'));
     }
@@ -82,7 +85,7 @@
     else status('Import failed', data.error || 'No textures could be imported.');
     box.dataset.importState = kind;
     box.removeAttribute('aria-busy');
-    play('finish', kind, tray());
+    showResult(kind);
     if (!overlay.classList.contains('active')) return false;
     held = true;
     actions(kind);
@@ -94,7 +97,7 @@
     held = false;
     box.removeAttribute('aria-busy');
     box.dataset.importState = 'idle';
-    play('setState', 'idle');
+    clearGlyph();
   }
   function dismiss() {
     if (!held) return;

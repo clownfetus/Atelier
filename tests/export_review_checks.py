@@ -254,6 +254,60 @@ def run_export_review_checks(page, context, url, report, checks):
                 pass
         review.close()
     run_export_review_glyph_checks(context, url, report, checks)
+    run_import_dialog_glyph_checks(context, url, report, checks)
+
+
+def run_import_dialog_glyph_checks(context, url, report, checks):
+    """Edit All: the glyph reports the real job, and the count stays in the text."""
+    tab = context.new_page()
+    errors = []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    host = '#import-stage > [data-atelier-motion="glyph"]'
+    items = "[{game_rel:'A'},{game_rel:'B'}]"
+    try:
+        tab.goto(url)
+        tab.wait_for_function('window.AtelierImportDialog && window.AtelierMotion?.glyph && window.atelierProject?.()')
+        tab.evaluate(f"document.getElementById('prog-overlay').classList.add('active'); AtelierImportDialog.begin({items})")
+        glyph = tab.locator(host)
+        assert glyph.count() == 1 and glyph.get_attribute('data-glyph-state') == 'busy' and glyph.get_attribute('data-glyph-tier') == 'stage'
+        assert glyph.get_attribute('data-glyph-asset') in (None, ''), 'A batch names no one asset'
+        box = glyph.bounding_box()
+        assert box['width'] == 211 and box['height'] == 176, box
+        assert glyph.locator('.glyph-piece').first.evaluate('el=>getComputedStyle(el).stroke') != 'none', 'The halo has no colour'
+        tab.evaluate("AtelierImportDialog.progress({game_rel:'A', ok:true, name:'A'})")
+        assert glyph.get_attribute('data-glyph-state') == 'busy', 'An item finishing is not a result'
+        assert tab.locator('.am-import-ink-flight').count() == 0
+        cases = (({'results': [1, 2], 'total': 2}, 'success', 'Imported 2 textures'),
+                 ({'results': [1], 'total': 2, 'error': 'Fixture failure'}, 'warning', 'Imported with warnings'),
+                 ({'results': [], 'total': 2, 'error': 'Fixture failure'}, 'error', 'Import failed'),
+                 ({'results': [], 'total': 2, 'error': 'Cancelled'}, 'info', 'Import cancelled'))
+        for data, state, title in cases:
+            tab.evaluate(f"AtelierImportDialog.begin({items})")
+            assert glyph.get_attribute('data-glyph-state') == 'busy'
+            tab.evaluate('data=>AtelierImportDialog.finish(data)', data)
+            assert glyph.get_attribute('data-glyph-state') == state, state
+            assert tab.locator('#import-status-title').inner_text() == title
+            assert tab.locator(host).count() == 1
+            tab.wait_for_timeout(1900)
+            tab.screenshot(path=str(report / f'import-glyph-{state}.png'))
+        tab.evaluate('AtelierImportDialog.abandon()')
+        assert tab.locator('#import-stage').evaluate('el=>el.childElementCount') == 0
+        tab.evaluate("""items => {
+          const original = AtelierMotion.glyph;
+          try {
+            for (const failure of ['missing', 'mount']) {
+              AtelierMotion.glyph = failure === 'missing' ? undefined : {mount: () => { throw Error('Fixture mount failure'); }};
+              AtelierImportDialog.begin(items);
+              if (document.getElementById('import-stage').childElementCount) throw Error('Failed glyph left its host');
+              AtelierImportDialog.finish({results: [1, 2], total: 2});
+              if (document.getElementById('import-status-title').textContent !== 'Imported 2 textures') throw Error('Lost the result text');
+            }
+          } finally { AtelierMotion.glyph = original; }
+        }""", [{'game_rel': 'A'}, {'game_rel': 'B'}])
+        assert not errors, errors
+        checks.append('Edit All import shows the glyph at Stage size, forms each real result with the count in text, and works without the glyph')
+    finally:
+        tab.close()
 
 
 SNAPSHOT = """{project:'Smoke A', modName:'Glyph fixture', copyToMods:false, modsPath:'', protected:false, skipped:0, excluded:[],
