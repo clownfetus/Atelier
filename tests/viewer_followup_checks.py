@@ -130,10 +130,10 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         assert len(refreshed)==1
         checks.append('Available high-resolution mips trigger automatic tracked repair and explain paint preservation and backups')
         tab.evaluate("buildGrid([_makeCard({type:'asset',file_type:'texture',name:'T_Painted',label:'Painted texture',game_rel:'Fixture/T_Painted',imported:true,token:'kept'})])")
-        assert tab.locator('.card.imported .card-editing-badge').inner_text()=='Editing'
+        assert tab.locator('.card.imported .card-editing-badge').inner_text()=='Edited'
         assert has_border_of_at_least(tab.locator('.card.imported'),3)
         tab.screenshot(path=str(report/'editing-card-border.png'))
-        checks.append('Edited grid assets have a three-pixel contrasting border and an explicit Editing badge')
+        checks.append('Edited grid assets have a three-pixel contrasting border and an explicit Edited marker')
         tab.evaluate("""() => {
           window.followupExport={project:atelierProject(),modName:'Completed build',copyToMods:true,modsPath:'D:/Test/mods',protected:false,included:[],excluded:[],skipped:0};
           AtelierExportReview.open(followupExport,{refresh(){},confirm(){},settings(){}});

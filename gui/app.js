@@ -576,7 +576,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       }
       thumb.appendChild(img);
     } else if (card.imported && card.swatches?.length) {
-      thumb.appendChild(_editedDots(card.swatches));
+      thumb.appendChild(_editedBands(card.swatches));
     } else {
       thumb.appendChild(renderCardIcon(card, el));
     }
@@ -593,7 +593,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     el.appendChild(name);
     if (card.imported) {
       const editing = document.createElement('span');
-      editing.className = 'card-editing-badge'; editing.textContent = 'Editing';
+      editing.className = 'card-editing-badge'; editing.textContent = 'Edited';
       thumb.appendChild(editing);
       el.title += '\nIn your edit list';
     }
@@ -622,28 +622,12 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   _gridThumbs?.start(retryThumbs);
 }
 
-// An edited material has no preview, so its saved colours fill the thumb as the Krackle 45° lattice,
-// in diagonal bands. Textures and glyphs being edited keep their own colours through the same
-// lattice as a mask (polish.css).
-function _editedDots(colors) {
-  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 96 96"); svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-  svg.setAttribute("class", "card-edited-dots"); svg.setAttribute("aria-hidden", "true");
-  const band = 192 / colors.length;
-  for (let y = 3, row = 0; y < 96; y += 6, row++) for (let x = row % 2 ? 9 : 3; x < 96; x += 12) {
-    const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("r", 4);
-    dot.setAttribute("fill", colors[Math.min(colors.length - 1, Math.floor((x + y) / band))]);
-    dot.style.setProperty("--d", ((x + y) / 192).toFixed(3));
-    svg.append(dot);
-  }
-  return svg;
-}
-
-// The dissolve plays once, when an asset joins the edit list; cards already being edited are still.
-function _playEditDissolve(card) {
-  card.classList.remove("just-edited"); void card.offsetWidth; card.classList.add("just-edited");
-  setTimeout(() => card.classList.remove("just-edited"), 1400);
+// An edited material has no preview, so its saved colours fill the thumb as flat diagonal bands.
+function _editedBands(colors) {
+  const bands = document.createElement("div"), step = 100 / colors.length;
+  bands.className = "card-edited-bands"; bands.setAttribute("aria-hidden", "true");
+  bands.style.background = `linear-gradient(135deg, ${colors.map((color, i) => `${color} ${(i * step).toFixed(2)}% ${((i + 1) * step).toFixed(2)}%`).join(", ")})`;
+  return bands;
 }
 
 function _refreshEditedSwatches(gameRel, colors) {
@@ -653,8 +637,8 @@ function _refreshEditedSwatches(gameRel, colors) {
   const card = [...document.querySelectorAll('#grid-area .card')].find(node => node._libraryCard?.game_rel === gameRel);
   if (!card || !swatches.length) return;
   card._libraryCard.swatches = swatches;
-  const thumb = card.querySelector('.card-thumb'), current = thumb.querySelector('.card-edited-dots, .card-icon');
-  if (current) current.replaceWith(_editedDots(swatches));
+  const thumb = card.querySelector('.card-thumb'), current = thumb.querySelector('.card-edited-bands, .card-icon');
+  if (current) current.replaceWith(_editedBands(swatches));
 }
 
 function updateImportedCard(gameRel, record) {
@@ -668,10 +652,9 @@ function updateImportedCard(gameRel, record) {
   if (button) {
     Object.assign(button._libraryCard, {imported:true, token:record.token});
     delete button._libraryCard.thumbnail;
-    if (!button.classList.contains('imported')) _playEditDissolve(button);
     button.classList.add('imported');
     if (!button.querySelector('.card-editing-badge')) {
-      const badge=document.createElement('span');badge.className='card-editing-badge';badge.textContent='Editing';
+      const badge=document.createElement('span');badge.className='card-editing-badge';badge.textContent='Edited';
       button.querySelector('.card-thumb').append(badge);button.title+='\nIn your edit list';
     }
     const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
