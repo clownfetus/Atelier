@@ -94,7 +94,6 @@
   --studio-space-3: 12px;
   --studio-space-4: 16px;
   --studio-space-6: 24px;
-  --screen-dot:rgb(18 18 22 / 12%);
   --studio-shape-xs: 4px;
   --studio-shape-small: 6px;
   --studio-shape-medium: 8px;
@@ -167,7 +166,6 @@
 
 :root[data-theme='dark'] {
   --studio-workspace-gutter:var(--md-sys-color-surface-container-lowest);
-  --screen-dot:rgb(238 229 207 / 13%);
   color-scheme: dark;
   --md-sys-color-primary: #F4F6F8;
   --md-sys-color-on-primary: #0D151F;

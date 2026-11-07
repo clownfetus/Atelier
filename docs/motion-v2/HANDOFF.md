@@ -193,11 +193,11 @@ for over 50 ms; settled glyphs cost nothing per frame.
   (P3.7), header logo entrance (P3.8), empty states (P3.9), spinners and
   progress bars (P3.10), Settings preview wiring (P3.11). Follow
   `SURFACE_MAP.md` for each.
-- [ ] **P3.12 Retire.** Stop mounting the six retired surfaces (working panels,
+- [x] **P3.12 Retire.** Stop mounting the six retired surfaces (working panels,
   workflow gestures, ink transfers, halftone reconstruction, folder flap,
   contextual pigments). Swap in the replacements from the map. Leave the files
   in place for now.
-- [ ] **P3.12b Surfaces from D10 and D17.** One commit each: model appearance loading,
+- [x] **P3.12b Surfaces from D10 and D17.** One commit each: model appearance loading,
   setup-status check, Showcase backdrop, thumbnail loading, cards being edited, deleting
   a row, startup stage, index failure, first-export moment, theme change, toast captions,
   toast repeat count, selection count, texture drop target and dot lattice. Follow
