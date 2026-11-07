@@ -12,17 +12,10 @@ def run_polish_checks(page, context, url, report, checks):
     viewport = (Path(__file__).resolve().parents[1] / 'gui/viewport.js').read_text(encoding='utf-8')
     viewport += """
 window.__polishViewport={
-  revealFrames(){
-    const original=performance.now,base=performance.now();
-    try {
-      // Capture real renders at fixed reveal positions; screenshot scheduling on
-      // a software GPU can otherwise miss the entire 420ms transition.
-      performance.now=()=>base;inspection.materialize();
-      performance.now=()=>base+84;inspection.render();
-      const wire=renderer.domElement.toDataURL('image/png');
-      performance.now=()=>base+600;inspection.render();
-      return {wire,shaded:renderer.domElement.toDataURL('image/png')};
-    } finally {performance.now=original;}
+  shaded(){
+    // The loaded appearance replaces the old one directly: no overlay pass draws over the model.
+    inspection.materialize();inspection.render();
+    return {image:renderer.domElement.toDataURL('image/png'),presentation:inspection.presentationState()};
   },
   state:()=>({filmic:renderer.toneMapping===THREE.ACESFilmicToneMapping,
   environment:!!scene.environment?.isTexture,materials:Object.values(matsByName).flat().map(m=>({opacity:m.opacity,wireframe:m.wireframe,color:m.color.toArray()}))})};
@@ -111,12 +104,12 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.wait_for_timeout(600)
         state=tab.evaluate('__polishViewport.state()'); assert state['filmic'] and state['environment'],state
         tab.wait_for_function("document.getElementById('viewport-animation').value!=='' && document.getElementById('viewport-play').getAttribute('aria-pressed')==='true'")
-        frames=tab.evaluate('__polishViewport.revealFrames()')
-        assert frames['wire'].startswith('data:image/png;base64,')
-        assert frames['wire']!=frames['shaded']
+        shaded=tab.evaluate('__polishViewport.shaded()')
+        assert shaded['image'].startswith('data:image/png;base64,') and len(shaded['image']) > 2000
+        assert not {'scan','scans','scanFrames','reveal'} & set(shaded['presentation']), shaded['presentation']
         assert tab.evaluate('__polishViewport.state().materials')==state['materials']
         tab.evaluate('AtelierViewport.close()')
-        checks.append('Filmic studio environment and wireframe-to-shaded reveal render real Three.js geometry without changing editable materials; discovered idle starts automatically')
+        checks.append('Filmic studio environment renders real Three.js geometry with no overlay sweep without changing editable materials; discovered idle starts automatically')
 
         tab.evaluate("""() => {
           document.getElementById('toast-area').replaceChildren();

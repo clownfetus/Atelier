@@ -162,7 +162,9 @@ def run_viewport_motion_checks(page, context, url, report, checks):
           viewportTestHost.remove();
           window.originalGlyph = AtelierMotion.glyph;
           window.viewportMotionEvents = [];
+          // Only the mesh loader's glyph is recorded; the appearance loader in the corner has its own checks.
           AtelierMotion.glyph = {...originalGlyph, mount(host, options) {
+            if (host.id !== 'viewport-loading-motion-host') return originalGlyph.mount(host, options);
             viewportMotionEvents.push(options.state);
             const instance = originalGlyph.mount(host, options);
             return {
@@ -278,16 +280,16 @@ def run_viewport_motion_checks(page, context, url, report, checks):
           const poster=document.querySelector('.vp-poster');
           return poster?.dataset.phase==='geometry' && getComputedStyle(poster).zIndex==='auto';
         }""")
-        motion_page.evaluate("""() => {
-          window.posterWipes=[];const poster=document.querySelector('.vp-poster');
-          const tick=()=>{if(!poster.isConnected)return;const value=poster.style.getPropertyValue('--vp-poster-wipe');
-            if(value&&posterWipes.at(-1)!==+value)posterWipes.push(+value);requestAnimationFrame(tick);};
-          requestAnimationFrame(tick);
+        # While the appearance loads, the texture loader works Inline in the corner; the model stays in view.
+        motion_page.wait_for_selector('#viewport-appearance:not([hidden]) .viewport-appearance-glyph[data-glyph-state="busy"][data-glyph-asset="texture"][data-glyph-tier="inline"]')
+        corner = motion_page.evaluate("""() => {
+          const stage=document.getElementById('viewport-stage').getBoundingClientRect(),notice=document.getElementById('viewport-appearance').getBoundingClientRect();
+          return {left:notice.left-stage.left<40,bottom:stage.bottom-notice.bottom<40,canvas:getComputedStyle(document.getElementById('viewport-canvas')).visibility};
         }""")
+        assert corner == {'left': True, 'bottom': True, 'canvas': 'visible'}, corner
         settle_materials()
         motion_page.wait_for_function("!document.querySelector('.vp-poster')")
-        wipes = motion_page.evaluate('posterWipes')
-        assert len(wipes) >= 3 and wipes == sorted(wipes) and wipes[-1] > .5, wipes
+        assert motion_page.evaluate("(n => n.hidden && !n.querySelector('svg,canvas') && !n.querySelector('[data-atelier-motion]'))(document.getElementById('viewport-appearance'))")
         assert not motion_page.evaluate("document.getElementById('viewport-stage').classList.contains('vp-has-poster')")
         close_preview()
 
@@ -318,7 +320,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         assert not motion_page.locator('.vp-poster').count()
         motion_page.evaluate("document.querySelector('.poster-fixture')?.remove()")
-        checks.append('Opening from costume artwork flies it to the stage above the loader, keeps it behind arriving geometry and wipes it with the reveal sweep; Off stays still, and failures and closing remove it at once')
+        checks.append('Opening from costume artwork flies it to the stage above the loader, keeps it behind arriving geometry while the texture loader works in the corner, then fades it; Off stays still, and failures and closing remove it at once')
 
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Old fixture')

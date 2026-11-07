@@ -89,9 +89,9 @@ async def main():
                 print('Opening real skin '+skin,flush=True)
                 await control('settings-motion','full')
                 await page.evaluate('skin=>{void AtelierViewport.open(skin);}',skin)
-                await page.wait_for_function('window.__studio&&(!!__studio.state().presentation.scan||__studio.ready())',timeout=300000)
+                await page.wait_for_function('window.__studio&&(!!__studio.state().presentation.assetsLoading||__studio.ready())',timeout=300000)
                 scan=await page.evaluate('__studio.state().presentation')
-                if scan.get('scan'):
+                if scan.get('assetsLoading'):
                     await page.screenshot(path=str(folder/'loading-full.png'))
                 await page.wait_for_function('__studio.ready()',timeout=900000)
                 await page.evaluate('__studio.rest()')
@@ -99,9 +99,8 @@ async def main():
                 state=await page.evaluate('__studio.state()')
                 (folder/'loaded.json').write_text(json.dumps(state,indent=2),encoding='utf-8')
                 assert not any(m.get('mapping_error') for m in state['materials']),[(m['slot_name'],m.get('mapping_error')) for m in state['materials']]
-                assert not state['presentation']['scan'] and state['presentation']['scans']==0,state['presentation']
-                frames=state['presentation']['scanFrames'];await page.wait_for_timeout(180)
-                assert frames==await page.evaluate('__studio.state().presentation.scanFrames')
+                assert not state['presentation']['assetsLoading'],state['presentation']
+                assert await page.locator('#viewport-appearance [data-atelier-motion]').count()==0
                 for mode in ('inspect','showcase'):
                     await page.locator('#viewport-'+mode).click()
                     await page.screenshot(path=str(folder/(mode+'.png')))
@@ -133,19 +132,19 @@ async def main():
                 for motion in (() if args.skip_settings else ('calm','off')):
                     await control('settings-motion',motion)
                     await page.evaluate('__studio.loading(true)');await page.wait_for_timeout(100)
-                    assert await page.evaluate('__studio.state().presentation.scan') is None
+                    assert await page.locator('#viewport-appearance [data-glyph-asset=texture]').count()==1
                     await page.evaluate('__studio.loading(false)')
                 if not args.skip_settings:
                     await control('settings-motion','full');await page.emulate_media(reduced_motion='reduce')
                     await page.evaluate('__studio.loading(true)');await page.wait_for_timeout(100)
-                    assert await page.evaluate('__studio.state().presentation.scan') is None
+                    assert await page.locator('#viewport-appearance [data-glyph-asset=texture]').count()==1
                     await page.evaluate('__studio.loading(false)');await page.emulate_media(reduced_motion='no-preference')
                 for theme in (() if args.skip_settings else ('light','dark')):
                     await control('settings-theme',theme)
                     await page.screenshot(path=str(folder/('identity-'+theme+'.png')))
                 await page.evaluate("const c=document.querySelector('[data-theme-color=accent]');if(c){c.value='#ce75a8';c.dispatchEvent(new Event('input'));}")
                 await page.screenshot(path=str(folder/'identity-custom.png'))
-                result={'skin':skin,'objects':state['objects'],'materials':len(state['materials']),'full_scan_observed':bool(scan.get('scan')),'view_modes_verified':True,'settings_both_modes':not args.skip_settings}
+                result={'skin':skin,'objects':state['objects'],'materials':len(state['materials']),'appearance_loading_observed':bool(scan.get('assetsLoading')),'view_modes_verified':True,'settings_both_modes':not args.skip_settings}
                 extra_items=[]
                 if args.weapons:
                     weapons=[o for o in state['objects'] if o['kind']=='weapon']
@@ -230,7 +229,7 @@ async def main():
                     assert await page.locator('#atelier-confirm').count()==0
                 await page.evaluate('AtelierViewport.close()')
                 assert not await page.evaluate('__studio.state().animating')
-                assert await page.evaluate('__studio.state().presentation.scans')==0
+                assert await page.locator('#viewport-appearance [data-atelier-motion]').count()==0
                 results.append(result);print('Verified real skin '+skin,flush=True)
         finally:
             if page and not page.is_closed():

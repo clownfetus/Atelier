@@ -72,11 +72,9 @@ export function createViewportInspection(api) {
     updateRegions();refresh();
     $('viewport-comparison').hidden=comparison!=='wipe' || showcaseMode;
   }
-  // The reveal is one last Krackle sweep (viewport-effects.js) that leaves the loaded appearance behind it.
-  let revealStart = null, reveal = 1;
-  const scanAllowed=()=>!document.hidden && !reducedMotion.matches && window.AtelierMotionPolicy?.allows(2)!==false;
-  function materialize() { revealStart = scanAllowed() ? performance.now() : null;if(showcaseMode){showcaseColors=null;setShowcase(true);} }
-  reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { revealStart = null; reveal = 1; finishCamera(); } });
+  // The loaded appearance simply replaces the old one; Showcase redraws its backdrop from the costume.
+  function materialize() { if(showcaseMode){showcaseColors=null;setShowcase(true);} }
+  reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) finishCamera(); });
   window.addEventListener('pagehide', () => {toonGradient.dispose();replacedCopy.dispose();}, {once:true});
 
   function worldBoxes() {
@@ -341,17 +339,10 @@ export function createViewportInspection(api) {
     const captured=showcase;
     showcase ||= comic;
     if (!captured) { updateCamera(); updateAxes(); }
-    if (!captured) {
-      if(!scanAllowed()){revealStart=null;effects.stopLoading();}
-      reveal = revealStart === null ? 1 : Math.min(1, (performance.now() - revealStart) / 420);
-      if (reveal === 1) revealStart = null;
-      if (!assetsLoading && reveal===1) effects.stopLoading();
-      window.AtelierMotion?.viewportPoster?.frame(assetsLoading, reveal, revealStart !== null);
-    }
+    if (!captured) window.AtelierMotion?.viewportPoster?.frame(assetsLoading);
     if (comparison !== 'wipe' || showcase) {
       renderPass(!showcase && comparison === 'original', showcase,comic,canonical);
-      if (!captured && scanAllowed() && (assetsLoading || reveal < 1)) effects.drawLoading(bounds(), assetsLoading ? null : reveal);
-      else if (!showcase) effects.drawOutline(related || hovered);
+      if (!showcase) effects.drawOutline(related || hovered);
       return;
     }
     const size = renderer.getSize(new THREE.Vector2());
@@ -361,7 +352,6 @@ export function createViewportInspection(api) {
       renderer.setScissor(0, 0, divider, size.y); renderPass(true); effects.drawOutline(related || hovered);
       renderer.setScissor(divider, 0, size.x - divider, size.y); renderPass(false); effects.drawOutline(related || hovered);
     } finally { renderer.setScissorTest(false); }
-    if (scanAllowed() && (assetsLoading || reveal<1)) effects.drawLoading(bounds(),assetsLoading?null:reveal);
   }
 
   function pick(event) {
@@ -584,7 +574,6 @@ export function createViewportInspection(api) {
     if (uvOpen) openUV();
     setShowcase(false);showcaseColors=null;
     setLoading(false);
-    revealStart = null; reveal = 1;
     capture?.abort(); clearMaterials(); view = 'perspective'; $('viewport-view').value = view;
     fitOnResize = true; $('viewport-capture-name').value = $('mod-name-input')?.value.trim() || $('viewport-title').textContent;
     $('viewport-capture-menu').open = false; refresh();
@@ -611,16 +600,22 @@ export function createViewportInspection(api) {
     if (shortcuts[key]) { event.preventDefault(); $(shortcuts[key]).click(); }
     else if (['1','3','7'].includes(key) && !bounds().isEmpty()) { event.preventDefault(); chooseView({'1':'front','3':'right','7':'top'}[key]); }
   }
+  // While the model's appearance loads, the texture loader works Inline in the stage's corner and the model stays in view.
+  let appearanceGlyph = null;
   function setLoading(value) {
     assetsLoading=!!value;
-    revealStart=null;reveal=1;effects.stopLoading();
     renderer.domElement.setAttribute('aria-busy',String(assetsLoading));
     $('viewport-stage').classList.toggle('vp-assets-loading',assetsLoading);
+    const notice=$('viewport-appearance'),host=notice?.querySelector('.viewport-appearance-glyph');
+    if(!notice)return;
+    notice.hidden=!assetsLoading;
+    if(!assetsLoading){appearanceGlyph?.destroy();appearanceGlyph=null;return;}
+    if(!appearanceGlyph&&host)try{appearanceGlyph=window.AtelierMotion?.glyph?.mount(host,{state:'busy',asset:'texture'})||null;}catch(_){appearanceGlyph=null;host.replaceChildren();}
   }
   return {frame, refresh, render, reset, clearMaterials, show, closed, keydown, materialize, setLoading,cardPoster,setShowcase,
     preserveFraming:()=>{fitOnResize=false;}, setRelated:value=>{related=value;},
     selectSurface:surface=>{uvSurface=surface;if(uvOpen)uvInspector?.select(surface);},
     inspectSurface:surface=>{uvSurface=surface;if(!uvOpen)openUV();else uvInspector?.select(surface);},
-    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,reveal,assetsLoading,showcase:showcaseMode,grid:grid.visible}),
+    retireTexture:effects.retireTexture, presentationState:()=>({...effects.state(),moving:!!cameraMove,assetsLoading,showcase:showcaseMode,grid:grid.visible}),
     resized:() => { if (fitOnResize && !capture && !cameraMove) frame(true);drawShowcase(); }, capturing:() => !!capture};
 }

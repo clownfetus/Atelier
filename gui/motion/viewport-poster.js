@@ -1,5 +1,5 @@
 // Presentation only: the costume artwork the user opened lands on the Model Studio stage as a poster
-// while the model decodes, stays dimmed behind the arriving geometry, and leaves with the reveal sweep.
+// while the model decodes, stays dimmed behind the arriving geometry, and fades once the appearance has loaded.
 // Model loading never waits for it. Missing artwork, a refused moment, Calm and Off skip parts of it.
 (() => {
   'use strict';
@@ -92,18 +92,13 @@
     setTimeout(land, 540);
   }
 
-  // Called by the inspection renderer for each live frame, after it has advanced the reveal sweep.
-  function frame(assetsLoading, reveal, sweeping) {
+  // Called by the inspection renderer for each live frame.
+  function frame(assetsLoading) {
     const state = current;
     if (!state || state.phase === 'settled') return;
     if (document.getElementById('viewport-loading')?.style.display !== 'none') {
       // A loader that stays up with nothing loading is an error or empty result: its text must read clearly.
       if (!assetsLoading) end();
-      return;
-    }
-    if (sweeping) {
-      state.phase = 'reveal'; state.poster.dataset.phase = 'reveal';
-      state.poster.style.setProperty('--vp-poster-wipe', reveal.toFixed(3));
       return;
     }
     if (assetsLoading) { if (state.phase === 'loading') { state.phase = 'geometry'; state.poster.dataset.phase = 'geometry'; } return; }
@@ -112,7 +107,7 @@
 
   function settle(state) {
     state.phase = 'settled'; state.flight?.();
-    if (!allows(1) || document.hidden || state.poster.dataset.phase === 'reveal') { end(); return; }
+    if (!allows(1) || document.hidden) { end(); return; }
     state.poster.dataset.phase = 'settled';
     setTimeout(() => { if (current === state) end(); }, 240);
   }
