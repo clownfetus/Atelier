@@ -39,7 +39,7 @@
 /* Thumbs, and hovered card bodies, paint --bg3. No var(--krackle-charge) fallback here: a self-reference is a cycle and voids the property. */
 .card-thumb, .card:hover { --krackle-charge: var(--krackle-charge-raised); }
 .am-stage-micro { display:inline-flex; width:48px; height:48px; }
-#krackle-accent-status { font-size:var(--studio-text-micro); letter-spacing:.08em; padding:2px 5px; border:1px solid var(--border); }
+#krackle-accent-status { font-size:var(--studio-text-micro); padding:2px 5px; border:1px solid var(--border); }
 #krackle-accent-status[hidden] { display:none; }
 :root[data-krackle='calm'] .search-no-results { display:none; }
 [data-am-state='success'] .am-krackle-glyph-hole,

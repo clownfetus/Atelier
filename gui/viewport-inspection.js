@@ -470,7 +470,7 @@ export function createViewportInspection(api) {
     }
     context.drawImage(renderer.domElement, 0,0,size,size);
     if(footer<=0)return output;
-    context.fillStyle = '#e5e2e4'; context.font = `500 ${Math.round(size*.025)}px Roboto, sans-serif`;
+    context.fillStyle = '#e5e2e4'; context.font = `500 ${Math.round(size*.025)}px Inter, sans-serif`;
     context.fillText(($('viewport-capture-name').value.trim() || $('viewport-title').textContent).slice(0,100), size*.035, size+footer*.38, size*.85);
     palette().forEach((color,i) => { context.fillStyle = color; context.fillRect(size*.035 + i*size*.045, size+footer*.6, size*.032, footer*.18); });
     return output;

@@ -404,7 +404,7 @@ ConvertTo-Json -InputObject $items -Compress
             first = page.evaluate("""() => ({url: location.href, tokens: !!document.querySelector('link[href="/static/tokens.css"]'),
                 font: getComputedStyle(document.body).fontFamily, setup: !!document.querySelector('#setup-overlay.active'),
                 setup_ready: !document.querySelector('#setup-loading.active')})""")
-            assert '?ui=' in first['url'] and first['tokens'] and 'Roboto' in first['font'] and first['setup'], first
+            assert '?ui=' in first['url'] and first['tokens'] and 'Inter' in first['font'] and first['setup'], first
             page.screenshot(path=str(report / 'clean-first-launch.png'))
             result['clean_first_launch'] = first
             journal('clean-first-launch-verified', **first)

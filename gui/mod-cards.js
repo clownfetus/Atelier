@@ -21,7 +21,7 @@
         await image.decode();if(disposed)return;picture=image;
       }
       const version=await fetch('/api/app_info',{signal:controller.signal}).then(r=>r.json());
-      await document.fonts.load('650 58px "Bricolage Grotesque"');if(disposed)return;
+      await document.fonts.load('600 58px Inter');if(disposed)return;
       const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1240;canvas.className='mod-card-preview';canvas.setAttribute('role','img');canvas.setAttribute('aria-label',snapshot.modName+' mod card');
       const ctx=canvas.getContext('2d');if(!ctx)return;
       const colors=picture instanceof HTMLImageElement?window.AtelierPolish?.samplePalette(picture):[];
@@ -33,17 +33,17 @@
         stamp=new Image();stamp.src='/api/catalogue/hero/'+context.hero+'/kill';
         try{await stamp.decode();if(disposed)return;ctx.drawImage(stamp,876,20,104,104);canvas.dataset.heroBadge=context.hero;}catch(_){}
       }
-      ctx.fillStyle='#eee5cf';ctx.fillRect(0,1000,1000,240);ctx.fillStyle='#121216';ctx.font='650 58px "Bricolage Grotesque",Roboto,sans-serif';ctx.fillText(snapshot.modName,34,1070,930);
+      ctx.fillStyle='#eee5cf';ctx.fillRect(0,1000,1000,240);ctx.fillStyle='#121216';ctx.font='600 58px Inter,sans-serif';ctx.fillText(snapshot.modName,34,1070,930);
       const singular={textures:'texture',materials:'material',meshes:'mesh',curves:'curve',texts:'text',levels:'level',collections:'collection',configs:'config'};
       const count=AtelierModCardData.counts(result.applied),details=Object.entries(count.types).map(([type,n])=>`${n} ${n===1?singular[type]||type:type}`);
       const countLabel=`${count.total} asset${count.total===1?'':'s'}${details.length?' · '+details.join(' · '):''}`;
-      ctx.font='400 24px Roboto,sans-serif';ctx.fillText(countLabel,34,1120,930);
+      ctx.font='400 24px Inter,sans-serif';ctx.fillText(countLabel,34,1120,930);
       const skipped=(result.skipped||[]).length,warning=!result.ok||!!skipped||!!snapshot.skipped;
       if(warning){
         ctx.save();ctx.translate(54,1160);ctx.fillStyle='#9a6b00';ctx.beginPath();ctx.arc(0,-2,16,.7,Math.PI*2-.4);ctx.arc(0,-2,10,Math.PI*2-.4,.7,true);ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(14,13,5,0,Math.PI*2);ctx.fill();ctx.restore();
         ctx.fillStyle='#121216';ctx.fillText(`${skipped} skipped${snapshot.skipped?' · '+snapshot.skipped+' excluded':''}${!result.ok?' · Copy incomplete':''}`,84,1168,870);
       }else ctx.fillText(source,34,1168,930);
-      ctx.font='400 20px Roboto,sans-serif';ctx.fillText(`Built with Atelier ${version.version} · ${builtAt.slice(0,10)}`,34,1212,930);
+      ctx.font='400 20px Inter,sans-serif';ctx.fillText(`Built with Atelier ${version.version} · ${builtAt.slice(0,10)}`,34,1212,930);
       if(disposed)return;
       const card=document.createElement('details');card.className='mod-card';card.open=true;card.dataset.warning=String(warning);const summary=document.createElement('summary');summary.textContent='Mod card';card.append(summary,canvas);
       const stats=document.createElement('p');stats.className='mod-card-stats';

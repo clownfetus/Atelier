@@ -171,7 +171,7 @@ def main():
                 beatMs: AtelierMotion.beatMs, exitMs: AtelierMotion.exitMs,
                 modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley && window.AtelierModCards),
                 folderMotion: !!document.querySelector('link[href$="folder-flap.css"]'),
-                font: document.fonts.check('14px Roboto'),
+                font: document.fonts.check('14px Inter'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
                 emptyTray: document.querySelector('[data-atelier-motion="empty-assets"]')?.getBoundingClientRect().width,
                 singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="logo-entrance"]')]

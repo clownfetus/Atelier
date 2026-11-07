@@ -5,22 +5,6 @@
  * never reach the rest of the interface until it adopts the identity too.
  * Source: the Atelier identity sheet; see docs/DESIGN_SYSTEM.md → Identity.
  */
-@font-face {
-  font-family: 'Instrument Sans';
-  src: url('/static/vendor/instrument-sans/InstrumentSans-Latin.woff2') format('woff2');
-  font-weight: 400 700;
-  font-stretch: 75% 100%;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Fragment Mono';
-  src: url('/static/vendor/fragment-mono/FragmentMono-Latin.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   /* Pigments */
   --at-gesso: #FAF7F0;          /* ground, from the master artwork */
@@ -73,12 +57,11 @@
   --rivals: var(--at-cadmium);          /* the game's name in the lockup, kept apart from caution */
 
   /* Type */
-  --font-display: 'Bricolage Grotesque', 'Arial Narrow', sans-serif;
-  --font-ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'Fragment Mono', 'Cascadia Code', ui-monospace, monospace;
-  --stretch-display: 86%;
-  --type-display: 780 64px/0.94 var(--font-display);
-  --type-headline: 760 36px/1 var(--font-display);
+  --font-display: var(--studio-display);
+  --font-ui: var(--studio-font);
+  --font-mono: var(--studio-mono);
+  --type-display: 600 64px/1.05 var(--font-display);
+  --type-headline: 600 36px/1.05 var(--font-display);
   --type-title: 600 20px/26px var(--font-ui);
   --type-body: 400 14px/21px var(--font-ui);
   --type-label: 600 11px/14px var(--font-ui);   /* uppercase, 0.09em */
@@ -143,7 +126,7 @@
 .at-label {
   font: var(--type-label);
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: var(--studio-label-tracking);
   color: var(--text-muted);
 }
 .at-btn {
@@ -195,9 +178,7 @@
 .at-import-head { display: grid; gap: var(--space-2); }
 .at-import-head h2 {
   margin: 0;
-  font: 760 30px/0.95 var(--font-display);
-  font-stretch: 84%;
-  letter-spacing: -0.02em;
+  font: 600 30px/1.2 var(--font-display);
   color: var(--text);
 }
 /* The stage well: a flat-footed Linen field the ink performs in. */
@@ -344,9 +325,7 @@
 .at-proj-lockup {
   display: inline-flex;
   align-items: baseline;
-  font: 780 clamp(40px, 5vw, 64px)/1 var(--font-display);
-  font-stretch: var(--stretch-display);
-  letter-spacing: -0.03em;
+  font: 600 clamp(40px, 5vw, 64px)/1 var(--font-display);
   color: var(--text);
 }
 /* The mark is the wordmark's A: cap height, sitting on the baseline, set as a letter. */
@@ -362,7 +341,7 @@
   border-radius: 50%; background: var(--drop);
 }
 /* "RIVALS" is bespoke lettering (index.html): its caps fill the x-height band of "telier"
-   (Bricolage's x-height is 0.53em) on the same baseline, so the three parts share one band.
+   (0.53em tall) on the same baseline, so the three parts share one band.
    Its own pigment, never a state colour. */
 .at-proj-rivals {
   display: block;
@@ -377,8 +356,6 @@
   margin: 0 0 0.35em;
   max-width: 24ch;
   font: 600 18px/1.3 var(--font-display);
-  font-stretch: var(--stretch-display);
-  letter-spacing: -0.02em;
   color: var(--text-muted);
   text-wrap: balance;
 }
@@ -422,8 +399,6 @@
 .at-setup-page h1 {
   margin: 0 0 var(--space-3);
   font: var(--type-headline);
-  font-stretch: 84%;
-  letter-spacing: -0.02em;
   color: var(--text);
 }
 .at-setup-page h1:focus:not(:focus-visible) { outline: none; }
@@ -449,7 +424,7 @@
 }
 .at-setup-name { font: 600 15px/20px var(--font-ui); color: var(--text); }
 .at-setup-row[data-state="waiting"] .at-setup-name { color: var(--text-muted); }
-.at-setup-code { margin-left: 6px; font: 400 11px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--text-muted); }
+.at-setup-code { margin-left: 6px; font: 400 11px/1 var(--font-mono); letter-spacing: var(--studio-label-tracking); color: var(--text-muted); }
 .at-setup-detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .at-setup-what { color: var(--text); }
 .at-setup-row[data-state="pending"] .at-setup-what { color: var(--text-muted); }
@@ -558,7 +533,7 @@
   display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4);
   padding: var(--space-5) 0 var(--space-4); border-bottom: 1px solid var(--line); flex-shrink: 0;
 }
-.at-modopen-head h1 { margin: 0; font: var(--type-headline); font-stretch: 84%; letter-spacing: -0.02em; color: var(--text); }
+.at-modopen-head h1 { margin: 0; font: var(--type-headline); color: var(--text); }
 .at-modopen-head h1:focus:not(:focus-visible) { outline: none; }
 .at-modopen-lede { margin: var(--space-2) 0 0; max-width: 70ch; font: 400 15px/22px var(--font-ui); color: var(--text-muted); }
 .at-modopen-head .at-btn { height: 36px; padding: 0 18px; font-size: 14px; flex: none; }
@@ -644,7 +619,7 @@
   color: var(--text);
   font: var(--type-body);
 }
-.modal.at-dialog h2 { margin: 0 0 var(--space-2); font: 760 28px/1 var(--font-display); font-stretch: 84%; letter-spacing: -0.02em; }
+.modal.at-dialog h2 { margin: 0 0 var(--space-2); font: 600 28px/1.2 var(--font-display); }
 .modal.at-proj-name .at-field { height: 36px; font: 400 14px/1 var(--font-ui); }
 .modal.at-dialog p { margin: 0; font: 400 14px/1.55 var(--font-ui); color: var(--text-muted); }
 .modal.at-dialog .proj-name-error { color:var(--fault); }

@@ -32,7 +32,7 @@
 #viewport-head { min-height:65px; padding:8px 18px; gap:14px; background:var(--bg2); position:relative; z-index:10; }
 #viewport-head .vp-icon-button, #viewport-head .sb-clear { padding:7px; width:36px; height:36px; flex:none; border-color:transparent; background:transparent; color:var(--muted); }
 .vp-workspace-identity { min-width:0; margin-right:auto; display:flex; align-items:center; gap:18px; }
-.vp-workspace-label { display:flex; align-items:center; gap:7px; color:var(--acc); font-size:var(--studio-text-micro); font-weight:700; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; border-right:1px solid var(--border2); padding-right:18px; }
+.vp-workspace-label { display:flex; align-items:center; gap:7px; color:var(--acc); font-size:var(--studio-text-micro); font-weight:600; letter-spacing:var(--studio-label-tracking); text-transform:uppercase; white-space:nowrap; border-right:1px solid var(--border2); padding-right:18px; }
 #viewport-head h2 { min-width:0; max-width:none; font-size:16px; font-weight:600; gap:8px; }
 #viewport-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hero-emblem { width:24px; height:24px; object-fit:contain; flex:none; filter:brightness(0) invert(1); }
@@ -265,7 +265,7 @@
 #viewport-show-hidden { pointer-events:auto; }
 #viewport-axes { position:absolute; right:20px;bottom:18px; width:56px;height:56px;pointer-events:none; opacity:.75; }
 #viewport-axes line { stroke:currentColor;stroke-width:1.7; }
-#viewport-axes text { fill:currentColor;font:600 10px Roboto,sans-serif;text-anchor:middle;paint-order:stroke;stroke:var(--bg2);stroke-width:2px; }
+#viewport-axes text { fill:currentColor;font:600 10px var(--studio-font);text-anchor:middle;paint-order:stroke;stroke:var(--bg2);stroke-width:2px; }
 .axis-x { color:#c25a53; }.axis-y { color:#548a65; }.axis-z { color:#4d79ad; }
 :root[data-theme=dark] .axis-x { color:#ef8b82; }:root[data-theme=dark] .axis-y { color:#8ecc9f; }:root[data-theme=dark] .axis-z { color:#99bfff; }
 #viewport-hover { position:absolute; z-index:2; bottom:18px;left:22px;max-width:calc(100% - 120px); padding:8px 11px;border:1px solid var(--border2);border-radius:var(--studio-shape-small);background:var(--bg2);color:var(--text);font-size:var(--studio-text-micro);pointer-events:none;overflow-wrap:anywhere; }

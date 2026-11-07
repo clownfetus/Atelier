@@ -90,7 +90,7 @@ def main():
                   items: typeof allItems === 'undefined' ? 0 : allItems.length,
                   status: document.querySelector('.overlay.active')?.id || '',
                   icons: document.querySelectorAll('svg.lucide').length,
-                  font: document.fonts.check('14px Roboto'),
+                  font: document.fonts.check('14px Inter'),
                   logo: document.querySelector('.studio-brand img')?.naturalWidth || 0,
                   renderer: navigator.userAgent
                 })""")

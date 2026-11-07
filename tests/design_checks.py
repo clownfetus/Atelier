@@ -1,5 +1,52 @@
 """Material foundation checks run inside browser_smoke's real Bottle/Chromium session."""
 
+import re
+from pathlib import Path
+
+GUI = Path(__file__).resolve().parent.parent / 'gui'
+
+
+def source_files(*patterns):
+    for pattern in patterns:
+        for path in GUI.rglob(pattern):
+            if 'vendor' not in path.relative_to(GUI).parts:
+                yield path
+
+
+def assert_type_system(page):
+    # Static scan first: only uppercase labels are tracked, and the retired faces stay gone.
+    tracked = re.compile(r'letter-spacing\s*:\s*([^;}]+)')
+    for path in source_files('*.css'):
+        text = path.read_text(encoding='utf-8')
+        for value in tracked.findall(text):
+            assert value.strip() in ('var(--studio-label-tracking)', '0'), (path.name, value)
+        assert 'font-stretch' not in text and "'wdth'" not in text, path.name
+    retired = re.compile(r'\b(Bricolage|Roboto|Instrument Sans)\b')
+    for path in source_files('*.css', '*.js', '*.html'):
+        assert not retired.search(path.read_text(encoding='utf-8')), path.name
+
+    # One file carries both cuts, so the optical size axis has to follow the text's size.
+    fonts = page.evaluate('''async () => {
+      await document.fonts.load('400 64px Inter');
+      const width = (size, settings) => {
+        const probe = document.createElement('span');
+        probe.textContent = 'Hamburgefonstiv Atelier 0123';
+        probe.style.cssText = `position:absolute;white-space:nowrap;font:400 ${size}px Inter;font-optical-sizing:auto;`
+          + (settings ? `font-variation-settings:${settings};` : '');
+        document.body.append(probe);
+        const result = probe.getBoundingClientRect().width;
+        probe.remove();
+        return result;
+      };
+      return {body: getComputedStyle(document.body).fontFamily,
+        small: width(14), smallText: width(14, "'opsz' 14"),
+        large: width(64), largeText: width(64, "'opsz' 14"), largeDisplay: width(64, "'opsz' 32")};
+    }''')
+    assert fonts['body'].startswith('Inter'), fonts
+    assert abs(fonts['small'] - fonts['smallText']) < .5, fonts
+    assert abs(fonts['large'] - fonts['largeDisplay']) < .5, fonts
+    assert fonts['largeText'] - fonts['largeDisplay'] > 10, fonts
+
 
 def measure_contrast(page):
     return page.evaluate('''() => {
@@ -57,7 +104,9 @@ def run_design_checks(page, context, url, report, checks):
         picker.select_option(theme)
         page.locator('#setup-close').click()
     page.set_viewport_size({'width': 1400, 'height': 900})
-    page.wait_for_function('document.fonts.check("14px Roboto")')
+    page.wait_for_function('document.fonts.check("14px Inter")')
+    assert_type_system(page)
+    checks.append('Inter is the interface face, optical size follows the text, only uppercase labels are tracked')
     page.evaluate("pushNav({path:'Foundation checks'})")
     assert page.evaluate('document.querySelector(".studio-brand img").naturalWidth') > 0
     for theme in ('light', 'dark'):

@@ -172,7 +172,8 @@ existing contrast checks pass.
     runs once, in Full only, and never turns green or clicks; a glyph mounted in `busy`
     never shows an A; a loader only runs when a surface names its asset type, and hands
     over only on a real event.
-  - A `--assembly-only` flag in `tests/browser_smoke.py`.
+  - A `--glyph-only` flag in `tests/browser_smoke.py`. (`--assembly-only` already
+    belongs to the Assembly workspace.)
 
 **Gate:** Preview motion runs all five states and the loaders at all three sizes; film strips
 (`reference/checks/state_film.py`) match the prototype; 30 Micro glyphs cost

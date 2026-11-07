@@ -767,7 +767,7 @@ body {
 }
 .setup-help-btn:hover { border-color: var(--acc); color: var(--text); }
 .setup-section {
-  font-size: var(--studio-text-micro); text-transform: uppercase; letter-spacing: .7px;
+  font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking);
   color: var(--muted); margin: 4px 0 2px;
   border-bottom: 1px solid var(--border); padding-bottom: 4px;
 }
@@ -788,7 +788,7 @@ body {
 .mat-head h2 i { color: var(--green); }
 .mat-subpath { font-size: var(--studio-text-micro); color: var(--muted); margin-top: 3px; word-break: break-all; }
 .mat-body { padding: 6px 20px 14px; overflow-y: auto; max-height: 62vh; }
-.mat-section { font-size: var(--studio-text-micro); text-transform: uppercase; letter-spacing: .7px;
+.mat-section { font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking);
                color: var(--muted); margin: 14px 0 4px; border-bottom: 1px solid var(--border);
                padding-bottom: 4px; }
 .mat-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
@@ -1266,7 +1266,7 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 .shader-search svg { color: var(--muted); }
 .shader-search input {
   background: none; border: none; outline: none; color: var(--text);
-  font-size: var(--studio-text-detail); font-family: ui-monospace, monospace; width: 180px;
+  font-size: var(--studio-text-detail); font-family: var(--studio-mono); width: 180px;
 }
 #shader-count { margin-left: auto; font-size: var(--studio-text-detail); }
 
@@ -1283,16 +1283,16 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 .shader-row:hover { background: var(--bg3); }
 .shader-row.sel { background: color-mix(in srgb, var(--acc) 22%, var(--bg2)); }
 .sh-badge {
-  font-size: var(--studio-text-micro); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 6px; border-radius: var(--studio-shape-xs); flex-shrink: 0; width: 52px; text-align: center;
+  font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking);
+  padding: 2px 4px; border-radius: var(--studio-shape-xs); flex-shrink: 0; width: 76px; text-align: center;
   background: var(--bg); color: var(--muted); border: 1px solid var(--border2);
 }
 .sh-badge.pix { color: var(--acc2); border-color: color-mix(in srgb, var(--acc2) 45%, transparent); }
 .sh-badge.vtx { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); }
 .sh-badge.cmp { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
 .sh-idx  { color: var(--muted); width: 58px; flex-shrink: 0; }
-.sh-hash { font-family: ui-monospace, monospace; color: var(--text); flex: 1; }
-.sh-size { color: var(--muted); font-family: ui-monospace, monospace; }
+.sh-hash { font-family: var(--studio-mono); color: var(--text); flex: 1; }
+.sh-size { color: var(--muted); font-family: var(--studio-mono); }
 
 .shader-foot {
   display: flex; align-items: center; justify-content: center; gap: 14px;
@@ -1311,7 +1311,7 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
   font-size: var(--studio-text-micro); color: var(--muted); background: var(--bg3);
   border: 1px solid var(--border2); border-radius: var(--studio-shape-small); padding: 2px 8px;
 }
-.sh-chip code { color: var(--text); font-family: ui-monospace, monospace; }
+.sh-chip code { color: var(--text); font-family: var(--studio-mono); }
 #shader-disasm {
   flex: 1; overflow: auto; margin: 0; padding: 14px 16px;
   font-family: var(--studio-mono); font-size: var(--studio-text-detail); line-height: 1.5;
@@ -1342,15 +1342,15 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
   color: var(--text); margin-bottom: 6px;
 }
 .sh-sec-h svg { color: var(--acc); }
-.sh-sec-h code { font-family: ui-monospace, monospace; color: var(--acc2); }
+.sh-sec-h code { font-family: var(--studio-mono); color: var(--acc2); }
 .sh-sec-h .pm { margin-left: auto; font-weight: 400; }
 .sh-tbl { width: 100%; border-collapse: collapse; font-size: var(--studio-text-detail); }
 .sh-tbl td { padding: 4px 8px; border-bottom: 1px solid var(--bg2); vertical-align: middle; }
-.sh-tbl .pk { font-family: ui-monospace, monospace; color: var(--text); white-space: nowrap; }
+.sh-tbl .pk { font-family: var(--studio-mono); color: var(--text); white-space: nowrap; }
 .sh-tbl .pm { color: var(--muted); white-space: nowrap; }
 .sh-pval {
   width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--studio-shape-small);
-  color: var(--text); font-family: ui-monospace, monospace; font-size: var(--studio-text-detail); padding: 4px 8px;
+  color: var(--text); font-family: var(--studio-mono); font-size: var(--studio-text-detail); padding: 4px 8px;
 }
 .sh-pval:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -1358,14 +1358,14 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 #shader-edit { flex: 1; overflow: auto; padding: 12px 16px; display: none; }
 .sh-eval {
   width: 120px; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--studio-shape-small);
-  color: var(--text); font-family: ui-monospace, monospace; font-size: var(--studio-text-detail); padding: 4px 8px;
+  color: var(--text); font-family: var(--studio-mono); font-size: var(--studio-text-detail); padding: 4px 8px;
 }
 .sh-eval:focus { border-color: var(--acc); outline: none; }
 .sh-buildrow { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 
 /* Shader Studio â€” used badge + sticky build row */
 .sh-used {
-  font-size: var(--studio-text-micro); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking);
   color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
   border-radius: var(--studio-shape-xs); padding: 1px 6px;
 }
@@ -1383,7 +1383,7 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
   padding: 10px 12px; resize: vertical; white-space: pre; overflow: auto; tab-size: 4;
 }
 .sh-ir:focus { border-color: var(--acc); outline: none; }
-.sh-note code { font-family: ui-monospace, monospace; color: var(--acc2); }
+.sh-note code { font-family: var(--studio-mono); color: var(--acc2); }
 
 /* Phase 4 â€” per-asset export options, and the "what did my install actually ship" note */
 .muted { color: var(--muted); }
@@ -1408,8 +1408,8 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 
 /* a texture whose export has been altered must say so where the user can see it */
 .sb-opt {
-  display: inline-block; margin-left: 5px; font-size: var(--studio-text-micro); font-weight: 700;
-  text-transform: uppercase; letter-spacing: .04em; color: var(--acc2);
+  display: inline-block; margin-left: 5px; font-size: var(--studio-text-micro); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--studio-label-tracking); color: var(--acc2);
   border: 1px solid color-mix(in srgb, var(--acc2) 45%, transparent);
   border-radius: var(--studio-shape-xs); padding: 0 4px; vertical-align: 1px;
 }
@@ -1422,7 +1422,7 @@ button:disabled { cursor: default; }
 button svg, .btn svg { flex-shrink: 0; width: var(--studio-icon-size); height: var(--studio-icon-size); }
 .studio-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 .studio-brand { display: flex; align-items: center; gap: 10px; margin-right: 24px; flex-shrink: 0; }
-.studio-brand span { font-size: 18px; font-weight: 600; letter-spacing: -.35px; }
+.studio-brand span { font-size: 18px; font-weight: 600; }
 .studio-brand img { display: block; object-fit: contain; }
 /* Apply to the static fallback and the animated mark without filtering artwork. */
 :root { --studio-brand-color: #000; --studio-brand-filter: brightness(0); }
@@ -1512,7 +1512,7 @@ select:focus-visible { border-color: var(--acc); }
 .setup-advanced { margin-top: 16px; }
 .setup-advanced summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
 .setup-step h3 { display: flex; align-items: center; gap: 10px; font-size: 24px; margin: 6px 0 12px; }
-.setup-step-count { color: var(--muted); font-size: var(--studio-text-micro); text-transform: uppercase; letter-spacing: .12em; }
+.setup-step-count { color: var(--muted); font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking); }
 .setup-step-status { color: var(--text); font-size: var(--studio-text-label); }
 .setup-step-glyph { display: inline-flex; width: 24px; height: 24px; }
 .setup-step-nav { display: inline-flex; gap: 8px; }

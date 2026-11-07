@@ -6,6 +6,6 @@ identity sheet (v1.0), which carries Google Fonts' Latin subset (regular 400).
 The browser makes no runtime font request.
 
 - Upstream: https://github.com/weiweihuanghuang/fragment-mono
-- Used by the identity data role (`--font-mono` in `gui/identity.css`).
+- Used by `--studio-mono` in `gui/tokens.css`.
 
 SHA-256: `44c4e39bff5e76652a24a872cbebabccbcfb20f62c4633b27c1f2745cba86b56`

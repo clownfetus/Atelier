@@ -14,7 +14,7 @@ def run_surfaces_checks(page,context,url,report,checks):
     try:
         tab.goto(url);tab.wait_for_selector('#grid-area .card')
         stored=tab.evaluate("Object.fromEntries(['motion','theme','appearance'].map(key=>['atelier.'+key,localStorage.getItem('atelier.'+key)]))")
-        assert tab.evaluate("document.fonts.load('650 24px \"Bricolage Grotesque\"').then(f=>f.length>0)")
+        assert tab.evaluate("document.fonts.load('600 24px Inter').then(f=>f.length>0)")
         assert tab.locator('#explorer').evaluate('el=>getComputedStyle(el).borderRadius')=='6px'
         assert 'Mod tray' in tab.locator('#sidebar-header').inner_text()
         assert 'Build mod' in tab.locator('#install-btn').inner_text()
