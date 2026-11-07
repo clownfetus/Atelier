@@ -89,13 +89,15 @@ _HOME_CONTENT_LOCK = threading.Lock()
 
 
 def _home_content():
-    """Browsable roots from the loaded index, cached until that index is replaced."""
+    """What the loaded index can show, cached until that index is replaced: the lower-cased path of
+    every folder with a listed asset beneath it at any depth, then whether the curated Nameplates
+    and Text sections have content."""
     global _HOME_CONTENT
     index = ensure_index()
     with _HOME_CONTENT_LOCK:
         if _HOME_CONTENT is not None and _HOME_CONTENT[0] is index:
             return _HOME_CONTENT[1:]
-        roots, nameplates, text = set(), False, False
+        listed, nameplates, text = set(), False, False
         plate_prefixes = tuple(path.casefold() + '/' for path, _ in NAMEPLATE_PATHS)
         for game_rel, _container, _mount in index:
             if not game_rel.lower().endswith('.uasset'):
@@ -106,12 +108,28 @@ def _home_content():
                 text = True
             if _classify_file(name, path) not in LISTED_FILE_TYPES:
                 continue
-            if path:
-                roots.add(game_rel.split('/', 1)[0].casefold())
+            folder = path.lower()
+            while folder and folder not in listed:   # a folder already seen has its parents too
+                listed.add(folder)
+                folder = folder.rpartition('/')[0]
             if lower.startswith(plate_prefixes):
                 nameplates = True
-        _HOME_CONTENT = (index, roots, nameplates, text)
-        return roots, nameplates, text
+        _HOME_CONTENT = (index, listed, nameplates, text)
+        return listed, nameplates, text
+
+
+def _project_folders(rel_path):
+    """Lower-cased names of the folders directly under rel_path where the active project keeps a
+    file. A project mirrors game paths, so this keeps a folder visible for an imported copy the
+    index can't vouch for: one the game has since removed, or a texture imported through a material
+    whose name isn't listed. A directory the project has emptied doesn't count."""
+    try:
+        with os.scandir(project_base(rel_path) if rel_path else get_import_root()) as found:
+            folders = [entry for entry in found if entry.is_dir()]
+    except (OSError, ValueError):
+        return set()
+    return {entry.name.lower() for entry in folders
+            if any(files for _dir, _subdirs, files in os.walk(entry.path))}
 
 def _parse_char_md_text(text):
     """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
@@ -285,9 +303,13 @@ def _browse_pak_level(rel_path):
     # costs a dict lookup instead of a walk of every indexed asset.
     from atelier.index import children
     folders, files = children(rel_path)
+    listed = _home_content()[0]
+    in_project = _project_folders(rel_path)
 
     result = []
     for fname_lower in sorted(folders):
+        if search_pfx + fname_lower not in listed and fname_lower not in in_project:
+            continue
         fname = folders[fname_lower]
         label = _label_folder(rel_path, fname)
         child = f"{rel_path}/{fname}" if rel_path else fname
@@ -342,12 +364,18 @@ def _browse_skin(skin_id, subpath):
             gr = game_rel_for_skin(skin_id, (prefix + rest).strip("/"))
             files[rest] = {"rel_path": (prefix + rest).strip("/"), "game_rel": gr}
 
+    listed = _home_content()[0]
+    in_project = _project_folders(game_rel_for_skin(skin_id, subpath).rstrip("/"))
+
     result = []
     for name in sorted(folders, key=str.lower):
-        result.append({"type": "folder", "name": name, "label": name, "rel_path": folders[name]})
+        if game_rel_for_skin(skin_id, folders[name]).lower() in listed or name.lower() in in_project:
+            result.append({"type": "folder", "name": name, "label": name, "rel_path": folders[name]})
     for name in sorted(files, key=str.lower):
         td     = files[name]
-        ft     = _classify_file(name, td["rel_path"])
+        # By its folder, as every other listing classifies. The asset's own path would make one
+        # named "Textures" a texture here, inside a folder _home_content counts as empty.
+        ft     = _classify_file(name, subpath)
         if ft not in LISTED_FILE_TYPES:        # hide meshes/curves/blueprints/vfx/etc.
             continue
         is_mat   = ft == "material"
@@ -423,10 +451,10 @@ def _browse_game_dispatch(path):
     """Unified browse entry point. path is relative to Marvel/Content/Marvel/."""
     path = (path or "").strip("/")
     if not path:
-        roots, nameplates, text = _home_content()
+        _listed, nameplates, text = _home_content()
         synthetic = {'maps', 'text', 'nameplates'}
         res = [item for item in _browse_pak_level('') if item['type'] != 'folder'
-               or (item['name'].casefold() in roots and item['name'].casefold() not in synthetic)]
+               or item['name'].casefold() not in synthetic]
         if nameplates:
             res.insert(0, {"type": "folder", "name": "Nameplates",
                            "label": "Nameplates (all three paths)", "rel_path": "Nameplates"})
