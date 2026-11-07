@@ -174,7 +174,7 @@ def main():
                 font: document.fonts.check('14px Inter'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
                 emptyTray: document.querySelector('[data-atelier-motion="empty-assets"]')?.getBoundingClientRect().width,
-                singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="logo-entrance"]')]
+                singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="glyph"]')]
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info

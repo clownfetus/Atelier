@@ -1,96 +1,88 @@
-/* Startup presentation only. Never delays init(), APIs, projects or indexing. */
+/* Startup presentation only. Never delays init(), APIs, projects or indexing.
+   The header logo builds itself once on launch in Full motion, then hands over to the still mark (SPEC 4.8). */
 (() => {
   'use strict';
   if (window.AtelierLogoEntranceUI) return;
-  let started = false, destroyed = false, ready = false, startupHeld = false, pending = null, instance, host, fallback;
-  const hidden = () => document.hidden || document.visibilityState === 'hidden';
-  const reduced = () => (window.AtelierMotionPolicy?.query() || window.matchMedia?.('(prefers-reduced-motion: reduce)')).matches;
-  // The startup entrance is a showcase moment, so it plays only in Full; an explicit replay still plays in Calm.
-  const showcase = () => !reduced() && window.AtelierMotionPolicy?.allows(2) !== false;
+  let started = false, destroyed = false, held = false, waiting = false, restarted = false;
+  let entrance = null, host = null, mark = null;
 
-  function enterPending() {
-    if (destroyed || !ready || startupHeld || !pending) return;
-    const request = pending; pending = null;
-    if (hidden() || reduced() || request === 'startup' && !showcase()) return;
-    instance?.replay();
+  function clear() {
+    entrance?.destroy(); entrance = null;
+    host?.remove(); host = null;
   }
+  // The mark stays in place, unseen, until the pieces have built it, so it never shows twice.
+  function showMark() {
+    if (mark) { mark.hidden = false; mark.style.visibility = ''; }
+  }
+  const handOver = () => { clear(); showMark(); };
+
+  function enter() {
+    if (destroyed || !waiting || held) return;
+    waiting = false;
+    if (document.hidden || !window.AtelierMotion?.glyph) { showMark(); return; }
+    host = document.createElement('span');
+    host.setAttribute('aria-hidden', 'true');
+    mark.after(host);
+    try {
+      const size = parseFloat(getComputedStyle(mark).height) || 32.4;
+      entrance = window.AtelierMotion.glyph.entrance(host, {size, preview: restarted, onDone: handOver});
+      if (entrance) {
+        // The mark's own width, so the wordmark beside it doesn't move at the handover.
+        host.style.width = `${size * mark.naturalWidth / mark.naturalHeight}px`;
+        host.style.flex = 'none';
+        mark.hidden = true;
+      }
+    } catch (_) { handOver(); }
+  }
+  // The launch stage goes first. An entrance it interrupts plays in full afterwards; one that has finished doesn't repeat.
   function holdStartup() {
-    if (destroyed || startupHeld) return;
-    startupHeld = true;
-    if (started && fallback && !hidden() && showcase()) pending = 'startup';
-    instance?.setState('settled');
+    if (destroyed || held) return;
+    held = true;
+    if (entrance) {
+      clear();
+      mark.hidden = false; mark.style.visibility = 'hidden';
+      waiting = restarted = true;
+    }
   }
   function startupDone() {
-    startupHeld = false;
-    enterPending();
+    held = false;
+    enter();
   }
-  function onVisibility() { if (hidden()) pending = null; }
-  function restore() {
-    if (fallback) { fallback.hidden = false; fallback.classList.remove('am-logo-entrance-fallback'); }
-    if (host) host.hidden = true;
+  function onVisibility() {
+    if (document.hidden && waiting) { waiting = false; showMark(); }
   }
   function destroy() {
     if (destroyed) return;
     destroyed = true;
-    pending = null;
+    waiting = false;
     document.removeEventListener('DOMContentLoaded', start);
     document.removeEventListener('visibilitychange', onVisibility);
     window.removeEventListener('pagehide', destroy);
-    fallback?.removeEventListener('load', mount);
-    fallback?.removeEventListener('error', restore);
-    instance?.destroy(); restore(); host?.remove();
+    mark?.removeEventListener('load', ready);
+    mark?.removeEventListener('error', failed);
+    handOver();
   }
-  function mount() {
-    fallback?.removeEventListener('load', mount);
-    fallback?.removeEventListener('error', restore);
-    if (destroyed || hidden() || reduced() || !fallback?.naturalWidth ||
-        typeof Element.prototype.animate !== 'function' || !window.AtelierMotion?.logoEntrance) return;
-    const brand = fallback.parentElement;
-    if (!brand?.isConnected) return;
-    host = document.createElement('span'); host.hidden = true;
-    host.dataset.atelierMotion = 'logo-entrance'; host.setAttribute('aria-hidden', 'true');
-    fallback.after(host);
-    fallback.classList.add('am-logo-entrance-fallback');
-    try {
-      instance = window.AtelierMotion.logoEntrance.mount(host, {
-        state: 'settled', reducedMotion: 'system', logoSrc: fallback.currentSrc || fallback.src,
-      });
-      const owned = instance;
-      owned.ready.then(() => {
-        if (destroyed || owned !== instance || !host.isConnected || hidden() || reduced()) {
-          owned.destroy(); restore(); return;
-        }
-        // Exchange equal-size slots in one task, with no duplicated visible mark.
-        host.hidden = false; fallback.hidden = true;
-        ready = true;
-        enterPending();
-      }).catch(() => { if (!destroyed && owned === instance) { owned.destroy(); restore(); } });
-    } catch (_) { instance?.destroy(); restore(); }
+  function failed() { waiting = false; showMark(); }
+  function ready() {
+    if (mark.naturalWidth) enter();
+    else failed();
   }
   function start() {
     if (started || destroyed) return;
-    started = true; // Record before waiting/mounting: a hidden startup never replays later.
-    fallback = document.querySelector('#topbar .studio-brand > img');
-    const brand = fallback?.parentElement;
-    if (brand) {
-      brand.setAttribute('role','button'); brand.tabIndex=0; brand.setAttribute('aria-label','Replay Atelier logo entrance');
-      const replay = () => {
-        if (destroyed || hidden() || reduced() || startupHeld) return;
-        pending = 'replay';
-        if (instance) enterPending();
-        else mount();
-      };
-      brand.addEventListener('click', replay);
-      brand.addEventListener('keydown', event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();replay();}});
+    started = true; // Record before waiting: a hidden startup never plays later.
+    mark = document.querySelector('#topbar .studio-brand > img');
+    if (!mark || document.hidden || !window.AtelierMotion?.glyph || (window.AtelierMotionPolicy && window.AtelierMotionPolicy.mode() !== 'full')) return;
+    waiting = true;
+    mark.style.visibility = 'hidden';
+    if (mark.complete) ready();
+    else {
+      mark.addEventListener('load', ready, {once: true});
+      mark.addEventListener('error', failed, {once: true});
     }
-    if (!fallback || hidden() || !showcase() || !window.AtelierMotion?.logoEntrance) return;
-    pending = 'startup';
-    if (fallback.complete) { if (fallback.naturalWidth) mount(); }
-    else { fallback.addEventListener('load', mount, { once: true }); fallback.addEventListener('error', restore, { once: true }); }
   }
-  window.AtelierLogoEntranceUI = Object.freeze({ start, destroy, holdStartup, startupDone });
+  window.AtelierLogoEntranceUI = Object.freeze({start, destroy, holdStartup, startupDone});
   document.addEventListener('visibilitychange', onVisibility);
-  window.addEventListener('pagehide', destroy, { once: true });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  window.addEventListener('pagehide', destroy, {once: true});
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
   else start();
 })();

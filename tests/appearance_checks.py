@@ -7,7 +7,7 @@ def assert_brand_follows_theme(tab):
       const brand = document.querySelector('.studio-brand'), probe = document.createElement('span');
       probe.style.color = 'var(--text)'; document.body.append(probe);
       const text = getComputedStyle(probe).color; probe.remove();
-      const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="logo-entrance"]')];
+      const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="glyph"]')];
       return {text, letters: getComputedStyle(brand.querySelector('.studio-wordmark')).color,
               filters: marks.map(mark => getComputedStyle(mark).filter),
               signature: getComputedStyle(document.documentElement).getPropertyValue('--library-signature-filter')};

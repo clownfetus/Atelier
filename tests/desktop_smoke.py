@@ -275,7 +275,7 @@ def main():
                 logo_motion = window.evaluate_js("""(() => {
                   const {host, instance} = window.__desktopLogoMotion;
                   const brand = document.querySelector('.studio-brand');
-                  const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="logo-entrance"]')]
+                  const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="glyph"]')]
                     .filter(el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0);
                   const visibleWidth = marks[0]?.getBoundingClientRect().width;
                   const result = {width:Math.round(host.getBoundingClientRect().width), state:host.dataset.amState,
@@ -326,7 +326,7 @@ def main():
                   const theme=document.getElementById('settings-theme');theme.value='dark';theme.dispatchEvent(new Event('change'));
                   return {same,repeated,staticMotion,segments,newPalette,compact:document.documentElement.dataset.density==='compact',
                     continuity:typeof AtelierContinuity.closeEditor==='function',roster:typeof AtelierRoster.show==='function',
-                    logoReplay:document.querySelector('.studio-brand').getAttribute('role')==='button'};
+                    logoStill:document.querySelector('.studio-brand').getAttribute('role')==='img'};
                 })()""")
                 assert all(polish.values()), polish
                 deadline=time.monotonic()+5

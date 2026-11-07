@@ -40,7 +40,6 @@
 .mat-row label:has(input[type=color]) { position:relative; }
 .swatch-wipe { position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:2; }
 .mat-color-well { position:relative; display:inline-flex; flex:0 0 auto; border-radius:var(--studio-shape-xs); background-color:var(--bg2); background-image:conic-gradient(var(--border) 25%,transparent 0 50%,var(--border) 0 75%,transparent 0); background-size:8px 8px; }
-.studio-brand[role=button] { cursor:pointer; }
 .toast { position:relative; overflow:hidden; }
 .toast-timed::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--acc); transform-origin:left; animation:toast-timer var(--toast-duration) linear forwards; }
 .toast-timed:hover::after { animation-play-state:paused; }
