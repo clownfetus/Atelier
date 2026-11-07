@@ -6,8 +6,6 @@
 }
 .roster-portrait strong,.roster-portrait .roster-counts { width:100%; background:var(--bg2); }
 
-#sel-count {display:inline-flex;align-items:center;gap:5px;}
-#sel-count::before {content:'';width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 28%,#eee5cf 0 1px,transparent 1.2px),radial-gradient(circle at 65% 68%,#121216 0 2px,transparent 2.2px),var(--krackle-charge);}
 /* Update drops sit in the topbar row before Activity, so toolbar labels never collide with them. */
 .k-update-drop {flex:0 0 auto;width:36px;height:36px;margin-left:8px;padding:0;border:1px solid var(--border);border-radius:var(--studio-shape-small);background:transparent;color:var(--krackle-charge);cursor:pointer;display:grid;place-items:center;}
 .k-update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}

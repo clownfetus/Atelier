@@ -63,6 +63,11 @@ def run_retired_surfaces_checks(context, url, report, checks):
         assert swap['swapped'] and swap['after'] == 0 and not swap['carriesData'], swap
         checks.append('A changed texture cross-fades and leaves no copy of itself behind')
 
+        # The selection count is the number alone, with no bubble beside it.
+        bubble = tab.evaluate("getComputedStyle(document.getElementById('sel-count'), '::before').content")
+        assert bubble in ('none', 'normal'), bubble
+        checks.append('The selection count is the number alone')
+
         # The plain folder stands still.
         folder = tab.evaluate("""() => {
           const card = document.createElement('button'); card.className = 'card'; card.type = 'button';
