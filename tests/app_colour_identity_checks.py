@@ -280,7 +280,7 @@ def synthetic(browser, args, report, results, errors, mode, custom):
         assert all(contract[key] is None for key in ['unloaded', 'transparent', 'inaccessible']), contract
         assert contract['grey'] == contract['sample'] == '#808080', contract
         assert contract['detail'] == {'accent': '#808080', 'colors': ['#808080']}, contract
-        assert all(name in contract['exports'] for name in ['sample', 'samplePalette', 'accent', 'artwork', 'count', 'fly', 'exported', 'empty', 'leave']), contract
+        assert all(name in contract['exports'] for name in ['sample', 'samplePalette', 'accent', 'artwork', 'count', 'fly', 'empty', 'leave']), contract
 
         # The path returns to A with different art while A's old requests are pending.
         page.evaluate("""()=>{

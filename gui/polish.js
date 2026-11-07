@@ -5,8 +5,6 @@
   const mounts = new Map();
   const drains = new Set();
   const clearDrains = () => { for (const dispose of [...drains]) dispose(); };
-  const receipts = new Set();
-  const clearReceipts = () => { for (const dispose of [...receipts]) dispose(); };
   function mount(host, {frames = [], duration = 160, state = 'idle', easing = window.AtelierMotion.ease.standard} = {}) {
     mounts.get(host)?.destroy(); let animation = null, destroyed = false;
     const instance = {
@@ -32,10 +30,9 @@
   };
   window.AtelierMotion ||= {}; window.AtelierMotion.polish = Object.freeze({mount});
   window.AtelierMotionPolicy?.query().addEventListener('change', () => { if (reduced()) for (const instance of mounts.values()) instance.destroy(); });
-  window.AtelierMotionPolicy?.query().addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(2)) clearDrains(); });
-  window.AtelierMotionPolicy?.query().addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(3)) clearReceipts(); });
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearDrains();clearReceipts();for(const instance of mounts.values())instance.destroy();}});
-  window.addEventListener('pagehide',()=>{clearDrains();clearReceipts();});
+  window.AtelierMotionPolicy?.query().addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(1)) clearDrains(); });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearDrains();for(const instance of mounts.values())instance.destroy();}});
+  window.addEventListener('pagehide',()=>{clearDrains();});
   window.addEventListener('pagehide', () => { removals.disconnect(); for (const instance of mounts.values()) instance.destroy(); });
 
   function count(host, value) {
@@ -161,102 +158,6 @@
       }
     }
   }
-  let burstQueued=false;
-  function exported() {
-    if(!window.AtelierMotionPolicy?.allows(3)||document.hidden)return;
-    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return; } catch (_) {}
-    const colors = [...new Set([...document.querySelectorAll('.sb-item.selected img')].map(sample).concat(
-      [...document.querySelectorAll('.sb-item.selected [data-swatch-color]')].map(node=>node.dataset.swatchColor)).filter(Boolean))].slice(0,6);
-    if (!colors.length) return;
-    // The export review owns the moment while open. The seal waits for its actual
-    // receiver to be visible after the overlay's exit and stage release.
-    const overlay=document.getElementById('export-review-overlay');
-    if (overlay?.classList.contains('active')) {
-      if (burstQueued) return;
-      burstQueued=true;
-      const closed=()=>{
-        if (overlay.classList.contains('active')) return;
-        document.removeEventListener('atelier:export-review',closed); burstQueued=false;
-        let tries=0; const attempt=()=>{ if(!burst(colors)&&++tries<5) setTimeout(attempt,150); };
-        setTimeout(attempt,140);
-      };
-      document.addEventListener('atelier:export-review',closed);
-      return;
-    }
-    burst(colors);
-  }
-  // Returns false only when the moment was refused, so a deferred burst can retry.
-  function burst(colors) {
-    if(!window.AtelierMotionPolicy?.allows(3)||document.hidden)return true;
-    try { if (localStorage.getItem('atelier.firstExportCelebrated')) return true; } catch (_) {}
-    const release=window.AtelierMotion?.moment?.claim('first-export',3);if(!release)return false;
-    try{localStorage.setItem('atelier.firstExportCelebrated','1');}catch(_){}
-    const button=document.getElementById('install-btn');
-    if(!button?.isConnected||!button.getClientRects().length){release();return true;}
-    // Keep the exported hues readable even when one matches the button's paint.
-    const rect=button.getBoundingClientRect(),slot=button.querySelector('.export-feedback-slot')?.getBoundingClientRect();
-    const w=rect.width,h=rect.height,seam=h-4.5;
-    const sourceX=slot?.width?slot.x-rect.x+slot.width/2:7;
-    const sourceY=slot?.height?Math.min(seam,slot.y-rect.y+slot.height*.72):seam;
-    const sealWidth=Math.min(64,w*.28),sealX=Math.max(sourceX+8,w/2-sealWidth*.22),sealEnd=Math.min(w-8,sealX+sealWidth);
-    const elbow=Math.min(6,Math.max(0,seam-sourceY),Math.max(0,sealX-sourceX));
-    const ns='http://www.w3.org/2000/svg',id='export-receipt-'+Math.round(performance.now()*1000);
-    const node=(tag,attrs={})=>{const element=document.createElementNS(ns,tag);for(const [key,value] of Object.entries(attrs))element.setAttribute(key,String(value));return element;};
-    const svg=node('svg',{class:'export-color-moment',viewBox:`0 0 ${w} ${h}`,width:w,height:h,'aria-hidden':'true',focusable:'false'});
-    svg.inert=true;Object.assign(svg.style,{left:rect.left+'px',top:rect.top+'px',width:w+'px',height:h+'px',borderRadius:getComputedStyle(button).borderRadius});
-    const defs=node('defs'),gradient=node('linearGradient',{id:id+'-ink',gradientUnits:'userSpaceOnUse',x1:sourceX,y1:seam,x2:sealEnd,y2:seam});
-    // Hard stops keep each sampled ink flat while sharing one continuous silhouette.
-    colors.forEach((color,index)=>{
-      gradient.append(node('stop',{offset:index/colors.length,'stop-color':color}),node('stop',{offset:(index+1)/colors.length,'stop-color':color}));
-    });
-    const mask=node('mask',{id:id+'-content',maskUnits:'userSpaceOnUse',x:0,y:0,width:w,height:h});
-    mask.append(node('rect',{x:0,y:0,width:w,height:h,fill:'white'}));
-    // Protect the actual label rectangles, including localized or wrapping labels.
-    const walker=document.createTreeWalker(button,NodeFilter.SHOW_TEXT);
-    while(walker.nextNode()){
-      const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.export-feedback-slot'))continue;
-      const range=document.createRange();range.selectNodeContents(text);
-      for(const box of range.getClientRects())mask.append(node('rect',{class:'export-receipt-content-cutout',x:box.left-rect.left-1,y:box.top-rect.top-1,width:box.width+2,height:box.height+2,fill:'black'}));
-    }
-    defs.append(gradient,mask);svg.append(defs);
-    const ink='url(#'+id+'-ink)',body=node('g',{mask:'url(#'+id+'-content)'});
-    const source=node('g',{class:'export-receipt-source'});
-    source.append(node('path',{d:`M${sourceX-4} ${sourceY}a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M${sourceX+.1} ${sourceY+.7}a1.3 1.3 0 1 0 2.6 0a1.3 1.3 0 1 0 -2.6 0`,fill:colors[0],'fill-rule':'evenodd'}));
-    const flow=node('path',{class:'export-receipt-flow',d:`M${sourceX} ${sourceY}V${seam-elbow}Q${sourceX} ${seam} ${sourceX+elbow} ${seam}H${sealX+4}`,fill:'none',stroke:ink,'stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:1,'stroke-dasharray':'1 1','stroke-dashoffset':1});
-    // A single connected seal, with a cluster of holes cut through its right lobe.
-    let sealPath=`M${sealX+4} ${seam-3}H${sealEnd-5}Q${sealEnd+1} ${seam-3} ${sealEnd} ${seam}Q${sealEnd+1} ${seam+3} ${sealEnd-5} ${seam+3}H${sealX+4}Q${sealX-2} ${seam+3} ${sealX} ${seam}Q${sealX-2} ${seam-3} ${sealX+4} ${seam-3}Z`;
-    for(const [offset,y,r] of [[8,-.7,1.15],[12,1,1],[16,-.6,.75]]){const x=sealEnd-offset;sealPath+=`M${x-r} ${seam+y}a${r} ${r} 0 1 0 ${r*2} 0a${r} ${r} 0 1 0 ${-r*2} 0Z`;}
-    const seal=node('path',{class:'export-receipt-seal',d:sealPath,fill:ink,'fill-rule':'evenodd'});
-    body.append(flow,source,seal);svg.append(body);document.body.append(svg);
-    const clamp=value=>Math.max(0,Math.min(1,value)),ease=value=>{const t=clamp(value);return t*t*(3-2*t);};
-    let frame=null,timer=null,started=null,disposed=false;
-    const dispose=()=>{if(disposed)return;disposed=true;clearTimeout(timer);cancelAnimationFrame(frame);svg.remove();release();receipts.delete(dispose);};
-    receipts.add(dispose);
-    function draw(now){
-      if(disposed)return;
-      const current=button.getBoundingClientRect();
-      if(document.hidden||!button.isConnected||!window.AtelierMotionPolicy?.allows(3)||Math.abs(current.left-rect.left)>1||Math.abs(current.top-rect.top)>1||Math.abs(current.width-w)>1||Math.abs(current.height-h)>1){dispose();return;}
-      if(started===null)started=now;const time=now-started;
-      if(time>=980){dispose();return;}
-      // Charge, pour, receive, compress, rebound, then absorb into the seam.
-      const charge=ease(time/130),travel=ease((time-130)/420),arrival=clamp((time-550)/270),fade=1-ease((time-830)/150);
-      source.setAttribute('opacity',clamp(time/45)*(1-ease((time-250)/270)));
-      const size=.35+charge*.9-travel*.4;
-      source.setAttribute('transform',`translate(${sourceX} ${sourceY}) scale(${size} ${size*(1+travel*.25)}) translate(${-sourceX} ${-sourceY})`);
-      flow.setAttribute('stroke-dashoffset',1-travel);flow.setAttribute('opacity',clamp((time-120)/60)*fade);
-      flow.setAttribute('stroke-width',5+Math.sin(Math.PI*travel)*1.4);
-      seal.setAttribute('opacity',clamp((time-550)/45)*fade);
-      let sx,sy;
-      if(arrival<.42){const t=ease(arrival/.42);sx=.12+t*1.03;sy=1.4-t*.72;}
-      else if(arrival<.76){const t=ease((arrival-.42)/.34);sx=1.15-t*.19;sy=.68+t*.46;}
-      else{const t=ease((arrival-.76)/.24);sx=.96+t*.04;sy=1.14-t*.14;}
-      seal.setAttribute('transform',`translate(${sealX} ${seam}) scale(${sx} ${sy}) translate(${-sealX} ${-seam})`);
-      frame=requestAnimationFrame(draw);
-    }
-    source.setAttribute('opacity',0);seal.setAttribute('opacity',0);flow.setAttribute('opacity',0);
-    frame=requestAnimationFrame(draw);timer=setTimeout(dispose,1100);
-    return true;
-  }
   // A dismissed toast leaves its slot at once, so the live region, collation and the stack stay truthful,
   // while the same element fades 4 px down for 120 ms (accelerating) in an inert layer. Off removes it outright.
   function leave(el, done) {
@@ -344,5 +245,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,swapImage,sidebarBefore,sidebarAfter,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,swapImage,sidebarBefore,sidebarAfter,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

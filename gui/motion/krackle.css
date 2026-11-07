@@ -132,16 +132,5 @@
   content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
   background:var(--krackle-charge);clip-path:none;mask:var(--krackle-edited-mask) center/contain no-repeat;
 }
-/* First export: one glyph-fed stream presses a joined seal into the button seam. */
-.export-color-moment {
-  position: fixed;
-  z-index: calc(var(--studio-layer-toast) + 20);
-  display: block;
-  overflow: hidden;
-  margin: 0;
-  pointer-events: none;
-}
-.export-receipt-flow { fill: none; }
-.export-receipt-source,.export-receipt-seal { will-change: auto; }
 /* Import result dots live with the import dialog in ../identity.css. */
 

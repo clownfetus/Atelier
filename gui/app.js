@@ -3127,7 +3127,6 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
     });
     if (res.ok) {
       const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
-      if (outcome === 'success') window.AtelierPolish?.exported();
       finishFeedback(outcome);
       settle(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000);
       if (project === _activeProjectName) setStatus(res.installed_dir ? `Installed → ${res.installed_dir}` : `Exported → ${res.pak_path || ""}`);
