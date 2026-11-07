@@ -100,7 +100,6 @@ def main():
     parser.add_argument('--category-icons-only', action='store_true', help='Check category artwork and file-icon plates in both themes')
     parser.add_argument('--glyph-only', action='store_true', help='Run only the assembly glyph checks: planner, clearance, states and Preview motion')
     parser.add_argument('--krackle-motion-only', action='store_true', help='Run only the motion checks in krackle_motion_checks.py')
-    parser.add_argument('--texture-reconstruction-only', action='store_true', help='Run only edited-texture motion workflows')
     parser.add_argument('--s-maps-only', action='store_true', help='Run only one-click D/S processing workflows')
     parser.add_argument('--add-assets-only', action='store_true', help='Run only named asset uploads and folder selection workflows')
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
@@ -115,10 +114,10 @@ def main():
     parser.add_argument('--library-only', action='store_true', help='Check search, home pins, filters and keyboard navigation')
     parser.add_argument('--inks-dial-only', action='store_true', help='Check measured inks, volume dial and moment arbitration')
     parser.add_argument('--surfaces-only',action='store_true',help='Check Krackle surfaces, byte drops and frame costs')
-    parser.add_argument('--workflow-motion-only', action='store_true', help='Check Krackle hero, navigation, editor and tray motion')
     parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--logo-only', action='store_true', help="Check the header logo's entrance")
     parser.add_argument('--empty-assets-only', action='store_true', help="Check the Mod tray's empty state")
+    parser.add_argument('--retired-only', action='store_true', help='Check the surfaces motion v2 retired stay gone')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
@@ -306,6 +305,14 @@ def main():
                     for check in checks:print('PASS '+check)
                     browser.close();return
 
+                if args.retired_only:
+                    from retired_surfaces_checks import run_retired_surfaces_checks
+                    run_retired_surfaces_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close(); return
+
                 if args.empty_assets_only:
                     from empty_assets_motion_checks import run_empty_assets_motion_checks
                     run_empty_assets_motion_checks(page, context, url, report, checks)
@@ -323,14 +330,12 @@ def main():
                     browser.close(); return
 
                 if args.working_panels_only:
-                    from working_panels_checks import run_working_panels_checks
                     from fluid_work_checks import run_fluid_work_checks
                     from material_save_motion_checks import run_material_save_motion_checks
                     from export_motion_checks import run_export_motion_checks
                     from export_review_checks import run_export_review_checks
                     from viewport_loading_checks import run_viewport_loading_checks
                     from viewport_motion_checks import run_viewport_motion_checks
-                    run_working_panels_checks(context, url, report, checks)
                     run_fluid_work_checks(context, url, report, checks)
                     run_material_save_motion_checks(page, context, url, report, checks)
                     run_export_motion_checks(page, context, url, report, checks)
@@ -339,16 +344,6 @@ def main():
                     run_ink_well_checks(context, url, report, checks)
                     run_viewport_loading_checks(page, context, url, report, checks)
                     run_viewport_motion_checks(page, context, url, report, checks)
-                    assert not errors, errors
-                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
-                    for check in checks: print('PASS ' + check)
-                    browser.close(); return
-
-                if args.workflow_motion_only:
-                    from context_ink_checks import run_context_ink_checks
-                    from workflow_motion_checks import run_workflow_motion_checks
-                    run_context_ink_checks(context, url, report, checks)
-                    run_workflow_motion_checks(context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks: print('PASS ' + check)
@@ -482,16 +477,6 @@ def main():
                     browser.close()
                     return
 
-                if args.texture_reconstruction_only:
-                    from texture_reconstruction_checks import run_texture_reconstruction_checks
-                    run_texture_reconstruction_checks(page, context, url, report, checks)
-                    assert not errors, errors
-                    (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
-                    for check in checks:
-                        print('PASS '+check)
-                    browser.close()
-                    return
-
                 if args.jobs_bulk_only:
                     from jobs_bulk_browser_checks import run_job_bulk_checks
                     run_job_bulk_checks(page, context, url, report, checks)
@@ -568,18 +553,12 @@ def main():
                 run_surfaces_checks(page,context,url,report,checks)
                 from inks_dial_checks import run_inks_dial_checks
                 run_inks_dial_checks(page,context,url,report,checks)
-                from workflow_motion_checks import run_workflow_motion_checks
-                from context_ink_checks import run_context_ink_checks
-                run_context_ink_checks(context, url, report, checks)
-                run_workflow_motion_checks(context, url, report, checks)
                 from assembly_planner_checks import run_assembly_planner_checks
                 from assembly_clearance_checks import run_assembly_clearance_checks
                 from assembly_state_checks import run_assembly_state_checks
                 run_assembly_planner_checks(context, url, report, checks)
                 run_assembly_clearance_checks(context, url, report, checks)
                 run_assembly_state_checks(context, url, report, checks)
-                from working_panels_checks import run_working_panels_checks
-                run_working_panels_checks(context, url, report, checks)
                 from fluid_work_checks import run_fluid_work_checks
                 run_fluid_work_checks(context, url, report, checks)
                 from find_checks import run_find_checks
@@ -608,8 +587,6 @@ def main():
                 run_export_motion_checks(page, context, url, report, checks)
                 from viewport_motion_checks import run_viewport_motion_checks
                 run_viewport_motion_checks(page, context, url, report, checks)
-                from folder_motion_checks import run_folder_motion_checks
-                run_folder_motion_checks(page, context, url, report, checks)
                 from material_save_motion_checks import run_material_save_motion_checks
                 run_material_save_motion_checks(page, context, url, report, checks)
                 from library_pins_checks import run_library_pins_checks
@@ -622,8 +599,8 @@ def main():
                 run_motionboard_checks(page, context, url, report, checks)
                 from thumbnail_checks import run_thumbnail_checks
                 run_thumbnail_checks(page, context, url, report, checks)
-                from texture_reconstruction_checks import run_texture_reconstruction_checks
-                run_texture_reconstruction_checks(page, context, url, report, checks)
+                from retired_surfaces_checks import run_retired_surfaces_checks
+                run_retired_surfaces_checks(context, url, report, checks)
                 from s_maps_browser_checks import run_s_maps_checks
                 run_s_maps_checks(page, context, url, report, checks)
                 from added_assets_browser_checks import run_added_asset_checks

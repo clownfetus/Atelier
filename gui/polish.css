@@ -13,7 +13,7 @@
 /* Being edited, a card's preview dissolves into the Krackle 45° lattice (two offset square grids)
    and keeps its own colours. Edited materials draw their saved colours as the same lattice. */
 @property --edit-dot { syntax:'<length>'; inherits:false; initial-value:2.6px; }
-.card.imported .card-thumb > :is(img, .card-icon, .thumbnail-fallback, .texture-reconstruction) {
+.card.imported .card-thumb > :is(img, .card-icon, .thumbnail-fallback) {
   --edit-mask:radial-gradient(circle,#000 var(--edit-dot),transparent calc(var(--edit-dot) + .5px));
   -webkit-mask:var(--edit-mask) 0 0/8px 8px,var(--edit-mask) 4px 4px/8px 8px;
   mask:var(--edit-mask) 0 0/8px 8px,var(--edit-mask) 4px 4px/8px 8px;

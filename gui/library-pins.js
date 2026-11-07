@@ -135,15 +135,7 @@
     else pins.push(pin);
     publish();
     const pinned = isPinned(pin.path);
-    present(pin.path, pinned);
     return pinned;
-  }
-
-  function present(path, pinned) {
-    const control = [...document.querySelectorAll('.library-pin-toggle')]
-      .find(button => button.dataset.libraryPinPath === path);
-    if (control && Number(getComputedStyle(control).opacity) > 0)
-      window.AtelierMotion?.workflow?.[pinned ? 'pin' : 'unpin']?.(control);
   }
 
   function remove(path) {
@@ -151,7 +143,6 @@
     if (!normalized || !isPinned(normalized)) return false;
     pins = pins.filter(pin => pin.path !== normalized);
     publish();
-    present(normalized, false);
     return true;
   }
 

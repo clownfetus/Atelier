@@ -4,12 +4,6 @@
   const reduced = (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)'));
   let active = null;
   let bannerArgs = null;
-  let workflowNavigation = 0;
-  let workflowEditor = 0;
-  function cancelWorkflow() {
-    workflowNavigation++; workflowEditor++;
-    window.AtelierMotion?.workflow?.stop();
-  }
   const origins = new WeakMap();
   const cardFor = path => [...document.querySelectorAll('#grid-area .card')]
     .find(card => card.dataset.libraryPath === path);
@@ -153,14 +147,13 @@
   window.addEventListener('atelier:identities-updated',()=>{if(bannerArgs)banner(...bannerArgs);});
 
   function library(from, to, direction, update) {
-    const generation = ++workflowNavigation;
     const source = cardFor(to);
     const sourceLabel = source?.querySelector('.card-name');
     const banner = document.getElementById('library-hero');
     document.documentElement.dataset.libraryDirection = direction;
     // The banner enters and leaves on its own. Morphing the square card portrait into the wide
     // story art zoomed and stretched two different pictures into each other.
-    const ready = transition(update, name => {
+    return transition(update, name => {
       name(document.querySelector('#grid-area > .grid'), 'atelier-grid');
       name(direction === 'back' ? document.querySelector('#breadcrumbs > :last-child') : sourceLabel, 'atelier-folder-name');
       name(banner, 'atelier-banner');
@@ -172,35 +165,22 @@
       const grid = document.querySelector('#grid-area > .grid');
       animate(grid, [{opacity: 0, transform: `translateX(${direction === 'back' ? -8 : 8}px)`}, {opacity: 1, transform: 'none'}]);
     });
-    ready.then(() => active?.finished.catch(() => {})).then(() => {
-      if (generation === workflowNavigation)
-        window.AtelierMotion?.workflow?.navigation(document.querySelector('.library-location'), direction);
-    }).catch(() => {});
-    return ready;
   }
 
   function openEditor(overlay, path) {
-    const generation = ++workflowEditor;
     const card = cardFor(path), panel = overlay.firstElementChild;
     const box = visible(card) ? card.getBoundingClientRect() : null;
     origins.set(overlay, {path, card, box});
-    const reveal = () => {
-      if (generation === workflowEditor && overlay.classList.contains('active'))
-        window.AtelierMotion?.workflow?.editor(panel.querySelector('.mat-head'));
-    };
-    if (!box) { overlay.classList.add('active'); reveal(); return Promise.resolve(); }
-    const ready = transition(() => overlay.classList.add('active'),
+    if (!box) { overlay.classList.add('active'); return Promise.resolve(); }
+    return transition(() => overlay.classList.add('active'),
       name => name(card, 'atelier-editor'), name => name(panel, 'atelier-editor'), () => {
         if (!box) return;
         const rect = panel.getBoundingClientRect();
         animate(panel, [{opacity: .3, transformOrigin: 'top left', transform: `translate(${box.x - rect.x}px,${box.y - rect.y}px) scale(${box.width / rect.width},${box.height / rect.height})`},
           {opacity: 1, transformOrigin: 'top left', transform: 'none'}], 200);
       });
-    ready.then(() => active?.finished.catch(() => {})).then(reveal).catch(() => {});
-    return ready;
   }
   function closeEditor(overlay) {
-    cancelWorkflow();
     const origin = origins.get(overlay), card = cardFor(origin?.path), panel = overlay.firstElementChild;
     // Close logical state immediately; a disposable snapshot carries the visual return.
     let ghost, rect;
@@ -225,8 +205,7 @@
     const bounds = el.getBoundingClientRect();
     el.style.transformOrigin = `${Math.max(0, Math.min(bounds.width, x - bounds.x))}px ${Math.max(0, Math.min(bounds.height, y - bounds.y))}px`;
     animate(el, [{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'scale(1)'}], 120);
-    window.AtelierMotion?.workflow?.menu(el);
   }
   reduced.addEventListener('change', () => { if (reduced.matches) active?.skipTransition(); });
-  window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu, cancelWorkflow});
+  window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu});
 })();

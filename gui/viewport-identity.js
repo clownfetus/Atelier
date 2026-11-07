@@ -25,7 +25,6 @@
     const skin = /^\d{7}$/.test(skinId || '') ? skinId : '';
     const hero = skin ? skin.slice(0, 4) : (/^\d{4}$/.test(heroId || '') ? heroId : '');
     box.classList.remove('has-skin-colour'); box.style.removeProperty('--vp-skin-colour');
-    window.AtelierMotion?.energy?.refresh();
     const icon = element('viewport-skin-icon', 'img', $('viewport-title')?.parentElement, 'prepend');
     const card = element('viewport-skin-card', 'figure', $('viewport-materials'), 'prepend');
     if (!icon || !card) return;
@@ -40,7 +39,6 @@
       try { colour = window.AtelierPolish?.accent(image); } catch (_) { /* Artwork is optional. */ }
       if (/^#[0-9a-f]{6}$/i.test(colour || '')) {
         box.style.setProperty('--vp-skin-colour', colour); box.classList.add('has-skin-colour');
-        window.AtelierMotion?.energy?.refresh();
         return colour;
       }
       return null;
@@ -77,7 +75,6 @@
     }
     $('viewport-box')?.classList.remove('has-skin-colour');
     $('viewport-box')?.style.removeProperty('--vp-skin-colour');
-    window.AtelierMotion?.energy?.refresh();
   }
   window.AtelierViewportIdentity = Object.freeze({show, clear});
 })();

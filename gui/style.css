@@ -265,6 +265,7 @@ body {
 .card-icon.texture-folder-icon  { color: var(--studio-emblem-texture); }
 .card-icon.material-folder-icon { color: var(--studio-emblem-material); }
 .card-icon.mesh-folder-icon     { color: var(--studio-emblem-mesh); }
+svg.card-icon.folder-icon { display: block; }
 .card-icon.folder-icon,
 .card-icon.char-icon,
 .card-icon.ui-folder-icon,

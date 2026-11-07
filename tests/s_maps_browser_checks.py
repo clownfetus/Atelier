@@ -75,7 +75,6 @@ def run_s_maps_checks(page, context, url, report, checks):
                 assert any(any(row['s'] == shared and row['d'] == second for row in item['processed']) for item in records)
                 assert shared_path.read_bytes() != before
                 tab.wait_for_function("_gridStatus === 'ready' && document.querySelectorAll('#grid-area img').length > 0 && [...document.querySelectorAll('#grid-area img, #sidebar-list .sb-thumb img')].every(image => image.complete && image.naturalWidth > 0)")
-                tab.wait_for_function("!document.querySelector('.texture-reconstruction')")
                 tab.screenshot(path=str(report / 'process-s-maps-dark.png'))
                 checks.append('Shared S maps require an explicit D choice; the chosen pairing is saved in the batch record and its S output appears in Mod tray')
 

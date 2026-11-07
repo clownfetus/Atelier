@@ -142,9 +142,6 @@ def run_export_review_checks(page, context, url, report, checks):
         assert len(pending) == 1
         assert review.locator('#install-btn').is_disabled()
         assert overlay.locator('progress').count() == 0  # A build can't be counted, so there's no bar.
-        overlay.locator('.am-working-border').wait_for()
-        assert overlay.locator('.am-working-dot').count() == 0
-        assert overlay.locator('.am-working-border').evaluate("el=>getComputedStyle(el).backgroundImage.includes('data:image/svg+xml')")
         # The build runs in the glyph, at the Stage tier.
         stage = overlay.locator('.export-review-stage')
         assert stage.get_attribute('data-atelier-motion') == 'glyph'
@@ -163,7 +160,6 @@ def run_export_review_checks(page, context, url, report, checks):
         review.keyboard.press('Escape')
         overlay.wait_for(state='hidden')
         assert not overlay.is_visible()
-        overlay.locator('.am-working-border').wait_for(state='detached')
         review.locator('#export-last-result').click()
         assert overlay.locator('.export-review-stage[data-glyph-state=busy]').is_visible()
         review.evaluate('doInstallMod()')
@@ -179,7 +175,6 @@ def run_export_review_checks(page, context, url, report, checks):
                                    'installed_dir': 'D:/Fixture/mods', 'applied': ['mat MI_Body'],
                                    'skipped': ['Missing optional texture']})
         review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'warning'")
-        overlay.locator('.am-working-border').wait_for(state='detached')
         assert 'Missing optional texture' in overlay.inner_text()
         assert 'mat MI_Body' in overlay.inner_text()
         assert 'D:/Fixture/exported/Review.pak' in overlay.inner_text()

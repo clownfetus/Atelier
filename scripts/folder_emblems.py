@@ -315,12 +315,12 @@ def script():
 
 
 def plain_folder():
-    """The plain folder as card artwork: its two pieces, so the front one can tip on hover."""
+    """The plain folder as card artwork, standing still in its category colour."""
     _cls, _label, (back, front) = next(entry for entry in ALL if entry[0] == 'folder-icon')
     part = lambda piece: f'<path d="{path_d(build(piece, MASTER)["ring"])}"/>'
-    return ('<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon am-folder-flap" viewBox="0 0 24 24" '
+    return ('<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon" viewBox="0 0 24 24" '
             'width="96" height="96" fill="currentColor" aria-hidden="true" focusable="false">'
-            f'<g class="am-folder-flap-back">{part(back)}</g><g class="am-folder-flap-front">{part(front)}</g></svg>')
+            f'{part(back)}{part(front)}</svg>')
 
 
 def targets():

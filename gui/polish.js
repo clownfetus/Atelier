@@ -106,14 +106,33 @@
   function fly(path) {
     requestAnimationFrame(() => {
       if (document.hidden || reduced()) return;
-      // The asset frame has a clear ink lane even when its image fills the thumbnail.
-      const source = [...document.querySelectorAll('#grid-area .card')].find(node=>node.dataset.libraryPath===path);
+      // A row arriving in the Mod tray fades and rises. It's interface chrome, not the glyph.
       const destination = [...document.querySelectorAll('.sb-item')].find(node=>node.dataset.gameRel===path);
-      if (!destination) return;
-      if (window.AtelierMotion?.workflow?.transfer?.(source,destination,'arrival')) return;
-      if (!window.AtelierMotion?.workflow?.arrival(destination))
-        play(destination,[{boxShadow:'0 0 0 0 var(--acc)'},{boxShadow:'0 0 0 3px transparent'}],220);
+      if (destination) play(destination,[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],200);
     });
+  }
+  // A changed texture fades in over the old one, so what's on screen is always the artwork itself.
+  function swapImage(image, src) {
+    const parent = image.parentElement;
+    if (reduced() || document.hidden || !parent || !image.naturalWidth || window.AtelierMotionPolicy?.allows(1) === false) { image.src = src; return; }
+    parent.querySelector(':scope > .image-swap')?.remove();
+    const old = image.cloneNode(false);
+    old.removeAttribute('id');
+    for (const name of [...old.attributes]) if (name.name.startsWith('data-')) old.removeAttribute(name.name);
+    old.classList.add('image-swap'); old.alt = ''; old.setAttribute('aria-hidden', 'true');
+    Object.assign(old.style, {position:'absolute', left:image.offsetLeft+'px', top:image.offsetTop+'px', width:image.offsetWidth+'px', height:image.offsetHeight+'px', pointerEvents:'none'});
+    parent.append(old);
+    const done = () => { image.removeEventListener('load', fade); image.removeEventListener('error', done); clearTimeout(timer); old.remove(); };
+    const fade = () => {
+      clearTimeout(timer); image.removeEventListener('error', done);
+      if (!old.isConnected) return;
+      try { old.animate([{opacity:1},{opacity:0}],{duration:200,easing:window.AtelierMotion?.ease?.standard||'linear'}).finished.catch(()=>{}).finally(()=>old.remove()); }
+      catch (_) { old.remove(); }
+    };
+    const timer = setTimeout(done, 8000);
+    image.addEventListener('load', fade, {once:true});
+    image.addEventListener('error', done, {once:true});
+    image.src = src;
   }
   function sidebarBefore(list) {
     return [...list.querySelectorAll('.sb-item')].map(row=>({token:row.dataset.token,rect:row.getBoundingClientRect(),row}));
@@ -129,8 +148,7 @@
         if (window.AtelierMotionPolicy?.allows(2) === false) continue;
         const copy = entry.row.cloneNode(true); copy.classList.add('polish-ghost'); copy.inert=true; copy.setAttribute('aria-hidden','true');
         copy.removeAttribute('id');copy.querySelectorAll('[id],[name]').forEach(node=>{node.removeAttribute('id');node.removeAttribute('name');});
-        copy.querySelectorAll('.texture-reconstruction,.swatch-wipe').forEach(node=>node.remove());
-        for (const node of [copy,...copy.querySelectorAll('.texture-reconstructing')]) node.classList.remove('texture-reconstructing');
+        copy.querySelectorAll('.swatch-wipe').forEach(node=>node.remove());
         for (const node of [copy,...copy.querySelectorAll('[data-token],[data-game-rel],[data-library-path]')]) {
           for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
         }
@@ -139,8 +157,6 @@
         const rowAnimation=play(copy,[{opacity:1,clipPath:'inset(0 0 0 0)',transform:'none'},{opacity:.8,clipPath:'inset(56% 0 0 0)',transform:'translateY(3px)'},{opacity:0,clipPath:'inset(100% 0 0 0)',transform:'translateY(5px)'}],300,AtelierMotion.ease.fall);
         const bubbles=document.createElement('span'); bubbles.className='trash-drain'; bubbles.setAttribute('aria-hidden','true'); bubbles.inert=true;
         Object.assign(bubbles.style,{left:(entry.rect.x+12)+'px',top:(entry.rect.bottom-14)+'px'});
-        const energy=window.AtelierMotion?.energy?.resolve(list);
-        if(energy)bubbles.style.setProperty('--krackle-energy',energy.charge);
         const animations=[rowAnimation];
         // Three connected lobes merge into the removed thumbnail's baseline.
         for(let i=0;i<3;i++) {
@@ -152,15 +168,6 @@
         const timer=setTimeout(dispose,320);drains.add(dispose);
       }
     }
-  }
-  function packing() {
-    if (reduced() || document.hidden || window.AtelierMotionPolicy?.allows(2) === false) return;
-    const tray = document.getElementById('install-btn'); if (!tray) return;
-    const source = [...document.querySelectorAll('.sb-item.selected')].find(node=>{
-      const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0&&rect.bottom>0&&rect.top<innerHeight;
-    });
-    // One continuous handoff connects the selected work to its actual export receiver.
-    if (source) window.AtelierMotion?.workflow?.transfer?.(source,tray,'action');
   }
   let burstQueued=false;
   function exported() {
@@ -195,7 +202,6 @@
     const button=document.getElementById('install-btn');
     if(!button?.isConnected||!button.getClientRects().length){release();return true;}
     // Keep the exported hues readable even when one matches the button's paint.
-    colors=colors.map(color=>window.AtelierMotion?.energy?.fit?.(color,button)||color);
     const rect=button.getBoundingClientRect(),slot=button.querySelector('.export-feedback-slot')?.getBoundingClientRect();
     const w=rect.width,h=rect.height,seam=h-4.5;
     const sourceX=slot?.width?slot.x-rect.x+slot.width/2:7;
@@ -346,5 +352,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,sidebarBefore,sidebarAfter,packing,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,swapImage,sidebarBefore,sidebarAfter,exported,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

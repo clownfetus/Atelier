@@ -94,25 +94,17 @@ async function api(path, opts = {}) {
   }
 }
 
-// Presentation follows the originating editor/request, including a close or project switch.
-function panelWorking(panel, options) {
-  try {
-    const finish = window.AtelierMotion?.working?.begin(panel, options);
-    return (...args) => { try { finish?.(...args); } catch (_) { /* Presentation is optional. */ } };
-  } catch (_) { return () => {}; }
-}
+// The small glyph beside an editor's Save button while it saves. Panels themselves stay still.
+// The setup page has its own glyph.
 function editorWorking(overlayId, current, kind = 'saving') {
+  if (kind !== 'saving' || overlayId === 'setup-overlay') return () => {};
   const overlay = document.getElementById(overlayId), panel = overlay?.querySelector('.modal');
   const live = () => current() && overlay.classList.contains('active');
-  const stop = panelWorking(panel, {kind, current: live, anchor: panel?.querySelector(kind === 'saving' ? '[id$="-save"]' : 'h2')});
-  // The setup page has its own glyph.
-  if (kind !== 'saving' || overlayId === 'setup-overlay') return stop;
   let badge = null;
   try { badge = window.AtelierMaterialSaveFeedback?.saving(panel?.querySelector('[id$="-save"]'), live, overlayId === 'material-overlay' ? 'material' : undefined); }
   catch (_) { /* Presentation is optional. */ }
-  return (...args) => { try { badge?.(); } catch (_) { /* Presentation is optional. */ } stop(...args); };
+  return () => { try { badge?.(); } catch (_) { /* Presentation is optional. */ } };
 }
-const savedTray = () => ({destination: document.getElementById('sidebar'), anchor: document.getElementById('sidebar-header')});
 
 async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Continue', tone = 'danger') {
   const project = _activeProjectName;
@@ -222,7 +214,6 @@ function toastExportFeedback(msg, type, duration, state, options) {
 }
 
 function beginExportFeedback(project, options) {
-  window.AtelierPolish?.packing();
   let finish;
   try { finish = window.AtelierExportFeedback?.begin(document.getElementById("install-btn"), project, options); }
   catch (error) { console.warn("Export animation unavailable", error); }
@@ -412,7 +403,6 @@ function showLibraryLoading(area) {
   if (!area.querySelector('.library-loading')) area.replaceChildren(libraryLoading.cloneNode(true));
 }
 async function renderGrid(focusPath = null, direction = 'forward') {
-  window.AtelierContinuity?.cancelWorkflow();
   window.AtelierSearch?.reset();
   const requestId = ++_gridRequest, project = _activeProjectName, path = nav.path || '';
   _gridStatus = 'loading';
@@ -423,10 +413,6 @@ async function renderGrid(focusPath = null, direction = 'forward') {
   renderHomePins();
   const area = document.getElementById("grid-area");
   const current = () => requestId === _gridRequest && project === _activeProjectName;
-  const stopWorking = panelWorking(document.getElementById('explorer'), {
-    kind: 'loading', current, anchor: document.getElementById('breadcrumbs')
-  });
-  window.AtelierTextureReconstruction?.disposeWithin(area);
   // Retain the old grid until the response can be committed in one transition.
   area.setAttribute('aria-busy', 'true');
   if (!area.querySelector('.grid')) showLibraryLoading(area);
@@ -468,7 +454,6 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       renderBreadcrumbs();
       _gridRenderedPath = path;
       area.setAttribute('aria-busy', 'false');
-      stopWorking('success');
       window.AtelierPolish?.startupDone();
       return bannerReady;
     };
@@ -484,13 +469,12 @@ async function renderGrid(focusPath = null, direction = 'forward') {
     const failure = document.createElement("div"); failure.id = "empty-state";
     failure.textContent = e.message; area.replaceChildren(failure);
     area.setAttribute('aria-busy', 'false');
-    stopWorking('error');
     window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
     renderBreadcrumbs();
     window.AtelierEmptyGlyph?.mount(failure, "error");
     document.getElementById("library-count").textContent = "Could not load assets";
     window.AtelierPolish?.startupDone();
-  } finally { stopWorking(); }
+  }
 }
 
 function renderHomePins() {
@@ -506,7 +490,6 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   renderHomePins();
   const area = document.getElementById("grid-area");
   area.classList.toggle('home-categories',!nav.path);
-  window.AtelierTextureReconstruction?.disposeWithin(area);
   const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
   let filtered = AtelierLibraryTools.filter(cards, q);
@@ -714,13 +697,9 @@ function updateImportedCard(gameRel, record) {
 function renderCardIcon(card, cardEl) {
   // Called only when artwork is absent, including failed portrait requests.
   if (card.type === "folder" && card.iconCls === "folder-icon") {
-    const artwork = document.getElementById("folder-flap-template")?.content?.firstElementChild;
-    if (artwork) {
-      cardEl.dataset.atelierMotion = "folder-flap";
-      return artwork.cloneNode(true);
-    }
+    const artwork = document.getElementById("folder-plain-template")?.content?.firstElementChild;
+    if (artwork) return artwork.cloneNode(true);
   }
-  delete cardEl.dataset.atelierMotion;
   return makeIcon(card);
 }
 
@@ -755,7 +734,6 @@ function applyLibraryView() {
   if (_gridStatus === 'ready') buildGrid(allItems.map(_makeCard));
   else if (_gridStatus === 'loading') {
     const area=document.getElementById('grid-area');
-    window.AtelierTextureReconstruction?.disposeWithin(area);
     showLibraryLoading(area);
   }
   renderSidebar();
@@ -1832,7 +1810,7 @@ async function saveMaterial() {
       const newerEdits = isCurrent() && JSON.stringify(materialSaveSnapshot(editor)) !== body;
       const n = Object.keys(submitted.inten).length;
       const intenLost = n > 0 && res.inten_saved !== true;
-      stopWorking(intenLost || newerEdits ? 'warning' : 'success', !newerEdits ? savedTray() : undefined);
+      stopWorking();
       const status = "Submitted changes saved; newer edits remain unsaved.";
       let message = newerEdits ? `${name}: ${status}` : `Saved: ${name}`;
       if (intenLost) message += `\nColour intensities could not be saved for this project — ${n} colour${n === 1 ? "" : "s"} ` +
@@ -2089,7 +2067,7 @@ async function saveCurve() {
       const saved = JSON.parse(submitted);
       for (const ch of Object.keys(edits)) if (_editSnapshot(c.channels[ch]) === _editSnapshot(saved[ch])) delete c.dirty[ch];
       const newer = _curveDirty();
-      stopWorking(newer ? 'warning' : 'success', newer ? undefined : savedTray());
+      stopWorking();
       toast(`Saved: ${c.name}`, "success"); loadSidebar();
       if (newer) document.getElementById("curve-status").textContent = "Submitted edits saved; newer changes remain unsaved.";
       else closeCurveEditor(true);
@@ -2447,7 +2425,7 @@ async function saveVfx() {
         });
         v.baseline=JSON.stringify(saved); v.savedGroups=saved.groups;
         const newer = _vfxSnapshot(v) !== v.baseline;
-        stopWorking(newer || Object.keys(inten).length && res.inten_saved !== true ? 'warning' : 'success', !newer ? savedTray() : undefined);
+        stopWorking();
         if (newer) { document.getElementById('vfx-status').textContent = 'Submitted edits saved; newer changes remain unsaved.'; window.AtelierMotionboard?.sync(); }
         else closeVfxEditor(true);
       }
@@ -2737,14 +2715,8 @@ function refreshEditedTexture(gameRel, tok, animate = true) {
   const query = new URLSearchParams({game_rel: gameRel, _project: project, _t: String(Date.now())});
   const src = `/api/preview?${query}`;
   for (const img of images) {
-    try {
-      if (!animate) window.AtelierTextureReconstruction?.disposeWithin(img.parentElement);
-      if (animate && window.AtelierTextureReconstruction) {
-        window.AtelierTextureReconstruction.refresh(img, src, {project, mode:'wipe'});
-        continue;
-      }
-    } catch (error) { console.warn('Texture reconstruction unavailable', error); }
-    img.src = src;
+    if (animate && window.AtelierPolish) window.AtelierPolish.swapImage(img, src);
+    else img.src = src;
   }
 }
 
@@ -2953,7 +2925,6 @@ function renderSidebar() {
     window.AtelierPolish?.sidebarAfter(previousRows, list);
   });
   window.AtelierEmptyAssetsUI?.dispose();
-  window.AtelierTextureReconstruction?.disposeWithin(list);
   list.innerHTML = "";
   const all = Object.values(sidebarData);
   window.AtelierCatalogueArt?.tray(all);
@@ -3027,7 +2998,6 @@ function renderSidebar() {
       item.selected = !item.selected;
       renderSidebar();
       saveSelection();
-      window.AtelierMotion?.workflow?.selection?.(document.getElementById('sel-count'));
     });
     el.addEventListener("click", e => {
       // ctrl/cmd or shift marks for a bulk action; a plain click still opens the asset, and
@@ -3051,7 +3021,6 @@ function toggleSelectAll() {
   all.forEach(i => { i.selected = selectAll; });
   renderSidebar();
   saveSelection();
-  window.AtelierMotion?.workflow?.selection?.(document.getElementById('sel-count'));
 }
 
 // Persist the OFF set to the active project. Debounced: toggling several assets in a row is one
@@ -4056,7 +4025,6 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      stopWorking('success', {destination: document.getElementById('explorer'), anchor: document.getElementById('breadcrumbs')});
       const wasPaths   = _pathsMode;
       const wasModsSet = _modsFolderSet;
       _pathsMode = false;
@@ -5078,8 +5046,6 @@ async function _selectProject(name, workspace=null) {
     await renderGrid();
     await loadSidebar();
   }
-  if (previousProject && previousProject !== name && _activeProjectName === name)
-    window.AtelierMotion?.workflow?.project(document.getElementById('project-chip'));
   if(workspace) {
     window.AtelierWorkspace.present();
     await window.AtelierViewport.open(workspace.skin_id,workspace.title);

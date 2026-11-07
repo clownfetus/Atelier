@@ -173,7 +173,6 @@
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
       if (record && changed) {
         window.AtelierPolish?.artwork(button.querySelector('img'));
-        window.AtelierMotion?.workflow?.hero(button);
       }
     }
     const editCount=hero=>edits.filter(item=>item.char_id===hero.path.split('/')[1]||item.game_rel.startsWith(hero.path+'/')).length;

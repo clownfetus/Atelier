@@ -48,22 +48,9 @@ window.__showcase={
         for value in ['full','calm','off']:
             motion(value);tab.locator('#viewport-showcase').click();tab.wait_for_timeout(80)
             if value == 'full':
-                flow=tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]')
-                flow.wait_for(state='attached')
-                assert flow.evaluate("""svg => {
-                    const ink=svg.getBoundingClientRect(), seam=document.getElementById('viewport-modes').getBoundingClientRect();
-                    return svg.namespaceURI==='http://www.w3.org/2000/svg'
-                        && svg.inert && getComputedStyle(svg).pointerEvents==='none'
-                        && [...svg.querySelectorAll('path[data-ink]')].some(path=>Number(path.getAttribute('opacity'))>0)
-                        && ['x','y','width','height'].every(key=>Math.abs(ink[key]-seam[key])<1);
-                }""")
                 assert tab.locator('#viewport-showcase').get_attribute('aria-pressed') == 'true'
                 tab.screenshot(path=str(report/'workflow-showcase-mode.png'))
-                flow.wait_for(state='detached')
                 tab.locator('#viewport-showcase').click()
-                assert not flow.count()
-            else:
-                assert not tab.locator('.k-workflow-svg[data-workflow-trigger=workspace]').count()
             assert tab.evaluate('__inspection.presentation().showcase')
             assert tab.evaluate("__renderTypes.includes('MeshToonMaterial')")
             assert tab.locator('.vp-showcase-backdrop').is_visible()

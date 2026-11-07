@@ -308,7 +308,6 @@ function setWorkspaceMode(mode, animate = false) {
     try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
   }
   requestAnimationFrame(onResize);
-  if (animate && changed) window.AtelierMotion?.workflow?.workspace($('viewport-modes'), mode);
 }
 
 // Only one transient menu is open; Escape returns focus before it can leave the workspace.
@@ -372,7 +371,6 @@ function disposeTree(obj) {
 
 // The loader is optional presentation. Its errors must never block model decoding.
 let viewportLoaderMotion = null;
-let viewportLoadingBorder = null;
 
 function destroyViewportLoader() {
   const motion = viewportLoaderMotion;
@@ -397,14 +395,6 @@ function setViewportLoaderFallback(state) {
 }
 
 function startViewportLoader() {
-  viewportLoadingBorder?.();
-  const gen = generation, project = viewportProject;
-  try {
-    viewportLoadingBorder = window.AtelierMotion?.working?.begin($('viewport-box'), {
-      kind: 'loading', anchor: $('viewport-loading-motion-host'),
-      current: () => gen === generation && project === viewportProject && $('viewport-overlay').classList.contains('active')
-    });
-  } catch (_) { viewportLoadingBorder = null; }
   setViewportLoaderFallback('loading');
   const host = $('viewport-loading-motion-host');
   if (!host || !window.AtelierMotion?.glyph) return;
@@ -418,10 +408,6 @@ function startViewportLoader() {
 }
 
 function setViewportLoaderState(state) {
-  if (state !== 'loading') {
-    try { viewportLoadingBorder?.(state === 'ready' ? 'success' : state === 'empty' ? 'warning' : 'error'); } catch (_) {}
-    viewportLoadingBorder = null;
-  }
   setViewportLoaderFallback(state);
   // The loader carries the wait and nothing else: a model that arrives is its own result, so it never forms the A.
   try { if (state === 'empty' || state === 'error') viewportLoaderMotion?.set(state === 'empty' ? 'warning' : 'error'); }
@@ -432,8 +418,6 @@ function setViewportLoaderState(state) {
 }
 
 function clearModel() {
-  try { viewportLoadingBorder?.(); } catch (_) {}
-  viewportLoadingBorder = null;
   connectedEditorPending = false; clearTimeout(assemblyRefreshTimer);
   modelLoading=false;
   if (modelLoad) {
@@ -1586,12 +1570,9 @@ async function saveEdits() {
   const targets = Object.fromEntries(names.map(name => [name, matData[name]]));
   const savedPaths=new Set();
   saving = true; refreshFoot();
-  let stopWorking, stopBadge;
+  let stopBadge;
   const stillCurrent = () => gen === generation && edited === draft && project === viewportProject;
   try {
-    stopWorking = window.AtelierMotion?.working?.begin($('viewport-box'), {
-      kind: 'saving', anchor: $('viewport-mat-save'), current: stillCurrent
-    });
     stopBadge = window.AtelierMaterialSaveFeedback?.saving($('viewport-mat-save'), stillCurrent, 'material');
   } catch (_) { /* Optional presentation never blocks saving. */ }
   let ok = 0;
@@ -1623,8 +1604,6 @@ async function saveEdits() {
       } catch (e) { failed.push(name); reason ||= e?.message || ''; console.warn('viewport: material_save failed', name, e); }
     }
   } finally {
-    const newer = gen === generation && edited === draft && Object.values(edited).some(params => Object.keys(params).length);
-    try { stopWorking?.(failed.length && !ok ? 'error' : failed.length || newer ? 'warning' : 'success'); } catch (_) {}
     try { stopBadge?.(); } catch (_) {}
   }
   const ownsView = gen === generation && edited === draft && project === viewportProject;

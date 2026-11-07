@@ -100,7 +100,7 @@ def run_category_icon_checks(page, context, url, report, checks):
                 .map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4)
                 .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
               return [...document.querySelectorAll('#grid-area .card .card-icon')].map(el=>{
-                const emblem=el.matches('[data-emblem],.am-folder-flap');
+                const emblem=el.matches('[data-emblem],svg.folder-icon');
                 const style=getComputedStyle(el);
                 const color=style.color;
                 const bg=getComputedStyle(el.closest('.card-thumb')).backgroundColor;

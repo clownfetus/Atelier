@@ -170,14 +170,13 @@ def main():
                 motions: Object.keys(AtelierMotion).sort(),
                 beatMs: AtelierMotion.beatMs, exitMs: AtelierMotion.exitMs,
                 modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley && window.AtelierModCards),
-                folderMotion: !!document.querySelector('link[href$="folder-flap.css"]'),
                 font: document.fonts.check('14px Inter'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
                 emptyTray: document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width,
                 singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="glyph"]')]
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
-            assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info
+            assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'font')), info
             assert {'emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader', 'krackleGlyph', 'krackleStage'}.issubset(info['motions']), info
             assert info['beatMs'] == 1040 and info['exitMs'] == 120 and info['modernFeedback'], info
             assert info['logo'] > 0 and info['emptyTray'] == 130 and info['singleMark'] == 1, info

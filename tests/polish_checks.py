@@ -174,8 +174,6 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('#import-segments [data-state=failed]').count() == 1
         tab.evaluate("AtelierPolish.importProgress({done:true,results:[],error:'Cancelled after A'})")
         assert tab.locator('#import-segments [data-state=done]').count() == 1
-        tab.evaluate('AtelierPolish.packing()')
-        tab.wait_for_function("!document.querySelector('.k-workflow-link,.k-workflow-svg')")
         tab.evaluate("localStorage.removeItem('atelier.firstExportCelebrated'); AtelierPolish.exported()")
         assert tab.locator('svg.export-color-moment').count() == 1
         assert tab.evaluate("""() => {

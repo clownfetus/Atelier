@@ -204,37 +204,6 @@ def main():
                 assert [s['state'] for s in loader_motion['states']] == ['loading', 'empty', 'error', 'ready'], loader_motion
                 assert all(s['animations'] == 0 for s in loader_motion['states']), loader_motion
                 result['viewport_motion'] = loader_motion
-                folder_motion = window.evaluate_js("""(() => {
-                  // Root categories can all have dedicated symbols. Exercise the real
-                  // generic-folder renderer without rebuilding the grid or changing navigation.
-                  const item = _makeCard({type:'folder', name:'Miscellaneous', rel_path:'NativeSmoke/Miscellaneous'});
-                  const card = document.createElement('button');
-                  card.className = 'card'; card.type = 'button';
-                  card.dataset.amReduced = 'true';
-                  const thumb = document.createElement('div'); thumb.className = 'card-thumb';
-                  thumb.appendChild(renderCardIcon(item, card));
-                  const name = document.createElement('div'); name.className = 'card-name';
-                  name.textContent = item.label;
-                  card.append(thumb, name);
-                  const fullSize = document.createElement('div'); fullSize.className='grid'; fullSize.style.setProperty('--card-w','156px');
-                  fullSize.append(card); document.body.append(fullSize);
-                  try {
-                    const svg = card.querySelector('.am-folder-flap');
-                    const front = svg.querySelector('.am-folder-flap-front');
-                    // Hidden WebView2 cannot receive keyboard focus; browser smoke covers it.
-                    return {width:svg.getBoundingClientRect().width,
-                      hidden:svg.getAttribute('aria-hidden'),
-                      transform:getComputedStyle(front).transform,
-                      transition:getComputedStyle(front).transitionDuration,
-                      animations:svg.getAnimations({subtree:true}).length};
-                  } finally {
-                    fullSize.remove();
-                  }
-                })()""")
-                assert 101 <= folder_motion['width'] <= 103, folder_motion
-                assert folder_motion['hidden'] == 'true' and folder_motion['transform'] == 'none', folder_motion
-                assert folder_motion['transition'] == '0s' and folder_motion['animations'] == 0, folder_motion
-                result['folder_motion'] = folder_motion
                 material_motion = window.evaluate_js("""(() => {
                   const host = document.createElement('span'); document.body.append(host);
                   const instance = AtelierMotion.materialSave.mount(host, {state:'saving', reducedMotion:'reduce'});

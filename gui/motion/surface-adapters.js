@@ -37,10 +37,6 @@
   };
   // Projects: the picker's empty drop and new-project ink live in app.js and project-ink.js.
   const drops=new Map();
-  document.addEventListener('click',event=>{
-    const button=event.target.closest?.('.btn.primary:not(:disabled)');if(!button||!AtelierMotionPolicy.allows(2)||document.hidden)return;
-    window.AtelierMotion?.workflow?.action?.(button);
-  },true);
   api.updateDrop=(kind,open)=>{
     drops.get(kind)?.remove();
     const button=document.createElement('button');button.className='k-update-drop';button.type='button';button.title=kind==='usmap'?'Mapping update available':'Atelier update available';button.setAttribute('aria-label',button.title);
