@@ -40,9 +40,9 @@ spikes (Phase 0). Nothing in Phases 1–5 should start until they have answers.
 | Replace texture, open in editor | Texture replace flow; `/api/texture_png` prefers the edited PNG | Move into the Texture tab |
 | Part thumbnails | `captureModPoster` renders the viewport to an image | Per-section framing |
 | Install to game | `_install_to_mods` with verification and rollback; `/api/check_mod_conflict` | None |
-| Review moment and ink-well | Export review with the Krackle ink-well (`gui/motion/ink-well.js`) | Entry from the dock |
-| Heroes, costumes, projects | `roster.js`, `catalogue.js`, the Projects screen with portfolio ink | Route into the workspace |
-| Ink flights | `gui/motion/import-ink.js`, `project-ink.js`, the moment claim, `AtelierMotionPolicy` | A pin → dock flight and the halftone reveal |
+| Review moment | Export review with the working glyph at Stage | Entry from the dock |
+| Heroes, costumes, projects | `roster.js`, `catalogue.js`, the Projects screen | Route into the workspace |
+| Motion | The assembly glyph (`gui/motion/assembly/`) and `AtelierMotionPolicy` | The Phase 4 moments, in the glyph's language |
 | Undo and redo | Only the project-trash undo toast in `app.js` | An edit history (new) |
 
 ---
@@ -236,6 +236,10 @@ parts of a dyeing skin with a chroma, undo all of it, and the saved MI JSON matc
 editor writes for the same colours. Effort: Large; the texture recolour is most of it.
 
 ## Phase 4 — Ink moments
+
+> Superseded in part by motion system v2 (`docs/motion-v2/`). The ink, the halftone reveal, the
+> ink-well and the moment claim below no longer exist; these moments need redesigning in the
+> glyph's language before they're built, and that design is Thiago's call.
 
 All full-motion only: still poses under Calm, Off and reduced motion. One stage owner through the
 moment claim. Ink only for real state changes.

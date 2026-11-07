@@ -69,7 +69,7 @@ OutputBaseFilename=AtelierSetup
 Compression=lzma2
 SolidCompression=yes
 ; Native controls retain keyboard, screen-reader, high-contrast and DPI support.
-; Generated plates share the app's A silhouette and connected Krackle ink system.
+; Generated plates share the app's A silhouette.
 WizardStyle=modern dynamic windows11 hidebevels
 WizardSizePercent=125,125
 DisableWelcomePage=no

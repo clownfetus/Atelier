@@ -18,7 +18,6 @@ no compositing, simulated UI, cropping or image generation.
 | `uv-xray.png` | The selected surface's actual UV0 wireframe and decoded texture |
 | `vfx-motionboard.png` | Real Niagara LUT tracks with the Motionboard editing controls |
 | `appearance-settings.png` | Appearance palettes and motion preferences |
-| `krackle-examples.png` | The authored motion examples and connected handoff in Settings |
 | `blender-settings.png` | The option to keep Blender textures out of the project |
 
 The game installation is read through an isolated **Release Verification**

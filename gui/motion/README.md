@@ -1,10 +1,17 @@
-# Assembly glyph
+# Atelier motion
 
-Motion system v2 replaces Krackle with three opaque pieces: texture tile, mesh block and
-material disc. They come apart and try to fit while work runs, click into an A on a real
-success, balance into a `!` on a warning and cross into an X on a failure. The rules are in
-`docs/motion-v2/SPEC.md`. Surfaces move to it in Phase 3; until then, what follows this
-section still describes what's on screen.
+Atelier's motion is one glyph made of three opaque pieces: the texture tile (blue), the mesh block
+(teal) and the material disc (copper), one for each kind of asset a modder edits. While work runs
+they come apart and try to fit. On a real success they click into an A, on a warning they balance
+into a `!`, and on a failure they cross into an X. The rules, including the ten invariants every
+change must keep, are in `docs/motion-v2/SPEC.md`; the decisions behind them are in
+`docs/motion-v2/DECISIONS.md`.
+
+The glyph is presentation only. Application code owns project state, requests and results; the
+glyph is told what happened and never decides it. A glyph that can't mount leaves its host's own
+text and fallback icon in place, so the interface stays usable without it.
+
+## The glyph
 
 | File | Job |
 | --- | --- |
@@ -14,941 +21,98 @@ section still describes what's on screen.
 | `assembly/glyph.js` | The renderer and the public API |
 | `assembly/assembly.css` | The halo and the glyph's box |
 
-`AtelierMotion.glyph.mount(host, {state, asset, size, reducedMotion, surface})` returns
+`AtelierMotion.glyph.mount(host, {state, asset, size, reducedMotion, surface, still})` returns
 `{set(state, {asset}), replay(), destroy(), state}`. States are `busy`, `info`, `success`,
-`warning` and `error`. `asset` is `mesh`, `texture` or `material`, only with `busy`, and only
-when the surface truly knows it. Call `success` only for a real `succeeded` result. `surface`
-names the colour behind the glyph if it isn't the page background.
+`warning` and `error`. `asset` is `mesh`, `texture` or `material`, only with `busy`, and only when
+the surface truly knows it. Call `success` only for a real `succeeded` result, never from a timer.
+`surface` names the colour behind the glyph if it isn't the page background; `--glyph-halo` does
+the same from CSS. `still` places a result without animating it. A glyph's `reducedMotion` is
+fixed when it's mounted, so a caller that follows a change of motion setting mounts it again.
 
-`AtelierMotion.glyph.entrance(host, {size, onDone})` is the header logo's entrance: once per
-launch, in Full motion, while the window is visible. It ends on the still mark and then calls
-`onDone`. Where it doesn't play, it mounts nothing, calls `onDone` at once and returns `null`.
+`AtelierMotion.glyph.entrance(host, {size, onDone})` is the header logo's entrance: once per launch,
+in Full motion, while the window is visible. It ends on the still mark and then calls `onDone`.
+Where it doesn't play, it mounts nothing, calls `onDone` at once and returns `null`.
 
-The tier comes from the host's height: Stage from 96 px, Inline from 32 px, Micro below. Below
-48 px, Working is the row with each piece nudging 1.5 px, because the moving fits need the whole
-canvas and draw too small there; loaders still run from 32 px. A glyph's time stops while it's off screen, while the document is hidden and once it has settled,
-and a settled glyph asks for no frames. A state set meanwhile plays when the glyph comes back.
+The host gets `data-atelier-motion="glyph"` and `data-glyph-state`, `data-glyph-asset` and
+`data-glyph-tier`. The tier comes from the host's height: Stage from 96 px, Inline from 32 px, Micro
+below. Below 48 px, Working is the row with each piece nudging 1.5 px, because the moving fits need
+the whole canvas and draw too small there; loaders still run from 32 px. A glyph's time stops while
+it's off screen, while the document is hidden and once it has settled, and a settled glyph asks for
+no frames. A state set meanwhile plays when the glyph comes back.
 
-Settings has Preview motion (`motion-preview.js`): real glyphs at 16, 48 and 128 px, the five
-states, the three loaders and the logo's entrance. `AtelierFoley.click()` is the optional success
-click. It plays at Stage and Inline in Full motion, and glyphs finishing together click once.
+**Interruption (D7).** Status text and controls update the moment a result arrives. The glyph lets
+the piece already in flight land (640 ms at most), then moves to the new state; cutting a move off
+mid-flight makes the pieces pop. A busy state that follows the same busy state carries on, and a
+result never animates twice. Only busy loops; results form once and hold still.
 
-Run `tests/browser_smoke.py --glyph-only --report-dir <folder>` for the planner and clearance
-baselines, the glyph's promises and Preview motion. `tests/glyph_fixture.py` is their bare page:
-the production files, a stand-in for the Motion setting and a clock stepped by hand.
+**Layers and fades.** The pieces always stack tile, mesh, disc. Nothing in the glyph fades or
+dissolves, except the cross-fade that stands in for movement in Off and under OS reduced motion.
 
-# Motion inventory
+## Motion setting
 
-Atelier's job feedback, ownership markers, empty states and brand moments speak
-**Krackle**. Energy defines the silhouette; bubbles give it texture and movement;
-at small sizes the silhouette survives with minimal texture. There are no outlines,
-gradients or symbols: busy is a ring of dots a charge travels around; success is a
-starburst; *completed with warnings* is a cracked ring whose broken chunk falls out
-(the work finished, but something broke off); failure is a splat that drips. The
-shapes give each outcome its personality; the text beside them says what happened.
+Settings has a Motion dial: Full, Calm and Off. `AtelierMotionPolicy` (`../preferences.js`)
+exposes `mode()`, `tier()` and `allows(n)` (Full is 3, Calm 1, Off 0) and sets
+`data-motion-mode` on the root. OS reduced motion forces Off, and Settings says so beside the dial.
+Calm keeps the shape and the colour of each result without the flourish; Off shows stills.
 
-Krackle is concentrated, not ambient. It appears for substantial job feedback
-(export, import, saves, loading, Activity), meaningful selections and arrivals
-(heroes, folders, editors and Mod tray assets), restrained ownership markers,
-empty states and occasional showcase moments (the logo entrance, the first
-export). Typing, pointer hover and repeated selection stay plain. Toolbar,
-menu and form controls keep Material Sharp glyphs; category emblems use their
-shared cut-out artwork. Artwork being edited stays visually trustworthy: Krackle
-never textures a colour swatch or the material-inspection viewport.
+Settings also has Preview motion (`motion-preview.js`): real glyphs at 16, 48 and 128 px, the five
+states, the three loaders and the logo's entrance. `AtelierFoley.click()` (`foley.js`) is the
+optional success click, off by default. It plays at Stage and Inline in Full motion only, and
+glyphs finishing together click once.
 
-Presentation owns artwork and animation lifecycle; application code owns project
-state, requests and outcomes. The static interface remains usable when an optional
-controller, image or animation API fails. No demo exporter, theme override or
-simulated progress loop is part of the application.
+## Where the glyph appears
 
-**Interruption and ownership.** An animation is never entitled to finish its
-performance. A real result replaces whatever is playing at once (mid-drop, mid-
-coalesce or mid-loop), and readable status text and controls render immediately,
-before the formation settles. A busy state that follows another busy state (a
-destination check running straight into a build) continues the current animation
-rather than dropping new ink. Only busy states loop; results animate once and hold
-still, and a settled or hidden stage stops drawing. The large Krackle stage belongs
-to the dialog the user has open (export review or the Edit All import); other jobs that
-finish or fail meanwhile report through their own toasts and Activity rows and
-never take over that stage.
+| File | Surface |
+| --- | --- |
+| `export-feedback-ui.js` / `.css` | The Build button and operation toasts. A result holds 1.8 s, then the button's icon comes back |
+| `material-save-ui.js` / `.css` | The glyph beside a Save button while it runs, and its result in a toast |
+| `toast-glyph.js` | A plain toast's icon becomes the small glyph, with the icon kept as the fallback |
+| `spinner-glyph.js` / `.css` | Every `.spinner` is the Micro glyph, working; the plain ring in `style.css` shows only if it can't mount |
+| `empty-glyph.js` / `.css` | The still glyph in empty places: the three pieces at rest, or the X when a place couldn't load |
+| `empty-assets-ui.js` | The Mod tray's empty state, shown only when the application confirms the project is empty |
+| `config-discovery.js` / `.css` | The setup-status check in Settings: the working glyph, Inline, while the request runs |
+| `logo-entrance-ui.js` | The header logo's entrance on launch |
+| `viewport-poster.js` | Model Studio opened from costume artwork: the artwork waits on the stage while the model decodes |
+| `surface-adapters.js` | Startup beside the counted bar, the index failure notice and the update button in the topbar |
+| `motion-preview.js` / `.css` | Settings: Preview motion |
+| `../job-tools.js` | Activity rows: a glyph per job, kept across refreshes |
+| `../mod-open.js` | Open a mod: a glyph per outcome row |
+| `../viewport.js` | The 3D viewport's loader at Stage, on the dark stage |
 
-| Set | Production use | Slot / behavior |
-| --- | --- | --- |
-| Export feedback | Export button and notifications | 28px / 40px, charge ring, starburst, cracked ring, splat |
-| Viewport loader | Existing 3D loading overlay | 112px, twelve-dot ring around a boiling ball; resting bubbles; KO splat |
-| Viewport poster | Model Studio opened from costume artwork | Artwork flies to the stage (Full), waits above the loader, drops behind geometry and leaves with the reveal sweep |
-| Folder flap | Generic folder cards | 76% of thumbnail, Krackle folder whose front panel tips open |
-| Material save | Editor save indicators and result notifications | 44px while saving (36px in Model Studio), 40px results |
-| Logo entrance | Topbar brand | Existing 32px mark, one 320ms entrance with a bubble splash |
-| Empty assets | Confirmed empty Edited Assets sidebar | 112px tray of bubbles, brief entrance then still |
-| Texture reconstruction | Edited texture previews in the grid and sidebar | New pixels arrive through swelling halftone dots |
-| Continuity / polish | Navigation, editors, menus, counters and confirmed operation feedback | `../continuity.js`, `../polish.js`; disposable snapshots, real outcomes only |
-| Krackle glyph | Job toasts and Activity job rows | 16-24px, the same micro shapes for any job outcome |
-| Empty state | Empty folder, no matches, failed folder load, no projects | 64px, bubbles drop in once |
-| Krackle stage | Export review | 184-216px canvas particle formations; smaller in short windows |
-| Import ink | Edit All import dialog (`import-ink.js`, styled in `../identity.css`) | 176px SVG stage (140px in short windows); ink gathers on the chosen asset cards, pours into the stage's well, charges a six-dot ring and leaves for the Mod tray header per finished asset; burst, cracked ring, splat or a still muted drop for the result |
-| Setup check | Launch check and first-run setup page (`setup-check.js`, styled in `../identity.css`) | 72px band on the page header's rule: a drop pours along the channel to a latch while the check runs; starburst, cracked ring or splat on the latch for the result; 20px Krackle glyphs on the rows |
-| Setup blocks | First-run setup page (`../setup-wizard.js`, styled in `../identity.css`) | Each row's block condenses out of specks when its real check passes, once and solid throughout; Calm keeps the swell, Off and reduced motion use the 150 ms fade |
-| Ink-well | Export review: checking, building and the result; the first-run page's receiving well | 216px SVG vessel of living bubbles (164px in short windows); a few carry the cooked skin's colours; success releases, warning strains in a loop, failure ruptures |
-| Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
-| Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
-| Workflow accents | Pin/unpin, project handoffs and model workspace changes | Finite, event-owned formations outside labels and model artwork |
-| Connected surfaces | Primary actions, build selections, Settings, Activity, projects and tool panels | Surface-bound seams receive ink from actual initiating controls |
-| `krackle.css` | Every `.spinner`, progress bars, the Activity ring, import segments, edited rows | CSS only |
+`docs/motion-v2/SURFACE_MAP.md` lists every surface with its tier and states.
 
-`workflow-krackle.js` gives committed actions a finite SVG gesture inside their
-own rounded bounds. A 3–6px edge mask and content cutouts protect labels, controls,
-portraits, textures, swatches and model canvases. There are four gestures, each
-with one meaning:
+## Colour and timing
 
-| Gesture | Meaning | Call names |
-|---|---|---|
-| Arrive | something opened or arrived here | `arrive`, `hero`, `arrival`, `editor`, `panel`, `workspace`, `project` |
-| Trace | you moved somewhere (`'back'` reverses it) | `trace`, `navigation` |
-| Seal | you committed something | `seal`, `action`, `selection`, `pin` |
-| Release | you undid something | `release`, `unpin` |
+`inks.js` (`AtelierInks`) is the colour maths: sRGB fitting and CIELAB distance. `../theme.js` uses
+it to fit `--charge` to the card surface and `--charge-raised` to raised surfaces, and sets
+`data-glyph-surface` (dark or light) on the root. `charge.css` holds the unmeasured defaults and the
+edited corner, a plain triangle in the charge colour on edited rows, cards and portraits.
 
-Arrive's rails leave a lower seal and rise up both sides, capped on tall panels.
-Seal closes two jaws on a lower clasp, and Release unwinds those same jaws. The
-SVG carries `data-workflow-kind` (the gesture) and `data-workflow-trigger` (the
-call name). Context menus already scale open from the pointer, so they draw no
-edge ink; `workflow.menu` stays as a no-op. Filled receiver seals have true
-holes. Local gestures take 500–720ms, and at most three run together. Trace and
-the navigation, editor, workspace and panel calls share `moment.js` with
-import/export. Repeated selections, failed navigation, typing and background
-panels never start an arrival.
+`timing.js` loads after `tokens.css` and before the controllers. It exposes `AtelierMotion.ease`,
+`AtelierMotion.beatMs` (from `--motion-beat`), `AtelierMotion.exitMs` and `AtelierMotion.springMs`.
 
-`workflow.transfer(source, destination, kind)` joins two actual, visible DOM
-edges with a filled SVG stream. A visible reservoir charges at the source before
-the ink stretches along a curved path. The receiving edge compresses, rebounds
-once and sends a connected ink seam along its border after the stream arrives.
-The source, stream and reaction share one clock and the same contextual pigment;
-the actual surface, artwork and controls stay fixed. Transfers finish in about
-1.1–1.4 seconds, including the receiving gesture.
-It skips missing, overlapping or hidden endpoints. Pointer and keyboard origins
-can supply the source of navigation, editors, projects and selections. Imports use
-the real asset card frame and matching Mod tray row; packing joins a selected
-tray entry to Export. Connections protect intervening content and cancel when
-either endpoint moves, disappears, or loses visibility. Scroll, resize, policy
-changes and teardown remove owned effects; palette changes repaint live ink.
-Calm keeps a brief local pulse and Off stays still.
+## Continuity and polish
 
-`workflow-surfaces.js` opens panel seams after a genuine user gesture. Pending
-entrances cancel on dismissal, hiding and policy changes. Operations and control
-responses remain immediate; motion never controls request completion.
-
-`krackle-context.js` supplies `AtelierMotion.energy.resolve(host)` and the
-decorative `--krackle-energy` / `--krackle-energy-rift` pigments. Costume icons
-take precedence over unrelated banner colours; Model Studio owns its current
-costume context, and leaving it restores the library context. Missing art uses
-the chosen theme accent. Pigments retain their hue and are fitted for readable
-contrast against the actual surface, including translucent and color-mix paint.
-Theme controls, ownership markers and semantic result inks retain their roles.
-
-The Motion dial in Settings controls the volume of these gestures. Opening a
-dialog cancels workspace formations, including Calm pulses.
-
-Run `tests/browser_smoke.py --workflow-motion-only --report-dir <folder>` for the
-selection/navigation/editor/tray integration, reduced-motion, ownership and
-failure/lifecycle checks.
-
-## Artwork source and rules
-
-`scripts/krackle_art.py` draws every Krackle illustration once. It writes the
-standalone `.svg` files here and the copies embedded in the controllers, in
-`krackle.css` (spinner masks) and in `index.html` (`folder-flap-template`), so the
-editable and embedded artwork cannot drift. Run it after any geometry change;
-`python scripts/krackle_art.py --check` fails when a copy is stale and is part of
-the browser checks.
-
-- **Composition:** bubbles gather into one or two deliberate dark masses on the
-  shadow side and thin into isolated satellites, leaving broad clean energy
-  elsewhere. No bubble touches a silhouette's edge: in the stage a bubble may only
-  sit on a dot at least one lattice step inside the shape, and its size is capped by
-  that depth, so thin bands such as the ring keep a sparse centreline. Success stays
-  mostly clean, a warning darkens the fracture and a failure carries one substantial
-  mass, always with its outline intact. Highlights are crisp Paper specks (the
-  charge crest swells and catches a few), never a soft glow or gradient.
-- **Inks:** a formation uses one energy ink (two at most while one state hands over
-  to the next). Bubbles and glints are not inks: bubbles are holes that show the
-  surface behind (`--krackle-hole`, ink black on dark surfaces, the surface or button
-  colour on light ones) and glints are a small fixed Paper highlight.
-- **Colour:** energy uses Atelier's semantic tokens through the `--krackle-*`
-  variables in `krackle.css`, so every palette, including custom palettes, keeps its
-  tested contrast. Any future skin-derived accent and its clash guard change only
-  interface accents, never an asset's colour values.
-- **Sizes:** at 48px and below glyphs are drawn by hand rather than sampled from a
-  formation; the large stage keeps its dots about 8px on screen.
-
-## Continuity and polish lifecycle
-
-`AtelierMotion.polish.mount(host, {state, frames, duration})` returns `setState`,
-`destroy` and a completion promise. Replacing or removing a host cancels its
-previous effect; page hide and forced/OS reduced motion release active effects.
-View Transition names are transient and cleaned after completion or cancellation.
-The actual request/close is independent of the visual completion. Dialogs retain
-plain CSS exits when discrete transitions are supported; older engines close
-immediately. Existing save/export controllers also follow the shared motion policy.
-
-The optional first-export color burst requires a confirmed successful export and
-real selected-preview colors, persists its one-time flag locally, and becomes
-static chips with reduced motion. Logo replay is an explicit click/keyboard
-action. The loader's artwork tint remains contrast-corrected on its fixed surround.
-
-`timing.js` loads after `tokens.css` and before the controllers. It exposes the
-shared `AtelierMotion.ease` table and reads the 1040ms `--krackle-beat` into
-`AtelierMotion.beatMs`. CSS busy rings use that token directly; JS micro rings
-use one beat and the large stage takes two beats per revolution. The exit tokens
-also supply `AtelierMotion.exitMs` and `AtelierMotion.ease.exit`.
-
-Browser coverage: `tests/browser_smoke.py --polish-only --report-dir <folder>`.
-Native coverage: `tests/desktop_smoke.py --fixtures` with isolated
-`ATELIER_DATA_DIR`; its `polish` report checks static lifecycle, operation identity,
-collation, segments, preferences and the actual native launch/title-bar bridge.
-
-# Texture reconstruction
-
-`texture-reconstruction.js` exposes `AtelierTextureReconstruction.refresh(image,
-src, {project})`, `disposeWithin(container)` and `clear()`. Only edit notifications
-and successful Replace Texture actions call it; ordinary browsing and initial
-imports do not animate. Grid and sidebar refreshes use the same project-bound
-edited PNG URL and wait for the real image load before starting.
-
-The updated image remains underneath a temporary, non-interactive canvas. Its
-pixels arrive through a 45° halftone screen (about 14 dots across a tile, 8 in the
-compact sidebar): each dot swells from nothing, outward from the centre, until the
-dots overlap into the finished image, settling in about 640ms/430ms. The wipe swap
-sends the same swelling dots across the old preview from left to right. Rectangular maps retain contain fit and transparency. At most four
-canvases animate concurrently; offscreen, hidden and reduced-motion views update
-statically. Repeated saves replace the previous effect. Navigation, list redraw,
-project changes, failed reads, missing canvas support and page hide release the
-temporary layers. Presentation does not write textures or delay image requests.
-
-`tests/texture_reconstruction_checks.py` covers actual image arrival, external
-save and replacement integration, exact final pixels, repeated saves, reduced
-motion, optional component failures and abandoned project/grid updates. Run the
-focused browser checks with `tests/browser_smoke.py --texture-reconstruction-only
---report-dir _work/texture-reconstruction-checks`.
-
-# Export feedback
-
-Lifecycle adapted from the user's Gemini export feedback controller (15 October
-2026); the artwork is now Krackle. Idle is a drop of ink above a tray of energy.
-Busy is the six-dot charge ring: each dot swells and shows a bubble as the charge
-passes, clockwise, every 1040ms. Success pops a starburst (420ms) with four flecks
-thrown out; completed-with-warnings stamps a cracked ring and drops its chunk,
-which bounces twice (620ms); failure squeezes to a point, bursts into a splat with
-satellites and a drip, and leaves one dazed bubble circling to rest (about 1.4s,
-decorative; the toast text is already there). The SVG is the editable static
-resting vector; the controller embeds the same geometry, both generated by
-`scripts/krackle_art.py`. CSS uses Atelier's semantic colour tokens.
-
-## Ownership and integration
-
-- `export-feedback.js` provides `AtelierMotion.exportFeedback.mount(emptyHost,
-  {state, reducedMotion})`. Its handle supports `setState`, `replay`,
-  `setReducedMotion` and idempotent `destroy`. It owns only its inline SVG,
-  animation effects and lifecycle listeners. There are no API or storage calls.
-- States are `idle`, `busy`, `success`, `warning`, `error`. The busy loop is
-  indeterminate (1040ms); terminal transitions are one-shots of 420ms to about
-  1.4s, released when they finish. Both OS
-  reduced motion and the forced `reduce` setting select static poses. Hidden
-  documents stop loops, resuming only still-busy work. Unavailable/throwing WAAPI
-  degrades to static artwork. Finished effects are released; detached/replaced
-  hosts and duplicate mounts dispose old instances.
-- `export-feedback-ui.js` mounts the button and each export toast separately.
-  `begin(button, project)` returns a result callback guarded by operation and
-  project. Only the latest operation can update/reset that button. After 1800ms
-  the glyph crossfades into the static download icon over 120ms; this timer never
-  gates another export. New work, hiding, teardown and reduced motion cancel the fade.
-- Toast removal, timeout and click share one cleanup path. Hover pauses terminal
-  toast dismissal. Text is inserted with `textContent`; dynamic filenames and
-  backend errors never become SVG/HTML markup. Existing non-export toasts keep
-  their previous behavior.
-- `_runInstall` starts motion after validation/overwrite confirmation and maps
-  actual results: clean completion -> success; client/server skipped items,
-  missing mods folder or built-but-not-installed -> warning; build/network
-  failure -> error. Detailed skipped-item messages retain their 16-second
-  duration. Requests, payloads, project headers and button availability remain
-  under the existing application logic. Optional presentation failures fall
-  back to existing notifications without changing the export result.
-
-`../export-review.js` adds the review/result surface around this existing
-feedback. It lists included/excluded changes, uses indeterminate build progress
-and preserves the latest result for the session. Application guards reject stale
-project/selection/settings snapshots and material/viewport drafts or active saves.
-The destination conflict check has a timeout; builds are never automatically
-retried or cancelled by presentation. Built-but-not-copied results expose the
-exported files separately from installation failure. `tests/export_review_checks.py`
-uses intercepted responses to check these contracts without writing a mod.
+`AtelierMotion.polish.mount(host, {state, frames, duration})` (`../polish.js`) returns `setState`,
+`destroy` and a completion promise. Replacing or removing a host cancels its previous effect; page
+hide and reduced motion release active effects. View Transition names are transient and cleaned up
+after completion or cancellation. The request or close a transition belongs to never waits for it.
 
 ## Checks
 
-`tests/export_motion_checks.py` runs through `tests/browser_smoke.py` with real
-frontend functions and intercepted export responses. It covers lifecycle,
-reduced motion, visibility, unsupported animation, outcomes, rapid operations,
-project changes and toast disposal. No game/mod output is written by these
-fixtures. `tests/desktop_smoke.py` also checks static states and destruction in
-native WebView2. In-game compatibility is a separate release check.
+Each flag runs one part of `tests/browser_smoke.py --report-dir <folder>`:
 
-# 3D viewport loader
-
-Lifecycle adapted from the user's Gemini viewport loader controller (15 October
-2026); the artwork is now Krackle and shares geometry with `viewport-loader.svg`.
-After a 150ms show-delay, loading coalesces twelve dots out of the centre around a ball of energy (220ms),
-then the charge travels the ring while the ball bobs, its bubbles boil out of step
-and three loose bubbles drift. Empty drains the ball away: the ring fades and three
-bubbles drop to the floor and bounce. Error squeezes and bursts into a dripping
-splat, then three dazed bubbles circle above it and slow to a stop; the existing
-message and controls appear immediately.
-
-The production loader occupies **112px**. Export feedback is **28px** in the
-button and **40px** in toasts. The standalone components keep their original
-72px and 20px defaults; production slots supply the larger sizes. Fixed dimensions
-prevent layout movement during state changes.
-
-`AtelierMotion.viewportLoader.mount(emptyHost, {state, reducedMotion})` returns the
-same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape. It extends
-the existing namespace without replacing export feedback. States are `idle`,
-`loading`, `ready`, `empty` and `error`; replay only repeats loading assembly.
-The 220ms assembly transitions into a 1040ms fluid loop: an upper inlet feeds
-two connected frame sides into a lower catch plate. Existing rim lobes remain
-attached to that frame; loose bubbles stay hidden while loading. Mounting is immediate,
-and all loading artwork stays hidden during the show-delay. Ready cancels that
-delay immediately; empty/error results and reduced-motion stills do not wait. These are
-indeterminate decoration, not a percentage or model progress measurement.
-Ready cancels immediately; empty settles in about 640ms and error in about 1.6s. Finished effects are
-released, duplicate mounts destroy their predecessor, and a partial WAAPI failure
-cancels all effects and selects a static pose for that instance. OS/forced reduced
-motion and hidden-document behavior are handled explicitly.
-
-`viewport.js` owns this persistent host's lifetime. `clearModel()` destroys the
-old animation; both open paths mount after clearing/capturing the new generation.
-Successful geometry hides and destroys the loader before background materials
-start. Empty/error states preserve their existing messages. Stale successes and
-failures do not touch the current loader. A denied `canLeave()` leaves it intact.
-Callers must explicitly destroy before removing/replacing a loader host; unlike
-short-lived export toasts, this component needs no DOM-wide observer.
-
-The static fallback uses bundled Material box/error symbols rather than an
-animated spinner, so absent scripts or failed presentation cannot imply that an
-empty/failed load is still working. Mount/state failures restore this fallback
-without changing decoding, project headers, API requests, cameras or materials.
-No new dependencies are needed. Fixed dark-surface accent/error colors remain
-legible when the surrounding application is in light mode.
-
-`tests/viewport_motion_checks.py` is run by `tests/browser_smoke.py`. It exercises
-the actual viewport functions using controlled Three.js geometry and API responses:
-fast readiness, deferred materials, empty/error results, late geometry disposal,
-rapid reopening, close/save guards, optional-script failures, animation lifecycle,
-and 72px rendering at two desktop sizes in both themes. The optional `--mesh`
-browser run additionally loads a real previously decoded GLB. The native desktop
-smoke checks static states, dimensions and teardown in WebView2.
-
-# Folder flap
-
-The interaction was initially adapted from the user's Gemini folder flap
-(15 October 2026). The artwork is now a Krackle folder: back and front panels of
-energy in the folder colour, a bubbly top edge on the front panel, and one composed
-mass of bubbles punched through to the tile in the lower right.
-
-`scripts/folder_emblems.py` draws the folder and embeds it in `index.html`'s
-`folder-flap-template`, avoiding an extra request per folder or a JavaScript animation
-controller.
-`app.js`'s `renderCardIcon` clones the template only for generic folder icons;
-missing templates fall back to the existing Material symbol. The same helper runs
-after failed portrait requests, whose original `thumbnail` property remains set.
-Loaded hero/skin portraits, category symbols, asset previews and their fallbacks
-keep their existing rendering. The inline SVG has no IDs, events or external
-references, and the icon adapter leaves it alone.
-
-Scoped CSS tips the front panel open (a skew and squash from its base, 220ms with a
-small overshoot) on fine-pointer hover or keyboard `:focus-visible`, returning in
-150ms. Hover adds no particles.
-Focus retains the open pose after the
-pointer leaves. Coarse pointers have no hover pose. OS/forced reduced motion
-selects immediate static poses. The existing native button owns clicks, Enter,
-focus outlines and press feedback; Space uses the library preview shortcut when
-one is available, otherwise native folder activation. No animation controller,
-timers or cleanup hooks
-are added. Replacing a grid automatically cancels its CSS transitions.
-
-The existing 76% icon sizing is applied once: a **~102px SVG slot** in a 134px
-thumbnail, with **~90px painted width** and no clipping in either pose. Both paths
-inherit the existing theme-aware folder color. SVG opacity attributes leave the
-closed folder visible when motion CSS is missing.
-
-`tests/folder_motion_checks.py`, invoked by `tests/browser_smoke.py`, covers
-eligibility, image fallbacks, actual navigation, keyboard/pointer behavior,
-reduced motion, touch media queries, dimensions in both themes and grid rebuilds.
-Native WebView2 checks the static SVG size and reduced-motion styles; keyboard
-behavior is tested in Chromium because the native smoke window is hidden.
-
-# Material-save feedback
-
-Lifecycle adapted from the user's Gemini material save controller (15 October
-2026); the artwork is now Krackle and shares geometry with `material-save.svg`.
-Idle is a swatch: a ball of energy shaded by bubbles, with a glint. Saving runs the
-charge ring around a small pulsing swatch. Results use the same starburst, cracked
-ring (saved, with something lost such as intensity metadata) and splat as export
-feedback. The glyph is decoration beside the save message, never the material's
-own colour.
-
-`AtelierMotion.materialSave.mount(emptyHost, {state, reducedMotion})` returns the
-same `setState`, `replay`, `setReducedMotion`, `destroy` handle shape as the other
-components. States are `idle`, `saving`, `success`, `warning`, `error`. The icon
-defaults to **24px**; production notifications use **40px**. An upper reservoir
-feeds a continuous S-shaped ribbon into a lower seal. Success catches at that
-same receiver, compresses, rebounds and spreads into the settled result;
-warning drops its chunk in 620ms and error splats in about 1.4s. Saving uses a
-1040ms fluid loop beside the existing `Saving…` text: **44px** in editors and **36px**
-in Model Studio. Only actual responses produce result notifications.
-
-Direct terminal mounts animate once; identical states do not replay. Finite
-effects and their finish callbacks are released. OS/forced reduced motion and
-hidden documents cancel motion; only genuinely busy work resumes. Missing,
-throwing or partially failing WAAPI cancels all effects and leaves static CSS
-artwork. State validation excludes inherited object properties. Duplicate mounts
-destroy the prior instance; callers explicitly destroy before removing hosts.
-
-`material-save-ui.js` provides the save-only `AtelierMaterialSaveFeedback.toast`.
-It creates a 40px static fallback beside the motion host, inserts dynamic messages
-with `textContent`, and returns the exact toast element. Its `remove()`, click and
-timeout paths share idempotent disposal. Hover pauses expiry. Failed mounting
-leaves the fallback visible; cleanup errors cannot prevent removal. The existing
-toast area's live-region behavior is retained. No DOM-wide observer is added.
-`app.js`'s no-throw `toastMaterialSave` boundary falls back to escaped generic
-notifications if the optional presentation helper fails or is absent.
-
-The material dialog captures its editor, project, material name and exact submitted
-payload before awaiting persistence. Duplicate Save clicks on that editor share
-the in-flight guard. A late result cannot close or relabel another editor/project.
-If colors, scalars or intensity metadata change during the request, the newer
-draft remains open with qualified warning feedback. Clean saves close immediately;
-the toast plays independently. Missing intensity persistence uses warning artwork
-and retains the explanatory message. Failed requests retain the draft and inline
-error. Other callers of `_warnIntenLost` are unchanged.
-
-Viewport saving preserves its existing per-material requests, submitted snapshot,
-project header, draft comparisons and retry behavior. Any failed material yields
-the original warning/counts; successful submissions with newer dirty edits get
-qualified warning feedback. Completion releases the singleton saving guard even
-if the view is stale. Editor-local status/controls update only for the originating
-view, and an old project's notification identifies that project. Non-save `note`
-calls and the Save button's text/count/disabled behavior are preserved.
-
-No Python API, payload fields, intensity persistence rules, model rendering or mod
-formats change. `tests/material_save_motion_checks.py` exercises the controllers
-and real save hooks with intercepted responses through `tests/browser_smoke.py`.
-The native desktop smoke checks 24px static states and disposal in WebView2.
-
-# Logo entrance
-
-`logo-entrance.js`, `.css` and `.svg` adapt the supplied Gemini entrance without
-redrawing the Atelier mark. The controller uses the caller's unchanged PNG inside
-an inline SVG and exposes `AtelierMotion.logoEntrance.mount(emptyHost, options)`.
-States are `settled` and `entering`; the handle provides the common state/replay/
-reduced-motion/destroy methods and a `ready` promise. The entrance stays fully
-opaque and stamps with a squash and stretch over 320ms while six charge bubbles pop out from
-behind the mark and fade inside the slot; settling cancels them with the entrance. The topbar keeps its existing 32px
-slot, avoiding layout movement or an enlarged startup splash.
-
-`logo-entrance-ui.js` owns a single document-start attempt. It keeps the original
-image visible until both controller/image readiness succeed, then exchanges equal
-slots in one task. Missing scripts, load failure, hidden startup, reduced motion
-or unavailable animation keep the static mark. Startup never waits for the motion;
-when the Full launch formation draws the logo, it settles any topbar entrance
-and queues one stamp for `AtelierSurfaces.startupDone()`. Hiding discards the queued
-stamp, and Calm/Off keep the automatic startup mark still. Explicit replay remains
-available in Calm after the launch formation has finished;
-theme changes, project changes and ordinary renders do not replay it. Page teardown
-destroys its effects/listeners and restores the caller-owned fallback.
-
-# Empty Edited Assets
-
-`empty-assets.js`, `.css` and `.svg` keep the supplied Gemini controller's
-lifecycle with Krackle artwork: a tray of energy holding four loose accent bubbles,
-a drop of ink waiting above it and halftone registration dots in the corners.
-Scoped selectors override the sidebar's ordinary small-icon size only for this
-illustration. `AtelierMotion.emptyAssets.mount(emptyHost, options)` accepts
-`settled` and `entering`; the entrance stamps the tray up, drops the bubbles in one
-after another with a bounce and swings the drop in, finishing in about 625ms, with
-no idle loop.
-Reduced motion, hidden/offscreen hosts or unavailable animation settle statically.
-Duplicate mounts and explicit destroy release owned effects/listeners/observers.
-
-`empty-assets-ui.js` follows authoritative imported-asset responses, after the
-application's project/request-generation checks. Loading, stale responses and
-failed requests cannot establish emptiness. Filtering a nonempty project's sidebar
-to zero matches does not show the tray. Each project enters on first confirmed
-emptiness or a genuine nonempty-to-empty transition; ordinary sidebar rerenders,
-search, theme changes and returning to the same empty state stay settled.
-The adapter disposes before replacing its host and hides the static package
-fallback only after successful mounting. Text and export controls remain owned
-by the sidebar, not the animation.
-
-## Entrance validation contract
-
-Check both themes, reduced motion, hidden startup, image/WAAPI failures, repeated
-mount/unmount, equal brand bounds, visible 112px tray bounds and absence of idle
-effects. Confirm that project loading/failure/search cannot replay or falsely
-trigger empty-state motion, and that no new API/project writes are introduced.
-Run the combined browser suite and native smoke before claiming end-to-end
-integration; asset presence and the older four-set test counts alone are not
-validation of these two adapters.
-
-Saved-preview swaps pass the mode 'wipe' to AtelierTextureReconstruction.refresh.
-The controller retains a small previous-preview snapshot until the real image
-loads, then wipes to the new pixels over 320ms. Alpha, contain fit and lifecycle
-cleanup remain intact. Block assembly remains the default for direct consumers.
-
-The viewport's existing render lifecycle also owns its 420ms wireframe/shaded
-clipping sweep, 150ms linear colour and texture blends, and 260ms camera framing.
-`viewport-effects.js` owns disposable display variants and bounded optional bloom
-targets. Model/project replacement and close release these resources; the hidden
-viewer stops rendering. Reduced motion selects the final shaded colours and
-camera position immediately. No additional idle loop or automatic standing-idle
-playback is introduced. Browser and native viewer checks include rendering,
-interruption, alpha captures and target disposal. Native automation intercepts
-only the final download click to inspect real encoded bytes before an OS dialog.
-
-# Import ink
-
-`import-ink.js` draws the Edit All dialog's stage and the ink that joins the real
-asset cards, the stage and the Mod tray. `../import-dialog.js` maps the job to it;
-`app.js` still owns the request, SSE progress and the library refresh, and
-`AtelierPolish.importStart/importProgress` still own the result dots.
-
-| Real event | Ink |
+| Flag | Covers |
 | --- | --- |
-| Edit All confirmed | A drop gathers on each visible chosen card (up to five, 85ms apart) and pours into the stage; the first splashes and is drawn out into the six-dot ring. With no visible card, the stage charges at once. |
-| Extracting / decoding | The crest steps once per sixth of the 1040ms beat: a count, not a spin. |
-| One texture finished | The crest pops a starburst (imported) or a splat (failed); imported ink leaves for the Mod tray header, coalesced to one flight per 320ms. |
-| Job done | Success bursts, a partial import cracks the ring and drops its chunk, failure splats and drips. Kept work rides a blue core to the tray header and spreads a seam along it. A cancel with nothing imported settles to a still, muted drop. |
+| `--glyph-only` | Planner and clearance baselines, the glyph's promises and Preview motion, on the bare page in `tests/glyph_fixture.py` |
+| `--assembly-only` | Glyph states, tiers and mounting rules in the app |
+| `--glyph-surfaces-only` | Spinners, toasts, empty grids, Activity and the counted ring |
+| `--working-panels-only` | Export, material save and the viewport loader, with their real hooks |
+| `--surfaces-only` | Startup, the index failure notice, the update button and folder icons |
+| `--inks-dial-only` | Charge fitting on every preset and the Motion dial |
+| `--logo-only`, `--empty-assets-only` | The logo entrance and the Mod tray's empty state |
+| `--polish-only`, `--retired-only` | Continuity, and that the retired surfaces stay gone |
+| `--showcase-only` | Showcase views and the success click |
 
-Results interrupt inbound ink at once; the status text, dots and Done button are
-already written. Flights are hidden over the dialog panel except inside the stage
-well, so ink never crosses text or controls. The stage redraws on twos (12 fps) and
-re-seeds its boil each drawn frame; flights step at 24 fps. Full motion only: Calm,
-Off and reduced motion show each state's final pose and nothing travels. Hidden
-stages and documents stop drawing, and a flight whose endpoint leaves the screen
-ends without landing. The dialog's own ink replaces the working-panel border charge.
-Colours are the identity roles in `../identity.css` (energy, its core, done, caution
-and fault), so Light draws Lamp Black ink and Dark draws Smalt Light.
-
-# Project ink (archived presentation)
-
-The app now uses a compact project picker and no longer loads `project-ink.js`.
-The module is retained for motion studies; the following describes its former
-portfolio presentation.
-
-Projects were portfolios: `app.js` draws each card as the folder itself (a back panel and
-tab on a flat foot, the newest edited texture inside as a loose sheet, the front panel
-behind a paper halo carrying the name, a punched clasp and the Smalt drop). Each part is
-followed by an empty `.pp-live` slot that `project-ink.js` draws liquid outlines into,
-so a formation sits in the right layer without copying the artwork.
-
-`form(card)` runs once after `/api/project/create` succeeds and the list has re-rendered
-with the new card focused. Ink enters from the far edge of the screen and runs along the
-row's baseline, beneath the picker's content, so it never crosses text. It pools in the
-new card's slot, and the front panel rises out of it as liquid whose wavy lip settles
-flat. The back panel and tab follow, then the clasp opens and the drop pops in. The sheet
-slides up and the name prints on the panel in two steps. About 1.5s. The run keeps a
-fixed, position-seeded edge and is drawn every display frame, so it flows rather than
-flickers.
-
-`snapshot(grid)` and `dissolve(snapshot, deletedNames)` play it backwards for deleted
-cards: inert, `aria-hidden` ghosts beneath the already-updated list (up to six, 70ms
-apart). The name goes in two steps, the sheet slides in and the drop lifts off. The panels
-melt into a puddle at the foot, which drains along the baseline to the nearer edge.
-Surviving cards hold for 700ms, then glide into the gap with a small overshoot.
-
-Both read the card's own geometry and computed colours, so their last frame is the static
-artwork. They claim the `new-project` / `delete-project` stage, but while the Projects
-page is open a stage busy behind it (the startup loader) cannot refuse them: the page is
-opaque and the moment is the picker's. They end at once when the card leaves the screen,
-the picker closes or the document hides, and do nothing in Calm, Off or reduced motion.
-The picker reports results in its header status line (`#proj-status`, a polite live
-region), not in a toast.
-
-# Setup check
-
-The launch check stands on the same page as Projects: the same ink surface, wordmark and
-tagline, and a channel exactly where the Projects header rule is. `app.js` owns the
-`/api/setup_status` request, the key and mapping retrievals, validation and the save;
-`../setup-wizard.js` (`AtelierSetup`) presents them and `setup-check.js` draws the band.
-
-| Real event | Ink and page |
-| --- | --- |
-| Check starts | The normal startup splash stays visible while `/api/setup_status` is pending. |
-| Configured | The Library opens with the active project. Without an active project, the project picker opens. |
-| First run | The rows fill from the real answer together. Found rows get a 20px found glyph (the ink key, the code file, the folder: see **Krackle glyphs**), what was found and the path or file in Fragment Mono, and a quiet Change. The key and mapping charge a six-dot ring while they are fetched. Missing rows get the cracked ring in the caution colour, an instruction and the field. The latch shows a starburst if the game was found, otherwise the cracked ring. One drop runs down past the valid rows into the ink-well below them (see **Setup ink-well**); "Open Atelier", the well's label, stays disabled until every row is valid. |
-| Check failed | The latch squeezes and splats. The page says the check couldn't finish, shows the real error in a mono box and offers Try again, Open settings and Get help. |
-
-`AtelierMotion.setupCheck.mount(host, {state, play})` returns `setState` and idempotent
-`destroy`; states are `busy`, `success`, `warning` and `error`. Only `busy` loops, on the
-1040ms beat, and only in Full motion with the document visible; results play once. Calm,
-Off and reduced motion show each state's final pose (the busy pose is the drop resting at
-the start of the channel). The band measures its host on resize; it is `aria-hidden` and
-the heading, lede and row text carry every outcome. Artwork comes from
-`scripts/krackle_art.py` (`setup-check.svg`), colours from the identity roles: energy for
-the drop and latch, done, caution and fault for the results.
-
-The page reuses the Settings controls (one set of IDs, validators and save payloads): it
-moves the game, key and mapping rows and the save button into its own rows while it is
-showing and puts them back for Settings, which keeps its dialog, its loading cover and
-configuration discovery unchanged. Appearance and motion are chosen in Settings, not
-during first run.
-
-## Setup blocks
-
-The first-run page splits its three stages with the three blocks (`docs/motion-v2/DECISIONS.md`,
-D18). `setup-wizard.js` draws a block when its row becomes valid: specks gather for 340 ms and the
-block swells from 250 ms to 620 ms under a clip and a scale, with no opacity. A move in flight
-finishes before a row can lose its block. The host carries `data-piece` and, once drawn,
-`data-shown`.
-
-## Setup ink-well
-
-No page mounts this any more. `setup-drop.js` stays, with its fixture test, until P4 removes the
-Krackle files.
-
-The first-run page was the Grand pour: each row names its thing on the left, the drop's
-column runs down the middle through the glyphs, and what was found sits on the right. The
-page ends on the export review's ink-well (**Ink-well**, below), mounted as it is, standing
-prominent under the column with the page's Open Atelier button as its paper label and the
-note beneath. One drop of ink follows one dotted line down the column, in the page's order:
-Unlock key, Mapping file, Game folder. The glyphs sit on the line like beads (the dots part
-around them, and the drop passes behind each glyph). The source is the top of the rows, the
-path is the line, the receiving point is the well's mouth. The well's lid is a status, not
-decoration: shut in the energy ink while a row needs the person, open in the done colour
-once every row is valid.
-
-| Real event | Ink |
-| --- | --- |
-| The page shows its first answer | The drop forms on the rows' top rule (200ms pop). The well is alive: it cooks as it does in the export review, sparse (a few large bubbles, no small ones), its lid shut. |
-| Rows become valid, from the top | The drop runs down the line to the rule under the last row that is valid in an unbroken run from the top (260–520ms a row), stretching as it runs and inking the dots behind it. It waits at the first row that isn't valid; if it continues while moving, it carries on rather than starting again. |
-| The row it waits at is being fetched | The drop charges on the beat (Full motion only). A row that needs the person leaves it still. The well keeps cooking either way; hidden or off-screen, it stops drawing. |
-| Every row is valid (Open Atelier turns on) | As the drop gathers at its station (140ms) the lid takes the done colour (260ms) and swings open about its left cap (620ms, overshooting: -150°, -132°, resting at -138°). The drop leaves the column, falls into the mouth from above (360ms, gathering speed), and plunges in, shrinking into the hole (90ms). The well's success starts as the drop crosses the rim: its ink washes through the bubbles, it squeezes, a clean burst leaps from the mouth and floats away, and it settles calm (1.6s, once). |
-| A row stops being valid | The drop is placed at once under the last valid row above it, the lid shuts in the energy ink, and a landed well cooks again (busy after a result). |
-
-`AtelierMotion.setupDrop.mount(host, {layer, size})` returns `setProgress(reached, {rows,
-glyphs, waiting})` and idempotent `destroy`. `host` is the well's slot; the controller mounts
-`AtelierMotion.inkWell` in it (`state: 'busy'`, `fixedFrame: true`, `sparse: true`, 240px) and moves it between
-`busy` and `success`, and lays the lid over its mouth (`data-am-lid` shut or open on the host). `setup-wizard.js` passes how many rows are valid in an unbroken run from
-the top, the rows and their glyph hosts in page order, and `busy` when the next row is being
-fetched. `layer` is the positioned page (`#setup-page`); the line and drop are drawn above the
-rows and beneath the well, and are re-measured when any part of the page resizes or fonts load.
-The button's state is the page's and is never held for the drop. Travel is Full motion only:
-Calm, Off, reduced motion, a hidden document or missing Web Animations place the drop, and the
-well is told to show its still poses. Without the ink-well the drop still travels and lands.
-The host exposes `data-am-reached`, `data-am-full`, `data-am-moving` and `data-am-lid`. The
-drop, dot and lid come from `scripts/krackle_art.py` (`setup-drop.svg`; the lid is a pill 8px
-past the rim on each side and 4px above it with a 24×10 knob, drawn for the 240px well and
-scaled with it); the mouth is the ink-well's rim centre.
-Colours are the identity roles: `setup-drop.css` maps the well's rift body to `--line` (the
-glass), its charge to `--energy`, its holes to `--energy-hole` and its success to `--done`;
-plain dots are `--line`, inked dots and the drop `--energy`, specks `--energy-glint`. The label
-sits on the glass of the lower belly (`identity.css`) in `--surface` with `--text` (muted while
-disabled), so no text ever sits on ink.
-
-# Krackle glyphs, empty states and the stage
-
-`krackle-glyph.js` (`AtelierMotion.krackleGlyph`) renders the micro shapes for job
-outcomes: `busy`, `info` (a drop), `success`, `warning` and `error`. Mounted with `found`
-(the setup page's rows), success shows a found glyph in place of the starburst, with the
-starburst's pop and four flecks; other states are unchanged, and Calm, Off and reduced
-motion show each final pose (green key, code file with all its lines, closed green folder).
-
-- `'key'`, the ink key (Unlock key): a key whose bow is the Krackle drop on its side, its
-  point running into the blade, with a bow hole, one bubble and a glint, leaning 8°. It pops
-  in the energy ink and takes the done colour 290ms in (260ms, ease-out). It is 2:1, so it
-  runs 20% past the glyph's sides (24×12px in a 20px glyph, inside the rows' glyph column).
-- `'file'`, the code file (Mapping file): a sheet with its top-right corner cut off, done
-  from the start, with four code lines in the surface colour that draw left to right one
-  after another (240ms each, from 180ms, 90ms apart).
-- `'folder'`, the folder (Game folder): a back with a tab and a front panel on a
-  surface-coloured halo, so it reads as a flap without an outline. It pops in the energy ink;
-  at 160ms the front flips open and settles, hinged at its bottom (560ms, overshooting:
-  skewX(-16°) scaleY(.62) at 35%, skewX(3°) scaleY(1.06) at 70%); at 380ms it takes the done
-  colour and at 400ms its flecks burst.
-
-Their geometry is `micro_key`, `micro_file` and `micro_folder` in `scripts/krackle_art.py`;
-only the notification glyph carries them.
-Operation toasts (`toastSpinner(...)`) are owned by the export-feedback set, which
-charges and then resolves into the same result shapes. When that controller is
-absent, `AtelierKrackleGlyph.toastIcon(toast, type)` swaps the resolved toast's icon
-for a glyph instead; the original icon stays in the slot as the fallback and
-removing the toast destroys the glyph. Ordinary informational and warning toasts
-keep their Material icons, because "warning" in those messages also covers cautions
-and failures. Activity job rows show a 16px glyph beside each state label,
-animating only when that job's state changes; a job that succeeded with skipped
-items is labelled "Succeeded with warnings", the only place its cracked ring
-appears.
-
-`empty-state.js` (`AtelierMotion.emptyState`) supplies the art for
-`AtelierPolish.empty`: an empty folder or project list (a tray with two bubbles
-dropped in), no matches (three loose bubbles bounce to the floor) and a failed
-folder load (a splat). Titles and descriptions stay authoritative; a failed mount
-keeps the original outline drawing.
-
-`krackle-stage.js` (`AtelierMotion.krackleStage`) is the full particle language
-from the Krackle prototype, ported to plain Canvas 2D without p5.js. `mount(host,
-{state, size, reducedMotion})` accepts `idle`, `busy`, `success`, `warning` and
-`error`. A fresh busy starts as a drop of ink that splashes into a puddle and is
-drawn into a charging formation fed from its upper inlet; results settle into a
-starburst, crack the ring so its chunk falls, or squeeze and burst into a
-knocked-out splat with three dazed bubbles. Ink merging uses a blur-and-threshold
-canvas filter where available and falls back to separate haloed bubbles when
-unsupported or slow (WebKitGTK). Settled results stop the frame loop
-(`data-am-sleeping="true"`), and an IntersectionObserver stops a stage whose
-dialog is hidden. Hidden documents pause; reduced motion jumps to each formation.
-`mount` throws without canvas, so callers keep their static progress UI. The export
-review's stage host holds the ink-well instead (below) for checking, building and the
-result, under a heading that names the outcome ("Mod exported with warnings");
-cancelled exports hide it, and the canvas stage remains its fallback when the
-ink-well cannot mount. Long reports scroll inside the dialog so the heading and
-actions stay visible.
-
-`ink-well.js` (`AtelierMotion.inkWell`) is the build's busy voice, an SVG vessel
-traced from the approved concept: rift body, charge ink and rim, with holes for its
-bubbles. Each bubble runs its own life (nucleate, grow, circulate round a central
-void, then dissolve or merge into the bubble ahead) on lanes that follow the cavity
-and turn at different rates. A 3.4s pressure cycle crowds the field (contact faces
-flatten, a few pairs fuse through metaball necks), then releases it: pairs split, a
-bud pinches off the void, climbs the neck and bursts into the mouth, throwing the
-splash, and the walls rebound once. Collisions carry over between frames with a speed
-limit, so crowded bubbles slide round each other rather than hop.
-
-Results interrupt the cook where it is: it coasts to a stop and its pressure relaxes,
-and the outcome ink washes out from the void with a small pop per bubble (skin tints
-keep their colours).
-
-- **Failure, ruptured** (`--krackle-fault`, 1.75s): subtle cracks run from the void
-  and widen; the vessel breaks into seven wedge pieces (`<use>` copies of it, each
-  clipped to its wedge) that drift apart while the split rim, neck and shoulders slump
-  and tip; red ink leaks from the low cracks, runs to the ground and pools, and drops
-  splash out and flatten where they land. It settles on the broken pose.
-- **Warning, overpressurised** (`--krackle-warn`): the body swells and wobbles slowly,
-  the bubbles swell and fuse under held pressure, the rim stretches and an amber bulge
-  strains up out of the mouth, spitting a drop that falls back now and then. It never
-  breaks. By request it holds in this tense loop, the one result that loops: Full motion
-  only, stopped when hidden, and still after 15s so a dialog left open stops drawing.
-- **Success, clean release** (`--krackle-success`, 1.6s): the bubbles rise and gather
-  under the neck, the mouth brims and a burst of tendrils leaps and curls outward; their
-  tips break into drops that float up and dissipate with a spray of small bubbles, and
-  the well settles calm back in its cooking frame.
-
-The artboard eases out while released ink needs room, so it stays inside the stage and
-clear of the heading; `fixedFrame` keeps it still instead, for a well with something laid
-over it (the first-run label), and released ink spills past the SVG. `sparse` keeps every
-other bubble of the inner ring, the large satellites and two neck risers, and drops the small
-lanes and secondary pockets: a well people watch while waiting (the first-run page), where a
-dense field of small holes reads as a cluster rather than ink.
-`mount(host, {size, kind, state, settled, palette, fixedFrame, sparse})` returns `setState`
-(`busy`, `success`, `warning`, `error`), `setPalette`, `setReducedMotion`, `frames` and an
-idempotent `destroy`; a reopened result mounts `settled`. It claims the
-moment like the stage (refused, it shows the 48px glyph for its state), Calm/Off/reduced
-motion draw each state's still pose, and hidden documents or off-screen hosts stop
-drawing. Success plays the `pop` foley and failure the `splat`, under the same rules as
-the stage.
-
-The palette is up to four colours averaged from the cooked skins' original `_D` /
-`BaseColor` maps. `export-review.js` asks `/api/diffuse_palette?skin=…` once per
-review for the skins in the included paths; the server reads cached library
-thumbnails or decoded viewport PNGs only (never decoding), weights coloured texels
-over grey ones in linear light and lifts a near-black result along its hue so it
-cannot pass for a hole. Two to four inner-ring bubbles carry the colours, rotating
-between lives so the hues mix through the well; they never merge or fuse. No answer
-leaves plain holes. `tests/ink_well_checks.py` (in `--working-panels-only`) covers the
-palette, busy-after-busy continuity, failure and success performing once and settling,
-the warning loop and its reduced-motion pose, hiding and teardown; `tests/test_diffuse_palette.py` covers selection, averaging and the route. Short windows use 164px so actions remain reachable.
-
-`working-panels.js` observes real `aria-busy` and controller states, plus explicit
-request leases from editor saves/loads. An animated SVG paints the native border
-band as a border-box background. The native border keeps its dimensions but becomes
-transparent while the SVG supplies its paint. A precise even-odd clip leaves the
-entire interior transparent; existing background layers, clipping, scrolling,
-corner radii, per-side widths and colors are retained. The border never paints
-inside content. A measured SVG conduit connects the save glyph, footer gutter
-and button only where there is clear space. There are no floating dots, random
-positions or additional JavaScript frame loops.
-
-Each border has a measured source, continuous channel, moving ribbon and receiver.
-Loading feeds the frame from the active heading or inlet; saving carries ink to
-the save control. The two-beat cycle uses the shared 1040ms clock. Native geometry
-determines the path. Ordinary renders retain the SVG source; resizing and pigment
-changes rebuild with the current phase. The border, nearby busy glyph and stage
-share the current hero/skin pigment.
-
-`working.begin(panel, {kind, anchor, current})` returns an idempotent
-`finish(outcome = 'cancel', {destination, anchor} = {})`. Actual request owners
-pass `success`, `warning` or `error`; removing an automatic busy marker never
-invents success. The final active lease releases a finite receiving reaction:
-catch, compression, rebound and border spread. Stale requests and hidden results
-settle silently. A successful material/curve/VFX save hands its receipt to the
-mod-tray border before closing the editor; newer edits and partial persistence
-receive a warning. Model geometry appears as soon as it is ready while the
-surrounding frame receives the completion.
-
-Configuration discovery connects the actual panel edges through a scanner and
-configuration latch when Settings opens (the launch check uses the setup check
-band instead). `configDiscovery.begin(setupOverlay)` follows the real
-setup-status request and hands its result to the native frame after the loading
-cover disappears. Closing/reopening Settings invalidates old discoveries. The
-local conduit is measured again on resize; status text remains outside the ink.
-
-Concurrent leases share one border, and an old project's completion cannot stop
-a later request or decorate its replacement editor. Only foreground panels animate,
-with at most four active frames. Calm/Off, OS reduction, hidden panels, removal and
-teardown remove the animated image and restore the native border and background.
-Only work still active resumes. Missing SVG animation leaves the ordinary border
-and status UI intact. Save indicators use the existing SVG controller.
-
-`tests/browser_smoke.py --working-panels-only --report-dir <folder>` holds actual
-loading/save/export requests and verifies actual moving border pixels, unchanged
-interior pixels, asymmetric corner/width geometry, background restoration,
-failure/retry, concurrent work, visibility, policy changes and SVG fallback.
-`fluid_work_checks.py` additionally holds configuration responses and checks
-measured connections, cancellation races, true outcomes, and raster continuity
-of the save and model loaders at their production sizes.
-
-`krackle.css` restyles existing feedback rather than adding new effects: every
-`.spinner` becomes a connected reservoir, conduit and catch plate whose pressure
-travels on the shared beat while its carrier stays still;
-the update download bar is energy with a registered screen and an ink-blob leading
-edge; indeterminate `<progress>` runs dots along the bar; the Activity ring is six
-dots that fill clockwise with progress; import results are one dot per asset; the
-first-export colour moment carries the skin's hues from the completed glyph
-through a rounded pour into a joined seal along its button's bottom edge.
-Each flat ink is fitted to the button for readable contrast; the receiving seal
-compresses and rebounds after arrival. Edited sidebar
-rows keep their accent corner with a single bubble. Every loop stops under OS or
-Atelier reduced motion (`[data-motion=reduce]`).
-
-Typing, dialog backdrops and material inspection stay plain. Full allows a brief
-primary-button edge strike and a scalloped theme wash; Calm/Off skip both. Category
-emblems are Krackle energy marks (see below). Swatch interiors and dye /
-texture previews keep their exact content; HDR energy stays outside the swatch.
-
-`tests/krackle_motion_checks.py` (via `tests/browser_smoke.py`) covers the spinner,
-job toast glyphs and fallbacks, empty states, the stage's sleep, hidden-dialog and
-cleanup behaviour and the Activity ring, and fails if the generated artwork is
-stale.
-
-Wave 2 adds a 300 ms deletion drain to the existing inert sidebar snapshots.
-Snapshots contain no live asset identifiers, are noninteractive and never delay
-the delete request or rendering. Three ink lobes merge into the removed
-thumbnail's baseline within a 48 px host;
-OS/Atelier reduced motion skips the drain. Detached snapshots and their effects
-are disposed after completion. Undo itself is ordinary focusable UI, with the
-existing hover-paused toast timer.
-
-First-run validation uses `krackleGlyph` at 20 px at the start of each setup row
-(see **Setup check**). A row reuses its mount across states; it does not decorate
-input fields or delay Open Atelier. The glyphs are the stops on the **Setup ink-well**
-drop's line. The motion dial lives in Settings.
-
-Viewport `canLeave` and `close` now return promises. Every dependent action awaits
-them before clearing geometry or changing skin. A cancelled answer retains the
-draft, loaded geometry and loader; export's public pending-edit guard still
-focuses Save without offering to discard anything.
-
-Search typing remains plain. A completed empty global result may show three
-decorative bubbles, with no per-keystroke effect. A new query aborts the old
-request; Escape and navigation dispose its popover. Roster filtering, card focus
-and Continue do not wait for animation. Portrait accents stay behind artwork,
-and costume opening follows the actual mesh lookup with a folder fallback.
-
-Wave 4a fixes outcome inks by measured surface luminance, independently of the
-palette's semantic UI colours. Success uses Paper on dark surfaces and Ink with
-Paper holes on light ones. Charge/Rift alone can follow sampled hero/skin art.
-`krackle-inks.js` is pure sRGB: fitting guarantees 3:1 contrast; CIE76 distances
-use CIELAB with a consistent D65 reference white (not CSS's D50 `lab()`). The
-guard reserves outcome inks, nudges the smallest colour distance within 45°,
-then tries other sampled colours and a full hue turn. Pink moves toward magenta;
-gold/amber toward orange. Manual colours can retain a CLASH warning. SHIFTED
-explains automatic changes in Settings. Primary buttons and the dark model
-loader fit against their own surfaces. The root `--krackle-charge` is fitted (or
-guarded) against the card body's `--bg2`. Card thumbs, and hovered card bodies,
-paint the raised `--bg3`, so theme.js also fits (or guards) `--krackle-charge-raised`
-against `--bg3`, and `.card-thumb` and `.card:hover` read it as their
-`--krackle-charge`. The edited corner therefore keeps 3:1 when a card is hovered.
-
-`AtelierMotionPolicy.tier()` returns 3/1/0 for Full/Calm/Off; `allows(tier)` is
-the shared gate. Legacy system/reduce values migrate to full/off. OS reduced
-motion always forces Off. `query()` and `data-motion` retain their old contract;
-`data-krackle` exposes the effective dial. Calm keeps micro responses but stops
-particle frames on a still formation. Off keeps static feedback.
-
-`AtelierMotion.moment.claim(kind,tier)` returns an idempotent release or null.
-Only one Tier 2/3 formation owns the screen; refused stages render a hand-drawn
-48 px glyph. Export review and the model loader release ownership
-on completion, hiding or disposal. A Tier 3 kind can claim only once per page
-session. Result states interrupt work immediately. Theme changes repaint still
-formations without replaying a result. Tests cover the colour guard, every
-palette, migration, OS overrides, stopped frames and competing stage ownership.
-
-Wave 4b adds the local OFL Latin Bricolage display face, empty-space `.k-screen`,
-Paper caption toasts, Mod tray corners and real Build drop. All existing toast
-APIs, live regions and hover-paused timers remain. Repeat badges show up to five
-bubbles, then a number. The update drop opens the existing offer/notice; it never
-blocks input. Container progress drives index formations and a once-per-launch
-A sampled from the original PNG. Calm/Off retain the plain launch splash. Index
-failures show the KO result beside the original explanation and Settings action.
-
-Texture drops upload `File` bytes through `replaceTextureFromFile`, the same
-project-scoped FormData path as Replace with Image. As with that menu item, only
-edited textures accept a drop; unedited cards show no pool and refuse it. The
-replacement overwrites the edit in place, so a drop asks for confirmation before
-any request is sent. Success uses the existing
-texture refresh/reconstruction. Calm/Off keep the final preview without particles.
-Cancelled Activity glyphs drain once; replaced rows dispose their controllers.
-The empty-project drop starts the original creation dialog immediately. All
-transient button/project bubbles release on hiding, policy changes and teardown.
-
-Folder icons are generated by `scripts/folder_emblems.py` (SPEC section 3.5).
-`icons.js` inlines the generated markup from `gui/folder-emblems.js`, so they take
-the theme's colour.
-Control glyphs keep Material Sharp.
-
-Particle rendering uses preallocated circle command buffers, linked per integer
-ink key, and native `beginPath` batches. Path2D has no reset method, so reusing
-Path2D instances would accumulate geometry (see the WHATWG Canvas path API).
-The merge guard measures RAF intervals against the observed refresh baseline;
-14 ms of sustained excess disables merging. An absolute 14 ms threshold would
-disable it even on an idle 60 Hz display. `perf()` reports sampled CPU costs and
-frame intervals; `surfaces_checks.py` logs the median and verifies the 8 ms ceiling
-plus a simulated slow-frame fallback. No Linux WebKitGTK result is claimed.
-
-Wave 4c adds explicit Inspect/Showcase controls. `viewport-inspection.js` creates
-one shared nearest-filtered toon ramp and disposable per-source toon variants.
-Only display draws use them. A `try/finally` restores every source material object
-and the grid; originals, textures, colours, alpha and editable drafts stay intact.
-Reopening a model resets to Inspect. `showcase-art.js` draws a still 45° screen
-and composed burst behind the model for the explicit mode and its captures.
-The normal viewport RAF owns all 3D drawing; there is no second animation loop.
-
-`AtelierViewport.captureModPoster(context)` refuses another project/skin, pending
-edits or an unready model. It returns a clean Showcase canvas with camera/render
-settings restored even on failure. `AtelierModCards.mount` is optional result UI:
-it uses that capture, a labelled catalogue fallback, or no card. Result resets
-abort old image/version work and revoke download URLs. Counts use completed
-applied entries (`mod-card-data.js`), not the selected list. Packaging summaries
-do not count as assets. Explicit custom-texture counts and dye-off masks do.
-Warning cards include a crack/skipped count; failure has no card. Footer text is
-always on Paper, and the build date survives reopening the last result. Clipboard
-failure explains Save PNG; no optional card failure changes the export result.
-`/api/app_info` is a local read of the bundled version, with no release request.
-
-`AtelierFoley.play(drop|pop|splat)` is called only by an owned, visible Full
-formation transition. Settings stores `atelier.foley` locally, default off.
-WebAudio is initialized by an enabled pointer gesture. Oscillators/noise and gain
-envelopes last 90–140 ms. Hiding, changing policy or disabling sounds cancels
-active sources before suspending, so no old sound resumes later. Page teardown
-closes the context. Unavailable or blocked WebAudio fails silently.
-
-`showcase_checks.py` checks render-time toon use, exact material restoration,
-capture camera/error restoration, all dial modes, silent audio gates, real card
-counts/actions and failed builds. `test_mod_cards.py` checks the pure report/context
-logic; frontend HTTP tests check local build identity. All are in the full suites.
+`tests/test_inks.py` runs the colour maths in Node. `tests/desktop_smoke.py` and
+`tests/frozen_smoke.py` probe the glyph in WebView2 and in the frozen bundle.

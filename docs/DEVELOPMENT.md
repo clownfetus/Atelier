@@ -1,17 +1,14 @@
 # Local development and reliability checks
 
-Wave 4a adds `test_krackle_inks.py` (a dependency-free Node colour harness) and
-`inks_dial_checks.py` in the full browser suite. Use `--inks-dial-only` for the
-focused browser run. It checks all palettes, measured surfaces, adaptive context,
-legacy preference migration, OS overrides, still frame counts and moment claims.
+`test_inks.py` (a dependency-free Node colour harness) and `inks_dial_checks.py`
+in the full browser suite cover the measured charge colour. Use `--inks-dial-only`
+for the focused browser run. It checks all palettes, measured surfaces, legacy
+preference migration and OS reduced motion.
 
 Wave 4b adds `--surfaces-only`: File-byte upload fixtures, caption/shape/font
-checks, real-progress launch presentation, policy gates and a recorded particle
-CPU median (`krackle-frame-perf.json`). It also simulates 8 ms refresh intervals
-followed by 40 ms intervals to test merge-filter fallback. Native WebView2 smoke
+checks, real-progress launch presentation and policy gates. Native WebView2 smoke
 uploads a pathless File to a disposable fixture endpoint and verifies its bytes
-and originating project header. Category emblems are on by default; both-scale
-review sheets are generated with the artwork, not maintained separately. Run the full browser suite before a PR.
+and originating project header. Run the full browser suite before a PR.
 
 Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
 WebAudio context (no test sounds reach the speakers). It checks disposable toon

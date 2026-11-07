@@ -74,7 +74,7 @@ See the [patch notes](docs/release-1.1.3.md) for details and verification limits
   completed builds can produce a shareable Mod card.
 - **Recover deleted edits.** Project trash keeps deleted edits and export
   options together. Undo is available immediately, with seven days of recovery.
-- **Make Atelier yours.** The latest Krackle A logo, comic-inspired surfaces,
+- **Make Atelier yours.** The assembled A logo, comic-inspired surfaces,
   readable result captions, new palettes and a Full / Calm / Off motion dial.
   Optional formation sounds start off; system reduced-motion settings take
   precedence.

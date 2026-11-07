@@ -8,7 +8,7 @@ and native tools for the asset pipeline. Run it from source with
 
 ## Current workstream: motion system v2
 
-Replacing the Krackle animation system with the three-piece assembly glyph.
+Replacing the old animation system with the three-piece assembly glyph.
 Start with `docs/motion-v2/HANDOFF.md` and follow its phases in order.
 
 Rules that always apply:

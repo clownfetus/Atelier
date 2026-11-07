@@ -236,12 +236,14 @@ ever created.
   (`gui/preferences.js:15` and the CSS) and the `--krackle-*` tokens. (Done: `data-motion-mode`,
   `--charge`, `--charge-raised`, `--motion-beat`, `charge.css`, `inks.js` / `AtelierInks`,
   `update-drop`. The rift and the per-button charge had no reader left and are gone.)
-- [ ] **P4.4** Rewrite `gui/motion/README.md` for the new system, including the
+- [x] **P4.4** Rewrite `gui/motion/README.md` for the new system, including the
   D7 interruption rule. Update `docs/DESIGN_SYSTEM.md`, the Krackle notes in
   `docs/DEVELOPMENT.md`, and `docs/WORKSPACE_PLAN.md`. Clear `README.md:77`,
   `images/README.md`, `packaging/Atelier.iss:72` and `CLAUDE.md`. Remove
   `images/krackle-examples.png` and its entry in `images/screenshots.json`, and capture
-  its replacement in P5.2.
+  its replacement in P5.2. (Done. No script captured that image, so P5.2 adds a motion shot
+  to `scripts/capture_release_screenshots.py`. `docs/WORKSPACE_PLAN.md` Phase 4 is marked
+  superseded: its ink moments need redesigning in the glyph's language.)
 
 **Gate (D11):** these both return nothing, because history stays as it was written;
 every suite passes on Windows (WebView2) and the Linux AppImage.
