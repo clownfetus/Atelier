@@ -515,6 +515,8 @@ svg.card-icon.folder-icon { display: block; }
 .switch input:checked + .switch-track { background: var(--acc); border-color: var(--acc); }
 .switch input:checked + .switch-track::before { background: var(--md-sys-color-on-primary); transform: translateX(16px); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--blue); outline-offset: 1px; }
+/* An edited texture card under a dragged image: a plain outline in the text colour. */
+.card.texture-drop-target { outline: 2px solid var(--text); outline-offset: -4px; }
 #sel-count {
   display: flex;
   align-items: center;

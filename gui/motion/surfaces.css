@@ -11,8 +11,6 @@
 .k-update-drop:hover {border-color:var(--acc);background:var(--studio-hover);}
 .k-update-drop > span {width:28px;height:18px;}
 [data-density=compact] .k-update-drop {width:30px;height:30px;}
-.card.k-texture-pool {outline:2px solid var(--krackle-energy, var(--acc));outline-offset:-4px;}
-.card.k-texture-pool::before {content:'';position:absolute;inset:auto 8px 7px;height:3px;pointer-events:none;border-radius:2px;background:var(--krackle-energy, var(--acc));}
 .hdr-ring {position:absolute;inset:calc(-1 * var(--hdr-radius,4px));border:2px solid var(--swatch-color);border-radius:var(--studio-shape-medium);pointer-events:none;}
 .hdr-ring i {position:absolute;width:4px;height:4px;margin:-2px;background:#121216;border-radius:50%;}
 .k-button-pop {position:fixed;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--krackle-energy, var(--acc));pointer-events:none;z-index:calc(var(--studio-layer-top) - 1);}

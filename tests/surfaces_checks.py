@@ -41,7 +41,8 @@ def run_surfaces_checks(page,context,url,report,checks):
               const card=[...document.querySelectorAll('#grid-area .card')].find(node=>node._libraryCard.label===label),transfer=new DataTransfer();
               transfer.items.add(new File([new Uint8Array(bytes)],name,{type:mime}));
               const over=new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer});card.dispatchEvent(over);
-              window.poolRect=card.getBoundingClientRect().toJSON();window.hadPool=card.classList.contains('k-texture-pool');
+              window.poolRect=card.getBoundingClientRect().toJSON();window.hadPool=card.classList.contains('texture-drop-target');
+              window.poolLook=[getComputedStyle(card).outlineColor===getComputedStyle(document.body).color,getComputedStyle(card,'::before').content];
               window.overPrevented=over.defaultPrevented;window.overEffect=transfer.dropEffect;
               card.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer}));
             }""",[name,mime,list(bytes_),label])
@@ -56,7 +57,8 @@ def run_surfaces_checks(page,context,url,report,checks):
             assert 'T_Fixture' in tab.locator('#atelier-confirm-body').inner_text()
             tab.locator('#atelier-confirm-ok').click()
             tab.wait_for_function('expected=>replaced.length===expected',arg=index+1)
-            assert tab.evaluate('hadPool') and not tab.locator('.k-texture-pool').count()
+            assert tab.evaluate('hadPool') and not tab.locator('.texture-drop-target').count()
+            assert tab.evaluate('poolLook')[0] and tab.evaluate('poolLook')[1] in ('none','normal'),tab.evaluate('poolLook')
         assert len(uploads)==3 and all(header=='Smoke%20A' and png in body for header,body in uploads)
         assert tab.evaluate('replaced.length')==3
         drop('unsafe.txt','text/plain',b'not an image');tab.wait_for_timeout(80)

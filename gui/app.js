@@ -4232,10 +4232,10 @@ for(const name of ['dragenter','dragover','dragleave','drop'])document.getElemen
     if(name==='drop')toast('Edit this texture first, then drop an image to replace it.','info');
     return;
   }
-  if(name==='dragenter'||name==='dragover'){target.classList.add('k-texture-pool');event.dataTransfer.dropEffect='copy';}
-  else if(name==='dragleave'){if(!target.contains(event.relatedTarget))target.classList.remove('k-texture-pool');}
+  if(name==='dragenter'||name==='dragover'){target.classList.add('texture-drop-target');event.dataTransfer.dropEffect='copy';}
+  else if(name==='dragleave'){if(!target.contains(event.relatedTarget))target.classList.remove('texture-drop-target');}
   else {
-    target.classList.remove('k-texture-pool');
+    target.classList.remove('texture-drop-target');
     const file=event.dataTransfer.files[0];  // Read before awaiting: the drop's data expires with the event.
     if(!file)return;
     if(!_isImageFile(file)){toast('Drop an image file to replace this texture.','warning');return;}
