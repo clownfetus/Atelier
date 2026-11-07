@@ -4,9 +4,11 @@
   const active = new Set(['queued', 'running', 'cancelling']);
   const live = new Map();
   let timer, hidden = false, overlay, body, activityButton, rendered = '';
-  // Row glyphs: a job's glyph animates only when its state changes.
+  // Row glyphs: a job's glyph animates only when its state changes. Each job keeps its glyph across
+  // refreshes, so a progress tick doesn't restart its motion and a result lets the piece in flight land
+  // before the glyph moves to it (D7). The row's text updates at once.
   const shownStates = new Map();
-  const rowGlyphs=new Set();
+  const rowGlyphs=new Map();
   function jobGlyph(job) {
     if (active.has(job.state)) return 'busy';
     if (job.state === 'succeeded') return (job.result?.skipped || []).length ? 'warning' : 'success';
@@ -15,12 +17,19 @@
   }
   function decorateState(row, job) {
     if (!window.AtelierMotion?.krackleGlyph) return;
-    const host = el('span', undefined, 'job-state-glyph'); host.setAttribute('aria-hidden', 'true');
-    const state = jobGlyph(job), seen = shownStates.get(job.id) === state;
+    const state = jobGlyph(job), seen = shownStates.get(job.id) === state, target = row.querySelector('.job-state');
     shownStates.set(job.id, state);
+    const kept = rowGlyphs.get(job.id);
+    if (kept) {
+      target.prepend(kept.host); kept.used = true;
+      try { kept.glyph.setState(state); } catch (_) { /* The label carries the state. */ }
+      return;
+    }
+    const host = el('span', undefined, 'job-state-glyph'); host.setAttribute('aria-hidden', 'true');
     try {
-      row.querySelector('.job-state').prepend(host);
-      rowGlyphs.add(window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'}));
+      target.prepend(host);
+      const glyph = window.AtelierMotion.krackleGlyph.mount(host, {state, reducedMotion: seen && state !== 'busy' ? 'reduce' : 'system'});
+      rowGlyphs.set(job.id, {host, glyph, used: true});
     } catch (_) { host.remove(); }
   }
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -73,7 +82,7 @@
     const focusedRow = document.activeElement.closest?.('.job-row');
     const focusJob = focusedRow?.dataset.jobId;
     const focusLabel = focusedRow ? document.activeElement.textContent : null;
-    for(const glyph of rowGlyphs)glyph.destroy();rowGlyphs.clear();
+    for(const kept of rowGlyphs.values())kept.used=false;
     body.replaceChildren();
     body.append(el('p', 'Project: ' + (window.atelierProject() || 'Default project')));
     body.append(el('p', 'Jobs belong to this project. Completed results remain available after reopening Atelier.'));
@@ -119,6 +128,7 @@
       }
       body.append(row);
     }
+    for (const [id, kept] of rowGlyphs) if (!kept.used) { try { kept.glyph.destroy(); } catch (_) {} rowGlyphs.delete(id); }
     updateActivity();
     if (focusJob) {
       const row = [...body.querySelectorAll('.job-row')].find(node => node.dataset.jobId === focusJob);

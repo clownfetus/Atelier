@@ -181,12 +181,19 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.route('**/api/jobs',lambda route:route.fulfill(json={'jobs':jobs}))
         tab.evaluate('AtelierJobs.refresh()')
         assert tab.locator('.activity-ring').evaluate("el=>el.style.getPropertyValue('--job-progress')==='50%'")
+        # A job keeps one glyph across refreshes: progress doesn't restart it, and a result goes to the same glyph.
+        tab.evaluate("window.jobGlyphHost=document.querySelector('.job-row[data-job-id=\"polish-job\"] .job-state-glyph')")
+        jobs[0]['current']=3;tab.evaluate('AtelierJobs.refresh()')
+        assert tab.evaluate("(h=>h===jobGlyphHost&&h.isConnected&&h.dataset.glyphState==='busy')(document.querySelector('.job-row[data-job-id=\"polish-job\"] .job-state-glyph'))")
         jobs[0]['total']=0;tab.evaluate('AtelierJobs.refresh()');assert tab.locator('.activity-ring.indeterminate').count()==1
         jobs[0]['state']='succeeded';tab.evaluate('AtelierJobs.refresh()');assert not tab.locator('.activity-ring').count()
+        assert tab.evaluate("(h=>h===jobGlyphHost&&h.dataset.glyphState==='success')(document.querySelector('.job-row[data-job-id=\"polish-job\"] .job-state-glyph'))")
+        jobs.clear();tab.evaluate('AtelierJobs.refresh()')
+        assert tab.evaluate("!jobGlyphHost.isConnected&&!jobGlyphHost.hasAttribute('data-atelier-motion')")
         tab.locator('#grid-area .card').click(button='right')
         assert tab.locator('#ctx-menu').evaluate("el=>getComputedStyle(el).transformOrigin!=='50% 50%'")
         tab.keyboard.press('Escape')
-        checks.append('Activity ring uses reported progress or an indeterminate running state and clears at completion; menu motion starts at its anchor')
+        checks.append('Activity ring uses reported progress or an indeterminate running state and clears at completion; a job keeps one glyph across refreshes and its result goes to that glyph; menu motion starts at its anchor')
 
         tab.evaluate("""() => {
           document.getElementById('settings-density').value='compact';document.getElementById('settings-density').dispatchEvent(new Event('change'));
@@ -205,7 +212,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
               let fades = [];
               for (let i = 0; i < 30 && !fades.length; i++) {
                 await new Promise(requestAnimationFrame);
-                fades = document.documentElement.getAnimations({subtree: true}).filter(a => /view-transition-(old|new)\(root\)/.test(String(a.effect?.pseudoElement)));
+                fades = document.documentElement.getAnimations({subtree: true}).filter(a => /view-transition-(old|new)\\(root\\)/.test(String(a.effect?.pseudoElement)));
               }
               return {palette: document.documentElement.dataset.palette,
                 fades: fades.map(a => [a.effect.pseudoElement, a.effect.getTiming().duration, a.effect.getKeyframes().map(f => f.opacity).join(','), a.effect.getKeyframes().some(f => f.clipPath)]).sort()};

@@ -202,7 +202,7 @@ for over 50 ms; settled glyphs cost nothing per frame.
   a row, startup stage, index failure, first-export moment, theme change, toast captions,
   toast repeat count, selection count, texture drop target and dot lattice. Follow
   `SURFACE_MAP.md`. Don't change how materials or models render.
-- [ ] **P3.13 Interruption (D7).** Update the surfaces that replaced animations
+- [x] **P3.13 Interruption (D7).** Update the surfaces that replaced animations
   instantly on a result, so the move in flight lands first and the text
   updates immediately.
 - [ ] **P3.14** ⏸ Recording of a full walk-through to Thiago: launch with indexing,
