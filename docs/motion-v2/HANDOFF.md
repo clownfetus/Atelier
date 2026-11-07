@@ -268,6 +268,13 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
 - [ ] **P4b.5** ⏸ Studio colours. The texture, mesh and material studios each take their
   piece's colour across the whole module (blue tile, teal mesh, copper disc), so it's clear
   at a glance what you're working on. Keep text and controls readable on every theme.
+- [ ] **P4b.6** ⏸ Tray pieces. Adding something to the mod tray looks like clicking in a
+  new piece: the added item seats into the tray with the glyph's contact, snap and settle,
+  not a plain insert.
+- [ ] **P4b.7** ⏸ No fades on pop-ups or toasts. Nothing that pops up (toasts, captions,
+  dialogs, menus, popovers) fades in or out; each enters and leaves with deliberate
+  movement. Audit every one, then show the movement options. In Off and OS reduced motion
+  they still need to appear and leave without motion: ask Thiago how before building it.
 
 ## Phase 5 · Release
 
