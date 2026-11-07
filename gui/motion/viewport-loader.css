@@ -137,29 +137,6 @@
   }
 }
 
-/* Static fallback sibling wrapper */
-.am-viewport-loader-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  line-height: 0;
-  flex-shrink: 0;
-}
-
-.am-viewport-loader-slot[data-am-mounted="true"] > .am-viewport-loader-fallback {
-  display: none !important;
-}
-
-.am-viewport-loader-fallback { display: inline-flex; color: var(--studio-preview-on-surface); }
-.am-viewport-loader-slot[data-am-state="error"] > .am-viewport-loader-fallback { color: #ffb4ab; }
-
-/* Give the production model loader room to read as a complete formation. */
-#viewport-loading-slot { width: 112px; height: 112px; }
-#viewport-loading-slot [data-atelier-motion="viewport-loader"] { --am-viewport-loader-size: 112px; }
-#viewport-loading-slot .am-viewport-loader-fallback svg { width: 112px; height: 112px; }
-
 /* Fit decorative energy to the preview without changing semantic outcomes. */
 [data-atelier-motion="viewport-loader"]:is([data-am-state="idle"], [data-am-state="ready"], [data-am-state="loading"]) .am-viewport-loader-loading {
   color: var(--am-local-charge, var(--am-viewport-loader-accent));

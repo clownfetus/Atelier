@@ -160,13 +160,13 @@ def run_viewport_motion_checks(page, context, url, report, checks):
             }
           } finally { Element.prototype.animate = original; }
           viewportTestHost.remove();
-          window.originalViewportLoader = AtelierMotion.viewportLoader;
+          window.originalGlyph = AtelierMotion.glyph;
           window.viewportMotionEvents = [];
-          AtelierMotion.viewportLoader = {mount(host, options) {
+          AtelierMotion.glyph = {...originalGlyph, mount(host, options) {
             viewportMotionEvents.push(options.state);
-            const instance = originalViewportLoader.mount(host, options);
+            const instance = originalGlyph.mount(host, options);
             return {
-              setState(state) { viewportMotionEvents.push(state); instance.setState(state); },
+              set(state) { viewportMotionEvents.push(state); instance.set(state); },
               destroy() { viewportMotionEvents.push('destroy'); instance.destroy(); }
             };
           }};
@@ -188,43 +188,44 @@ def run_viewport_motion_checks(page, context, url, report, checks):
             assert motion_page.locator('#viewport-loading-motion-host svg').count() == 0
 
         start_mesh('Slow materials')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'loading'
-        motion_page.evaluate("document.getElementById('viewport-loading-motion-host').getAnimations({subtree:true}).forEach(a=>a.pause())")
+        loader = motion_page.locator('#viewport-loading-motion-host')
+        assert loader.get_attribute('data-glyph-state') == 'busy' and loader.get_attribute('data-glyph-asset') == 'mesh'
+        assert loader.get_attribute('data-glyph-tier') == 'stage'
         motion_page.evaluate('__viewportMotion.model(0); viewportOpen')
         assert motion_page.locator('#viewport-loading').is_hidden()
         assert motion_page.locator('#viewport-loading-motion-host svg').count() == 0
         assert motion_page.evaluate('__viewportMotion.state().materialRequests') == 1
         assert motion_page.evaluate('__viewportMotion.state().children.length') == 1
-        assert motion_page.evaluate("viewportMotionEvents.slice(-3)") == ['loading', 'ready', 'destroy']
+        assert motion_page.evaluate("viewportMotionEvents.slice(-2)") == ['busy', 'destroy'], 'A model that arrives never forms the A'
         close_preview()
         start_mesh('Immediate fixture', immediate=True)
         motion_page.evaluate('viewportOpen')
         assert motion_page.locator('#viewport-loading').is_hidden()
-        assert motion_page.evaluate("viewportMotionEvents.slice(-3)") == ['loading', 'ready', 'destroy']
+        assert motion_page.evaluate("viewportMotionEvents.slice(-2)") == ['busy', 'destroy']
         close_preview()
-        checks.append('Real viewport reveals fast geometry immediately, even with paused assembly or pending material responses')
+        checks.append('Real viewport shows the mesh loader, reveals fast geometry immediately and never forms the A, even with pending material responses')
 
         motion_page.evaluate("__viewportMotion.configure({skinList:[]}); AtelierViewport.open('1029001', 'Empty fixture')")
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'empty'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'warning'
         assert motion_page.locator('#viewport-loading-msg').inner_text() == 'No meshes found for this skin.'
         close_preview()
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         motion_page.evaluate("() => { __viewportMotion.configure(); window.viewportOpen = AtelierViewport.open('1029001', 'Failed skin fixture'); }")
         motion_page.wait_for_function(f'__viewportMotion.state().modelRequests === {before + 1}')
         motion_page.evaluate(f'__viewportMotion.model({before}, true); viewportOpen')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'error'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'error'
         assert motion_page.locator('#viewport-loading-msg').inner_text() == 'Failed to load meshes. Fixture mesh: Fixture decode failure'
         close_preview()
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Failed mesh fixture')
         motion_page.evaluate(f'__viewportMotion.model({before}, true); viewportOpen')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'error'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'error'
         assert 'Fixture decode failure' in motion_page.locator('#viewport-loading-msg').inner_text()
         close_preview()
         before = motion_page.evaluate('__viewportMotion.state().skinRequests')
         motion_page.evaluate("() => { __viewportMotion.configure({deferSkins:true}); window.viewportOpen=AtelierViewport.open('1029001', 'Failed index fixture'); }")
         motion_page.evaluate(f'__viewportMotion.skin({before}, [], true); viewportOpen')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'error'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'error'
         assert 'Fixture index failure' in motion_page.locator('#viewport-loading-msg').inner_text()
         close_preview()
         checks.append('Real viewport maps no meshes, failed decoding and failed index requests to truthful static outcomes')
@@ -321,11 +322,11 @@ def run_viewport_motion_checks(page, context, url, report, checks):
 
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Old fixture')
-        motion_page.evaluate("window.oldViewportOpen=viewportOpen; window.oldViewportEffects=document.getElementById('viewport-loading-motion-host').getAnimations({subtree:true})")
+        motion_page.evaluate("() => { window.oldViewportOpen=viewportOpen; }")
         start_mesh('New fixture')
-        assert motion_page.evaluate("oldViewportEffects.every(a=>a.playState==='idle')")
+        assert motion_page.locator('#viewport-loading-motion-host svg').count() == 1
         motion_page.evaluate(f'__viewportMotion.model({before}); oldViewportOpen')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'loading'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'busy'
         assert motion_page.evaluate('__viewportMotion.state().children.length') == 0
         assert motion_page.evaluate('__viewportMotion.state().scenes.at(-1).geometryDisposed')
         assert motion_page.evaluate('__viewportMotion.state().scenes.at(-1).materialDisposed')
@@ -345,7 +346,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         motion_page.evaluate('() => { window.oldViewportOpen=viewportOpen; }')
         start_mesh('Current fixture')
         motion_page.evaluate(f'__viewportMotion.model({before}, true); oldViewportOpen')
-        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'loading'
+        assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'busy'
         motion_page.evaluate(f'__viewportMotion.model({before + 1}); viewportOpen')
         close_preview()
         for fail in (False, True):
@@ -354,7 +355,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
             motion_page.evaluate("() => { __viewportMotion.configure({deferSkins:true}); window.oldViewportOpen=AtelierViewport.open('1029001', 'Old index'); }")
             start_mesh('New index fixture')
             motion_page.evaluate(f'__viewportMotion.skin({old_skin}, [], {str(fail).lower()}); oldViewportOpen')
-            assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-am-state') == 'loading'
+            assert motion_page.locator('#viewport-loading-motion-host').get_attribute('data-glyph-state') == 'busy'
             motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
             close_preview()
         checks.append('Rapid reopen/close cancels old motion, disposes late geometry and ignores stale failures')
@@ -392,23 +393,23 @@ def run_viewport_motion_checks(page, context, url, report, checks):
 
         for failure in ('missing', 'mount', 'state'):
             motion_page.evaluate("""failure => {
-              AtelierMotion.viewportLoader = failure === 'missing' ? undefined : failure === 'mount'
+              AtelierMotion.glyph = failure === 'missing' ? undefined : failure === 'mount'
                 ? {mount:()=>{throw Error('Fixture mount failure')}}
                 : {mount(host, options) {
-                    const instance=originalViewportLoader.mount(host, options);
-                    return {setState:()=>{throw Error('Fixture state failure')}, destroy:()=>instance.destroy()};
+                    const instance=originalGlyph.mount(host, options);
+                    return {set:()=>{throw Error('Fixture state failure')}, destroy:()=>instance.destroy()};
                   }};
             }""", failure)
             before = motion_page.evaluate('__viewportMotion.state().modelRequests')
             start_mesh(f'{failure} presentation fixture')
             if failure != 'state':
-                assert motion_page.locator('#viewport-loading-slot .am-viewport-loader-fallback').is_visible()
+                assert motion_page.locator('#viewport-loading-slot .viewport-loader-fallback').is_visible()
             motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
             assert motion_page.locator('#viewport-loading').is_hidden(), failure
             assert motion_page.evaluate('__viewportMotion.state().children.length') == 1
             assert motion_page.locator('#viewport-loading-motion-host svg').count() == 0
             close_preview()
-        motion_page.evaluate('AtelierMotion.viewportLoader=originalViewportLoader')
+        motion_page.evaluate('AtelierMotion.glyph=originalGlyph')
         checks.append('Missing, throwing mount and throwing state presentation cannot prevent geometry loading or ready cleanup')
 
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
@@ -419,20 +420,18 @@ def run_viewport_motion_checks(page, context, url, report, checks):
                 motion_page.locator('#settings-theme').select_option(theme, force=True)
                 dimensions = motion_page.locator('#viewport-loading-motion-host svg').evaluate("""svg => {
                   const rect=svg.getBoundingClientRect();
-                  // Krackle has no strokes: the smallest charge dot must stay a readable comic dot.
-                  const dots=[...svg.querySelectorAll('.am-viewport-loader-dot')].map(dot=>Number(dot.getAttribute('r')));
-                  return {width:rect.width, height:rect.height, dot:Math.min(...dots), dots:dots.length,
-                    viewBox:svg.viewBox.baseVal.width};
+                  return {width:rect.width, height:rect.height, tier:svg.parentElement.dataset.glyphTier,
+                    halo:getComputedStyle(svg.querySelector('.glyph-piece')).stroke};
                 }""")
                 # Browser transforms can round a CSS pixel to 111.99997 here.
-                assert abs(dimensions['width'] - 112) < .01 and abs(dimensions['height'] - 112) < .01, dimensions
-                assert dimensions['dots'] == 12 and dimensions['dot'] * dimensions['width'] / dimensions['viewBox'] >= 2.5, dimensions
+                assert abs(dimensions['width'] - 135) < .01 and abs(dimensions['height'] - 112) < .01, dimensions
+                assert dimensions['tier'] == 'stage' and dimensions['halo'] == 'rgb(23, 35, 55)', dimensions
                 motion_page.screenshot(path=str(report / f'viewport-loader-{theme}-{width}.png'), animations='disabled')
                 assert motion_page.locator('#viewport-inspect-tools').is_hidden()
                 assert motion_page.locator('#viewport-tools').is_hidden()
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         close_preview()
-        checks.append('Viewport loader remains 112px with readable comic-sized dots in both themes at compact and standard desktop sizes')
+        checks.append('Viewport loader stays at the Stage tier on the dark stage in both themes at compact and standard desktop sizes')
         assert not errors, errors
     finally:
         motion_page.close()

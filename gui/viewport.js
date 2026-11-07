@@ -380,7 +380,6 @@ function destroyViewportLoader() {
   try { motion?.destroy(); } catch (e) { console.warn('viewport: loader cleanup failed', e); }
   const host = $('viewport-loading-motion-host');
   host?.replaceChildren();
-  for (const attr of ['data-atelier-motion', 'data-am-state', 'data-am-reduced']) host?.removeAttribute(attr);
   $('viewport-loading-slot')?.removeAttribute('data-am-mounted');
 }
 
@@ -388,7 +387,7 @@ function setViewportLoaderFallback(state) {
   const slot = $('viewport-loading-slot');
   if (!slot) return;
   slot.dataset.amState = state;
-  const fallback = slot.querySelector('.am-viewport-loader-fallback');
+  const fallback = slot.querySelector('.viewport-loader-fallback');
   if (!fallback) return;
   const icon = state === 'error' ? 'alert-triangle' : 'box';
   if (fallback.dataset.icon === icon) return;
@@ -408,9 +407,9 @@ function startViewportLoader() {
   } catch (_) { viewportLoadingBorder = null; }
   setViewportLoaderFallback('loading');
   const host = $('viewport-loading-motion-host');
-  if (!host || !window.AtelierMotion?.viewportLoader) return;
+  if (!host || !window.AtelierMotion?.glyph) return;
   try {
-    viewportLoaderMotion = window.AtelierMotion.viewportLoader.mount(host, {state: 'loading'});
+    viewportLoaderMotion = window.AtelierMotion.glyph.mount(host, {state: 'busy', asset: 'mesh'});
     $('viewport-loading-slot').dataset.amMounted = 'true';
   } catch (e) {
     destroyViewportLoader();
@@ -424,7 +423,8 @@ function setViewportLoaderState(state) {
     viewportLoadingBorder = null;
   }
   setViewportLoaderFallback(state);
-  try { viewportLoaderMotion?.setState(state); }
+  // The loader carries the wait and nothing else: a model that arrives is its own result, so it never forms the A.
+  try { if (state === 'empty' || state === 'error') viewportLoaderMotion?.set(state === 'empty' ? 'warning' : 'error'); }
   catch (e) {
     destroyViewportLoader();
     console.warn('viewport: loader unavailable', e);

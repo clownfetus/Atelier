@@ -240,6 +240,15 @@
 #viewport-status[data-kind=warning] { color:var(--status-warning-text); }
 #viewport-status:has(.vp-load-status) { color:var(--acc); }
 #viewport-loading { z-index:3; background:#172337; color:#e5edf9; }
+/* The loader's slot: the static icon until the glyph mounts, then the glyph at the Stage tier. The stage
+   is dark in both themes, so its status colours are the dark theme's. */
+.viewport-loader-slot { display:inline-flex; align-items:center; justify-content:center; width:135px; height:112px; line-height:0; flex-shrink:0;
+  --glyph-halo:#172337; --status-warning:#E6C35C; --status-error:#EC6A86; }
+.viewport-loader-slot[data-am-mounted="true"] > .viewport-loader-fallback { display:none !important; }
+.viewport-loader-fallback { display:inline-flex; color:var(--studio-preview-on-surface); }
+.viewport-loader-slot[data-am-state="error"] > .viewport-loader-fallback { color:#ffb4ab; }
+.viewport-loader-fallback svg { width:112px; height:112px; }
+#viewport-loading-motion-host.atelier-glyph { width:100%; height:100%; }
 /* The opened costume's artwork waits on the stage, then the reveal sweep wipes it away (motion/viewport-poster.js). */
 /* Costume art is a transparent cut-out, so it stands on the stage with a shadow rather than in a frame. */
 .vp-poster { position:absolute; z-index:4; margin:0; pointer-events:none; filter:drop-shadow(0 14px 28px rgb(0 0 0 / 45%));
