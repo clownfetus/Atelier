@@ -145,7 +145,7 @@
         const dy = entry.rect.y-next.getBoundingClientRect().y;
         if (dy) play(next,[{transform:`translateY(${dy}px)`},{transform:'none'}],120);
       } else {
-        if (window.AtelierMotionPolicy?.allows(2) === false) continue;
+        if (window.AtelierMotionPolicy?.allows(1) === false) continue;
         const copy = entry.row.cloneNode(true); copy.classList.add('polish-ghost'); copy.inert=true; copy.setAttribute('aria-hidden','true');
         copy.removeAttribute('id');copy.querySelectorAll('[id],[name]').forEach(node=>{node.removeAttribute('id');node.removeAttribute('name');});
         copy.querySelectorAll('.swatch-wipe').forEach(node=>node.remove());
@@ -154,18 +154,10 @@
         }
         Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden',opacity:'0'});
         document.body.append(copy);
-        const rowAnimation=play(copy,[{opacity:1,clipPath:'inset(0 0 0 0)',transform:'none'},{opacity:.8,clipPath:'inset(56% 0 0 0)',transform:'translateY(3px)'},{opacity:0,clipPath:'inset(100% 0 0 0)',transform:'translateY(5px)'}],300,AtelierMotion.ease.fall);
-        const bubbles=document.createElement('span'); bubbles.className='trash-drain'; bubbles.setAttribute('aria-hidden','true'); bubbles.inert=true;
-        Object.assign(bubbles.style,{left:(entry.rect.x+12)+'px',top:(entry.rect.bottom-14)+'px'});
-        const animations=[rowAnimation];
-        // Three connected lobes merge into the removed thumbnail's baseline.
-        for(let i=0;i<3;i++) {
-          const dot=document.createElement('i'); dot.style.left=(i*8)+'px'; dot.style.top='0'; dot.style.opacity='0'; bubbles.append(dot);
-          animations.push(play(dot,[{transform:'translateY(-4px) scale(.6,1.1)',opacity:0},{transform:'translateY(0) scale(1.25,.7)',opacity:1,offset:.45},{transform:`translate(${(1-i)*8}px,4px) scale(.2)`,opacity:0}],300,AtelierMotion.ease.fall));
-        }
-        document.body.append(bubbles);
-        const dispose=()=>{clearTimeout(timer);for(const animation of animations)animation.destroy();copy.remove();bubbles.remove();drains.delete(dispose);};
-        const timer=setTimeout(dispose,320);drains.add(dispose);
+        // A removed row fades where it stood, for 200 ms.
+        const rowAnimation=play(copy,[{opacity:1},{opacity:0}],200);
+        const dispose=()=>{clearTimeout(timer);rowAnimation?.destroy();copy.remove();drains.delete(dispose);};
+        const timer=setTimeout(dispose,220);drains.add(dispose);
       }
     }
   }

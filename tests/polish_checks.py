@@ -159,7 +159,14 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('.sb-color-mosaic').count() == 1
         assert tab.locator('.sb-sparkline').count() == 1
         assert tab.locator('#sel-count').inner_text() == '2'
-        tab.evaluate("delete sidebarData.c;renderSidebar()")
+        removal = tab.evaluate("""async () => {
+          delete sidebarData.c; renderSidebar();
+          await new Promise(requestAnimationFrame);
+          const ghost = document.querySelector('.polish-ghost'), motion = ghost?.getAnimations()[0];
+          return {ghost: !!ghost, duration: motion?.effect.getTiming().duration, frames: motion?.effect.getKeyframes().map(f => [f.opacity, f.transform || '', f.clipPath || ''])};
+        }""")
+        if tab.evaluate('!AtelierMotionPolicy.query().matches'):
+            assert removal['duration'] == 200 and removal['frames'] == [['1', '', ''], ['0', '', '']], removal
         tab.wait_for_timeout(400)
         assert tab.locator('.sb-item').count() == 1 and not tab.locator('.polish-ghost').count()
         tab.evaluate("AtelierPolish.importStart([{name:'A',game_rel:'A'},{name:'B',game_rel:'B'}]);AtelierPolish.importProgress({game_rel:'A',ok:true});AtelierPolish.importProgress({game_rel:'B',ok:false})")

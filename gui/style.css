@@ -1500,8 +1500,6 @@ select:focus-visible { border-color: var(--acc); }
 .setup-step-status { color: var(--text); font-size: var(--studio-text-label); }
 .setup-step-glyph { display: inline-flex; width: 24px; height: 24px; }
 .setup-step-nav { display: inline-flex; gap: 8px; }
-.trash-drain { position: fixed; width: 28px; height: 12px; pointer-events: none; z-index: calc(var(--studio-layer-overlay) + 30); }
-.trash-drain i { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 60% 56%,var(--bg2) 0 1.4px,var(--krackle-energy, var(--acc)) 1.7px); transform-origin: center bottom; }
 
 /* Kept last: editors previously suppressed native outlines. */
 #search-results { position: absolute; right: 0; top: calc(100% + 8px); width: min(620px, 85vw); max-height: 65vh; overflow-y: auto; z-index: calc(var(--studio-layer-overlay) + 70); padding: 12px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg2); color: var(--text); box-shadow: var(--studio-elevation-menu); }

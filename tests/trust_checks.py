@@ -43,7 +43,7 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         tab.emulate_media(reduced_motion='reduce')
         tab.locator('.sb-item .sb-clear').first.click(modifiers=['Shift'])
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===1")
-        assert tab.locator('.trash-drain').count()==0
+        assert tab.locator('.polish-ghost').count()==0
         tab.locator('#toast-area .toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
         checks.append('Clear All uses one Undo batch, hover pauses its ten-second toast and reduced motion omits the row dissolve')
 
