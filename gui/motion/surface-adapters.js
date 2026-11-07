@@ -18,10 +18,12 @@
     if(AtelierMotionPolicy.allows(3)&&!document.hidden)window.AtelierLogoEntranceUI?.holdStartup();
   };
   api.startupDone=()=>{try{startupGlyph?.destroy();}catch(_){}startupGlyph=null;startupHost?.remove();startupHost=null;window.AtelierLogoEntranceUI?.startupDone();};
+  // Containers that couldn't be read: the X, still, at Stage, in place of the notice's own small glyph. The text is unchanged.
   api.indexFailure=notice=>{
-    const host=document.createElement('div');host.className='k-index-failure';notice.prepend(host);
-    let stage;try{stage=AtelierMotion.krackleStage.mount(host,{state:'error',size:112,kind:'index-load'});}catch(_){host.remove();}
-    const remove=notice.remove.bind(notice);notice.remove=()=>{stage?.destroy();remove();};
+    const host=document.createElement('span');host.className='index-failure-glyph';host.setAttribute('aria-hidden','true');notice.prepend(host);
+    let glyph;try{glyph=AtelierMotion.glyph.mount(host,{state:'error',still:true});}catch(_){host.remove();return;}
+    notice.classList.add('index-failure');
+    const remove=notice.remove.bind(notice);notice.remove=()=>{try{glyph.destroy();}catch(_){}remove();};
   };
   // Projects: the picker's empty drop and new-project ink live in app.js and project-ink.js.
   const drops=new Map();

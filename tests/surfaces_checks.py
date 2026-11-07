@@ -111,6 +111,16 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert fallback['filter'] is False,fallback
         checks.append('Startup shows the working glyph at Stage beside the counted bar in Full and the still logo in Calm; particle batches stay below 8ms median CPU, sleep in Calm/Off and disable merging when real frame intervals exceed the measured refresh baseline')
         mode('full')
+        failure=tab.evaluate("""() => {
+          document.getElementById('toast-area').replaceChildren();
+          const notice=toast('2 pak container(s) could not be read: A, B.','warning',60000);AtelierSurfaces.indexFailure(notice);
+          const host=notice.querySelector(':scope > .index-failure-glyph'),slot=notice.querySelector('.toast-glyph-slot');
+          const result={state:host?.dataset.glyphState,tier:host?.dataset.glyphTier,slot:slot?getComputedStyle(slot).display:'',text:notice.textContent.includes('could not be read')};
+          notice.remove();result.left=document.querySelectorAll('.index-failure-glyph[data-atelier-motion], .index-failure-glyph > *').length;
+          return result;
+        }""")
+        assert failure=={'state':'error','tier':'stage','slot':'none','text':True,'left':0},failure
+        checks.append('An index failure shows the still X at Stage in place of the notice\'s small glyph, with its text unchanged')
         tab.evaluate("window.openedDrop=0;AtelierSurfaces.updateDrop('fixture',()=>openedDrop++)")
         tab.locator('.k-update-drop').click();assert tab.evaluate('openedDrop')==1
         tab.evaluate("""() => {

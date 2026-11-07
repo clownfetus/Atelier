@@ -46,3 +46,7 @@
 }
 .toast-glyph-slot[data-glyph-mounted="true"] > .toast-glyph-fallback { display: none !important; }
 .toast-glyph-slot > .atelier-glyph { width: 100%; height: 100%; }
+/* Containers that couldn't be read: the X at Stage stands in for the notice's own glyph. */
+.toast.index-failure { max-width: 520px; }
+.toast.index-failure > .toast-glyph-slot { display: none; }
+.index-failure-glyph { display: block; flex: none; width: 135px; height: 112px; }
