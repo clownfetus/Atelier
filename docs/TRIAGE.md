@@ -1,15 +1,13 @@
 # Atelier — triage board
 
-Every change proposed in `retrieval/ANALYSIS.md`, scored by value and effort, with the number of
-real user reports each one would close. This is the flat backlog; `PHASES.md` is the same work
-ordered into a delivery sequence. Where the two disagree on a line number, `ANALYSIS.md` is the
-original and both were written against the same commit.
-
-Interactive version: <https://claude.ai/artifact/Ng5HzAGKBEbQP2yYMCXPbF>
+Historical engineering proposals, scored by value and effort, with the number of
+user reports each one would close. This is the flat backlog; [PHASES.md](PHASES.md)
+orders the same work into a delivery sequence. Status and source line numbers
+describe the revisions named below; verify current code before treating an item as open.
 
 | | |
 |---|---|
-| **Source** | 29,871 messages · 6 DMs · 2 user logs · cross-referenced against the code |
+| **Source** | Historical issue reports and user logs, cross-referenced against the code |
 | **Window** | 2026-03-20 → 2026-10-15 (items 38–49 come from the 09-18 → 10-15 sweep) |
 | **Excludes** | mesh editing and the 3D preview (parked as a unit — see PHASES.md) |
 
@@ -178,8 +176,8 @@ UAssetTool faked in the original phase suites. This PR adds opt-in native materi
 
 | # | Change | Value | Effort | Reports | Where | Why it's here |
 |---|---|---|---|---|---|---|
-| 28 | Ask an MRM op for a bug channel or a pinned post | High | Trivial | 1 | — | diiea asked outright: "i wish there was a place for bug reports". Reports are spread over four channels, six DMs and a 726-message thread — which is why nobody noticed one bug had four reporters. You also cannot pin releases yourself. |
-| 33 | Reply to cartbuddy and open his repro zip | Medium | Trivial | 1 | — | He handed over a reproducible broken mod on 09-12 and you said "alright". His 09-13 follow-up is unanswered, and it is the same flicker boncchickenx reported. |
+| 28 | Ask an MRM op for a bug channel or a pinned post | High | Trivial | 1 | — | A canonical bug-report destination would make duplicate reports easier to identify and track. |
+| 33 | Review a supplied reproduction ZIP and record the outcome | Medium | Trivial | 1 | — | A reported inconsistency needs a reproducible case and a recorded outcome. |
 | 34 | Publish a donation link | Low | Trivial | 2 | README | Two people fund the app. There is no public link anywhere; both offers came to you unprompted. |
 
 ## Testing
