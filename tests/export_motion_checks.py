@@ -134,8 +134,8 @@ def run_export_motion_checks(page, context, url, report, checks):
             motion_page.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
             motion_page.evaluate("""args => _runInstall(args.name, args.items, args.skipped,
               args.copy, args.password, args.project)""", dict(args, skipped=client_skipped))
-            assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') == expected
-            assert motion_page.locator(f'#toast-area [data-am-state="{expected}"]').count() > 0
+            assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') == expected
+            assert motion_page.locator(f'#toast-area [data-glyph-state="{expected}"]').count() > 0
             assert motion_page.locator('#install-btn').is_enabled()
 
         run_export({'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}, 'success')
@@ -194,18 +194,18 @@ def run_export_motion_checks(page, context, url, report, checks):
         motion_page.route('**/api/install_mod', lambda route: pending.append(route))
         motion_page.evaluate("""() => { window.firstMotionExport = _runInstall('First',
           [{game_rel:'Characters/Fixture/First'}], 0, false, '', 'Motion Ω'); }""")
-        motion_page.wait_for_function("document.getElementById('install-btn-motion-host').dataset.amState === 'busy'")
+        motion_page.wait_for_function("document.getElementById('install-btn-motion-host').dataset.glyphState === 'busy'")
         motion_page.evaluate("""() => { window.secondMotionExport = _runInstall('Second',
           [{game_rel:'Characters/Fixture/Second'}], 0, false, '', 'Motion Ω'); }""")
         motion_page.wait_for_timeout(50)
         assert len(pending) == 2, len(pending)
         pending[1].fulfill(json={'ok': True, 'skipped': ['Fixture skipped']})
         motion_page.evaluate('secondMotionExport')
-        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') == 'warning'
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') == 'warning'
         pending[0].fulfill(json={'ok': True, 'skipped': []})
         motion_page.evaluate('firstMotionExport')
-        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') == 'warning'
-        motion_page.wait_for_function("!document.getElementById('install-btn-motion-host').dataset.amState || document.getElementById('install-btn-motion-host').dataset.amState === 'idle'", timeout=4000)
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') == 'warning'
+        motion_page.wait_for_function("!document.getElementById('install-btn-motion-host').dataset.glyphState", timeout=4000)
         # A completion from an old project must not turn the new project's button into success.
         motion_page.evaluate("""() => { window.oldProjectExport = _runInstall('Old project',
           [{game_rel:'Characters/Fixture/Old'}], 0, false, '', 'Motion Ω'); }""")
@@ -214,47 +214,59 @@ def run_export_motion_checks(page, context, url, report, checks):
         motion_page.evaluate("_activeProjectName = 'Smoke B'; updateInstallBtn()")
         pending[2].fulfill(json={'ok': True, 'skipped': []})
         motion_page.evaluate('oldProjectExport')
-        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') != 'success'
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') != 'success'
         motion_page.evaluate('_activeProjectName = originalMotionProject; updateInstallBtn()')
         checks.append('Overlapping exports keep independent feedback; old operations/projects cannot overwrite current button results')
 
         motion_page.evaluate(r"""() => {
           window.fadeButton = document.getElementById('install-btn');
-          window.fadeSlot = fadeButton.querySelector('.am-export-feedback-slot');
+          window.fadeSlot = fadeButton.querySelector('.export-feedback-slot');
+          window.fadeHost = document.getElementById('install-btn-motion-host');
           window.fadeDone = AtelierExportFeedback.begin(fadeButton); fadeDone('success');
         }""")
-        motion_page.wait_for_function('fadeSlot.dataset.amResetting === "true"', polling=5, timeout=4000)
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-tier') == 'micro'
+        motion_page.wait_for_function('!fadeHost.dataset.glyphState', polling=5, timeout=4000)
         motion_page.evaluate(r"""() => {
-          const host = fadeSlot.lastElementChild, fallback = fadeSlot.firstElementChild;
-          const fades = fadeSlot.getAnimations({subtree:true});
-          if (!host.querySelector('svg') || fades.length !== 2 || fades.some(a=>a.effect.getTiming().duration!==120))
-            throw Error('Button result did not crossfade before disposal');
-          for (const animation of fades) { animation.pause(); animation.currentTime = 60; }
-          if (![host,fallback].every(node=>{const opacity=Number(getComputedStyle(node).opacity);return opacity>0 && opacity<1;}))
-            throw Error('Both button icons did not participate in the crossfade');
-          if (fadeSlot.getBoundingClientRect().width !== 28) throw Error('Crossfade changed the icon slot');
-          window.interruptedFades = fades;
+          const fallback = fadeSlot.firstElementChild;
+          if (fadeHost.querySelector('svg') || fadeHost.getAnimations().length) throw Error('The glyph should go without a fade');
+          if (getComputedStyle(fallback).display === 'none') throw Error('The icon did not come back');
+          if (fadeSlot.getBoundingClientRect().width !== 28) throw Error('The result changed the icon slot');
           fadeDone = AtelierExportFeedback.begin(fadeButton);
-          if (fadeSlot.dataset.amResetting || !interruptedFades.every(a=>a.playState==='idle'))
-            throw Error('New operation retained the old reset fade');
+          if (fadeHost.dataset.glyphState !== 'busy' || getComputedStyle(fallback).display !== 'none')
+            throw Error('A new export did not bring the glyph back');
         }""")
         motion_page.wait_for_timeout(250)
-        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-am-state') == 'busy'
+        assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') == 'busy'
         motion_page.evaluate("fadeDone('warning')")
-        motion_page.wait_for_function('fadeSlot.dataset.amResetting === "true"', polling=5, timeout=4000)
-        motion_page.emulate_media(reduced_motion='reduce')
-        motion_page.wait_for_function('AtelierMotionPolicy.query().matches && !fadeSlot.dataset.amResetting && !fadeSlot.querySelector("[data-atelier-motion]") && !fadeSlot.getAnimations({subtree:true}).length')
-        motion_page.emulate_media(reduced_motion='no-preference')
-        checks.append('Export results crossfade back to the static icon in a fixed 28px slot; new operations and reduced motion cancel the reset safely')
+        motion_page.wait_for_function('!fadeHost.dataset.glyphState', polling=5, timeout=4000)
+        checks.append('Export results hand back to the static icon in a fixed 28px slot, with no fade in the glyph, and a new export brings the glyph back')
+
+        # While the review's stage draws the job, the button holds still, and it follows the dialog.
+        moved = motion_page.evaluate("""async () => {
+          window.reviewShown = true;
+          window.quietDone = AtelierExportFeedback.begin(fadeButton, atelierProject(), {quiet: () => reviewShown});
+          const frames = async () => { const a = fadeHost.innerHTML; await new Promise(r => setTimeout(r, 500)); return a !== fadeHost.innerHTML; };
+          const shown = await frames();
+          reviewShown = false; document.dispatchEvent(new Event('atelier:export-review'));
+          const hidden = await frames();
+          reviewShown = true; document.dispatchEvent(new Event('atelier:export-review'));
+          const again = await frames();
+          quietDone('success');
+          const state = fadeHost.dataset.glyphState, done = await frames();
+          return {shown, hidden, again, state, done};
+        }""")
+        assert moved == {'shown': False, 'hidden': True, 'again': False, 'state': 'success', 'done': False}, moved
+        motion_page.wait_for_function('!fadeHost.dataset.glyphState', timeout=4000)
+        checks.append('The button holds still while the review stage draws the job and follows the dialog as it hides and shows')
 
         motion_page.evaluate("""() => {
           document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove());
           window.dismissedToast = AtelierExportFeedback.toast('Dismiss fixture', 'info', 0, 'busy');
-          window.dismissedAnimations = dismissedToast.getAnimations({subtree:true});
-          if (!dismissedAnimations.length) throw Error('Toast did not mount motion');
+          window.dismissedHost = dismissedToast.querySelector('[data-atelier-motion=glyph]');
+          if (dismissedHost?.dataset.glyphState !== 'busy') throw Error('Toast did not mount the glyph');
           dismissedToast.remove(); dismissedToast.remove();
         }""")
-        motion_page.wait_for_function("!dismissedToast.isConnected && dismissedAnimations.every(a=>a.playState === 'idle')")
+        motion_page.wait_for_function("!dismissedToast.isConnected && !dismissedHost.querySelector('svg')")
         motion_page.evaluate("""() => {
           window.clickedToast = AtelierExportFeedback.toast('Click fixture', 'success', 5000, 'success');
           clickedToast.click();
@@ -267,8 +279,8 @@ def run_export_motion_checks(page, context, url, report, checks):
         for theme in ('light', 'dark'):
             motion_page.locator('#settings-theme').select_option(theme, force=True)
             motion_page.evaluate("AtelierExportFeedback.begin(document.getElementById('install-btn'))('success')")
-            assert motion_page.locator('#install-btn-motion-host').evaluate('(el)=>el.getBoundingClientRect().width') == 28
-            assert motion_page.locator('#toast-area [data-atelier-motion="export-feedback"]').evaluate('(el)=>el.getBoundingClientRect().width') == 40
+            assert motion_page.locator('#install-btn-motion-host').evaluate('(el)=>el.getBoundingClientRect().width') == 44
+            assert motion_page.locator('#toast-area [data-atelier-motion="glyph"]').evaluate('(el)=>[el.getBoundingClientRect().width,el.getBoundingClientRect().height]') == [59, 40]
             motion_page.screenshot(path=str(report / f'export-motion-{theme}.png'), animations='disabled')
         motion_page.evaluate('visibleToast.remove()')
         checks.append('Export toasts dispose on explicit removal, click and timeout; light/dark feedback captured')

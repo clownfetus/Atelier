@@ -152,7 +152,7 @@ function toastSpinner(msg) {
     el.firstElementChild.remove(); el.lastElementChild.textContent = message;
     const icon = document.createElement('i'); icon.dataset.lucide = state === 'success' ? 'check-circle' : 'alert-triangle';
     el.prepend(icon); lucide.createIcons({nodes:[el]});
-    try { window.AtelierKrackleGlyph?.toastIcon(el, state === 'error' ? 'error' : state); } catch (_) {}
+    try { window.AtelierToastGlyph?.icon(el, state === 'error' ? 'error' : state); } catch (_) {}
     setTimeout(() => leaveToast(el, () => el.remove()), duration);
   };
   document.getElementById("toast-area").appendChild(el);
@@ -204,7 +204,7 @@ function toast(msg, type = "info", duration = 3200, instance = '') {
   el.addEventListener("mouseenter", () => { hovered = true; clearTimeout(t); remaining = Math.max(0, remaining-(Date.now()-start)); });
   el.addEventListener("mouseleave", () => { hovered = false; start = Date.now(); t = setTimeout(() => el.remove(), remaining); });
   el.addEventListener("click", () => el.remove());
-  try {window.AtelierKrackleGlyph?.toastIcon(el,type);}catch(_){}
+  try {window.AtelierToastGlyph?.icon(el,type);}catch(_){}
   return el;
 }
 
@@ -3222,7 +3222,7 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
     return res;
   } catch (e) {
     finishFeedback("error");
-    settle(`Error: ${e.message}`, "error", 3200);
+    settle(`Error: ${e.message}`, "error", 6000);
     if (project === _activeProjectName) setStatus("");
     const res = {ok: false, error: e.message};
     if (review) window.AtelierExportReview?.finish(review, res);

@@ -1648,7 +1648,7 @@ async function saveEdits() {
   const toastMessage = currentProject ? message : `${project}: ${message}`;
   try {
     if (typeof window.toastMaterialSave === 'function') {
-      window.toastMaterialSave(toastMessage, state, state === 'warning' ? 8000 : 3600);
+      window.toastMaterialSave(toastMessage, state, state === 'success' ? 3600 : 8000);
       return;
     }
   } catch (error) { console.warn('Viewport save feedback unavailable', error); }

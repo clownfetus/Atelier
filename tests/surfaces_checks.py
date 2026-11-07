@@ -119,8 +119,8 @@ def run_surfaces_checks(page,context,url,report,checks):
         tab.evaluate("""() => {
           window.buildDone=beginExportFeedback(atelierProject());
           const host=document.getElementById('install-btn-motion-host');
-          if(host.dataset.amState!=='busy')throw Error('Build did not charge');
-          buildDone('warning');if(host.dataset.amState!=='warning')throw Error('Result did not interrupt the drop');
+          if(host.dataset.glyphState!=='busy')throw Error('Build did not start the glyph');
+          buildDone('warning');if(host.dataset.glyphState!=='warning')throw Error('The result did not reach the glyph');
           const splash=document.createElement('div');splash.id='startup-splash';splash.innerHTML='<progress id="startup-progress" max="10" value="2"></progress>';document.body.append(splash);
           const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=()=>null;
           try{AtelierSurfaces.startupProgress({total:10,current:2});if(splash.querySelector('canvas'))throw Error('Canvas fallback lost');}finally{HTMLCanvasElement.prototype.getContext=original;AtelierSurfaces.startupDone();splash.remove();}

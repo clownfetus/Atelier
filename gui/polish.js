@@ -200,7 +200,7 @@
     if(!button?.isConnected||!button.getClientRects().length){release();return true;}
     // Keep the exported hues readable even when one matches the button's paint.
     colors=colors.map(color=>window.AtelierMotion?.energy?.fit?.(color,button)||color);
-    const rect=button.getBoundingClientRect(),slot=button.querySelector('.am-export-feedback-slot')?.getBoundingClientRect();
+    const rect=button.getBoundingClientRect(),slot=button.querySelector('.export-feedback-slot')?.getBoundingClientRect();
     const w=rect.width,h=rect.height,seam=h-4.5;
     const sourceX=slot?.width?slot.x-rect.x+slot.width/2:7;
     const sourceY=slot?.height?Math.min(seam,slot.y-rect.y+slot.height*.72):seam;
@@ -220,7 +220,7 @@
     // Protect the actual label rectangles, including localized or wrapping labels.
     const walker=document.createTreeWalker(button,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()){
-      const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.am-export-feedback-slot'))continue;
+      const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.export-feedback-slot'))continue;
       const range=document.createRange();range.selectNodeContents(text);
       for(const box of range.getClientRects())mask.append(node('rect',{class:'export-receipt-content-cutout',x:box.left-rect.left-1,y:box.top-rect.top-1,width:box.width+2,height:box.height+2,fill:'black'}));
     }

@@ -23,7 +23,6 @@
 .job-row { --glyph-halo: var(--md-sys-color-surface-container); }
 .at-modopen-rows { --glyph-halo: var(--surface); }
 .k-update-drop { --glyph-halo: var(--bg2); }
-.am-krackle-glyph-slot > .atelier-glyph { width: 100%; height: 100%; }
 
 .glyph-piece {
   stroke: var(--glyph-halo);

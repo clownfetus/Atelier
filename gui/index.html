@@ -40,6 +40,7 @@
 <link rel="stylesheet" href="/static/motion/surfaces.css">
 <link rel="stylesheet" href="/static/motion/workflow-krackle.css">
 <link rel="stylesheet" href="/static/motion/export-feedback.css">
+<link rel="stylesheet" href="/static/motion/export-feedback-ui.css">
 <link rel="stylesheet" href="/static/motion/viewport-loader.css">
 <link rel="stylesheet" href="/static/viewport.css">
 <link rel="stylesheet" href="/static/assembly.css">
@@ -186,8 +187,8 @@
       <label class="field-label" for="mod-name-input">Mod filename</label>
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
       <button class="btn primary" id="install-btn" title="Build the mod and install it" disabled>
-        <span class="am-export-feedback-slot" aria-hidden="true">
-          <i data-lucide="hard-drive-download" size="20" class="am-export-feedback-fallback"></i>
+        <span class="export-feedback-slot" aria-hidden="true">
+          <i data-lucide="hard-drive-download" size="20" class="export-feedback-fallback"></i>
           <span id="install-btn-motion-host"></span>
         </span>
         Build mod
@@ -1046,6 +1047,7 @@
 <script src="/static/motion/moment.js"></script>
 <script src="/static/motion/export-feedback.js"></script>
 <script src="/static/motion/export-feedback-ui.js"></script>
+<script src="/static/motion/toast-glyph.js"></script>
 <script src="/static/motion/viewport-loader.js"></script>
 <script src="/static/motion/viewport-poster.js"></script>
 <script src="/static/motion/material-save.js"></script>

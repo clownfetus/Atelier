@@ -181,14 +181,6 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   height: 64px;
   margin: 0 auto 12px;
 }
-.toast > .am-krackle-glyph-slot {
-  display: inline-flex;
-  flex: 0 0 31px;
-  width: 31px;
-  height: 20px;
-  line-height: 0;
-}
-.am-krackle-glyph-slot[data-am-mounted='true'] > .am-krackle-glyph-fallback { display: none !important; }
 
 /* Forced and OS reduced motion stop every CSS-only Krackle loop. */
 [data-motion='reduce'] .spinner::after,

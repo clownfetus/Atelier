@@ -82,7 +82,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         checks.append('Native20px spinners render one opaque masked reservoir/conduit/receiver with travelling pressure; Calm/Off/reduced keep the connected pose and hidden pauses it')
 
         # Job toasts resolve from the charge ring into a Krackle result that pops once, then holds still.
-        # The export-feedback set owns operation toasts; without it, app.js falls back to a Krackle glyph.
+        # The export-feedback set owns operation toasts; without it, app.js falls back to the small toast glyph.
         # Ordinary informational and warning toasts keep their Material icons.
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
         tab.evaluate("toast('Plain warning', 'warning', 60000)")
@@ -91,7 +91,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         assert tab.locator('#toast-area .toast.warning svg.lucide').count() == 1
         for state in ('success', 'warning', 'error'):
             tab.evaluate("state => { const t = toastSpinner('Working ' + state); t.resolve('Finished ' + state, state, 60000); }", state)
-            assert tab.locator(f'#toast-area [data-atelier-motion=export-feedback][data-am-state={state}]').count() == 1, state
+            assert tab.locator(f'#toast-area .export-feedback-slot [data-atelier-motion=glyph][data-glyph-state={state}]').count() == 1, state
         tab.evaluate("""() => {
           const feedback = window.AtelierExportFeedback;
           window.AtelierExportFeedback = undefined;
@@ -105,12 +105,12 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
         assert tab.locator('#toast-area [data-atelier-motion]').count() == 0
         tab.evaluate("""() => {
-          const original = window.AtelierMotion.krackleGlyph, feedback = window.AtelierExportFeedback;
-          window.AtelierMotion.krackleGlyph = {mount() { throw Error('fixture glyph failure'); }};
+          const original = window.AtelierMotion.glyph, feedback = window.AtelierExportFeedback;
+          window.AtelierMotion.glyph = {mount() { throw Error('fixture glyph failure'); }};
           window.AtelierExportFeedback = undefined;
           let toastEl;
           try { toastEl = toastSpinner('Fallback'); toastEl.resolve('Fallback kept', 'success', 60000); }
-          finally { window.AtelierMotion.krackleGlyph = original; window.AtelierExportFeedback = feedback; }
+          finally { window.AtelierMotion.glyph = original; window.AtelierExportFeedback = feedback; }
           if (!toastEl.querySelector('svg.lucide') || toastEl.querySelector('[data-atelier-motion]')) throw Error('Glyph failure lost the static icon');
           toastEl.remove();
         }""")

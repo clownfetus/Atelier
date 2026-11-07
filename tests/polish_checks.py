@@ -187,7 +187,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
           if(Math.abs(box.left-bounds.left)>.1||Math.abs(box.top-bounds.top)>.1||box.width!==bounds.width||box.height!==bounds.height)return false;
           if(getComputedStyle(svg).overflow!=='hidden'||getComputedStyle(svg).pointerEvents!=='none')return false;
           const length=flow.getTotalLength(),start=flow.getPointAtLength(0),end=flow.getPointAtLength(length),receiver=seal.getBBox();
-          const slot=button.querySelector('.am-export-feedback-slot').getBoundingClientRect();
+          const slot=button.querySelector('.export-feedback-slot').getBoundingClientRect();
           if(start.x<slot.left-bounds.left||start.x>slot.right-bounds.left||start.y<slot.top-bounds.top||start.y>slot.bottom-bounds.top)return false;
           if(end.x<receiver.x||end.x>receiver.x+receiver.width||end.y<receiver.y||end.y>receiver.y+receiver.height)return false;
           // The measured route remains inside the receiver, never a detached particle trip.
@@ -196,7 +196,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
           if(!cutouts.length||flow.parentElement.getAttribute('mask')!==`url(#${mask.id})`)return false;
           const walker=document.createTreeWalker(button,NodeFilter.SHOW_TEXT);
           while(walker.nextNode()){
-            const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.am-export-feedback-slot'))continue;
+            const text=walker.currentNode;if(!text.textContent.trim()||text.parentElement?.closest('.export-feedback-slot'))continue;
             const range=document.createRange();range.selectNodeContents(text);
             for(const label of range.getClientRects())if(!cutouts.some(cutout=>{const cut=cutout.getBBox();return cut.x<=label.left-bounds.left&&cut.y<=label.top-bounds.top&&cut.x+cut.width>=label.right-bounds.left&&cut.y+cut.height>=label.bottom-bounds.top;}))return false;
           }

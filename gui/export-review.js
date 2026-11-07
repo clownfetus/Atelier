@@ -313,7 +313,6 @@
     // is open (it can be hidden mid-build), results always (finish() reopens the dialog).
     staging(state) {
       if (!glyph || !stageHost?.isConnected) return false;
-      if (!window.AtelierMotionPolicy?.allows(2)) return false;
       return state !== 'busy' || overlay.classList.contains('active');
     },
     notice(message) {

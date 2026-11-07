@@ -1,0 +1,48 @@
+/* The glyph on the Build button and in operation toasts, and the small one in plain toasts. */
+.export-feedback-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+.export-feedback-slot[data-glyph-mounted="true"] > .export-feedback-fallback { display: none !important; }
+.export-feedback-slot > .atelier-glyph { width: 100%; height: 100%; }
+
+.toast .export-feedback-slot { width: 59px; height: 40px; }
+.toast .export-feedback-slot > .export-feedback-fallback { width: 40px; height: 40px; }
+.toast.export-feedback-toast > .export-feedback-message { white-space: pre-line; overflow-wrap: anywhere; }
+.toast.export-feedback-toast.error { border-color: var(--md-sys-color-error); cursor: pointer; }
+
+/* The Build button is the app's accent, which is dark on the light theme and light on the dark one,
+   so the glyph takes its halo from the button and its status colours from the opposite theme. */
+#install-btn {
+  --glyph-halo: var(--acc);
+  --status-complete: #7CC47F;
+  --status-warning: #E6C35C;
+  --status-error: #EC6A86;
+}
+:root[data-theme="dark"] #install-btn {
+  --status-complete: #419145;
+  --status-warning: #9E7C18;
+  --status-error: #E74165;
+}
+#install-btn:hover { --glyph-halo: var(--studio-primary-hover); }
+/* The glyph's pieces are opaque, so the button doesn't dim while it holds one. It can't be clicked either way. */
+#install-btn:disabled:has(.atelier-glyph) { opacity: 1; }
+#install-btn .export-feedback-slot { width: 28px; height: 28px; }
+/* Micro needs a wider box than the icon's slot. It spills away from the label, so the label doesn't move or get crowded. */
+#install-btn .export-feedback-slot > .atelier-glyph { position: absolute; right: 0; top: 0; width: 44px; height: 28px; }
+
+.toast > .toast-glyph-slot {
+  display: inline-flex;
+  flex: 0 0 31px;
+  width: 31px;
+  height: 20px;
+  line-height: 0;
+}
+.toast-glyph-slot[data-glyph-mounted="true"] > .toast-glyph-fallback { display: none !important; }
+.toast-glyph-slot > .atelier-glyph { width: 100%; height: 100%; }
