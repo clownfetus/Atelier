@@ -237,6 +237,7 @@
 
 /* ── Launch and setup identity ─────────────────────────────────────────── */
 .at-proj-hero {
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -396,7 +397,6 @@
 .at-setup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .at-setup-actions .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
 .at-setup-help { margin-left: var(--space-2); font: 400 13px/1 var(--font-ui); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-#setup-page [data-atelier-motion="krackle-glyph"] { color: var(--energy); --krackle-hole: var(--energy-hole); --krackle-glint: var(--energy-glint); }
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
 #setup-page [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
 @media (max-width: 640px) {
@@ -502,7 +502,6 @@
 .at-modopen-foot .at-btn { height: 36px; padding: 0 18px; font-size: 14px; }
 .at-modopen-outcome { display: inline-flex; width: 24px; height: 24px; flex: none; }
 .at-modopen-outcome:empty { display: none; }
-#mod-open-overlay [data-atelier-motion="krackle-glyph"] { color: var(--energy); --krackle-hole: var(--energy-hole); --krackle-glint: var(--energy-glint); }
 #mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="success"] { color: var(--done); }
 #mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="warning"] { color: var(--caution); }
 #mod-open-overlay [data-atelier-motion="krackle-glyph"][data-am-state="error"] { color: var(--fault); }

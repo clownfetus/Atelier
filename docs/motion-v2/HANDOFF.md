@@ -215,7 +215,7 @@ ever created.
 
 ## Phase 4 · Remove Krackle
 
-- [ ] **P4.1** Delete the Krackle files in `gui/motion/` (everything not used
+- [x] **P4.1** Delete the Krackle files in `gui/motion/` (everything not used
   by the new system), their `<script>` and `<link>` lines in `gui/index.html`,
   `scripts/krackle_art.py`, and the folder-flap SVG in `index.html`.
 - [ ] **P4.2** Delete or rewrite the 15 Krackle test files

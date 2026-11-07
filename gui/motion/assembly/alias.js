@@ -1,6 +1,6 @@
 /*
  * The old glyph's callers on the assembly glyph, unchanged: Activity rows, toasts, Open a mod and the
- * update button. This file goes when Krackle does. Load after glyph.js and krackle-glyph.js.
+ * update button. Load after glyph.js. P4.3 renames its callers and removes it.
  */
 (() => {
   'use strict';
