@@ -321,7 +321,6 @@
       const active = (busy || item.finish) && onScreen;
       const save = active && leases.find(lease => lease.kind === 'saving' && lease.anchor?.isConnected);
       if (save) item.saveAnchor = save.anchor;
-      const retainedSave = active && item.finish && item.kind === 'saving' && item.badge && item.saveAnchor?.isConnected;
       if (busy && (leases.length || !item.pending)) {
         item.kind = leases.some(lease => lease.kind === 'saving') ? 'saving' :
           leases.some(lease => /export|install|build/.test(lease.kind || '')) ||
@@ -331,22 +330,6 @@
         item.anchor = (save || leases.find(lease => lease.anchor))?.anchor;
         item.anchorPoint = captureAnchor(item.anchor, item.panel) || item.anchorPoint;
       } else if (busy && item.pending) item.kind = item.pending.kind;
-      if ((save || retainedSave) && !item.badgeFailed && window.AtelierMotionPolicy?.allows(1) !== false && motion.materialSave) {
-        if (!item.badge) {
-          item.badge = document.createElement('span'); item.badge.className = 'am-working-save';
-          item.badge.setAttribute('aria-hidden', 'true');
-          const host = document.createElement('span'); item.badge.append(host); save.anchor.before(item.badge);
-          try { item.glyph = motion.materialSave.mount(host, {state: 'saving'}); item.glyphState = 'saving'; }
-          catch (_) { item.badgeFailed = true; stopBadge(item); }
-        }
-      } else stopBadge(item);
-      if (item.badge) {
-        item.badge.style.color = motion.energy?.resolve(item.badge).charge || '';
-        const glyphState = item.finish?.outcome || 'saving';
-        if (item.glyphState !== glyphState) { item.glyph?.setState(glyphState); item.glyphState = glyphState; }
-        if (allowed) drawDock(item, item.saveAnchor);
-        else { item.dock?.remove(); item.dock = null; item.dockGeometry = ''; item.inlet = null; }
-      }
       if (active && allowed && count++ < 4) drawBorder(item);
       else stopBorder(item);
     }

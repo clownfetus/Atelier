@@ -65,7 +65,7 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         material_page.locator('#material-overlay.active').wait_for(state='detached')
 
     def state_toasts(state):
-        return material_page.locator(f'#toast-area [data-atelier-motion="material-save"][data-am-state="{state}"]')
+        return material_page.locator(f'#toast-area [data-atelier-motion="glyph"][data-glyph-state="{state}"]')
 
     def wait_pending(count):
         deadline = monotonic() + 5
@@ -297,50 +297,52 @@ def run_material_save_motion_checks(page, context, url, report, checks):
         material_page.evaluate('window.AtelierMaterialSaveFeedback=originalMaterialPresentation')
         clear_toasts()
         material_page.evaluate(r"""() => {
-          const original=AtelierMotion.materialSave;
+          const original=AtelierMotion.glyph;
           try {
             for (const failure of ['missing','mount']) {
-              AtelierMotion.materialSave=failure==='missing' ? undefined : {mount:()=>{throw Error('Fixture mount failure')}};
+              AtelierMotion.glyph=failure==='missing' ? undefined : {mount:()=>{throw Error('Fixture mount failure')}};
               const el=toastMaterialSave('Static save fallback','error',5000);
               if (!el?.isConnected || !el.textContent.includes('Static save fallback')) throw Error('Lost static save message');
               el.remove();
             }
-          } finally { AtelierMotion.materialSave=original; }
+          } finally { AtelierMotion.glyph=original; }
         }""")
         checks.append('Missing or throwing save presentation preserves successful requests and renders filenames/errors as text with static fallback')
 
         material_page.evaluate(r"""() => {
           window.materialToast=AtelierMaterialSaveFeedback.toast('Saving fixture','saving',0);
-          window.materialToastEffects=materialToast.getAnimations({subtree:true});
-          if (!materialToastEffects.length) throw Error('Saving toast did not animate');
+          window.materialToastHost=materialToast.querySelector('[data-atelier-motion=glyph]');
+          if (materialToastHost?.dataset.glyphState!=='busy') throw Error('Saving toast is not working');
           materialToast.remove(); materialToast.remove();
-          if (!materialToastEffects.every(a=>a.playState==='idle')) throw Error('Toast removal leaked motion');
           window.clickedMaterialToast=AtelierMaterialSaveFeedback.toast('Saved fixture','success',5000);
           clickedMaterialToast.click();
           window.timedMaterialToast=AtelierMaterialSaveFeedback.toast('Saved fixture','success',60);
         }""")
         material_page.wait_for_function('!materialToast.isConnected && !clickedMaterialToast.isConnected && !timedMaterialToast.isConnected')
+        assert material_page.evaluate("!materialToastHost.querySelector('svg')"), 'Toast removal left its glyph'
         clear_toasts()
         response['defer'] = True
         open_editor('MI_Save_feedback')
         save = start_save()
         for theme in ('light', 'dark'):
             material_page.locator('#settings-theme').evaluate('(el,value)=>{el.value=value;el.dispatchEvent(new Event("change"));}', theme)
-            # The large busy glyph stays in the existing footer, beside the authoritative text.
+            # The material loader stays in the existing footer, beside the authoritative text.
             assert material_page.locator('#mat-status').inner_text() == 'Saving…'
-            material_page.locator('#material-overlay .am-working-save').wait_for()
-            assert material_page.locator('#material-overlay .am-working-save .am-material-save-svg').bounding_box()['width'] == 44
+            badge = material_page.locator('#material-overlay .material-save-badge[data-glyph-state="busy"][data-glyph-asset="material"][data-glyph-tier="inline"]')
+            badge.wait_for()
+            box = badge.bounding_box()
+            assert box['width'] == 90 and box['height'] == 44, box
             assert material_page.locator('#material-overlay').evaluate('el=>el.classList.contains("active")')
             material_page.screenshot(path=str(report / f'material-save-saving-{theme}.png'), animations='disabled')
         save.fulfill(json={'ok': True, 'inten_saved': True})
         material_page.evaluate('materialSavePending')
         for theme in ('light', 'dark'):
             material_page.locator('#settings-theme').evaluate('(el,value)=>{el.value=value;el.dispatchEvent(new Event("change"));}', theme)
-            svg = state_toasts('success').locator('svg')
-            box = svg.bounding_box()
-            assert box['width'] == 40 and box['height'] == 40, box
+            box = state_toasts('success').bounding_box()
+            assert box['width'] == 59 and box['height'] == 40, box
             material_page.screenshot(path=str(report / f'material-save-success-{theme}.png'), animations='disabled')
-        checks.append('Save toasts clean up on removal/click/timeout and use 40px results beside 44px pending-save feedback in both themes')
+        assert material_page.locator('#material-overlay .material-save-badge').count() == 0
+        checks.append('Save toasts clean up on removal/click/timeout and use 40px results beside the 44px material loader in both themes')
         assert not errors, errors
     finally:
         material_page.unroute_all(behavior='ignoreErrors')

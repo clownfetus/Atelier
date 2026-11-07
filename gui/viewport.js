@@ -1586,12 +1586,13 @@ async function saveEdits() {
   const targets = Object.fromEntries(names.map(name => [name, matData[name]]));
   const savedPaths=new Set();
   saving = true; refreshFoot();
-  let stopWorking;
+  let stopWorking, stopBadge;
+  const stillCurrent = () => gen === generation && edited === draft && project === viewportProject;
   try {
     stopWorking = window.AtelierMotion?.working?.begin($('viewport-box'), {
-      kind: 'saving', anchor: $('viewport-mat-save'),
-      current: () => gen === generation && edited === draft && project === viewportProject
+      kind: 'saving', anchor: $('viewport-mat-save'), current: stillCurrent
     });
+    stopBadge = window.AtelierMaterialSaveFeedback?.saving($('viewport-mat-save'), stillCurrent, 'material');
   } catch (_) { /* Optional presentation never blocks saving. */ }
   let ok = 0;
   const failed = [];
@@ -1624,6 +1625,7 @@ async function saveEdits() {
   } finally {
     const newer = gen === generation && edited === draft && Object.values(edited).some(params => Object.keys(params).length);
     try { stopWorking?.(failed.length && !ok ? 'error' : failed.length || newer ? 'warning' : 'success'); } catch (_) {}
+    try { stopBadge?.(); } catch (_) {}
   }
   const ownsView = gen === generation && edited === draft && project === viewportProject;
   const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);

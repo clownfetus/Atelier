@@ -57,18 +57,11 @@ def run_working_panels_checks(context, url, report, checks):
 
         tab.evaluate("() => {matEditor.colors[0].rgba=[.8,.2,.1,1];renderMatEditor();window.savingWork=saveMaterial();}")
         request = held()
-        tab.locator('#material-overlay .am-working-save').wait_for()
+        tab.locator('#material-overlay .material-save-badge[data-glyph-state="busy"][data-glyph-asset="material"]').wait_for()
         assert tab.locator('#mat-status').inner_text() == 'Saving…'
-        assert tab.locator('#material-overlay .am-working-save .am-material-save-svg').bounding_box()['width'] == 44
-        tab.locator('#material-overlay .am-working-dock').wait_for()
-        assert tab.locator('#material-overlay .am-working-dock').evaluate("""svg=>{
-          const path=svg.querySelector('[data-role=channel]'),matrix=svg.getScreenCTM();
-          const start=path.getPointAtLength(0).matrixTransform(matrix),end=path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
-          const icon=svg.parentElement.querySelector('.am-material-save-svg').getBoundingClientRect();
-          const button=document.getElementById('mat-save').getBoundingClientRect();
-          return start.x>=icon.left&&start.x<=icon.right&&start.y>=icon.top&&start.y<=icon.bottom&&
-            Math.abs(end.y-button.bottom)<2&&end.x>=button.left&&end.x<=button.right;
-        }""")
+        box = tab.locator('#material-overlay .material-save-badge').bounding_box()
+        assert box['width'] == 90 and box['height'] == 44, box
+        assert tab.locator('#material-overlay .am-working-dock').count() == 0
         for theme in ('dark', 'light'):
             tab.evaluate("theme=>{const el=document.getElementById('settings-theme');el.value=theme;el.dispatchEvent(new Event('change'));}", theme)
             tab.screenshot(path=str(report / f'working-save-{theme}.png'))
@@ -76,9 +69,9 @@ def run_working_panels_checks(context, url, report, checks):
         tab.evaluate('savingWork')
         tab.wait_for_function("document.querySelector('#material-overlay .modal').dataset.amWorkingOutcome==='error'")
         tab.locator('#material-overlay .am-working-border').wait_for(state='detached')
-        assert tab.locator('#material-overlay .am-working-save').count() == 0
+        assert tab.locator('#material-overlay .material-save-badge').count() == 0
         assert 'Fixture save failure' in tab.locator('#mat-status').inner_text()
-        assert tab.locator('.am-material-save-toast .am-material-save-svg').evaluate('el=>getComputedStyle(el).width') == '40px'
+        assert tab.locator('.material-save-toast [data-glyph-state="error"]').bounding_box()['height'] == 40
         tab.evaluate('() => {window.retryWork=saveMaterial()}')
         request = held()
         request.fulfill(json={'ok': True, 'inten_saved': True})
@@ -236,7 +229,7 @@ def run_working_panels_checks(context, url, report, checks):
         }""")
         tab.evaluate("endSecond()")
         border.wait_for(state='detached')
-        assert tab.locator('#working-fixture .am-working-save').count() == 0
+        assert tab.locator('#working-fixture .material-save-badge').count() == 0
         checks.append('SVG border motion preserves its shared clock, leaves interior pixels unchanged and restores the native border for Calm/Off, reduced motion and hidden panels')
 
         tab.evaluate("""() => {

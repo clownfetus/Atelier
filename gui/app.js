@@ -103,8 +103,14 @@ function panelWorking(panel, options) {
 }
 function editorWorking(overlayId, current, kind = 'saving') {
   const overlay = document.getElementById(overlayId), panel = overlay?.querySelector('.modal');
-  return panelWorking(panel, {kind, current: () => current() && overlay.classList.contains('active'),
-    anchor: panel?.querySelector(kind === 'saving' ? '[id$="-save"]' : 'h2')});
+  const live = () => current() && overlay.classList.contains('active');
+  const stop = panelWorking(panel, {kind, current: live, anchor: panel?.querySelector(kind === 'saving' ? '[id$="-save"]' : 'h2')});
+  // The setup page has its own glyph.
+  if (kind !== 'saving' || overlayId === 'setup-overlay') return stop;
+  let badge = null;
+  try { badge = window.AtelierMaterialSaveFeedback?.saving(panel?.querySelector('[id$="-save"]'), live, overlayId === 'material-overlay' ? 'material' : undefined); }
+  catch (_) { /* Presentation is optional. */ }
+  return (...args) => { try { badge?.(); } catch (_) { /* Presentation is optional. */ } stop(...args); };
 }
 const savedTray = () => ({destination: document.getElementById('sidebar'), anchor: document.getElementById('sidebar-header')});
 

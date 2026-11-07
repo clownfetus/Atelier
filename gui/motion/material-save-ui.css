@@ -1,0 +1,24 @@
+/* What a save shows: the glyph beside its Save button while it runs, and its result in a toast. */
+.material-save-badge { flex: 0 0 90px; width: 90px; height: 44px; pointer-events: none; }
+#viewport-head .material-save-badge { flex-basis: 74px; width: 74px; height: 36px; }
+
+.material-save-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 59px;
+  height: 40px;
+  flex: 0 0 59px;
+  line-height: 0;
+  position: relative;
+}
+.material-save-slot > .atelier-glyph { width: 100%; height: 100%; }
+.material-save-slot > .material-save-fallback { width: 40px; height: 40px; flex: 0 0 40px; display: block; }
+.material-save-slot[data-am-mounted="true"] > .material-save-fallback { display: none !important; }
+
+.toast.material-save-toast { max-width: 340px; }
+.toast.material-save-toast > .material-save-message { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.4; }
+.toast.material-save-toast.error { border-color: var(--md-sys-color-error, #ba1a1a); cursor: pointer; }
+.toast.material-save-toast.success .material-save-fallback { color: var(--studio-success, #216642); }
+.toast.material-save-toast.warning .material-save-fallback { color: var(--studio-warning, #785300); }
+.toast.material-save-toast.error .material-save-fallback { color: var(--md-sys-color-error, #ba1a1a); }

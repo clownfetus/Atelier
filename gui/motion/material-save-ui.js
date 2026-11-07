@@ -5,16 +5,16 @@
     if (!area) return null;
     const tone = ['success', 'warning', 'error'].includes(state) ? state : 'info';
     const el = document.createElement('div');
-    el.className = `toast am-material-save-toast ${tone}`;
+    el.className = `toast material-save-toast ${tone}`;
     const slot = document.createElement('span');
-    slot.className = 'am-material-save-slot';
+    slot.className = 'material-save-slot';
     slot.setAttribute('aria-hidden', 'true');
     const icon = state === 'success' ? 'check-circle'
       : state === 'warning' || state === 'error' ? 'alert-triangle' : 'save';
     // Bundled trusted glyphs; this fallback works even if the animation script is absent.
     const artwork = window.AtelierSymbolPaths?.[icon];
     const fallback = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    fallback.setAttribute('class', 'am-material-save-fallback studio-icon');
+    fallback.setAttribute('class', 'material-save-fallback studio-icon');
     fallback.setAttribute('viewBox', artwork?.viewBox || '0 0 24 24');
     fallback.setAttribute('width', '24'); fallback.setAttribute('height', '24');
     fallback.setAttribute('fill', 'currentColor');
@@ -23,7 +23,7 @@
     const host = document.createElement('span');
     slot.append(fallback, host);
     const label = document.createElement('span');
-    label.className = 'am-material-save-message';
+    label.className = 'material-save-message';
     label.textContent = String(msg ?? '');
     el.append(slot, label);
 
@@ -36,9 +36,6 @@
       finally {
         motion = null;
         host.replaceChildren();
-        host.removeAttribute('data-atelier-motion');
-        host.removeAttribute('data-am-state');
-        host.removeAttribute('data-am-reduced');
         delete slot.dataset.amMounted;
       }
     }
@@ -46,8 +43,6 @@
       if (disposed) return;
       disposed = true;
       clearTimeout(timer);
-      // Effects stop now; the glyph holds its still pose while the toast fades, then goes with it.
-      try { motion?.setReducedMotion('reduce'); } catch (_) { stopMotion(); }
       const finish = () => { stopMotion(); nativeRemove(); };
       try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, finish); return; } } catch (_) { /* Fall through. */ }
       finish();
@@ -57,13 +52,8 @@
     area.appendChild(el);
     if (duration > 0) { el.classList.add('toast-timed'); el.style.setProperty('--toast-duration', duration+'ms'); }
     try {
-      if (window.AtelierMotion?.materialSave) {
-        motion = window.AtelierMotion.materialSave.mount(host, {state});
-        const destroy = motion.destroy;
-        motion.destroy = () => {
-          try { destroy(); }
-          finally { delete slot.dataset.amMounted; }
-        };
+      if (window.AtelierMotion?.glyph) {
+        motion = window.AtelierMotion.glyph.mount(host, {state: state === 'saving' ? 'busy' : tone});
         slot.dataset.amMounted = 'true';
       }
     } catch (error) {
@@ -92,5 +82,31 @@
     return el;
   }
 
-  window.AtelierMaterialSaveFeedback = Object.freeze({toast});
+  // The glyph beside a Save button for as long as that save runs. It reports the wait and nothing else: the
+  // toast carries the result. It goes when the save ends or its editor is no longer the current one.
+  // asset is 'material' only where the save really is a material's (D16).
+  function saving(anchor, current, asset) {
+    if (!anchor?.isConnected || !window.AtelierMotion?.glyph) return () => {};
+    const badge = document.createElement('span');
+    badge.className = 'material-save-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    anchor.before(badge);
+    let glyph = null, watch = null;
+    const stop = () => {
+      watch?.disconnect(); watch = null;
+      try { glyph?.destroy(); } catch (_) { /* Presentation is optional. */ }
+      glyph = null;
+      badge.remove();
+    };
+    try { glyph = window.AtelierMotion.glyph.mount(badge, {state: 'busy', asset}); }
+    catch (_) { stop(); return () => {}; }
+    const overlay = anchor.closest('.overlay');
+    if (overlay && current) {
+      watch = new MutationObserver(() => { if (!current()) stop(); });
+      watch.observe(overlay, {attributes: true, attributeFilter: ['class']});
+    }
+    return stop;
+  }
+
+  window.AtelierMaterialSaveFeedback = Object.freeze({toast, saving});
 })();
