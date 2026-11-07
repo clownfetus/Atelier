@@ -255,15 +255,9 @@ opens when configuration is incomplete. A failed check offers a retry. On first 
 three rows (Unlock key `AES`, Mapping file `USMAP`, Game folder) say what the check
 found. Found rows show the path or file in Fragment Mono and a quiet Change. Missing
 rows open a field with Browse or Paste, use the caution colour and explain
-what to provide. On the Grand pour page, each row names its
-item on the left, the drop's column runs down the middle through the glyphs, and
-the result sits on the right. "Open Atelier" is the primary action and the paper label of the export
-review's ink-well, which stands prominent under the column and cooks until the drop lands.
-One drop follows a dotted line down the column, past each row that is valid, waits at the
-first that isn't, and falls into the well when Open Atelier turns on; the well's lid, shut in
-the brand ink while a row needs you, turns done green and swings open before it, and landing
-is the well's success, a clean burst that settles calm. The label sits on the well's glass
-and stays paper (`--surface`, `--text`, muted while disabled) so text never sits on ink. A failed check
+what to provide. Each row names its item on the left and gives the result on the right, with
+one block in the centred column between them and no rules. "Open Atelier" is the primary action
+under the column. A failed check
 shows the real error in a mono box with Try again, Open settings and Get help.
 Appearance and motion moved to Settings, which keeps its existing dialog, IDs,
 validators and save payloads. See the motion README's **Setup check** section.
@@ -494,8 +488,11 @@ for what is missing (see Identity v1.0). Existing controls are reparented, retai
 their IDs and save contract; Settings restores the complete form. Automatic key and
 mapping retrieval runs while the page shows and never replaces manually entered
 values. The three blocks split the page's three stages: the tile for the key, the mesh block
-for the mapping file and the disc for the game folder, in the mark's order and with no rules
-between the rows. They mark the stages and don't report on them, so their colours never change.
+for the mapping file and the disc for the game folder, in the mark's order. A row that hasn't
+passed holds a dot. When its check passes, specks of the piece gather from nothing and the block
+swells out of where they meet, solid throughout (620 ms, once; blocks settling together take
+turns). A row that stops being valid loses its block. Calm keeps the swell, and Off and reduced
+motion use the 150 ms accessibility fade.
 A 20 px Krackle glyph beside each row's sentence gives its status: the charge ring while fetching, the cracked
 ring when missing, and when found a glyph of the thing itself in the done colour: the ink
 key (a key whose bow is the Krackle drop lying on its side, its point running into the

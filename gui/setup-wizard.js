@@ -4,7 +4,7 @@
 (() => {
   'use strict';
   const $=id=>document.getElementById(id);
-  const NAMES=['key','map','game'];   // the page's order, and the drop's path
+  const NAMES=['key','map','game'];   // the page's order
   const ROWS={
     game:{input:'setup-path',help:'https://github.com/clownfetus/Atelier#get-marvelrivals-path'},
     key:{input:'setup-aes',help:'https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616'},
@@ -22,7 +22,7 @@
   let initialized=false, settings=true, page='checking', outcome='busy', error='';
   let valid={}, validated=false, editing={}, prefill={}, fetched={}, retrieval={}, awaiting={};
   let overlay, modal, hero, pageEl, line=null, lineHost=null, moved=[], glyphs={};
-  let drop=null, dropFrame=0;
+  let nextBlock=0;
 
   const join=items=>items.length<2?items.join(''):items.slice(0,-1).join(', ')+' and '+items[items.length-1];
   const capital=text=>text.charAt(0).toUpperCase()+text.slice(1);
@@ -38,18 +38,10 @@
         where:el.querySelector('.at-setup-where'),field:el.querySelector('.at-setup-field'),change:el.querySelector('.at-setup-change'),
         controls:$(row.input).closest('.setup-row')});
       row.change.addEventListener('click',()=>{editing[name]=true;render();$(row.input).focus();});
-      drawBlock(row.block,BLOCK[name]);
+      row.block.dataset.piece=BLOCK[name];
     }
     new MutationObserver(syncLine).observe(overlay,{attributes:true,attributeFilter:['class']});
     window.addEventListener('atelier:preferences',()=>{for(const glyph of Object.values(glyphs))glyph?.setReducedMotion(full()?'system':'reduce');});
-  }
-  // The blocks mark the stages and never report on them: their colours don't change with a row's state.
-  function drawBlock(host,piece) {
-    host.dataset.piece=piece;
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('viewBox','0 0 24 24');
-    svg.innerHTML=window.AtelierFolderEmblems.markup(piece+'-folder-icon',48);
-    host.replaceChildren(svg);
   }
   function move(node,into) {
     if(!node)return;
@@ -62,7 +54,7 @@
       for(const {node,marker} of moved)marker.after(node);
       overlay.classList.remove('at-identity');modal.classList.remove('at-projects');delete overlay.dataset.setupPage;
       hero.hidden=pageEl.hidden=true;
-      destroyLine();destroyDrop();
+      destroyLine();resetBlocks();
     } else {
       for(const name of NAMES)move(ROWS[name].controls,ROWS[name].field);
       move($('setup-save'),pageEl.querySelector('.at-setup-save-slot'));
@@ -146,7 +138,7 @@
     setText($('setup-page-title'),title);setText($('setup-page-lede'),lede);setText($('setup-page-note'),note);
     $('setup-rows').hidden=page==='failed';$('setup-failure').hidden=page!=='failed';$('setup-page-foot').hidden=page!=='first-run';
     setText($('setup-page-error'),error);
-    syncDrop(states);
+    for(const name of NAMES){ROWS[name].wanted=states[name]==='done';syncBlock(ROWS[name]);}
   }
   function arrive() {
     // A result moves focus to its heading unless the person is already working in the page.
@@ -154,24 +146,69 @@
     $('setup-page-title').focus({preventScroll:true});
   }
 
-  // ── The ink-well Open Atelier is labelled on: one drop runs down the rows that are valid ──
-  function destroyDrop() {
-    cancelAnimationFrame(dropFrame);dropFrame=0;drop?.destroy();drop=null;
+  // ── A block comes into existence when its row's check really passes ──
+  // Specks of the piece gather from nothing and it swells out of where they met. It's solid
+  // throughout: a clip and a scale reveal it, never opacity. Blocks settling together take turns.
+  const SPECKS=[[-.53,-.28],[.42,-.47],[.58,.14],[-.19,.56],[-.61,.22],[.25,-.61],[.5,.47],[-.42,-.56]];
+  const FORM=620, TURN=260, GATHER=340, SWELL_AT=250, EASE='cubic-bezier(.45,.05,.2,1)';
+  const hidden=()=>'circle(0% at 50% 50%)', whole=()=>'circle(72% at 50% 50%)';
+  function drawBlock(row) {
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 24 24');
+    svg.innerHTML=window.AtelierFolderEmblems.markup(row.block.dataset.piece+'-folder-icon',48);
+    row.block.replaceChildren(svg);row.block.dataset.shown='true';row.drawn=true;
+    return svg;
   }
-  function syncDrop(states) {
-    if(page!=='first-run'){destroyDrop();return;}
-    let reached=0;while(reached<NAMES.length&&states[NAMES[reached]]==='done')reached++;
-    const waiting=states[NAMES[reached]]==='pending'?'busy':'still';
-    // The page may become visible in the same task; the line is measured once it is laid out.
-    cancelAnimationFrame(dropFrame);
-    dropFrame=requestAnimationFrame(()=>{
-      dropFrame=0;
-      if(!drop){
-        try{drop=window.AtelierMotion.setupDrop.mount($('setup-well-art'),{layer:pageEl,size:240});}
-        catch(_){drop=null;return;}
-      }
-      drop.setProgress(reached,{rows:NAMES.map(n=>ROWS[n].el),glyphs:NAMES.map(n=>ROWS[n].block),waiting});
+  function landed(row,running,after) {
+    row.running=running;row.moving=true;
+    Promise.allSettled(running.map(a=>a.finished)).then(()=>{
+      if(row.running!==running)return;   // reset while it played
+      after?.();running.forEach(a=>a.cancel());
+      row.running=null;row.moving=false;syncBlock(row);
     });
+  }
+  function condense(row) {
+    const svg=drawBlock(row), size=row.block.offsetWidth, specks=[];
+    const running=[
+      svg.animate([{clipPath:hidden()},{clipPath:whole()}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
+      svg.animate([{transform:'scale(.82)',offset:0},{transform:'scale(1.04)',offset:.72},{transform:'scale(1)',offset:1}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
+    ];
+    SPECKS.forEach(([x,y],i)=>{
+      const speck=document.createElement('span'), from=`translate(${(x*size).toFixed(1)}px,${(y*size).toFixed(1)}px)`;
+      speck.className='at-setup-speck';row.block.append(speck);specks.push(speck);
+      running.push(speck.animate([{transform:from+' scale(0)',offset:0},{transform:from+' scale(1)',offset:.3},{transform:'translate(0,0) scale(.5)',offset:.98},{transform:'translate(0,0) scale(0)',offset:1}],
+        {delay:i*14,duration:GATHER,easing:'cubic-bezier(.5,0,.75,.4)',fill:'both'}));
+    });
+    landed(row,running,()=>specks.forEach(s=>s.remove()));
+  }
+  function arriveBlock(row) {
+    if(document.hidden||!row.block.animate){drawBlock(row);return;}
+    const motion=window.AtelierMotionPolicy?window.AtelierMotionPolicy.mode():'full';
+    if(motion==='full'){condense(row);return;}
+    const svg=drawBlock(row);
+    // Calm keeps the swell. Off and reduced motion take the one fade the system allows (SPEC §5).
+    landed(row,[motion==='calm'?svg.animate([{clipPath:hidden()},{clipPath:whole()}],{duration:240,easing:EASE,fill:'both'})
+      :svg.animate([{opacity:0},{opacity:1}],{duration:150,fill:'both'})]);
+  }
+  function syncBlock(row) {
+    // A move in flight finishes first; a block still waiting for its turn just doesn't start.
+    if(row.moving||row.wanted===!!row.drawn)return;
+    if(!row.wanted){row.drawn=false;row.block.replaceChildren();delete row.block.dataset.shown;return;}
+    if(!full()){arriveBlock(row);return;}
+    const now=performance.now(), wait=Math.max(0,nextBlock-now);
+    nextBlock=now+wait+FORM+TURN;
+    row.moving=true;
+    row.timer=setTimeout(()=>{row.timer=0;row.moving=false;
+      if(row.wanted)arriveBlock(row);else syncBlock(row);},wait);
+  }
+  function resetBlocks() {
+    nextBlock=0;
+    for(const name of NAMES) {
+      const row=ROWS[name], running=row.running;
+      clearTimeout(row.timer);row.timer=0;row.running=null;row.moving=false;row.drawn=false;row.wanted=false;
+      running?.forEach(a=>a.cancel());
+      row.block.replaceChildren();delete row.block.dataset.shown;
+    }
   }
 
   // ── The line the page stands on ──

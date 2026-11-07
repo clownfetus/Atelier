@@ -365,13 +365,15 @@
 #setup-page .setup-row .btn:disabled { opacity: 0.55; cursor: progress; }
 /* Three stages, one block each, and no rules: the blocks are what splits the page. Each row
    names the thing on the left and says what was found on the right, with the row's status glyph
-   beside its sentence. The rows and the foot share one grid, so the blocks and the ink-well
-   stand on one centred column. */
+   beside its sentence. A row that hasn't passed holds a dot; setup-wizard.js condenses the block
+   out of nothing when its check passes. */
 #setup-page .at-setup-rows { border-top: 0; }
 #setup-page .at-setup-row { grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr); gap: 0 var(--space-4); min-height: 76px; border-bottom: 0; }
-#setup-page .at-setup-row.is-editing { align-items: center; }
+#setup-page .at-setup-row.is-editing { align-items: center; padding-top: 10px; padding-bottom: 10px; }
 #setup-page .at-setup-name { grid-column: 1; text-align: right; }
-#setup-page .at-setup-block { grid-column: 2; grid-row: 1; justify-self: center; display: block; width: 44px; height: 44px; }
+#setup-page .at-setup-block { grid-column: 2; grid-row: 1; justify-self: center; position: relative; display: block; width: 44px; height: 44px; }
+.at-setup-block:not([data-shown])::before { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: var(--line); }
+.at-setup-speck { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: currentColor; }
 .at-setup-block svg { display: block; width: 100%; height: 100%; fill: currentColor; }
 .at-setup-block[data-piece="texture"] { color: var(--atelier-texture); }
 .at-setup-block[data-piece="mesh"] { color: var(--atelier-mesh); }
@@ -382,27 +384,17 @@
 #setup-page .at-setup-detail { grid-column: 3; grid-row: 1; padding-left: 32px; }
 #setup-page .at-setup-row:not(.is-editing) .at-setup-detail { padding-right: 88px; }
 #setup-page .at-setup-change { grid-column: 3; grid-row: 1; justify-self: end; }
-/* Room for the open lid to clear the last row. */
-.at-setup-foot { display: grid; grid-template-columns: minmax(150px, 1fr) 120px minmax(0, 1fr); gap: var(--space-4); margin-top: 60px; }
+.at-setup-foot { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
 .at-setup-foot[hidden] { display: none; }
-.at-setup-foot .at-setup-note { grid-column: 2; grid-row: 2; justify-self: center; white-space: nowrap; text-align: center; }
-/* The drop's dotted line runs beneath the rows and the ink-well (setup-drop.css). */
-#setup-page { position: relative; }
-#setup-page > :not(.am-setup-drop-flight) { position: relative; z-index: 1; }
-#setup-page > .at-setup-foot { z-index: 3; }
-/* Open Atelier is the ink-well's paper label, across the glass of its lower belly (the 240px
-   ink-well of setup-drop.js). */
-.at-setup-well { grid-column: 2; grid-row: 1; justify-self: center; position: relative; flex: none; width: 240px; height: 240px; }
-.at-setup-well .at-setup-save-slot { position: absolute; left: 49px; top: 152px; width: 142px; height: 40px; }
+.at-setup-foot .at-setup-note { text-align: center; }
 #setup-page #setup-save {
-  width: 100%; height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-control);
+  min-width: 200px; height: 40px; padding: 0 var(--space-5); border: 0; border-radius: var(--radius-control);
   display: flex; align-items: center; justify-content: center;
-  background: var(--surface); color: var(--text); font: 600 15px/1 var(--font-ui); white-space: nowrap; cursor: pointer;
+  background: var(--action); color: var(--on-action); font: 600 15px/1 var(--font-ui); white-space: nowrap; cursor: pointer;
 }
 #setup-page #setup-save > :not(#setup-save-label) { display: none; }
-/* A paper label: the ink never carries the text; the landed drop says it is ready. */
-#setup-page #setup-save:hover:not(:disabled) { background: var(--surface-panel); }
-#setup-page #setup-save:disabled { opacity: 1; color: var(--text-muted); font-weight: 500; cursor: not-allowed; }
+#setup-page #setup-save:hover:not(:disabled) { background: var(--action-hover); }
+#setup-page #setup-save:disabled { opacity: 1; background: var(--surface-sunk); color: var(--text-muted); font-weight: 500; cursor: not-allowed; }
 .at-setup-note { font: 400 13px/1.4 var(--font-ui); color: var(--text-muted); }
 .at-setup-failure { display: grid; justify-items: start; gap: var(--space-5); margin-top: var(--space-5); }
 .at-setup-failure[hidden] { display: none; }
@@ -429,8 +421,6 @@
   #setup-page .at-setup-change { grid-column: 3; grid-row: 1; }
   #setup-page .at-setup-glyph { grid-column: 2; grid-row: 2; }
   #setup-page .at-setup-detail, #setup-page .at-setup-row:not(.is-editing) .at-setup-detail { grid-column: 2 / -1; grid-row: 2; padding-right: 0; }
-  .at-setup-foot { display: flex; flex-direction: column; align-items: center; }
-  .at-setup-foot .at-setup-note { white-space: normal; }
 }
 
 /* ── Open a mod (#mod-open-overlay) ───────────────────────────────────────────────────── */

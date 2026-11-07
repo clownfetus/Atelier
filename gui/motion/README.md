@@ -49,7 +49,7 @@ never take over that stage.
 | Krackle stage | Export review | 184-216px canvas particle formations; smaller in short windows |
 | Import ink | Edit All import dialog (`import-ink.js`, styled in `../identity.css`) | 176px SVG stage (140px in short windows); ink gathers on the chosen asset cards, pours into the stage's well, charges a six-dot ring and leaves for the Mod tray header per finished asset; burst, cracked ring, splat or a still muted drop for the result |
 | Setup check | Launch check and first-run setup page (`setup-check.js`, styled in `../identity.css`) | 72px band on the page header's rule: a drop pours along the channel to a latch while the check runs; starburst, cracked ring or splat on the latch for the result; 20px Krackle glyphs on the rows |
-| Setup ink-well | First-run setup page (`setup-drop.js`, styled in `setup-drop.css` and `../identity.css`) | The Grand pour: one drop on a dotted line down the rows' centre column into a 240px ink-well (cooking, then its success) whose paper label is the Open Atelier button and whose lid is its status; the drop advances only past valid rows and falls in when all are |
+| Setup blocks | First-run setup page (`../setup-wizard.js`, styled in `../identity.css`) | Each row's block condenses out of specks when its real check passes, once and solid throughout; Calm keeps the swell, Off and reduced motion use the 150 ms fade |
 | Ink-well | Export review: checking, building and the result; the first-run page's receiving well | 216px SVG vessel of living bubbles (164px in short windows); a few carry the cooked skin's colours; success releases, warning strains in a loop, failure ruptures |
 | Working panels | Loading, saving, import/export, Activity and bulk tools | Coordinated SVG charges replace the panel's border paint during real work, Full only |
 | Workflow Krackle | Hero selection, folder arrivals, editor headers and Mod tray arrivals | Short edge formations in Full; 180ms local pulse in Calm; still in Off |
@@ -561,9 +561,20 @@ showing and puts them back for Settings, which keeps its dialog, its loading cov
 configuration discovery unchanged. Appearance and motion are chosen in Settings, not
 during first run.
 
+## Setup blocks
+
+The first-run page splits its three stages with the three blocks (`docs/motion-v2/DECISIONS.md`,
+D18). `setup-wizard.js` draws a block when its row becomes valid: specks gather for 340 ms and the
+block swells from 250 ms to 620 ms under a clip and a scale, with no opacity. A move in flight
+finishes before a row can lose its block. The host carries `data-piece` and, once drawn,
+`data-shown`.
+
 ## Setup ink-well
 
-The first-run page is the Grand pour: each row names its thing on the left, the drop's
+No page mounts this any more. `setup-drop.js` stays, with its fixture test, until P4 removes the
+Krackle files.
+
+The first-run page was the Grand pour: each row names its thing on the left, the drop's
 column runs down the middle through the glyphs, and what was found sits on the right. The
 page ends on the export review's ink-well (**Ink-well**, below), mounted as it is, standing
 prominent under the column with the page's Open Atelier button as its paper label and the

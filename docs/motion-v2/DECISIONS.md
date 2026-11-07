@@ -500,9 +500,14 @@ Added at the P1.7 checkpoint, from Thiago's note on the first-run setup sheet.
 
 - **Decision:** the three blocks split the page's three stages, and the rows lose their
   rules. In the page's order and the mark's: tile for the unlock key, mesh block for the
-  mapping file, disc for the game folder.
-- **Limits:** the blocks stay still and always use the exact piece colours, so they aren't
-  a progress bar (SPEC §2) and don't form an A (invariant 5). Each row's status stays in a
-  20 px glyph and its sentence. Which block goes with which stage is by order only, and
-  Thiago can change it.
-- **Status:** asked for by Thiago, 7 Nov 2026; the drawing awaits his sign-off at P1.7.
+  mapping file, disc for the game folder. The drop and ink-well go, and Open Atelier becomes
+  a plain primary button under the column.
+- **Materialising:** each block comes into existence when its row's real check passes, by
+  Condense: specks of the piece gather from nothing and it swells out of where they met
+  (620 ms, once, opaque throughout, with a clip and a scale and no fade). Thiago chose it from
+  three prototypes (Condense, Swell, Lines). Rows pass independently, so the disc can arrive
+  first. Blocks settling together take turns.
+- **Limits:** the block always uses the exact piece colour and the three never form an A here
+  (invariant 5). Each row's status stays in a 20 px glyph and its sentence. A block appearing
+  is a kind of progress; SPEC §2 bans category colours on progress bars, which this isn't.
+- **Status:** asked for and Condense chosen by Thiago, 7 Nov 2026; the page awaits his sign-off at P1.7.

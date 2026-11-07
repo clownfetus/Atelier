@@ -153,8 +153,7 @@ def _confirm_paths(tab,checks):
 
 def _setup(context,url,report,checks):
     rows="['game','key','map'].map(n=>document.querySelector(`#setup-rows [data-row=${n}]`).dataset.state).join()"
-    well="document.querySelector('#setup-well [data-atelier-motion=setup-drop]')?.dataset"
-    ink="document.querySelector('#setup-well [data-atelier-motion=ink-well]')?.dataset"
+    shown="[...document.querySelectorAll('#setup-rows .at-setup-block')].map(b=>b.querySelector('svg')&&!b.querySelector('.at-setup-speck')&&!b.querySelector('svg').getAnimations().length?1:0).join()"
     for automatic in (True,False):
         tab=context.new_page();writes=[];errors=[];tab.on('pageerror',lambda e:errors.append(str(e)))
         try:
@@ -171,27 +170,29 @@ def _setup(context,url,report,checks):
             assert tab.locator('#setup-save').inner_text().strip()=='Open Atelier'
             if automatic:
                 tab.wait_for_function(rows+"==='done,done,done'")
-                # One drop runs down past every valid row and falls into the well Open Atelier labels.
-                tab.wait_for_function(well+".amFull==='true'",timeout=5000)
-                # Landing is the export review's ink-well performing its success.
-                assert tab.evaluate(ink+".amState")=='success'
+                # Each block comes into existence once its row passes, solid the whole way, and they take turns.
+                if tab.evaluate("AtelierMotionPolicy.mode()")=='full':
+                    tab.wait_for_selector('.at-setup-speck',state='attached',timeout=5000)
+                    assert tab.evaluate("""()=>[...document.querySelectorAll('.at-setup-block svg, .at-setup-speck')].every(el=>
+                      getComputedStyle(el).opacity==='1'&&el.getAnimations().every(a=>a.effect.getKeyframes().every(k=>!('opacity' in k))))""")
+                    assert tab.locator('.at-setup-block:has(.at-setup-speck)').count()==1
+                tab.wait_for_function(shown+"==='1,1,1'",timeout=8000)
                 assert tab.locator('#setup-rows > li').evaluate_all('rows=>rows.map(r=>r.dataset.row).join()')=='key,map,game'
-                assert tab.locator('#setup-well .at-setup-save-slot #setup-save').count()==1
-                # One block to a stage, in the mark's order and exact colours, on one column with the well.
+                assert tab.locator('.at-setup-foot .at-setup-save-slot #setup-save').count()==1
+                # One block to a stage, in the mark's order and exact colours, on one column with Open Atelier.
                 blocks=tab.evaluate("""()=>[...document.querySelectorAll('#setup-rows > li')].map(row=>{
                   const block=row.querySelector('.at-setup-block'),box=block.getBoundingClientRect(),css=getComputedStyle(row);
                   return {piece:block.dataset.piece,color:getComputedStyle(block.querySelector('svg').firstElementChild).fill,x:box.left+box.width/2,rule:css.borderBottomWidth};})""")
                 assert [b['piece'] for b in blocks]==['texture','mesh','material'],blocks
                 assert [b['color'] for b in blocks]==['rgb(108, 152, 202)','rgb(90, 170, 154)','rgb(223, 143, 107)'],blocks
                 assert all(b['rule']=='0px' for b in blocks),blocks
-                centre=tab.evaluate("()=>{const box=document.getElementById('setup-well').getBoundingClientRect();return box.left+box.width/2}")
+                centre=tab.evaluate("()=>{const box=document.getElementById('setup-save').getBoundingClientRect();return box.left+box.width/2}")
                 assert all(abs(b['x']-centre)<1 for b in blocks),(blocks,centre)
                 assert tab.locator('[data-row=game] .at-setup-what').inner_text()=='Found on this PC'
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Current key retrieved'
-                # Each row's found glyph: the ink key, the code file, the folder; the well's lid is open.
+                # Each row's found glyph: the ink key, the code file, the folder.
                 for row,found in (('key','key'),('map','file'),('game','folder')):
                     assert tab.locator(f'[data-row={row}] [data-atelier-motion=krackle-glyph][data-am-found={found}][data-am-state=success]').count()==1
-                assert tab.evaluate(well+".amLid")=='open'
                 assert tab.locator('#setup-page-title').inner_text()=='Ready to open Atelier'
                 assert tab.locator('#setup-path').is_hidden() and tab.locator('#setup-save').is_enabled()
                 tab.locator('[data-row=game] .at-setup-change').click()
@@ -201,18 +202,16 @@ def _setup(context,url,report,checks):
                     tab.screenshot(path=str(report/f'trust-setup-{theme}.png'),animations='disabled')
             else:
                 tab.wait_for_function(rows+"==='done,missing,missing'")
-                # The key comes first, so the drop waits above it although the game was found.
-                tab.wait_for_function(well+".amReached==='0' && "+well+".amFull==='false' && "+well+".amMoving==='false'",timeout=5000)
-                # Waiting on the person, the well is alive: it cooks as it does in the export review,
-                # and its lid is shut.
-                tab.wait_for_function(ink+".amState==='busy' && "+ink+".amSleeping==='false'",timeout=3000)
-                assert tab.evaluate(well+".amLid")=='shut'
+                # Only the row that passed has its block: the game folder's disc arrives alone, and the
+                # rows still waiting hold a dot.
+                tab.wait_for_function(shown+"==='0,0,1'",timeout=5000)
+                assert tab.locator('[data-row=key] .at-setup-block svg, [data-row=map] .at-setup-block svg').count()==0
                 assert "couldn't be reached" in tab.locator('[data-row=key] .at-setup-what').inner_text()
                 assert tab.locator('#setup-page-title').inner_text()=='Atelier needs two things from you'
                 assert tab.locator('#setup-save').is_disabled() and tab.locator('#setup-aes').is_visible()
                 tab.locator('#setup-aes').fill('0x'+'a'*64);tab.locator('#setup-usmap').fill('Fixture.usmap')
                 tab.wait_for_function(rows+"==='done,done,done'")
-                tab.wait_for_function(well+".amFull==='true'",timeout=5000)
+                tab.wait_for_function(shown+"==='1,1,1'",timeout=8000)
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Key entered'
             tab.wait_for_function("document.querySelector('#setup-save:not(:disabled)')")
             tab.locator('#setup-save').click();tab.wait_for_function("!document.getElementById('setup-overlay').classList.contains('active')")
@@ -223,10 +222,10 @@ def _setup(context,url,report,checks):
             assert tab.locator('#setup-path').is_visible();assert tab.locator('#settings-theme').is_visible()
             assert tab.locator('#setup-page').is_hidden();assert tab.locator('#setup-save-label').inner_text()=='Save'
             assert tab.locator('#setup-overlay[data-setup-page]').count()==0
-            assert tab.locator('#setup-well [data-atelier-motion], .am-setup-drop-flight').count()==0
+            assert tab.locator('#setup-page .at-setup-block svg, .at-setup-speck, .am-setup-drop-flight').count()==0
             assert not errors,errors
         finally:tab.close()
-    checks.append('First-run setup is one page that fills from the check and its ink-well, asks only for what is missing, supports offline fallback, preserves the save payload and keeps Settings as a full form')
+    checks.append('First-run setup is one page that fills from the check, brings each block into existence as its check passes, asks only for what is missing, supports offline fallback, preserves the save payload and keeps Settings as a full form')
 
 
 def _launch_check(context,url,report,checks):
