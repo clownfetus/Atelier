@@ -150,6 +150,9 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.template
 .envrc
 .venv
 env/
@@ -236,10 +239,9 @@ _cache/
 _webview/
 Atelier.exe
 
-# discord retrieval scratch (contains user token + scraped msgs)
-retrieval/.env
-retrieval/data/
-retrieval/test.py
+# Local research and machine-specific assistant configuration are not project source.
+/retrieval/
+/.mcp.json
 # Additional local virtual environments (.venv312 etc.)
 .venv*/
 
