@@ -151,7 +151,7 @@
   // throughout: a clip and a scale reveal it, never opacity. Blocks settling together take turns.
   const SPECKS=[[-.53,-.28],[.42,-.47],[.58,.14],[-.19,.56],[-.61,.22],[.25,-.61],[.5,.47],[-.42,-.56]];
   const FORM=620, TURN=260, GATHER=340, SWELL_AT=250, EASE='cubic-bezier(.45,.05,.2,1)';
-  const hidden=()=>'circle(0% at 50% 50%)', whole=()=>'circle(72% at 50% 50%)';
+  const CLOSED='circle(0% at 50% 50%)', OPEN='circle(72% at 50% 50%)';
   function drawBlock(row) {
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     svg.setAttribute('viewBox','0 0 24 24');
@@ -170,7 +170,7 @@
   function condense(row) {
     const svg=drawBlock(row), size=row.block.offsetWidth, specks=[];
     const running=[
-      svg.animate([{clipPath:hidden()},{clipPath:whole()}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
+      svg.animate([{clipPath:CLOSED},{clipPath:OPEN}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
       svg.animate([{transform:'scale(.82)',offset:0},{transform:'scale(1.04)',offset:.72},{transform:'scale(1)',offset:1}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
     ];
     SPECKS.forEach(([x,y],i)=>{
@@ -187,7 +187,7 @@
     if(motion==='full'){condense(row);return;}
     const svg=drawBlock(row);
     // Calm keeps the swell. Off and reduced motion take the one fade the system allows (SPEC §5).
-    landed(row,[motion==='calm'?svg.animate([{clipPath:hidden()},{clipPath:whole()}],{duration:240,easing:EASE,fill:'both'})
+    landed(row,[motion==='calm'?svg.animate([{clipPath:CLOSED},{clipPath:OPEN}],{duration:240,easing:EASE,fill:'both'})
       :svg.animate([{opacity:0},{opacity:1}],{duration:150,fill:'both'})]);
   }
   function syncBlock(row) {

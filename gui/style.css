@@ -788,7 +788,7 @@ body {
                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mat-row input[type=color] { width: 34px; height: 26px; padding: 1px; cursor: pointer;
                  background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--studio-shape-small); }
-.mat-row input[type=range] { flex: 1; min-width: 50px; accent-color: var(--green); }
+.mat-row input[type=range] { flex: 1; min-width: 50px; accent-color: var(--acc); }
 .mat-tag { font-size: var(--studio-text-micro); color: var(--muted); }
 .mat-num { width: 62px; background: var(--bg3); border: 1px solid var(--border);
            border-radius: var(--studio-shape-small); color: var(--text); font: inherit; font-size: var(--studio-text-detail); padding: 4px 6px; }
@@ -1477,7 +1477,7 @@ select:focus-visible { border-color: var(--acc); }
 #ctx-menu { border-radius: var(--studio-shape-medium); padding: 6px; }
 .mat-num, .mat-hex, .sh-eval, .sh-pval { min-height: 30px; }
 .mat-row input[type=range] { min-height: 28px; }
-.proj-thumb-icon { width: 76%; height: 76%; color: var(--acc); }
+.proj-thumb-icon { width: 76%; height: 76%; color: var(--studio-emblem-neutral); }
 .proj-card:focus-within .proj-actions, .proj-card:focus-within .proj-check { display: flex; }
 .proj-row:focus-within .proj-actions { visibility: visible; }
 #viewport-box { border-radius: var(--studio-shape-dialog); }

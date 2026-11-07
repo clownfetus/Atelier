@@ -31,7 +31,7 @@ let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/"
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
-let   _openAfterImport = _store.get("atelier.openAfterImport") !== "0"; // Settings → Behavior toggle
+let   _openAfterImport = _store.get("atelier.openAfterImport") !== "0"; // Settings → Behaviour toggle
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -1595,11 +1595,11 @@ function renderMatEditor() {
       ${_dyeOffHtml(m)}`;
   }
   if (m.colors.length) {
-    h += `<div class="mat-section with-ctl">Color parameters ${colorModeSeg()}</div>`;
+    h += `<div class="mat-section with-ctl">Colour parameters ${colorModeSeg()}</div>`;
     const groups = new Map();
     m.colors.forEach((c, i) => {
       const region = /^Region\s+(\d+)\s*-/.exec(c.name);
-      const group = region ? `Dye region ${region[1]}` : "Surface colors";
+      const group = region ? `Dye region ${region[1]}` : "Surface colours";
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group).push({ c, i });
     });
@@ -1641,7 +1641,7 @@ function renderMatEditor() {
   // a dye-off toggle above, and replacing the body would throw both away along with the only
   // controls that material has.
   if (!m.colors.length && !m.scalars.length)
-    h += `<div class="mat-empty">This material exposes no editable color or scalar parameters.</div>`;
+    h += `<div class="mat-empty">This material exposes no editable colour or scalar parameters.</div>`;
   body.innerHTML = h;
   lucide.createIcons({ nodes: [body] });
   window.AtelierPolish?.swatchesAfter(previousSwatches, m.colors);
@@ -1675,7 +1675,7 @@ function materialReplacementHtml(m, expanded) {
       <select id="mat-source-results" size="5" aria-label="Matching materials" hidden onchange="matChooseSource(this.value)"></select>
       <label for="mat-source-path">Source material path</label>
       <input id="mat-source-path" type="text" placeholder="Characters/…/Materials/MI_…" value="${_matEscape(m.sourceDraft || m.materialSource || "")}" oninput="matEditor.sourceDraft=this.value">
-      <p>UVs, vertex colors and character-specific shader inputs can affect the result. Animated game shaders are not fully represented in the 3D preview.</p>
+      <p>UVs, vertex colours and character-specific shader inputs can affect the result. Animated game shaders are not fully represented in the 3D preview.</p>
       <button type="button" id="mat-use-source" class="btn" onclick="replaceMaterialFromSource()">Use this material</button>
     </div></details>`;
 }
@@ -4870,7 +4870,7 @@ function _renderProjectPicker(projects, keepQuery) {
     const check = `<div class="proj-check" title="Select"><input type="checkbox" aria-label="Select ${_esc(proj.name)}" ${sel ? "checked" : ""}></div>`;
     const thumb = `<div class="proj-thumb">
       ${proj.asset_count ? `<img src="${thumbUrl}" alt="" loading="lazy" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">` : ''}
-      <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon"></i>
+      <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon folder-icon"></i>
     </div>`;
     const actions = `
       <div class="proj-actions">

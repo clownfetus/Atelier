@@ -20,7 +20,7 @@
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-labelledby', 's-maps-title');
     const heading = el('h2', 'Choose shared S-map pairings'); heading.id = 's-maps-title';
-    panel.append(heading, el('p', 'Several edited D maps share an S map. Choose which D supplies its color, or skip that S map.'));
+    panel.append(heading, el('p', 'Several edited D maps share an S map. Choose which D supplies its colour, or skip that S map.'));
     rows = el('div', undefined, 's-maps-pairings');
     status = el('p', '', 's-maps-status'); status.setAttribute('role', 'status');
     const actions = el('div', undefined, 'bulk-actions');

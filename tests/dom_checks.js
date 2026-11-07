@@ -253,7 +253,7 @@ matEditor.dyeOff = true;
 renderMatEditor();
 mh = document.getElementById("mat-body").innerHTML.replace(/\s+/g, " ");
 if (!/toggle-row on/.test(mh)) throw new Error("the toggle does not reflect its own state");
-if (!mh.includes("no editable color or scalar parameters"))
+if (!mh.includes("no editable colour or scalar parameters"))
   throw new Error("the empty-parameter note went missing");
 
 // ── curve / VFX / level / text editors: unsaved drafts and destructive resets ─────────────────

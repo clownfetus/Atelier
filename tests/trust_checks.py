@@ -213,6 +213,19 @@ def _setup(context,url,report,checks):
                 tab.wait_for_function(rows+"==='done,done,done'")
                 tab.wait_for_function(shown+"==='1,1,1'",timeout=8000)
                 assert tab.locator('[data-row=key] .at-setup-what').inner_text()=='Key entered'
+                # A row that stops being valid loses its block, even if the block is still forming, and
+                # the others keep theirs. The row can then earn it back.
+                tab.locator('[data-row=map] .at-setup-change').click();tab.locator('#setup-usmap').fill('')
+                tab.wait_for_function(rows+"==='done,done,missing'");tab.wait_for_function(shown+"==='1,0,1'",timeout=5000)
+                tab.locator('#setup-usmap').fill('Fixture.usmap')
+                if tab.evaluate("AtelierMotionPolicy.mode()")=='full':tab.wait_for_selector('[data-row=map] .at-setup-speck',state='attached',timeout=5000)
+                tab.locator('#setup-usmap').fill('')
+                # The move in flight lands first, then the block goes, leaving nothing behind.
+                tab.wait_for_function(rows+"==='done,done,missing'")
+                tab.wait_for_function("!document.querySelector('[data-row=map] .at-setup-block').hasChildNodes()",timeout=5000)
+                assert tab.evaluate(shown)=='1,0,1'
+                tab.locator('#setup-usmap').fill('Fixture.usmap')
+                tab.wait_for_function(shown+"==='1,1,1'",timeout=8000)
             tab.wait_for_function("document.querySelector('#setup-save:not(:disabled)')")
             tab.locator('#setup-save').click();tab.wait_for_function("!document.getElementById('setup-overlay').classList.contains('active')")
             assert writes==[{'path':'D:/Steam/MarvelRivals','aes_key':'a'*64,'usmap_path':'Fixture.usmap'}]

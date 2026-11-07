@@ -175,7 +175,7 @@ async def main():
                     await picker.evaluate("e=>{e.value='#357aa8';e.dispatchEvent(new Event('input'));}")
                     await page.locator('#viewport-mat-save').click()
                     await page.wait_for_function('!__studio.pending()',timeout=120000)
-                    assert 'Saved recolors' in await page.locator('#viewport-status').inner_text()
+                    assert 'Saved recolours' in await page.locator('#viewport-status').inner_text()
                     result['weapon_colour_saved']=material['game_rel'];extra_items.append(material['game_rel'])
                     param=next((p for p,g in material.get('textures',{}).items() if g==material.get('texture_roles',{}).get('basecolor')),None)
                     if param:

@@ -82,7 +82,7 @@
     controls = el('div', undefined, 'bulk-controls');
     source = select('bulk-source', 'Assets', [['edited', 'Selected edited assets'], ['folder', 'Current folder']]);
     operation = select('bulk-operation', 'Operation', [['multiply', 'Multiply values'], ['recolor', 'Replace RGB']]);
-    scope = select('bulk-scope', 'Channels', [['rgb', 'Color RGB only'], ['alpha', 'Alpha only'], ['all', 'All channels and scalars']]);
+    scope = select('bulk-scope', 'Channels', [['rgb', 'Colour RGB only'], ['alpha', 'Alpha only'], ['all', 'All channels and scalars']]);
     const factorLabel = el('label', 'Multiplier'); factor = el('input'); factor.id = 'bulk-factor'; factor.type = 'number'; factor.step = 'any'; factor.value = '1.2'; factorLabel.append(factor); controls.append(factorLabel);
     const colorLabel = el('label', 'New RGB'); color = el('input'); color.id = 'bulk-color'; color.type = 'color'; color.value = '#66bbee'; colorLabel.append(color); controls.append(colorLabel);
     const valueLabel = el('label', 'New value'); value = el('input'); value.id = 'bulk-value'; value.type = 'number'; value.step = 'any'; value.value = '0'; valueLabel.append(value); controls.append(valueLabel);

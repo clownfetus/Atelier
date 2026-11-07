@@ -119,7 +119,7 @@ async function canLeave() {
   if (visibilityBusy.size) { note('Wait for the section visibility change to finish.', 'warning'); return false; }
   if (!Object.keys(edited).length) return true;
   const gen = generation, project = viewportProject;
-  return await window.AtelierDialog.confirm({title:'Discard preview recolours?', body:'Discard unsaved preview recolors?', tone:'danger', confirmLabel:'Discard'})
+  return await window.AtelierDialog.confirm({title:'Discard preview recolours?', body:'Discard unsaved preview recolours?', tone:'danger', confirmLabel:'Discard'})
     && gen === generation && project === viewportProject && !saving;
 }
 
@@ -1629,9 +1629,9 @@ async function saveEdits() {
   const newerEdits = ownsView && Object.values(edited).some(params => Object.keys(params).length);
   const message = failed.length
     ? `Saved ${ok}; ${failed.length} material(s) could not be saved. ` +
-      (reason && reason !== 'Save failed' ? `${reason.replace(/\.?$/, '.')} Unsaved recolors are retained.` : 'Unsaved recolors are retained; retry Save.')
+      (reason && reason !== 'Save failed' ? `${reason.replace(/\.?$/, '.')} Unsaved recolours are retained.` : 'Unsaved recolours are retained; retry Save.')
     : newerEdits ? 'Submitted changes saved; newer edits remain unsaved.'
-    : `Saved recolors to ${ok} material${ok !== 1 ? 's' : ''}`;
+    : `Saved recolours to ${ok} material${ok !== 1 ? 's' : ''}`;
   const state = failed.length || newerEdits ? 'warning' : 'success';
   const currentProject = project === (window.atelierProject?.() || '');
   if(currentProject && ok)await window.loadSidebar?.();
@@ -1890,7 +1890,7 @@ window.addEventListener('keydown', e => {
 
 window.addEventListener('beforeunload', event => {
   if (saving || visibilityBusy.size || Object.values(edited).some(params => Object.keys(params).length)) {
-    event.preventDefault(); event.returnValue = 'Preview recolors have unsaved changes.';
+    event.preventDefault(); event.returnValue = 'Preview recolours have unsaved changes.';
   }
 });
 window.addEventListener('pagehide', () => {
@@ -1908,7 +1908,7 @@ function focusPendingEdits() {
   $('viewport-overlay').classList.add('active');
   const status = $('viewport-status');
   status.textContent = saving || visibilityBusy.size ? 'Preview save in progress. Wait for it to finish before exporting.'
-    : 'Save or revert these unsaved preview recolors before exporting.';
+    : 'Save or revert these unsaved preview recolours before exporting.';
   status.setAttribute('role', 'status');
   const save = $('viewport-mat-save');
   if (!saving && !save.disabled && save.getClientRects().length) save.focus();
