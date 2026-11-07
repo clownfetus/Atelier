@@ -307,7 +307,7 @@ def script():
             'function fit(){const root=document.documentElement,css=getComputedStyle(root),mode=root.dataset.theme===\'dark\'?\'dark\':\'light\';\n'
             "  const surfaces=['--bg3','--bg2'].map(name=>css.getPropertyValue(name).trim()).filter(Boolean);\n"
             '  for(const [role,ink] of Object.entries(inks)){let color=ink[mode];\n'
-            '    try{for(const surface of surfaces)color=AtelierColourFit.fit(color,surface);}catch(_){color=ink[mode];}\n'
+            '    try{color=AtelierColourFit.fit(color,surfaces);}catch(_){}\n'
             "    root.style.setProperty('--studio-emblem-'+role,color);}}\n"
             "fit();window.addEventListener('atelier:inks',fit);\n"
             'window.AtelierFolderEmblems=Object.freeze({names:Object.freeze(Object.keys(marks)),roles:Object.freeze(roles),inks:Object.freeze(inks),\n'

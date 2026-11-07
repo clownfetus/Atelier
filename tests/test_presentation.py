@@ -31,7 +31,7 @@ class Presentation(unittest.TestCase):
     def test_validated_cache_resolves_system_theme_at_launch(self):
         with tempfile.TemporaryDirectory() as root, patch('atelier.window_theme._system_dark', return_value=False):
             appearance = WindowTheme(root)
-            self.assertEqual(appearance._background(), '#f5f6f8')
+            self.assertEqual(appearance._background(), '#f4f6f8')
             self.assertFalse(appearance.set_window_theme('dark', 'url(invalid)')['ok'])
             self.assertFalse(appearance._path.exists())
             self.assertTrue(appearance.set_window_theme('dark', '#112233', 'system', '#fafafa', '#112233')['ok'])
@@ -39,9 +39,9 @@ class Presentation(unittest.TestCase):
             with patch('atelier.window_theme._system_dark', return_value=True):
                 self.assertEqual(WindowTheme(root)._background(), '#112233')
             appearance._path.write_text('{broken', encoding='utf-8')
-            self.assertEqual(WindowTheme(root)._background(), '#f5f6f8')
+            self.assertEqual(WindowTheme(root)._background(), '#f4f6f8')
             appearance._path.write_text('[]', encoding='utf-8')
-            self.assertEqual(WindowTheme(root)._background(), '#f5f6f8')
+            self.assertEqual(WindowTheme(root)._background(), '#f4f6f8')
 
     def test_previews_use_only_existing_json_and_keep_it_unchanged(self):
         root = Path(data.name, 'preview'); root.mkdir(exist_ok=True)

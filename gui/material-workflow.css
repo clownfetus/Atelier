@@ -58,3 +58,7 @@
   #material-overlay .mat-row input[type=range] { min-width: 50px; }
   #material-overlay .mat-reference { flex-wrap: wrap; }
 }
+
+/* Atelier's accent is neutral, so where its colour was the only cue, these get another one (D3). */
+:root[data-palette=studio] #material-overlay .mat-restore { text-decoration: underline; text-underline-offset: 2px; }
+:root[data-palette=studio] #material-overlay .mat-changed { font-weight: 600; }

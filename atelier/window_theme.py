@@ -28,7 +28,7 @@ class WindowTheme:
         self._path = Path(data_root) / '_webview' / 'window-theme.json'
         self._window = None
         self._lock = threading.Lock()
-        self._state = {'preference': 'system', 'light': '#f5f6f8', 'dark': '#17191d'}
+        self._state = {'preference': 'system', 'light': '#f4f6f8', 'dark': '#0d151f'}
         try:
             saved = json.loads(self._path.read_text(encoding='utf-8'))
             if (saved.get('preference') in ('light', 'dark', 'system')
@@ -75,7 +75,7 @@ class WindowTheme:
             # Other backends and older Windows retain their native title bar.
             pass
 
-    def set_window_theme(self, mode, background, preference='system', light='#f5f6f8', dark='#17191d'):
+    def set_window_theme(self, mode, background, preference='system', light='#f4f6f8', dark='#0d151f'):
         if (mode not in ('light', 'dark') or preference not in ('light', 'dark', 'system')
                 or not all(_color(value) for value in (background, light, dark))):
             return {'ok': False}

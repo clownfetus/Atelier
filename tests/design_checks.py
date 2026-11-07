@@ -70,6 +70,66 @@ def measure_contrast(page):
     }''')
 
 
+ATELIER_SURFACES = {
+    'light': {'--bg': '#F4F6F8', '--bg2': '#FFFFFF', '--bg3': '#E6EAEF', '--text': '#0D151F', '--muted': '#4E5F73',
+              '--border': '#DDE3EA', '--acc': '#0D151F', '--md-sys-color-error': '#C5193E'},
+    'dark': {'--bg': '#0D151F', '--bg2': '#172331', '--bg3': '#212E3B', '--text': '#F4F6F8', '--muted': '#B4C0CE',
+             '--border': '#24323F', '--acc': '#F4F6F8', '--md-sys-color-error': '#EC6A86'},
+}
+STATUS_BASES = {'light': {'complete': '#419145', 'warning': '#9E7C18', 'error': '#E74165'},
+                'dark': {'complete': '#7CC47F', 'warning': '#E6C35C', 'error': '#EC6A86'}}
+PIECE_COLOURS = {'--atelier-texture': '#6C98CA', '--atelier-mesh': '#5AAA9A', '--atelier-material': '#DF8F6B'}
+
+
+def assert_theme_tokens(page, mode, preset):
+    """Pieces never change, statuses read on this theme's surfaces and keep their hue, the halo is the surface."""
+    colour = lambda *names: page.evaluate("""names => {
+      const probe = document.createElement('span'); document.body.append(probe);
+      const values = names.map(name => { probe.style.color = `var(${name})`;
+        return '#' + getComputedStyle(probe).color.match(/[\\d.]+/g).slice(0,3).map(n => (+n).toString(16).padStart(2,'0')).join('').toUpperCase(); });
+      probe.remove(); return values; }""", list(names))
+    def rgb(value):
+        return [int(value[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    def luminance(value):
+        return sum(w * (v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4)
+                   for v, w in zip(rgb(value), (.2126, .7152, .0722)))
+    def ratio(a, b):
+        a, b = sorted((luminance(a), luminance(b)), reverse=True)
+        return (a + .05) / (b + .05)
+    def hue(value):
+        r, g, b = rgb(value)
+        high, low = max(r, g, b), min(r, g, b)
+        if high == low:
+            return None
+        return ((g - b) / (high - low) % 6 if high == r else (b - r) / (high - low) + 2 if high == g
+                else (r - g) / (high - low) + 4) * 60
+
+    assert colour(*PIECE_COLOURS) == list(PIECE_COLOURS.values()), (mode, preset)
+    backgrounds = colour('--bg', '--bg2', '--bg3')
+    assert colour('--glyph-halo') == [backgrounds[0]], (mode, preset)
+    for role, base in STATUS_BASES[mode].items():
+        shown, sentence = colour(f'--status-{role}', f'--status-{role}-text')
+        assert min(ratio(shown, surface) for surface in backgrounds) >= 3, (mode, preset, role, shown)
+        assert min(ratio(sentence, surface) for surface in backgrounds) >= 4.5, (mode, preset, role, sentence)
+        turned = abs(hue(shown) - hue(base)) % 360
+        assert min(turned, 360 - turned) < 4, (mode, preset, role, shown, base)
+    for name in ('--studio-success', '--studio-warning', '--md-sys-color-error'):
+        assert min(ratio(colour(name)[0], surface) for surface in backgrounds) >= 4.5, (mode, preset, name)
+    for role in ('texture', 'mesh', 'material', 'neutral'):
+        assert min(ratio(colour(f'--studio-icon-{role}')[0], surface) for surface in backgrounds) >= 4.5, (mode, preset, role)
+    if preset == 'studio':
+        names = list(ATELIER_SURFACES[mode])
+        assert dict(zip(names, colour(*names))) == ATELIER_SURFACES[mode], mode
+    # The identity's surfaces use the same theme.
+    roles = page.evaluate("""() => { const host = document.createElement('div'); host.className = 'at-identity'; document.body.append(host);
+      const css = getComputedStyle(host), read = name => { host.style.color = `var(${name})`; return css.color; };
+      const roles = {text: read('--text'), surface: (host.style.background = 'var(--surface)', css.backgroundColor)}; host.remove(); return roles; }""")
+    plain = page.evaluate("""() => { const host = document.createElement('div'); document.body.append(host);
+      host.style.color = 'var(--text)'; host.style.background = 'var(--bg)'; const css = getComputedStyle(host);
+      const roles = {text: css.color, surface: css.backgroundColor}; host.remove(); return roles; }""")
+    assert roles == plain, (mode, preset, roles, plain)
+
+
 def assert_folder_icon_size(card):
     measurements = card.locator('.card-thumb > .card-icon').evaluate('''icon => {
       const thumb = icon.parentElement, css = getComputedStyle(thumb);

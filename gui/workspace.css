@@ -60,8 +60,8 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace-choice button:focus-visible { outline:2px solid var(--drop); outline-offset:3px; }
 #viewport-overlay.mounted { position:relative; inset:auto; display:none; width:100%; padding:0; background:none; backdrop-filter:none; z-index:auto; }
 #viewport-overlay.mounted.active { display:flex; }
-#workspace #viewport-box { --bg2:var(--surface-panel); --bg3:var(--surface); --text:var(--at-lamp-black); --muted:var(--text-muted); --acc:var(--drop-text); --border:var(--line); --border2:var(--line); --vp-selected:var(--drop-wash); --vp-hover:var(--surface-sunk); --vp-stage-top:var(--at-linen); --vp-stage-bottom:var(--at-chalk); width:100%; height:100%; min-height:500px; border:1px solid var(--line); border-radius:12px; box-shadow:none; font-family:var(--font-ui); }
-:root[data-theme=dark] #workspace #viewport-box { --text:var(--at-gesso); --vp-stage-top:var(--at-charcoal); --vp-stage-bottom:var(--at-lamp-black); }
+#workspace #viewport-box { --bg2:var(--surface-panel); --bg3:var(--surface); --text:var(--md-sys-color-on-surface); --muted:var(--text-muted); --acc:var(--drop-text); --border:var(--line); --border2:var(--line); --vp-selected:var(--drop-wash); --vp-hover:var(--surface-sunk); --vp-stage-top:var(--md-sys-color-surface-container); --vp-stage-bottom:var(--md-sys-color-surface-container-highest); width:100%; height:100%; min-height:500px; border:1px solid var(--line); border-radius:12px; box-shadow:none; font-family:var(--font-ui); }
+:root[data-theme=dark] #workspace #viewport-box { --vp-stage-top:var(--md-sys-color-surface-container); --vp-stage-bottom:var(--md-sys-color-surface-container-lowest); }
 #workspace #viewport-head { min-height:60px; padding:8px 14px; }
 #workspace :is(#viewport-close,#viewport-back,#viewport-expand,.vp-workspace-label) { display:none; }
 /* Workspace exposes colour editing and comparison. The full model tools are in Library. */
@@ -69,7 +69,7 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace #viewport-playback:has(#viewport-play:disabled) { display:none; }
 #workspace #viewport-status { margin-left:auto; }
 #workspace #viewport-head #viewport-mat-save { background:var(--drop); border-color:var(--drop); color:var(--on-drop); }
-#workspace #viewport-head #viewport-mat-save:hover:not(:disabled) { background:var(--at-smalt-deep); }
+#workspace #viewport-head #viewport-mat-save:hover:not(:disabled) { background:var(--action-hover); }
 #workspace #viewport-box.expanded { width:100%; height:100%; }
 #workspace-dock { flex:none; display:flex; flex-direction:column; gap:12px; padding:14px 16px; background:var(--surface-panel); border:1px solid var(--line); border-radius:12px; }
 #workspace-stage[hidden] ~ #workspace-dock { display:none; }

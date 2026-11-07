@@ -27,15 +27,16 @@
     const values = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
     return '#' + values.map(n => Math.round((n + m) * 255).toString(16).padStart(2, '0')).join('');
   }
-  // The smallest lightness move that reaches the target. A colour already there comes back unchanged.
-  function fit(color, surface, target = 3) {
+  // The smallest lightness move that reads on every surface given. A colour already there comes back unchanged.
+  function fit(color, surfaces, target = 3) {
+    const list = [].concat(surfaces), score = candidate => Math.min(...list.map(surface => contrast(candidate, surface)));
     color = hex(color);
-    if (contrast(color, surface) >= target) return color;
-    const [h, s, l] = hsl(color), dark = luminance(surface) < .179;
-    let low = 0, high = 1, result = dark ? '#ffffff' : '#000000';
+    if (score(color) >= target) return color;
+    const [h, s, l] = hsl(color), lift = score('#ffffff') > score('#000000');
+    let low = 0, high = 1, result = lift ? '#ffffff' : '#000000';
     for (let i = 0; i < 18; i++) {
-      const t = (low + high) / 2, candidate = fromHsl(h, s, clamp(l + (dark ? 1 - l : -l) * t));
-      if (contrast(candidate, surface) >= target) { result = candidate; high = t; } else low = t;
+      const t = (low + high) / 2, candidate = fromHsl(h, s, clamp(l + (lift ? 1 - l : -l) * t));
+      if (score(candidate) >= target) { result = candidate; high = t; } else low = t;
     }
     return result;
   }

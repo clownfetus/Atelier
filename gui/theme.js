@@ -7,8 +7,8 @@
   const system = window.matchMedia('(prefers-color-scheme: dark)');
   const palettes = {
     studio: {
-      light: ['#f5f6f8', '#e4e7eb', '#23272e', '#37639d'],
-      dark: ['#17191d', '#2b2f35', '#e4e6e9', '#98b7e2'],
+      light: ['#f4f6f8', '#e6eaef', '#0d151f', '#0d151f'],
+      dark: ['#0d151f', '#212e3b', '#f4f6f8', '#f4f6f8'],
     },
     darcula: {
       light: ['#faf8f4', '#ebe6de', '#323232', '#875327'],
@@ -21,6 +21,20 @@
     contrast: {light:['#ffffff','#ededed','#000000','#003c99'], dark:['#080808','#181818','#ffffff','#afd2ff']},
     blueprint: {light:['#edf4fa','#dce8f2','#152e48','#215f9b'], dark:['#102235','#1b344c','#e4eff9','#88c5ff']},
     comic: {light:['#faf5e8','#e9e0ca','#201d17','#a12b24'], dark:['#201e19','#343028','#fff3d7','#ff9a80']},
+  };
+  // Status colours and small category icons (SPEC section 2). Other palettes move only their lightness.
+  // The mark's own colours are in tokens.css, and no theme ever touches them.
+  const fixed = {
+    light: {
+      status: {complete: '#419145', warning: '#9e7c18', error: '#e74165'},
+      sentence: {complete: '#337136', warning: '#7a6013', error: '#c5193e'},
+      icon: {texture: '#38679d', mesh: '#386d63', material: '#a24b23', neutral: '#4e5f73'},
+    },
+    dark: {
+      status: {complete: '#7cc47f', warning: '#e6c35c', error: '#ec6a86'},
+      sentence: {complete: '#7cc47f', warning: '#e6c35c', error: '#ec6a86'},
+      icon: {texture: '#6c98ca', mesh: '#5aaa9a', material: '#df8f6b', neutral: '#b4c0ce'},
+    },
   };
   const defaults = () => ({preset: 'studio', custom: {}, saved: []});
   const validColors = p => p && colors.every(key => typeof p[key] === 'string' && /^#[0-9a-f]{6}$/i.test(p[key]));
@@ -104,7 +118,7 @@
     const primary = readable(p.accent, backgrounds);
     const primaryContainer = mix(surface, primary, .18);
     const secondaryContainer = mix(surface, primary, .08);
-    const error = readable(mode === 'dark' ? '#df9d99' : '#ad3032', backgrounds);
+    const error = AtelierColourFit.fit(fixed[mode].sentence.error, backgrounds, 4.5);
     const errorContainer = mix(surface, error, .16);
     return {
       'surface': bg,
@@ -138,9 +152,16 @@
       const derived = roles(p, mode);
       for (const [key, value] of Object.entries(derived)) set('--md-sys-color-' + key, value);
       const backgrounds = [derived.surface, derived['surface-container-low'], derived['surface-container-high']];
-      for (const [key, value] of Object.entries({success: '#3e6d4a', warning: '#786020', info: p.accent})) {
-        set('--studio-' + key, readable(value, backgrounds));
+      const fit = (color, target) => AtelierColourFit.fit(color, backgrounds, target);
+      const values = fixed[mode];
+      for (const role of Object.keys(values.status)) {
+        set('--status-' + role, fit(values.status[role], 3));
+        set('--status-' + role + '-text', fit(values.sentence[role], 4.5));
       }
+      set('--studio-success', fit(values.sentence.complete, 4.5));
+      set('--studio-warning', fit(values.sentence.warning, 4.5));
+      set('--studio-info', readable(p.accent, backgrounds));
+      for (const [role, color] of Object.entries(values.icon)) set('--studio-icon-' + role, fit(color, 4.5));
       const blackMark = contrast('#000000', derived['surface-container-low']) >= contrast('#ffffff', derived['surface-container-low']);
       set('--studio-brand-color', blackMark ? '#000000' : '#ffffff');
       set('--studio-brand-filter', blackMark ? 'brightness(0)' : 'brightness(0) invert(1)');

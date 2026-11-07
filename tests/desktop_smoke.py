@@ -332,7 +332,7 @@ def main():
                 deadline=time.monotonic()+5
                 while time.monotonic()<deadline:
                     saved=json.loads(native_appearance._path.read_text(encoding='utf-8')) if native_appearance._path.exists() else {}
-                    if saved.get('preference')=='dark' and saved.get('dark')=='#17191d': break
+                    if saved.get('preference')=='dark' and saved.get('dark')=='#0d151f': break
                     time.sleep(.05)
                 assert saved.get('preference')=='dark', saved
                 import ctypes

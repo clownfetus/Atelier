@@ -100,7 +100,7 @@
   position: relative;
   min-width: 10px;
   border-radius: var(--studio-shape-full);
-  background-color: var(--krackle-energy, var(--acc));
+  background-color: var(--text);
   background-image: radial-gradient(circle, var(--krackle-hole) 0 1.15px, transparent 1.5px),
                     radial-gradient(circle, var(--krackle-hole) 0 .7px, transparent 1px);
   background-size: 9px 10px, 9px 10px;

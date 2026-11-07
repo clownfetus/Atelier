@@ -26,7 +26,7 @@ const inks={"texture": {"dark": "#6C98CA", "light": "#5084C0"}, "mesh": {"dark":
 function fit(){const root=document.documentElement,css=getComputedStyle(root),mode=root.dataset.theme==='dark'?'dark':'light';
   const surfaces=['--bg3','--bg2'].map(name=>css.getPropertyValue(name).trim()).filter(Boolean);
   for(const [role,ink] of Object.entries(inks)){let color=ink[mode];
-    try{for(const surface of surfaces)color=AtelierColourFit.fit(color,surface);}catch(_){color=ink[mode];}
+    try{color=AtelierColourFit.fit(color,surfaces);}catch(_){}
     root.style.setProperty('--studio-emblem-'+role,color);}}
 fit();window.addEventListener('atelier:inks',fit);
 window.AtelierFolderEmblems=Object.freeze({names:Object.freeze(Object.keys(marks)),roles:Object.freeze(roles),inks:Object.freeze(inks),

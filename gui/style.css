@@ -381,7 +381,7 @@ body {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.clear-all-btn:hover { color: var(--acc); background: var(--md-sys-color-error-container); }
+.clear-all-btn:hover { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
 .sb-clear {
   width: 28px; height: 28px;
   border: none;
@@ -394,7 +394,7 @@ body {
   padding: 0;
   transition: color var(--studio-motion-fast) var(--studio-easing), background var(--studio-motion-fast) var(--studio-easing);
 }
-.sb-clear:hover { color: var(--acc); background: var(--md-sys-color-error-container); }
+.sb-clear:hover { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
 #sidebar-list {
   flex: 1;
   min-height: 0;
@@ -624,7 +624,7 @@ body {
 }
 .progress-bar-fill {
   height: 100%;
-  background: var(--acc);
+  background: var(--text);
   border-radius: var(--studio-shape-xs);
   transition: width 200ms linear;
   width: 0%;
@@ -734,7 +734,7 @@ body {
   color: var(--muted);
 }
 #setup-status.ok    { color: var(--green); }
-#setup-status.error { color: var(--acc2); }
+#setup-status.error { color: var(--md-sys-color-error); }
 .setup-help-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; margin-left: auto; flex-shrink: 0;
@@ -757,7 +757,7 @@ body {
   color: var(--muted); min-height: 14px;
 }
 .setup-field-status.ok    { color: var(--green); }
-.setup-field-status.error { color: var(--acc2); }
+.setup-field-status.error { color: var(--md-sys-color-error); }
 
 /* â”€â”€ material parameter editor â”€â”€ */
 .mat-modal { max-width: 660px; width: calc(100% - 40px); max-height: 86vh;
@@ -998,7 +998,7 @@ body {
   transition: background var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing);
 }
 .proj-action-btn:hover { background: var(--bg3); color: var(--text); }
-.proj-action-btn.danger:hover { color: var(--acc2); background: var(--md-sys-color-error-container); }
+.proj-action-btn.danger:hover { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
 
 /* multi-select: the tick is revealed on hover in the grid, and always on in the list */
 .proj-check {
@@ -1090,7 +1090,7 @@ body {
   white-space: nowrap;
 }
 .ctx-item:hover { background: var(--bg3); }
-.ctx-item.danger { color: var(--acc2); }
+.ctx-item.danger { color: var(--md-sys-color-error); }
 .ctx-item.danger:hover { background: var(--md-sys-color-error-container); }
 .ctx-sep { height: 1px; background: var(--border); margin: 3px 4px; }
 

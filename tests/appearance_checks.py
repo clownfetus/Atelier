@@ -1,5 +1,5 @@
 """Exercise appearance through Settings and first-run setup in real Chromium."""
-from design_checks import measure_contrast
+from design_checks import assert_theme_tokens, measure_contrast
 
 
 def run_appearance_checks(page, context, url, report, checks):
@@ -36,13 +36,14 @@ def run_appearance_checks(page, context, url, report, checks):
         assert picker.locator('option').all_text_contents() == ['Light', 'Dark', 'System']
         for mode in ('dark', 'light'):
             picker.select_option(mode)
-            for preset in ('studio', 'darcula', 'repak'):
+            for preset in ('studio', 'darcula', 'repak', 'contrast', 'blueprint', 'comic'):
                 button = tab.locator(f'[data-theme-preset="{preset}"]')
                 button.click()
                 tab.wait_for_function("([mode,preset])=>document.documentElement.dataset.theme===mode && document.documentElement.dataset.palette===preset", arg=[mode,preset])
                 assert button.get_attribute('aria-pressed') == 'true'
                 assert button.locator('.theme-swatches i').count() == 4
                 assert all(pair['ratio'] >= 4.5 for pair in measure_contrast(tab)), (mode, preset)
+                assert_theme_tokens(tab, mode, preset)
                 # Check popup options in every select, including dynamically created editors.
                 styles = tab.evaluate('''() => [...document.querySelectorAll('select')].map(select => {
                   const option = select.querySelector('option');
@@ -61,7 +62,7 @@ def run_appearance_checks(page, context, url, report, checks):
                 mark = brand.locator(':scope > img, :scope > [data-atelier-motion="logo-entrance"]').last
                 assert 'brightness(0)' in mark.evaluate('(el)=>getComputedStyle(el).filter')
                 tab.screenshot(path=str(report / f'appearance-{preset}-{mode}.png'), animations='disabled')
-        checks.append('Settings presets show four swatches; six palettes pass contrast checks; native selects/options and monochrome brand follow the theme')
+        checks.append('Settings presets show four swatches; all six presets pass contrast checks in light and dark, keep the piece colours fixed and fit status colours by lightness only; native selects/options and monochrome brand follow the theme')
 
         # Real popup interaction keeps native focus, selection and dismissal behavior.
         picker.click()

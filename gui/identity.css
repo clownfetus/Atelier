@@ -1,60 +1,33 @@
 /*
- * Atelier identity tokens · v1.0, first applied to the Edit All import dialog.
- * Pigments are primitives; components read only the role tokens, so the ink
- * surface (dark theme) is a token swap. Roles live under `.at-identity` so they
- * never reach the rest of the interface until it adopts the identity too.
- * Source: the Atelier identity sheet; see docs/DESIGN_SYSTEM.md → Identity.
+ * Atelier identity tokens, first applied to the Edit All import dialog.
+ * Components read only these roles, and the roles read the app's themed tokens, so these
+ * surfaces follow the theme like everything else. See docs/DESIGN_SYSTEM.md, Identity.
  */
-:root {
-  /* Pigments */
-  --at-gesso: #FAF7F0;          /* ground, from the master artwork */
-  --at-linen: #F1ECE2;          /* panels on paper */
-  --at-chalk: #E2DBCD;          /* hairlines, empty slots, off tracks */
-  --at-ash: #A9A49A;            /* muted text on ink */
-  --at-graphite: #5C5A54;       /* muted text on paper */
-  --at-slate: #3A3935;          /* raised on ink */
-  --at-charcoal: #2B2A28;       /* ink panels */
-  --at-lamp-black: #1F1F1E;     /* the ink, from the master artwork */
-  --at-smalt: #5165A9;          /* the drop, from the master artwork */
-  --at-smalt-deep: #3F5190;     /* drop pressed, drop text on paper */
-  --at-smalt-light: #95A5DD;    /* the drop on ink */
-  --at-smalt-wash: #E1E5F2;     /* selected, on paper */
-  --at-smalt-dusk: #343A52;     /* selected, on ink */
-  --at-terre-verte: #4C7556;    /* done */
-  --at-terre-verte-light: #8DB59A;
-  --at-ochre: #C08A28;          /* caution energy */
-  --at-ochre-ink: #855E12;      /* caution text on paper */
-  --at-ochre-light: #D4A24A;
-  --at-madder: #B03F4B;         /* failed */
-  --at-madder-light: #E0848D;
-  --at-cadmium: #B0611B;        /* the Rivals name on paper; never a state */
-  --at-cadmium-light: #F0A93C;  /* the Rivals name on ink */
-}
-
-/* Roles: paper surface (light theme) */
+/* Roles */
 .at-identity {
-  --surface: var(--at-gesso);
-  --surface-panel: var(--at-linen);
-  --surface-sunk: var(--at-chalk);
-  --line: var(--at-chalk);
-  --text: var(--at-lamp-black);
-  --text-muted: var(--at-graphite);
-  --action: var(--at-lamp-black);
-  --action-hover: var(--at-charcoal);
-  --on-action: var(--at-gesso);
-  --drop: var(--at-smalt);              /* yours: selection, focus, owned work */
-  --drop-text: var(--at-smalt-deep);
-  --on-drop: var(--at-gesso);
-  --drop-wash: var(--at-smalt-wash);
-  --done: var(--at-terre-verte);
-  --caution: var(--at-ochre);
-  --caution-text: var(--at-ochre-ink);
-  --fault: var(--at-madder);
-  --energy: var(--at-lamp-black);       /* Krackle ink */
-  --energy-hole: var(--surface);        /* bubbles show the surface */
-  --energy-glint: var(--at-gesso);      /* crisp specks, never a glow */
-  --energy-core: var(--at-smalt);       /* the drop the ink carries to the Mod tray */
-  --rivals: var(--at-cadmium);          /* the game's name in the lockup, kept apart from caution */
+  --surface: var(--md-sys-color-surface);
+  --surface-panel: var(--md-sys-color-surface-container);
+  --surface-sunk: var(--md-sys-color-surface-container-lowest);
+  --line: var(--md-sys-color-outline-variant);
+  --text: var(--md-sys-color-on-surface);
+  --text-muted: var(--md-sys-color-on-surface-variant);
+  --action: var(--md-sys-color-primary);
+  --action-hover: var(--studio-primary-hover);
+  --on-action: var(--md-sys-color-on-primary);
+  --drop: var(--md-sys-color-primary);  /* yours: selection, focus, owned work */
+  --drop-text: var(--md-sys-color-primary);
+  --on-drop: var(--md-sys-color-on-primary);
+  --drop-wash: var(--md-sys-color-surface-container-high);
+  --done: var(--status-complete);
+  --caution: var(--status-warning);
+  --caution-text: var(--status-warning-text);
+  --fault: var(--status-error-text);
+  /* Removed in P4.1 and P1.5, with what reads them. */
+  --energy: var(--md-sys-color-on-surface);
+  --energy-hole: var(--surface);
+  --energy-glint: var(--surface);
+  --energy-core: var(--md-sys-color-primary);
+  --rivals: var(--md-sys-color-on-surface);
 
   /* Type */
   --font-display: var(--studio-display);
@@ -94,32 +67,6 @@
   --ease-pour: cubic-bezier(.25, .1, .15, 1);
   --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
   --ease-settle: cubic-bezier(.2, .8, .2, 1);
-}
-
-/* Roles: ink surface (dark theme and explicit ink panels) */
-:root[data-theme="dark"] .at-identity, .at-identity[data-surface="ink"] {
-  --surface: var(--at-charcoal);
-  --surface-panel: var(--at-slate);
-  --surface-sunk: var(--at-lamp-black);
-  --line: var(--at-slate);
-  --text: var(--at-gesso);
-  --text-muted: var(--at-ash);
-  --action: var(--at-gesso);
-  --action-hover: var(--at-linen);
-  --on-action: var(--at-lamp-black);
-  --drop: var(--at-smalt-light);
-  --drop-text: var(--at-smalt-light);
-  --on-drop: var(--at-lamp-black);
-  --drop-wash: var(--at-smalt-dusk);
-  --done: var(--at-terre-verte-light);
-  --caution: var(--at-ochre-light);
-  --caution-text: var(--at-ochre-light);
-  --fault: var(--at-madder-light);
-  --energy: var(--at-smalt-light);
-  --energy-hole: var(--at-lamp-black);
-  --energy-glint: var(--at-gesso);
-  --energy-core: var(--at-gesso);
-  --rivals: var(--at-cadmium-light);
 }
 
 /* ── Shared components ─────────────────────────────────────── */

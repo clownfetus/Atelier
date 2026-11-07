@@ -1,17 +1,14 @@
 /* Model Studio is a self-contained editing environment, with local surface tokens. */
 #viewport-overlay { background:rgb(15 23 42 / 68%); backdrop-filter:blur(12px); padding:0; z-index:var(--studio-layer-workspace); }
 #viewport-box {
-  --bg2:#f6f8fc; --bg3:#ffffff; --text:#202c3d; --muted:#526176; --acc:#3769aa;
-  --border:#d7e0eb; --border2:#bac8da; --vp-selected:#e0eafa; --vp-hover:#eaf0f8;
-  --vp-stage-top:#e3eaf3; --vp-stage-bottom:#c9d5e3; --vp-success:#377648;
+  --vp-selected:var(--md-sys-color-primary-container); --vp-hover:var(--md-sys-color-surface-container-high);
+  --vp-stage-top:#e3eaf3; --vp-stage-bottom:#c9d5e3; --vp-success:var(--status-complete-text);
   width:min(97vw,1740px); height:95vh; border:1px solid var(--border2); border-top:3px solid var(--acc);
   border-radius:var(--studio-shape-dialog); color:var(--text); background:var(--bg2); box-shadow:var(--studio-elevation-dialog);
   font-family:var(--studio-font); color-scheme:light;
 }
 :root[data-theme=dark] #viewport-box {
-  --bg2:#1e293a; --bg3:#263449; --text:#e5edf9; --muted:#aabbd1; --acc:#9cc3ff;
-  --border:#36475f; --border2:#51637c; --vp-selected:#344f74; --vp-hover:#2b3e57;
-  --vp-stage-top:#2b3e56; --vp-stage-bottom:#111c2d; --vp-success:#8cd0a1; color-scheme:dark;
+  --vp-stage-top:#2b3e56; --vp-stage-bottom:#111c2d; color-scheme:dark;
 }
 #viewport-box.expanded { width:100vw; height:100vh; border-radius:0; }
 #viewport-box [hidden] { display:none !important; }
@@ -120,7 +117,7 @@
 .vp-uv-opacity input { width:100%; accent-color:var(--acc); }
 .vp-uv-path { overflow-wrap:anywhere; user-select:text; color:var(--muted); }
 .vp-uv-coordinate { font-variant-numeric:tabular-nums; user-select:text; }
-#viewport-uv-status[data-kind=warning] { color:var(--acc); border-left:2px solid var(--acc); padding-left:8px; }
+#viewport-uv-status[data-kind=warning] { color:var(--status-warning-text); border-left:2px solid var(--status-warning); padding-left:8px; }
 #viewport-uv-scroll { flex:1 0 200px; min-height:200px; max-height:420px; overflow:auto; padding:9px; border:1px solid var(--border2); border-radius:var(--studio-shape-small); background-color:#353b44; background-image:conic-gradient(#444c57 25%,transparent 0 50%,#444c57 0 75%,transparent 0); background-size:20px 20px; }
 #viewport-uv-sheet { position:relative; margin:auto; }
 #viewport-uv-sheet canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
@@ -240,7 +237,7 @@
 #viewport-status:has(> button) { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:1 1 100%; max-width:100%; overflow:visible; white-space:normal; }
 #viewport-status > button { flex:none; }
 #viewport-status[data-kind=success] { color:var(--vp-success); }
-#viewport-status[data-kind=warning] { color:var(--acc); }
+#viewport-status[data-kind=warning] { color:var(--status-warning-text); }
 #viewport-status:has(.vp-load-status) { color:var(--acc); }
 #viewport-loading { z-index:3; background:#172337; color:#e5edf9; }
 /* The opened costume's artwork waits on the stage, then the reveal sweep wipes it away (motion/viewport-poster.js). */
@@ -377,3 +374,10 @@
 .vp-blender-help { font-size: var(--studio-text-detail); max-width: 310px; }
 .vp-blender-help p { white-space: normal; line-height: 1.5; margin: 8px 0; }
 .vp-blender-help a { color: var(--accent); text-decoration: underline; }
+
+/* Atelier's accent is neutral, so where its colour was the only cue, these get another one (D3). */
+:root[data-palette=studio] #viewport-box :is(.vp-text-button,.vp-recolour-cancel,.vp-recolour-restore,.vp-curve-reset,.vp-revert-material),
+:root[data-palette=studio] .vp-curve-custom > summary { text-decoration:underline; text-underline-offset:2px; }
+:root[data-palette=studio] #viewport-unsaved.is-dirty,
+:root[data-palette=studio] .vp-material-select .vp-draft-marker,
+:root[data-palette=studio] .vp-color-field.is-modified .vp-color-label::after { font-weight:600; }

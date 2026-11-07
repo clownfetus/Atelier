@@ -19,28 +19,28 @@
 
 :root {
   color-scheme: light;
-  --md-sys-color-primary: #37639d;
-  --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #dce6f4;
-  --md-sys-color-on-primary-container: #243a58;
-  --md-sys-color-secondary-container: #e0e7e3;
-  --md-sys-color-on-secondary-container: #35473d;
-  --md-sys-color-surface: #f5f6f8;
-  --md-sys-color-surface-container-lowest: #ffffff;
-  --md-sys-color-surface-container-low: #eef0f3;
-  --md-sys-color-surface-container: #e9ecf0;
-  --md-sys-color-surface-container-high: #e4e7eb;
-  --md-sys-color-surface-container-highest: #dce0e6;
-  --md-sys-color-on-surface: #23272e;
-  --md-sys-color-on-surface-variant: #565e6a;
-  --md-sys-color-outline: #747e8b;
-  --md-sys-color-outline-variant: #c8cdd4;
-  --md-sys-color-error: #ad3032;
-  --md-sys-color-error-container: #f4dedd;
-  --md-sys-color-on-error-container: #692527;
-  --studio-success: #3e6d4a;
-  --studio-warning: #786020;
-  --studio-info: #3b6299;
+  --md-sys-color-primary: #0D151F;
+  --md-sys-color-on-primary: #F4F6F8;
+  --md-sys-color-primary-container: #DDE3EA;
+  --md-sys-color-on-primary-container: #0D151F;
+  --md-sys-color-secondary-container: #E6EAEF;
+  --md-sys-color-on-secondary-container: #0D151F;
+  --md-sys-color-surface: #F4F6F8;
+  --md-sys-color-surface-container-lowest: #FFFFFF;
+  --md-sys-color-surface-container-low: #FFFFFF;
+  --md-sys-color-surface-container: #EEF1F4;
+  --md-sys-color-surface-container-high: #E6EAEF;
+  --md-sys-color-surface-container-highest: #DDE3EA;
+  --md-sys-color-on-surface: #0D151F;
+  --md-sys-color-on-surface-variant: #4E5F73;
+  --md-sys-color-outline: #6A7C90;
+  --md-sys-color-outline-variant: #DDE3EA;
+  --md-sys-color-error: #C5193E;
+  --md-sys-color-error-container: #F8E3E7;
+  --md-sys-color-on-error-container: #7E1330;
+  --studio-success: #337136;
+  --studio-warning: #7A6013;
+  --studio-info: #4E5F73;
   /* The brand's own colours (SPEC section 2). The mark and the glyph use them exactly, in every theme. */
   --atelier-texture: #6C98CA;
   --atelier-mesh: #5AAA9A;
@@ -132,6 +132,9 @@
   --studio-preview-on-surface: #e5e2e4;
 
   /* Compatibility aliases for existing editors and dynamically generated markup. */
+  /* The glyph's halo equals the surface behind it. A host on another surface sets this to that surface. */
+  --glyph-halo: var(--bg);
+
   --bg: var(--md-sys-color-surface);
   --bg2: var(--md-sys-color-surface-container-low);
   --bg3: var(--md-sys-color-surface-container-high);
@@ -163,31 +166,31 @@
 }
 
 :root[data-theme='dark'] {
-  --studio-workspace-gutter:#121216;
+  --studio-workspace-gutter:var(--md-sys-color-surface-container-lowest);
   --screen-dot:rgb(238 229 207 / 13%);
   color-scheme: dark;
-  --md-sys-color-primary: #98b7e2;
-  --md-sys-color-on-primary: #173252;
-  --md-sys-color-primary-container: #30435f;
-  --md-sys-color-on-primary-container: #dce6f4;
-  --md-sys-color-secondary-container: #35443d;
-  --md-sys-color-on-secondary-container: #d6e2d9;
-  --md-sys-color-surface: #17191d;
-  --md-sys-color-surface-container-lowest: #121417;
-  --md-sys-color-surface-container-low: #1e2126;
-  --md-sys-color-surface-container: #24272c;
-  --md-sys-color-surface-container-high: #2b2f35;
-  --md-sys-color-surface-container-highest: #353a42;
-  --md-sys-color-on-surface: #e4e6e9;
-  --md-sys-color-on-surface-variant: #b1b7c0;
-  --md-sys-color-outline: #88929f;
-  --md-sys-color-outline-variant: #434a54;
-  --md-sys-color-error: #df9d99;
-  --md-sys-color-error-container: #643534;
-  --md-sys-color-on-error-container: #f4dedd;
-  --studio-success: #96bfa0;
-  --studio-warning: #c5ad75;
-  --studio-info: #98b7e2;
+  --md-sys-color-primary: #F4F6F8;
+  --md-sys-color-on-primary: #0D151F;
+  --md-sys-color-primary-container: #2A3847;
+  --md-sys-color-on-primary-container: #F4F6F8;
+  --md-sys-color-secondary-container: #212E3B;
+  --md-sys-color-on-secondary-container: #F4F6F8;
+  --md-sys-color-surface: #0D151F;
+  --md-sys-color-surface-container-lowest: #0A1018;
+  --md-sys-color-surface-container-low: #172331;
+  --md-sys-color-surface-container: #1C2936;
+  --md-sys-color-surface-container-high: #212E3B;
+  --md-sys-color-surface-container-highest: #2A3847;
+  --md-sys-color-on-surface: #F4F6F8;
+  --md-sys-color-on-surface-variant: #B4C0CE;
+  --md-sys-color-outline: #778BA3;
+  --md-sys-color-outline-variant: #24323F;
+  --md-sys-color-error: #EC6A86;
+  --md-sys-color-error-container: #4A2530;
+  --md-sys-color-on-error-container: #FBE3E8;
+  --studio-success: #7CC47F;
+  --studio-warning: #E6C35C;
+  --studio-info: #B4C0CE;
   --status-complete: #7CC47F;
   --status-warning: #E6C35C;
   --status-error: #EC6A86;
