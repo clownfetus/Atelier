@@ -1452,7 +1452,7 @@ select:focus-visible { border-color: var(--acc); }
 .field-label { font: var(--studio-type-detail); color: var(--muted); }
 .sidebar-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 100%; box-sizing: border-box; padding: 24px 16px; text-align: center; color: var(--muted); font: var(--studio-type-detail); }
 .sidebar-empty strong { color: var(--text); font-weight: 500; font-size: var(--studio-text-body); }
-.sidebar-empty svg { width: 24px; height: 24px; margin-bottom: 4px; color: var(--muted); }
+.sidebar-empty > svg { width: 24px; height: 24px; margin-bottom: 4px; color: var(--muted); }
 .toggle-row { min-height: 32px; font-weight: 400; }
 #sidebar-resize:hover, #sidebar-resize.dragging { background: color-mix(in srgb, var(--acc) 24%, transparent); border-radius: var(--studio-shape-full); }
 #mod-name-input, .setup-input { min-height: var(--studio-control-height); }

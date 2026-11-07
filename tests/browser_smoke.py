@@ -118,6 +118,7 @@ def main():
     parser.add_argument('--workflow-motion-only', action='store_true', help='Check Krackle hero, navigation, editor and tray motion')
     parser.add_argument('--working-panels-only', action='store_true', help='Check loading, save/export feedback and active panel borders')
     parser.add_argument('--logo-only', action='store_true', help="Check the header logo's entrance")
+    parser.add_argument('--empty-assets-only', action='store_true', help="Check the Mod tray's empty state")
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
@@ -304,6 +305,14 @@ def main():
                     (report/'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
                     for check in checks:print('PASS '+check)
                     browser.close();return
+
+                if args.empty_assets_only:
+                    from empty_assets_motion_checks import run_empty_assets_motion_checks
+                    run_empty_assets_motion_checks(page, context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
+                    browser.close(); return
 
                 if args.logo_only:
                     from logo_motion_checks import run_logo_motion_checks

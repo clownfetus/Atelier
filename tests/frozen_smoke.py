@@ -159,7 +159,7 @@ def main():
             page.wait_for_function("window.AtelierViewport && window.atelierProject?.() === 'Frozen smoke'")
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 6")
             page.wait_for_function("!document.querySelector('.overlay.active')")
-            page.wait_for_function("document.querySelector('[data-atelier-motion=\"empty-assets\"]')?.getBoundingClientRect().width === 112")
+            page.wait_for_function("document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width === 130")
             result['renderer'] = page.evaluate('navigator.userAgent')
             result['checks'].append('Actual frozen executable serves the interface in native WebView2')
             info = page.evaluate("""() => ({
@@ -173,14 +173,14 @@ def main():
                 folderMotion: !!document.querySelector('link[href$="folder-flap.css"]'),
                 font: document.fonts.check('14px Inter'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
-                emptyTray: document.querySelector('[data-atelier-motion="empty-assets"]')?.getBoundingClientRect().width,
+                emptyTray: document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width,
                 singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="glyph"]')]
                   .filter(el => getComputedStyle(el).display !== 'none').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'folderMotion', 'font')), info
             assert {'emptyAssets', 'exportFeedback', 'logoEntrance', 'materialSave', 'polish', 'viewportLoader', 'krackleGlyph', 'krackleStage'}.issubset(info['motions']), info
             assert info['beatMs'] == 1040 and info['exitMs'] == 120 and info['modernFeedback'], info
-            assert info['logo'] > 0 and info['emptyTray'] == 112 and info['singleMark'] == 1, info
+            assert info['logo'] > 0 and info['emptyTray'] == 130 and info['singleMark'] == 1, info
             result['interface'] = info
             result['checks'].append('All workflow modules, shared timing, Krackle controllers, local font and latest logo load from the frozen bundle')
             # WebView2 throttles rendering in hidden native windows, including

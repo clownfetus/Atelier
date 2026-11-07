@@ -174,14 +174,6 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
   animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
 }
 
-/* ── Grid empty states and notification glyph hosts ────────────────────────── */
-#empty-state .am-empty-state-host {
-  display: block;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 12px;
-}
-
 /* Forced and OS reduced motion stop every CSS-only Krackle loop. */
 [data-motion='reduce'] .spinner::after,
 [data-motion='reduce'] #job-activity .activity-ring::after,

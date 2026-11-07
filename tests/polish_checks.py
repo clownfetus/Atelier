@@ -144,19 +144,16 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         if full:
             assert tab.evaluate("(layer=>layer.inert && layer.contains(leavingToast) && !leavingToast.hasAttribute('role'))(document.getElementById('toast-exit-layer'))")
         tab.wait_for_function('!leavingToast.isConnected', timeout=1000)
-        # Typing that keeps a folder empty rebuilds the empty state without replaying its entrance.
+        # Typing that keeps a folder empty rebuilds the empty state, which never moves.
         tab.locator('#search-scope').click()
         assert tab.evaluate('AtelierSearch.scope()') == 'folder'
 
         def empty_effects(text):
             tab.locator('#search-input').fill(text)
-            tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=none]')
-            return tab.evaluate("document.querySelector('#empty-state [data-atelier-motion=empty-state]').getAnimations({subtree:true}).length")
+            tab.wait_for_selector('#empty-state > .empty-state-glyph[data-glyph-state=info]')
+            return tab.evaluate("document.querySelector('#empty-state > .empty-state-glyph').getAnimations({subtree:true}).length")
         first, repeat = empty_effects('zzqx'), empty_effects('zzqxy')
-        tab.locator('#search-input').fill('')
-        tab.wait_for_function("!document.querySelector('#empty-state [data-am-kind=none]')")
-        again = empty_effects('zzqx')
-        assert repeat == 0 and (not full or (first > 0 and again > 0)), (first, repeat, again)
+        assert first == 0 and repeat == 0, (first, repeat)
         tab.locator('#search-input').fill('')
         tab.locator('#search-scope').click()
         checks.append('A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance')

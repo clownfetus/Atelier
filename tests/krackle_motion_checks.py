@@ -19,7 +19,7 @@ def run_krackle_motion_checks(page, context, url, report, checks):
     tab.on('pageerror', lambda error: errors.append(str(error)))
     try:
         tab.goto(url)
-        tab.wait_for_function("window.AtelierMotion?.krackleGlyph && window.AtelierMotion?.emptyState && window.AtelierMotion?.krackleStage && window.atelierProject?.()")
+        tab.wait_for_function("window.AtelierMotion?.krackleGlyph && window.AtelierEmptyGlyph && window.AtelierMotion?.krackleStage && window.atelierProject?.()")
         tab.wait_for_selector('#grid-area .card')
         tab.emulate_media(reduced_motion='no-preference')
 
@@ -136,30 +136,43 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         }""")
         checks.append('The old glyph mount reaches the assembly glyph with the same handle: setState, replay, setReducedMotion and destroy')
 
-        # Grid empty states keep their text; the art is decorative and settles.
+        # Grid empty states keep their text; the glyph is decorative and never moves.
+        still_glyph = '#empty-state > .empty-state-glyph[data-atelier-motion=glyph]'
         tab.evaluate("buildGrid([])")
-        tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=empty]')
+        tab.wait_for_selector(still_glyph + '[data-glyph-state=info]')
         assert tab.locator('#empty-state').inner_text().strip().startswith('Empty folder')
         assert tab.locator('#empty-state svg.lucide').count() == 0
-        tab.wait_for_function("!document.querySelector('#grid-area').getAnimations({subtree:true}).length")
+        assert tab.evaluate("""async selector => {
+          const svg = document.querySelector(selector + ' svg'), first = svg.innerHTML;
+          for (let i = 0; i < 12; i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            if (svg.innerHTML !== first || svg.getAnimations().length) return false;
+          }
+          return true;
+        }""", still_glyph)
         tab.locator('#search-scope').click()
         tab.locator('#search-input').fill('no such asset anywhere')
         tab.evaluate("buildGrid([_makeCard({type:'folder', name:'Characters', rel_path:'Characters'})])")
-        tab.wait_for_selector('#empty-state [data-atelier-motion=empty-state][data-am-kind=none]')
+        tab.wait_for_selector(still_glyph + '[data-glyph-state=info]')
         assert tab.locator('#empty-state').inner_text().strip().startswith('No matches')
         tab.locator('#search-input').fill('')
-        tab.screenshot(path=str(report / 'krackle-empty-state.png'))
+        tab.screenshot(path=str(report / 'empty-state.png'))
         tab.evaluate("""() => {
-          const original = window.AtelierMotion.emptyState;
-          window.AtelierMotion.emptyState = {mount() { throw Error('fixture empty failure'); }};
-          try { buildGrid([]); } finally { window.AtelierMotion.emptyState = original; }
+          const original = window.AtelierMotion.glyph;
+          window.AtelierMotion.glyph = {...original, mount() { throw Error('fixture empty failure'); }};
+          try { buildGrid([]); } finally { window.AtelierMotion.glyph = original; }
           const host = document.querySelector('#empty-state');
-          if (!host?.querySelector(':scope > svg:not(.lucide)') || host.querySelector('.am-empty-state-host'))
+          const fallback = host?.querySelector(':scope > svg:not(.lucide)');
+          if (!fallback || getComputedStyle(fallback).display === 'none' || host.querySelector('.empty-state-glyph'))
             throw Error('Empty-state failure lost the static drawing');
+          const failed = document.createElement('div'); failed.id = 'empty-state'; failed.textContent = 'Fixture failure';
+          host.replaceWith(failed);
+          AtelierEmptyGlyph.mount(failed, 'error');
+          if (failed.querySelector('.empty-state-glyph')?.dataset.glyphState !== 'error') throw Error('A failed load has no X');
         }""")
         tab.evaluate("renderGrid()")
         tab.wait_for_selector('#grid-area .card')
-        checks.append('Empty folder, no-match and failure grids keep their text and the static drawing as fallback while Krackle art settles')
+        checks.append('Empty folder and no-match grids keep their text with a still glyph at rest, a failed load shows the X, and the drawing is the fallback')
 
         # The Krackle stage: busy keeps drawing, a result settles and stops, destroy cleans up.
         tab.evaluate("""() => {

@@ -54,7 +54,7 @@
 .polish-ghost { position:fixed !important; z-index:calc(var(--studio-layer-toast) + 10); pointer-events:none !important; max-width:none !important; max-height:none !important; }
 .export-color-moment { position:fixed; z-index:calc(var(--studio-layer-toast) + 20); pointer-events:none; }
 .polish-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px; color:var(--muted); text-align:center; }
-.polish-empty svg { width:96px; height:64px; opacity:.7; }
+.polish-empty > svg { width:96px; height:64px; opacity:.7; }
 .polish-empty strong { color:var(--text); font-size:var(--studio-text-label); font-weight:500; }
 .polish-empty span { font-size:var(--studio-text-detail); line-height:1.5; }
 .job-activity-button { position:relative; display:flex; align-items:center; gap:6px; }

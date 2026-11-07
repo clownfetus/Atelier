@@ -1,0 +1,18 @@
+/* The still glyph in empty states. An Inline row, sized like the art it replaced. */
+.empty-state-glyph {
+  display: block;
+  flex: none;
+  width: 130px;
+  height: 64px;
+  pointer-events: none;
+}
+#empty-state:not(.polish-empty) > .empty-state-glyph { margin: 0 auto 12px; }
+
+/* The icon or outline drawing is the fallback, so it comes back if the glyph is missing or leaves. */
+:has(> .empty-state-glyph) > svg,
+:has(> .empty-state-glyph) > i { display: none; }
+
+/* The glyph's halo takes the colour of the surface it sits on. */
+#explorer .empty-state-glyph { --glyph-halo: var(--md-sys-color-surface-container-lowest); }
+.sidebar-empty > .empty-state-glyph { --glyph-halo: var(--bg2); }
+.job-modal .empty-state-glyph { --glyph-halo: var(--md-sys-color-surface-container); }
