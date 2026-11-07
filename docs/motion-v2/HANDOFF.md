@@ -263,6 +263,9 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   Show before and after for each fix.
 - [ ] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
   same identity. Packaging only: no change to what it installs or where.
+- [ ] **P4b.5** ⏸ Studio colours. The texture, mesh and material studios each take their
+  piece's colour across the whole module (blue tile, teal mesh, copper disc), so it's clear
+  at a glance what you're working on. Keep text and controls readable on every theme.
 
 ## Phase 5 · Release
 
