@@ -31,37 +31,31 @@
   window.AtelierMotionPolicy = Object.freeze({query:() => query,tier,allows:value=>Number(value)<=tier(),mode});
   const write = (key, value) => { try { localStorage.setItem('atelier.' + key, value); } catch (_) {} };
   if(read('motion','full')!==motion)write('motion',motion);
-  let origin = null, reveal = null, themeAnimation = null;
-  document.addEventListener('pointerdown', event => {
-    origin = event.target.closest('[data-theme-picker],[data-theme-preset]') ? {x:event.clientX,y:event.clientY} : null;
-  }, true);
+  // A theme the person chooses cross-fades the page for 200 ms in Full and Calm, as interface chrome.
+  // Off, and changes that arrive from elsewhere (storage, the system), apply at once.
+  let armed = false, reveal = null, fades = [];
+  const arm = event => { armed = !!event.target?.closest?.('[data-theme-picker],[data-theme-preset]'); };
+  document.addEventListener('pointerdown', arm, true);
+  document.addEventListener('keydown', arm, true);
+  function stopFade() { for (const fade of fades) fade.cancel(); fades = []; reveal?.skipTransition(); }
   function revealTheme(update) {
-    if (!origin || !window.AtelierMotionPolicy.allows(2) || !document.startViewTransition || document.hidden) { origin = null; return false; }
-    const release=window.AtelierMotion?.moment?.claim('theme-wave',2);if(!release){origin=null;return false;}
-    const point = origin; origin = null; reveal?.skipTransition();
-    let current;try{current=document.startViewTransition(update);}catch(_){release();return false;}reveal = current;
+    const chosen = armed; armed = false;
+    if (!chosen || !window.AtelierMotionPolicy.allows(1) || !document.startViewTransition || document.hidden) return false;
+    reveal?.skipTransition();
+    let current;try{current=document.startViewTransition(update);}catch(_){return false;}reveal = current;
     current.ready.then(() => {
-      if(reveal!==current||document.hidden||!window.AtelierMotionPolicy.allows(2)){current.skipTransition();return;}
-      // A print wash crosses the page from the chosen control's side. The modest
-      // scalloped leading edge belongs to the sheet, never a floating screen-sized arc.
-      const fromRight=point.x>innerWidth/2;
-      const wash=front=>{
-        const x=value=>fromRight?innerWidth-value:value;
-        const points=[`${x(-24)}px -24px`,`${x(front)}px -24px`];
-        for(let i=0;i<=12;i++)points.push(`${x(front+(i%2?5:-5))}px ${innerHeight*i/12}px`);
-        points.push(`${x(front)}px ${innerHeight+24}px`,`${x(-24)}px ${innerHeight+24}px`);
-        return `polygon(${points.join(',')})`;
-      };
-      themeAnimation = document.documentElement.animate({clipPath:[wash(-12),wash(innerWidth+12)]},
-        {duration:300,easing:'cubic-bezier(.3,0,.2,1)',pseudoElement:'::view-transition-new(root)'});
-      themeAnimation.finished.catch(()=>{});
+      if(reveal!==current||document.hidden||!window.AtelierMotionPolicy.allows(1)){current.skipTransition();return;}
+      const timing={duration:200,easing:'linear'};
+      fades=[document.documentElement.animate({opacity:[1,0]},{...timing,pseudoElement:'::view-transition-old(root)'}),
+        document.documentElement.animate({opacity:[0,1]},{...timing,pseudoElement:'::view-transition-new(root)'})];
+      for(const fade of fades)fade.finished.catch(()=>{});
     }).catch(() => {});
-    current.finished.catch(() => {}).finally(() => {release(); if (reveal === current) {reveal = null;themeAnimation = null;} });
+    current.finished.catch(() => {}).finally(() => { if (reveal === current) { reveal = null; fades = []; } });
     return true;
   }
-  changes.addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(2)) { themeAnimation?.cancel(); reveal?.skipTransition(); } });
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){themeAnimation?.cancel();reveal?.skipTransition();}});
-  window.addEventListener('pagehide',()=>{themeAnimation?.cancel();reveal?.skipTransition();});
+  changes.addEventListener('change', () => { if (!window.AtelierMotionPolicy.allows(1)) stopFade(); });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopFade();});
+  window.addEventListener('pagehide',stopFade);
   window.AtelierPreferences = Object.freeze({revealTheme, adaptive:() => adaptive});
   apply();
   document.addEventListener('DOMContentLoaded', () => {

@@ -197,6 +197,21 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.evaluate("window.dispatchEvent(new StorageEvent('storage',{key:'atelier.adaptiveAccent',newValue:'1'}));window.dispatchEvent(new CustomEvent('atelier:artwork',{detail:{accent:'#ff0000',colors:['#ff0000']}}))")
         assert tab.evaluate("[getComputedStyle(document.documentElement).getPropertyValue('--acc'),getComputedStyle(document.querySelector('.btn.primary')).backgroundColor]") == theme_before
         checks.append('Artwork and legacy adaptive-accent preferences preserve theme colours on controls')
+        # A chosen theme cross-fades the page for 200 ms: no wash, no clip.
+        if tab.evaluate("AtelierMotionPolicy.allows(1)"):
+            fade = tab.evaluate("""async () => {
+              const control = document.querySelector('[data-theme-preset="darcula"]');
+              control.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true})); control.click();
+              let fades = [];
+              for (let i = 0; i < 30 && !fades.length; i++) {
+                await new Promise(requestAnimationFrame);
+                fades = document.documentElement.getAnimations({subtree: true}).filter(a => /view-transition-(old|new)\(root\)/.test(String(a.effect?.pseudoElement)));
+              }
+              return {palette: document.documentElement.dataset.palette,
+                fades: fades.map(a => [a.effect.pseudoElement, a.effect.getTiming().duration, a.effect.getKeyframes().map(f => f.opacity).join(','), a.effect.getKeyframes().some(f => f.clipPath)]).sort()};
+            }""")
+            assert fade == {'palette': 'darcula', 'fades': [['::view-transition-new(root)', 200, '0,1', False], ['::view-transition-old(root)', 200, '1,0', False]]}, fade
+            checks.append('Choosing a theme cross-fades the page for 200 ms in Full and Calm')
         for preset in ('contrast','blueprint','comic'):
             tab.evaluate('(preset)=>document.querySelector(`[data-theme-preset="${preset}"]`).click()',preset)
             assert tab.locator('html').get_attribute('data-palette') == preset
