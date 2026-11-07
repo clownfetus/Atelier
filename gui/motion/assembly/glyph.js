@@ -184,5 +184,75 @@
     };
   }
 
+  // ---------- the public glyph ----------
+  const STATES = new Set(['busy', 'info', 'success', 'warning', 'error']);
+  const ASSETS = new Set(['mesh', 'texture', 'material']);
+  const mounted = new WeakMap();
+  const motion = window.AtelierMotion;
+
+  // mount(host, {state, asset?, size?, reducedMotion?, surface?})
+  //   state: busy, info, success, warning or error. Defaults to info.
+  //   asset: mesh, texture or material, only with busy, and only when the surface truly knows it.
+  //   size: the host's height in pixels, if the host doesn't set its own.
+  //   surface: the colour behind the glyph, if it isn't the page background (a CSS colour or var()).
+  // Success forms the A, so call it only for a real succeeded result (SPEC invariant 5).
+  function mount(host, options) {
+    if (!host || host.nodeType !== 1) throw new Error('AtelierMotion.glyph.mount requires a DOM host.');
+    mounted.get(host)?.destroy();
+    if (host.childNodes.length) throw new Error('The glyph needs an empty host.');
+    const opts = options || {};
+    const assetFor = (state, wanted) => (state === 'busy' && ASSETS.has(wanted) ? wanted : null);
+    let state = STATES.has(opts.state) ? opts.state : 'info';
+    let asset = assetFor(state, opts.asset);
+    let destroyed = false;
+
+    host.setAttribute('data-atelier-motion', 'glyph');
+    host.classList.add('atelier-glyph');
+    if (opts.surface) host.style.setProperty('--glyph-halo', opts.surface);
+    if (opts.size) { host.style.height = `${opts.size}px`; host.style.width = `${opts.size * VB.w / VB.h}px`; }
+    const sync = () => {
+      host.setAttribute('data-glyph-state', state);
+      if (asset) host.setAttribute('data-glyph-asset', asset);
+      else host.removeAttribute('data-glyph-asset');
+    };
+    sync();
+    const engine = new assembly.Engine(createView(host));
+    engine.run(state, asset);
+
+    const handle = {
+      // A busy state that follows the same busy state carries on, and a result doesn't animate twice.
+      set(next, nextOptions) {
+        if (destroyed || !STATES.has(next)) return handle;
+        const nextAsset = assetFor(next, nextOptions && nextOptions.asset);
+        if (next === state && nextAsset === asset) return handle;
+        state = next;
+        asset = nextAsset;
+        sync();
+        engine.run(state, asset);
+        return handle;
+      },
+      replay() {
+        if (!destroyed) engine.run(state, asset);
+        return handle;
+      },
+      destroy() {
+        if (destroyed) return;
+        destroyed = true;
+        engine.destroy();
+        mounted.delete(host);
+        host.replaceChildren();
+        host.classList.remove('atelier-glyph');
+        for (const name of ['data-atelier-motion', 'data-glyph-state', 'data-glyph-asset']) host.removeAttribute(name);
+        if (opts.surface) host.style.removeProperty('--glyph-halo');
+        if (opts.size) { host.style.height = ''; host.style.width = ''; }
+      },
+      get state() { return state; },
+    };
+    if (window.__ATELIER_GLYPH_TEST__) handle.engine = engine;
+    mounted.set(host, handle);
+    return handle;
+  }
+
   assembly.createView = createView;
+  motion.glyph = Object.freeze({mount});
 })();

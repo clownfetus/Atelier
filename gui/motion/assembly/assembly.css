@@ -3,6 +3,16 @@
  * piece (SPEC invariant 3). --glyph-halo defaults to the page background; a host on another
  * surface sets it to that surface.
  */
+.atelier-glyph {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 0;
+}
+.atelier-glyph > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .glyph-piece {
   stroke: var(--glyph-halo);
   stroke-width: 28;
