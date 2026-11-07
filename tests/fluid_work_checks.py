@@ -1,7 +1,7 @@
 """Real configuration requests drive the setup-status feedback, using offline fixtures."""
 from time import monotonic
 
-LOADING = '#setup-loading[aria-busy="true"] .am-config-art'
+LOADING = '#setup-loading[aria-busy="true"] .am-config-art[data-glyph-state="busy"][data-glyph-tier="inline"]'
 
 
 def run_fluid_work_checks(context, url, report, checks):
@@ -64,7 +64,9 @@ def run_fluid_work_checks(context, url, report, checks):
         tab.locator('#setup-overlay .modal').screenshot(path=str(report / 'setup-status-busy.png'))
         respond(held)
         assert tab.locator('#setup-path').input_value() == 'Fixture/Paks'
-        checks.append('Held real configuration discovery shows its feedback while the request runs and finishes once with success')
+        # The cover lifts with the result, and the glyph goes with it.
+        tab.wait_for_function("!document.querySelector('.am-config-art') && !document.querySelector('#setup-loading.am-config-discovery-active')")
+        checks.append('Held real configuration discovery shows the working glyph while the request runs and finishes once with success')
         close()
 
         old = request()
