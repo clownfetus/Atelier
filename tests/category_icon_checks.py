@@ -1,6 +1,10 @@
 """Real card/category artwork and shared home-shortcut colors in both themes."""
 from pathlib import Path
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def run_category_icon_checks(page, context, url, report, checks):
@@ -15,11 +19,8 @@ def run_category_icon_checks(page, context, url, report, checks):
           nav = {path: 'Icon checks'};
           document.getElementById('search-input').value = '';
           const folders = ['Miscellaneous', 'Characters', 'UI', 'Textures', 'VFX', 'Materials',
-            'Meshes', 'Text', 'Nameplates', 'Plugins', 'Weapons',
-            'Animation', 'Audio', 'Maps', 'Lights', 'Blueprints', 'AI', 'AbilitySystem',
-            'Chaos', 'Controls', 'Data', 'ArtTools', 'Environment', 'Font', 'Movies',
-            'L10N', 'Functions', 'Statistics', 'Pipelines', 'DefaultAssets', 'Marvel_Encrypt',
-            'MobileResources', 'VREditor', 'BasicShapes', 'EngineSky', 'Deformers', 'Prototype'];
+            'Meshes', 'Text', 'Nameplates', 'Plugins', 'Weapons', 'Maps', 'Blueprints', 'AbilitySystem',
+            'Data', 'Environment', 'L10N'];
           const cards = folders.map(name => _makeCard({type:'folder', name, rel_path:`Icon checks/${name}`}));
           cards.push(_makeCard({type:'asset', name:'Curves', file_type:'curve', game_rel:'Icon checks/Curve'}));
           cards.push(_makeCard({type:'asset', name:'Other', file_type:'other', game_rel:'Icon checks/Other'}));
@@ -39,28 +40,40 @@ def run_category_icon_checks(page, context, url, report, checks):
         for name in ('Weapon', 'Weapons', 'WEAPONS'):
             assert icon_page.evaluate('(name)=>folderIconCls(name)', name) == 'weapon-folder-icon'
         category_aliases = {
-            'animation-folder-icon': ('Animation', 'Animations', 'ANIMATIONS', 'AnimSequences', 'BlendSpaces'),
-            'audio-folder-icon': ('Audio', 'AudioBanks', 'Cues', 'SoundCue', 'EngineSounds', 'Wwise'),
-            'map-folder-icon': ('Maps', 'MapTemplates', 'OpenWorldTemplate', 'Levels', 'Worlds'),
-            'light-folder-icon': ('Lights', 'Lighting', 'EngineLightProfiles'),
-            'material-folder-icon': ('EngineMaterials', 'MaterialFunctions'),
-            'environment-folder-icon': ('EnvironmentHydraC', 'EditorLandscapeResources', 'SpeedTree9'),
-            'movie-folder-icon': ('Movies_Activity', 'Movies_Level', 'MoviesBink'),
-            'resources-folder-icon': ('EngineResources', 'EditorResources', 'Marvel_LQ'),
+            'char-icon': ('Characters', 'NPC', 'NPCS'),
+            'ui-folder-icon': ('UI', 'Icon', 'ICONS'),
+            'texture-folder-icon': ('Texture', 'TEXTURES'),
+            'material-folder-icon': ('Material', 'MATERIALS'),
+            'mesh-folder-icon': ('Mesh', 'MESHES'),
+            'vfx-folder-icon': ('VFX', 'Effect', 'Effects'),
+            'ability-folder-icon': ('Abilities', 'Ability', 'AbilitySystem'),
+            'environment-folder-icon': ('Environment', 'Landscape', 'Landscapes', 'Foliage'),
+            'blueprint-folder-icon': ('Blueprint', 'Blueprints'),
+            'plugin-folder-icon': ('Plugin', 'Plugins'),
+            'nameplate-folder-icon': ('Nameplate', 'Nameplates'),
+            'data-folder-icon': ('Data',),
+            'text-folder-icon': ('Text', 'StringTable', 'StringTables'),
+            'language-folder-icon': ('L10N', 'Localization', 'Localisation'),
+            'map-folder-icon': ('Map', 'Maps'),
         }
         for expected, names in category_aliases.items():
             for name in names:
                 assert icon_page.evaluate('(name)=>folderIconCls(name)', name) == expected, name
         # A category word inside a custom folder/skin name must not steal its identity.
+        # So must a name the modder has no reason to open (D9): these earn the plain folder.
         for name in ('Miscellaneous', 'Unsorted Assets', 'Audio Notes', 'MapsBackup', 'AnimationsOld',
-                     'My Weapons', '1015502', '502', 'GODDESS OF THUNDER', '', None):
+                     'My Weapons', '1015502', '502', 'GODDESS OF THUNDER', '', None,
+                     'Audio', 'Wwise', 'Animation', 'Lights', 'Controls', 'Physics', 'AI', 'Fonts', 'Movies',
+                     'Functions', 'Statistics', 'Pipelines', 'Resources', 'Marvel_Encrypt', 'MobileResources',
+                     'VREditor', 'Shapes', 'Sky', 'Deformers', 'Prototypes', 'Tools', 'EngineMaterials',
+                     'MaterialFunctions', 'Levels', 'Worlds', 'DataTable', 'EngineMeshes', 'SpeedTree9'):
             assert icon_page.evaluate('(name)=>folderIconCls(name)', name) == 'folder-icon', name
         assert icon_page.evaluate("ICON_CLS_TO_LUCIDE['weapon-folder-icon']") == 'swords'
         weapon = icon_page.locator('#grid-area .card .weapon-folder-icon')
         assert weapon.get_attribute('data-lucide') == 'swords'
-        artwork = ET.parse(Path(__file__).resolve().parents[1] / 'gui/motion/category-emblems/weapon-folder-icon-102.svg')
-        expected = artwork.find(".//{*}g[@class='k-category-emblem-energy']/{*}path").attrib['d']
-        assert weapon.locator('.k-category-emblem-energy path').get_attribute('d') == expected
+        artwork = ET.parse(ROOT / 'gui/brand/emblems/weapon-folder-icon-master.svg')
+        expected = [path.attrib['d'] for path in artwork.findall('.//{*}path')]
+        assert weapon.evaluate("el=>[...el.querySelectorAll('path')].map(path=>path.getAttribute('d'))") == expected
         assert weapon.get_attribute('aria-hidden') == 'true'
         assert weapon.get_attribute('focusable') == 'false'
         assert weapon.locator('path').count() > 0
@@ -72,7 +85,13 @@ def run_category_icon_checks(page, context, url, report, checks):
         }""")
         assert 100 <= bounds['slot'] <= 104 and bounds['painted'] >= 80 and not bounds['clipped'], bounds
         assert icon_page.evaluate("['pin','pin-off'].every(name=>!!AtelierSymbolPaths[name]?.body)")
-        checks.append('Category aliases resolve case-insensitively without matching custom folder/skin substrings; weapons retain full-size accessible crossed swords')
+        generated = subprocess.run([sys.executable, str(ROOT / 'scripts/folder_emblems.py'), '--check'], capture_output=True, text=True)
+        assert generated.returncode == 0, generated.stderr
+        # The icons are the drawings Thiago approved, and the generator is still the one that drew them.
+        for path in sorted((ROOT / 'docs/motion-v2/assets/emblems').glob('*.svg')):
+            shipped = (ROOT / 'gui/brand/emblems' / path.name).read_bytes().replace(b'\r\n', b'\n')
+            assert shipped == path.read_bytes().replace(b'\r\n', b'\n'), path.name
+        checks.append('Folder rules match whole names case-insensitively and give dropped categories the plain folder; icons are generated, match the approved drawings and stay accessible')
 
         for theme in ('light', 'dark'):
             icon_page.locator('#settings-theme').select_option(theme, force=True)
@@ -81,23 +100,27 @@ def run_category_icon_checks(page, context, url, report, checks):
                 .map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4)
                 .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
               return [...document.querySelectorAll('#grid-area .card .card-icon')].map(el=>{
-                const energy=el.querySelector('.k-category-emblem-energy > *');
+                const emblem=el.matches('[data-emblem],.am-folder-flap');
                 const style=getComputedStyle(el);
-                const color=energy?getComputedStyle(energy).fill:style.color;
+                const color=style.color;
                 const bg=getComputedStyle(el.closest('.card-thumb')).backgroundColor;
                 const a=lum(color), b=lum(bg), cls=Object.keys(ICON_CLS_TO_LUCIDE).find(c=>el.classList.contains(c));
                 const chip=document.querySelector(`#category-icon-chips [data-category="${cls}"] svg`);
-                const chipEnergy=chip.querySelector('.k-category-emblem-energy > *');
-                return {cls,color,emblem:!!energy,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),
-                  chipColor:chipEnergy?getComputedStyle(chipEnergy).fill:getComputedStyle(chip).color, chipSize:chip.getBoundingClientRect().width,
+                return {cls,color,emblem,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),
+                  chipColor:getComputedStyle(chip).color, chipEmblem:chip.getAttribute('data-emblem'), chipSize:chip.getBoundingClientRect().width,
                   slot:el.getBoundingClientRect().width, plate:style.backgroundColor,
                   glyphWidth:el.getBoundingClientRect().width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),
                   cardWidth:el.closest('.card').getBoundingClientRect().width,
                   thumbWidth:el.closest('.card-thumb').getBoundingClientRect().width};
               });
             }""")
-            assert len(measurements) == 39, measurements
-            assert len({m['color'] for m in measurements}) >= 36, measurements
+            assert len(measurements) == 19, measurements
+            # Only texture, mesh and material carry colour; the other fourteen emblems share one neutral (D2).
+            colours = {m['cls']: m['color'] for m in measurements if m['emblem']}
+            coloured = {cls: colours.pop(cls) for cls in ('texture-folder-icon', 'mesh-folder-icon', 'material-folder-icon')}
+            assert len(colours) == 14 and len(set(colours.values())) == 1, colours
+            assert len({*coloured.values(), *colours.values()}) == 4, (coloured, colours)
+            assert all(m['chipEmblem'] == m['cls'] for m in measurements if m['emblem']), measurements
             assert all(m['ratio'] >= (3 if m['emblem'] else 4.5) for m in measurements), (theme, measurements)
             # File outlines now have a smaller tonal plate; folder artwork still
             # fills its original large slot. Both keep the standard card layout.
@@ -107,17 +130,22 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert all(m['glyphWidth'] >= 32 and m['plate'] not in {'transparent', 'rgba(0, 0, 0, 0)'}
                        for m in measurements if m['cls'] in file_types), measurements
             assert all(m['color'] == m['chipColor'] and m['chipSize'] == 18 for m in measurements), measurements
-            aliases = icon_page.evaluate("""() => {
-              const pairs = [['texture-folder-icon','texture-icon'], ['vfx-folder-icon','vfx-icon'],
-                ['material-folder-icon','material-icon'], ['mesh-folder-icon','mesh-icon'], ['text-folder-icon','text-icon']];
-              return pairs.map(pair=>pair.map(cls=>{
-                const probe=document.createElement('span'); probe.className=`card-icon ${cls}`;
-                document.body.append(probe); const color=getComputedStyle(probe).color; probe.remove(); return color;
-              }));
+            # File glyphs are thin, so on light themes they take a deeper value than the solid emblem.
+            glyphs = icon_page.evaluate("""() => {
+              const paint = (cls, token) => {
+                const probe = document.createElement('span'); probe.className = `card-icon ${cls}`;
+                const expected = document.createElement('span'); expected.style.color = `var(${token})`;
+                document.body.append(probe, expected);
+                const result = [getComputedStyle(probe).color, getComputedStyle(expected).color];
+                probe.remove(); expected.remove(); return result;
+              };
+              return [paint('texture-icon', '--studio-icon-texture'), paint('mesh-icon', '--studio-icon-mesh'),
+                paint('material-icon', '--studio-icon-material'), paint('vfx-icon', '--studio-icon-neutral'),
+                paint('curve-icon', '--studio-icon-neutral'), paint('text-icon', '--studio-icon-neutral')];
             }""")
-            assert all(a == b for a, b in aliases), aliases
+            assert all(a == b for a, b in glyphs), glyphs
             icon_page.screenshot(path=str(report / f'category-icons-{theme}.png'), animations='disabled')
         assert not errors, errors
-        checks.append('All 39 icon types retain readable folder artwork or file glyphs on tonal plates; category emblems reach 3:1 in both themes, and 18px home chips share category colors')
+        checks.append('All 17 folder icons and the file glyphs read on their plates in both themes; only texture, mesh and material carry colour, and 18px home chips use the small drawing in the same colour')
     finally:
         icon_page.close()

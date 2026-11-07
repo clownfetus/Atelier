@@ -255,50 +255,30 @@ body {
   width: 76%; height: 76%;
   opacity: 1;
 }
-.card-icon.folder-icon          { color: var(--studio-icon-folder); }
-.card-icon.char-icon            { color: var(--studio-icon-character); }
-.card-icon.ui-folder-icon       { color: var(--studio-icon-ui); }
-.card-icon.texture-folder-icon,
 .card-icon.texture-icon         { color: var(--studio-icon-texture); }
-.card-icon.vfx-folder-icon,
-.card-icon.vfx-icon             { color: var(--studio-icon-vfx); }
-.card-icon.material-folder-icon,
 .card-icon.material-icon        { color: var(--studio-icon-material); }
-.card-icon.curve-icon           { color: var(--studio-icon-curve); }
-.card-icon.mesh-folder-icon,
 .card-icon.mesh-icon            { color: var(--studio-icon-mesh); }
+.card-icon.vfx-icon,
+.card-icon.curve-icon,
+.card-icon.text-icon,
+.card-icon.unhandled-icon       { color: var(--studio-icon-neutral); }
+.card-icon.texture-folder-icon  { color: var(--studio-emblem-texture); }
+.card-icon.material-folder-icon { color: var(--studio-emblem-material); }
+.card-icon.mesh-folder-icon     { color: var(--studio-emblem-mesh); }
+.card-icon.folder-icon,
+.card-icon.char-icon,
+.card-icon.ui-folder-icon,
+.card-icon.vfx-folder-icon,
 .card-icon.text-folder-icon,
-.card-icon.text-icon            { color: var(--studio-icon-text); }
-.card-icon.nameplate-folder-icon { color: var(--studio-icon-nameplate); }
-.card-icon.plugin-folder-icon    { color: var(--studio-icon-plugin); }
-.card-icon.weapon-folder-icon    { color: var(--studio-icon-weapon); }
-.card-icon.unhandled-icon        { color: var(--studio-icon-unknown); }
-.card-icon.animation-folder-icon { color: var(--studio-icon-animation); }
-.card-icon.audio-folder-icon     { color: var(--studio-icon-audio); }
+.card-icon.nameplate-folder-icon,
+.card-icon.plugin-folder-icon,
+.card-icon.weapon-folder-icon,
 .card-icon.map-folder-icon,
-.card-icon.sky-folder-icon       { color: var(--studio-icon-map); }
-.card-icon.light-folder-icon     { color: var(--studio-icon-light); }
 .card-icon.blueprint-folder-icon,
-.card-icon.ai-folder-icon,
-.card-icon.code-folder-icon,
-.card-icon.pipeline-folder-icon  { color: var(--studio-icon-logic); }
-.card-icon.ability-folder-icon   { color: var(--studio-icon-vfx); }
-.card-icon.physics-folder-icon,
-.card-icon.shapes-folder-icon,
-.card-icon.deformer-folder-icon  { color: var(--studio-icon-mesh); }
-.card-icon.controls-folder-icon,
-.card-icon.tools-folder-icon     { color: var(--studio-icon-tools); }
+.card-icon.ability-folder-icon,
 .card-icon.data-folder-icon,
-.card-icon.statistics-folder-icon { color: var(--studio-icon-data); }
-.card-icon.environment-folder-icon { color: var(--studio-icon-environment); }
-.card-icon.font-folder-icon,
-.card-icon.language-folder-icon  { color: var(--studio-icon-text); }
-.card-icon.movie-folder-icon     { color: var(--studio-icon-movie); }
-.card-icon.resources-folder-icon { color: var(--studio-icon-folder); }
-.card-icon.security-folder-icon  { color: var(--studio-icon-unknown); }
-.card-icon.mobile-folder-icon,
-.card-icon.vr-folder-icon        { color: var(--studio-icon-ui); }
-.card-icon.prototype-folder-icon { color: var(--studio-icon-curve); }
+.card-icon.environment-folder-icon,
+.card-icon.language-folder-icon { color: var(--studio-emblem-neutral); }
 .card-name {
   font: var(--studio-type-label);
   color: var(--text);

@@ -1,10 +1,9 @@
 /*
- * Atelier — Scoped Folder Hover & Keyboard Focus Styles (CSS-Only, Krackle)
+ * Atelier: the plain folder's hover and keyboard focus (CSS only).
  * Scope prefix: .am-folder-flap / .card[data-atelier-motion="folder-flap"]
- * Preserves existing 156px .card, 134px .card-thumb, and 76% (~102px) .card-icon slot.
- * Krackle folder (scripts/krackle_art.py): energy panels in the folder colour with
- * one composed mass of bubbles punched through to the tile. On hover or keyboard focus
- * the front panel tips open; hover never adds extra particles.
+ * Preserves the existing 156px .card, 134px .card-thumb and 76% (~102px) .card-icon slot.
+ * Two opaque pieces from scripts/folder_emblems.py. On hover or keyboard focus the front piece
+ * tips open, and hover never adds anything else.
  */
 
 .card[data-atelier-motion="folder-flap"] .am-folder-flap {
@@ -15,38 +14,31 @@
   pointer-events: none;
 }
 
-.card[data-atelier-motion="folder-flap"] .am-folder-flap-energy { fill: currentColor; }
-.card[data-atelier-motion="folder-flap"] .am-folder-flap-back .am-folder-flap-panel { opacity: 0.62; }
-/* Bubbles show the tile behind the folder; the tile darkens on hover, so they follow it. */
-.card[data-atelier-motion="folder-flap"] .am-folder-flap-hole { fill: var(--bg3, #e4e7eb); }
-:root[data-theme="dark"] .card[data-atelier-motion="folder-flap"] .am-folder-flap-hole { fill: #121216; }
-.card[data-atelier-motion="folder-flap"] .am-folder-flap-speck { fill: var(--krackle-glint, #fbf6ea); opacity: 0.9; }
-
 .card[data-atelier-motion="folder-flap"] .am-folder-flap-back,
 .card[data-atelier-motion="folder-flap"] .am-folder-flap-front {
   opacity: 1;
   transform-box: view-box;
-  transform-origin: 48px 80px;
+  transform-origin: 12px 21.5px;
   transition: transform 180ms cubic-bezier(.4,0,.6,1);
 }
 
 /* Open pose, shared by keyboard focus and fine-pointer hover. */
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-front {
-  transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
+  transform: skewX(-7deg) scaleY(0.82) translateY(-.25px);
   transition: transform var(--studio-spring-snappy-duration) var(--studio-spring-snappy);
 }
 .card[data-atelier-motion="folder-flap"]:focus-visible .am-folder-flap-back {
-  transform: translateY(-2px) rotate(1deg);
+  transform: translateY(-.5px) rotate(1deg);
   transition-duration: 240ms;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-front {
-    transform: skewX(-7deg) scaleY(0.82) translateY(-1px);
+    transform: skewX(-7deg) scaleY(0.82) translateY(-.25px);
     transition: transform var(--studio-spring-snappy-duration) var(--studio-spring-snappy);
   }
   .card[data-atelier-motion="folder-flap"]:hover .am-folder-flap-back {
-    transform: translateY(-2px) rotate(1deg);
+    transform: translateY(-.5px) rotate(1deg);
     transition-duration: 240ms;
   }
 }

@@ -51,11 +51,10 @@ def run_library_pins_checks(page, context, url, report, checks):
         assert glyph.get_attribute('data-lucide') == 'folder-map'
         assert 'map-folder-icon' in glyph.get_attribute('class')
         assert glyph.bounding_box()['width'] == 18
-        # Category emblems replace the Sharp glyph by default; pins draw the same Krackle mark.
+        # Folder emblems replace the Sharp glyph by default; below 32 px pins use the small drawing.
         assert glyph.evaluate("""el=>{const expected=document.createElementNS('http://www.w3.org/2000/svg','svg');
-          expected.innerHTML=AtelierCategoryEmblems.markup('map-folder-icon',24);
-          return el.querySelector('.k-category-emblem-energy path')?.getAttribute('d') ===
-            expected.querySelector('.k-category-emblem-energy path').getAttribute('d');}""")
+          expected.innerHTML=AtelierFolderEmblems.markup('map-folder-icon',18);
+          return el.querySelector('path')?.getAttribute('d') === expected.querySelector('path').getAttribute('d');}""")
         assert pins_page.evaluate('AtelierLibraryPins.list().find(pin=>pin.path==="Maps").iconCls') == 'map-folder-icon'
 
     try:

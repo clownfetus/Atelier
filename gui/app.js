@@ -626,7 +626,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
     if (card.type === 'asset') {
       const badge = document.createElement('span'); badge.className = 'card-type-badge'; badge.setAttribute('aria-hidden','true');
       const glyph = makeIcon(card); glyph.classList.remove('card-icon'); glyph.classList.add('card-type-glyph');
-      badge.style.color = `var(--studio-icon-${['texture','vfx','material','mesh','curve','text'].includes(card.file_type) ? card.file_type : 'unknown'})`;
+      badge.style.color = `var(--studio-icon-${['texture','material','mesh'].includes(card.file_type) ? card.file_type : 'neutral'})`;
       badge.appendChild(glyph); thumb.appendChild(badge);
     }
     if (card.type === "asset" && card.file_type === "mesh") {

@@ -14,7 +14,6 @@ a solid silhouette in currentColor; bubbles are holes punched into it, painted w
 success is a starburst, warning a cracked ring with its fallen chunk, error a splat.
 """
 import argparse
-import json
 import math
 import re
 import sys
@@ -250,26 +249,6 @@ def viewport_loader():
     return svg(f'{p}-svg', 48, body, size=72, extra=' fill="currentColor"')
 
 
-# ── folder flap (96-unit viewBox, ~102px slot) ────────────────────────────────
-def folder_flap():
-    p = 'am-folder-flap'
-    back = path('M6 13.5 Q6 11 8.5 11 H32.5 L39.5 18 H87.5 Q90 18 90 20.5 V80 H6 Z', f'{p}-energy {p}-panel')
-    back_holes = ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in ((80.5, 25.2, 1.5), (73.6, 24.6, 0.9)))
-    front_body = path('M6 31 H90 V77.5 Q90 80 87.5 80 H8.5 Q6 80 6 77.5 Z', f'{p}-energy {p}-panel')
-    bumps = ''.join(circle(x, 31.2, r, f'{p}-energy') for x, r in
-                    ((10.5, 3.1), (19, 2.4), (27.5, 3.3), (37, 2.2), (46, 3.0), (55.5, 2.5), (64.5, 3.2), (74, 2.3), (83, 3.0), (88.2, 1.9)))
-    # One overlapping mass in the lower right, a trail of satellites, and clean energy elsewhere.
-    front_holes = ''.join(circle(x, y, r, f'{p}-hole') for x, y, r in
-                          ((72, 65, 5.6), (64.5, 69.5, 4.2), (78.5, 58.5, 3.6), (68.5, 58.5, 2.6), (80.5, 69.5, 3.0),
-                           (56, 72.5, 2.0), (59.5, 61.5, 1.5), (83.5, 50.5, 1.6), (51.5, 66.5, 1.1), (46, 72.5, 1.0),
-                           (76.5, 47.5, 1.0), (40.5, 74, 0.8)))
-    specks = circle(70.2, 63.2, 1.3, f'{p}-speck') + circle(63.4, 68.3, .8, f'{p}-speck')
-    body = (f'<g class="{p}-back" opacity="1">{back}{back_holes}</g>'
-            f'<g class="{p}-front" opacity="1">{front_body}{bumps}{front_holes}{specks}</g>')
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="card-icon folder-icon studio-icon {p}" viewBox="0 0 96 96" '
-            f'width="96" height="96" fill="currentColor" aria-hidden="true" focusable="false">{body}</svg>')
-
-
 # ── empty edited-assets tray (112-unit viewBox) ───────────────────────────────
 def empty_assets():
     p = 'am-empty-assets'
@@ -414,159 +393,18 @@ def fluid_spinner_masks():
 
 
 # ── writing ───────────────────────────────────────────────────────────────────
-# One ink per category, so no two emblems share a colour. Every ink has a relative luminance near
-# .207, which reads at 3:1 on Studio's cards and thumbs in both themes (#eef0f3/#e4e7eb, #1e2126/#2b2f35),
-# so an emblem keeps the same colour in light and dark; other themes refit it at runtime.
-EMBLEM_INKS = {
-    'weapon-folder-icon': '#e73e3e', 'prototype-folder-icon': '#ec390c', 'ability-folder-icon': '#d35805',
-    'mesh-folder-icon': '#aa7145', 'tools-folder-icon': '#b06f0e', 'resources-folder-icon': '#967a39',
-    'light-folder-icon': '#987a04', 'font-folder-icon': '#848113', 'statistics-folder-icon': '#72860f',
-    'shapes-folder-icon': '#578c07', 'physics-folder-icon': '#418f12', 'map-folder-icon': '#728639',
-    'plugin-folder-icon': '#4a8c42', 'environment-folder-icon': '#109221', 'material-folder-icon': '#3a8e56',
-    'deformer-folder-icon': '#049053', 'data-folder-icon': '#4d8975', 'pipeline-folder-icon': '#078d80',
-    'texture-folder-icon': '#3b8891', 'code-folder-icon': '#048aa4', 'audio-folder-icon': '#0585bd',
-    'sky-folder-icon': '#5a7fb1', 'char-icon': '#337be8', 'language-folder-icon': '#5b7ad0',
-    'blueprint-folder-icon': '#5e72f2', 'controls-folder-icon': '#7471db', 'mobile-folder-icon': '#8272c3',
-    'ui-folder-icon': '#8d62f2', 'ai-folder-icon': '#a162cb', 'animation-folder-icon': '#af58cf',
-    'vr-folder-icon': '#cc38dc', 'vfx-folder-icon': '#dd20cb', 'movie-folder-icon': '#bf58a4',
-    'nameplate-folder-icon': '#dc3b97', 'security-folder-icon': '#d84970', 'text-folder-icon': '#8e7a67',
-}
-
-
-def category_emblems():
-    """Broad energy silhouettes, each in its own ink, with bubbles composed for that silhouette.
-
-    Bubbles are (x, y, r) holes cut through the energy with a mask, so the card shows through them.
-    Each icon's are placed for what it depicts (lenses, sprocket holes, a keyhole, typing dots...);
-    the 24 px mark keeps one or two that still read at that size."""
-    definitions=[
-      ('char-icon','Characters','<circle cx="12" cy="6" r="4"/><path d="M3 23V19Q3 11 12 11Q21 11 21 19V23Z"/>',
-       [(14.4,17.4,1.8)], [(14.6,17.2,2.1),(10.6,19.6,1.3),(17.6,20.6,.8),(13.6,4.6,1)]),
-      ('ui-folder-icon','UI','<path d="M2 2H11V11H2ZM13 2H22V11H13ZM2 13H11V22H2ZM13 13H22V22H13Z"/>',
-       [(6.5,6.5,1.8)], [(6.5,6.5,2.2),(17.5,6.5,1.6),(6.5,17.5,1.1),(17.5,17.5,.7)]),
-      ('texture-folder-icon','Textures','<path d="M1 22L8 7L13 14L17 10L23 22Z"/><circle cx="18" cy="5" r="3"/>',
-       [(8,17.5,1.7)], [(8.2,17,2),(11.8,19.6,1.2),(5.2,19.8,.8),(18,5,1.2)]),
-      ('material-folder-icon','Materials',path(teardrop(12,14,9,1),'energy'),
-       [(15,17,1.8)], [(15.2,17,2.1),(11.8,19.2,1.2),(16.4,13.4,1)]),
-      ('vfx-folder-icon','VFX',path(starburst(12,12,12,5.5,10,.2),'energy'),
-       [(12,12,1.9)], [(12,12,2.2),(9,9.6,.7),(15,14.4,.7)]),
-      ('mesh-folder-icon','Meshes','<path d="M12 1L23 7V18L12 24L1 18V7Z"/>',
-       [(12,13,1.9)], [(12,7,1.3),(7,15.5,1.3),(17,15.5,1.3),(12,12.6,.7)]),
-      ('text-folder-icon','Text','<path d="M2 2H22V8H15V23H9V8H2Z"/>',
-       [(12,14.5,1.8)], [(12,13,1.9),(12,17.6,1.3),(12,20.9,.8)]),
-      ('nameplate-folder-icon','Nameplates','<path d="M1 3H23V21H1Z"/>',
-       [(7,12,2.4)], [(7,12,3),(12.8,12,1),(15.8,12,1),(18.8,12,1)]),
-      ('plugin-folder-icon','Plugins','<path d="M2 4H9V2Q12 -1 15 2V4H22V11H24V17H22V23H2V16H0V10H2Z"/>',
-       [(11.6,13.8,1.9)], [(11.6,13.6,2.3),(15.6,17.2,1.1),(12,2.6,.8)]),
-      ('weapon-folder-icon','Weapons','<path d="M1 0L8 3L13 10L23 21L20 24L10 13L3 8ZM24 0L21 8L14 13L4 24L0 20L11 10L16 3Z"/>',
-       [(12,11.5,1.7)], [(12,11.5,1.7),(17,17.55,.9),(7,17.55,.9)]),
-      ('animation-folder-icon','Animation','<path d="M4 1H20V23H4Z"/><path d="M0 4H24V8H0ZM0 16H24V20H0Z"/>',
-       [(12,12,2)], [(12,12,2.4),(2,6,.9),(22,6,.9),(2,18,.9),(22,18,.9)]),
-      ('audio-folder-icon','Audio','<path d="M1 8H7L16 1V23L7 16H1Z"/><circle cx="20" cy="9" r="3"/><circle cx="21" cy="16" r="2"/>',
-       [(11.4,12,1.8)], [(11.4,12,2.1),(4,12,1),(20,9,1.1),(21,16,.7)]),
-      ('map-folder-icon','Maps','<path d="M1 4L8 1L16 5L23 2V20L16 23L8 19L1 22Z"/>',
-       [(16.5,10,1.8)], [(4.5,16.5,.7),(8.2,13.6,.9),(12.2,11.6,1.2),(17.5,9,2)]),
-      ('light-folder-icon','Lights','<circle cx="12" cy="9" r="9"/><path d="M7 14H17V23H7Z"/>',
-       [(15,6.5,1.8)], [(15.4,6,2),(12.2,4.2,.9),(17.6,9.6,.8)]),
-      ('blueprint-folder-icon','Blueprints','<path d="M1 8L12 0L23 8V23H1Z"/>',
-       [(12,13,1.9)], [(12,7.2,1.7),(7.2,15,1.4),(16.8,15,1.4)]),
-      ('ai-folder-icon','AI','<circle cx="8" cy="9" r="7"/><circle cx="16" cy="9" r="7"/><circle cx="8" cy="15" r="7"/><circle cx="16" cy="15" r="7"/>',
-       [(12,12,1.9)], [(12,12,2),(7,7,.9),(17,7,.9),(7,17,.9),(17,17,.9)]),
-      ('ability-folder-icon','Abilities','<path d="M13 0L1 14H10L7 24L23 8H14L18 0Z"/>',
-       [(11.4,10.8,1.7)], [(11.4,10.6,1.9),(15.6,9.6,.9),(10.6,18,.8)]),
-      ('physics-folder-icon','Physics','<circle cx="12" cy="6" r="6"/><circle cx="6" cy="17" r="6"/><circle cx="18" cy="17" r="6"/>',
-       [(13.4,4.6,1.6)], [(13.8,4.4,1.5),(7.8,15.4,1.5),(19.8,15.4,1.5)]),
-      ('controls-folder-icon','Controls','<path d="M4 5H20L24 22H18L14 17H10L6 22H0Z"/>',
-       [(7,10.5,1.7),(17,10.5,1.2)], [(7,10.5,2),(17,8.6,.75),(19,10.6,.75),(17,12.6,.75),(15,10.6,.75)]),
-      ('data-folder-icon','Data','<path d="M2 4Q12 -3 22 4V20Q12 27 2 20Z"/>',
-       [(12,12.5,1.9)], [(12,7.6,1.3),(12,12.2,1.8),(12,17.2,1.3)]),
-      ('tools-folder-icon','Tools','<path d="M3 0L10 4V9L23 19L19 24L6 11H2L0 4Z"/>',
-       [(5.4,5.8,1.7)], [(5.4,5.6,1.9),(14.6,15.2,1.3),(19.4,19.6,.9)]),
-      ('environment-folder-icon','Environment','<path d="M12 0L22 13H18L24 20H15V24H9V20H0L6 13H2Z"/>',
-       [(12,14.5,1.8)], [(12,7.5,1.1),(8.6,15.6,1.3),(15.6,16.6,1.6),(11,11.4,.7)]),
-      ('font-folder-icon','Fonts','<path d="M4 1H23V7H11V11H20V17H11V24H4Z"/>',
-       [(7.5,18,1.7)], [(7.5,19.5,1.9),(16.5,14,1.3),(19.5,4,1.1)]),
-      ('movie-folder-icon','Movies','<path d="M1 1H23V7H1ZM1 9H23V23H1Z"/>',
-       [(12,16,2)], [(12,16,2.4),(5,4,1.1),(10,4,1.1),(15,4,1.1),(20,4,1.1)]),
-      ('language-folder-icon','Languages','<circle cx="12" cy="12" r="12"/>',
-       [(7.4,12,1.3),(12,12,1.3),(16.6,12,1.3)], [(7.5,12,1.3),(12,12,1.3),(16.5,12,1.3)]),
-      ('code-folder-icon','Functions','<path d="M8 1L0 12L8 23L12 19L7 12L12 5ZM16 1L24 12L16 23L12 19L17 12L12 5Z"/>',
-       [(3.9,12,1.5),(20.1,12,1.5)], [(3.9,12,1.7),(20.1,12,1.7),(8.4,6.4,.8),(15.6,17.6,.8)]),
-      ('statistics-folder-icon','Statistics','<path d="M1 13H7V24H1ZM9 7H15V24H9ZM17 0H23V24H17Z"/>',
-       [(4,16.2,1.3),(12,10.2,1.3),(20,3.6,1.3)], [(4,16.2,1.5),(12,10.2,1.5),(20,3.6,1.5)]),
-      ('pipeline-folder-icon','Pipelines','<path d="M0 0H8V8H24V16H16V24H8V16H0Z"/>',
-       [(12,12,1.9)], [(4,4.2,1.3),(12,12,2.1),(19.8,12,1.3),(12,19.8,1.3)]),
-      ('resources-folder-icon','Resources','<path d="M12 0L24 6L12 12L0 6ZM0 9L12 15L24 9V15L12 21L0 15ZM0 18L12 24L24 18V24H0Z"/>',
-       [(12,6,1.7)], [(12,6,1.9),(5.5,14.8,1),(18.5,14.8,1)]),
-      ('security-folder-icon','Security','<path d="M12 0L23 5V12Q22 21 12 24Q2 21 1 12V5Z"/>',
-       [(12,10,1.8)], [(12,9.4,2.2),(12,13.6,1.2),(12,16.6,.8)]),
-      ('mobile-folder-icon','Mobile','<path d="M5 0H19V24H5Z"/>',
-       [(12,20,1.6)], [(12,20.5,1.5),(12,2.6,.6)]),
-      ('vr-folder-icon','VR','<path d="M2 4H22L24 20H16L12 15L8 20H0Z"/>',
-       [(7.2,11,1.8),(16.8,11,1.8)], [(7.2,11,2.4),(16.8,11,2.4)]),
-      ('shapes-folder-icon','Shapes','<path d="M6 0L13 14H0Z"/><circle cx="17" cy="17" r="7"/>',
-       [(17.5,16.8,1.8)], [(6.4,9.6,1.8),(18.6,15.6,2),(15.4,19.4,1.1)]),
-      ('sky-folder-icon','Sky','<circle cx="18" cy="6" r="6"/><circle cx="8" cy="14" r="7"/><circle cx="16" cy="16" r="7"/><path d="M1 14H23V23H1Z"/>',
-       [(8.6,16.8,1.8)], [(8.5,16.5,2),(13,19.2,1.2),(17.5,18.6,.8),(19.6,4.4,1.2)]),
-      ('deformer-folder-icon','Deformers','<path d="M2 2Q12 -2 22 2Q15 12 22 22Q12 26 2 22Q10 12 2 2Z"/>',
-       [(12,6.6,1.6),(12,17.6,1.6)], [(12,6.6,1.9),(12,12,.8),(12,17.6,1.9)]),
-      ('prototype-folder-icon','Prototypes','<path d="M12 0Q24 8 18 19H6Q0 8 12 0ZM6 12L0 23L8 20ZM18 12L24 23L16 20ZM9 20H15L12 24Z"/>',
-       [(12,9,1.9)], [(12,8.6,2.3),(12,13.6,1.1),(12,21.3,.75)]),
-    ]
-    assert len({cls for cls,*_ in definitions})==len(definitions)==len(EMBLEM_INKS)
-    out={};mapping={};marks={};previews={}
-    for cls,label,body,*holes in definitions:
-        mapping[cls]=cls;marks[cls]={}
-        for size,bubbles in zip([24,102],holes):
-            cut=''.join(circle(a,b,r,'bubble') for a,b,r in bubbles)
-            # Inks are page variables, so the markup must be inlined (an <image> SVG never sees them).
-            # Inline copies share one document: {mask} is replaced by a per-instance id.
-            mark=(f'<defs><mask id="{{mask}}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">'
-                  f'<rect width="24" height="24" fill="#fff"/><g class="k-category-emblem-bubbles" fill="#000">{cut}</g></mask></defs>'
-                  f'<g class="k-category-emblem-energy" fill="var(--k-emblem-{cls},{EMBLEM_INKS[cls]})" mask="url(#{{mask}})">{body}</g>')
-            marks[cls][size]=mark
-            markup=svg('k-category-emblem',24,mark.replace('{mask}',f'bubbles-{cls}-{size}'),size=size)
-            previews[cls,size]=markup
-            out[MOTION/'category-emblems'/f'{cls}-{size}.svg']=('whole',markup+'\n')
-    entries=',\n'.join(f'  {json.dumps(cls)}:{json.dumps(sizes)}' for cls,sizes in marks.items())
-    source=('// Generated by scripts/krackle_art.py. Category emblems; Sharp covers folders without one.\n'
-            '// Trusted generated markup, inlined by icons.js so each category\'s ink (a page variable) applies.\n'
-            '(()=>{\nconst marks={\n'+entries+'\n};\nconst inks='+json.dumps(EMBLEM_INKS)+';\nlet next=0;\n'
-            '// Each ink reads at 3:1 on Studio\'s cards and thumbs; other themes get it lifted or deepened.\n'
-            'function fit(){const K=window.AtelierKrackleInks,root=document.documentElement,css=getComputedStyle(root);\n'
-            "  const surfaces=['--bg3','--bg2'].map(name=>css.getPropertyValue(name).trim()).filter(Boolean);\n"
-            '  for(const [cls,ink] of Object.entries(inks)){let color=ink;try{for(const surface of surfaces)color=K?K.fit(color,surface):color;}catch(_){color=ink;}\n'
-            "    root.style.setProperty('--k-emblem-'+cls,color);}}\n"
-            "fit();window.addEventListener('atelier:inks',fit);\n"
-            "window.AtelierCategoryEmblems=Object.freeze({names:"+json.dumps(mapping)+",inks:Object.freeze(inks),\n"
-            "  markup:(cls,scale)=>marks[cls][scale].replaceAll('{mask}','k-category-emblem-mask-'+(++next))});\n})();\n")
-    out[MOTION/'category-emblems.js']=('whole',source)
-    cells=''.join(f'<article><strong>{label}</strong><div>{previews[cls,24]}{previews[cls,102]}</div></article>' for cls,label,*_ in definitions)
-    # Studio card (--bg2), thumb (--bg3) and the charge theme.js fits to the thumb, per theme.
-    # surfaces_checks.py asserts these match the app, so the review PNGs show what cards show.
-    theme=lambda card,thumb,charge:f'--card:{card};--thumb:{thumb};--krackle-charge:{charge}'
-    sheet=('<!doctype html><html lang="en"><meta charset="utf-8"><title>Category emblem review</title><style>'
-           'body{'+theme('#eef0f3','#e4e7eb','#258dbf')+';background:#eee5cf;color:#121216;font:13px Arial;margin:20px}'
-           'body.dark{'+theme('#1e2126','#2b2f35','#2a9fd6')+';background:#121216;color:#eee5cf}'
-           'main{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}article{background:var(--card);border:1px solid #888;padding:10px}'
-           'article div{display:flex;align-items:center;gap:20px;margin-top:10px;padding:8px;border-radius:4px;background:var(--thumb)}h1{font-size:22px}'
-           '</style><h1>Category emblems · 24 px and 102 px on Studio card thumbs</h1><main>'+cells+'</main></html>\n')
-    out[ROOT/'docs/review/wave-4b/category-emblems.html']=('whole',sheet)
-    return out
-
 HEADER = {
     'export-feedback': 'Krackle export feedback: drop and tray (idle), six-dot charge ring (busy), starburst, cracked ring and splat.',
     'material-save': 'Krackle material save: shaded swatch (idle), charge ring around a small swatch (saving), starburst, cracked ring and splat.',
     'krackle-glyph': 'Krackle micro glyphs for notifications: charge ring, ink drop (info), starburst (or the ink key, code file and folder), cracked ring and splat.',
     'viewport-loader': 'Krackle viewport loader: twelve-dot charge ring around a boiling ball, resting bubbles (empty) and a knocked-out splat (error).',
-    'folder-flap': 'Krackle folder: energy panels with one composed mass of bubbles. The front panel tips open on hover/focus.',
     'empty-assets': 'Krackle empty tray: a tray of energy holding a few loose bubbles, with a drop of ink waiting above it.',
     'empty-state': 'Krackle grid empty states: a tray with two bubbles (empty folder), three loose bubbles (no matches) and a splat (failed to load).',
     'setup-check': 'Krackle setup check: a drop pours along the header rule into a latch (busy), which becomes a starburst, cracked ring or splat.',
     'setup-drop': 'Krackle setup drop: one drop follows a dotted line down the setup rows and falls into the ink-well, whose lid is its status.',
 }
 ART = {'export-feedback': export_feedback, 'material-save': material_save, 'krackle-glyph': krackle_glyph,
-       'viewport-loader': viewport_loader, 'folder-flap': folder_flap, 'empty-assets': empty_assets,
+       'viewport-loader': viewport_loader, 'empty-assets': empty_assets,
        'empty-state': empty_state, 'setup-check': setup_check, 'setup-drop': setup_drop}
 
 
@@ -590,13 +428,11 @@ def replace_region(text, name, payload, kind):
 
 
 def targets():
-    out = category_emblems()
+    out = {}
     for name, fn in ART.items():
         markup = fn()
         out[MOTION / f'{name}.svg'] = ('whole', standalone(name, markup))
-        if name == 'folder-flap':
-            out.setdefault(ROOT / 'gui' / 'index.html', []).append((name, markup, 'html'))
-        elif name != 'empty-assets':
+        if name != 'empty-assets':
             out.setdefault(MOTION / f'{name}.js', []).append((name, f'  var SVG_MARKUP = {js_literal(markup)};', 'js'))
         else:
             inner = markup[markup.index('>') + 1:markup.rindex('</svg>')]

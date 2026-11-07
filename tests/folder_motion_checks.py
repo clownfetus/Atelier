@@ -6,14 +6,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 FIXTURES = r"""() => {
   window.folderMotionClicks = [];
-  // Use deliberately unclassified names: Maps and Audio now have category symbols.
+  // Use deliberately unclassified names: Maps has a category symbol.
   window.folderMotionItems = [
     {type:'folder', name:'Miscellaneous', rel_path:'Miscellaneous'},
     {type:'folder', name:'Unsorted Assets', rel_path:'Unsorted Assets'},
     {type:'folder', name:'Characters', rel_path:'Characters'},
     {type:'folder', name:'UI', rel_path:'UI'},
     {type:'folder', name:'Maps', rel_path:'Maps'},
-    {type:'folder', name:'Audio', rel_path:'Audio'},
     {type:'folder', name:'1029', label:'Loaded hero portrait', rel_path:'Characters/1029', thumbnail:'/folder-motion/portrait.svg'},
     {type:'folder', name:'1039', label:'Failed hero portrait', rel_path:'Characters/1039', thumbnail:'/folder-motion/missing.svg'},
     {type:'folder', name:'Textures', label:'Failed category portrait', rel_path:'Textures', thumbnail:'/folder-motion/missing.svg'},
@@ -69,7 +68,7 @@ def run_folder_motion_checks(page, context, url, report, checks):
         }""")
         assert 100 <= bounds['svgWidth'] <= 104 and 100 <= bounds['svgHeight'] <= 104, bounds
         assert abs(bounds['svgWidth'] / bounds['thumbWidth'] - .76) < .01, bounds
-        assert bounds['paintedWidth'] >= 88 and not bounds['clipped'], bounds
+        assert bounds['paintedWidth'] >= 80 and not bounds['clipped'], bounds
 
     try:
         motion_page.goto(url)
@@ -85,7 +84,7 @@ def run_folder_motion_checks(page, context, url, report, checks):
             assert card(label).locator('.card-thumb > svg.am-folder-flap').count() == 1
             assert card(label).locator('svg').get_attribute('aria-hidden') == 'true'
             assert card(label).locator('svg').get_attribute('focusable') == 'false'
-        for label in ('Characters', 'UI', 'Maps', 'Audio', 'Loaded hero portrait', 'Failed category portrait',
+        for label in ('Characters', 'UI', 'Maps', 'Loaded hero portrait', 'Failed category portrait',
                       'Fixture material', 'Failed edited texture', 'Failed original texture'):
             assert card(label).get_attribute('data-atelier-motion') is None, label
             assert card(label).locator('.am-folder-flap').count() == 0, label

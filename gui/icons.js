@@ -28,9 +28,13 @@
         svg.setAttribute('focusable', 'false');
         // Trusted, vendored SVG path data only; never insert asset names or API data here.
         svg.innerHTML = artwork.body;
-        // Category emblems: generated markup is inlined (not an <image>) so the theme's Krackle inks reach it.
-        const emblems=window.AtelierCategoryEmblems,category=Object.keys(emblems?.names||{}).find(cls=>node.classList.contains(cls));
-        if(category)svg.innerHTML=emblems.markup(category,size>=32?102:24),svg.setAttribute('viewBox','0 0 24 24');
+        // Folder emblems: generated markup is inlined (not an <image>) so the theme's colour reaches it.
+        const emblems = window.AtelierFolderEmblems, folder = emblems?.names.find(cls => node.classList.contains(cls));
+        if (folder) {
+          svg.innerHTML = emblems.markup(folder, size);
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('data-emblem', folder);
+        }
         node.replaceWith(svg);
       }
     }
