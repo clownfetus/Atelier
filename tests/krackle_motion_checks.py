@@ -1,8 +1,5 @@
 """Krackle animations added across the app, using the real frontend and local fixtures only."""
 import subprocess
-from io import BytesIO
-
-from PIL import Image, ImageChops
 import sys
 from pathlib import Path
 
@@ -23,63 +20,71 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.wait_for_selector('#grid-area .card')
         tab.emulate_media(reduced_motion='no-preference')
 
-        # Native 20px spinners carry opaque connected ink; pressure follows the conduit, not a rotation.
-        spinner = tab.evaluate("""() => {
-          const s = window.fluidSpinner = document.createElement('div'); s.className = 'spinner';
-          s.style.cssText='position:fixed;left:24px;top:130px;background:#14161b;--krackle-energy:#e0a552;z-index:9999';
-          document.body.append(s);
-          const after = getComputedStyle(s, '::after'), before = getComputedStyle(s, '::before');
-          const mask = decodeURIComponent(before.maskImage || before.webkitMaskImage || '');
-          return {name:after.animationName,timing:after.animationTimingFunction,duration:after.animationDuration,
-            pressure:(after.maskImage || after.webkitMaskImage || '').startsWith('url('),
-            connected:mask.includes('M5 5C5 9 10 7 10 11C10 15 16 12 16 18'),
-            holes:mask.includes('<mask') && mask.includes("fill='black'"),
-            opaque:before.opacity,border:getComputedStyle(s).borderTopWidth,width:s.getBoundingClientRect().width,
-            stationary:before.transform==='none' && before.animationName==='none'};
+        # Every spinner is the Micro glyph, working, however it was added, and it goes when the spinner does.
+        spinner = tab.evaluate("""async () => {
+          const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:24px;top:130px;z-index:9999';
+          box.innerHTML = '<div class="spinner"></div>';
+          document.body.append(box);
+          const s = window.spinnerGlyph = box.firstChild;
+          await new Promise(resolve => setTimeout(resolve, 50));
+          const style = getComputedStyle(s), border = style.borderTopWidth, animation = style.animationName;
+          const rect = s.getBoundingClientRect(), first = s.innerHTML;
+          let moved = false;
+          for (let i = 0; i < 20 && !moved; i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            moved = s.innerHTML !== first;
+          }
+          box.remove();
+          await new Promise(resolve => setTimeout(resolve, 50));
+          return {motion: s.dataset.atelierMotion === 'glyph' || s.classList.contains('atelier-glyph') ? 'left' : 'gone',
+            wasMoving: moved, width: rect.width, height: rect.height, border, animation};
         }""")
-        assert spinner['name'] == 'krackle-fluid-charge' and 'steps' not in spinner['timing'], spinner
-        assert spinner['duration'] == '1.04s' and spinner['width'] == 20, spinner
-        assert spinner['pressure'] and spinner['connected'] and spinner['holes'], spinner
-        assert spinner['opaque'] == '1' and spinner['stationary'] and spinner['border'] == '0px', spinner
-        samples = []
-        for phase in (220, 660):
-            tab.evaluate('phase=>{for(const a of fluidSpinner.getAnimations()){a.pause();a.currentTime=phase;}}', phase)
-            pixels = Image.open(BytesIO(tab.locator('.spinner').last.screenshot())).convert('RGB')
-            assert pixels.size == (20, 20), pixels.size
-            ink = {(x, y) for y in range(20) for x in range(20)
-                   if max(abs(pixels.getpixel((x, y))[c] - (20, 22, 27)[c]) for c in range(3)) > 28}
-            count = len(ink)
-            largest = 0
-            while ink:
-                todo = [ink.pop()]
-                size = 0
-                while todo:
-                    x, y = todo.pop()
-                    size += 1
-                    for dx, dy in ((-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1)):
-                        point = (x+dx, y+dy)
-                        if point in ink:
-                            ink.remove(point)
-                            todo.append(point)
-                largest = max(largest, size)
-            assert count >= 60 and largest >= count * .9, (phase, count, largest)
-            pixels.save(report / f'fluid-spinner-{phase}.png')
-            samples.append(pixels)
-        assert ImageChops.difference(*samples).getbbox(), 'Pressure did not travel through the stationary fluid carrier'
-        tab.evaluate('for(const a of fluidSpinner.getAnimations())a.play()')
-        for mode in ('calm', 'off'):
-            tab.evaluate("mode=>{window.spinnerOldMode=document.documentElement.dataset.krackle;document.documentElement.dataset.krackle=mode;}", mode)
-            assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationName") == 'none'
-            assert tab.evaluate("getComputedStyle(fluidSpinner,'::before').opacity") == '1'
-            tab.evaluate('document.documentElement.dataset.krackle=spinnerOldMode')
-        tab.evaluate("document.documentElement.setAttribute('data-krackle-hidden','')")
-        assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationPlayState") == 'paused'
-        tab.evaluate("document.documentElement.removeAttribute('data-krackle-hidden')")
-        tab.emulate_media(reduced_motion='reduce')
-        assert tab.evaluate("getComputedStyle(fluidSpinner,'::after').animationName") == 'none'
-        tab.emulate_media(reduced_motion='no-preference')
-        tab.evaluate('fluidSpinner.remove()')
-        checks.append('Native20px spinners render one opaque masked reservoir/conduit/receiver with travelling pressure; Calm/Off/reduced keep the connected pose and hidden pauses it')
+        assert spinner['motion'] == 'gone' and spinner['wasMoving'], spinner
+        assert spinner['width'] == 31 and spinner['height'] == 20, spinner
+        assert spinner['border'] == '0px' and spinner['animation'] == 'none', spinner
+        tab.evaluate("""async () => {
+          const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:24px;top:130px;z-index:9999';
+          box.innerHTML = '<div class="spinner"></div>';
+          document.body.append(box);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          const s = box.firstChild;
+          if (s.dataset.glyphState !== 'busy' || s.dataset.glyphTier !== 'micro') throw Error('Spinner is not the Micro glyph: ' + s.outerHTML.slice(0, 200));
+          const copy = s.cloneNode(true); box.append(copy);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          if (copy.querySelectorAll('svg').length !== 1 || copy.dataset.glyphState !== 'busy') throw Error('A copied spinner has no working glyph');
+          box.remove();
+          const original = AtelierMotion.glyph;
+          AtelierMotion.glyph = {...original, mount() { throw Error('fixture spinner failure'); }};
+          const plain = document.createElement('div'); plain.className = 'spinner'; document.body.append(plain);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          AtelierMotion.glyph = original;
+          const border = getComputedStyle(plain).borderTopWidth;
+          plain.remove();
+          if (border === '0px') throw Error('A spinner with no glyph lost its plain ring');
+          const thumb = document.createElement('div'); thumb.className = 'card-thumb'; thumb.innerHTML = '<div class="spinner"></div>';
+          document.body.append(thumb);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          const mounted = thumb.firstChild.hasAttribute('data-atelier-motion');
+          thumb.remove();
+          if (mounted) throw Error('A thumbnail spinner, which is never seen, got a glyph');
+        }""")
+        checks.append('Every spinner is the Micro glyph at work, a copy gets its own, it leaves with its spinner, and with no glyph the plain ring shows')
+
+        # Bars show counted steps only.
+        bars = tab.evaluate("""() => {
+          const open = document.createElement('progress'), counted = document.createElement('progress');
+          counted.max = 4; counted.value = 2;
+          const track = document.createElement('div'); track.className = 'progress-bar-bg'; track.innerHTML = '<div class="progress-bar-fill" style="width:40%"></div>';
+          document.body.append(open, counted, track);
+          const result = {open: getComputedStyle(open).display, counted: getComputedStyle(counted).display,
+            fill: getComputedStyle(track.firstChild).backgroundColor, fillImage: getComputedStyle(track.firstChild).backgroundImage,
+            trackImage: getComputedStyle(track).backgroundImage, text: getComputedStyle(document.body).color};
+          open.remove(); counted.remove(); track.remove();
+          return result;
+        }""")
+        assert bars['open'] == 'none' and bars['counted'] != 'none', bars
+        assert bars['fillImage'] == 'none' and bars['trackImage'] == 'none', bars
+        checks.append('A bar shows only counted steps in plain colour; with nothing to count there is no bar')
 
         # Job toasts resolve from the charge ring into a Krackle result that pops once, then holds still.
         # The export-feedback set owns operation toasts; without it, app.js falls back to the small toast glyph.
@@ -208,16 +213,22 @@ def run_krackle_motion_checks(page, context, url, report, checks):
         tab.evaluate("hiddenStage.destroy(); hiddenHost.remove()")
         checks.append('Hidden Krackle stages stop drawing and resume when their dialog is shown')
 
-        # Activity's running-jobs ring is six dots with a counting crest.
-        tab.evaluate("""() => {
-          const ring = document.createElement('span'); ring.className = 'activity-ring indeterminate';
+        # Activity: a counted ring in plain colour; work that can't be counted is the Micro glyph.
+        tab.evaluate("""async () => {
+          const ring = document.createElement('span'); ring.className = 'activity-ring indeterminate spinner';
           document.getElementById('job-activity').prepend(ring);
-          const after = getComputedStyle(ring, '::after');
-          const result = [after.animationName, (after.maskImage || after.webkitMaskImage || '').startsWith('url(')];
+          await new Promise(resolve => setTimeout(resolve, 50));
+          const state = ring.dataset.glyphState, tier = ring.dataset.glyphTier, rect = ring.getBoundingClientRect();
           ring.remove();
-          if (result[0] !== 'krackle-charge' || !result[1]) throw Error('Activity ring is not Krackle: ' + result);
+          if (state !== 'busy' || tier !== 'micro' || rect.height !== 16) throw Error('Activity is not the Micro glyph: ' + [state, tier, rect.height]);
+          const counted = document.createElement('span'); counted.className = 'activity-ring';
+          counted.style.setProperty('--job-progress', '50%');
+          document.getElementById('job-activity').prepend(counted);
+          const after = getComputedStyle(counted, '::after').content, mask = getComputedStyle(counted).maskImage || '';
+          counted.remove();
+          if (after !== 'none' || mask.startsWith('url(')) throw Error('The counted ring still has Krackle dots: ' + [after, mask]);
         }""")
-        checks.append('Activity shows its running-jobs ring as six Krackle dots with a counting crest')
+        checks.append('Activity shows a counted ring in plain colour, and the Micro glyph for work it cannot count')
 
         # The setup check band loops only while busy. The setup drop runs down a dotted line only as
         # far as the rows are valid and falls into the export review's ink-well once all are; the

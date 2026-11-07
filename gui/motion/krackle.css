@@ -46,146 +46,6 @@
 [data-am-state='success'] .am-export-feedback-hole,
 [data-am-state='success'] .am-material-save-hole { fill:var(--krackle-success-hole) !important; }
 
-/* Busy: a connected reservoir → conduit → catch plate at the native 20px size. */
-.spinner {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  animation: none;
-  flex-shrink: 0;
-}
-.spinner::before,
-.spinner::after {
-  content:'';position:absolute;inset:0;
-  background:var(--krackle-energy,var(--acc));
-  -webkit-mask:var(--krackle-fluid-mask) center / 100% 100% no-repeat;
-  mask:var(--krackle-fluid-mask) center / 100% 100% no-repeat;
-}
-/* The opaque carrier stays still; a thicker parcel moves only inside its connected silhouette. */
-.spinner::before { opacity:1; }
-.spinner::after {
-  -webkit-mask-image:var(--krackle-fluid-pressure-mask);
-  mask-image:var(--krackle-fluid-pressure-mask);
-  clip-path:ellipse(0% 0% at 21% 21%);
-  animation:krackle-fluid-charge var(--krackle-beat,1040ms) linear infinite;
-}
-@keyframes krackle-fluid-charge {
-  0% { clip-path:ellipse(0% 0% at 21% 21%); }
-  12% { clip-path:ellipse(23% 17% at 21% 21%); }
-  35% { clip-path:ellipse(24% 18% at 41% 38%); }
-  57% { clip-path:ellipse(25% 18% at 46% 55%); }
-  76% { clip-path:ellipse(27% 18% at 67% 75%); }
-  88% { clip-path:ellipse(35% 19% at 67% 78%); }
-  100% { clip-path:ellipse(0% 0% at 67% 78%); }
-}
-:root[data-krackle='off'] .spinner::after { animation:none !important; }
-/* Activity retains its established six-stop progress language. */
-@keyframes krackle-charge { to { transform: rotate(360deg); } }
-
-/* ── Determinate progress: a bar of energy with a registered halftone screen ───── */
-.progress-bar-bg {
-  position: relative;
-  height: 10px;
-  border-radius: var(--studio-shape-full);
-  background-color: var(--bg3);
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--krackle-energy, var(--acc)) 32%, transparent) 0 1px, transparent 1.4px);
-  background-size: 8px 8px;
-  background-position: 4px 1px;
-  overflow: visible;
-}
-.progress-bar-fill {
-  position: relative;
-  min-width: 10px;
-  border-radius: var(--studio-shape-full);
-  background-color: var(--text);
-  background-image: radial-gradient(circle, var(--krackle-hole) 0 1.15px, transparent 1.5px),
-                    radial-gradient(circle, var(--krackle-hole) 0 .7px, transparent 1px);
-  background-size: 9px 10px, 9px 10px;
-  background-position: 0 2px, 4.5px 6px;
-  /* The advancing edge already communicates progress; its screen stays registered. */
-  animation: none;
-}
-/* The leading edge is a blob of energy, so the bar reads as ink being pushed. */
-.progress-bar-fill::after {
-  content: '';
-  position: absolute;
-  right: -5px;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-top: -7px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 58% 56%, var(--krackle-hole) 0 2px, var(--krackle-energy, var(--acc)) 2.4px);
-}
-
-/* ── Indeterminate progress (<progress> without a value) ───────────────────── */
-progress:not([value]) {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 10px;
-  border: 0;
-  border-radius: var(--studio-shape-full);
-  background-color: var(--bg3);
-  background-image:
-    radial-gradient(circle, var(--krackle-energy, var(--acc)) 0 3.4px, transparent 3.8px),
-    radial-gradient(circle, var(--krackle-energy, var(--acc)) 0 2.3px, transparent 2.7px),
-    radial-gradient(circle, color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent) 0 1.2px, transparent 1.6px);
-  background-size: 48px 10px, 48px 10px, 8px 10px;
-  background-position: 0 0, 14px 0, 0 0;
-  background-repeat: repeat-x;
-  animation: krackle-indeterminate var(--krackle-beat) steps(12, end) infinite;
-}
-progress:not([value])::-webkit-progress-bar { background: transparent; }
-progress:not([value])::-moz-progress-bar { background: transparent; }
-@keyframes krackle-indeterminate { to { background-position: 48px 0, 62px 0, 8px 0; } }
-
-/* ── Activity: the running-jobs ring is six dots; progress fills them clockwise ── */
-#job-activity .activity-ring {
-  position: relative;
-  border-radius: 0;
-  background: conic-gradient(var(--krackle-energy, var(--acc)) var(--job-progress, 25%), color-mix(in srgb, var(--krackle-energy, var(--acc)) 32%, transparent) 0);
-  -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
-  mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
-}
-/* Indeterminate work: the crest counts round the dots instead of a spinning arc. */
-#job-activity .activity-ring.indeterminate {
-  animation: none;
-  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent);
-  -webkit-mask: none;
-  mask: none;
-}
-#job-activity .activity-ring.indeterminate::before,
-#job-activity .activity-ring.indeterminate::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--krackle-energy, var(--acc)) 45%, transparent);
-  -webkit-mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
-  mask: var(--krackle-ring-mask) center / 100% 100% no-repeat;
-}
-#job-activity .activity-ring.indeterminate { background: none; }
-#job-activity .activity-ring.indeterminate::after {
-  background: var(--krackle-energy, var(--acc));
-  -webkit-mask-image: var(--krackle-crest-mask);
-  mask-image: var(--krackle-crest-mask);
-  animation: krackle-charge var(--krackle-beat) steps(6, end) infinite;
-}
-
-/* Forced and OS reduced motion stop every CSS-only Krackle loop. */
-[data-motion='reduce'] .spinner::after,
-[data-motion='reduce'] #job-activity .activity-ring::after,
-[data-motion='reduce'] .progress-bar-fill,
-[data-motion='reduce'] progress:not([value]) { animation: none !important; }
-@media (prefers-reduced-motion: reduce) {
-  .spinner::after,
-  #job-activity .activity-ring::after,
-  .progress-bar-fill,
-  progress:not([value]) { animation: none !important; }
-}
-
 /* ── Notification glyphs (AtelierMotion.krackleGlyph) ──────────────────────── */
 [data-atelier-motion="krackle-glyph"] {
   display: inline-flex;
@@ -267,8 +127,6 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 }
 
 /* ── Krackle on the 0.4 polish surfaces ────────────────────────────────────── */
-/* The startup splash's progress is a run of dots, tall enough to read as Krackle. */
-#startup-progress:not([value]) { height: 10px; }
 /* Edited sidebar rows: the corner of energy carries a bubble. */
 .sb-item::after,.card.imported::after,.roster-portrait.has-edits::after {
   content:'';position:absolute;top:0;right:0;width:20px;height:20px;pointer-events:none;
@@ -287,10 +145,3 @@ progress:not([value])::-moz-progress-bar { background: transparent; }
 .export-receipt-source,.export-receipt-seal { will-change: auto; }
 /* Import result dots live with the import dialog in ../identity.css. */
 
-/* Calm keeps the counted formation; hidden documents never run CSS busy loops. */
-:root[data-krackle='calm'] .spinner::after,
-:root[data-krackle='calm'] #job-activity .activity-ring::after,
-:root[data-krackle='calm'] progress:not([value]) { animation: none !important; }
-:root[data-krackle-hidden] .spinner::after,
-:root[data-krackle-hidden] #job-activity .activity-ring::after,
-:root[data-krackle-hidden] progress:not([value]) { animation-play-state: paused !important; }

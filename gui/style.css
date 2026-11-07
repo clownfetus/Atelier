@@ -629,6 +629,8 @@ body {
   transition: width 200ms linear;
   width: 0%;
 }
+/* A bar only ever shows counted steps. With nothing to count, there's no bar. */
+progress:not([value]) { display: none; }
 
 /* â”€â”€ toast â”€â”€ */
 #toast-area {
@@ -1228,7 +1230,7 @@ body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 #shader-build-title { font-size: 15px; font-weight: 600; text-align: center; }
 .shader-bar { height: 8px; background: var(--bg3); border-radius: var(--studio-shape-small); overflow: hidden; }
 /* Scaling, not resizing, keeps progress updates off the layout path; the clipped track rounds the ends. */
-#shader-bar-fill { height: 100%; width: 100%; background: var(--acc); transform-origin: left; transform: scaleX(var(--progress, .05)); transition: transform var(--studio-motion-standard) linear; }
+#shader-bar-fill { height: 100%; width: 100%; background: var(--text); transform-origin: left; transform: scaleX(var(--progress, 0)); transition: transform var(--studio-motion-standard) linear; }
 
 #shader-browser { flex: 1; display: none; flex-direction: column; min-height: 0; }
 .shader-toolbar {

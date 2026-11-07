@@ -133,7 +133,7 @@ def run_export_review_checks(page, context, url, report, checks):
         review.locator('#export-review-refresh').click()
         assert 'Included changes · 1' in overlay.inner_text()
         review.locator('#export-review-confirm').click()
-        review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'busy' && document.querySelector('progress')")
+        review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'busy' && document.querySelector('.export-review-stage[data-glyph-state=busy]')")
         # The build request leaves in the same task as the busy render; allow its interception to arrive.
         for _ in range(50):
             if pending:
@@ -141,7 +141,7 @@ def run_export_review_checks(page, context, url, report, checks):
             review.wait_for_timeout(20)
         assert len(pending) == 1
         assert review.locator('#install-btn').is_disabled()
-        assert overlay.locator('progress').get_attribute('value') is None
+        assert overlay.locator('progress').count() == 0  # A build can't be counted, so there's no bar.
         overlay.locator('.am-working-border').wait_for()
         assert overlay.locator('.am-working-dot').count() == 0
         assert overlay.locator('.am-working-border').evaluate("el=>getComputedStyle(el).backgroundImage.includes('data:image/svg+xml')")
@@ -165,7 +165,7 @@ def run_export_review_checks(page, context, url, report, checks):
         assert not overlay.is_visible()
         overlay.locator('.am-working-border').wait_for(state='detached')
         review.locator('#export-last-result').click()
-        assert overlay.locator('progress').is_visible()
+        assert overlay.locator('.export-review-stage[data-glyph-state=busy]').is_visible()
         review.evaluate('doInstallMod()')
         assert len(installs) == 1
         request = installs[-1]
@@ -194,7 +194,7 @@ def run_export_review_checks(page, context, url, report, checks):
         # A successful build with failed installation must remain distinguishable and recoverable.
         review.locator('#export-review-refresh').click()
         review.locator('#export-review-confirm').click()
-        review.wait_for_function("document.querySelector('progress') !== null")
+        review.wait_for_function("document.querySelector('.export-review-stage[data-glyph-state=busy]') !== null")
         pending.pop(0).fulfill(json={'ok': False, 'built': True, 'pak_path': 'D:/Fixture/exported/Review.pak',
                                    'applied': ['mat MI_Body'], 'error': 'Fixture copy denied'})
         review.wait_for_selector('#export-review-retry')
@@ -232,7 +232,7 @@ def run_export_review_checks(page, context, url, report, checks):
         conflict_response.clear()
         conflict_response.update(default=False, mods=False)
         review.locator('#export-review-retry').click()
-        review.wait_for_function("document.querySelector('progress') !== null")
+        review.wait_for_function("document.querySelector('.export-review-stage[data-glyph-state=busy]') !== null")
         pending.pop(0).abort('failed')
         review.wait_for_selector('#export-review-retry')
         assert 'Your project edits are preserved' in overlay.inner_text()

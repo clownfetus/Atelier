@@ -281,7 +281,6 @@
     start(snapshot) {
       if (current?.snapshot !== snapshot) return;
       busy = true; reset('Building mod…', 'busy'); metadata(snapshot);
-      const progress = el('progress'); progress.setAttribute('aria-label', 'Export in progress'); body.append(progress);
       body.append(el('p', snapshot.copyToMods ? 'Building the selected saved edits, then copying the output to your mods folder.' : 'Building the selected saved edits in the export folder.'));
       body.append(el('p', 'This operation has no percentage estimate. You can hide this window; the build will continue.'));
       const stage = el('p', 'Starting…'); stage.id = 'export-job-stage'; stage.setAttribute('role','status'); body.append(stage);

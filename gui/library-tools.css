@@ -56,14 +56,6 @@
   color: var(--text);
   font: var(--studio-type-label);
 }
-.library-loading-indicator {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--border);
-  border-top-color: var(--acc);
-  border-radius: 50%;
-}
-:root[data-krackle=full] .library-loading-indicator { animation: spin .9s linear infinite; }
 .library-keyboard-help { color: var(--muted); font: var(--studio-type-detail); margin: 0 20px 10px; }
 .asset-card-wrap { position: relative; display: flex; flex: 0 0 var(--card-w); width: var(--card-w); }
 .library-preview-button { position: absolute; top: 16px; left: 16px; z-index: 1; width: 26px; height: 26px; padding: 4px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--md-sys-color-surface-container-lowest); color: var(--text); cursor: pointer; opacity: 0; pointer-events: none; }

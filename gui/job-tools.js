@@ -48,13 +48,14 @@
     if (!activityButton) return;
     const jobs = [...live.values()].filter(job=>job.project===window.atelierProject() && active.has(job.state));
     const previous = activityButton.querySelector('.activity-pip')?.textContent || '';
+    const working = activityButton.querySelector('.activity-ring.indeterminate');
     activityButton.replaceChildren(document.createTextNode('Activity'));
     activityButton.setAttribute('aria-label', jobs.length ? `Activity · ${jobs.length} running` : 'Activity');
     if (!jobs.length) return;
-    const ring=el('span',undefined,'activity-ring'); ring.setAttribute('aria-hidden','true');
     const determinate=jobs.every(job=>Number(job.total)>0);
+    // Uncounted work is the working glyph, kept across refreshes so its motion doesn't restart.
+    const ring=!determinate&&working||el('span',undefined,determinate?'activity-ring':'activity-ring indeterminate spinner'); ring.setAttribute('aria-hidden','true');
     if (determinate) ring.style.setProperty('--job-progress', Math.min(100,jobs.reduce((n,j)=>n+Math.max(0,Number(j.current)||0),0)/jobs.reduce((n,j)=>n+Number(j.total),0)*100)+'%');
-    else ring.classList.add('indeterminate');
     const pip=el('span',previous,'activity-pip'); window.AtelierPolish?.count(pip,jobs.length); if(!pip.textContent) pip.textContent=jobs.length;
     activityButton.prepend(ring); activityButton.append(pip);
   }

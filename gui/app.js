@@ -5375,7 +5375,7 @@ async function startShaderBuild() {
   _shEl("shader-build-btn").style.display = "none";
   _shEl("shader-build-err").style.display = "none";
   _shEl("shader-build-prog").style.display = "block";
-  _shEl("shader-bar-fill").style.setProperty("--progress", ".05");
+  _shEl("shader-bar-fill").style.setProperty("--progress", "0");
   _shEl("shader-build-msg").textContent = "Starting…";
   try { await api("/api/shaders/build", { method: "POST" }); }
   catch (e) { _shBuildError(e.message); return; }
@@ -5383,7 +5383,7 @@ async function startShaderBuild() {
     let st; try { st = await api("/api/shaders/status"); } catch { return; }
     const b = st.build || {};
     if (b.error) { clearInterval(_sh.poll); _sh.poll = null; _shBuildError(b.error); return; }
-    _shEl("shader-bar-fill").style.setProperty("--progress", Math.max(5, Math.min(100, b.pct || 0)) / 100);
+    _shEl("shader-bar-fill").style.setProperty("--progress", Math.max(0, Math.min(100, b.pct || 0)) / 100);
     _shEl("shader-build-msg").textContent =
       (b.phase || "Working…") + (b.count ? `  (${b.count.toLocaleString()} shaders)` : "");
     if (st.db_ready && b.done) {
