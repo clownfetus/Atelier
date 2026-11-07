@@ -219,7 +219,7 @@
     return best;
   }
   // Every order of moving the pieces is tried; the preferred order is favoured.
-  function* planSteps(from, to, prefer = IDS) {
+  function* planSteps(from, to, prefer = IDS, progress = {}) {
     const movers = prefer.filter(id => differs(from[id], to[id]));
     let best = null, oi = 0;
     orders: for (const order of perms(movers)) {
@@ -232,7 +232,7 @@
         cost += r.cost; over += r.over;
         st[id] = {...to[id]};
       }
-      if (!best || cost < best.cost) best = {steps, cost, over};
+      if (!best || cost < best.cost) progress.best = best = {steps, cost, over};
     }
     return best || {steps: [], cost: 0, over: 0};
   }
@@ -308,7 +308,104 @@
   }
   const seated = p => (p.teal.m ?? 0) >= .5 && gap(p, 'teal', 'disc') < G + 6 && gap(p, 'blue', 'disc') < G + 6;
 
+  // ---------- routes: planned ahead at idle, or live on a budget ----------
+  // A route is the same whoever asks, so every glyph shares them.
+  const ROUTES = new Map(), ROUTE_LIMIT = 512;
+  const SLICE_MS = 6, BUDGET_MS = 400;
+  const stats = {hits: 0, live: 0, overBudget: 0, longestSlice: 0, planned: 0};
+  const n2 = v => (v ?? 0).toFixed(2);
+  const pieceKey = o => [n2(o.x), n2(o.y), n2(o.rot), n2(o.w ?? o.r), n2(o.h), n2(o.m), n2(o.k), n2(o.taper ?? o.dx)].join();
+  const routeKey = (from, to, prefer) => IDS.map(id => pieceKey(from[id]) + '>' + pieceKey(to[id])).join('|') + '|' + prefer.join();
+  function remember(key, steps) {
+    if (ROUTES.size >= ROUTE_LIMIT) ROUTES.delete(ROUTES.keys().next().value);
+    ROUTES.set(key, steps);
+    return steps;
+  }
+  // Moved straight, in the preferred order, when a plan runs out of time. The fixed layer order means
+  // a crossing can only read as one piece passing in front of another.
+  const straight = (from, to, prefer) => prefer.filter(id => differs(from[id], to[id])).map(id => ({id, path: {a: from[id], b: to[id], c: []}}));
+  // A planned route, or null if it would have to be worked out.
+  function known(from, to, prefer = IDS) {
+    const hit = ROUTES.get(routeKey(from, to, prefer));
+    if (hit) stats.hits++;
+    return hit || null;
+  }
+  // Plans in slices of a few milliseconds, so the page keeps running; a plan took up to 146 ms on one thread.
+  function planLive(from, to, prefer = IDS) {
+    const key = routeKey(from, to, prefer), progress = {}, walk = planSteps(clone(from), to, prefer, progress), began = performance.now();
+    stats.live++;
+    return new Promise(resolve => {
+      const slice = () => {
+        const start = performance.now(), end = start + SLICE_MS;
+        let step = walk.next();
+        while (!step.done && performance.now() < end) step = walk.next();
+        stats.longestSlice = Math.max(stats.longestSlice, performance.now() - start);
+        if (step.done) resolve(remember(key, step.value.steps));
+        else if (performance.now() - began > BUDGET_MS) { stats.overBudget++; resolve(progress.best ? progress.best.steps : straight(from, to, prefer)); }
+        else setTimeout(slice, 0);
+      };
+      slice();
+    });
+  }
+  // The moves an assembly makes from a starting pose, in order (SPEC section 4.1).
+  function* assemblyRoutes(a, target, from) {
+    const {standOff} = assembly.pieces, open = seated(from);
+    let cur = from;
+    if (open) { const s = standOff(cur); yield [cur, s, ['teal']]; cur = s; }
+    const sp = spreadFor(a, cur, open);
+    if (!simulClear(cur, sp)) yield [cur, sp, IDS];
+    const sl = slotsFor(a, sp);
+    yield [sp, sl, a.order.slice(1)];
+    yield [sl, target, a.order];
+  }
+  // Everything the working loop and the outcomes go through from a pose they're designed to rest in.
+  function* commonRoutes() {
+    const {fits, rest, POSES, OUT, STRAIGHT, standOff, clone: copy} = assembly.pieces, F = fits(), W = POSES.warning, M = POSES.master;
+    const X = copy(POSES.error);
+    X.blue.rot -= 6; X.teal.rot += 6;
+    for (const a of F) {
+      for (const b of F) {
+        if (a === b) continue;
+        if (STRAIGHT.has(a.name) && STRAIGHT.has(b.name)) yield [a.contact, b.approach, b.order];
+        else yield* assemblyRoutes(b, b.approach, a.contact);
+      }
+    }
+    const wait = standOff(M), starts = [...F.flatMap(a => [a.contact, a.tap, a.approach]), rest(), M];
+    for (const from of starts) {
+      yield* assemblyRoutes({...OUT.warning, contact: W}, W, from);
+      yield* assemblyRoutes({...OUT.error, contact: X}, X, from);
+    }
+    yield* assemblyRoutes({...OUT.master, contact: wait, fixed: ['teal']}, wait, rest());
+    yield [wait, M, ['teal']];
+  }
+  let idle = null;
+  const later = fn => (window.requestIdleCallback ? window.requestIdleCallback(fn) : setTimeout(() => fn({timeRemaining: () => 8}), 200));
+  // After start-up, in idle time only. It stops as soon as the page has something better to do.
+  function precompute() {
+    if (idle || window.AtelierMotionPolicy?.mode() === 'off') return;
+    idle = {routes: commonRoutes(), walk: null, key: null};
+    const run = deadline => {
+      while (deadline.timeRemaining() > 1) {
+        if (!idle.walk) {
+          const next = idle.routes.next();
+          if (next.done) { idle.done = true; return; }
+          const [from, to, prefer] = next.value;
+          idle.key = routeKey(from, to, prefer);
+          if (ROUTES.has(idle.key)) continue;
+          idle.walk = planSteps(clone(from), to, prefer);
+        }
+        const step = idle.walk.next();
+        if (step.done) { remember(idle.key, step.value.steps); stats.planned++; idle.walk = null; }
+      }
+      later(run);
+    };
+    later(run);
+  }
+  if (document.readyState === 'complete') later(precompute);
+  else window.addEventListener('load', () => later(precompute), {once: true});
+
   assembly.planner = Object.freeze({
     outline, polyOf, gap, lerpPose, curvePt, pieceAt, pathLen, planSteps, planSequence, simulClear, spreadFor, slotsFor, seated,
+    known, planLive, precompute, stats, commonRoutes, idleDone: () => Boolean(idle && idle.done), clearRoutes: () => ROUTES.clear(),
   });
 })();

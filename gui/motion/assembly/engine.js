@@ -8,7 +8,7 @@
   'use strict';
   const assembly = window.AtelierMotion.assembly;
   const {CAT, PLATES, G, IDS, E, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS, FRAME, clone, mixC, all, warningPose, standOff, nudge, fits, rest, atRest, raised, micro, frameOf} = assembly.pieces;
-  const {lerpPose, pieceAt, pathLen, planSequence, simulClear, spreadFor, slotsFor, seated} = assembly.planner;
+  const {lerpPose, pieceAt, pathLen, known, planLive, simulClear, spreadFor, slotsFor, seated} = assembly.planner;
 
   // One clock for every glyph: 30 glyphs share one frame callback. Time stops when no glyph needs it,
   // and a long gap (a hidden window) moves it on by at most a quarter of a second.
@@ -177,7 +177,8 @@
     }
     // One piece at a time, along planned curves.
     async travelTo(to, tk, prefer) {
-      const steps = planSequence(this.cur, to, prefer);
+      const steps = known(this.cur, to, prefer) || await planLive(this.cur, to, prefer);
+      if (tk !== this.token) return false; // replaced while planning: nothing has moved
       for (const st of steps) {
         const ms = Math.max(300, Math.min(640, 220 + pathLen(st.path) * .95)) * this.pace;
         this.moving = this.animate(ms, E.move, e => { this.cur = {...this.cur, [st.id]: pieceAt(st.path, e)}; })
