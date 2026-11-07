@@ -19,7 +19,7 @@
   overflow: visible;
 }
 /* The old glyph's hosts: the surface behind each, and the toast's slot gives its host a size. */
-.toast { --glyph-halo: #eee5cf; }
+.toast { --glyph-halo: var(--bg2); }
 .job-row { --glyph-halo: var(--md-sys-color-surface-container); }
 .at-modopen-rows { --glyph-halo: var(--surface); }
 .k-update-drop { --glyph-halo: var(--bg2); }
