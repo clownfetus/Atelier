@@ -1,4 +1,4 @@
-"""Logo startup/ownership checks. Uses original local PNG; never writes project data."""
+"""Logo startup/ownership checks. Uses the local mark; never writes project data."""
 import subprocess
 import sys
 from pathlib import Path
@@ -14,7 +14,7 @@ Element.prototype.animate=function(frames, options) {
   return nativeAnimate.call(this,frames,options);
 };
 document.addEventListener('DOMContentLoaded',()=>{
-  const label=document.querySelector('.studio-brand > span:not([data-atelier-motion])');
+  const label=document.querySelector('.studio-wordmark');
   window.logoInitialLabel=label?.getBoundingClientRect().x;
 });
 """
@@ -43,9 +43,9 @@ def run_logo_motion_checks(page, context, url, report, checks):
         assert tab.evaluate('logoAnimationOptions[0].frames[1].offset') == .32
         assert tab.evaluate('logoAnimationOptions[0].options.easing') == 'linear'
         assert tab.locator('.studio-brand > img').evaluate('el=>el.naturalWidth>0 && el.hidden')
-        assert tab.locator('.studio-brand [data-atelier-motion=logo-entrance]').evaluate('el=>el.getBoundingClientRect().width===32 && el.getBoundingClientRect().height===32 && !el.getAnimations({subtree:true}).length')
-        assert tab.evaluate('document.querySelector(".studio-brand > span:not([data-atelier-motion])").getBoundingClientRect().x === logoInitialLabel')
-        assert tab.locator('.studio-brand image').get_attribute('href').endswith('/static/brand/atelier-mark.png')
+        assert tab.locator('.studio-brand [data-atelier-motion=logo-entrance]').evaluate('el=>Math.abs(el.getBoundingClientRect().width-50.08)<.1 && Math.abs(el.getBoundingClientRect().height-32.4)<.1 && !el.getAnimations({subtree:true}).length')
+        assert tab.evaluate('Math.abs(document.querySelector(".studio-wordmark").getBoundingClientRect().x - logoInitialLabel) < .5')
+        assert tab.locator('.studio-brand image').get_attribute('href').endswith('/static/brand/atelier-mark.svg')
         tab.evaluate("document.documentElement.dataset.theme='light'; AtelierLogoEntranceUI.start(); document.dispatchEvent(new Event('atelier:navigation')); document.dispatchEvent(new Event('atelier:project-changed'))")
         tab.wait_for_timeout(50)
         assert tab.evaluate('logoEntrances') == 1
@@ -53,7 +53,7 @@ def run_logo_motion_checks(page, context, url, report, checks):
         tab.evaluate("document.documentElement.dataset.theme='dark'")
         tab.wait_for_timeout(250)
         tab.screenshot(path=str(report / 'logo-startup-dark.png'))
-        checks.append('Logo entrance runs once independently of pending startup configuration, preserves the original 32px PNG and wordmark position, then releases its effects')
+        checks.append('Logo entrance runs once independently of pending startup configuration, holds the mark size and wordmark position, then releases its effects')
 
         tab.evaluate(r"""async () => {
           await document.querySelector('.studio-brand > img').decode();
@@ -181,7 +181,7 @@ def run_logo_motion_checks(page, context, url, report, checks):
         tab.unroute_all(behavior='ignoreErrors')
         tab.close()
 
-    for mode in ('hidden', 'reduced', 'missing-waapi', 'missing-controller', 'png-error'):
+    for mode in ('hidden', 'reduced', 'missing-waapi', 'missing-controller', 'mark-error'):
         quiet = context.new_page()
         quiet.add_init_script(INSTRUMENT)
         if mode == 'hidden':
@@ -192,8 +192,8 @@ def run_logo_motion_checks(page, context, url, report, checks):
             quiet.add_init_script('Element.prototype.animate=undefined;')
         elif mode == 'missing-controller':
             quiet.route('**/static/motion/logo-entrance.js', lambda route: route.fulfill(body='',content_type='text/javascript'))
-        elif mode == 'png-error':
-            quiet.route('**/static/brand/atelier-mark.png', lambda route: route.abort('failed'))
+        elif mode == 'mark-error':
+            quiet.route('**/static/brand/atelier-mark.svg', lambda route: route.abort('failed'))
         try:
             quiet.goto(url)
             quiet.wait_for_function('window.AtelierLogoEntranceUI')
@@ -206,4 +206,4 @@ def run_logo_motion_checks(page, context, url, report, checks):
         finally:
             quiet.unroute_all(behavior='ignoreErrors')
             quiet.close()
-    checks.append('Hidden/reduced-motion startup, absent animation/controller and PNG failures keep the static fallback and never replay on later visibility')
+    checks.append('Hidden/reduced-motion startup, absent animation/controller and image failures keep the static fallback and never replay on later visibility')

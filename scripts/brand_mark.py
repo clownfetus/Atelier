@@ -405,7 +405,10 @@ def wordmark_problems():
     if not all(path.exists() for path in files.values()):
         return list(files)
     texts = {rel: path.read_text(encoding='utf-8').replace(WORDMARKS[rel], 'INK') for rel, path in files.items()}
-    return [] if len(set(texts.values())) == 1 else list(files)
+    if len(set(texts.values())) != 1:
+        return list(files)
+    outlines = next(iter(texts.values())).split(' d="')[1].split('"')[0]
+    return [] if f'fill="currentColor" d="{outlines}"' in (ROOT / 'gui/index.html').read_text(encoding='utf-8') else ['gui/index.html']
 
 
 def main():

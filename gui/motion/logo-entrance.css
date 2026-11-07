@@ -6,13 +6,14 @@
 [data-atelier-motion="logo-entrance"] {
   --am-logo-entrance-size: 32px;
   display: inline-block;
-  width: var(--am-logo-entrance-size);
+  --am-logo-entrance-width: calc(var(--am-logo-entrance-size) * 1.5455);
+  width: var(--am-logo-entrance-width);
   height: var(--am-logo-entrance-size);
-  min-width: var(--am-logo-entrance-size);
+  min-width: var(--am-logo-entrance-width);
   min-height: var(--am-logo-entrance-size);
-  max-width: var(--am-logo-entrance-size);
+  max-width: var(--am-logo-entrance-width);
   max-height: var(--am-logo-entrance-size);
-  flex: 0 0 var(--am-logo-entrance-size);
+  flex: 0 0 var(--am-logo-entrance-width);
   margin: 0;
   padding: 0;
   border: 0;
@@ -53,6 +54,11 @@
   --am-logo-entrance-size: 128px;
 }
 
+/* The header's mark, the same size as the image it stands in for. */
+.studio-brand > [data-atelier-motion="logo-entrance"] {
+  --am-logo-entrance-size: 32.4px;
+}
+
 [data-atelier-motion="logo-entrance"] .am-logo-entrance-svg {
   display: block;
   width: 100%;
@@ -68,8 +74,6 @@
 
 [data-atelier-motion="logo-entrance"] .am-logo-entrance-image {
   display: block;
-  width: 32px;
-  height: 32px;
 }
 
 @media (prefers-reduced-motion: reduce) {

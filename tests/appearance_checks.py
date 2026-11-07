@@ -2,6 +2,54 @@
 from design_checks import assert_theme_tokens, measure_contrast
 
 
+def assert_brand_follows_theme(tab):
+    state = tab.evaluate("""() => {
+      const brand = document.querySelector('.studio-brand'), probe = document.createElement('span');
+      probe.style.color = 'var(--text)'; document.body.append(probe);
+      const text = getComputedStyle(probe).color; probe.remove();
+      const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="logo-entrance"]')];
+      return {text, letters: getComputedStyle(brand.querySelector('.studio-wordmark')).color,
+              filters: marks.map(mark => getComputedStyle(mark).filter),
+              signature: getComputedStyle(document.documentElement).getPropertyValue('--library-signature-filter')};
+    }""")
+    assert state['letters'] == state['text'], state
+    assert all(value == 'none' for value in state['filters']), state
+    assert 'brightness(0)' in state['signature'], state
+
+
+def assert_lockups(tab):
+    """D6: the spacing from bible p.12 in the header and on the start page, and a header that fits."""
+    measure = """host => {
+      const shown = [...host.querySelectorAll(':scope > img, :scope > [data-atelier-motion]')].find(el => el.getBoundingClientRect().width);
+      const mark = shown.getBoundingClientRect(), name = host.querySelector(':scope > svg').getBoundingClientRect();
+      return {mark: mark.height, markWidth: mark.width, cap: name.height, name: name.width, gap: name.left - mark.right};
+    }"""
+    near = lambda a, b: abs(a - b) < .3
+    header = tab.locator('.studio-brand').evaluate(measure)
+    assert near(header['mark'], 32.4) and near(header['cap'], 12) and near(header['gap'], 15.6), header
+    assert 136 <= tab.locator('.studio-brand').evaluate('el => el.getBoundingClientRect().width') <= 146, header
+    start = tab.evaluate("""measure => {
+      const copy = document.querySelector('#setup-hero .at-proj-lockup').cloneNode(true);
+      document.body.append(copy); const result = eval(measure)(copy); copy.remove(); return result;
+    }""", measure)
+    assert near(start['mark'], 64.8) and near(start['cap'], 24) and near(start['gap'], 31.2), start
+    hero = tab.locator('#setup-hero')
+    assert hero.locator('.at-proj-lockup').get_attribute('aria-label') == 'Atelier'
+    assert hero.locator('.at-proj-rivals, .at-proj-tagline').count() == 0
+    size = tab.viewport_size
+    try:
+        for width, named in ((1400, True), (1101, True), (1100, False), (900, False)):
+            tab.set_viewport_size({'width': width, 'height': size['height']})
+            state = tab.evaluate("""() => {
+              const bar = document.getElementById('topbar'), name = document.querySelector('.studio-wordmark');
+              return {fits: bar.scrollWidth <= bar.clientWidth, named: getComputedStyle(name).display !== 'none',
+                      accessible: document.querySelector('.studio-brand').getAttribute('aria-label')};
+            }""")
+            assert state['fits'] and state['named'] == named and state['accessible'], (width, state)
+    finally:
+        tab.set_viewport_size(size)
+
+
 def run_appearance_checks(page, context, url, report, checks):
     tab = context.new_page()
     failures = []
@@ -57,12 +105,10 @@ def run_appearance_checks(page, context, url, report, checks):
                 })''')
                 assert all(s['scheme'] == mode and s['color'] == s['text'] and s['option'] == s['expected']
                            and s['background'] != 'rgba(0, 0, 0, 0)' for s in styles), styles
-                brand = tab.locator('.studio-brand')
-                assert brand.evaluate('(el)=>getComputedStyle(el).color') == ('rgb(255, 255, 255)' if mode == 'dark' else 'rgb(0, 0, 0)')
-                mark = brand.locator(':scope > img, :scope > [data-atelier-motion="logo-entrance"]').last
-                assert 'brightness(0)' in mark.evaluate('(el)=>getComputedStyle(el).filter')
+                assert_brand_follows_theme(tab)
                 tab.screenshot(path=str(report / f'appearance-{preset}-{mode}.png'), animations='disabled')
-        checks.append('Settings presets show four swatches; all six presets pass contrast checks in light and dark, keep the piece colours fixed and fit status colours by lightness only; native selects/options and monochrome brand follow the theme')
+        assert_lockups(tab)
+        checks.append('Settings presets show four swatches; all six presets pass contrast checks in light and dark, keep the piece colours fixed and fit status colours by lightness only; native selects/options follow the theme, and the logo keeps its colours with its letters in the text colour')
 
         # Real popup interaction keeps native focus, selection and dismissal behavior.
         picker.click()
@@ -119,7 +165,7 @@ def run_appearance_checks(page, context, url, report, checks):
         color('background', '#ffffff')
         color('foreground', '#fafafa')
         assert all(pair['ratio'] >= 4.5 for pair in measure_contrast(tab))
-        assert tab.locator('.studio-brand').evaluate('(el)=>getComputedStyle(el).color') == 'rgb(0, 0, 0)'
+        assert_brand_follows_theme(tab)
         color('background', '#080808')
         color('foreground', '#f7f7f7')
         assert tab.locator('#theme-contrast').is_hidden()

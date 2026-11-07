@@ -22,12 +22,11 @@
   --caution: var(--status-warning);
   --caution-text: var(--status-warning-text);
   --fault: var(--status-error-text);
-  /* Removed in P4.1 and P1.5, with what reads them. */
+  /* Removed in P4.1, with what reads them. */
   --energy: var(--md-sys-color-on-surface);
   --energy-hole: var(--surface);
   --energy-glint: var(--surface);
   --energy-core: var(--md-sys-color-primary);
-  --rivals: var(--md-sys-color-on-surface);
 
   /* Type */
   --font-display: var(--studio-display);
@@ -269,43 +268,10 @@
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
-.at-proj-lockup {
-  display: inline-flex;
-  align-items: baseline;
-  font: 600 clamp(40px, 5vw, 64px)/1 var(--font-display);
-  color: var(--text);
-}
-/* The mark is the wordmark's A: cap height, sitting on the baseline, set as a letter. */
-.at-proj-mark { height: 0.76em; width: auto; margin-right: 0.015em; align-self: baseline; overflow: visible; }
-.at-proj-mark .mk-ink { fill: var(--text); }
-.at-proj-mark .mk-drop { fill: var(--drop); }
-.at-proj-wordmark { display: block; line-height: 0.8; }
-/* The i's tittle is the drop: a Smalt circle over a dotless ı, sized and set as the sheet's wordmark. */
-.at-proj-wordmark .at-i { position: relative; }
-.at-proj-wordmark .at-i::before {
-  content: ""; position: absolute; left: 50%; bottom: 0.79em;
-  width: 0.168em; height: 0.168em; margin-left: -0.084em;
-  border-radius: 50%; background: var(--drop);
-}
-/* "RIVALS" is bespoke lettering (index.html): its caps fill the x-height band of "telier"
-   (0.53em tall) on the same baseline, so the three parts share one band.
-   Its own pigment, never a state colour. */
-.at-proj-rivals {
-  display: block;
-  height: 0.53em;
-  width: auto;
-  margin-right: -0.1em;   /* the S tucks under the mark's empty upper left; its foot stays a halo clear of the orb */
-  align-self: baseline;
-  fill: var(--rivals);
-  overflow: visible;
-}
-.at-projects .at-proj-tagline {
-  margin: 0 0 0.35em;
-  max-width: 24ch;
-  font: 600 18px/1.3 var(--font-display);
-  color: var(--text-muted);
-  text-wrap: balance;
-}
+/* The bible's horizontal lockup (p.12): mark 2.7 x cap height, gap 1.3 x cap height. */
+.at-proj-lockup { display: inline-flex; align-items: center; gap: 31.2px; color: var(--text); }
+.at-proj-lockup img { display: block; width: auto; height: 64.8px; }
+.at-proj-lockup svg { display: block; width: calc(24px * 9265 / 1490); height: 24px; }
 /* ── Launch check and first-run setup (#setup-overlay outside Settings) ──────────────────── */
 /* Setup has its own header and ground, with the header's rule drawn by the check
    (motion/setup-check.css). Settings keeps the Material dialog; setup-wizard.js moves the
@@ -575,5 +541,4 @@
 
 @media (max-height: 760px) {
   .at-proj-hero { padding:14px 0; }
-  .at-proj-lockup { font-size:44px; }
 }

@@ -17,7 +17,7 @@
         const image=document.querySelector('.studio-brand > img');
         if(!launchAttempted&&image?.complete&&image.naturalWidth){
           launchAttempted=true;const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
-          const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,128,128);mask=ctx.getImageData(0,0,128,128);
+          const ctx=canvas.getContext('2d');const tall=128*image.naturalHeight/image.naturalWidth;ctx.drawImage(image,0,(128-tall)/2,128,tall);mask=ctx.getImageData(0,0,128,128);
         }
         startupStage=AtelierMotion.krackleStage.mount(startupHost,{state:'busy',size:mask?224:156,kind:mask?'launch':'index-load',tier:mask?3:2,mask});
         if(mask&&startupHost.dataset.amMicro!=='true') {

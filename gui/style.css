@@ -1401,14 +1401,15 @@ input, select, textarea { accent-color: var(--acc); }
 button:disabled { cursor: default; }
 button svg, .btn svg { flex-shrink: 0; width: var(--studio-icon-size); height: var(--studio-icon-size); }
 .studio-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
-.studio-brand { display: flex; align-items: center; gap: 10px; margin-right: 24px; flex-shrink: 0; }
-.studio-brand span { font-size: 18px; font-weight: 600; }
-.studio-brand img { display: block; object-fit: contain; }
+/* Bible p.12: cap height 12, mark 2.7 x cap height, gap 1.3 x cap height. */
+.studio-brand { display: flex; align-items: center; gap: 15.6px; margin-right: 24px; flex-shrink: 0; color: var(--text); }
+.studio-wordmark { display: block; flex: none; width: calc(12px * 9265 / 1490); height: 12px; }
+.brand-symbols { position: absolute; width: 0; height: 0; }
+.studio-brand img { display: block; width: auto; height: 32.4px; }
 /* Apply to the static fallback and the animated mark without filtering artwork. */
-:root { --studio-brand-color: #000; --studio-brand-filter: brightness(0); }
-:root[data-theme="dark"] { --studio-brand-color: #fff; --studio-brand-filter: brightness(0) invert(1); }
-.studio-brand > img, .studio-brand > [data-atelier-motion="logo-entrance"] { filter: var(--studio-brand-filter); }
-.studio-brand { color: var(--studio-brand-color); }
+/* The Library hero signature is game art, so it stays monochrome. */
+:root { --library-signature-filter: brightness(0); }
+:root[data-theme="dark"] { --library-signature-filter: brightness(0) invert(1); }
 /* Native popup options need explicit roles as well as the closed select. */
 select { color-scheme: inherit; background-color: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-small); min-height: 32px; padding: 6px 8px; cursor: pointer; }
 select option, select optgroup { background-color: var(--bg2); color: var(--text); }
@@ -1516,7 +1517,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 @media (max-width: 1100px) {
   #topbar { padding-inline: 12px; }
   .studio-brand { margin-right: 12px; }
-  .studio-brand span, #searchbar kbd, .project-chip-count { display: none; }
+  .studio-wordmark, #searchbar kbd, .project-chip-count { display: none; }
   .project-chip { max-width: 180px; }
   #search-input { width: 140px; }
   #sidebar { width: 260px; }

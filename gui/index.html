@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atelier</title>
+<link rel="icon" type="image/svg+xml" href="/static/brand/atelier-mark-small.svg">
 <link rel="icon" type="image/png" href="/static/brand/atelier-mark.png">
 <script src="/static/preferences.js"></script>
 <script src="/static/motion/krackle-inks.js"></script>
@@ -55,10 +56,13 @@
 </head>
 <body data-page="library">
 
+<!-- The wordmark, outlined. scripts/brand_mark.py --check keeps these outlines the same as gui/brand/atelier-wordmark.svg. -->
+<svg class="brand-symbols" aria-hidden="true" focusable="false"><symbol id="atelier-wordmark" viewBox="0 0 9265 1490"><path fill="currentColor" d="M13 1490H297L565 707C610 570 655 427 711 239C767 427 811 570 855 707L1116 1490H1407L877 0H545Z M1491.28 229H1955.28V1490H2220.2799999999997V229H2682.2799999999997V0H1491.28Z M3078.56 1490H4113.5599999999995V1261H3342.56V846H4055.56V621H3342.56V229H4113.5599999999995V0H3078.56Z M4529.84 1490H5484.84V1261H4793.84V0H4529.84Z M6145.12 0H5881.12V1490H6145.12Z M6618.4 1490H7653.4V1261H6882.4V846H7595.4V621H6882.4V229H7653.4V0H6618.4Z M8069.679999999999 1490H8333.68V948H8633.68C8636.68 948 8638.68 948 8640.68 948L8920.68 1490H9211.68L8900.68 900C9077.68 828 9183.68 679 9183.68 476C9183.68 184 8978.68 0 8650.68 0H8069.679999999999ZM8333.68 730V224H8635.68C8813.68 224 8923.68 321 8923.68 476C8923.68 632 8813.68 730 8637.68 730Z"/><circle style="fill:var(--atelier-material)" cx="710.0" cy="1065.3" r="175.8"/></symbol></svg>
+
 <!-- ── top bar ── -->
 <div id="topbar">
   <div class="topbar-navigation">
-    <div class="studio-brand"><img src="/static/brand/atelier-mark.png" alt="" width="32" height="32"><span>Atelier</span></div>
+    <div class="studio-brand"><img src="/static/brand/atelier-mark.svg" alt="" width="50" height="32"><svg class="studio-wordmark" role="img" aria-label="Atelier" focusable="false"><use href="#atelier-wordmark"/></svg></div>
     <button class="project-chip" id="project-chip" type="button" title="Switch project" hidden><i data-lucide="folder-open" size="15"></i><span id="project-chip-name"></span><span id="project-chip-count" class="project-chip-count"></span></button>
     <nav id="app-pages" aria-label="Main navigation"><button id="page-library" type="button" aria-current="page">Library</button><button id="page-workspace" type="button" title="Guided costume and colour editing">Workspace</button></nav>
   </div>
@@ -111,7 +115,7 @@
       </div>
       <nav id="breadcrumbs" aria-label="Asset location"></nav>
     </div>
-    <div id="startup-splash" role="status"><img src="/static/brand/atelier-mark.png" alt=""><span id="startup-label">Opening your library…</span><progress id="startup-progress" aria-label="Container indexing"></progress></div>
+    <div id="startup-splash" role="status"><img src="/static/brand/atelier-mark.svg" alt=""><span id="startup-label">Opening your library…</span><progress id="startup-progress" aria-label="Container indexing"></progress></div>
     <div class="library-heading"><h1>Asset library</h1><span id="library-count" aria-live="polite"></span><span id="library-category-line" class="card-icon folder-icon" aria-hidden="true"></span></div>
     <section id="library-hero" aria-label="Current character" hidden></section>
     <section id="continue-ribbon" aria-label="Continue editing" hidden></section>
@@ -504,13 +508,7 @@
   <div class="modal setup-modal">
     <!-- Launch check and first-run setup. Settings shares the controls below. -->
     <header class="at-proj-hero at-setup-hero" id="setup-hero" hidden>
-      <div class="at-proj-lockup" role="img" aria-label="Rivals Atelier">
-        <!-- RIVALS: bespoke lettering on a 100-unit cap height, flat-footed, sharing one 18° slant baked into the outlines; the R and A counters are punched true circles. -->
-        <svg class="at-proj-rivals" viewBox="0 0 411 100" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M32.5 0L70.5 0C90.5 0 96.28 13 90.75 30C86.2 44 75.95 54 63.65 58L70 100L44 100L40.35 62L36.35 62L24 100L0 100ZM48.75 30a10 10 0 1 0 20 0a10 10 0 1 0 -20 0ZM110.5 0L134.5 0L102 100L78 100ZM142.5 0L167.5 0L159.35 62L191.5 0L216.5 0L160 100L134 100ZM224.5 0L250.5 0L242 100L218 100L219.85 82L201.85 82L192 100L168 100ZM211.6 52a9 9 0 1 0 18 0a9 9 0 1 0 -18 0ZM282.5 0L306.5 0L281.8 76L313.8 76L306 100L250 100ZM358.5 0L410.5 0L403.35 22L367.35 22L361.82 39L385.82 39L393.93 51L381.9 88L366 100L314 100L321.15 78L357.15 78L362.68 61L338.68 61L330.57 49L342.6 12Z"/></svg>
-        <svg class="at-proj-mark" viewBox="-6 -6 1012 865" aria-hidden="true" focusable="false"><path class="mk-ink" fill-rule="evenodd" d="M305.2 859.7C303.8 859.1 304.6 857.6 308.7 853.1C322.3 838.2 330.5 817.4 330.8 797.0C331.3 754.6 287.4 718.3 245.0 726.0C232.0 728.4 223.4 731.5 213.6 737.6C209.9 739.8 208.6 739.6 207.8 736.7C207.6 735.7 206.6 731.7 205.7 728.0C197.4 694.2 172.7 666.8 139.3 654.1C131.1 651.0 116.1 647.4 111.2 647.4C102.6 647.4 103.0 645.5 113.2 637.8C141.8 616.3 170.7 587.9 195.5 557.2C207.8 541.9 220.5 524.2 228.5 511.2C229.6 509.3 231.9 505.7 233.4 503.2C238.1 495.8 243.6 486.6 245.8 482.8C246.9 480.8 248.9 477.4 250.1 475.3C254.8 467.1 257.9 461.4 263.4 450.9C266.5 444.8 269.7 438.7 270.5 437.2C277.8 423.3 292.1 390.5 297.6 375.0C299.0 371.0 300.8 366.0 301.6 363.8C302.4 361.6 303.7 357.4 304.6 354.4C305.5 351.5 306.9 346.7 307.7 343.8C312.1 328.8 316.4 309.6 318.4 295.1C320.7 278.8 321.2 271.8 321.2 254.3C321.2 237.4 320.9 232.2 318.5 217.1C317.3 209.8 313.3 195.9 309.8 186.8C303.7 170.9 301.9 162.9 301.5 148.8C301.2 140.1 301.3 138.4 303.4 127.1C316.9 54.7 425.7 -17.9 487.1 4.5C506.9 11.7 518.3 28.6 524.6 60.3C530.1 88.4 536.8 105.4 550.3 126.3C554.6 133.0 566.4 151.5 570.5 158.1C581.3 175.3 598.8 201.9 663.5 299.1C694.6 345.7 720.6 384.7 721.3 385.7C723.8 389.4 727.5 394.8 742.5 417.2C774.3 464.4 796.9 497.7 808.7 514.8C811.9 519.6 817.3 527.4 820.6 532.2C823.9 537.0 830.6 546.8 835.5 554.0C840.3 561.2 845.6 568.8 847.1 571.0C851.5 577.3 851.3 577.6 840.0 580.1C784.5 592.6 756.9 654.8 785.8 702.0C814.7 749.1 879.5 757.0 919.7 718.4C925.9 712.4 926.6 712.0 928.0 713.5C928.5 714.1 941.4 739.5 956.7 770.0C972.0 800.6 988.0 832.3 992.3 840.5C999.9 855.4 1000.6 857.1 999.4 858.3C997.8 859.9 749.2 859.2 743.9 857.6C731.3 854.0 727.3 849.2 719.0 827.5C716.6 821.1 713.2 812.4 711.4 808.0C709.7 803.6 706.3 795.1 704.1 789.3C701.8 783.4 697.7 773.1 695.1 766.3C692.4 759.5 688.1 748.4 685.4 741.6C682.7 734.8 678.4 723.6 675.7 716.7C669.7 701.4 657.1 669.0 652.4 656.8C644.5 636.3 640.1 629.0 628.7 617.7C588.8 578.1 520.6 591.3 494.4 643.7C492.5 647.5 491.4 650.2 485.6 666.7C484.2 670.6 482.0 676.6 480.8 680.0C479.5 683.4 477.1 690.1 475.4 695.0C471.4 706.3 467.6 717.2 464.7 724.9C463.5 728.3 461.3 734.3 459.9 738.2C458.5 742.2 456.1 748.9 454.6 753.1C453.1 757.3 450.7 764.0 449.3 768.0C447.9 772.1 445.7 778.0 444.5 781.2C437.8 799.7 438.1 798.9 430.1 821.3C421.6 845.2 421.2 846.0 415.9 851.4C411.8 855.7 408.1 857.9 402.9 859.2C399.8 860.0 307.1 860.5 305.2 859.7ZM361.9 422.6a146.6 146.6 0 1 0 293.3 0a146.6 146.6 0 1 0 -293.3 0Z"/><path class="mk-ink" d="M-0.1 766.6a91.9 91.9 0 1 0 183.7 0a91.9 91.9 0 1 0 -183.7 0Z"/><path class="mk-drop" d="M195.6 802.8a56.1 56.1 0 1 0 112.2 0a56.1 56.1 0 1 0 -112.2 0Z"/></svg>
-        <span class="at-proj-wordmark" aria-hidden="true">tel<span class="at-i">ı</span>er</span>
-      </div>
-      <p class="at-proj-tagline">Every skin starts as a drop&nbsp;of&nbsp;ink.</p>
+      <div class="at-proj-lockup" role="img" aria-label="Atelier"><img src="/static/brand/atelier-mark.svg" alt=""><svg aria-hidden="true" focusable="false"><use href="#atelier-wordmark"/></svg></div>
     </header>
     <section class="at-setup-page" id="setup-page" aria-labelledby="setup-page-title" hidden>
       <h1 id="setup-page-title" tabindex="-1">Checking your setup</h1>
@@ -598,7 +596,7 @@
         <label class="theme-color">Surface<span><input type="color" data-theme-color="surface" value="#2b2f35"><output>#2b2f35</output></span></label>
         <label class="theme-color">Accent<span><input type="color" data-theme-color="accent" value="#98b7e2"><output>#98b7e2</output></span></label>
       </div>
-      <p class="opt-help theme-help">Choose a color to open its native picker. Changes apply and persist immediately. Name and save a palette to reuse it. Light and Dark colors are saved separately; text, accents and surfaces adapt for readable contrast.</p>
+      <p class="opt-help theme-help">Choose a colour to open its native picker. Changes apply and persist immediately. Name and save a palette to reuse it. Light and Dark colours are saved separately; text, accents and surfaces adapt for readable contrast.</p>
       <p class="opt-help theme-contrast" id="theme-contrast" role="status" hidden></p>
       <div class="setup-section">Hero and skin artwork</div>
       <p id="catalogue-status" class="opt-help" role="status">Using saved portraits.</p>

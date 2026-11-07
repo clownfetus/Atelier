@@ -146,7 +146,7 @@ def main():
                         scheme:getComputedStyle(select).colorScheme,
                         text:getComputedStyle(select).color, option:getComputedStyle(option).color, expected,
                         optionBackground:getComputedStyle(option).backgroundColor,
-                        brand:getComputedStyle(document.querySelector('.studio-brand')).color});
+                        brand:getComputedStyle(document.querySelector('.studio-brand')).color===getComputedStyle(document.body).color});
                     }
                   }
                   document.querySelector('[data-theme-color="background"]').value='#080808';
@@ -170,7 +170,7 @@ def main():
                 assert all(row['theme'] == row['mode'] and row['palette'] == row['preset']
                            and row['scheme'] == row['mode'] and row['expected'] == row['option']
                            and row['optionBackground'] != 'rgba(0, 0, 0, 0)'
-                           and row['brand'] == ('rgb(0, 0, 0)' if row['mode'] == 'light' else 'rgb(255, 255, 255)')
+                           and row['brand']
                            for row in appearance['rows']), appearance
                 result['appearance'] = appearance
                 motion = window.evaluate_js("""(() => {
@@ -278,24 +278,24 @@ def main():
                   const marks = [...brand.querySelectorAll(':scope > img, :scope > [data-atelier-motion="logo-entrance"]')]
                     .filter(el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0);
                   const visibleWidth = marks[0]?.getBoundingClientRect().width;
-                  const result = {width:host.getBoundingClientRect().width, state:host.dataset.amState,
+                  const result = {width:Math.round(host.getBoundingClientRect().width), state:host.dataset.amState,
                     opacity:getComputedStyle(host.querySelector('.am-logo-entrance-stage')).opacity,
                     animations:host.getAnimations({subtree:true}).length,
-                    ready:host.dataset.amReady, visibleMarks:marks.length, visibleWidth,
+                    ready:host.dataset.amReady, visibleMarks:marks.length, visibleWidth:Math.round(visibleWidth),
                     startupAPI:typeof AtelierLogoEntranceUI.destroy === 'function'};
                   instance.destroy(); instance.destroy(); instance.replay();
                   result.clean = !host.querySelector('svg') && !host.dataset.amState;
                   host.remove(); delete window.__desktopLogoMotion; return result;
                 })()""")
-                assert logo_motion == {'width': 32, 'state': 'settled', 'opacity': '1',
+                assert logo_motion == {'width': 49, 'state': 'settled', 'opacity': '1',
                                        'animations': 0, 'ready': 'true', 'visibleMarks': 1,
-                                       'visibleWidth': 32, 'startupAPI': True, 'clean': True}, logo_motion
+                                       'visibleWidth': 50, 'startupAPI': True, 'clean': True}, logo_motion
                 result['logo_entrance'] = logo_motion
                 empty_motion = window.evaluate_js("""(() => {
                   const host = document.createElement('div'); document.body.append(host);
                   const instance = AtelierMotion.emptyAssets.mount(host, {state:'entering', reducedMotion:'reduce'});
                   instance.replay(); instance.setState('settled');
-                  const result = {width:host.getBoundingClientRect().width, state:host.dataset.amState,
+                  const result = {width:Math.round(host.getBoundingClientRect().width), state:host.dataset.amState,
                     hidden:host.querySelector('svg').getAttribute('aria-hidden'),
                     animations:host.getAnimations({subtree:true}).length,
                     sidebarAPI:typeof AtelierEmptyAssetsUI.confirmed === 'function'};

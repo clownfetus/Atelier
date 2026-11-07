@@ -95,7 +95,7 @@
     svg.setAttribute('xmlns', SVG_NS);
     svg.setAttribute('width', '32');
     svg.setAttribute('height', '32');
-    svg.setAttribute('viewBox', '0 0 32 32');
+    svg.setAttribute('viewBox', '-8.729 0 49.457 32');
     svg.setAttribute('fill', 'none');
     svg.setAttribute('class', 'am-logo-entrance-svg');
     svg.setAttribute('aria-hidden', 'true');
@@ -125,9 +125,9 @@
 
     var image = document.createElementNS(SVG_NS, 'image');
     image.setAttribute('class', 'am-logo-entrance-image');
-    image.setAttribute('x', '0');
+    image.setAttribute('x', '-8.729');
     image.setAttribute('y', '0');
-    image.setAttribute('width', '32');
+    image.setAttribute('width', '49.457');
     image.setAttribute('height', '32');
     image.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     image.setAttribute('href', logoSrc);

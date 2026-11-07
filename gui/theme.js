@@ -162,9 +162,8 @@
       set('--studio-warning', fit(values.sentence.warning, 4.5));
       set('--studio-info', readable(p.accent, backgrounds));
       for (const [role, color] of Object.entries(values.icon)) set('--studio-icon-' + role, fit(color, 4.5));
-      const blackMark = contrast('#000000', derived['surface-container-low']) >= contrast('#ffffff', derived['surface-container-low']);
-      set('--studio-brand-color', blackMark ? '#000000' : '#ffffff');
-      set('--studio-brand-filter', blackMark ? 'brightness(0)' : 'brightness(0) invert(1)');
+      const blackSignature = contrast('#000000', derived['surface-container-low']) >= contrast('#ffffff', derived['surface-container-low']);
+      set('--library-signature-filter', blackSignature ? 'brightness(0)' : 'brightness(0) invert(1)');
     }
     const surface=getComputedStyle(root).getPropertyValue('--bg2').trim()||p.surface;
     const raised=getComputedStyle(root).getPropertyValue('--bg3').trim()||p.surface;

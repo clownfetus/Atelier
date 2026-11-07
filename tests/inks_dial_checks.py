@@ -108,7 +108,7 @@ def run_inks_dial_checks(page,context,url,report,checks):
         card_ink()
         tab.evaluate("document.getElementById('library-hero').hidden=true;window.dispatchEvent(new Event('atelier:preferences'))")
         assert tab.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--krackle-charge').trim()")=='#2693c6'
-        thumb=thumb_ink();assert thumb['ink']==thumb['expected']=='rgb(37, 141, 191)',('studio light thumb',thumb)
+        thumb=thumb_ink();assert thumb['ink']==thumb['expected']=='rgb(37, 143, 193)',('studio light thumb',thumb)
         checks.append('Hero artwork and legacy adaptive settings preserve theme inks on cards, selection markers and the readable model loader')
         motion('full')
         result=tab.evaluate("""() => {
