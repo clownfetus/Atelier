@@ -1,7 +1,7 @@
 # Atelier — phased plan
 
-Derived from `retrieval/ANALYSIS.md`, ordered so the **first three phases need no in-game
-testing**. You can reach real confidence on a dev machine, with the game closed, before you
+Derived from the historical engineering backlog in [TRIAGE.md](TRIAGE.md), ordered so the
+**first three phases need no in-game testing**. You can reach real confidence on a dev machine, with the game closed, before you
 spend a single round-trip checking whether a mod shows up or whether materials checkerboard.
 
 Mesh editing, the 3D preview, and preview-fidelity work (LUTs, labelling the dye preview) are
@@ -48,13 +48,13 @@ No code paths change. No verification needed beyond reading your own README.
 | 30 | Link leagueofthearcane's Master Class from the README and first-run screen | README, first-run |
 | 29 | State the prerequisites on the export screen — UTOC signature bypass + Project Galacta | gui |
 | 31 | Say where the exported mod went (`assets/projects/exported`) | gui |
-| 33 | Reply to cartbuddy; open his repro zip | Discord |
+| 33 | Review a supplied reproduction ZIP and record the outcome | Issue follow-up |
 | 34 | Publish a donation link | README |
 
 **Confidence at the end:** total — none of it can regress.
 
 **Why first:** #28 and #30 change what future reports look like. Every week without a bug
-channel is another week of reports scattered across four channels and six DMs, which is how one
+channel is another week of reports scattered across several conversations, which is how one
 bug ended up with four reporters and nobody noticed.
 
 ---
@@ -290,8 +290,8 @@ unchanged since 2026-09-18; no base chunk changed either, so what arrived was th
 not a game update. A differently-keyed pak has now failed to appear twice, across a content
 download that added 47k assets. Item 2 stays parked, not reopened.
 
-**Still open, per your read:** cartbuddy's inconsistency (new-skin mods working while older
-material edits broke) could be a skin added straight to the base paks rather than patched, or
+**Historical report, still unverified:** new-skin mods working while older material edits fail
+could indicate a skin added straight to the base paks rather than patched, or
 one patch pak encrypted and another not. Not decidable from logs. Worth capturing a copy of the
 paks at the next season boundary so this can be settled offline instead of live.
 
@@ -328,8 +328,7 @@ more useful than "it didn't throw".
 - **LUT support for recolor preview** — noobmasterpro believed it doable, blocker was the backend
 - **Labelling the dye preview as approximate** — `DYE_BASE = 0.35` is a hardcoded stand-in,
   commented "Tune 0.4–0.8"
-- **cinarette (Eesa) is a mesh modder and offered to help**, 2026-08-16, never taken up. Worth
-  reopening when this restarts.
+- Seek a mesh-modder review when this work restarts.
 
 ---
 
