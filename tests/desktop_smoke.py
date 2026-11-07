@@ -412,7 +412,7 @@ def main():
     report = Path(C.DATA_ROOT) / 'desktop-smoke.json'
     report.write_text(json.dumps(result, indent=2), encoding='utf-8')
     assert 'error' not in result, result
-    print('PASS native WebView2: browser, project, symbols, font, monochrome logo, palettes, dropdown roles and viewport module loaded'
+    print('PASS native WebView2: browser, project, symbols, font, full-colour logo, palettes, dropdown roles and viewport module loaded'
           + (' (synthetic folder fixtures)' if args.fixtures else ' (real assets)'))
     print('Report:', report)
 
