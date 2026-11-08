@@ -20,7 +20,7 @@
   background: var(--library-art-colour); opacity: 0; transition: opacity 300ms var(--studio-easing); pointer-events: none; }
 #library-hero.has-art-colour::before { opacity: 1; }
 .library-hero-art { position: absolute; inset: 0 auto 0 24%; width: 76%; height: 100%; object-fit: cover; object-position: right center; opacity: 0; mask-image:linear-gradient(90deg,transparent,#000 18%);
-  transform: translateX(16px); transition: opacity 360ms var(--studio-easing), transform 560ms var(--studio-easing); }
+  transform: translateX(16px); transition: opacity var(--studio-motion-panel) var(--studio-easing), transform var(--studio-motion-panel) var(--studio-easing); }
 /* Art that arrives after the banner settles slides a little into place; cached art is simply there. */
 .has-art .library-hero-art { opacity: 1; transform: none; }
 #library-hero::after {

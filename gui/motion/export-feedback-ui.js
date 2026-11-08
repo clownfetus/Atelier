@@ -72,7 +72,7 @@
         // The glyph doesn't fade: it goes, and the plain icon comes back with a short fade of its own.
         run.dispose();
         if (document.hidden || window.AtelierMotionPolicy?.allows(1) === false) return;
-        try { slot?.firstElementChild?.animate([{opacity: 0}, {opacity: 1}], {duration: 120, easing: 'ease-out'}); }
+        try { slot?.firstElementChild?.animate([{opacity: 0}, {opacity: 1}], {duration: window.AtelierMotion?.exitMs || 120, easing: window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); }
         catch (_) { /* The icon is already showing. */ }
       }, RESULT_HOLD);
     };

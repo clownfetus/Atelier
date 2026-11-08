@@ -426,7 +426,8 @@ geometry readiness hides the overlay immediately, independently of texture loadi
 
 Opening a costume from visible artwork (a costume card, roster costume or search row) lands that
 artwork on the stage as a poster (`motion/viewport-poster.js`). In Full a disposable copy flies
-from the card's own crop to the poster over 460ms on the emphasized easing, above the fading
+from the card's own crop to the poster over 520ms (`--studio-motion-travel`) on the emphasized
+easing, bowing upwards on a gentle arc rather than a straight line, above the fading
 studio; Calm fades the poster in; Off shows it still. While the model decodes, the poster sits
 above the loader, which moves below it. When geometry arrives the poster drops behind the canvas
 at 38% so the orbitable model reads over it, and the 420ms reveal sweep wipes it away in step

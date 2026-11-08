@@ -149,7 +149,10 @@
   // Specks of the piece gather from nothing and it swells out of where they met. It's solid
   // throughout: a clip and a scale reveal it, never opacity. Blocks settling together take turns.
   const SPECKS=[[-.53,-.28],[.42,-.47],[.58,.14],[-.19,.56],[-.61,.22],[.25,-.61],[.5,.47],[-.42,-.56]];
-  const FORM=620, TURN=260, GATHER=340, SWELL_AT=250, EASE='cubic-bezier(.45,.05,.2,1)';
+  const FORM=620, TURN=260, GATHER=340, SWELL_AT=250;
+  // The glyph's own curves (SPEC 4.9, pieces.js loads after this file, so they're read when a block lands):
+  // the swell travels on `move`; specks gather on `heavy`, accelerating into the block.
+  const curve=(name,fallback)=>window.AtelierMotion?.assembly?.curves?.[name]||fallback;
   const CLOSED='circle(0% at 50% 50%)', OPEN='circle(72% at 50% 50%)';
   function drawBlock(row) {
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -167,7 +170,7 @@
     });
   }
   function condense(row) {
-    const svg=drawBlock(row), size=row.block.offsetWidth, specks=[];
+    const svg=drawBlock(row), size=row.block.offsetWidth, specks=[], EASE=curve('move','cubic-bezier(.65,0,.35,1)');
     const running=[
       svg.animate([{clipPath:CLOSED},{clipPath:OPEN}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
       svg.animate([{transform:'scale(.82)',offset:0},{transform:'scale(1.04)',offset:.72},{transform:'scale(1)',offset:1}],{delay:SWELL_AT,duration:FORM-SWELL_AT,easing:EASE,fill:'both'}),
@@ -176,7 +179,7 @@
       const speck=document.createElement('span'), from=`translate(${(x*size).toFixed(1)}px,${(y*size).toFixed(1)}px)`;
       speck.className='at-setup-speck';row.block.append(speck);specks.push(speck);
       running.push(speck.animate([{transform:from+' scale(0)',offset:0},{transform:from+' scale(1)',offset:.3},{transform:'translate(0,0) scale(.5)',offset:.98},{transform:'translate(0,0) scale(0)',offset:1}],
-        {delay:i*14,duration:GATHER,easing:'cubic-bezier(.5,0,.75,.4)',fill:'both'}));
+        {delay:i*14,duration:GATHER,easing:curve('heavy','cubic-bezier(.6,0,.95,.55)'),fill:'both'}));
     });
     landed(row,running,()=>specks.forEach(s=>s.remove()));
   }
@@ -186,7 +189,7 @@
     if(motion==='full'){condense(row);return;}
     const svg=drawBlock(row);
     // Calm keeps the swell. Off and reduced motion take the one fade the system allows (SPEC §5).
-    landed(row,[motion==='calm'?svg.animate([{clipPath:CLOSED},{clipPath:OPEN}],{duration:240,easing:EASE,fill:'both'})
+    landed(row,[motion==='calm'?svg.animate([{clipPath:CLOSED},{clipPath:OPEN}],{duration:240,easing:curve('move','cubic-bezier(.65,0,.35,1)'),fill:'both'})
       :svg.animate([{opacity:0},{opacity:1}],{duration:150,fill:'both'})]);
   }
   function syncBlock(row) {

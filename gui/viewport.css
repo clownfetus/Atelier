@@ -217,7 +217,7 @@
 .vp-curve-reset[hidden] { display:none; }
 .vp-curve-custom > summary { display:flex; align-items:center; gap:8px; padding:6px 0; color:var(--acc); cursor:pointer; list-style:none; font-size:var(--studio-text-label); }
 .vp-curve-custom > summary::-webkit-details-marker { display:none; }
-.vp-curve-custom > summary svg:last-child { margin-left:auto; transition:transform .15s; }
+.vp-curve-custom > summary svg:last-child { margin-left:auto; transition:transform var(--studio-motion-fast) var(--studio-easing); }
 .vp-curve-custom[open] > summary svg:last-child { transform:rotate(180deg); }
 .vp-recolour-status { min-height:1.4em; margin:12px 0 0; font-size:var(--studio-text-detail); color:var(--muted); }
 .vp-advanced { border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:8px; }

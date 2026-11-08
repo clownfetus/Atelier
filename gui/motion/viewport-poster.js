@@ -82,14 +82,24 @@
       if (poster.isConnected) poster.style.visibility = '';
     };
     state.flight = land;
+    // The flight crosses much of the window, so it bows upwards on a gentle arc (8% of the distance, at most
+    // 40 px) rather than sliding in a straight line. Eight samples of the curve keep the path smooth.
+    const length = Math.hypot(dx, dy) || 1, bow = Math.min(40, length * .08);
+    let nx = -dy / length, ny = dx / length;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    const cx = dx / 2 + nx * bow * 2, cy = dy / 2 + ny * bow * 2;
+    const frames = Array.from({length: 9}, (_, i) => {
+      const t = i / 8, u = 1 - t, x = u * u * dx + 2 * u * t * cx, y = u * u * dy + 2 * u * t * cy, s = scale + (1 - scale) * t;
+      return {offset: t, transform: i === 8 ? 'none' : `translate(${x}px,${y}px) scale(${s})`};
+    });
+    frames[0].clipPath = `inset(${iy}px ${ix}px round ${origin.radius / scale}px)`;
+    frames[8].clipPath = 'inset(0px 0px round 6px)';
+    const duration = motion.travelMs || 520;
     try {
-      animation = ghost.animate([
-        {transform: `translate(${dx}px,${dy}px) scale(${scale})`, clipPath: `inset(${iy}px ${ix}px round ${origin.radius / scale}px)`},
-        {transform: 'none', clipPath: 'inset(0px 0px round 6px)'}],
-        {duration: 460, easing: motion.ease?.emphasized || motion.ease?.standard || 'cubic-bezier(.2,0,0,1)'});
+      animation = ghost.animate(frames, {duration, easing: motion.ease?.emphasized || motion.ease?.standard || 'cubic-bezier(.2,0,0,1)'});
       animation.finished.then(land, land);
     } catch (_) { land(); }
-    setTimeout(land, 540);
+    setTimeout(land, duration + 80);
   }
 
   // Called by the inspection renderer for each live frame.

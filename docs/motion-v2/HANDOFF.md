@@ -305,6 +305,12 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
 
 - [ ] **P5.1** ⏸ Thiago's timing pass on the real app. Tune only the durations
   and easing in one place (`pieces.js` or `easing.js`); don't touch the invariants.
+  Before this, an audit Thiago asked for (after P4b.6) put the strays onto shared timings.
+  `tokens.css` now holds `--studio-motion-panel` (320ms: roster fold, library hero art),
+  `--studio-motion-travel` (520ms, on an arc: the costume flight) and
+  `--studio-motion-toast-exit` (220ms). `pieces.js` exposes the glyph curves as
+  `AtelierMotion.assembly.curves`, which the tray and the setup wizard use. Unused easing
+  tokens are gone, and the hidden progress-bar fill no longer animates its width.
 - [ ] **P5.2** Release screenshots (`scripts/release_screenshots.py`; any change to
   `gui/` makes line 31 reject `images/screenshots.json` until they're recaptured), README
   "What's new", a `CHANGELOG.md` *Unreleased* entry, `docs/release-<version>.md`

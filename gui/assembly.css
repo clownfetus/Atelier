@@ -83,7 +83,7 @@
 #assembly-links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; opacity:0; overflow:visible; }
 #assembly-links path { fill:none; stroke:var(--acc); stroke-width:1; stroke-dasharray:3 5; }
 #assembly-links circle { fill:var(--acc); stroke:var(--bg2); stroke-width:2; }
-#assembly-links.is-linking { animation:assembly-link 600ms ease-out both; }
+#assembly-links.is-linking { animation:assembly-link 600ms var(--studio-easing) both; }
 @keyframes assembly-link { 0% { opacity:0; } 18% { opacity:.65; } 100% { opacity:0; } }
 .assembly-textures { grid-column:2; grid-row:2; background:var(--bg2); min-width:0; }
 .assembly-textures .assembly-panel-head { min-height:42px; padding:8px 16px; }

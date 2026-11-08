@@ -51,7 +51,7 @@
     if(!animate||!library||document.hidden||window.AtelierMotionPolicy?.allows(1)===false)return;
     const shift=before-library.getBoundingClientRect().top;
     if(Math.abs(shift)>1)try{library.animate([{transform:`translateY(${shift}px)`},{transform:'none'}],
-      {duration:window.AtelierMotion?.springMs?.snappy||340,easing:window.AtelierMotion?.ease?.snappy||'cubic-bezier(.2,0,0,1)'});}catch(_){}
+      {duration:window.AtelierMotion?.panelMs||320,easing:window.AtelierMotion?.ease?.standard||'cubic-bezier(.2,0,0,1)'});}catch(_){}
   }
   const categories=document.getElementById('grid-area');
   // Wheel, touch, scrolling keys and dragging the scrollbar itself count; pressing a control does not.

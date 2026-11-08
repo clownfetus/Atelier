@@ -217,7 +217,7 @@
     }
   }
   // A dismissed toast leaves its slot at once, so the live region, collation and the stack stay truthful,
-  // while the same element fades 4 px down for 120 ms (accelerating) in an inert layer. Off removes it outright.
+  // while the same element fades 4 px down for 220 ms (accelerating) in an inert layer. Off removes it outright.
   function leave(el, done) {
     if (!el?.isConnected || reduced() || document.hidden || typeof el.animate !== 'function') { done(); return; }
     if (el.parentElement?.id==='toast-exit-layer') return; // Already leaving; the first exit removes it.
@@ -235,9 +235,10 @@
       el.classList.remove('toast-timed'); el.removeAttribute('role'); el.removeAttribute('aria-live'); delete el.dataset.operationState;
       Object.assign(el.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',margin:'0',animation:'none',pointerEvents:'none'});
       layer.append(el);
+      const exitMs=AtelierMotion.toastExitMs||220;
       el.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(4px)'}],
-        {duration:AtelierMotion.exitMs,easing:AtelierMotion.ease.exit,fill:'forwards'}).finished.then(finish,finish);
-      setTimeout(finish,AtelierMotion.exitMs+80);
+        {duration:exitMs,easing:AtelierMotion.ease.exit,fill:'forwards'}).finished.then(finish,finish);
+      setTimeout(finish,exitMs+80);
     } catch (_) { finish(); }
   }
   function swatchesBefore() { return new Map([...document.querySelectorAll('#mat-body input[type=color]')].map(node=>[node.id,node.value])); }

@@ -104,6 +104,12 @@
   --studio-motion-fast: 120ms;
   --studio-motion-standard: 200ms;
   --studio-motion-exit: 120ms;
+  /* A panel or artwork moving as one block (the roster fold, the library hero art). Large, so no overshoot. */
+  --studio-motion-panel: 320ms;
+  /* Something crossing a good part of the window (a costume flying onto the stage), on an arc. */
+  --studio-motion-travel: 520ms;
+  /* A toast leaving: about two thirds of its 340 ms entrance. */
+  --studio-motion-toast-exit: 220ms;
   --studio-easing: cubic-bezier(.2, 0, 0, 1);
   --studio-easing-exit: cubic-bezier(.3, 0, 1, 1);
   /* Large surfaces travelling into place decelerate harder than ordinary state changes. */

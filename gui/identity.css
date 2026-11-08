@@ -57,15 +57,8 @@
   --halo: 2px;                  /* paper gap between touching forms */
   --control-height: 32px;
 
-  /* Motion */
-  --beat: 1040ms;               /* the only loop: busy */
-  --dur-form: 200ms;
-  --dur-transform: 500ms;
-  --dur-resolve: 400ms;
-  --ease-gather: cubic-bezier(.55, 0, .8, .35);
-  --ease-pour: cubic-bezier(.25, .1, .15, 1);
-  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
-  --ease-settle: cubic-bezier(.2, .8, .2, 1);
+  /* Motion timing lives in tokens.css (--studio-motion-*, --studio-easing*, --motion-beat) and the glyph's
+     curves in motion/assembly/pieces.js. */
 }
 
 /* ── Shared components ─────────────────────────────────────── */
@@ -88,7 +81,7 @@
   background: var(--surface-panel);
   color: var(--text);
   cursor: pointer;
-  transition: background-color 120ms var(--ease-settle);
+  transition: background-color var(--studio-motion-fast) var(--studio-easing);
 }
 .at-btn:hover { background: var(--surface-sunk); }
 .at-btn--primary { background: var(--action); color: var(--on-action); }
