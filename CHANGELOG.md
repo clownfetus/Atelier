@@ -26,6 +26,12 @@ The app, installers and update checker identify each release by its full number,
   Showcase images use a plain neutral backdrop. Working panels, ink transfers, the
   folder flap and the halftone texture reconstruction are retired.
 
+- Send to Blender (live) no longer fails on Blender 4.4 and newer, including 5.1,
+  where the importer's bone display shape cancelled the whole import. When Blender
+  is running an older Atelier Live Bridge, Send to Blender now asks for the current
+  one instead of importing with older material wiring. Install the new add-on once
+  after updating, from Set up live Blender beside Send to Blender.
+
 - The full changelog groups shipped changes by version and stays up to date
   automatically after each release.
 

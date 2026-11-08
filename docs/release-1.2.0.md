@@ -53,6 +53,15 @@ is still respected.
 **Motion sounds** (previously Formation sounds) plays one click when a job
 completes. It's off by default and plays only in Full.
 
+## Send to Blender
+
+- **Send to Blender (live)** no longer fails on Blender 4.4 and newer, including
+  5.1. The importer's bone display shape used to cancel the whole import.
+- If Blender is running an older **Atelier Live Bridge**, Send to Blender now says
+  so instead of importing with older material wiring. After updating, open
+  **Set up live Blender** beside Send to Blender, download the add-on and install
+  it in Blender over the old one. You only need to do this once.
+
 ## A few things to know
 
 - Showcase images now use a plain neutral backdrop. Showcase images you export

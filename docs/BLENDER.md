@@ -13,6 +13,8 @@ explicit; Atelier never installs or executes an arbitrary add-on for you.
 Use one enabled Blender session at a time. Save your Blender file after sending.
 When updating Atelier, download its bundled extension again and install that ZIP
 to keep both sides compatible; a local ZIP install has no automatic update feed.
+If Blender is running an older copy, Send to Blender stops and asks for the
+current one rather than importing with older material wiring.
 
 **Export portable .blend** creates a standalone scene with packed textures and
 opens it in Blender. It does not require the extension. The mesh card's existing

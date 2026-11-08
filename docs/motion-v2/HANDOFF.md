@@ -338,8 +338,11 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   "What's new", a `CHANGELOG.md` *Unreleased* entry, `docs/release-<version>.md`
   and a Discord draft in the style of `docs/discord-1.1.3.md`. Include one line
   on the category colour change.
-- [ ] **P5.3** ⏸ Thiago approves the notes and the version number. Follow
-  `docs/automatic-releases.md`. Don't publish anything yourself.
+- [x] **P5.3** ⏸ Thiago approves the notes and the version number. Follow
+  `docs/automatic-releases.md`. Don't publish anything yourself. Approved on 8 Nov 2026
+  as 1.2.0, with the live Send to Blender fix merged in and a line about it in every
+  set of notes. Merging to `main` and running **Release Atelier** with 1.2.0 are
+  Thiago's; a merge alone queues an automatic patch release (1.1.9) once Checks pass.
 
 ## Definition of done
 

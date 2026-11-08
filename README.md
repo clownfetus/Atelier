@@ -26,6 +26,8 @@ before building it. Available for Windows and Linux.
   and their studios wear it. Every other category is told apart by its icon.
 - **Full, Calm and Off** motion settings, with optional Motion sounds. See it all in
   Settings → Preview motion.
+- **Send to Blender works on Blender 5.1.** Reinstall Atelier Live Bridge once after
+  updating; Atelier tells you if Blender has an older copy.
 
 See the [patch notes](docs/release-1.2.0.md) for details.
 
