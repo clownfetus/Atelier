@@ -7,8 +7,32 @@
 (() => {
   'use strict';
   const assembly = window.AtelierMotion.assembly;
-  const {CAT, PLATES, G, IDS, E, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS, FRAME, clone, mixC, all, warningPose, standOff, nudge, fits, rest, atRest, raised, micro, logoStart, frameOf} = assembly.pieces;
-  const {lerpPose, pieceAt, pathLen, known, planLive, simulClear, spreadFor, slotsFor, seated} = assembly.planner;
+  const {CAT, PLATES, G, IDS, E, POSES, OUT, WREST, STRAIGHT, CONFIGS, PATTERNS, FRAME, clone, lerpObj, mixC, all, warningPose, standOff, nudge, fits, rest, atRest, raised, micro, logoStart, frameOf} = assembly.pieces;
+  const {gap, holdsClear, lerpPose, curvePt, pieceAt, pathLen, known, planLive, simulClear, spreadFor, slotsFor, seated} = assembly.planner;
+
+  // ---------- gaits (SPEC section 4.2) ----------
+  // Which way a path is heading at u, as a unit vector.
+  const heading = (path, u) => {
+    const a = curvePt(path, Math.max(0, u - .02)), b = curvePt(path, Math.min(1, u + .02));
+    let v = [b[0] - a[0], b[1] - a[1]];
+    if (Math.hypot(...v) < 1e-6) v = [path.b.x - path.a.x, path.b.y - path.a.y];
+    const l = Math.hypot(...v) || 1;
+    return [v[0] / l, v[1] / l];
+  };
+  // A bottom corner of the mesh, in canvas units: side −1 is its left, +1 its right.
+  const cornerOf = (o, side) => {
+    const lx = side * o.w / 2 * .92 + side * (o.dx || 0) / 2, ly = o.h / 2, sc = o.s || 1, r = o.rot * Math.PI / 180;
+    return [o.x + (lx * Math.cos(r) - ly * Math.sin(r)) * sc, o.y + (lx * Math.sin(r) + ly * Math.cos(r)) * sc];
+  };
+  // The piece turned by deg about the point P.
+  const tilt = (o, deg, P) => {
+    if (!deg) return o;
+    const r = deg * Math.PI / 180, vx = o.x - P[0], vy = o.y - P[1];
+    return {...o, x: P[0] + vx * Math.cos(r) - vy * Math.sin(r), y: P[1] + vx * Math.sin(r) + vy * Math.cos(r), rot: o.rot + deg};
+  };
+  const MOVE_PEAK = (() => { let m = 0; for (let i = 1; i <= 400; i++) m = Math.max(m, (E.move(i / 400) - E.move((i - 1) / 400)) * 400); return m; })();
+  const moveSlope = r => (E.move(Math.min(1, r + .005)) - E.move(Math.max(0, r - .005))) / (Math.min(1, r + .005) - Math.max(0, r - .005));
+  const BENDS = [1, .6, .3];
 
   // One clock for every glyph: 30 glyphs share one frame callback. Time stops when no glyph needs it,
   // and a long gap (a hidden window) moves it on by at most a quarter of a second.
@@ -54,6 +78,10 @@
       this.box = this.frameFor('info');
       this.cols = {...CAT};
       this.fx = {punch: 1, dsx: 1, dsy: 1, ringR: 0, ringW: 0, ringOp: 0};
+      this.after = {}; // what runs on after a landing, drawn over the pose: a tip or a nudge
+      this.afterTok = {blue: 0, teal: 0, disc: 0};
+      this.bend = null; // the disc's stretch or squash: {sx along ang, sy across}
+      this.bendTok = 0;
       this.load = null;
       this.token = 0;
       this.colourTok = 0;
@@ -181,20 +209,115 @@
       const from = clone(this.cur);
       return this.animate(ms, ease, e => { this.cur = lerpPose(from, to, e); }).then(() => this.place(clone(to)));
     }
-    // One piece at a time, along planned curves.
+    // One piece at a time, along planned curves, each in its own gait.
     async travelTo(to, tk, prefer) {
       const steps = known(this.cur, to, prefer) || await planLive(this.cur, to, prefer);
       if (tk !== this.token) return false; // replaced while planning: nothing has moved
       for (const st of steps) {
         const ms = Math.max(300, Math.min(640, 220 + pathLen(st.path) * .95)) * this.pace;
-        this.moving = this.animate(ms, E.move, e => { this.cur = {...this.cur, [st.id]: pieceAt(st.path, e)}; })
-          .then(() => { this.place({...this.cur, [st.id]: {...st.path.b}}); this.moving = null; });
+        const gait = this.modeNow === 'full' ? {blue: this.register, teal: this.weighted, disc: this.elastic}[st.id] : null;
+        let after = null;
+        this.moving = (gait ? gait.call(this, st, ms) : this.glide(st, ms))
+          .then(a => { after = a && a.after; this.place({...this.cur, [st.id]: {...st.path.b}}); this.moving = null; });
         await this.moving;
-        if (tk !== this.token) return false; // stop between pieces, never mid-flight
-        await this.pause(40 * this.pace);
+        if (tk !== this.token) return false; // stop between pieces, never mid-flight; what runs on after a landing finishes by itself
+        await Promise.all([this.pause(40 * this.pace), after]);
       }
       this.place(clone(to));
       return tk === this.token;
+    }
+    glide(st, ms) {
+      return this.animate(ms, E.move, e => { this.cur = {...this.cur, [st.id]: pieceAt(st.path, e)}; }).then(() => null);
+    }
+    // A gait resolves when its piece lands, with {after}: what runs on after the landing (never awaited by a new state).
+    // The largest share of a bend that keeps the planned clearance, or 0. bentAt(k) lists [unbent, bent] poses.
+    bendable(bentAt) {
+      return BENDS.find(k => bentAt(k).every(([base, bent]) => holdsClear(base, bent))) || 0;
+    }
+    // ---------- gaits (SPEC section 4.2): each lands within 640 ms ----------
+    // The tile registers: it lands a touch past its seat and above it, holds, then drops into register.
+    async register(st, ms) {
+      const {path} = st, hold = 70 * this.pace, drop = 90 * this.pace, T = Math.min(ms * .85, 640 * this.pace - hold - drop);
+      const h = heading(path, 1), over = [h[0] * 8, h[1] * 8 - 8], state = this.cur;
+      const at = (e, k) => { const o = pieceAt(path, e), w = k * e * e; o.x += over[0] * w; o.y += over[1] * w; return o; };
+      const k = this.bendable(k => Array.from({length: 16}, (_, i) => {
+        const e = (i + 1) / 16;
+        return [{...state, blue: pieceAt(path, e)}, {...state, blue: at(e, k)}];
+      }));
+      if (!k) return this.glide(st, ms);
+      await this.animate(T, E.out, e => { this.cur = {...this.cur, blue: at(e, k)}; });
+      await this.pause(hold);
+      const from = this.cur.blue, seat = {...path.b};
+      await this.animate(drop, E.snap, e => { this.cur = {...this.cur, blue: lerpObj(from, seat, e)}; });
+      return null;
+    }
+    // The mesh is weighted: it rocks back on its trailing corner, travels heavily, then tips onto its
+    // leading corner as it lands and nudges what it lands against.
+    async weighted(st, ms) {
+      const {path} = st, a = path.a, b = path.b, dir = Math.sign(b.x - a.x);
+      if (Math.abs(b.x - a.x) < 24) return this.glide(st, ms); // a lean needs a sideways move
+      const wind = 110 * this.pace, T = Math.min(ms * .9, 400 * this.pace), state = this.cur;
+      const at = (e, lean, back) => { const o = pieceAt(path, e); o.x -= dir * 4 * back; return tilt(o, -dir * 3.5 * lean, cornerOf(o, -dir)); };
+      const k = this.bendable(k => [[0, 1, 1], ...Array.from({length: 16}, (_, i) => [(i + 1) / 16])].map(([e, lean, back]) => {
+        lean ??= Math.max(0, 1 - e * 2.5); back ??= 1 - e;
+        return [{...state, teal: pieceAt(path, e)}, {...state, teal: at(e, k * lean, k * back)}];
+      }));
+      if (!k) return this.glide(st, ms);
+      await this.animate(wind, E.windup, e => { this.cur = {...this.cur, teal: at(0, k * e, k * e)}; });
+      await this.animate(T, E.heavy, e => { this.cur = {...this.cur, teal: at(e, k * Math.max(0, 1 - e * 2.5), k * (1 - e))}; });
+      // After the landing, drawn over the pose so it never holds up a new state.
+      const end = {...this.cur, teal: {...b}}, tipK = this.bendable(k => [[end, {...end, teal: tilt(end.teal, dir * 2.2 * k, cornerOf(end.teal, dir))}]]);
+      const tipped = {...end, teal: tilt(end.teal, dir * 2.2 * tipK, cornerOf(end.teal, dir))};
+      const near = IDS.filter(id => id !== 'teal' && (end[id].x - b.x) * dir > 0 && gap(end, 'teal', id) < G + 10)
+        .sort((p, q) => gap(end, 'teal', p) - gap(end, 'teal', q))[0];
+      const pushed = near && holdsClear(tipped, {...tipped, [near]: {...end[near], x: end[near].x + dir * 3}}) ? near : null;
+      return {after: Promise.all([
+        tipK ? this.runOn('teal', 130 * this.pace, r => ({deg: dir * 2.2 * tipK * Math.sin(Math.PI * r), side: dir})) : null,
+        pushed ? this.runOn(pushed, 150 * this.pace, r => ({dx: dir * 3 * Math.sin(Math.PI * r)})) : null,
+      ])};
+    }
+    // The disc is elastic: it stretches along its path as it speeds up and squashes as it lands.
+    async elastic(st, ms) {
+      const {path} = st, state = this.cur, stretch = (r, k) => 1 + .16 * k * moveSlope(r) / MOVE_PEAK;
+      const bent = (r, k) => { const e = E.move(r), d = pieceAt(path, e), h = heading(path, e), sx = stretch(r, k); d.bend = {sx, sy: 1 / sx, ang: Math.atan2(h[1], h[0])}; return d; };
+      const k = this.bendable(k => Array.from({length: 15}, (_, i) => {
+        const r = (i + 1) / 16;
+        return [{...state, disc: pieceAt(path, E.move(r))}, {...state, disc: bent(r, k)}];
+      }));
+      const end = {...state, disc: {...path.b}}, h = heading(path, 1), ang = Math.atan2(h[1], h[0]);
+      const squashK = this.bendable(k => [[end, {...end, disc: {...path.b, bend: {sx: 1 - .12 * k, sy: 1 + .12 * k, ang}}}]]);
+      if (!k && !squashK) return this.glide(st, ms);
+      const bt = ++this.bendTok;
+      await this.animate(ms, E.linear, (_, r) => {
+        this.cur = {...this.cur, disc: pieceAt(path, E.move(r))};
+        if (bt !== this.bendTok) return;
+        const b = k ? bent(r, k).bend : null;
+        this.bend = b && b.sx > 1.001 ? b : null;
+      });
+      if (bt === this.bendTok) this.bend = null;
+      if (!squashK) return null;
+      return {after: this.animate(300, E.punchBack, e => { this.bend = {sx: 1 - .12 * squashK * (1 - e), sy: 1 + .12 * squashK * (1 - e), ang}; }, () => bt === this.bendTok)
+        .then(() => { if (bt === this.bendTok) { this.bend = null; this.touch(); } })};
+    }
+    // Runs on after a landing, over the pose: {deg, side} tips a piece on a bottom corner, {dx} nudges it.
+    runOn(id, ms, at) {
+      const t = ++this.afterTok[id];
+      return this.animate(ms, E.linear, (_, r) => { this.after[id] = at(r); }, () => t === this.afterTok[id])
+        .then(() => { if (t === this.afterTok[id]) { delete this.after[id]; this.touch(); } });
+    }
+    // The pose as drawn: the pose, with anything running on after a landing.
+    shown() {
+      const {after} = this;
+      if (!after.blue && !after.teal && !after.disc) return this.cur;
+      const q = {...this.cur};
+      for (const id of IDS) {
+        const o = after[id];
+        if (!o) continue;
+        let p = o.dx ? {...q[id], x: q[id].x + o.dx} : q[id];
+        if (o.deg && id !== 'disc') p = tilt(p, o.deg, cornerOf(p, o.side));
+        q[id] = p;
+      }
+      return q;
     }
     // The first move out of an outcome: all three at once. The mesh hops over the tile if they swap sides.
     openTo(target, tk) {
@@ -240,7 +363,14 @@
       if (state === 'error') return all(status.error);
       return state === 'success' && this.tier === 'micro' ? all(status.complete) : {...CAT};
     }
+    // Anything running on after a landing stops where it is drawn: the pose is the pose.
+    unbend() {
+      this.bend = null; this.bendTok++;
+      for (const id of IDS) this.afterTok[id]++;
+      this.after = {};
+    }
     placeHeld(state) {
+      this.unbend();
       this.load = null;
       this.cols = this.heldColours(state);
       this.frameName = state === 'warning' || state === 'error' ? `${state}-formed` : state;
@@ -298,6 +428,7 @@
     async runStill(tk, fresh) {
       const state = this.state, pose = this.stillPose();
       const change = () => {
+        this.unbend();
         this.load = null;
         this.fx = {punch: 1, dsx: 1, dsy: 1, ringR: 0, ringW: 0, ringOp: 0};
         this.cols = this.heldColours(state);

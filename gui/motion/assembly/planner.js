@@ -147,6 +147,37 @@
   }
   const lerpPose = (a, b, t) => ({blue: lerpObj(a.blue, b.blue, t), teal: lerpObj(a.teal, b.teal, t), disc: lerpObj(a.disc, b.disc, t)});
 
+  // ---------- gaits (SPEC section 4.2) ----------
+  // A gait bends a piece away from its planned path for a moment: the tile's overshoot, the mesh's
+  // lean and tip, the disc's stretch and squash. The disc's bend is an ellipse along `ang`.
+  function ellipseOf(d) {
+    const {sx, sy, ang} = d.bend, r = d.r * (d.s || 1), c = Math.cos(ang), s = Math.sin(ang), out = [];
+    for (let i = 0; i < 48; i++) {
+      const t = i * Math.PI / 24, u = Math.cos(t) * r * sx, v = Math.sin(t) * r * sy;
+      out.push([d.x + u * c - v * s, d.y + u * s + v * c]);
+    }
+    return out;
+  }
+  function bentGap(pose, i, j) {
+    if (j === 'disc') [i, j] = [j, i];
+    if (i !== 'disc' || !pose.disc.bend) return gap(pose, i, j);
+    return polyDist(ellipseOf(pose.disc), outline(j, pose[j]));
+  }
+  // A bent pose may never bring a piece nearer another than the unbent one, wherever that is
+  // already inside the halo's width, and never takes a piece off the canvas.
+  function holdsClear(base, bent) {
+    for (const [i, j] of [['blue', 'teal'], ['blue', 'disc'], ['teal', 'disc']]) {
+      if (bent[i] === base[i] && bent[j] === base[j]) continue;
+      if (bentGap(bent, i, j) < Math.min(G, gap(base, i, j)) - .05) return false;
+    }
+    for (const id of IDS) {
+      if (bent[id] === base[id]) continue;
+      const pts = id === 'disc' && bent.disc.bend ? ellipseOf(bent.disc) : extent(id, bent[id]);
+      if (offCanvas(pts, 0) && !offCanvas(extent(id, base[id]), 0)) return false;
+    }
+    return true;
+  }
+
   // ---------- paths ----------
   const CEN = [240, 200];
   function curvePt(path, u) {
@@ -409,7 +440,7 @@
   else window.addEventListener('load', () => later(precompute), {once: true});
 
   assembly.planner = Object.freeze({
-    outline, polyOf, gap, lerpPose, curvePt, pieceAt, pathLen, planSteps, planSequence, simulClear, spreadFor, slotsFor, seated,
+    outline, polyOf, gap, bentGap, holdsClear, lerpPose, curvePt, pieceAt, pathLen, planSteps, planSequence, simulClear, spreadFor, slotsFor, seated,
     known, planLive, precompute, stats, commonRoutes, idleDone: () => Boolean(idle && idle.done), clearRoutes: () => ROUTES.clear(),
   });
 })();

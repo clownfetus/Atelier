@@ -259,9 +259,10 @@ Added by Thiago on 7 November 2026, after signing off P3.14. These come after th
 removal and before the timing pass, because P5.1 tunes motion these steps change. Each
 one is a set of taste calls: prototype the options, show them, and wait for his choice.
 
-- [ ] **P4b.1** ⏸ Piece behaviour. Give the tile, mesh and disc each a way of moving as
+- [x] **P4b.1** ⏸ Piece behaviour. Give the tile, mesh and disc each a way of moving as
   distinctive as its shape, tied to what it stands for: textures, meshes and materials.
   Keep the ten invariants in SPEC §1; if an idea needs one bent, stop and ask.
+  Thiago chose Register (tile), Weighted (mesh) and Elastic (disc); see SPEC §4.1, Gaits.
 - [ ] **P4b.2** ⏸ Progress bars. A bespoke treatment for the update download bar and every
   other loading bar in the app, in the same language as the glyph.
 - [ ] **P4b.3** ⏸ Alignment and sizing pass across the whole app, text included: things

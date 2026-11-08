@@ -67,12 +67,19 @@
         part.el.setAttribute('transform', `translate(${f(o.x)} ${f(o.y)}) rotate(${f(o.rot)})`);
       }
     }
-    function drawDisc(d, fx) {
+    // The disc's own stretch or squash (its gait) runs along the way it's heading; the click's squash is upright.
+    function drawDisc(d, fx, bend) {
       const part = parts.disc;
       if (d.r !== part.r) { part.r = d.r; part.el.setAttribute('r', f(d.r)); }
-      if (d.x !== part.x || d.y !== part.y || fx.dsx !== part.dsx || fx.dsy !== part.dsy) {
-        part.x = d.x; part.y = d.y; part.dsx = fx.dsx; part.dsy = fx.dsy;
-        part.el.setAttribute('transform', fx.dsx === 1 && fx.dsy === 1 ? `translate(${f(d.x)} ${f(d.y)})` : `translate(${f(d.x)} ${f(d.y)}) scale(${fx.dsx.toFixed(3)} ${fx.dsy.toFixed(3)})`);
+      if (d.x !== part.x || d.y !== part.y || fx.dsx !== part.dsx || fx.dsy !== part.dsy || bend !== part.bend) {
+        part.x = d.x; part.y = d.y; part.dsx = fx.dsx; part.dsy = fx.dsy; part.bend = bend;
+        let t = `translate(${f(d.x)} ${f(d.y)})`;
+        if (bend) {
+          const a = f(bend.ang * 180 / Math.PI);
+          t += ` rotate(${a}) scale(${bend.sx.toFixed(3)} ${bend.sy.toFixed(3)}) rotate(${-a})`;
+        }
+        if (fx.dsx !== 1 || fx.dsy !== 1) t += ` scale(${fx.dsx.toFixed(3)} ${fx.dsy.toFixed(3)})`;
+        part.el.setAttribute('transform', t);
       }
     }
     function drawColours(cols) {
@@ -165,7 +172,7 @@
         };
       },
       render(engine) {
-        const {cur, cols, fx, load, box} = engine, opacity = engine.opacity ?? 1;
+        const {cols, fx, load, box} = engine, cur = engine.shown(), opacity = engine.opacity ?? 1;
         if (box) {
           const text = `${f(box[0])} ${f(box[1])} ${f(box[2])} ${f(box[3])}`;
           if (text !== lastBox) { lastBox = text; svg.setAttribute('viewBox', text); }
@@ -177,7 +184,7 @@
         }
         drawShape('blue', cur.blue);
         drawShape('teal', cur.teal);
-        drawDisc(cur.disc, fx);
+        drawDisc(cur.disc, fx, engine.bend);
         drawColours(cols);
         drawRing(fx);
         drawLoad(cur, load);

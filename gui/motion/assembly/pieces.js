@@ -42,7 +42,7 @@
   }
   const E = Object.freeze({
     move: bez(.65, 0, .35, 1), out: bez(.16, 1, .3, 1), windup: bez(.45, 0, .55, 1), rest: bez(.45, 0, .55, 1),
-    snap: bez(.9, 0, 1, .5), recoil: bez(.2, .9, .4, 1), colour: bez(.4, 0, .2, 1),
+    snap: bez(.9, 0, 1, .5), recoil: bez(.2, .9, .4, 1), colour: bez(.4, 0, .2, 1), heavy: bez(.6, 0, .95, .55),
     punchOut: bez(.2, .8, .3, 1), punchBack: bez(.3, 1.6, .5, 1), linear: x => x,
   });
   const lerp = (a, b, t) => a + (b - a) * t;

@@ -29,7 +29,8 @@ check includes them.
 4. **Physical motion.** Pieces travel one at a time along planned curves that
    keep 14u clear of everything else, measured on the outlines actually drawn. In
    the rare move with no clear path, the fixed layer order means one piece simply
-   passes in front of another. The two exceptions to one at a time are Complete's
+   passes in front of another. A piece's gait (§4.1) never brings it nearer another
+   than its planned path does. The two exceptions to one at a time are Complete's
    brisk move into the A (§4.3, D15) and the brisk opening out of an outcome (§4.1,
    D16).
 5. **The A is earned.** Only a confirmed success (`job.state === 'succeeded'`
@@ -266,6 +267,23 @@ Per-piece move duration: `clamp(220 + pathLength × 0.95, 300, 640)` ms, easing
 `move`, with 40 ms between pieces. Paths are charged for leaving the canvas as well
 as for coming within 14u of another piece.
 
+**Gaits (P4b.1).** In Full motion each piece travels a planned path in its own way, as
+distinctive as its shape. The duration `d` is the one above.
+
+| Piece | Gait | How |
+| --- | --- | --- |
+| Tile | Register | Travels `min(0.85d, 480 ms)`, `out`, to 8u past its seat along its heading and 8u above it (the offset grows as `e²`); holds 70 ms; drops into its seat, 90 ms `snap`. Lands by 640 ms. |
+| Mesh | Weighted | Rocks back 3.5° on its trailing bottom corner and 4u back, 110 ms `windup`; travels `min(0.9d, 400 ms)`, `heavy`, the rock easing out over the first 40%. Lands by 510 ms. Then tips 2.2° onto its leading corner (130 ms, `sin(πr)`) and nudges a piece it lands against 3u (150 ms). Only on moves with 24u or more sideways. |
+| Disc | Elastic | Travels `d`, `move`, stretched along its heading by up to 16% at peak speed (`1 + 0.16·slope/peak`, area kept). Lands by 640 ms. Then squashes 0.88 along its heading and 1.12 across, back to round over 300 ms `punchBack`. |
+
+At Inline the times scale by the Working pace (0.8). Before a move, each gait is checked
+at 16 points along its path and at its landing: it plays in full, at 60% or at 30%, or not
+at all, whichever is largest that never brings a piece nearer another than the unbent path
+does where that is under 14u, and never takes a piece off the canvas. The mesh's tip, its
+nudge and the disc's squash run on after the landing, over the pose, so a new state never
+waits for them (invariant 6). Calm and the brisk moves (the opening, Complete's move in,
+the dock, tap and spread) keep the plain `move`.
+
 | Outcome | Order (anchor first) | Docks from |
 | --- | --- | --- |
 | Brand mark (A) | tile, mesh, disc | mesh goes to its stand-off and waits · disc comes in · mesh closes last |
@@ -407,6 +425,7 @@ priority over bible p.10 and p.14 here.
 | move | 0.65, 0, 0.35, 1 |
 | approach / out | 0.16, 1, 0.3, 1 |
 | windup / rest / tip | 0.45, 0, 0.55, 1 |
+| heavy | 0.6, 0, 0.95, 0.55 |
 | snap | 0.9, 0, 1, 0.5 |
 | recoil | 0.2, 0.9, 0.4, 1 |
 | land | 0.34, 1.32, 0.64, 1 |

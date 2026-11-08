@@ -45,6 +45,14 @@ the piece already in flight land (640 ms at most), then moves to the new state; 
 mid-flight makes the pieces pop. A busy state that follows the same busy state carries on, and a
 result never animates twice. Only busy loops; results form once and hold still.
 
+**Gaits.** Each piece travels its own way when it moves on its own (`travelTo`): the tile
+registers, landing past its seat and above it and dropping in; the mesh is weighted, rocking back,
+travelling heavily and tipping forward as it lands; the disc is elastic, stretching along its path
+and squashing as it lands. Each still lands within 640 ms. A gait is scaled down, or left out,
+wherever it would bring a piece nearer another than its planned path does (`holdsClear` in the
+planner). The mesh's tip and the disc's squash run on after the landing, drawn over the pose
+(`engine.shown()`, `engine.bend`), so they never hold up a new state. Calm travels plainly.
+
 **Layers and fades.** The pieces always stack tile, mesh, disc. Nothing in the glyph fades or
 dissolves, except the cross-fade that stands in for movement in Off and under OS reduced motion.
 
