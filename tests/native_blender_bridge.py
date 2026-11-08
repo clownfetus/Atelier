@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='atelier-native-bridge-', dir=report.par
     addon = importlib.util.module_from_spec(spec); sys.modules[spec.name] = addon; spec.loader.exec_module(addon)
     spool = work/'spool'; spool.mkdir()
     addon.bridge_root = lambda: spool
-    addon._RUNNING = True; addon._SESSION = 'a'*32
+    addon._RUNNING = True; addon._SESSION = 'a'*32; addon._BUILD = addon._own_build()
     job='b'*32; stage=spool/'staging'/job; stage.mkdir(parents=True)
     bpy.ops.object.select_all(action='DESELECT'); cube.select_set(True); bpy.context.view_layer.objects.active=cube
     bpy.ops.export_scene.gltf(filepath=str(stage/'model.glb'),export_format='GLB',use_selection=True)
@@ -72,9 +72,36 @@ with tempfile.TemporaryDirectory(prefix='atelier-native-bridge-', dir=report.par
     assert cube in bpy.data.objects.values() and len(set(bpy.data.objects)-before)==1
     assert not stage.exists()
     checks.append({'name':'packaged extension imports staged GLB into existing scene and acknowledges', 'meshes':receipt['meshes']})
+    from atelier.blender_extension import expected_build
+    heartbeat=json.loads((spool/'receiver.json').read_text())
+    assert heartbeat['build'] and heartbeat['build']==expected_build(root),heartbeat
+    checks.append({'name':'installed extension reports the build Atelier ships'})
+
+    # A rigged part: Blender 4.4+ draws bones with an Icosphere that is not part of the model.
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.armature_add(); rig=bpy.context.object; rig.name='Generated rig fixture'
+    bpy.ops.mesh.primitive_cube_add(); body=bpy.context.object; body.name='Generated rigged body'
+    body.parent=rig; body.modifiers.new('Armature','ARMATURE').object=rig
+    group=body.vertex_groups.new(name=rig.data.bones[0].name); group.add(range(len(body.data.vertices)),1.0,'REPLACE')
+    for item in (rig,body): item.select_set(True)
+    bpy.context.view_layer.objects.active=rig
+    job='c'*32; stage=spool/'staging'/job; stage.mkdir(parents=True)
+    bpy.ops.export_scene.gltf(filepath=str(stage/'model.glb'),export_format='GLB',use_selection=True)
+    (stage/'materials.json').write_text(json.dumps({'slots':{}}))
+    request={**request,'job':job,'expires':time.time()+120,
+             'parts':[{'glb':str(stage/'model.glb'),'materials':str(stage/'materials.json'),
+                       'name':'Received rig','transform':[list(row) for row in Matrix.Identity(4)]}]}
+    addon._atomic_json(spool/'requests'/(job+'.json'),request)
+    before=set(bpy.data.objects);addon.tick()
+    receipt=json.loads((spool/'receipts'/(job+'.json')).read_text())
+    assert receipt['ok'] and receipt['meshes']==1,receipt
+    received=bpy.data.collections['Received rig'].objects
+    assert sorted(obj.type for obj in received)==['ARMATURE','MESH'],[obj.name for obj in received]
+    checks.append({'name':'rigged part imports without a bone shape mesh in the model'})
     destination=work/'result.blend';bpy.ops.wm.save_as_mainfile(filepath=str(destination))
     bpy.ops.wm.open_mainfile(filepath=str(destination))
-    assert len([obj for obj in bpy.data.objects if obj.type=='MESH'])==2
+    # Both generated fixtures and both received copies; no bone shape mesh.
+    assert len([obj for obj in bpy.data.objects if obj.type=='MESH'])==4
     checks.append({'name':'saved and reopened Blender scene preserves original and received meshes'})
 report.write_text(json.dumps({'ok':True,'blender':bpy.app.version_string,'checks':checks},indent=2)+'\n')
 print('ATELIER_BRIDGE_NATIVE_OK',report)

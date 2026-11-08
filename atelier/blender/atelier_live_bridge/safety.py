@@ -1,14 +1,30 @@
 """Validate the local bridge envelope without importing Blender or executing content."""
+import hashlib
+import json
 import math
 from pathlib import Path
 import re
 import time
 
 PROTOCOL = 2
+# The add-on's own code. Atelier fingerprints the copy it ships the same way
+# (atelier/blender_extension.py), so it can tell when Blender runs an older one.
+BUILD_FILES = ('__init__.py', 'tracking.py', 'safety.py', 'material_nodes.py', 'blender_manifest.toml')
 
 
 def identity(value):
     return isinstance(value, str) and re.fullmatch('[0-9a-f]{32}', value) is not None
+
+
+def build_identity(read):
+    """Fingerprint BUILD_FILES; read(name) returns a file's bytes, or None when it is missing."""
+    digests = {}
+    for name in BUILD_FILES:
+        data = read(name)
+        if data is None:
+            return None
+        digests[name] = hashlib.sha256(data.replace(b'\r\n', b'\n')).hexdigest()
+    return hashlib.sha256(json.dumps(digests, sort_keys=True).encode('utf-8')).hexdigest()
 
 
 def validate_request(request, root, session):

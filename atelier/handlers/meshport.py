@@ -163,7 +163,8 @@ def send_to_blender(game_rel, weapons=None):
     config.validate_game_rel(game_rel)
     selected=_live_selection(game_rel,weapons)
     root=blender_bridge.bridge_root()
-    blender_bridge.receiver_status(root)  # no costly extraction without receiver
+    # No costly extraction without a receiver, or for an add-on older than this Atelier's.
+    blender_bridge.require_current_addon(blender_bridge.receiver_status(root))
     job_id=blender_bridge.new_job_id()
     stage=root/'staging'/job_id
     stage.mkdir(parents=True,exist_ok=False)
