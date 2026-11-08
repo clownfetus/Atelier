@@ -321,7 +321,9 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
 
 ## Phase 5 · Release
 
-- [ ] **P5.1** ⏸ Thiago's timing pass on the real app. Tune only the durations
+- [x] **P5.1** ⏸ Thiago's timing pass on the real app. Signed off with no changes on 8 Nov 2026,
+  from a board of every shared timing (mock-ups of each surface, and the real glyph engine with one
+  pace dial). Every token below stays at its current value. Tune only the durations
   and easing in one place (`pieces.js` or `easing.js`); don't touch the invariants.
   Before this, an audit Thiago asked for (after P4b.6) put the strays onto shared timings.
   `tokens.css` now holds `--studio-motion-panel` (320ms: roster fold, library hero art),
