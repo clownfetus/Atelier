@@ -167,44 +167,24 @@
     });
   }
 
+  // The material, curve and VFX editors are dialogs: they unfold out of their centre line and fold back like
+  // every other (continuity.css, P4b.7). The old card-to-panel morph cross-faded the card into the panel, a fade.
+  // The editor remembers its card so closing hands focus back to it.
   function openEditor(overlay, path) {
-    const card = cardFor(path), panel = overlay.firstElementChild;
-    const box = visible(card) ? card.getBoundingClientRect() : null;
-    origins.set(overlay, {path, card, box});
-    if (!box) { overlay.classList.add('active'); return Promise.resolve(); }
-    return transition(() => overlay.classList.add('active'),
-      name => name(card, 'atelier-editor'), name => name(panel, 'atelier-editor'), () => {
-        if (!box) return;
-        const rect = panel.getBoundingClientRect();
-        animate(panel, [{opacity: .3, transformOrigin: 'top left', transform: `translate(${box.x - rect.x}px,${box.y - rect.y}px) scale(${box.width / rect.width},${box.height / rect.height})`},
-          {opacity: 1, transformOrigin: 'top left', transform: 'none'}], 200);
-      });
+    origins.set(overlay, {path});
+    overlay.classList.add('active');
+    return Promise.resolve();
   }
   function closeEditor(overlay) {
-    const origin = origins.get(overlay), card = cardFor(origin?.path), panel = overlay.firstElementChild;
-    // Close logical state immediately; a disposable snapshot carries the visual return.
-    let ghost, rect;
-    if (visible(card) && visible(panel) && !reduced.matches) {
-      rect = panel.getBoundingClientRect(); ghost = panel.cloneNode(true);
-      ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-      ghost.inert = true; ghost.setAttribute('aria-hidden', 'true');
-      Object.assign(ghost.style, {position:'fixed',left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px',
-        margin:'0',maxWidth:'none',maxHeight:'none',pointerEvents:'none',zIndex:250});
-      document.body.appendChild(ghost);
-    }
+    const card = cardFor(origins.get(overlay)?.path);
     overlay.classList.remove('active');
     if (visible(card)) card.focus({preventScroll:true});
-    if (ghost) {
-      const target = card.getBoundingClientRect();
-      const motion = animate(ghost, [{opacity:1,transformOrigin:'top left',transform:'none'},
-        {opacity:0,transformOrigin:'top left',transform:`translate(${target.x-rect.x}px,${target.y-rect.y}px) scale(${target.width/rect.width},${target.height/rect.height})`}], 160);
-      if (motion) motion.finished.catch(() => {}).finally(() => ghost.remove()); else ghost.remove();
-    }
   }
+  // A menu unfolds out of the edge at its pointer or button: downwards, or upwards when it had to flip above.
   function menu(el, x, y) {
-    const bounds = el.getBoundingClientRect();
-    el.style.transformOrigin = `${Math.max(0, Math.min(bounds.width, x - bounds.x))}px ${Math.max(0, Math.min(bounds.height, y - bounds.y))}px`;
-    animate(el, [{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'scale(1)'}], 120);
+    const edge = el.getBoundingClientRect().top < y - 1 ? 'bottom' : 'top';
+    el.dataset.unfoldEdge = edge;
+    window.AtelierMotion?.unfold?.(el, edge);
   }
   reduced.addEventListener('change', () => { if (reduced.matches) active?.skipTransition(); });
   window.AtelierContinuity = Object.freeze({banner, library, openEditor, closeEditor, menu});

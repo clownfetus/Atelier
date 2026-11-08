@@ -125,7 +125,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert tab.locator('.toast-repeat').count() == 1
         assert tab.locator('.toast-repeat').evaluate("el=>getComputedStyle(el.parentElement,'::after').animationPlayState==='paused'")
         tab.mouse.move(0,0); tab.wait_for_timeout(1050)
-        # The toast leaves its slot on time; its 120 ms exit fade then removes the faded copy.
+        # The toast leaves its slot on time; its 150 ms fold then removes the folded copy.
         assert not tab.locator('#toast-area .toast-repeat').count()
         tab.wait_for_function("!document.querySelector('.toast-repeat')", timeout=1000)
         checks.append('Operation resolves on the same mount with literal text; repeats merge, bump and reset their paused countdown line')
@@ -136,6 +136,10 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert not tab.locator('#toast-area .toast').count()
         if full:
             assert tab.evaluate("(layer=>layer.inert && layer.contains(leavingToast) && !leavingToast.hasAttribute('role'))(document.getElementById('toast-exit-layer'))")
+            # It folds back down into its bottom edge; nothing fades (P4b.7).
+            frames = tab.evaluate("leavingToast.getAnimations().flatMap(a=>a.effect.getKeyframes())")
+            assert frames and not any('opacity' in f for f in frames), frames
+            assert frames[-1]['clipPath'].startswith('inset(100%') and frames[-1]['translate'].endswith(' 6px'), frames[-1]
         tab.wait_for_function('!leavingToast.isConnected', timeout=1000)
         # Typing that keeps a folder empty rebuilds the empty state, which never moves.
         tab.locator('#search-scope').click()
@@ -149,7 +153,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         assert first == 0 and repeat == 0, (first, repeat)
         tab.locator('#search-input').fill('')
         tab.locator('#search-scope').click()
-        checks.append('A dismissed toast leaves its slot at once and fades from an inert layer; typing that keeps a folder empty does not replay its empty-state entrance')
+        checks.append('A dismissed toast leaves its slot at once and folds away from an inert layer, with no fade; typing that keeps a folder empty does not replay its empty-state entrance')
 
         tab.evaluate("""() => {
           sidebarData={m:{token:'m',game_rel:'Fixture/MI_Fixture',name:'Material fixture',file_type:'material',selected:true,ui_preview:{colors:[[.8,.1,.2,1],[.2,.4,.7,1]]}},
@@ -191,9 +195,18 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         jobs.clear();tab.evaluate('AtelierJobs.refresh()')
         assert tab.evaluate("!jobGlyphHost.isConnected&&!jobGlyphHost.hasAttribute('data-atelier-motion')")
         tab.locator('#grid-area .card').click(button='right')
-        assert tab.locator('#ctx-menu').evaluate("el=>getComputedStyle(el).transformOrigin!=='50% 50%'")
+        # The menu unfolds out of the edge at the pointer and folds back into it, never fading (P4b.7).
+        menu_frames = tab.locator('#ctx-menu').evaluate("el=>el.getAnimations().flatMap(a=>a.effect.getKeyframes())")
+        if full:
+            assert menu_frames and not any('opacity' in f for f in menu_frames), menu_frames
+            # Closed at its top edge: no inset from the top, all of it from the bottom.
+            assert menu_frames[0]['clipPath'].startswith('inset(0') and '100%' in menu_frames[0]['clipPath'], menu_frames[0]
         tab.keyboard.press('Escape')
-        checks.append('Activity ring uses reported progress or an indeterminate running state and clears at completion; a job keeps one glyph across refreshes and its result goes to that glyph; menu motion starts at its anchor')
+        if full:
+            fold_frames = tab.locator('#ctx-menu').evaluate("el=>el.getAnimations().flatMap(a=>a.effect.getKeyframes())")
+            assert fold_frames and not any('opacity' in f for f in fold_frames), fold_frames
+        tab.wait_for_selector('#ctx-menu:not(.active)', state='attached', timeout=1000)
+        checks.append('Activity ring uses reported progress or an indeterminate running state and clears at completion; a job keeps one glyph across refreshes and its result goes to that glyph; the menu unfolds from its pointer edge and folds away, with no fade')
 
         tab.evaluate("""() => {
           document.getElementById('settings-density').value='compact';document.getElementById('settings-density').dispatchEvent(new Event('change'));

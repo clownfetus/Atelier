@@ -300,6 +300,17 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   dialogs, menus, popovers) fades in or out; each enters and leaves with deliberate
   movement. Audit every one, then show the movement options. In Off and OS reduced motion
   they still need to appear and leave without motion: ask Thiago how before building it.
+  Pop-ups are done. Thiago chose "unfold": a pop-up opens out of the edge it belongs to, with a
+  6px travel and no overshoot (220ms, the glyph's `out` curve), and folds back the same way (150ms).
+  A toast opens upwards, a menu, tooltip or search panel downwards (upwards when it flips above),
+  and a dialog from its centre line. The dialogs are the `.overlay`s, the image preview and the
+  material, curve and VFX editors, which no longer morph from their card. Off and OS reduced motion
+  cut. Only a dialog's dimmed backdrop still fades (120ms), as Thiago chose. The CSS is in
+  `continuity.css` and the helpers are `AtelierMotion.unfold` and `fold` in `motion/timing.js`.
+  Thiago also brought the remaining non-pop-up fades into P4b.7: the tray row removal, hero
+  portrait and banner art, texture swap, library grid, export icon return, rolling digits,
+  assembly link pulse, theme cross-fade, plus the mod card flip-in, Model Studio poster
+  entrance and thumbnail load found here. Film them in Unfold and show him before building.
 
 ## Phase 5 · Release
 
@@ -307,8 +318,9 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   and easing in one place (`pieces.js` or `easing.js`); don't touch the invariants.
   Before this, an audit Thiago asked for (after P4b.6) put the strays onto shared timings.
   `tokens.css` now holds `--studio-motion-panel` (320ms: roster fold, library hero art),
-  `--studio-motion-travel` (520ms, on an arc: the costume flight) and
-  `--studio-motion-toast-exit` (220ms). `pieces.js` exposes the glyph curves as
+  `--studio-motion-travel` (520ms, on an arc: the costume flight) and, from P4b.7,
+  `--studio-motion-unfold` (220ms), `--studio-motion-fold` (150ms) and
+  `--studio-easing-unfold` for every pop-up. `pieces.js` exposes the glyph curves as
   `AtelierMotion.assembly.curves`, which the tray and the setup wizard use. Unused easing
   tokens are gone, and the hidden progress-bar fill no longer animates its width.
 - [ ] **P5.2** Release screenshots (`scripts/release_screenshots.py`; any change to

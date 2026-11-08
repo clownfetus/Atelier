@@ -108,8 +108,12 @@
   --studio-motion-panel: 320ms;
   /* Something crossing a good part of the window (a costume flying onto the stage), on an arc. */
   --studio-motion-travel: 520ms;
-  /* A toast leaving: about two thirds of its 340 ms entrance. */
-  --studio-motion-toast-exit: 220ms;
+  /* Pop-ups (P4b.7, Thiago's "unfold"): a toast, menu, tooltip or dialog opens out of the edge it belongs to
+     with a 6px travel and no overshoot, and folds back the same way, faster. Nothing that pops up fades;
+     only a dialog's dimmed backdrop does (--studio-motion-exit). Off and reduced motion cut instantly. */
+  --studio-motion-unfold: 220ms;
+  --studio-motion-fold: 150ms;
+  --studio-easing-unfold: cubic-bezier(.16, 1, .3, 1); /* the glyph's `out` */
   --studio-easing: cubic-bezier(.2, 0, 0, 1);
   --studio-easing-exit: cubic-bezier(.3, 0, 1, 1);
   /* Large surfaces travelling into place decelerate harder than ordinary state changes. */

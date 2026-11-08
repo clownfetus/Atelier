@@ -66,14 +66,16 @@ def run_find_checks(page,context,url,report,checks):
         tab.wait_for_function("nav.path==='Characters/1029/1029001/Textures'")
         tab.wait_for_function("document.activeElement.dataset.libraryPath==='Characters/1029/1029001/Textures/T_Cafe'")
         field.fill('missing');tab.wait_for_function("document.querySelector('#search-results')?.textContent.includes('No results')")
-        field.press('Escape');assert tab.locator('#search-results').is_hidden();assert field.evaluate('el=>el===document.activeElement')
+        # Escape closes at once for assistive tech; the panel then folds away (P4b.7).
+        field.press('Escape');assert field.get_attribute('aria-expanded')=='false';assert field.evaluate('el=>el===document.activeElement')
+        tab.wait_for_selector('#search-results',state='hidden',timeout=1000)
         field.fill('slow');tab.wait_for_timeout(200);assert held
         field.fill('cafe');tab.wait_for_selector('#search-results .search-result')
         try:held.pop().fulfill(json={'heroes':[],'skins':[],'folders':[],'assets':[],'totals':{}})
         except Exception:pass # An aborted route can no longer be fulfilled.
         assert tab.locator('#search-results .search-result').count()==1
         field.press('Escape');tab.locator('#search-scope').click();field.fill('missing')
-        assert tab.locator('#grid-area .card').count()==0;assert tab.locator('#search-results').is_hidden()
+        assert tab.locator('#grid-area .card').count()==0;tab.wait_for_selector('#search-results',state='hidden',timeout=1000)
         field.fill('cafe');assert tab.locator('#grid-area .card').count()==1
         checks.append('Everywhere supports debounced keyboard navigation and asset focus, rejects stale responses, and This folder keeps local filtering')
         tab.evaluate("pushNav({path:''})");tab.wait_for_selector('.roster-portrait')

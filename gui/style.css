@@ -665,7 +665,7 @@ progress:not([value]) { display: none; }
   align-items: center;
   gap: 8px;
   box-shadow: var(--studio-shadow);
-  animation: toastIn var(--studio-spring-snappy-duration) var(--studio-spring-snappy);
+  animation: toast-unfold var(--studio-motion-unfold) var(--studio-easing-unfold);
   max-width: 300px;
   pointer-events: all;
 }
@@ -673,7 +673,8 @@ progress:not([value]) { display: none; }
 .toast.success { --toast-rule: var(--status-complete); }
 .toast.warning { --toast-rule: var(--status-warning); }
 .toast.error, .toast[data-operation-state=error] { --toast-rule: var(--status-error); }
-@keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+/* A caption opens upwards out of its bottom edge (P4b.7); polish.js folds it back down. No fade. */
+@keyframes toast-unfold { from { clip-path:inset(100% -40px 0 -40px); translate:0 6px; } to { clip-path:inset(-40px); translate:0 0; } }
 
 /* ── loading spinner ── */
 .spinner {
@@ -1462,8 +1463,7 @@ select:focus-visible { border-color: var(--acc); }
 .setup-modal { max-width: 560px; }
 .setup-section, .mat-section { font-weight: 500; }
 .modal:not(.setup-modal):not(.mat-modal):not(.proj-modal):not(.shader-modal) { max-height: calc(100vh - 40px); overflow-y: auto; }
-.overlay.active > :first-child { animation: dialogIn var(--studio-motion-standard) var(--studio-easing); }
-@keyframes dialogIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* Dialogs unfold and fold away in continuity.css. */
 .btn, .nav-btn, .card, .menu-btn, .ctx-item, .proj-card {
   transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing), box-shadow var(--studio-motion-fast) var(--studio-easing);
 }

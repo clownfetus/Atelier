@@ -14,27 +14,39 @@
       else owner.removeAttribute('aria-describedby');
       if (addedLabel && owner.getAttribute('aria-label') === title) owner.removeAttribute('aria-label');
     }
-    if (tooltip) {
-      if (typeof tooltip.hidePopover === 'function' && tooltip.matches(':popover-open')) tooltip.hidePopover();
-      tooltip.hidden = true;
+    // The description goes at once; the bubble folds back into the edge it opened from (P4b.7).
+    if (tooltip && !tooltip.hidden && !tooltip.dataset.folding) {
+      const bubble = tooltip;
+      const gone = () => {
+        if (!bubble.dataset.folding) return; // Shown again before the fold ended.
+        delete bubble.dataset.folding;
+        if (typeof bubble.hidePopover === 'function' && bubble.matches(':popover-open')) bubble.hidePopover();
+        bubble.hidden = true;
+      };
+      bubble.dataset.folding = '1';
+      if (window.AtelierMotion?.fold) window.AtelierMotion.fold(bubble, bubble.dataset.unfoldEdge || 'top', gone); else gone();
     }
     owner = null; addedLabel = false;
   }
   function show() {
     if (!owner?.isConnected) { hide(); return; }
     tooltip ||= Object.assign(document.createElement('div'), {id, className: 'studio-tooltip'});
+    if (tooltip.dataset.folding) { window.AtelierMotion?.unfoldStop?.(tooltip); delete tooltip.dataset.folding; }
     tooltip.setAttribute('role', 'tooltip');
     tooltip.textContent = title;
     // A dialog's top layer makes unrelated body children inert.
     (owner.closest('dialog[open]') || document.body).append(tooltip);
     tooltip.hidden = false;
     if (typeof tooltip.showPopover === 'function') {
-      tooltip.setAttribute('popover', 'manual'); tooltip.showPopover();
+      tooltip.setAttribute('popover', 'manual'); if (!tooltip.matches(':popover-open')) tooltip.showPopover();
     }
     const bounds = owner.getBoundingClientRect(), rect = tooltip.getBoundingClientRect();
     tooltip.style.left = Math.max(8, Math.min(bounds.left, innerWidth - rect.width - 8)) + 'px';
-    tooltip.style.top = (bounds.bottom + rect.height + 12 < innerHeight
-      ? bounds.bottom + 6 : Math.max(8, bounds.top - rect.height - 6)) + 'px';
+    const below = bounds.bottom + rect.height + 12 < innerHeight;
+    tooltip.style.top = (below ? bounds.bottom + 6 : Math.max(8, bounds.top - rect.height - 6)) + 'px';
+    // Below its owner it opens downwards from its top edge; above, upwards from its bottom edge.
+    tooltip.dataset.unfoldEdge = below ? 'top' : 'bottom';
+    window.AtelierMotion?.unfold?.(tooltip, tooltip.dataset.unfoldEdge);
     owner.setAttribute('aria-describedby', ((owner.getAttribute('aria-describedby') || '') + ' ' + id).trim());
   }
   function begin(target) {

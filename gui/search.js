@@ -3,7 +3,22 @@
   'use strict';
   let scope='everywhere', generation=0, timer, controller, callbacks={}, active=-1;
   const $=id=>document.getElementById(id);
-  function reset() {generation++;clearTimeout(timer);controller?.abort();if($('search-results'))$('search-results').hidden=true;$('search-input')?.setAttribute('aria-expanded','false');$('search-input')?.removeAttribute('aria-activedescendant');}
+  // Stops a lookup in flight. Typing does only this, so the open panel refreshes in place instead of closing.
+  function cancel() {generation++;clearTimeout(timer);controller?.abort();active=-1;$('search-input')?.removeAttribute('aria-activedescendant');}
+  const open=panel=>!panel.hidden&&!panel.dataset.folding;
+  // Closing: the panel folds back up under the search box (P4b.7); its logical state closes at once.
+  function reset() {
+    cancel();$('search-input')?.setAttribute('aria-expanded','false');
+    const panel=$('search-results');if(!panel||!open(panel))return;
+    panel.dataset.folding='1';
+    const gone=()=>{if(!panel.dataset.folding)return;delete panel.dataset.folding;panel.hidden=true;};
+    if(window.AtelierMotion?.fold)AtelierMotion.fold(panel,'top',gone);else gone();
+  }
+  function reveal(panel) {
+    const was=open(panel);
+    if(panel.dataset.folding){window.AtelierMotion?.unfoldStop?.(panel);delete panel.dataset.folding;}
+    panel.hidden=false;if(!was)window.AtelierMotion?.unfold?.(panel,'top');
+  }
   function rows() {return [...$('search-results').querySelectorAll('[role=option]')];}
   function select(index) {
     const items=rows();active=(index+items.length)%items.length;
@@ -11,9 +26,9 @@
     if(items[active]){$('search-input').setAttribute('aria-activedescendant',items[active].id);items[active].scrollIntoView({block:'nearest'});}
   }
   async function lookup() {
-    const q=$('search-input').value.trim();reset();if(scope!=='everywhere'||!q)return;
+    const q=$('search-input').value.trim();cancel();if(scope!=='everywhere'||!q){reset();return;}
     const gen=generation, project=window.atelierProject();controller=new AbortController();
-    const panel=$('search-results');panel.replaceChildren();panel.hidden=false;panel.textContent='Searching…';panel.setAttribute('aria-busy','true');$('search-input').setAttribute('aria-expanded','true');
+    const panel=$('search-results');panel.replaceChildren();reveal(panel);panel.textContent='Searching…';panel.setAttribute('aria-busy','true');$('search-input').setAttribute('aria-expanded','true');
     try {
       const response=await window.atelierFetch('/api/search?q='+encodeURIComponent(q)+'&limit=50',{signal:controller.signal});
       if(!response.ok)throw Error('Search could not be loaded. Try again.');
@@ -46,9 +61,9 @@
     wide.addEventListener('change',fit);fit();
     chip.addEventListener('click',()=>{scope=scope==='everywhere'?'folder':'everywhere';chip.textContent=scope==='folder'?'This folder':'Everywhere';chip.setAttribute('aria-label','Search scope: '+chip.textContent);reset();callbacks.changed?.();if(scope==='everywhere')lookup();input.focus();});
     input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls','search-results');input.setAttribute('aria-expanded','false');
-    input.addEventListener('input',()=>{reset();if(scope==='everywhere')timer=setTimeout(lookup,150);});
+    input.addEventListener('input',()=>{cancel();if(scope==='everywhere'&&input.value.trim())timer=setTimeout(lookup,150);else reset();});
     input.addEventListener('keydown',event=>{
-      if(scope!=='everywhere'||$('search-results').hidden)return;
+      if(scope!=='everywhere'||!open($('search-results')))return;
       if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();reset();input.focus();}
       else if(['ArrowDown','ArrowUp'].includes(event.key)&&rows().length){event.preventDefault();select(active<0?(event.key==='ArrowDown'?0:rows().length-1):active+(event.key==='ArrowDown'?1:-1));}
       else if(event.key==='Enter'&&active>=0){event.preventDefault();rows()[active]?.click();}

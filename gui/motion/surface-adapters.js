@@ -34,7 +34,8 @@
     const remove=button.remove.bind(button);button.remove=()=>{glyph?.destroy();button.getAnimations().forEach(a=>a.cancel());remove();if(drops.get(kind)===button)drops.delete(kind);};
     drops.set(kind,button);
     button.addEventListener('click',()=>{button.remove();open();});
-    if(AtelierMotionPolicy.allows(1)&&!document.hidden)try{button.animate([{transform:'translateY(-10px)',opacity:.5},{transform:'none',opacity:1}],{duration:AtelierMotion.springMs?.snappy||340,easing:AtelierMotion.ease?.snappy||'cubic-bezier(.22,.8,.32,1.12)'});}catch(_){}
+    // It unfolds downwards into the top bar, with no fade (P4b.7). Clicking it takes it away at once.
+    try{AtelierMotion.unfold?.(button,'top');}catch(_){}
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const button of drops.values())button.getAnimations().forEach(a=>a.cancel());});
   function stopTransients(){for(const dispose of [...transients])dispose();}

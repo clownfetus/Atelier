@@ -67,6 +67,15 @@
 #viewport-box .vp-menu > summary { display:flex; align-items:center; justify-content:center; gap:8px; list-style:none; user-select:none; white-space:nowrap; }
 #viewport-box summary::-webkit-details-marker { display:none; }
 .vp-popover { position:absolute; z-index:12; top:calc(100% + 10px); right:0; width:292px; padding:24px; border:1px solid var(--border2); border-radius:var(--studio-shape-medium); background:var(--bg2); box-shadow:0 12px 40px #0003; max-height:min(66vh,650px); overflow:auto; }
+/* Model Studio's menus unfold downwards from under their buttons and fold back up into them (P4b.7).
+   The details content stays painted while the panel folds; Off and reduced motion cut. */
+@keyframes vp-popover-unfold { from { clip-path:inset(0 -56px 100% -56px); translate:0 -6px; } to { clip-path:inset(-56px); translate:0 0; } }
+@keyframes vp-popover-fold { from { clip-path:inset(-56px); translate:0 0; } to { clip-path:inset(0 -56px 100% -56px); translate:0 -6px; } }
+.vp-menu[open] > .vp-popover { animation:vp-popover-unfold var(--studio-motion-unfold) var(--studio-easing-unfold); }
+.vp-menu:not([open]) > .vp-popover { animation:vp-popover-fold var(--studio-motion-fold) var(--studio-easing-exit) forwards; }
+.vp-menu::details-content { transition:content-visibility var(--studio-motion-fold) allow-discrete; }
+:root[data-motion=reduce] .vp-menu::details-content { transition:none; }
+@media (prefers-reduced-motion:reduce) { .vp-menu::details-content { transition:none; } }
 .vp-popover h3 { margin:0 0 16px; font-size:var(--studio-text-body); font-weight:600; }
 .vp-popover p { color:var(--muted); font-size:var(--studio-text-detail); line-height:1.6; margin:12px 0; }
 #viewport-model-menu .vp-setting { flex-direction:column;align-items:stretch;gap:8px; }

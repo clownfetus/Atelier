@@ -53,7 +53,8 @@ bottom before starting Phase 3**: line numbers drift.
 | Deleting a row (`gui/polish.js:144`, `gui/style.css:1519`, D10) | A plain 200 ms fade |
 | HDR swatch ring (`gui/polish.js:303`, D10) | Stays, because it reports a material's intensity. Only its "bubble" name changes |
 | Theme change (`gui/preferences.js:38`, D17) | A plain cross-fade of the page, 200 ms, in Full and Calm, as interface chrome. Off stays instant |
-| Toast captions (`gui/motion/surfaces.css:10-22`, D17) | The theme's Card surface and text, with a left rule in the status colour and no comic shadow |
+| Toast captions (`gui/motion/surfaces.css:10-22`, D17) | The theme's Card surface and text, with a left rule in the status colour and no comic shadow. It unfolds upwards from its bottom edge and folds back down (P4b.7), never fading |
+| Pop-ups: dialogs, editors, image preview, menus, tooltips, search results, Model Studio menus, the update button (P4b.7) | Each unfolds out of the edge it belongs to (220 ms, 6px, no overshoot) and folds back into it (150 ms). Nothing fades except a dialog's dimmed backdrop. Off and reduced motion cut. `continuity.css`, `AtelierMotion.unfold`/`fold` |
 | Toast repeat count (`gui/motion/surfaces.css`, `gui/app.js:191`, D17) | Always a number, such as "×3" |
 | Texture drop target (`.card.k-texture-pool`, `gui/app.js:4294`, D17) | A plain outline in the theme's text colour |
 

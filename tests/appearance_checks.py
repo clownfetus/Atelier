@@ -205,7 +205,8 @@ def run_appearance_checks(page, context, url, report, checks):
             assert tab.locator('#atelier-tooltip').evaluate('(el)=>getComputedStyle(el).color') == tab.locator('body').evaluate('(el)=>getComputedStyle(el).color')
             tab.screenshot(path=str(report / f'appearance-tooltip-{mode}.png'), animations='disabled')
             tab.keyboard.press('Escape')
-            assert tab.locator('#atelier-tooltip').is_hidden()
+            # The bubble folds away (P4b.7) and is gone within its 150 ms fold.
+            tab.wait_for_selector('#atelier-tooltip', state='hidden', timeout=1000)
             assert help_button.get_attribute('title') == 'Help'
         tab.locator('#setup-close').click()
         for mode in ('light', 'dark'):

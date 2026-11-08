@@ -96,11 +96,17 @@ Use 120ms (`--studio-motion-fast`) for small state changes and 200ms (`--studio-
 
 `continuity.js` moves the replaced grid container 8px over 160ms, with reverse
 direction for Back/parent navigation. Feature-detected View Transitions connect
-folder names to breadcrumbs, portraits to the contextual hero banner and cards
-to the material/curve/VFX editors. Logical close and requests do not wait for an
-animation to finish. Unsupported engines use short CSS/WAAPI transitions; no
-card layout or asset geometry is animated. Dialogs have a 120ms discrete exit
-where supported, and context menus scale from the actual pointer/keyboard anchor.
+folder names to breadcrumbs and portraits to the contextual hero banner. Logical
+close and requests do not wait for an animation to finish. Unsupported engines use
+short CSS/WAAPI transitions; no card layout or asset geometry is animated.
+
+Nothing that pops up fades. Each pop-up unfolds out of the edge it belongs to with a
+6px travel and no overshoot (`--studio-motion-unfold`, 220ms, `--studio-easing-unfold`)
+and folds back into it (`--studio-motion-fold`, 150ms): a toast upwards from its bottom
+edge, a menu, tooltip or search panel downwards from its top edge (upwards when it flips
+above its pointer), and a dialog, editor or image preview from its centre line. Only a
+dialog's dimmed backdrop fades, over 120ms. Off and reduced motion cut. Scripts use
+`AtelierMotion.unfold(el, edge)` and `AtelierMotion.fold(el, edge, done)`.
 
 The home roster reads existing catalogue metadata; it never scans containers,
 imports an asset or refreshes the remote catalogue. Selecting a hero reveals its

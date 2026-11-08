@@ -126,7 +126,7 @@ async function revealInExplorer(gameRel) {
   }
 }
 
-// Toasts fade out through AtelierPolish.leave when it is available; otherwise they go at once.
+// Toasts fold away through AtelierPolish.leave when it is available; otherwise they go at once.
 function leaveToast(el, remove) {
   try { if (window.AtelierPolish?.leave) { window.AtelierPolish.leave(el, remove); return; } } catch (_) { /* Fall through. */ }
   remove();
@@ -4094,6 +4094,8 @@ function _ctxShow(e, items) {
   e.preventDefault();
   e.stopPropagation();
   if (!items.length) return;
+  // Asked back while it folds away: stop the fold and open afresh.
+  if (_ctxMenu.dataset.folding) { window.AtelierMotion?.unfoldStop?.(_ctxMenu); delete _ctxMenu.dataset.folding; _ctxMenu.inert = false; }
   _ctxOpener = document.activeElement;
   _ctxMenu.innerHTML = "";
   for (const item of items) {
@@ -4123,10 +4125,15 @@ function _ctxShow(e, items) {
   _ctxMenu.querySelector("button")?.focus();
 }
 
+// The menu folds back into the edge it opened from (P4b.7), inert while it goes; Off hides it at once.
 function _ctxHide() {
+  if (!_ctxMenu.classList.contains("active") || _ctxMenu.dataset.folding) return;
   const restore = _ctxMenu.contains(document.activeElement);
-  _ctxMenu.classList.remove("active");
   if (restore) _ctxOpener?.focus();
+  const hide = () => { delete _ctxMenu.dataset.folding; _ctxMenu.inert = false; _ctxMenu.classList.remove("active"); };
+  if (!window.AtelierMotion?.fold) { hide(); return; }
+  _ctxMenu.dataset.folding = "1"; _ctxMenu.inert = true;
+  AtelierMotion.fold(_ctxMenu, _ctxMenu.dataset.unfoldEdge || "top", hide);
 }
 
 _ctxMenu.addEventListener("keydown", e => {

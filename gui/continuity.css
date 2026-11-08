@@ -54,13 +54,22 @@
 @keyframes library-grid-out { to { opacity: 0; } }
 @keyframes library-grid-in { from { opacity: 0; transform: translateX(var(--library-entry, 8px)); } to { opacity: 1; transform: none; } }
 
-/* Native display transitions keep a closing overlay painted for its 120ms exit.
-   Engines without discrete transitions retain the existing immediate close. */
+/* Dialogs and studios unfold (P4b.7). The dialog opens out of its centre line with a 6px rise and folds
+   back the same way; it never fades. Only the dimmed backdrop behind it fades, over 120ms. The clip's
+   side insets leave room for the dialog's shadow. A studio docked in the workspace is a page, not a
+   pop-up, so it simply appears. A discrete display transition keeps a closing overlay painted while it
+   folds; engines without one close at once. */
+@keyframes dialog-unfold { from { clip-path: inset(50% -96px 50% -96px); translate: 0 6px; } to { clip-path: inset(-96px); translate: 0 0; } }
+@keyframes dialog-fold { from { clip-path: inset(-96px); translate: 0 0; } to { clip-path: inset(50% -96px 50% -96px); translate: 0 6px; } }
+@keyframes scrim-in { from { background-color: transparent; backdrop-filter: none; } }
+@keyframes scrim-out { to { background-color: transparent; backdrop-filter: none; } }
+.overlay.active:not(.mounted) { animation: scrim-in var(--studio-motion-exit) var(--studio-easing); }
+.overlay.active:not(.mounted) > :first-child { animation: dialog-unfold var(--studio-motion-unfold) var(--studio-easing-unfold); }
 @supports (transition-behavior: allow-discrete) {
-  .overlay { opacity: 0; transition: opacity var(--studio-motion-exit) var(--studio-easing-exit), display var(--studio-motion-exit) allow-discrete; }
-  .overlay.active { opacity: 1; transition-timing-function: var(--studio-easing), linear; }
+  .overlay { transition: display var(--studio-motion-fold) allow-discrete; }
   .overlay:not(.active) { pointer-events: none; }
-  @starting-style { .overlay.active { opacity: 0; } }
+  .overlay:not(.active):not(.mounted) { animation: scrim-out var(--studio-motion-exit) var(--studio-easing-exit) forwards; }
+  .overlay:not(.active):not(.mounted) > :first-child { animation: dialog-fold var(--studio-motion-fold) var(--studio-easing-exit) forwards; }
 }
 @media (prefers-reduced-motion: reduce) {
   .overlay, .library-hero-art { transition: none !important; }

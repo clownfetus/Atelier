@@ -65,6 +65,17 @@
 @media (hover: none) { .library-preview-button { opacity: 1; pointer-events: auto; } }
 #library-preview { width: min(920px, calc(100vw - 48px)); max-height: calc(100vh - 48px); margin: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--studio-shape-dialog); background: var(--bg2); color: var(--text); box-shadow: var(--studio-shadow); }
 #library-preview::backdrop { background: var(--studio-scrim); }
+/* The preview unfolds like every dialog (continuity.css): out of its centre line, folding back on close,
+   while only its backdrop fades. The discrete transitions keep it in the top layer while it folds. */
+#library-preview[open] { animation: dialog-unfold var(--studio-motion-unfold) var(--studio-easing-unfold); }
+#library-preview[open]::backdrop { animation: scrim-in var(--studio-motion-exit) var(--studio-easing); }
+@supports (transition-behavior: allow-discrete) {
+  #library-preview { transition: display var(--studio-motion-fold) allow-discrete, overlay var(--studio-motion-fold) allow-discrete; }
+  #library-preview:not([open]) { animation: dialog-fold var(--studio-motion-fold) var(--studio-easing-exit) forwards; }
+  #library-preview:not([open])::backdrop { animation: scrim-out var(--studio-motion-exit) var(--studio-easing-exit) forwards; }
+}
+:root[data-motion=reduce] #library-preview, :root[data-motion=reduce] #library-preview::backdrop { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { #library-preview, #library-preview::backdrop { animation: none !important; transition: none !important; } }
 .library-preview-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px; }
 .library-preview-heading > div { min-width: 0; }
 .library-preview-heading h2 { font: var(--studio-type-title); margin: 0 0 4px; overflow-wrap: anywhere; }
