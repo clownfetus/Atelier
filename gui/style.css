@@ -1524,3 +1524,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .card:active, .card:hover .hero-portrait { transform: none; }
 }
+
+/* Studio colours (P4b.5). The texture, mesh and material studios take their piece's colour on the
+   frame's top edge, the header band and the header's icon or label, so it's clear what you're
+   working on. Buttons, links, fields, the stage and swatches stay neutral (SPEC §2). Model Studio
+   is scoped to its own overlay, so the Workspace page, which mounts the same box, stays neutral.
+   The band keeps the theme's own surface lightness and takes only the piece's hue (its OKLCH hue
+   angle), so text on it keeps the contrast the theme already gives it, in every preset. Chroma
+   falls as the surface lightens, so pale bands stay inside the colour gamut and keep their hue;
+   a white surface steps just below white, since white itself can't carry a hue. */
+#texopt-overlay .modal { --studio-piece: var(--atelier-texture); --studio-piece-hue: 252.3; --studio-piece-ink: var(--studio-icon-texture); --studio-band-base: var(--md-sys-color-surface-container); }
+#viewport-overlay.overlay #viewport-box { --studio-piece: var(--atelier-mesh); --studio-piece-hue: 179.1; --studio-piece-ink: var(--studio-icon-mesh); --studio-band-base: var(--bg2); }
+#material-overlay .mat-modal { --studio-piece: var(--atelier-material); --studio-piece-hue: 44.8; --studio-piece-ink: var(--studio-icon-material); --studio-band-base: var(--md-sys-color-surface-container); }
+#texopt-overlay .modal, #viewport-overlay.overlay #viewport-box, #material-overlay .mat-modal { border-top: 3px solid var(--studio-piece); }
+#texopt-overlay .setup-head, #viewport-overlay.overlay #viewport-head, #material-overlay .mat-head {
+  background: var(--studio-band-base);
+  background: oklch(from var(--studio-band-base) min(l, 0.975) calc(0.009 + (1 - l) * 0.022) var(--studio-piece-hue));
+  border-bottom-color: color-mix(in srgb, var(--studio-piece) 45%, var(--border));
+}
+#texopt-overlay .setup-head h2 > svg:first-child, #material-overlay .mat-head h2 > svg:first-child,
+#viewport-overlay.overlay .vp-workspace-label { color: var(--studio-piece-ink); }

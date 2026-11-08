@@ -55,6 +55,8 @@ Use semantic foreground/background pairs instead of adding hexadecimal colors to
 
 The piece colours, `--atelier-texture` `#6C98CA`, `--atelier-mesh` `#5AAA9A` and `--atelier-material` `#DF8F6B`, never change with the theme. `--glyph-halo` is the surface behind the glyph: Canvas by default, and a host on another surface sets it to that surface.
 
+Each studio wears its piece: texture Export options in blue, Model Studio in teal and the material editor in copper. The colour sits on the frame's 3px top edge, the header band and the header's icon or label, never on buttons, links, fields, the stage or swatches. The band keeps the theme's surface lightness and takes only the piece's OKLCH hue, so header text keeps the contrast the theme gives it in every preset. Model Studio wears teal only as its own overlay; mounted in Workspace it stays neutral.
+
 Status colours are in two roles. `--status-complete`, `--status-warning` and `--status-error` are for icons and shapes and reach 3:1, and the matching `-text` roles are for sentences and reach 4.5:1. Other presets fit both, and the `--studio-icon-*` roles, to their own surfaces with `AtelierColourFit`: lightness moves and hue doesn't.
 
 Because Atelier's accent is neutral, accent colour can't be the only cue. Under `data-palette="studio"`, text buttons in Model Studio and the material overlay are underlined, and edited markers are heavier. Progress bars use the text colour, with the material disc rolling the fill forward (motion spec §4.10), and Model Studio's chrome follows the theme; only its stage keeps local colours.
