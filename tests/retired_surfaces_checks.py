@@ -24,22 +24,40 @@ def run_retired_surfaces_checks(context, url, report, checks):
         assert gone == {'api': 0, 'scripts': [], 'styles': [], 'lattice': ['', False]}, gone
         checks.append('Working panels, workflow gestures, ink transfers, halftone reconstruction, the folder flap, contextual pigments and the dot lattice no longer load')
 
-        # A row arriving in the Mod tray fades and rises for 200 ms, and no ink is drawn across the screen.
+        # A row arriving in the Mod tray clicks in like a glyph piece (P4b.6): the slot opens, the thumbnail
+        # travels in, snaps 3 px past its well and settles, and the text wipes in. A re-save only re-seats.
+        # Nothing fades, and no ink is drawn across the screen.
         arrival = tab.evaluate("""async () => {
           sidebarData = {m: {token: 'm', game_rel: 'Fixture/MI_Fixture', name: 'Material fixture', file_type: 'material', selected: true}};
-          renderSidebar();
-          AtelierPolish.fly('Fixture/MI_Fixture');
-          await new Promise(requestAnimationFrame);
-          await new Promise(requestAnimationFrame);
-          const row = document.querySelector('.sb-item[data-game-rel="Fixture/MI_Fixture"]');
-          const motion = row.getAnimations()[0];
-          const frames = motion?.effect.getKeyframes() || [];
-          return {duration: motion?.effect.getTiming().duration, first: frames[0]?.opacity, added: document.querySelectorAll('.k-workflow-svg,.k-workflow-link,.k-workflow-canvas').length};
+          const take = async () => {
+            renderSidebar();
+            AtelierPolish.fly('Fixture/MI_Fixture');
+            await new Promise(requestAnimationFrame);
+            await new Promise(requestAnimationFrame);
+            const row = document.querySelector('.sb-item[data-game-rel="Fixture/MI_Fixture"]');
+            const all = row.getAnimations({subtree: true}), thumb = row.querySelector('.sb-thumb').getAnimations()[0];
+            const frames = thumb?.effect.getKeyframes() || [];
+            const out = {count: all.length, duration: thumb?.effect.getTiming().duration,
+              opacity: all.some(a => a.effect.getKeyframes().some(f => 'opacity' in f)),
+              moves: frames.map(f => f.transform), slot: row.getAnimations().some(a => a.effect.getKeyframes().some(f => f.height === '0px')),
+              wipes: all.filter(a => a.effect.getKeyframes().some(f => f.clipPath)).length};
+            all.forEach(a => a.finish()); await new Promise(requestAnimationFrame);
+            out.overflow = row.style.overflow; return out;
+          };
+          const fresh = await take();
+          sidebarData.m = {...sidebarData.m, name: 'Material fixture, saved again'};
+          const again = await take();
+          return {fresh, again, added: document.querySelectorAll('.k-workflow-svg,.k-workflow-link,.k-workflow-canvas').length};
         }""")
         assert arrival['added'] == 0, arrival
         if tab.evaluate('!AtelierMotionPolicy.query().matches'):
-            assert arrival['duration'] == 200 and arrival['first'] == '0', arrival
-        checks.append('A row arrives in the Mod tray with a plain 200 ms fade and rise')
+            fresh, again = arrival['fresh'], arrival['again']
+            assert not fresh['opacity'] and not again['opacity'], arrival
+            assert fresh['duration'] == 830 and fresh['slot'] and fresh['wipes'] == 3, arrival
+            assert fresh['moves'][:2] == ['translateX(-120px)', 'translateX(-12px)'] and 'translateX(3px)' in fresh['moves'], arrival
+            assert again['duration'] == 380 and not again['slot'] and again['wipes'] == 0 and again['moves'][0] == 'none', arrival
+            assert fresh['overflow'] == '' and again['overflow'] == '', arrival
+        checks.append('A row arriving in the Mod tray clicks in like a glyph piece and a re-save re-seats, with no fade')
 
         # A changed texture fades over the old one and leaves nothing behind.
         swap = tab.evaluate("""async () => {

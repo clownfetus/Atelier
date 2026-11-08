@@ -30,7 +30,7 @@ bottom before starting Phase 3**: line numbers drift.
 | --- | --- | --- |
 | Working panels (border charges) | `gui/motion/working-panels.js/.css` | Nothing; panels stay still while the glyph reports |
 | Workflow gestures (arrive, trace, seal, release) | `gui/motion/workflow-krackle.js/.css`, `moment.js` | The existing Material easing tokens on plain transitions |
-| Ink transfers and connected surfaces | `workflow.transfer`, `workflow-surfaces.js` | The Mod tray row enters with a plain 200 ms fade-and-rise. That's interface chrome, not the glyph, so invariant 2 doesn't apply. |
+| Ink transfers and connected surfaces | `workflow.transfer`, `workflow-surfaces.js` | A Mod tray row clicks in like a glyph piece (P4b.6, `seat()` in `polish.js`): the slot opens and the thumbnail seats with Complete's snap, recoil and rest. It never fades. |
 | Texture reconstruction (halftone dots) | `gui/motion/texture-reconstruction.js`, used from `gui/polish.js:136` | Plain image cross-fade (artwork must stay trustworthy) |
 | Folder flap | `gui/app.js:722`, inline SVG at `gui/index.html:1020` | Static folder icon in its category colour |
 | Contextual pigments | `gui/motion/krackle-context.js` (`AtelierMotion.energy`) | Nothing (D5) |

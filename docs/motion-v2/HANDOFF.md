@@ -287,9 +287,15 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   header icon or label in the piece colour. Controls, the stage and swatches stay neutral.
   Texture has no studio of its own, so its Export options dialog carries the blue, as Thiago
   confirmed. Header text holds 5:1 or better on the band in all six presets, light and dark.
-- [ ] **P4b.6** ⏸ Tray pieces. Adding something to the mod tray looks like clicking in a
+- [x] **P4b.6** ⏸ Tray pieces. Adding something to the mod tray looks like clicking in a
   new piece: the added item seats into the tray with the glyph's contact, snap and settle,
   not a plain insert.
+  Thiago chose "piece clicks in" (`gui/polish.js`, `seat()`). The row's slot opens while
+  the thumbnail travels in from the library's side. It snaps 3px past its well and recoils,
+  on Complete's timings and curves. At the impact the thumbnail squashes and the text wipes in.
+  A save over a row already in the tray only re-seats. Calm drops the squash and Off shows
+  the row at once. The curves come from `AtelierMotion.assembly.curves`. Removing a row still
+  fades; that's in P4b.7's audit.
 - [ ] **P4b.7** ⏸ No fades on pop-ups or toasts. Nothing that pops up (toasts, captions,
   dialogs, menus, popovers) fades in or out; each enters and leaves with deliberate
   movement. Audit every one, then show the movement options. In Off and OS reduced motion

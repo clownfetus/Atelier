@@ -100,12 +100,68 @@
     }
     document.documentElement.style.setProperty('--skin-loader-accent', loader);
   }
+  // Tokens of the rows the last tray render added, so a confirmed save can tell a new piece from a re-save.
+  let freshRows = new Set();
+  const seating = new Map();
+  // A row arriving in the Mod tray clicks in like a glyph piece (P4b.6, SPEC 4.3's click): its slot opens while
+  // the thumbnail travels in from the library's side (340 ms), comes in (110 ms), snaps 3 px past its well (80 ms),
+  // recoils (110 ms) and rests (130 ms); at the impact the thumbnail squashes and the name, tick and delete wipe in.
+  // A row saved over in place only re-seats: the snap, recoil and rest. Calm drops the squash; Off shows the row
+  // at once. Nothing fades. Called only once a save or import has really succeeded.
+  function seat(row, fresh) {
+    seating.get(row)?.();
+    const curves = window.AtelierMotion?.assembly?.curves, thumb = row.querySelector('.sb-thumb');
+    if (!curves || !thumb || typeof row.animate !== 'function') return;
+    const squash = window.AtelierMotionPolicy?.allows(3) !== false;
+    const lead = fresh ? 450 : 0, T = lead + 320 + (squash ? 60 : 0), at = ms => ms / T;
+    const run = (el, frames) => el.animate(frames, {duration: T, fill: 'backwards'});
+    // The library sits to one side of the tray; the piece travels from it.
+    const grid = document.getElementById('grid-area')?.getBoundingClientRect(), box = row.getBoundingClientRect();
+    const s = grid && grid.width && grid.left > box.left ? -1 : 1;
+    const x = v => v ? `translateX(${v}px)` : 'none';
+    const travel = [
+      ...(fresh ? [{offset: 0, transform: x(-s * 120), easing: curves.move},
+        {offset: at(340), transform: x(-s * 12), easing: curves.out}] : []),
+      {offset: at(lead), transform: 'none', easing: curves.snap},
+      {offset: at(lead + 80), transform: x(s * 3), easing: curves.recoil},
+      {offset: at(lead + 190), transform: x(s), easing: curves.rest},
+      {offset: at(lead + 320), transform: 'none'}, ...(T > lead + 320 ? [{offset: 1, transform: 'none'}] : [])];
+    const animations = [run(thumb, travel)];
+    if (squash) {
+      const art = thumb.firstElementChild || thumb, hit = at(lead + 80);
+      animations.push(art.animate([{offset: 0, transform: 'none'}, {offset: hit, transform: 'none'},
+        {offset: hit, transform: 'scale(.88,1.12)', easing: curves.punchBack}, {offset: Math.min(1, at(lead + 380)), transform: 'none'},
+        ...(at(lead + 380) < 1 ? [{offset: 1, transform: 'none'}] : [])], {duration: T}));
+    }
+    if (fresh) {
+      const cs = getComputedStyle(row), h = box.height + 'px';
+      // The opening slot carries the rows below down itself, so their slide from sidebarAfter would double it.
+      for (const other of row.closest('#sidebar-list')?.querySelectorAll('.sb-item') || []) {
+        if (row.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) mounts.get(other)?.destroy();
+      }
+      row.style.overflow = 'hidden';
+      animations.push(run(row, [{offset: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px', easing: curves.move},
+        {offset: at(340), height: h, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom}, {offset: 1, height: h, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom}]));
+      // A wipe, not a fade: the text is revealed from the impact by a clip.
+      for (const part of row.querySelectorAll(':scope > .sb-info, :scope > .sb-check, :scope > .sb-clear')) {
+        animations.push(run(part, [{offset: 0, clipPath: 'inset(0 100% 0 0)'}, {offset: at(530), clipPath: 'inset(0 100% 0 0)', easing: curves.out},
+          {offset: Math.min(1, at(770)), clipPath: 'inset(0 0 0 0)'}, ...(at(770) < 1 ? [{offset: 1, clipPath: 'inset(0 0 0 0)'}] : [])]));
+      }
+    }
+    let done = false;
+    const dispose = () => {
+      if (done) return; done = true;
+      for (const animation of animations) animation.cancel();
+      row.style.overflow = ''; seating.delete(row); drains.delete(dispose);
+    };
+    seating.set(row, dispose); drains.add(dispose);
+    Promise.all(animations.map(a => a.finished)).then(dispose, dispose);
+  }
   function fly(path) {
     requestAnimationFrame(() => {
       if (document.hidden || reduced()) return;
-      // A row arriving in the Mod tray fades and rises. It's interface chrome, not the glyph.
-      const destination = [...document.querySelectorAll('.sb-item')].find(node=>node.dataset.gameRel===path);
-      if (destination) play(destination,[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],200);
+      const row = [...document.querySelectorAll('.sb-item')].find(node=>node.dataset.gameRel===path);
+      if (row?.getClientRects().length) seat(row, freshRows.has(row.dataset.token));
     });
   }
   // A changed texture fades in over the old one, so what's on screen is always the artwork itself.
@@ -135,6 +191,8 @@
     return [...list.querySelectorAll('.sb-item')].map(row=>({token:row.dataset.token,rect:row.getBoundingClientRect(),row}));
   }
   function sidebarAfter(previous, list) {
+    const known = new Set((previous || []).map(entry => entry.token));
+    freshRows = new Set([...list.querySelectorAll('.sb-item')].map(row => row.dataset.token).filter(token => !known.has(token)));
     if (reduced() || document.hidden || !list.getClientRects().length) return;
     for (const entry of previous || []) {
       const next = [...list.querySelectorAll('.sb-item')].find(row=>row.dataset.token===entry.token);

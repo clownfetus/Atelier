@@ -40,11 +40,14 @@
       return Y(Math.max(0, Math.min(1, t)));
     };
   }
-  const E = Object.freeze({
-    move: bez(.65, 0, .35, 1), out: bez(.16, 1, .3, 1), windup: bez(.45, 0, .55, 1), rest: bez(.45, 0, .55, 1),
-    snap: bez(.9, 0, 1, .5), recoil: bez(.2, .9, .4, 1), colour: bez(.4, 0, .2, 1), heavy: bez(.6, 0, .95, .55),
-    punchOut: bez(.2, .8, .3, 1), punchBack: bez(.3, 1.6, .5, 1), linear: x => x,
+  // SPEC 4.9. The page's own CSS and Web Animations (the Mod tray's click-in) read these too, as `curves`.
+  const CURVES = Object.freeze({
+    move: [.65, 0, .35, 1], out: [.16, 1, .3, 1], windup: [.45, 0, .55, 1], rest: [.45, 0, .55, 1],
+    snap: [.9, 0, 1, .5], recoil: [.2, .9, .4, 1], colour: [.4, 0, .2, 1], heavy: [.6, 0, .95, .55],
+    punchOut: [.2, .8, .3, 1], punchBack: [.3, 1.6, .5, 1],
   });
+  const E = Object.freeze({...Object.fromEntries(Object.entries(CURVES).map(([k, c]) => [k, bez(...c)])), linear: x => x});
+  assembly.curves = Object.freeze(Object.fromEntries(Object.entries(CURVES).map(([k, c]) => [k, `cubic-bezier(${c.join(',')})`])));
   const lerp = (a, b, t) => a + (b - a) * t;
   function lerpObj(a, b, t) {
     const o = {};
