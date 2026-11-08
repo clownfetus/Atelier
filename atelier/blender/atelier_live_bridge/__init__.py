@@ -16,7 +16,7 @@ import bpy
 from mathutils import Matrix
 from .tracking import strip_tracking, restore_tracking
 from .material_nodes import wire_material
-from .safety import PROTOCOL, identity, validate_request
+from .safety import PROTOCOL, build_identity, identity, validate_request
 
 bl_info = {
     'name': 'Atelier Live Bridge', 'author': 'Atelier contributors',
@@ -26,6 +26,25 @@ bl_info = {
 
 _RUNNING = False
 _SESSION = None
+_BUILD = None
+
+
+def _own_build():
+    here = Path(__file__).resolve().parent
+    def read(name):
+        try:
+            return (here / name).read_bytes()
+        except OSError:
+            return None
+    return build_identity(read)
+
+
+def _import_glb(path):
+    # Blender 4.4 and newer otherwise add an Icosphere to draw the bones; it is not part of the model.
+    options = {}
+    if 'disable_bone_shape' in bpy.ops.import_scene.gltf.get_rna_type().properties.keys():
+        options['disable_bone_shape'] = True
+    bpy.ops.import_scene.gltf(filepath=path, **options)
 
 
 def bridge_root():
@@ -83,6 +102,7 @@ def receive(request, root):
     parts = validate_request(request, root, _SESSION)
     before = set(bpy.data.objects)
     added = []
+    received = []
     created_collections = []
     warning = []
     source_staging = (root / 'staging' / request['job']).resolve()
@@ -92,12 +112,17 @@ def receive(request, root):
             # glTF import operates on the current Blender scene, no headless restart.
             prepared_path, tracking = strip_tracking(part['glb'])
             try:
-                bpy.ops.import_scene.gltf(filepath=prepared_path)
+                _import_glb(prepared_path)
             finally:
                 if prepared_path != part['glb']:
                     Path(prepared_path).unlink(missing_ok=True)
             created = set(bpy.data.objects) - before
-            fresh = list(created - set(added))
+            new_objects = list(created - set(added))
+            added.extend(new_objects)
+            # Bone display shapes stay in the importer's hidden collection; only the model is checked and wired.
+            shapes = {bone.custom_shape for obj in new_objects if obj.type == 'ARMATURE'
+                      for bone in obj.pose.bones if bone.custom_shape is not None}
+            fresh = [obj for obj in new_objects if obj not in shapes]
             if tracking is not None:
                 for obj in fresh:
                     if obj.type == 'MESH':restore_tracking(obj.data, tracking)
@@ -118,12 +143,12 @@ def receive(request, root):
             for image in images:
                 if not image.packed_file:
                     image.pack()  # images survive deletion of temporary staging files
-            added.extend(fresh)
+            received.extend(fresh)
         for obj in added:
             obj.select_set(False)
-        for obj in added:
+        for obj in received:
             if obj.type == 'MESH':obj.select_set(True)
-        mesh_count = sum(obj.type == 'MESH' for obj in added)
+        mesh_count = sum(obj.type == 'MESH' for obj in received)
         return {'meshes': mesh_count, 'warnings': warning[:24],
                 'note': 'Imported into the open Blender scene. Save the Blender file to keep your edits.'}
     except Exception:
@@ -149,7 +174,8 @@ def tick():
         if active.get('receiver') != _SESSION and abs(time.time() - active.get('time', 0)) < 8:
             return .5
         _atomic_json(root / 'receiver.json', {'protocol': PROTOCOL, 'time': time.time(),
-                                              'receiver': _SESSION, 'blender': bpy.app.version_string})
+                                              'receiver': _SESSION, 'blender': bpy.app.version_string,
+                                              'build': _BUILD})
         for path in sorted((root / 'requests').glob('*.json'))[:1]:
             if not identity(path.stem):
                 continue
@@ -180,8 +206,9 @@ def tick():
 
 
 def register():
-    global _RUNNING, _SESSION
+    global _RUNNING, _SESSION, _BUILD
     _SESSION = uuid.uuid4().hex
+    _BUILD = _own_build()
     _RUNNING = True
     if not bpy.app.timers.is_registered(tick):
         bpy.app.timers.register(tick, first_interval=0.5, persistent=True)

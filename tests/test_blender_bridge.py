@@ -35,6 +35,12 @@ class BlenderBridgeTests(unittest.TestCase):
             B._atomic_json(root/'receiver.json', {'protocol': B.PROTOCOL, 'time': 100, 'receiver': self.session})
             self.assertEqual(B.receiver_status(root, now=103)['time'], 100)
 
+    def test_older_addon_is_refused_before_export(self):
+        for status in ({}, {'build': None}, {'build': 'f' * 64}):
+            with self.assertRaisesRegex(RuntimeError, 'older Atelier Live Bridge'):
+                B.require_current_addon(status, expected='e' * 64)
+        self.assertEqual(B.require_current_addon({'build': 'e' * 64}, expected='e' * 64)['build'], 'e' * 64)
+
     def test_atomically_submitted_request_gets_receipt(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder); job=B.new_job_id(); self.heartbeat(root)
@@ -111,6 +117,27 @@ class ConfinedRequests(unittest.TestCase):
             record=json.loads(archive.read('build-inputs.json'))
             self.assertIn('safety.py',record['files'])
             for name,digest in record['files'].items():self.assertEqual(digest,hashlib.sha256(archive.read(name)).hexdigest())
+
+    def test_installed_addon_reports_the_build_atelier_expects(self):
+        from atelier.blender_extension import archive_bytes, expected_build
+        root=Path(__file__).resolve().parents[1]
+        fixture=self.root/'package';fixture.mkdir()
+        import shutil
+        shutil.copytree(root/'atelier/blender',fixture/'atelier/blender')
+        (fixture/'version').write_text('1.1.1');(fixture/'LICENSE').write_text('fixture license')
+        installed=self.root/'installed'
+        with zipfile.ZipFile(io.BytesIO(archive_bytes(fixture))) as archive:archive.extractall(installed)
+        spec=importlib.util.spec_from_file_location('installed_safety',installed/'safety.py')
+        safety=importlib.util.module_from_spec(spec);spec.loader.exec_module(safety)
+        def read(name):
+            path=installed/name
+            return path.read_bytes() if path.is_file() else None
+        self.assertEqual(safety.build_identity(read),expected_build(fixture))
+        # Any change to the add-on's code is a different build, and a missing file is no build at all.
+        (installed/'material_nodes.py').write_bytes(read('material_nodes.py')+b'\n# older\n')
+        self.assertNotEqual(safety.build_identity(read),expected_build(fixture))
+        (installed/'tracking.py').unlink()
+        self.assertIsNone(safety.build_identity(read))
 
     def test_external_resources_inside_a_glb_are_rejected(self):
         # Loading a .glb is not sufficient confinement: its JSON can name an

@@ -50,6 +50,17 @@ def receiver_status(root=None, now=None):
         raise RuntimeError('Blender live-send add-on is not running. Enable Atelier Live Bridge in Blender, then try again.')
 
 
+def require_current_addon(status, expected=None):
+    """An older add-on still imports, but with old material wiring; ask for the current one instead."""
+    if expected is None:
+        from atelier.blender_extension import expected_build
+        expected = expected_build()
+    if status.get('build') != expected:
+        raise RuntimeError('Blender is running an older Atelier Live Bridge. Download the current one from '
+                           'Set up live Blender, install it in Blender over the old one, then try again.')
+    return status
+
+
 def new_job_id():
     return uuid.uuid4().hex
 

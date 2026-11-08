@@ -3,7 +3,11 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import sys
 import zipfile
+
+# Same files and fingerprint as build_identity in atelier_live_bridge/safety.py; a test keeps them in step.
+BUILD_FILES = ('__init__.py', 'tracking.py', 'safety.py', 'material_nodes.py', 'blender_manifest.toml')
 
 
 def archive_bytes(root=None):
@@ -26,3 +30,18 @@ def archive_bytes(root=None):
             info.external_attr = 0o644 << 16
             archive.writestr(info, data)
     return stream.getvalue()
+
+
+def shipped_archive(root=None):
+    """The add-on this Atelier offers for download: prebuilt in a frozen app, built from source otherwise."""
+    if root is None and getattr(sys, 'frozen', False):
+        return (Path(sys._MEIPASS) / 'extensions' / 'Atelier-Live-Bridge.zip').read_bytes()
+    return archive_bytes(root)
+
+
+def expected_build(root=None):
+    """Fingerprint of the shipped add-on's code, as the running add-on reports its own."""
+    with zipfile.ZipFile(io.BytesIO(shipped_archive(root))) as archive:
+        digests = {name: hashlib.sha256(archive.read(name).replace(b'\r\n', b'\n')).hexdigest()
+                   for name in BUILD_FILES}
+    return hashlib.sha256(json.dumps(digests, sort_keys=True).encode('utf-8')).hexdigest()
