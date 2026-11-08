@@ -64,9 +64,11 @@ check includes them.
 | Warning amber | `#E6C35C` | Warning (hue 45°; copper is 19°) |
 | Error rose | `#EC6A86` | Error (hue 347°) |
 | Loader plates | `#6C98CA`, `#5CB4D6`, `#9686D6`, `#5F6FD0`, `#B57FD0` | Texture loader's bands only (§4.7) |
-| Loader shine | `#F0BEA6` | Material loader's band of light only (§4.7) |
+| Loader shine | `#F0BEA6` | The material disc's band of light: its loader (§4.7) and the progress disc (§4.10) |
 
-Category colours never appear on progress bars, buttons or links. Status
+Category colours never appear on buttons or links. On a progress bar the fill
+and track stay neutral; the one piece on it is the material disc that rolls the
+fill forward (§4.10, P4b.2), drawn as the piece itself. Status
 colours never appear on the brand mark outside the status glyph. Status is
 always icon + sentence + colour; colour is the third cue.
 
@@ -432,6 +434,32 @@ priority over bible p.10 and p.14 here.
 | colour | 0.4, 0, 0.2, 1 |
 | punchOut | 0.2, 0.8, 0.3, 1 |
 | punchBack | 0.3, 1.6, 0.5, 1 |
+
+### 4.10 Counted progress (P4b.2)
+
+Every counted progress bar is the material disc rolling its fill forward:
+the update download bar, the startup bar, the shader-index bar and the Activity
+ring. Uncounted work never gets a bar; it is the working glyph.
+
+- **Drawing.** The bar's own track and value stay as they are (a `<progress>`
+  keeps its value and role; a fill keeps its width or `--progress`, unseen). Over
+  it: the fill in the theme's text colour and the disc at its head, radius
+  `max(3.6, 0.8h)` px for a bar `h` px tall, so it reads even on the 3 px startup
+  bar. Its halo, `2 × max(1.4, 0.28h)` px, is the colour of the surface behind the
+  bar, and its shine turns with the distance rolled (`distance ÷ r` radians).
+- **Rolling.** Each roll goes to the latest count: `move`, `clamp(220 +
+  distance × 0.95, 300, 640)` ms. It lands before the next roll starts, so the bar
+  trails the count by under a second and never passes it. A count that starts
+  again goes straight back; the disc never rolls backwards.
+- **Elastic.** In Full, a roll stretches the disc along the bar by up to 16% at
+  peak speed and squashes it to 0.88 by 1.12 as it lands, back to round over
+  300 ms `punchBack`, both scaled by `min(1, distance ÷ 4r)`. The squash runs on
+  after the landing and never holds up the next roll.
+- **Activity ring.** The disc (r 2.5 on a 16 px ring) rolls round the track,
+  without the stretch. A refreshed ring carries on from where the last one was.
+- **Calm** rolls without the stretch or squash. **Off** and OS reduced motion
+  step to each count. A bar not laid out yet, in a closed dialog, takes the count
+  at once.
 
 ## 5. Tiers and the Motion setting
 

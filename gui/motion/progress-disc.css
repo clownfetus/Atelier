@@ -1,0 +1,17 @@
+/* The rolling disc on every counted bar (progress-disc.js). The bar's own element keeps its track and its
+   value; its fill stays in layout, unseen, and the disc and fill are drawn over it. */
+.has-disc { position: relative; overflow: visible; }
+.progress-bar-bg.has-disc > .progress-bar-fill,
+.shader-bar.has-disc > #shader-bar-fill { visibility: hidden; }
+/* The startup bar is a <progress>: its value bar is hidden, its track stays. The id rule in polish.css paints it. */
+progress.has-disc::-webkit-progress-value { background: transparent !important; }
+progress.has-disc::-moz-progress-bar { background: transparent !important; }
+.progress-disc { position: absolute; left: 0; overflow: visible; pointer-events: none; }
+.progress-disc-fill { fill: var(--text); }
+.progress-disc-piece { fill: var(--atelier-material); paint-order: stroke; }
+.progress-disc-shine { fill: #F0BEA6; } /* the glyph's material shine (SHINE in pieces.js) */
+/* Activity's counted ring: the conic ring gives way to the disc rolling round a track. */
+.activity-ring.has-disc { background: none; mask: none; }
+.progress-disc-ring { inset: 0; width: 100%; height: 100%; }
+.progress-disc-track { fill: none; stroke: var(--border); stroke-width: 2.4; }
+.progress-disc-arc { fill: none; stroke: var(--text); stroke-width: 2.4; }

@@ -263,8 +263,9 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   distinctive as its shape, tied to what it stands for: textures, meshes and materials.
   Keep the ten invariants in SPEC §1; if an idea needs one bent, stop and ask.
   Thiago chose Register (tile), Weighted (mesh) and Elastic (disc); see SPEC §4.1, Gaits.
-- [ ] **P4b.2** ⏸ Progress bars. A bespoke treatment for the update download bar and every
+- [x] **P4b.2** ⏸ Progress bars. A bespoke treatment for the update download bar and every
   other loading bar in the app, in the same language as the glyph.
+  Thiago chose the Rolling disc (`gui/motion/progress-disc.js`, SPEC §4.10).
 - [ ] **P4b.3** ⏸ Alignment and sizing pass across the whole app, text included: things
   line up, share edges and baselines, and sit at the sizes the type and spacing scales set.
   Show before and after for each fix.

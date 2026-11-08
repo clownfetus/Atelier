@@ -82,6 +82,7 @@ glyphs finishing together click once.
 | `logo-entrance-ui.js` | The header logo's entrance on launch |
 | `viewport-poster.js` | Model Studio opened from costume artwork: the artwork waits on the stage while the model decodes |
 | `surface-adapters.js` | Startup beside the counted bar, the index failure notice and the update button in the topbar |
+| `progress-disc.js` | Every counted bar and the Activity ring: the material disc rolls the fill forward to the count (SPEC §4.10) |
 | `motion-preview.js` / `.css` | Settings: Preview motion |
 | `../job-tools.js` | Activity rows: a glyph per job, kept across refreshes |
 | `../mod-open.js` | Open a mod: a glyph per outcome row |
