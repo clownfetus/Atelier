@@ -4,19 +4,19 @@
 .add-asset-help, .add-asset-status { color: var(--muted); font-size: var(--studio-text-label); line-height: 1.5; }
 .add-asset-form { display: grid; gap: 12px; }
 .add-asset-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
-.add-asset-field { display: flex; flex-direction: column; gap: 7px; font-size: var(--studio-text-label); min-width: 0; }
-.add-asset-field input, .add-asset-field select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); background: var(--bg2); color: var(--text); font: inherit; padding: 8px 10px; }
+.add-asset-field { display: flex; flex-direction: column; gap: 8px; font-size: var(--studio-text-label); min-width: 0; }
+.add-asset-field input, .add-asset-field select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); background: var(--bg2); color: var(--text); font: inherit; padding: 8px 12px; }
 .add-asset-field input:focus-visible, .add-asset-field select:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .add-asset-inline { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .add-asset-inline input { flex: 1; }
 .add-asset-inline .btn { flex-shrink: 0; }
 .add-asset-files { overflow-wrap: anywhere; font-size: var(--studio-text-label); color: var(--muted); }
-.add-asset-destination { display: grid; gap: 6px; padding: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--studio-shape-medium); font-size: var(--studio-text-detail); }
+.add-asset-destination { display: grid; gap: 8px; padding: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--studio-shape-medium); font-size: var(--studio-text-detail); }
 .add-asset-destination code, .add-asset-browser-path { overflow-wrap: anywhere; color: var(--text); }
 .add-asset-browser { border: 1px solid var(--border); border-radius: var(--studio-shape-medium); padding: 12px; background: var(--bg2); }
-.add-asset-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: var(--studio-text-detail); }
+.add-asset-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; font-size: var(--studio-text-detail); }
 .add-asset-browser-path { flex: 1; min-width: 0; }
-.add-asset-browser-items { display: grid; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 10px; }
+.add-asset-browser-items { display: grid; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 12px; }
 .add-asset-browser-items button { width: 100%; justify-content: flex-start; text-align: left; overflow-wrap: anywhere; white-space: normal; }
 .add-asset-browser-items .hero-chip-art { flex: 0 0 32px; width: 32px; height: 32px; object-fit: contain; }
 .add-asset-browser-items small { color: var(--muted); margin-left: auto; }

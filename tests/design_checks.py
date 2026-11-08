@@ -214,7 +214,7 @@ def run_design_checks(page, context, url, report, checks):
     page.keyboard.press('Enter')
     page.wait_for_selector('#ctx-menu.active')
     page.keyboard.press('ArrowDown')
-    assert page.evaluate('document.activeElement.textContent.includes("Refresh View")')
+    assert page.evaluate('document.activeElement.textContent.includes("Refresh view")')
     page.keyboard.press('Escape')
     assert page.locator('#menu-btn').evaluate('(el)=>el===document.activeElement')
     page.locator('#grid-area .card').first.focus()

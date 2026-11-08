@@ -272,7 +272,9 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   Thiago approved all seven fixes: one 16px library edge, picker cards on the 24px edge,
   dialog spacing on the scale, the Repatch inset and fields, identity type roles (36 headline,
   20 title), the 36px tray field and toast padding. The library's empty glyph now sits centred
-  with its message. The asset editors weren't reachable without game assets.
+  with its message. A follow-up pass, run on fixture data, brought in the asset editors, the
+  dead CSS, padding, margins and gaps across the stylesheets, editor headings and fields, and
+  sentence-case copy.
 - [ ] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
   same identity. Packaging only: no change to what it installs or where.
 - [ ] **P4b.5** ⏸ Studio colours. The texture, mesh and material studios each take their

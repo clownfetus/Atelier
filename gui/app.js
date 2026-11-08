@@ -1138,7 +1138,7 @@ async function openMaterialEditor(item) {
   document.getElementById("mat-title").textContent = item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
-  document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
   const stopWorking = editorWorking('material-overlay', current, 'loading');
@@ -1286,7 +1286,7 @@ function _dyeLegendHtml(m) {
 // which is the workaround already circulating by hand, made one click and explained in place.
 function _dyeOffHtml(m) {
   const on = !!m.dyeOff;
-  return `<div class="opt-row" style="margin:14px 0 4px">
+  return `<div class="opt-row" style="margin:16px 0 4px">
       <label class="toggle-row ${on ? "on" : ""}">
         <span class="switch"><input type="checkbox" ${on ? "checked" : ""}
               onchange="matDyeOff(this.checked)"><span class="switch-track"></span></span>
@@ -1527,7 +1527,7 @@ function renderMatEditor() {
           <button class="seg-btn ${reg ? "" : "on"}" onclick="dyeView('preview')">Dyed</button>
           <button class="seg-btn ${reg ? "on" : ""}" onclick="dyeView('regions')">Region map</button>
         </span></div>
-      <div class="mat-row" style="align-items:flex-start;gap:14px">
+      <div class="mat-row" style="align-items:flex-start;gap:16px">
         <img id="dye-prev" alt="dye preview"
              style="width:230px;height:230px;object-fit:contain;background:#0d0d10;border:1px solid var(--bd);border-radius:6px">
         <div style="flex:1;font-size:12px;line-height:1.5" class="muted">
@@ -1959,7 +1959,7 @@ async function openCurveEditor(item) {
   document.getElementById("curve-title").textContent = item.name;
   document.getElementById("curve-sub").textContent = item.game_rel || "";
   document.getElementById("curve-status").textContent = "";
-  document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
   if (!current()) return;
@@ -1985,19 +1985,19 @@ function renderCurveEditor() {
     const keys = c.channels[ch] || (c.channels[ch] = []);
     h += `<div class="mat-section" style="display:flex;align-items:center;gap:8px">
       <span>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
-      <button class="btn" style="padding:2px 9px;font-size:11px" onclick="curveAddKey('${ch}')">+ key</button></div>`;
+      <button class="btn btn-small" onclick="curveAddKey('${ch}')">+ key</button></div>`;
     keys.forEach((k, i) => {
       const cubic = (k.interp || "RCIM_Linear") === "RCIM_Cubic";
-      h += `<div style="display:flex;gap:6px;align-items:center;padding:3px 0;flex-wrap:wrap;font-size:12px">
-        <input type="number" step="any" title="time" style="width:72px" value="${k.time}" oninput="curveKeyField('${ch}',${i},'time',this.value)">
-        <input type="number" step="any" title="value" style="width:88px" value="${k.value}" oninput="curveKeyField('${ch}',${i},'value',this.value)">
+      h += `<div class="curve-key">
+        <input class="editor-field" type="number" step="any" title="time" style="width:72px" value="${k.time}" oninput="curveKeyField('${ch}',${i},'time',this.value)">
+        <input class="editor-field" type="number" step="any" title="value" style="width:88px" value="${k.value}" oninput="curveKeyField('${ch}',${i},'value',this.value)">
         <select title="interpolation" onchange="curveKeyField('${ch}',${i},'interp',this.value)">
           ${CURVE_INTERP.map(m => `<option value="${m}" ${m === (k.interp || "RCIM_Linear") ? "selected" : ""}>${m.slice(5)}</option>`).join("")}
         </select>
-        ${cubic ? `<input type="number" step="any" title="arrive tangent" style="width:62px" value="${k.arriveTangent || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangent',this.value)">
-        <input type="number" step="any" title="arrive tangent WEIGHT" style="width:58px" value="${k.arriveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangentWeight',this.value)">
-        <input type="number" step="any" title="leave tangent" style="width:62px" value="${k.leaveTangent || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangent',this.value)">
-        <input type="number" step="any" title="leave tangent WEIGHT" style="width:58px" value="${k.leaveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangentWeight',this.value)">` : ""}
+        ${cubic ? `<input class="editor-field" type="number" step="any" title="arrive tangent" style="width:72px" value="${k.arriveTangent || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangent',this.value)">
+        <input class="editor-field" type="number" step="any" title="arrive tangent weight" style="width:64px" value="${k.arriveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'arriveTangentWeight',this.value)">
+        <input class="editor-field" type="number" step="any" title="leave tangent" style="width:72px" value="${k.leaveTangent || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangent',this.value)">
+        <input class="editor-field" type="number" step="any" title="leave tangent weight" style="width:64px" value="${k.leaveTangentWeight || 0}" oninput="curveKeyField('${ch}',${i},'leaveTangentWeight',this.value)">` : ""}
         <button class="sb-clear" title="remove key" onclick="curveRemoveKey('${ch}',${i})"><i data-lucide="x" size="13"></i></button>
       </div>`;
     });
@@ -2133,7 +2133,7 @@ async function openVfxEditor(item) {
   document.getElementById("vfx-title").textContent = item.name;
   document.getElementById("vfx-sub").textContent = item.game_rel || "";
   document.getElementById("vfx-status").textContent = "";
-  document.getElementById("vfx-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("vfx-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
   const stopWorking = editorWorking('vfx-overlay', current, 'loading');
@@ -2754,7 +2754,7 @@ function handleSSE(d) {
     if (!shown) {
       document.getElementById("prog-overlay").classList.remove("active");
       if (d.error) {
-        toast(`Edit All failed: ${d.error}`, "warning", 8000);
+        toast(`Edit all failed: ${d.error}`, "warning", 8000);
       } else {
         toast(`${d.current} texture${d.current !== 1 ? "s" : ""} ready to edit`, "success");
       }
@@ -2922,7 +2922,7 @@ function renderSidebar() {
   const q     = _libraryQuery().toLowerCase();
   const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
   if (!items.length) {
-    list.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
+    list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
     updateInstallBtn();
     return;
   }
@@ -3082,8 +3082,8 @@ function updateInstallBtn() {
   pwRow.classList.toggle("disabled", !hasPw);
   pwCb.disabled = !hasPw;
   if (!hasPw) pwCb.checked = false;
-  pwRow.title = hasPw ? "Encrypt the mod with the Protection Password set in Settings"
-                      : "Set a Protection Password first (Menu → Settings)";
+  pwRow.title = hasPw ? "Encrypt the mod with the protection password set in Settings"
+                      : "Set a protection password first (Menu → Settings)";
   _syncToggleRow("toggle-password");
 }
 
@@ -3638,7 +3638,7 @@ document.getElementById("setup-open-settings").addEventListener("click", () => o
 
 function _applySetupMode() {
   const paths = _pathsMode;
-  document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial Configuration";
+  document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial configuration";
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
   document.getElementById("setup-password-row").style.display = paths ? "" : "none";
@@ -3698,9 +3698,9 @@ async function loadContentMounts() {
     const rows = (res.mounts || []).map(m =>
       `<div><b>${m.mount}</b> — ${m.assets.toLocaleString()} assets</div>`).join("");
     const lq = res.has_lq
-      ? `<div class="good" style="margin-top:6px">Marvel_LQ is present, and has its own section in
+      ? `<div class="good" style="margin-top:8px">Marvel_LQ is present, and has its own section in
            the browser.</div>`
-      : `<div class="bad" style="margin-top:6px">No <b>Marvel_LQ</b> mount — the game does not ship
+      : `<div class="bad" style="margin-top:8px">No <b>Marvel_LQ</b> mount — the game does not ship
            one in this build, so there is no low-quality copy to browse or to duplicate a UI
            texture into. This is your install, not a missing feature.</div>`;
     el.innerHTML = (rows || "<div>No content mounts were read.</div>") + lq;
@@ -3722,7 +3722,7 @@ async function loadToolStatus(check = false) {
       const next = t.available ? ` <span class="good">→ ${_escTool(t.available)} available</span>` : "";
       return `<div><b>${_escTool(t.name)}</b> ${_escTool(t.version)}${state}${next}</div>`;
     }).join("");
-    const offline = res.channel_error ? `<div class="bad" style="margin-top:6px">Could not reach the update channel: ${_escTool(res.channel_error)}</div>` : "";
+    const offline = res.channel_error ? `<div class="bad" style="margin-top:8px">Could not reach the update channel: ${_escTool(res.channel_error)}</div>` : "";
     el.innerHTML = (rows || "<div>This install predates tool records; reinstall Atelier to enable tool updates.</div>") + offline;
     document.getElementById("tools-update").disabled = !(res.tools || []).some(t => t.available);
   } catch (e) { el.textContent = "Could not read the installed tools."; }
@@ -3838,7 +3838,7 @@ async function validateSetup() {
 
   if (pakOk && usmapOk && keyOk && !modsBad) {
     el.className = "ok";
-    el.innerHTML = '<i data-lucide="check-circle" size="13"></i> All Valid';
+    el.innerHTML = '<i data-lucide="check-circle" size="13"></i> All valid';
     saveBtn.disabled = false;
   } else {
     saveBtn.disabled = true;
@@ -4355,7 +4355,7 @@ async function openTexOpts(item) {
   const ov = document.getElementById("texopt-overlay");
   document.getElementById("texopt-title").textContent = " — " + item.name;
   document.getElementById("texopt-status").textContent = "";
-  document.getElementById("texopt-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("texopt-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   ov.classList.add("active");
   let res;
   try { res = await api(`/api/asset_opts?game_rel=${encodeURIComponent(item.game_rel)}`); }
@@ -4512,7 +4512,7 @@ async function checkUpdate(pending = api("/api/update_check")) {
   // Non-Windows builds can't update in place: same prompt, but the button opens the release page.
   if (info.manual) {
     document.getElementById("update-now").innerHTML =
-      '<i data-lucide="external-link" size="14"></i> Open Release Page';
+      '<i data-lucide="external-link" size="14"></i> Open release page';
     document.getElementById("update-tag").nextSibling.textContent = " is available to download.";
   }
   _showUpdatePanel(info.ready ? "update-ready" : "update-confirm");
@@ -4694,7 +4694,7 @@ function _ctxItemsProject(proj) {
 
 function _projRename(proj) {
   _showProjNameModal({
-    title: "Rename Project", value: proj.name, okLabel: "Rename",
+    title: "Rename project", value: proj.name, okLabel: "Rename",
     action: async newName => {
       await _flushSelection(proj.name);
       const filename = document.getElementById('mod-name-input').value;
@@ -4712,7 +4712,7 @@ function _projRename(proj) {
 
 function _projDuplicate(proj) {
   _showProjNameModal({
-    title: "Duplicate Project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
+    title: "Duplicate project", value: `Copy of ${proj.name}`, okLabel: "Duplicate",
     action: async newName => {
       await _flushSelection(proj.name);
       const r = await api("/api/project/duplicate", {
@@ -4907,7 +4907,7 @@ function _projDeleteConfirm(names) {
   const assets = _projAssetTotal(names);
   const assetTxt = `${assets} edited asset${assets !== 1 ? "s" : ""}`;
   document.getElementById("proj-delete-title").textContent =
-    names.length === 1 ? "Delete Project?" : `Delete ${names.length} Projects?`;
+    names.length === 1 ? "Delete project?" : `Delete ${names.length} projects?`;
   document.getElementById("proj-delete-msg").textContent = names.length === 1
     ? `Delete project "${names[0]}"? All ${assetTxt} will be permanently deleted.`
     : `Delete these ${names.length} projects? All ${assetTxt} across them will be permanently deleted.\n\n${_projNameList(names)}`;
@@ -4921,7 +4921,7 @@ function _projExportConfirm(names) {
   const assets = _projAssetTotal(names);
   const assetTxt = `${assets} edited asset${assets !== 1 ? "s" : ""}`;
   document.getElementById("proj-export-title").textContent =
-    names.length === 1 ? "Export Project?" : `Export ${names.length} Projects?`;
+    names.length === 1 ? "Export project?" : `Export ${names.length} projects?`;
   document.getElementById("proj-export-msg").textContent = names.length === 1
     ? `Pack project "${names[0]}" (${assetTxt}) into a .zip you can save or share. Nothing is changed or removed.`
     : `Pack these ${names.length} projects (${assetTxt}) into one .zip, each in its own folder. Nothing is changed or removed.\n\n${_projNameList(names)}`;
@@ -5056,7 +5056,7 @@ function _showProjNameModal(ctx) {
 
 document.getElementById("proj-new-btn").addEventListener("click", () => {
   _showProjNameModal({
-    title: "New Project", value: "", okLabel: "Create",
+    title: "New project", value: "", okLabel: "Create",
     action: async name => {
       const r = await api("/api/project/create", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -5169,18 +5169,18 @@ document.getElementById("menu-btn").addEventListener("click", e => {
     { preventDefault: () => {}, stopPropagation: () => e.stopPropagation(), clientX: rect.left, clientY: rect.bottom + 4 },
     [
       { icon: "folder-open", label: "My projects", action: openProjectPicker },
-      { icon: "refresh-cw", label: "Refresh View", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
+      { icon: "refresh-cw", label: "Refresh view", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
-      { icon: "package-open", label: "Open Export Folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
+      { icon: "package-open", label: "Open export folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
       "sep",
       { icon: "scan-box", label: "Open a mod…", action: () => window.AtelierModOpen?.open() },
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
       { icon: "sparkles", label: "What’s new…", action: () => window.AtelierChangelog?.show() },
-      { icon: "circle-help", label: "Help / Info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
+      { icon: "circle-help", label: "Help and info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
-      { icon: "trash-2", label: "Reset Data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },
+      { icon: "trash-2", label: "Reset data…", danger: true, action: () => document.getElementById("reset-overlay").classList.add("active") },
     ]
   );
 });
@@ -5385,10 +5385,10 @@ async function loadShaderList() {
   try {
     res = await api(`/api/shaders/list?lib=${encodeURIComponent(lib)}&freq=${freq}` +
                     `&q=${encodeURIComponent(q)}&page=${_sh.page}&page_size=200`);
-  } catch (e) { list.innerHTML = `<div class="muted" style="padding:14px">Error: ${e.message}</div>`; return; }
-  if (!res.ok) { list.innerHTML = `<div class="muted" style="padding:14px">${res.error}</div>`; return; }
+  } catch (e) { list.innerHTML = `<div class="muted" style="padding:16px">Error: ${e.message}</div>`; return; }
+  if (!res.ok) { list.innerHTML = `<div class="muted" style="padding:16px">${res.error}</div>`; return; }
   _sh.total = res.total;
-  if (!res.rows.length) { list.innerHTML = `<div class="muted" style="padding:14px">No shaders match.</div>`; }
+  if (!res.rows.length) { list.innerHTML = `<div class="muted" style="padding:16px">No shaders match.</div>`; }
   else {
     list.innerHTML = res.rows.map(r => {
       const fc = _FREQ_CLASS[r.freq] || "oth";
@@ -5565,7 +5565,7 @@ async function openWorldEditor(item) {
   document.getElementById("world-title").textContent = item.name;
   document.getElementById("world-sub").textContent = item.game_rel || "";
   document.getElementById("world-status").textContent = "";
-  document.getElementById("world-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("world-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
   const stopWorking = editorWorking('world-overlay', current, 'loading');
@@ -5584,8 +5584,8 @@ async function openWorldEditor(item) {
 
 function renderWorldEditor() {
   const m = worldEditor.model, ed = worldEditor.edits, out = [];
-  const sec = (icon, title, inner) => '<div style="margin-bottom:18px"><div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;margin-bottom:8px"><i data-lucide="' + icon + '" size="14" style="color:var(--acc)"></i> ' + title + '</div>' + inner + '</div>';
-  const row = inner => '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;flex-wrap:wrap">' + inner + '</div>';
+  const sec = (icon, title, inner) => '<div style="margin-bottom:16px"><div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:8px"><i data-lucide="' + icon + '" size="14" style="color:var(--acc)"></i> ' + title + '</div>' + inner + '</div>';
+  const row = inner => '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;flex-wrap:wrap">' + inner + '</div>';
 
   if (m.lights && m.lights.length) {
     const rows = m.lights.map(L => {
@@ -5603,7 +5603,7 @@ function renderWorldEditor() {
     const fd = (ed.fog.density != null) ? ed.fog.density : m.fog.density;
     const nc = (m.fog.color) ? '<label style="font-size:12px">Inscatter color <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
     const nd = (m.fog.density != null) ? '<label style="font-size:12px">Density <input type="number" step="0.001" style="width:90px" data-fog="density" value="' + fd + '"></label>' : "";
-    out.push(sec("cloud-fog", "Height Fog", row(nc + nd)));
+    out.push(sec("cloud-fog", "Height fog", row(nc + nd)));
   }
   const ppv = (m.components || []).find(c => c.is_ppv);
   if (ppv && ppv.grade && Object.keys(ppv.grade).length) {
@@ -5617,29 +5617,29 @@ function renderWorldEditor() {
       const gd = ppv.grade[name];
       const cur = (name in (ed.grade || {})) ? ed.grade[name] : gd.value;
       const pretty = name.replace(/^Color/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
-      const tag = gd.override ? "" : ' <span class="muted" style="font-size:10px">(off — edit to enable)</span>';
+      const tag = gd.override ? "" : ' <span class="muted" style="font-size:11px">(off — edit to enable)</span>';
       const dim = gd.override ? "" : ";opacity:.72";
       const lbl = '<span style="flex:0 0 158px">' + pretty + tag + '</span>';
       if (Array.isArray(gd.value)) {
         const v = Array.isArray(cur) ? cur : gd.value;
-        gh += '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px' + dim + '">' + lbl +
+        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
           [0, 1, 2].map(ci => '<input type="number" step="0.01" style="width:64px" title="' + "RGB"[ci] +
             '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + name + '" data-gch="' + ci + '">').join("") + '</div>';
       } else {
-        gh += '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px' + dim + '">' + lbl +
+        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
           '<input type="number" step="0.05" style="width:82px" value="' + (+cur).toFixed(3) + '" data-gname="' + name + '"></div>';
       }
     }
-    out.push(sec("palette", "Post-Process Grade", gh));
+    out.push(sec("palette", "Post-process grade", gh));
   }
   const hide = (m.components || []).filter(c => c.hideable);
   if (hide.length) {
     const rows = hide.map(c => {
       const cur = (c.idx in ed.visibility) ? ed.visibility[c.idx] : (c.enables && "bVisible" in c.enables ? c.enables.bVisible : true);
-      return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + c.name + ' <span class="muted">' + c.cls.replace(/Component$/, "") + '</span></span></label>';
+      return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + c.name + ' <span class="muted">' + c.cls.replace(/Component$/, "") + '</span></span></label>';
     }).join("");
     out.push(sec("eye", 'Visibility <span class="muted">(' + hide.length + ')</span>',
-      '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px">' + rows + '</div>'));
+      '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 12px">' + rows + '</div>'));
   }
   const body = document.getElementById("world-body");
   body.innerHTML = out.join("") || '<div class="mat-empty">No editable lights, fog, grade, or components in this sublevel.</div>';
@@ -5739,7 +5739,7 @@ async function openTextEditor(item) {
   document.getElementById("text-sub").textContent = item.game_rel || "";
   document.getElementById("text-status").textContent = "";
   document.getElementById("text-search").value = "";
-  document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:44px auto"></div>';
+  document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
   const stopWorking = editorWorking('text-overlay', current, 'loading');
@@ -5761,14 +5761,12 @@ function renderTextEditor(filter) {
     const cur = (e.key in ed) ? ed[e.key] : e.value;
     if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
     const changed = (e.key in ed) && ed[e.key] !== e.value;
-    rows.push('<div style="display:flex;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">' +
-      '<div style="flex:0 0 40%;font-size:12px;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"' +
-      ' title="' + _esc(e.key) + '">' + (changed ? '<span style="color:var(--acc)">●</span> ' : '') + _esc(e.key) + '</div>' +
-      '<input data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"' +
-      ' style="flex:1;background:#0000;color:inherit;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:12px"></div>');
+    rows.push('<div class="text-row">' +
+      '<div class="text-key" title="' + _esc(e.key) + '">' + (changed ? '<span class="text-changed">●</span> ' : '') + _esc(e.key) + '</div>' +
+      '<input class="editor-field" data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"></div>');
   }
   const body = document.getElementById("text-body");
-  body.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">' + textEditor.entries.length +
+  body.innerHTML = '<div class="text-count">' + textEditor.entries.length +
     ' strings' + (f ? ' (' + rows.length + ' shown)' : '') + '</div>' +
     (rows.join("") || '<div class="mat-empty">No matching strings.</div>');
   body.querySelectorAll("[data-tkey]").forEach(el => el.addEventListener("input", () => {

@@ -83,7 +83,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   font: 600 13px/1 var(--font-ui);
   background: var(--surface-panel);
   color: var(--text);
@@ -138,7 +138,7 @@
   --glyph-halo: var(--surface-panel);
 }
 .at-import-glyph { width: 211px; height: 176px; }
-.at-import-status { display: grid; gap: 3px; min-height: 58px; }
+.at-import-status { display: grid; gap: 4px; min-height: 58px; }
 .at-import-status b { font: var(--type-title); color: var(--text); }
 #prog-counter { font: 400 13px/19px var(--font-ui); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .at-import-current {
@@ -219,14 +219,6 @@
 }
 .at-field::placeholder { color: var(--text-muted); }
 .at-field:focus-visible { outline: none; box-shadow: 0 0 0 var(--halo) var(--surface), 0 0 0 calc(var(--halo) + 2px) var(--drop); }
-.at-seg { display: inline-flex; gap: 2px; padding: 3px; border: 0; border-radius: 9px; background: var(--surface-sunk); }
-.at-seg button {
-  height: 28px; min-width: 32px; padding: 0 9px; border: 0; border-radius: var(--radius-control);
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; color: var(--text-muted); cursor: pointer;
-}
-.at-seg button:hover { color: var(--text); }
-.at-seg button.on { background: var(--action); color: var(--on-action); }
 .at-count {
   display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 7px;
   border-radius: var(--radius-drop); background: var(--drop); color: var(--on-drop);
@@ -303,7 +295,7 @@
   color: var(--text);
 }
 .at-setup-page h1:focus:not(:focus-visible) { outline: none; }
-.at-setup-lede { margin: 0; max-width: 62ch; font: 400 15px/22px var(--font-ui); color: var(--text-muted); }
+.at-setup-lede { margin: 0; max-width: 62ch; font: var(--type-body); color: var(--text-muted); }
 .at-setup-rows { list-style: none; margin: var(--space-5) 0 0; padding: 0; border-top: 1px solid var(--line); }
 .at-setup-rows[hidden] { display: none; }
 .at-setup-row {
@@ -315,7 +307,7 @@
   padding: 0 var(--space-1);
   border-bottom: 1px solid var(--line);
 }
-.at-setup-row.is-editing { align-items: start; padding-top: 18px; padding-bottom: 18px; }
+.at-setup-row.is-editing { align-items: start; padding-top: 16px; padding-bottom: 16px; }
 .at-setup-glyph { position: relative; display: inline-flex; width: 31px; height: 20px; }
 .at-setup-row.is-editing .at-setup-glyph, .at-setup-row.is-editing .at-setup-name { margin-top: 1px; }
 /* Waiting: an empty slot, not a state. The heading says the check is running. */
@@ -378,7 +370,7 @@
 #setup-page #setup-save {
   min-width: 200px; height: 40px; padding: 0 var(--space-5); border: 0; border-radius: var(--radius-control);
   display: flex; align-items: center; justify-content: center;
-  background: var(--action); color: var(--on-action); font: 600 15px/1 var(--font-ui); white-space: nowrap; cursor: pointer;
+  background: var(--action); color: var(--on-action); font: 600 14px/1 var(--font-ui); white-space: nowrap; cursor: pointer;
 }
 #setup-page #setup-save > :not(#setup-save-label) { display: none; }
 #setup-page #setup-save:hover:not(:disabled) { background: var(--action-hover); }
@@ -388,7 +380,7 @@
 .at-setup-failure[hidden] { display: none; }
 /* The service's own words, as it said them. */
 .at-setup-error {
-  width: 100%; max-width: 720px; box-sizing: border-box; margin: 0; padding: 14px 16px;
+  width: 100%; max-width: 720px; box-sizing: border-box; margin: 0; padding: 16px 16px;
   border-radius: var(--radius-card); background: var(--surface-panel);
   font: var(--type-data); color: var(--fault); white-space: pre-wrap; overflow-wrap: anywhere;
 }
@@ -437,7 +429,7 @@
 }
 .at-modopen-head h1 { margin: 0; font: var(--type-headline); color: var(--text); }
 .at-modopen-head h1:focus:not(:focus-visible) { outline: none; }
-.at-modopen-lede { margin: var(--space-2) 0 0; max-width: 70ch; font: 400 15px/22px var(--font-ui); color: var(--text-muted); }
+.at-modopen-lede { margin: var(--space-2) 0 0; max-width: 70ch; font: var(--type-body); color: var(--text-muted); }
 .at-modopen-head .at-btn { height: 36px; padding: 0 18px; font-size: 14px; flex: none; }
 .at-modopen-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-5); }
 .at-modopen-rows.at-setup-rows { margin-top: 0; border-top: 0; }
@@ -480,7 +472,7 @@
 .at-modopen-asset[data-state="yours"] .at-modopen-status { color: var(--text); }
 /* Owned work: the drop marks what is now in your Mod tray. */
 .at-modopen-asset[data-state="yours"] .at-modopen-status::before {
-  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 1px;
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; vertical-align: 1px;
   border-radius: 50%; background: var(--drop);
 }
 .at-modopen-refs { margin-top: 2px; }
@@ -525,5 +517,5 @@
 .modal.at-dialog .modal-row { margin-top: var(--space-3); gap: var(--space-2); }
 
 @media (max-height: 760px) {
-  .at-proj-hero { padding:14px 0; }
+  .at-proj-hero { padding:16px 0; }
 }

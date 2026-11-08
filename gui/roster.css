@@ -6,7 +6,7 @@
   align-items:center;
   gap:8px;
   min-width:0;
-  padding-top:6px;
+  padding-top:8px;
   border-top:1px solid var(--border);
 }
 .roster-strip,.roster-skins { display:flex;overflow-x:auto;gap:8px;padding:2px;scrollbar-width:none;min-width:0; }
@@ -21,17 +21,17 @@
   display:inline-flex;
   align-items:center;
   min-height:var(--studio-control-height);
-  padding:4px 10px;
+  padding:4px 12px;
   font:var(--studio-type-detail);
   font-weight:500;
 }
 .roster-skin { max-width:220px; }
 /* Artwork colours stay on icon rings and small marks; the costume controls keep the theme. */
 #hero-roster .roster-skin[data-artwork-colour] .roster-skin-icon { box-shadow:0 0 0 2px var(--roster-skin-accent); }
-#hero-roster .roster-skin:not(:has(.roster-skin-icon))::before { content:'';width:3px;align-self:stretch;flex-shrink:0;margin-right:7px;border-radius:2px;background:var(--roster-skin-accent,transparent); }
+#hero-roster .roster-skin:not(:has(.roster-skin-icon))::before { content:'';width:3px;align-self:stretch;flex-shrink:0;margin-right:8px;border-radius:2px;background:var(--roster-skin-accent,transparent); }
 .roster-skin:hover { border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc); }
 .roster-skin span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.roster-skin:has(.roster-skin-icon) { padding-left:4px; gap:7px; }
+.roster-skin:has(.roster-skin-icon) { padding-left:4px; gap:8px; }
 .roster-skin-icon { width:26px; height:26px; flex:0 0 26px; border-radius:var(--studio-shape-xs); object-fit:cover; object-position:center 20%; background:var(--bg3); }
 /* Size (library-tools.js --card-w) scales heroes too: 156 Standard keeps the original 112px column. */
 .roster-strip {
@@ -68,11 +68,11 @@
 .roster-art { height:calc(var(--card-w,156px) * .64); width:100%; flex-shrink:0; overflow:hidden; background:color-mix(in srgb,var(--roster-accent,var(--acc)) 22%,var(--bg2)); }
 .roster-art img { display:block; height:100%; width:100%; object-fit:contain; }
 .roster-portrait strong { width:100%; min-height:calc(2.5em + 12px); padding:8px 8px 4px; font:600 var(--studio-text-body)/1.25 var(--studio-font); overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
-.roster-counts { display:flex; flex-wrap:wrap; gap:2px 6px; padding:0 8px 8px; font:var(--studio-type-detail); color:var(--muted); }
+.roster-counts { display:flex; flex-wrap:wrap; gap:2px 8px; padding:0 8px 8px; font:var(--studio-type-detail); color:var(--muted); }
 .roster-counts > span { white-space:nowrap; }
 .roster-edit-count { font-weight:600; color:var(--text); }
 .roster-portrait.has-edits::after { content:''; position:absolute; top:0; right:0; width:20px; height:20px; background:var(--charge,var(--acc)); clip-path:polygon(0 0,100% 0,100% 100%); }
-.roster-filters { display:flex; align-items:center; flex-wrap:wrap; gap:3px; width:fit-content; max-width:100%; padding:3px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--studio-shape-small); }
+.roster-filters { display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:fit-content; max-width:100%; padding:4px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--studio-shape-small); }
 .roster-heading { margin:0 0 8px; }
 .roster-toggle {
   display:flex;
@@ -93,7 +93,7 @@
 .roster-toggle:focus-visible { outline:2px solid var(--acc);outline-offset:2px; }
 .roster-disclosure { flex:none; color:var(--muted); }
 .roster-toggle[aria-expanded=true] .roster-disclosure { transform:rotate(90deg); }
-.roster-filters .btn { padding:3px 10px; min-height:28px; font-size:var(--studio-text-detail); border-color:transparent; background:transparent; }
+.roster-filters .btn { padding:3px 12px; min-height:28px; font-size:var(--studio-text-detail); border-color:transparent; background:transparent; }
 .roster-filters .btn:hover { background:var(--bg3); }
 .roster-filters [aria-pressed=true] { color:var(--md-sys-color-on-primary-container); background:var(--md-sys-color-primary-container); }
 .roster-filter-empty { padding:12px; color:var(--muted); }
@@ -103,15 +103,15 @@
 #continue-ribbon > img { width:48px; height:48px; flex:0 0 48px; object-fit:contain; background:var(--bg2); border:1px solid var(--border); border-radius:var(--studio-shape-small); }
 #continue-ribbon > .btn { flex:0 0 auto; justify-content:center; }
 .hero-chip-art { width:32px; height:32px; flex:none; object-fit:contain; vertical-align:middle; }
-.crumb .hero-chip-art { margin-right:6px; }
+.crumb .hero-chip-art { margin-right:8px; }
 /* Clip the separator when its chip starts a wrapped row. */
-#mod-tray-heroes { display:flex; flex-wrap:wrap; gap:6px 12px; min-width:0; overflow:hidden; }
+#mod-tray-heroes { display:flex; flex-wrap:wrap; gap:8px 12px; min-width:0; overflow:hidden; }
 #mod-tray-heroes[hidden] { display:none; }
 .tray-hero-chip {
   position:relative;
   display:inline-flex;
   align-items:center;
-  gap:5px;
+  gap:4px;
   max-width:100%;
   font-size:var(--studio-text-detail);
   color:var(--muted);
@@ -132,7 +132,7 @@
 .continue-caption { color:var(--muted); font:var(--studio-type-detail); font-weight:500; }
 .continue-asset { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:var(--studio-type-body); font-weight:600; }
 .continue-meta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--muted); font:var(--studio-type-detail); }
-.continue-identity { display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%; }
+.continue-identity { display:inline-flex; align-items:center; gap:8px; min-width:0; max-width:100%; }
 .continue-identity > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .continue-identity .hero-chip-art { width:20px; height:20px; }
 .continue-time { white-space:nowrap; }
@@ -148,6 +148,6 @@
 #hero-roster.roster-compact .roster-strip { grid-auto-flow:column; grid-template-columns:none; grid-auto-columns:84px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
 #hero-roster.roster-compact .roster-portrait { min-height:0; }
 #hero-roster.roster-compact .roster-art { height:52px; }
-#hero-roster.roster-compact .roster-portrait strong { display:block; min-height:0; padding:4px 6px 5px; font-size:var(--studio-text-micro); white-space:nowrap; text-overflow:ellipsis; }
+#hero-roster.roster-compact .roster-portrait strong { display:block; min-height:0; padding:4px 8px 4px; font-size:var(--studio-text-micro); white-space:nowrap; text-overflow:ellipsis; }
 #hero-roster.roster-compact .roster-portrait.has-edits::after { width:12px; height:12px; }
 #explorer:has(> #hero-roster.roster-compact:not([hidden])) > .library-content { flex:1 1 auto; max-height:none; }

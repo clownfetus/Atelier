@@ -54,7 +54,7 @@
           <details class="mb-details"><summary>Gradient & numeric controls</summary><label class="mb-all-controls"><input id="mb-all-controls" type="checkbox"> Show every track’s controls</label><div id="mb-legacy-controls"></div></details>
           <details class="mb-details"><summary>Source & limits</summary><div id="mb-source"></div><p>Editing points are uniformly spaced LUT stops. Their times cannot move; export rebuilds the native sample count with linear interpolation. Authored Niagara keys, tangents and full simulation are unavailable.</p><p>Proxy size and density share a scale across original and edited data. Negative size/rates and opacity are clamped for display; HDR colour is normalized. Source values are retained.</p><p id="mb-unsupported"></p></details>
         </aside>
-        <section class="mb-timeline-panel" aria-label="Synchronized LUT timeline">
+        <section class="mb-timeline-panel" aria-label="Synchronised LUT timeline">
           <div class="mb-transport"><div class="mb-play-buttons"><button id="mb-back" type="button" title="Previous preview frame" aria-label="Previous preview frame">‹</button><button id="mb-play" type="button" aria-pressed="false">Play</button><button id="mb-forward" type="button" title="Next preview frame" aria-label="Next preview frame">›</button></div>
             <label class="mb-loop"><input id="mb-loop" type="checkbox" checked> Loop</label>
             <label>Speed <select id="mb-speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>

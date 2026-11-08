@@ -143,7 +143,7 @@
     <div id="bottombar" style="display:none">
       <button class="btn primary" id="import-all-btn" disabled>
         <i data-lucide="download-cloud" size="15"></i>
-        Edit All
+        Edit all
       </button>
       <span id="status-msg"></span>
     </div>
@@ -185,9 +185,9 @@
         Build mod
       </button>
       <div id="install-toggles">
-        <label class="toggle-row" id="toggle-password-row" title="Encrypt the mod with the Protection Password set in Settings">
+        <label class="toggle-row" id="toggle-password-row" title="Encrypt the mod with the protection password set in Settings">
           <span class="switch"><input type="checkbox" id="toggle-password"><span class="switch-track"></span></span>
-          Password Protect
+          Password protect
         </label>
         <label class="toggle-row" id="toggle-copy-row">
           <span class="switch"><input type="checkbox" id="toggle-copy"><span class="switch-track"></span></span>
@@ -201,7 +201,7 @@
 <!-- ── confirm: import all ── -->
 <div class="overlay" id="confirm-all-overlay">
   <div class="modal">
-    <h2><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit All Textures?</h2>
+    <h2><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit all textures?</h2>
     <p id="confirm-all-msg">This will extract and decode all listed textures.</p>
     <div class="warning">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
@@ -211,7 +211,7 @@
       <button class="btn" id="confirm-all-cancel">Cancel</button>
       <button class="btn primary" id="confirm-all-ok">
         <i data-lucide="download-cloud" size="14"></i>
-        Start Editing
+        Start editing
       </button>
     </div>
   </div>
@@ -220,7 +220,7 @@
 <!-- ── confirm: overwrite existing mod on install ── -->
 <div class="overlay" id="confirm-overwrite-overlay">
   <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace Existing Mod?</h2>
+    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace existing mod?</h2>
     <p id="confirm-overwrite-msg">A mod with this name already exists and will be replaced.</p>
     <div class="modal-row">
       <button class="btn" id="confirm-overwrite-cancel">Cancel</button>
@@ -439,37 +439,37 @@
 <!-- ── update check / download ── -->
 <div class="overlay" id="update-overlay">
   <div class="modal" id="update-modal">
-    <div id="update-confirm" style="display:none;flex-direction:column;gap:14px">
-      <h2><i data-lucide="arrow-up-circle" size="18" style="color:var(--acc)"></i> Update Available</h2>
+    <div id="update-confirm" style="display:none;flex-direction:column;gap:16px">
+      <h2><i data-lucide="arrow-up-circle" size="18" style="color:var(--acc)"></i> Update available</h2>
       <p>Atelier <strong id="update-tag" style="color:var(--text)"></strong> is ready to install.</p>
       <div class="modal-row">
         <button class="btn" id="update-later">Later</button>
         <button class="btn primary" id="update-now">
           <i data-lucide="download" size="14"></i>
-          Download Update
+          Download update
         </button>
       </div>
     </div>
-    <div id="update-downloading" style="display:none;flex-direction:column;gap:14px">
-      <h2 style="font-size:15px;display:flex;align-items:center;gap:8px">
+    <div id="update-downloading" style="display:none;flex-direction:column;gap:16px">
+      <h2>
         <div class="spinner" style="flex-shrink:0"></div>
-        Downloading Update&hellip;
+        Downloading update&hellip;
       </h2>
       <div class="progress-bar-bg">
         <div class="progress-bar-fill" id="update-dl-fill" style="width:0%"></div>
       </div>
       <div id="update-dl-label" style="font-size:12px;color:var(--muted)">Starting&hellip;</div>
     </div>
-    <div id="update-ready" style="display:none;flex-direction:column;gap:14px">
-      <h2><i data-lucide="check-circle" size="18" style="color:var(--acc)"></i> Update Ready</h2>
+    <div id="update-ready" style="display:none;flex-direction:column;gap:16px">
+      <h2><i data-lucide="check-circle" size="18" style="color:var(--acc)"></i> Update ready</h2>
       <p>Save your open edits before restarting. Atelier will finish active tasks, then install the update and reopen.</p>
       <div class="modal-row">
-        <button class="btn" id="update-restart-later">Restart Later</button>
+        <button class="btn" id="update-restart-later">Restart later</button>
         <button class="btn primary" id="update-restart">Restart and Update</button>
       </div>
     </div>
-    <div id="update-error" style="display:none;flex-direction:column;gap:14px">
-      <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Update Failed</h2>
+    <div id="update-error" style="display:none;flex-direction:column;gap:16px">
+      <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Update failed</h2>
       <p id="update-error-message">Could not download the update. Check your connection and try again.</p>
       <div class="modal-row">
         <button class="btn primary" id="update-error-ok">Continue</button>
@@ -558,7 +558,7 @@
       </div>
     </section>
     <div class="setup-head">
-      <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial Configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
+      <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
       <button class="sb-clear" id="setup-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
     <div class="setup-body">
@@ -631,7 +631,7 @@
       <div class="setup-section">AES Keys</div>
       <div class="setup-field">
         <div class="setup-label">
-          <span>Main AES Key</span>
+          <span>Main AES key</span>
           <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
         </div>
         <div class="setup-row">
@@ -648,7 +648,7 @@
         </div>
       </div>
       <div class="setup-field" id="setup-password-row" style="display:none">
-        <div class="setup-label"><span>Protection Password — optional, for "Password Protect" toggle</span></div>
+        <div class="setup-label"><span>Protection password — optional, for the Password protect toggle</span></div>
         <div class="setup-row">
           <input id="setup-password" type="text" class="setup-input" placeholder="Password" maxlength="64" spellcheck="false">
         </div>
@@ -702,7 +702,7 @@
         <button class="btn" id="setup-cancel" style="display:none">Cancel</button>
         <button class="btn primary" id="setup-save" disabled>
           <i data-lucide="check" size="14"></i>
-          <span id="setup-save-label">Save &amp; Continue</span>
+          <span id="setup-save-label">Save &amp; continue</span>
         </button>
       </div>
     </div>
@@ -771,7 +771,7 @@
 <!-- ── project name input ── -->
 <div class="overlay at-identity" id="proj-name-overlay">
   <div class="modal at-dialog at-proj-name" role="dialog" aria-modal="true" aria-labelledby="proj-name-title">
-    <h2 id="proj-name-title">New Project</h2>
+    <h2 id="proj-name-title">New project</h2>
     <label class="at-label" for="proj-name-input">Project name</label>
     <input id="proj-name-input" type="text" class="at-field" placeholder="My first skin" maxlength="80" spellcheck="false" aria-describedby="proj-name-error">
     <p id="proj-name-error" class="proj-name-error" role="alert" hidden></p>
@@ -787,7 +787,7 @@
 <!-- ── project delete confirm ── -->
 <div class="overlay at-identity" id="proj-delete-overlay">
   <div class="modal at-dialog" role="alertdialog" aria-modal="true" aria-labelledby="proj-delete-title" aria-describedby="proj-delete-msg">
-    <h2 id="proj-delete-title">Delete Project?</h2>
+    <h2 id="proj-delete-title">Delete project?</h2>
     <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
     <div class="modal-row">
       <button class="at-btn at-btn--quiet" id="proj-delete-cancel" type="button">Cancel</button>
@@ -801,7 +801,7 @@
 <!-- ── project export confirm ── -->
 <div class="overlay at-identity" id="proj-export-overlay">
   <div class="modal at-dialog" role="dialog" aria-modal="true" aria-labelledby="proj-export-title" aria-describedby="proj-export-msg">
-    <h2 id="proj-export-title">Export Project?</h2>
+    <h2 id="proj-export-title">Export project?</h2>
     <p id="proj-export-msg">This packs the project folder into a .zip you can save anywhere.</p>
     <div class="modal-row">
       <button class="at-btn at-btn--quiet" id="proj-export-cancel" type="button">Cancel</button>
@@ -815,9 +815,9 @@
 <!-- ── reset data confirm ── -->
 <div class="overlay" id="reset-overlay">
   <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset All Data?</h2>
+    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset all data?</h2>
     <p>The following will be permanently deleted:</p>
-    <ul style="margin:2px 0 0 18px;font-size:12px;color:var(--muted);line-height:2;list-style:disc">
+    <ul style="margin:4px 0 0 16px;font-size:12px;color:var(--muted);line-height:2;list-style:disc">
       <li>All projects and edited assets</li>
       <li>Configuration (game path, AES key, USMAP)</li>
       <li>Thumbnails cache and logs</li>
@@ -830,7 +830,7 @@
       <button class="btn" id="reset-cancel">Cancel</button>
       <button class="btn primary" id="reset-ok">
         <i data-lucide="trash-2" size="14"></i>
-        Reset Everything
+        Reset everything
       </button>
     </div>
   </div>
@@ -860,7 +860,7 @@
         <span class="muted" style="font-size:11px">(load assets pre-edited, to remix)</span>
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px" class="muted">
-        Password Protect Repatch
+        Password protect repatch
         <input id="repatch-pw" class="setup-input repatch-field" type="text" placeholder="leave blank for none">
       </label>
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
@@ -1010,9 +1010,8 @@
       </div>
       <button class="sb-clear" id="text-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
-    <div style="padding:10px 16px 4px">
-      <input id="text-search" type="text" placeholder="Search keys or values…" spellcheck="false"
-             style="width:100%;background:var(--input,#0000);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:inherit">
+    <div class="text-search-row">
+      <input id="text-search" class="setup-input" type="text" placeholder="Search keys or values…" spellcheck="false">
     </div>
     <div id="text-body" class="mat-body"></div>
     <div class="mat-foot">
