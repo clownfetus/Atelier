@@ -45,7 +45,7 @@
       const slot = document.createElement('span'); slot.className = 'rolling-digit'; slot.textContent = digit;
       if (previous && previous[index] !== digit && /\d/.test(previous[index] || '')) {
         slot.dataset.previous = previous[index]; slot.classList.add('rolling-change');
-        setTimeout(() => { delete slot.dataset.previous; slot.classList.remove('rolling-change'); }, 180);
+        setTimeout(() => { delete slot.dataset.previous; slot.classList.remove('rolling-change'); }, 220);
       }
       host.append(slot);
     });
@@ -164,7 +164,8 @@
       if (row?.getClientRects().length) seat(row, freshRows.has(row.dataset.token));
     });
   }
-  // A changed texture fades in over the old one, so what's on screen is always the artwork itself.
+  // A changed texture opens downwards over the old one from its top edge (P4b.7): the old copy's top edge
+  // folds down out of the way. Nothing is blended, so every pixel on screen is one picture or the other.
   function swapImage(image, src) {
     const parent = image.parentElement;
     if (reduced() || document.hidden || !parent || !image.naturalWidth || window.AtelierMotionPolicy?.allows(1) === false) { image.src = src; return; }
@@ -179,7 +180,7 @@
     const fade = () => {
       clearTimeout(timer); image.removeEventListener('error', done);
       if (!old.isConnected) return;
-      try { old.animate([{opacity:1},{opacity:0}],{duration:200,easing:window.AtelierMotion?.ease?.standard||'linear'}).finished.catch(()=>{}).finally(()=>old.remove()); }
+      try { old.animate([{clipPath:'inset(0 0 0 0)'},{clipPath:'inset(100% 0 0 0)'}],{duration:AtelierMotion.unfoldMs||280,easing:AtelierMotion.ease?.unfold||'cubic-bezier(.16,1,.3,1)',fill:'forwards'}).finished.catch(()=>{}).finally(()=>old.remove()); }
       catch (_) { old.remove(); }
     };
     const timer = setTimeout(done, 8000);
@@ -194,11 +195,17 @@
     const known = new Set((previous || []).map(entry => entry.token));
     freshRows = new Set([...list.querySelectorAll('.sb-item')].map(row => row.dataset.token).filter(token => !known.has(token)));
     if (reduced() || document.hidden || !list.getClientRects().length) return;
+    // A removed row folds back into its left edge, the side rows arrive from (P4b.7). Only then does its
+    // slot close: the rows below hold where they were for the fold, then move up on the glyph's move curve.
+    const folding = window.AtelierMotionPolicy?.allows(1) !== false
+      && (previous || []).some(entry => !list.querySelector(`.sb-item[data-token="${CSS.escape(entry.token || '')}"]`));
+    const foldMs = AtelierMotion.foldMs || 190;
     for (const entry of previous || []) {
       const next = [...list.querySelectorAll('.sb-item')].find(row=>row.dataset.token===entry.token);
       if (next) {
         const dy = entry.rect.y-next.getBoundingClientRect().y;
-        if (dy) play(next,[{transform:`translateY(${dy}px)`},{transform:'none'}],120);
+        if (dy && folding) play(next,[{transform:`translateY(${dy}px)`},{transform:`translateY(${dy}px)`,offset:.5,easing:AtelierMotion.assembly?.curves?.move||'cubic-bezier(.65,0,.35,1)'},{transform:'none'}],foldMs*2,'linear');
+        else if (dy) play(next,[{transform:`translateY(${dy}px)`},{transform:'none'}],120);
       } else {
         if (window.AtelierMotionPolicy?.allows(1) === false) continue;
         const copy = entry.row.cloneNode(true); copy.classList.add('polish-ghost'); copy.inert=true; copy.setAttribute('aria-hidden','true');
@@ -207,12 +214,11 @@
         for (const node of [copy,...copy.querySelectorAll('[data-token],[data-game-rel],[data-library-path]')]) {
           for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
         }
-        Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden',opacity:'0'});
+        Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden',clipPath:'inset(0 100% 0 0)'});
         document.body.append(copy);
-        // A removed row fades where it stood, for 200 ms.
-        const rowAnimation=play(copy,[{opacity:1},{opacity:0}],200);
+        const rowAnimation=play(copy,[{clipPath:'inset(0 0 0 0)',translate:'0 0'},{clipPath:'inset(0 100% 0 0)',translate:'-6px 0'}],foldMs,AtelierMotion.ease.exit);
         const dispose=()=>{clearTimeout(timer);rowAnimation?.destroy();copy.remove();drains.delete(dispose);};
-        const timer=setTimeout(dispose,220);drains.add(dispose);
+        const timer=setTimeout(dispose,foldMs+20);drains.add(dispose);
       }
     }
   }

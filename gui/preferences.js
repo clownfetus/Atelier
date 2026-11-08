@@ -31,7 +31,8 @@
   window.AtelierMotionPolicy = Object.freeze({query:() => query,tier,allows:value=>Number(value)<=tier(),mode});
   const write = (key, value) => { try { localStorage.setItem('atelier.' + key, value); } catch (_) {} };
   if(read('motion','full')!==motion)write('motion',motion);
-  // A theme the person chooses cross-fades the page for 200 ms in Full and Calm, as interface chrome.
+  // A theme the person chooses opens downwards over the old one from the top edge of the window (P4b.7),
+  // in Full and Calm, as interface chrome. No moment shows both themes mixed.
   // Off, and changes that arrive from elsewhere (storage, the system), apply at once.
   let armed = false, reveal = null, fades = [];
   const arm = event => { armed = !!event.target?.closest?.('[data-theme-picker],[data-theme-preset]'); };
@@ -45,9 +46,9 @@
     let current;try{current=document.startViewTransition(update);}catch(_){return false;}reveal = current;
     current.ready.then(() => {
       if(reveal!==current||document.hidden||!window.AtelierMotionPolicy.allows(1)){current.skipTransition();return;}
-      const timing={duration:200,easing:'linear'};
-      fades=[document.documentElement.animate({opacity:[1,0]},{...timing,pseudoElement:'::view-transition-old(root)'}),
-        document.documentElement.animate({opacity:[0,1]},{...timing,pseudoElement:'::view-transition-new(root)'})];
+      const timing={duration:window.AtelierMotion?.unfoldLargeMs||400,easing:window.AtelierMotion?.ease?.unfold||'cubic-bezier(.16,1,.3,1)'};
+      // The old page stays still underneath; only the new one moves, so its clip is the whole change.
+      fades=[document.documentElement.animate({clipPath:['inset(0 0 100% 0)','inset(0)']},{...timing,pseudoElement:'::view-transition-new(root)'})];
       for(const fade of fades)fade.finished.catch(()=>{});
     }).catch(() => {});
     current.finished.catch(() => {}).finally(() => { if (reveal === current) { reveal = null; fades = []; } });

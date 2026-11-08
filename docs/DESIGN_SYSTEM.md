@@ -94,19 +94,26 @@ Use 120ms (`--studio-motion-fast`) for small state changes and 200ms (`--studio-
 
 ## Continuity and presentation preferences
 
-`continuity.js` moves the replaced grid container 8px over 160ms, with reverse
-direction for Back/parent navigation. Feature-detected View Transitions connect
+`continuity.js` opens the replaced grid container out of the side you're travelling
+from, 6px over 280ms, mirrored for Back/parent navigation; the old grid goes at once.
+Feature-detected View Transitions connect
 folder names to breadcrumbs and portraits to the contextual hero banner. Logical
 close and requests do not wait for an animation to finish. Unsupported engines use
 short CSS/WAAPI transitions; no card layout or asset geometry is animated.
 
 Nothing that pops up fades. Each pop-up unfolds out of the edge it belongs to with a
-6px travel and no overshoot (`--studio-motion-unfold`, 220ms, `--studio-easing-unfold`)
-and folds back into it (`--studio-motion-fold`, 150ms): a toast upwards from its bottom
+6px travel and no overshoot (`--studio-motion-unfold`, 280ms, `--studio-easing-unfold`)
+and folds back into it (`--studio-motion-fold`, 190ms): a toast upwards from its bottom
 edge, a menu, tooltip or search panel downwards from its top edge (upwards when it flips
 above its pointer), and a dialog, editor or image preview from its centre line. Only a
 dialog's dimmed backdrop fades, over 120ms. Off and reduced motion cut. Scripts use
 `AtelierMotion.unfold(el, edge)` and `AtelierMotion.fold(el, edge, done)`.
+
+The same language replaces every other fade. Art, portraits, thumbnails and a changed
+texture open out of an edge over what was there; a removed tray row folds into its left
+edge before its slot closes; digits roll inside their count's clip; the assembly link draws
+out and retracts. Large surfaces, the banner art and a newly chosen theme, take
+`--studio-motion-unfold-large` (400ms). Nothing on screen is ever two pictures blended.
 
 The home roster reads existing catalogue metadata; it never scans containers,
 imports an asset or refreshes the remote catalogue. Selecting a hero reveals its
@@ -319,7 +326,7 @@ Nested pins use contextual labels such as `Storm · Goddess of Thunder · Textur
 Resolved labels omit redundant numeric prefixes; full paths remain in tooltips.
 Unknown ancestors retain their path segments until display labels are available.
 
-Loading previews sit on a still tonal plate, and the image fades in over it. File glyphs (meshes, textures and
+Loading previews sit on a still tonal plate, and the image opens downwards over it. File glyphs (meshes, textures and
 other assets) sit on a rounded tonal plate in their family colour, which gives the thin Sharp
 outlines the visual weight of the filled folder emblems while still marking them as files.
 "Preview unavailable" sits on its own solid chip so it stays legible over the checkerboard.
@@ -434,10 +441,10 @@ Opening a costume from visible artwork (a costume card, roster costume or search
 artwork on the stage as a poster (`motion/viewport-poster.js`). In Full a disposable copy flies
 from the card's own crop to the poster over 520ms (`--studio-motion-travel`) on the emphasized
 easing, bowing upwards on a gentle arc rather than a straight line, above the fading
-studio; Calm fades the poster in; Off shows it still. While the model decodes, the poster sits
+studio; in Calm the poster rises out of the stage floor; Off shows it still. While the model decodes, the poster sits
 above the loader, which moves below it. When geometry arrives the poster drops behind the canvas
 at 38% so the orbitable model reads over it, and the 420ms reveal sweep wipes it away in step
-with its crest. Without a sweep it fades once appearance loading ends. Errors, empty results,
+with its crest. Without a sweep it folds back down into the stage floor once appearance loading ends. Errors, empty results,
 closing and a newer open remove it at once; loading never waits for it, and it claims no moment
 of its own because it belongs to the studio's `viewport-load` moment.
 

@@ -240,8 +240,14 @@ body {
   object-fit: contain;
   image-rendering: pixelated;
 }
-.card-thumb img.hero-portrait { object-fit: cover; image-rendering: auto; opacity: 0; transition: opacity var(--studio-motion-standard) var(--studio-easing); }
-.card-thumb img.hero-portrait.loaded { opacity: 1; }
+/* A portrait opens downwards out of its top edge over the tonal plate once it has loaded (P4b.7). No fade
+   and no travel, so a full grid never shifts. Until then it is simply not painted; it isn't clipped away,
+   because a portrait clipped to nothing never counts as on screen and its lazy load would never start. */
+.card-thumb img.hero-portrait { object-fit: cover; image-rendering: auto; }
+.card-thumb img.hero-portrait:not(.loaded) { opacity: 0; }
+.card-thumb img.hero-portrait.loaded { animation: portrait-open var(--studio-motion-unfold) var(--studio-easing-unfold) both; }
+@keyframes portrait-open { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+:root[data-motion=reduce] .card-thumb img.hero-portrait.loaded { animation: none; }
 .card.artwork-card { padding: 0; gap: 0; overflow: hidden; }
 .card.artwork-card .card-thumb { aspect-ratio: 4 / 5; border-radius: 0; }
 .card.artwork-card .card-thumb img.hero-portrait { object-position: center bottom; }

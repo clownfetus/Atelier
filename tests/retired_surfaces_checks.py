@@ -59,7 +59,7 @@ def run_retired_surfaces_checks(context, url, report, checks):
             assert fresh['overflow'] == '' and again['overflow'] == '', arrival
         checks.append('A row arriving in the Mod tray clicks in like a glyph piece and a re-save re-seats, with no fade')
 
-        # A changed texture fades over the old one and leaves nothing behind.
+        # A changed texture opens down over the old one, never blending, and leaves nothing behind (P4b.7).
         swap = tab.evaluate("""async () => {
           const pixel = colour => {
             const canvas = document.createElement('canvas'); canvas.width = canvas.height = 8;
@@ -74,13 +74,18 @@ def run_retired_surfaces_checks(context, url, report, checks):
           const during = box.querySelectorAll('.image-swap').length;
           const copy = box.querySelector('.image-swap');
           const carriesData = !!copy && [...copy.attributes].some(attribute => attribute.name.startsWith('data-'));
+          await new Promise(resolve => setTimeout(resolve, 40));
+          const frames = copy ? copy.getAnimations().flatMap(a => a.effect.getKeyframes()) : [];
+          const wipe = frames.length > 0 && frames.every(f => f.opacity === undefined && f.clipPath);
           await new Promise(resolve => setTimeout(resolve, 400));
           const after = box.querySelectorAll('.image-swap').length, source = image.src;
           box.remove();
-          return {during, carriesData, after, swapped: source === pixel('#445566')};
+          return {during, carriesData, after, wipe, swapped: source === pixel('#445566')};
         }""")
         assert swap['swapped'] and swap['after'] == 0 and not swap['carriesData'], swap
-        checks.append('A changed texture cross-fades and leaves no copy of itself behind')
+        if tab.evaluate('AtelierMotionPolicy.allows(1)'):
+            assert swap['wipe'], swap
+        checks.append('A changed texture opens down over the old one without blending and leaves no copy of itself behind')
 
         # The selection count is the number alone, with no bubble beside it.
         bubble = tab.evaluate("getComputedStyle(document.getElementById('sel-count'), '::before').content")

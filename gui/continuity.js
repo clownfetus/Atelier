@@ -8,13 +8,13 @@
   const cardFor = path => [...document.querySelectorAll('#grid-area .card')]
     .find(card => card.dataset.libraryPath === path);
   const visible = el => el?.isConnected && el.getClientRects().length;
-  function animate(el, frames, duration = 160) {
+  function animate(el, frames, duration = 160, easing = window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)') {
     if (!el || reduced.matches) return;
     if (window.AtelierMotion?.polish) {
-      const motion = window.AtelierMotion.polish.mount(el,{frames,duration,state:'playing'});
+      const motion = window.AtelierMotion.polish.mount(el,{frames,duration,easing,state:'playing'});
       motion.finished.catch(() => {}).finally(() => motion.destroy()); return motion;
     }
-    try { return el.animate(frames, {duration, easing: window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+    try { return el.animate(frames, {duration, easing}); } catch (_) {}
   }
   async function transition(update, before, after, fallback) {
     if (active) {
@@ -163,7 +163,10 @@
       name(banner, 'atelier-banner');
     }, () => {
       const grid = document.querySelector('#grid-area > .grid');
-      animate(grid, [{opacity: 0, transform: `translateX(${direction === 'back' ? -8 : 8}px)`}, {opacity: 1, transform: 'none'}]);
+      // Without view transitions the new grid still opens out of the side you're travelling from (P4b.7).
+      const back = direction === 'back';
+      animate(grid, [{clipPath: back ? 'inset(0 100% 0 0)' : 'inset(0 0 0 100%)', translate: `${back ? -6 : 6}px 0`}, {clipPath: 'inset(0)', translate: '0 0'}],
+        window.AtelierMotion?.unfoldMs || 280, window.AtelierMotion?.ease?.unfold);
     });
   }
 

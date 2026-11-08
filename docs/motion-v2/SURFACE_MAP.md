@@ -31,7 +31,7 @@ bottom before starting Phase 3**: line numbers drift.
 | Working panels (border charges) | `gui/motion/working-panels.js/.css` | Nothing; panels stay still while the glyph reports |
 | Workflow gestures (arrive, trace, seal, release) | `gui/motion/workflow-krackle.js/.css`, `moment.js` | The existing Material easing tokens on plain transitions |
 | Ink transfers and connected surfaces | `workflow.transfer`, `workflow-surfaces.js` | A Mod tray row clicks in like a glyph piece (P4b.6, `seat()` in `polish.js`): the slot opens and the thumbnail seats with Complete's snap, recoil and rest. It never fades. |
-| Texture reconstruction (halftone dots) | `gui/motion/texture-reconstruction.js`, used from `gui/polish.js:136` | Plain image cross-fade (artwork must stay trustworthy) |
+| Texture reconstruction (halftone dots) | `gui/motion/texture-reconstruction.js`, used from `gui/polish.js:136` | The new picture opens down over the old one from its top edge (P4b.7). Nothing is blended, so artwork stays trustworthy |
 | Folder flap | `gui/app.js:722`, inline SVG at `gui/index.html:1020` | Static folder icon in its category colour |
 | Contextual pigments | `gui/motion/krackle-context.js` (`AtelierMotion.energy`) | Nothing (D5) |
 | Project ink (D10) | `gui/motion/project-ink.js`: not loaded, and nothing calls it | Nothing. Delete it in P4.1 |
@@ -48,13 +48,13 @@ bottom before starting Phase 3**: line numbers drift.
 | Viewport poster (`gui/motion/viewport-poster.js`) | Kept: it moves the hero artwork itself, not ink. Remove any Krackle ink it uses. |
 | Formation sounds (`gui/motion/foley.js`, `#settings-foley`) | Becomes "Motion sounds": the success click only (SPEC §6), off by default, Full only |
 | Showcase backdrop (`gui/motion/showcase-art.js`, D10) | Neutral gradient only, with the dots and burst gone. Exported Showcase images change |
-| Thumbnail loading (`gui/thumbnails.css:16`, D10) | A still tonal plate, and the image cross-fades in. No glyph |
+| Thumbnail loading (`gui/thumbnails.css:16`, D10) | A still tonal plate, and the image opens downwards over it (P4b.7). No glyph, no fade |
 | Cards being edited (`gui/polish.css:13`, `gui/app.js:651`, D10) | The preview stays whole beside the "Edited" marker. Edited materials show their saved colours as flat diagonal bands |
-| Deleting a row (`gui/polish.js:144`, `gui/style.css:1519`, D10) | A plain 200 ms fade |
+| Deleting a row (`gui/polish.js:144`, `gui/style.css:1519`, D10) | The row folds back into its left edge, then its slot closes (P4b.7). No fade |
 | HDR swatch ring (`gui/polish.js:303`, D10) | Stays, because it reports a material's intensity. Only its "bubble" name changes |
-| Theme change (`gui/preferences.js:38`, D17) | A plain cross-fade of the page, 200 ms, in Full and Calm, as interface chrome. Off stays instant |
+| Theme change (`gui/preferences.js:38`, D17) | The new theme opens down over the old one from the window's top edge, 400 ms, in Full and Calm, as interface chrome (P4b.7). Off stays instant |
 | Toast captions (`gui/motion/surfaces.css:10-22`, D17) | The theme's Card surface and text, with a left rule in the status colour and no comic shadow. It unfolds upwards from its bottom edge and folds back down (P4b.7), never fading |
-| Pop-ups: dialogs, editors, image preview, menus, tooltips, search results, Model Studio menus, the update button (P4b.7) | Each unfolds out of the edge it belongs to (220 ms, 6px, no overshoot) and folds back into it (150 ms). Nothing fades except a dialog's dimmed backdrop. Off and reduced motion cut. `continuity.css`, `AtelierMotion.unfold`/`fold` |
+| Pop-ups: dialogs, editors, image preview, menus, tooltips, search results, Model Studio menus, the update button (P4b.7) | Each unfolds out of the edge it belongs to (280 ms, 6px, no overshoot) and folds back into it (190 ms). Nothing fades except a dialog's dimmed backdrop. Off and reduced motion cut. `continuity.css`, `AtelierMotion.unfold`/`fold` |
 | Toast repeat count (`gui/motion/surfaces.css`, `gui/app.js:191`, D17) | Always a number, such as "×3" |
 | Texture drop target (`.card.k-texture-pool`, `gui/app.js:4294`, D17) | A plain outline in the theme's text colour |
 

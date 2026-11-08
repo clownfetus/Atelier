@@ -46,9 +46,10 @@
     }
     // The flight belongs to the studio's own 'viewport-load' moment, so it never claims one of its own.
     if (origin.image && allows(2) && !document.hidden) { fly(state, origin, target); return; }
+    // Calm: the art rises upwards out of the stage floor, with a 6px travel and no fade (P4b.7).
     if (allows(1) && !document.hidden) {
-      try { poster.animate([{opacity: 0, transform: 'scale(.97)'}, {opacity: 1, transform: 'none'}],
-        {duration: 200, easing: motion.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); } catch (_) {}
+      try { poster.animate([{clipPath: 'inset(100% -64px 0 -64px)', translate: '0 6px'}, {clipPath: 'inset(-64px)', translate: '0 0'}],
+        {duration: motion.unfoldMs || 280, easing: motion.ease?.unfold || 'cubic-bezier(.16,1,.3,1)'}); } catch (_) {}
     }
   }
 
@@ -118,8 +119,9 @@
   function settle(state) {
     state.phase = 'settled'; state.flight?.();
     if (!allows(1) || document.hidden) { end(); return; }
-    state.poster.dataset.phase = 'settled';
-    setTimeout(() => { if (current === state) end(); }, 240);
+    // It folds down into the stage floor where it stands, at whatever brightness it had (P4b.7).
+    state.poster.dataset.leaving = '';
+    setTimeout(() => { if (current === state) end(); }, (motion.foldMs || 190) + 50);
   }
 
   function end() {

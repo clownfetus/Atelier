@@ -54,7 +54,10 @@ export function createAssemblyView(api) {
   selection.setAttribute('aria-live', 'polite'); stage.append(selection);
   const links = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   links.id = 'assembly-links'; links.setAttribute('aria-hidden', 'true');
-  links.innerHTML = '<path/><path/><circle r="4"/>'; stage.append(links);
+  // The two dashed links draw out from the part through a solid mask that grows along them (P4b.7).
+  links.innerHTML = '<g mask="url(#assembly-link-mask)"><path/><path/><circle r="4"/></g>' +
+    '<defs><mask id="assembly-link-mask" maskUnits="userSpaceOnUse"><path pathLength="1"/><path pathLength="1"/></mask></defs>';
+  stage.append(links);
   const focusPanel = make('button', 'Geometry', 'assembly-geometry-reopen'); focusPanel.id = 'assembly-geometry-reopen';
   focusPanel.setAttribute('aria-label', 'Expand geometry panel'); stage.append(focusPanel);
 
@@ -351,9 +354,10 @@ export function createAssemblyView(api) {
     const paths = links.querySelectorAll('path');
     paths[0].setAttribute('d', `M${x},${y} C${x+40},${y} ${w-60},${h*.5} ${w},${h*.5}`);
     paths[1].setAttribute('d', `M${x},${y} C${x},${y+40} ${w*.5},${h-20} ${w*.5},${h}`);
+    paths[2]?.setAttribute('d', paths[0].getAttribute('d')); paths[3]?.setAttribute('d', paths[1].getAttribute('d'));
     links.querySelector('circle').setAttribute('cx', x); links.querySelector('circle').setAttribute('cy', y);
     void links.getBoundingClientRect(); links.classList.add('is-linking');
-    linkTimer = setTimeout(() => links.classList.remove('is-linking'), 620);
+    linkTimer = setTimeout(() => links.classList.remove('is-linking'), 770);
   }
 
   function sync() {

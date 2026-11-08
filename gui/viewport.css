@@ -73,7 +73,8 @@
 @keyframes vp-popover-fold { from { clip-path:inset(-56px); translate:0 0; } to { clip-path:inset(0 -56px 100% -56px); translate:0 -6px; } }
 .vp-menu[open] > .vp-popover { animation:vp-popover-unfold var(--studio-motion-unfold) var(--studio-easing-unfold); }
 .vp-menu:not([open]) > .vp-popover { animation:vp-popover-fold var(--studio-motion-fold) var(--studio-easing-exit) forwards; }
-.vp-menu::details-content { transition:content-visibility var(--studio-motion-fold) allow-discrete; }
+/* Only closing waits for the fold; opening shows the content at once, so it is there from the first frame. */
+.vp-menu:not([open])::details-content { transition:content-visibility var(--studio-motion-fold) allow-discrete; }
 :root[data-motion=reduce] .vp-menu::details-content { transition:none; }
 @media (prefers-reduced-motion:reduce) { .vp-menu::details-content { transition:none; } }
 .vp-popover h3 { margin:0 0 16px; font-size:var(--studio-text-body); font-weight:600; }
@@ -263,14 +264,18 @@
 .viewport-loader-slot[data-am-state="error"] > .viewport-loader-fallback { color:#ffb4ab; }
 .viewport-loader-fallback svg { width:112px; height:112px; }
 #viewport-loading-motion-host.atelier-glyph { width:100%; height:100%; }
-/* The opened costume's artwork waits on the stage, then fades once the appearance has loaded (motion/viewport-poster.js). */
+/* The opened costume's artwork waits on the stage, then folds down into the stage floor once the appearance
+   has loaded (motion/viewport-poster.js, P4b.7). It never fades in or out. */
 /* Costume art is a transparent cut-out, so it stands on the stage with a shadow rather than in a frame. */
 .vp-poster { position:absolute; z-index:4; margin:0; pointer-events:none; filter:drop-shadow(0 14px 28px rgb(0 0 0 / 45%));
-  transition:opacity var(--studio-motion-standard) var(--studio-easing), filter var(--studio-motion-standard) var(--studio-easing); }
+  clip-path:inset(-64px); translate:0 0;
+  transition:opacity var(--studio-motion-standard) var(--studio-easing), filter var(--studio-motion-standard) var(--studio-easing),
+    clip-path var(--studio-motion-fold) var(--studio-easing-exit), translate var(--studio-motion-fold) var(--studio-easing-exit); }
 .vp-poster img { display:block; width:100%; height:100%; object-fit:contain; }
-/* Behind the canvas once geometry arrives, quiet enough for the model to read over it. */
+/* Behind the canvas once geometry arrives, quiet enough for the model to read over it. This dim is how
+   bright the art sits behind the model, not how it arrives or leaves, so it stays. */
 .vp-poster[data-phase=geometry] { z-index:auto; opacity:.38; filter:none; }
-.vp-poster[data-phase=settled] { opacity:0; }
+.vp-poster[data-leaving] { clip-path:inset(100% -64px 0 -64px); translate:0 6px; }
 .vp-poster-flight { position:fixed; z-index:calc(var(--studio-layer-workspace) + 10); margin:0; pointer-events:none; object-fit:contain; transform-origin:center;
   filter:drop-shadow(0 14px 28px rgb(0 0 0 / 45%)); }
 /* The loader moves below the poster. */

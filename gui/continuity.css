@@ -17,12 +17,15 @@
    bottom. The theme's surface and text inks stay in charge of everything readable. */
 #library-hero.has-art-colour { --library-hero-surface: color-mix(in srgb, var(--library-art-colour) 9%, var(--md-sys-color-surface-container)); }
 #library-hero::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; z-index: 3;
-  background: var(--library-art-colour); opacity: 0; transition: opacity 300ms var(--studio-easing); pointer-events: none; }
-#library-hero.has-art-colour::before { opacity: 1; }
-.library-hero-art { position: absolute; inset: 0 auto 0 24%; width: 76%; height: 100%; object-fit: cover; object-position: right center; opacity: 0; mask-image:linear-gradient(90deg,transparent,#000 18%);
-  transform: translateX(16px); transition: opacity var(--studio-motion-panel) var(--studio-easing), transform var(--studio-motion-panel) var(--studio-easing); }
-/* Art that arrives after the banner settles slides a little into place; cached art is simply there. */
-.has-art .library-hero-art { opacity: 1; transform: none; }
+  background: var(--library-art-colour); opacity: 0; clip-path: inset(0 100% 0 0); pointer-events: none; }
+/* The colour edge draws along the bottom from the left; it never fades (P4b.7). */
+#library-hero.has-art-colour::before { opacity: 1; clip-path: inset(0); transition: clip-path var(--studio-motion-unfold-large) var(--studio-easing-unfold); }
+.library-hero-art { position: absolute; inset: 0 auto 0 24%; width: 76%; height: 100%; object-fit: cover; object-position: right center; mask-image:linear-gradient(90deg,transparent,#000 18%);
+  clip-path: inset(0 0 0 100%); translate: 6px 0;
+  transition: clip-path var(--studio-motion-unfold-large) var(--studio-easing-unfold), translate var(--studio-motion-unfold-large) var(--studio-easing-unfold); }
+/* Art that arrives after the banner settles opens leftwards out of the banner's right edge, with a 6px
+   travel and no fade (P4b.7); cached art is simply there. */
+.has-art .library-hero-art { clip-path: inset(0); translate: 0 0; }
 #library-hero::after {
   content: ''; position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(90deg, var(--library-hero-surface) 25%, transparent 44%);
@@ -42,17 +45,23 @@
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 ::view-transition { pointer-events:none; }
 ::view-transition-group(*) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2,0,0,1); }
-::view-transition-old(atelier-grid) { animation: library-grid-out var(--studio-motion-exit) var(--studio-easing-exit) both; }
-::view-transition-new(atelier-grid) { animation: library-grid-in 160ms cubic-bezier(.2,0,0,1) both; }
-:root[data-library-direction="back"] { --library-entry: -8px; }
-:root[data-library-direction="forward"] { --library-entry: 8px; }
-/* Entering a hero the banner drops in; leaving to the roster it fades. Between a hero and its
-   skins it is in both states and simply stays put. */
-::view-transition-new(atelier-banner):only-child { animation: library-banner-in 240ms var(--studio-easing) both; }
-::view-transition-old(atelier-banner):only-child { animation: library-grid-out var(--studio-motion-exit) var(--studio-easing-exit) both; }
-@keyframes library-banner-in { from { opacity: 0; transform: translateY(-6px); } }
-@keyframes library-grid-out { to { opacity: 0; } }
-@keyframes library-grid-in { from { opacity: 0; transform: translateX(var(--library-entry, 8px)); } to { opacity: 1; transform: none; } }
+/* Opening a folder (P4b.7): the old grid goes at once and the new one opens out of the side you're
+   travelling from, with a 6px travel. Forward it opens leftwards out of its right edge; Back mirrors it. */
+::view-transition-old(atelier-grid) { animation: none; visibility: hidden; }
+/* The folder name travels from its card into the breadcrumb as the new label alone; the browser's default
+   cross-fade between the two labels is a fade, so it's off. */
+::view-transition-old(atelier-folder-name) { animation: none; visibility: hidden; }
+::view-transition-new(atelier-folder-name) { animation: none; }
+::view-transition-new(atelier-grid) { animation: library-grid-in var(--studio-motion-unfold) var(--studio-easing-unfold) both; }
+:root[data-library-direction="back"] { --library-entry: -6px; --library-entry-clip: inset(0 100% 0 0); }
+:root[data-library-direction="forward"] { --library-entry: 6px; --library-entry-clip: inset(0 0 0 100%); }
+/* Entering a hero the banner opens downwards from its top edge; leaving to the roster it folds back up
+   into it. Between a hero and its skins it is in both states and simply stays put. Nothing fades. */
+::view-transition-new(atelier-banner):only-child { animation: library-banner-in var(--studio-motion-unfold) var(--studio-easing-unfold) both; }
+::view-transition-old(atelier-banner):only-child { animation: library-banner-out var(--studio-motion-fold) var(--studio-easing-exit) both; }
+@keyframes library-banner-in { from { clip-path: inset(0 0 100% 0); translate: 0 -6px; } to { clip-path: inset(0); translate: 0 0; } }
+@keyframes library-banner-out { from { clip-path: inset(0); translate: 0 0; } to { clip-path: inset(0 0 100% 0); translate: 0 -6px; } }
+@keyframes library-grid-in { from { clip-path: var(--library-entry-clip, inset(0 0 0 100%)); translate: var(--library-entry, 6px) 0; } to { clip-path: inset(0); translate: 0 0; } }
 
 /* Dialogs and studios unfold (P4b.7). The dialog opens out of its centre line with a 6px rise and folds
    back the same way; it never fades. Only the dimmed backdrop behind it fades, over 120ms. The clip's
@@ -72,8 +81,8 @@
   .overlay:not(.active):not(.mounted) > :first-child { animation: dialog-fold var(--studio-motion-fold) var(--studio-easing-exit) forwards; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .overlay, .library-hero-art { transition: none !important; }
+  .overlay, .library-hero-art, #library-hero::before { transition: none !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
-:root[data-motion=reduce] .library-hero-art { transition: none; }
+:root[data-motion=reduce] .library-hero-art, :root[data-motion=reduce] #library-hero::before { transition: none; }
 :root[data-motion=reduce]::view-transition-group(*), :root[data-motion=reduce]::view-transition-old(*), :root[data-motion=reduce]::view-transition-new(*) { animation:none !important; }

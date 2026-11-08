@@ -53,7 +53,8 @@
         entry.fallback?.remove(); entry.fallback = null;
         thumb.dataset.previewState = 'ready';
         thumb.removeAttribute('title');
-        window.AtelierPolish?.play(img,[{opacity:0},{opacity:1}],200);
+        // It opens downwards out of its top edge over the plate; no fade, no travel (P4b.7).
+        window.AtelierPolish?.play(img,[{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0)'}],AtelierMotion.unfoldMs||280,AtelierMotion.ease.unfold);
         if (!remaining().length) clearTimeout(timer);
       };
       img.onerror = () => {

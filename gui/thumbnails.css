@@ -13,7 +13,7 @@
   width: 64%; height: 64%; padding: 14%; box-sizing: border-box;
   border-radius: var(--studio-shape-medium); background: color-mix(in srgb, currentColor 14%, transparent);
 }
-/* Loading previews sit on a still tonal plate; the image fades in over it. */
+/* Loading previews sit on a still tonal plate; the image opens downwards over it (thumbnails.js). */
 .card-thumb[data-preview-state="loading"]::before {
   content: ''; position: absolute; inset: 10px; border-radius: var(--studio-shape-xs);
   background: color-mix(in srgb, var(--text) 8%, transparent);

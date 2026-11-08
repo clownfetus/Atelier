@@ -227,7 +227,7 @@ def run_viewport_motion_checks(page, context, url, report, checks):
         motion_page.evaluate(f'__viewportMotion.model({before}); viewportOpen')
         assert not motion_page.locator('.vp-poster').count()
         motion_page.evaluate("document.querySelector('.poster-fixture')?.remove()")
-        checks.append('Opening from costume artwork flies it to the stage above the loader, keeps it behind arriving geometry while the texture loader works in the corner, then fades it; Off stays still, and failures and closing remove it at once')
+        checks.append('Opening from costume artwork flies it to the stage above the loader, keeps it behind arriving geometry while the texture loader works in the corner, then folds it away into the stage floor; Off stays still, and failures and closing remove it at once')
 
         before = motion_page.evaluate('__viewportMotion.state().modelRequests')
         start_mesh('Old fixture')

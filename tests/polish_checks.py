@@ -167,10 +167,12 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
           delete sidebarData.c; renderSidebar();
           await new Promise(requestAnimationFrame);
           const ghost = document.querySelector('.polish-ghost'), motion = ghost?.getAnimations()[0];
-          return {ghost: !!ghost, duration: motion?.effect.getTiming().duration, frames: motion?.effect.getKeyframes().map(f => [f.opacity, f.transform || '', f.clipPath || ''])};
+          return {ghost: !!ghost, duration: motion?.effect.getTiming().duration, frames: motion?.effect.getKeyframes().map(f => [f.opacity ?? null, f.translate || '', f.clipPath || ''])};
         }""")
         if tab.evaluate('!AtelierMotionPolicy.query().matches'):
-            assert removal['duration'] == 200 and removal['frames'] == [['1', '', ''], ['0', '', '']], removal
+            # A removed row folds back into its left edge, never fading (P4b.7).
+            assert removal['duration'] == 190 and [f[0] for f in removal['frames']] == [None, None], removal
+            assert removal['frames'][-1][2].startswith('inset(0') and '100%' in removal['frames'][-1][2], removal
         tab.wait_for_timeout(400)
         assert tab.locator('.sb-item').count() == 1 and not tab.locator('.polish-ghost').count()
         tab.evaluate("AtelierPolish.importStart([{name:'A',game_rel:'A'},{name:'B',game_rel:'B'}]);AtelierPolish.importProgress({game_rel:'A',ok:true});AtelierPolish.importProgress({game_rel:'B',ok:false})")
@@ -217,7 +219,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.evaluate("window.dispatchEvent(new StorageEvent('storage',{key:'atelier.adaptiveAccent',newValue:'1'}));window.dispatchEvent(new CustomEvent('atelier:artwork',{detail:{accent:'#ff0000',colors:['#ff0000']}}))")
         assert tab.evaluate("[getComputedStyle(document.documentElement).getPropertyValue('--acc'),getComputedStyle(document.querySelector('.btn.primary')).backgroundColor]") == theme_before
         checks.append('Artwork and legacy adaptive-accent preferences preserve theme colours on controls')
-        # A chosen theme cross-fades the page for 200 ms: no wash, no clip.
+        # A chosen theme opens down over the old one from the window's top edge (400 ms): no fade, no blend (P4b.7).
         if tab.evaluate("AtelierMotionPolicy.allows(1)"):
             fade = tab.evaluate("""async () => {
               const control = document.querySelector('[data-theme-preset="darcula"]');
@@ -228,10 +230,10 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
                 fades = document.documentElement.getAnimations({subtree: true}).filter(a => /view-transition-(old|new)\\(root\\)/.test(String(a.effect?.pseudoElement)));
               }
               return {palette: document.documentElement.dataset.palette,
-                fades: fades.map(a => [a.effect.pseudoElement, a.effect.getTiming().duration, a.effect.getKeyframes().map(f => f.opacity).join(','), a.effect.getKeyframes().some(f => f.clipPath)]).sort()};
+                fades: fades.map(a => [a.effect.pseudoElement, a.effect.getTiming().duration, a.effect.getKeyframes().some(f => f.opacity !== undefined), a.effect.getKeyframes()[0].clipPath || '']).sort()};
             }""")
-            assert fade == {'palette': 'darcula', 'fades': [['::view-transition-new(root)', 200, '0,1', False], ['::view-transition-old(root)', 200, '1,0', False]]}, fade
-            checks.append('Choosing a theme cross-fades the page for 200 ms in Full and Calm')
+            assert fade == {'palette': 'darcula', 'fades': [['::view-transition-new(root)', 400, False, 'inset(0px 0px 100%)']]}, fade
+            checks.append('Choosing a theme opens the new one down over the old for 400 ms in Full and Calm, with no fade')
         for preset in ('contrast','blueprint','comic'):
             tab.evaluate('(preset)=>document.querySelector(`[data-theme-preset="${preset}"]`).click()',preset)
             assert tab.locator('html').get_attribute('data-palette') == preset

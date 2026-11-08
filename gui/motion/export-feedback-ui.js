@@ -69,10 +69,10 @@
       clearTimeout(run.timer);
       run.timer = setTimeout(() => {
         if (runs.get(button) !== run) return;
-        // The glyph doesn't fade: it goes, and the plain icon comes back with a short fade of its own.
+        // The glyph doesn't fade: it goes, and the plain icon opens upwards out of its slot's bottom edge (P4b.7).
         run.dispose();
         if (document.hidden || window.AtelierMotionPolicy?.allows(1) === false) return;
-        try { slot?.firstElementChild?.animate([{opacity: 0}, {opacity: 1}], {duration: window.AtelierMotion?.exitMs || 120, easing: window.AtelierMotion?.ease?.standard || 'cubic-bezier(.2,0,0,1)'}); }
+        try { window.AtelierMotion?.unfold?.(slot?.firstElementChild, 'bottom'); }
         catch (_) { /* The icon is already showing. */ }
       }, RESULT_HOLD);
     };

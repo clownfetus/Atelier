@@ -3,11 +3,12 @@
   'use strict';
   const blob=canvas=>new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Image encoding unavailable')),'image/png'));
   // A just-finished build deals the card in (Full only): it flips down onto the result on the bouncy
-  // spring and its asset total rolls up. Re-opened results and other motion modes show it at rest.
+  // spring, opaque the whole way (P4b.7: the hinge already unfolds it), and its asset total rolls up.
+  // Re-opened results and other motion modes show it at rest.
   function deal(card,total) {
     if(!window.AtelierMotionPolicy?.allows(2)||document.hidden)return;
-    try{card.animate([{opacity:0,transformOrigin:'50% 0',transform:'perspective(900px) rotateX(-68deg) translateY(14px) scale(.96)'},
-      {opacity:1,transformOrigin:'50% 0',transform:'none'}],{duration:window.AtelierMotion?.springMs?.bouncy||610,easing:window.AtelierMotion?.ease?.bouncy||'cubic-bezier(.34,1.56,.64,1)'});}catch(_){}
+    try{card.animate([{transformOrigin:'50% 0',transform:'perspective(900px) rotateX(-68deg) translateY(14px) scale(.96)'},
+      {transformOrigin:'50% 0',transform:'none'}],{duration:window.AtelierMotion?.springMs?.bouncy||610,easing:window.AtelierMotion?.ease?.bouncy||'cubic-bezier(.34,1.56,.64,1)'});}catch(_){}
     if(total&&window.AtelierPolish?.count){window.AtelierPolish.count(total,'0'.repeat(total.textContent.length));requestAnimationFrame(()=>window.AtelierPolish.count(total,total.dataset.value));}
   }
   function mount(parent,snapshot,result,{reveal,builtAt=new Date().toISOString(),anchor=null,entrance=false}={}) {

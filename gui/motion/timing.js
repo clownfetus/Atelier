@@ -12,8 +12,9 @@
   motion.exitMs = milliseconds('--studio-motion-exit', 120);
   motion.panelMs = milliseconds('--studio-motion-panel', 320);
   motion.travelMs = milliseconds('--studio-motion-travel', 520);
-  motion.unfoldMs = milliseconds('--studio-motion-unfold', 220);
-  motion.foldMs = milliseconds('--studio-motion-fold', 150);
+  motion.unfoldMs = milliseconds('--studio-motion-unfold', 280);
+  motion.foldMs = milliseconds('--studio-motion-fold', 190);
+  motion.unfoldLargeMs = milliseconds('--studio-motion-unfold-large', 400);
   motion.springMs = Object.freeze({
     snappy: milliseconds('--studio-spring-snappy-duration', 340),
     bouncy: milliseconds('--studio-spring-bouncy-duration', 610),
