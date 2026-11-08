@@ -69,7 +69,7 @@ OutputBaseFilename=AtelierSetup
 Compression=lzma2
 SolidCompression=yes
 ; Native controls retain keyboard, screen-reader, high-contrast and DPI support.
-; Generated plates share the app's A silhouette.
+; Generated plates carry the lockup: the master A over the wordmark (scripts/installer_art.py).
 WizardStyle=modern dynamic windows11 hidebevels
 WizardSizePercent=125,125
 DisableWelcomePage=no

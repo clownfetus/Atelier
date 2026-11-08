@@ -1,42 +1,109 @@
 #!/usr/bin/env python3
 """Deterministic, DPI-ready Atelier installer plates; no runtime installer changes.
 
-The plate is a plain field with the mark on it. All copy remains native wizard text, so it
-scales and is available to accessibility. Run this script to regenerate assets; use --check
-to verify packaged pixels. packaging/Atelier.iss gives the wizard the same two field colours.
+The plate is a plain field with the lockup on it: the master mark over the wordmark, centred.
+All copy remains native wizard text, so it scales and is available to accessibility. Run this
+script to regenerate assets; use --check to verify packaged pixels. packaging/Atelier.iss gives
+the wizard the same two field colours.
 """
 import argparse
+import re
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageDraw
 
 import brand_mark
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'gui' / 'brand' / 'installer'
-THEMES = {'light': brand_mark.PAPER, 'dark': brand_mark.CHARCOAL}
+WORDMARK = ROOT / 'gui' / 'brand' / 'atelier-wordmark.svg'
+# Field and wordmark ink for each theme.
+THEMES = {'light': (brand_mark.PAPER, brand_mark.CHARCOAL), 'dark': (brand_mark.CHARCOAL, brand_mark.PAPER)}
 WIDTH, HEIGHT = 164, 314
-MARK_WIDTH = 116
-MARK_CENTRE_Y = 118
+MARK_WIDTH = 106
+WORD_WIDTH = 94
+GAP = 21                 # between the mark's foot and the wordmark's cap line
+LOCKUP_CENTRE_Y = 148    # a little above the middle, where the eye puts the centre of a tall plate
+SCALE = 4                # 4x output supplies crisp edges well beyond 200% Windows scaling
+SS = 4                   # supersampling on top of that, reduced away
+
+
+def _wordmark():
+    """The wordmark's outlines as flattened subpaths, its view box size and its disc."""
+    svg = WORDMARK.read_text(encoding='utf-8')
+    _, _, vw, vh = (float(v) for v in re.search(r'viewBox="([^"]+)"', svg).group(1).split())
+    d = re.search(r' d="([^"]+)"', svg).group(1)
+    disc = re.search(r'<circle fill="([^"]+)" cx="([^"]+)" cy="([^"]+)" r="([^"]+)"', svg)
+    subpaths, point, start = [], (0.0, 0.0), (0.0, 0.0)
+    for command, args in re.findall(r'([MLHVCZ])([^MLHVCZ]*)', d):
+        n = [float(v) for v in re.findall(r'-?\d+(?:\.\d+)?', args)]
+        if command == 'M':
+            point = start = (n[0], n[1])
+            subpaths.append([point])
+            for i in range(2, len(n), 2):
+                point = (n[i], n[i + 1]); subpaths[-1].append(point)
+        elif command == 'L':
+            for i in range(0, len(n), 2):
+                point = (n[i], n[i + 1]); subpaths[-1].append(point)
+        elif command == 'H':
+            for x in n:
+                point = (x, point[1]); subpaths[-1].append(point)
+        elif command == 'V':
+            for y in n:
+                point = (point[0], y); subpaths[-1].append(point)
+        elif command == 'C':
+            for i in range(0, len(n), 6):
+                (x1, y1), (x2, y2), (x3, y3), (x0, y0) = (n[i], n[i + 1]), (n[i + 2], n[i + 3]), (n[i + 4], n[i + 5]), point
+                for k in range(1, 25):
+                    t = k / 24; u = 1 - t
+                    subpaths[-1].append((u**3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t**3 * x3,
+                                         u**3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t**3 * y3))
+                point = (x3, y3)
+        elif command == 'Z':
+            point = start
+    return subpaths, (vw, vh), (disc.group(1), *(float(disc.group(i)) for i in (2, 3, 4)))
+
+
+def _layout():
+    """Top left and scale of the mark and the wordmark, in plate units."""
+    mw, mh = brand_mark._mark_size(brand_mark.MASTER)
+    _, (vw, vh), _ = _wordmark()
+    mark_h, word_h = MARK_WIDTH * mh / mw, WORD_WIDTH * vh / vw
+    top = LOCKUP_CENTRE_Y - (mark_h + GAP + word_h) / 2
+    return ((WIDTH - MARK_WIDTH) / 2, top, MARK_WIDTH / mw), ((WIDTH - WORD_WIDTH) / 2, top + mark_h + GAP, WORD_WIDTH / vw)
 
 
 def plate(theme):
-    # 4x output supplies crisp edges well beyond 200% Windows scaling.
-    image = Image.new('RGB', (WIDTH * 4, HEIGHT * 4), THEMES[theme])
-    mark = brand_mark.raster(MARK_WIDTH * 4)
-    image.paste(mark, ((WIDTH * 4 - mark.width) // 2, MARK_CENTRE_Y * 4 - mark.height // 2), mark)
-    return image
+    field, ink = THEMES[theme]
+    k = SCALE * SS
+    (mx, my, ms), (wx, wy, ws) = _layout()
+    image = Image.new('RGBA', (WIDTH * k, HEIGHT * k), brand_mark._rgb(field) + (255,))
+    brand_mark.draw_mark(ImageDraw.Draw(image), brand_mark.MASTER, mx * k, my * k, ms * k)
+    # Even-odd fill: letters never overlap, so each outline toggles the pixels it covers.
+    subpaths, _, (disc_fill, cx, cy, r) = _wordmark()
+    mask = Image.new('L', image.size, 0)
+    for poly in subpaths:
+        shape = Image.new('L', image.size, 0)
+        ImageDraw.Draw(shape).polygon([((wx + x * ws) * k, (wy + y * ws) * k) for x, y in poly], fill=255)
+        mask = ImageChops.difference(mask, shape)
+    image.paste(brand_mark._rgb(ink) + (255,), (0, 0), mask)
+    x, y, rr = (wx + cx * ws) * k, (wy + cy * ws) * k, r * ws * k
+    ImageDraw.Draw(image).ellipse([x - rr, y - rr, x + rr, y + rr], fill=brand_mark._rgb(disc_fill) + (255,))
+    return image.reduce(SS).convert('RGB')
 
 
 def vector(theme):
-    art, (x0, y0, x1, y1), _, _ = brand_mark.mark_svg(brand_mark.MASTER)
-    scale = MARK_WIDTH / (x1 - x0)
-    x, y = (WIDTH - MARK_WIDTH) / 2 - x0 * scale, MARK_CENTRE_Y - (y1 - y0) * scale / 2 - y0 * scale
+    field, ink = THEMES[theme]
+    art, (x0, y0, _, _), _, _ = brand_mark.mark_svg(brand_mark.MASTER)
+    (mx, my, ms), (wx, wy, ws) = _layout()
     pieces = art[art.index('>') + 1:art.rindex('</svg>')]
+    word = WORDMARK.read_text(encoding='utf-8')
+    word = word[word.index('>') + 1:word.rindex('</svg>')].replace(f'fill="{brand_mark.PAPER}"', f'fill="{ink}"')
     return ('<!-- Generated by scripts/installer_art.py; text stays native. -->\n'
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {WIDTH} {HEIGHT}">'
-            f'<rect width="{WIDTH}" height="{HEIGHT}" fill="{THEMES[theme]}"/>'
-            f'<g transform="translate({x:.3f} {y:.3f}) scale({scale:.5f})">{pieces}</g></svg>\n')
+            f'<rect width="{WIDTH}" height="{HEIGHT}" fill="{field}"/>'
+            f'<g transform="translate({mx - x0 * ms:.3f} {my - y0 * ms:.3f}) scale({ms:.5f})">{pieces}</g>'
+            f'<g transform="translate({wx:.3f} {wy:.3f}) scale({ws:.6f})">{word}</g></svg>\n')
 
 
 def outputs():

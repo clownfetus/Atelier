@@ -220,7 +220,8 @@ beside the glyph always says what happened. The rules and their ten invariants a
 - Toolbar, menu and form controls keep Material Sharp glyphs.
 
 The Windows installer uses native scalable controls with paired Paper and Charcoal
-plates, each a plain field with the mark. The wizard follows the system light/dark
+plates, each a plain field with the lockup centred on it: the master A over the wordmark,
+as in the app's header. Inner pages carry the A alone in their header. The wizard follows the system light/dark
 appearance, keeps installation progress native, and leaves installation, upgrade and
 data-preservation behaviour unchanged. `scripts/installer_art.py --check` verifies the
 deterministic high-resolution plates and transparent header mark, and

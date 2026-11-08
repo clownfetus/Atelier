@@ -275,8 +275,11 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   with its message. A follow-up pass, run on fixture data, brought in the asset editors, the
   dead CSS, padding, margins and gaps across the stylesheets, editor headings and fields, and
   sentence-case copy.
-- [ ] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
+- [x] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
   same identity. Packaging only: no change to what it installs or where.
+  Thiago chose the lockup: the welcome and finish plates carry the master A over the
+  wordmark, centred a little above the middle, in Paper and Charcoal. Inner pages keep the A
+  in their header. Shown as mockups, since Inno Setup isn't installed on the build machine.
 - [ ] **P4b.5** ⏸ Studio colours. The texture, mesh and material studios each take their
   piece's colour across the whole module (blue tile, teal mesh, copper disc), so it's clear
   at a glance what you're working on. Keep text and controls readable on every theme.
