@@ -5,6 +5,27 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Motion system v2. The assembly glyph, built from Atelier's three pieces (a blue
+  texture tile, a teal mesh block and a copper material disc), replaces the
+  coloured ink and Krackle wherever Atelier is working. It tries fits while a job
+  runs, clicks into the A only after a real success, and balances into a **!** or
+  closes into an **X** beside the warning or error sentence. Models, textures and
+  materials each have their own loader, and the model stays in view while its
+  textures load. The logo assembles once at launch. Settings → Preview motion
+  shows every state.
+
+- Pop-ups and other surfaces unfold instead of fading. Menus, tooltips, toasts,
+  dialogs, search results and the update button open out of their own edge and
+  fold back in. Folders, themes, thumbnails and texture swaps open the new picture
+  over the old one. Mod tray rows click into place, and the texture, mesh and
+  material studios wear their piece's colour.
+
+- Only textures, meshes and materials keep a category colour; every other
+  category is neutral and told apart by its icon. Full, Calm and Off motion
+  settings remain, and Formation sounds is now Motion sounds, off by default.
+  Showcase images use a plain neutral backdrop. Working panels, ink transfers, the
+  folder flap and the halftone texture reconstruction are retired.
+
 - The full changelog groups shipped changes by version and stays up to date
   automatically after each release.
 

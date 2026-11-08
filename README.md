@@ -1,18 +1,35 @@
 # Atelier: Modding Studio
 
-**Atelier 1.1.4** brings the Marvel Rivals modding workflow together: find heroes
+**Atelier 1.2.0** brings the Marvel Rivals modding workflow together: find heroes
 and assets, edit materials and textures, inspect models, and review your mod
 before building it. Available for Windows and Linux.
 
 [Download the latest release](https://github.com/clownfetus/Atelier/releases/latest)
-· [What's new in 1.1.4](docs/release-1.1.4.md)
+· [What's new in 1.2.0](docs/release-1.2.0.md)
 · [Tutorials](#tutorials)
 · [Development guide](docs/DEVELOPMENT.md)
 · [Report an issue](https://github.com/clownfetus/Atelier/issues)
 
 ![Atelier hero library in dark mode with global search and the Mod tray](images/studio-dark.png)
 
-## What's new in 1.1.4
+## What's new in 1.2.0
+
+- **Atelier's mark shows its work.** The assembly glyph replaces the coloured ink:
+  a blue texture tile, a teal mesh block and a copper material disc try fits while
+  a job runs, and click into the A only when it has actually succeeded. Warnings
+  and errors balance into a **!** or close into an **X** beside a clear sentence.
+- **A loader for each kind of asset.** Models, textures and materials each load in
+  their own way, and the model stays in view while its textures load.
+- **Calmer pop-ups.** Menus, tooltips, toasts and dialogs open out of their own edge
+  and fold back in; nothing fades. Mod tray rows click into place.
+- **Clearer colour.** Only textures, meshes and materials keep a category colour,
+  and their studios wear it. Every other category is told apart by its icon.
+- **Full, Calm and Off** motion settings, with optional Motion sounds. See it all in
+  Settings → Preview motion.
+
+See the [patch notes](docs/release-1.2.0.md) for details.
+
+## Included from 1.1.4
 
 - **Download updates inside Atelier** and restart when you're ready. Compatible
   Windows updates use smaller downloads; Linux replaces its AppImage in-app.
@@ -27,8 +44,6 @@ See the [patch notes](docs/release-1.1.4.md) for update instructions and details
 
 ## Included from 1.1.3
 
-- **Connected ink throughout the workspace.** Loading, saving and exports follow hero and
-  costume colours along the app's borders.
 - **Quieter Windows pickers.** File and folder selection opens without a PowerShell console.
 - **Textures match the game's brightness.** Exports keep their mip chain and build mips the way
   the game does, so textures no longer look brighter or glarey at a distance.

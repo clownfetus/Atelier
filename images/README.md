@@ -1,12 +1,12 @@
-# Atelier 1.1.3 screenshots
+# Atelier 1.2.0 screenshots
 
-Captured on 22 October 2026 from the consolidated 1.1.3 source using the actual
+Captured on 8 November 2026 from the motion v2 source (`version` file 1.1.4) using the actual
 Bottle-served interface in Microsoft Edge at 1400 × 900. Captures are unedited:
 no compositing, simulated UI, cropping or image generation.
 
 | File | View |
 | --- | --- |
-| `studio-dark.png` | Hero-led Home, global search, Mod tray, dark theme |
+| `studio-dark.png` | Library Home with neutral category icons, global search and the empty Mod tray's still glyph, dark theme |
 | `studio-light.png` | The same configured installation in the light theme |
 | `asset-library.png` | Character and costume names in legendary ultimate skin folders |
 | `material-editor.png` | Installed material parameters and comparisons |
@@ -17,7 +17,7 @@ no compositing, simulated UI, cropping or image generation.
 | `assembly-view.png` | Magik's selected body surface with connected material and textures |
 | `uv-xray.png` | The selected surface's actual UV0 wireframe and decoded texture |
 | `vfx-motionboard.png` | Real Niagara LUT tracks with the Motionboard editing controls |
-| `appearance-settings.png` | Appearance palettes and motion preferences |
+| `appearance-settings.png` | Appearance palettes |
 | `blender-settings.png` | The option to keep Blender textures out of the project |
 
 The game installation is read through an isolated **Release Verification**

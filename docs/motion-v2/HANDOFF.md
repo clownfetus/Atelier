@@ -333,7 +333,7 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   surfaces that replaced their fades. `pieces.js` exposes the glyph curves as
   `AtelierMotion.assembly.curves`, which the tray and the setup wizard use. Unused easing
   tokens are gone, and the hidden progress-bar fill no longer animates its width.
-- [ ] **P5.2** Release screenshots (`scripts/release_screenshots.py`; any change to
+- [x] **P5.2** Release screenshots (`scripts/release_screenshots.py`; any change to
   `gui/` makes line 31 reject `images/screenshots.json` until they're recaptured), README
   "What's new", a `CHANGELOG.md` *Unreleased* entry, `docs/release-<version>.md`
   and a Discord draft in the style of `docs/discord-1.1.3.md`. Include one line
