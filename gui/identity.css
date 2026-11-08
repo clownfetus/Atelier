@@ -124,7 +124,7 @@
 .at-import-head { display: grid; gap: var(--space-2); }
 .at-import-head h2 {
   margin: 0;
-  font: 600 30px/1.2 var(--font-display);
+  font: var(--type-headline);
   color: var(--text);
 }
 /* The stage well: a flat Linen field the glyph works in. */
@@ -139,7 +139,7 @@
 }
 .at-import-glyph { width: 211px; height: 176px; }
 .at-import-status { display: grid; gap: 3px; min-height: 58px; }
-.at-import-status b { font: 600 16px/22px var(--font-ui); color: var(--text); }
+.at-import-status b { font: var(--type-title); color: var(--text); }
 #prog-counter { font: 400 13px/19px var(--font-ui); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .at-import-current {
   font: var(--type-data);
@@ -191,7 +191,7 @@
   margin: 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
-  font: 400 12.5px/1.45 var(--font-ui);
+  font: 400 12px/18px var(--font-ui);
   color: var(--text-muted);
 }
 .at-import-note[hidden] { display: none; }
@@ -323,7 +323,7 @@
   content: ""; position: absolute; left: 6.5px; top: 6.5px; width: 7px; height: 7px;
   border-radius: 50%; background: var(--line);
 }
-.at-setup-name { font: 600 15px/20px var(--font-ui); color: var(--text); }
+.at-setup-name { font: 600 14px/20px var(--font-ui); color: var(--text); }
 .at-setup-row[data-state="waiting"] .at-setup-name { color: var(--text-muted); }
 .at-setup-code { margin-left: 6px; font: 400 11px/1 var(--font-mono); letter-spacing: var(--studio-label-tracking); color: var(--text-muted); }
 .at-setup-detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -517,7 +517,7 @@
   color: var(--text);
   font: var(--type-body);
 }
-.modal.at-dialog h2 { margin: 0 0 var(--space-2); font: 600 28px/1.2 var(--font-display); }
+.modal.at-dialog h2 { margin: 0 0 var(--space-2); font: var(--type-headline); }
 .modal.at-proj-name .at-field { height: 36px; font: 400 14px/1 var(--font-ui); }
 .modal.at-dialog p { margin: 0; font: 400 14px/1.55 var(--font-ui); color: var(--text-muted); }
 .modal.at-dialog .proj-name-error { color:var(--fault); }

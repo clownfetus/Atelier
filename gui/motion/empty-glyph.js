@@ -21,6 +21,18 @@
     try {
       container.prepend(host);
       const handle = glyph.mount(host, {state, still: true});
+      // The inline frame leaves the disc room to travel, so the still pose sits off its middle. It never
+      // moves, so the drawing is measured once and nudged until its own bounds are centred in the box.
+      const centre = () => {
+        const svg = host.querySelector('svg'), shape = svg?.querySelector('g'), view = svg?.viewBox.baseVal;
+        const bounds = shape?.getBBox();
+        if (!bounds?.width || !view?.width) return false;
+        const dx = view.x + view.width / 2 - (bounds.x + bounds.width / 2);
+        const dy = view.y + view.height / 2 - (bounds.y + bounds.height / 2);
+        svg.style.transform = `translate(${(dx / view.width * 100).toFixed(2)}%, ${(dy / view.height * 100).toFixed(2)}%)`;
+        return true;
+      };
+      requestAnimationFrame(() => { if (host.isConnected && !centre()) requestAnimationFrame(centre); });
       if (!live.size) watcher.observe(document.documentElement, {childList: true, subtree: true});
       live.set(host, {glyph: handle, attached: host.isConnected});
       return {

@@ -5228,7 +5228,7 @@ document.getElementById("repatch-run").addEventListener("click", async () => {
     const m = r.manifest || {};
     res.innerHTML = '<b>✓ Repatched</b> — ' + r.mod + '<br><span class="muted">' +
       (m.materials || 0) + ' materials · ' + (m.textures || 0) + ' textures · ' + (m.skipped || 0) + ' skipped' +
-      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · 🔒 locked' : '') +
+      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · password protected' : '') +
       '</span><br><a href="#" id="repatch-open">Open export folder</a>';
     const oa = document.getElementById("repatch-open");
     if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });

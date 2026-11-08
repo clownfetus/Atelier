@@ -54,6 +54,9 @@
 .roster-section { display:flex; flex-direction:column; flex:1; min-height:0; }
 .roster-content { display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:8px; flex:1; min-height:0; }
 .roster-content[hidden] { display:none; }
+/* The empty state drops the roster's three rows, so the glyph, title and line sit centred as one group. */
+.roster-content.polish-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+.roster-content.polish-empty > .empty-state-glyph { margin-bottom:4px; }
 #hero-roster.roster-collapsed:not([hidden]) { flex:0 0 auto; min-height:0; }
 #hero-roster.roster-collapsed .roster-section { flex:0 0 auto; }
 #hero-roster.roster-collapsed .roster-heading { margin-bottom:0; }

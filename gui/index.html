@@ -824,7 +824,7 @@
     </ul>
     <div class="warning">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
-      <span>This cannot be undone. Atelier will revert to intial state.</span>
+      <span>This cannot be undone. Atelier will return to its initial state.</span>
     </div>
     <div class="modal-row">
       <button class="btn" id="reset-cancel">Cancel</button>
@@ -838,13 +838,13 @@
 
 <!-- ── Repatcher ── -->
 <div class="overlay" id="repatch-overlay">
-  <div class="modal" style="width:560px;max-width:92vw">
+  <div class="modal repatch-modal">
     <div class="shader-head">
       <h2><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
       <span class="muted">port a broken mod to the current patch</span>
       <button class="sb-clear" id="repatch-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
-    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+    <div class="repatch-body">
       <div class="muted" style="line-height:1.55;font-size:12px">
         Decodes the mod's assets and re-applies them onto current-patch vanilla, so a mod broken by a
         game update works again. Materials + textures supported.
@@ -852,8 +852,8 @@
       <button class="btn" id="repatch-pick"><i data-lucide="folder-open" size="14"></i> Choose mod (.zip / .pak)…</button>
       <div id="repatch-file" class="muted" style="font-size:12px;word-break:break-all"></div>
       <div id="repatch-lockrow" style="display:none">
-        <label class="muted" style="font-size:12px">🔒 This mod is password-protected — enter its password:</label>
-        <input id="repatch-unlock" type="password" placeholder="mod password" style="width:100%;margin-top:4px">
+        <label class="muted" style="font-size:12px"><i data-lucide="lock" size="12"></i> This mod is password-protected — enter its password:</label>
+        <input id="repatch-unlock" class="setup-input repatch-field" type="password" placeholder="mod password" style="margin-top:4px">
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" id="repatch-stage"> Stage as project in editor
@@ -861,10 +861,10 @@
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px" class="muted">
         Password Protect Repatch
-        <input id="repatch-pw" type="text" placeholder="leave blank for none" style="width:100%">
+        <input id="repatch-pw" class="setup-input repatch-field" type="text" placeholder="leave blank for none">
       </label>
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
-      <div id="repatch-result" style="display:none;font-size:12.5px;line-height:1.6"></div>
+      <div id="repatch-result" style="display:none;font-size:12px;line-height:1.6"></div>
     </div>
   </div>
 </div>

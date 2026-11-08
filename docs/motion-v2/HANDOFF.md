@@ -266,9 +266,13 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
 - [x] **P4b.2** ⏸ Progress bars. A bespoke treatment for the update download bar and every
   other loading bar in the app, in the same language as the glyph.
   Thiago chose the Rolling disc (`gui/motion/progress-disc.js`, SPEC §4.10).
-- [ ] **P4b.3** ⏸ Alignment and sizing pass across the whole app, text included: things
+- [x] **P4b.3** ⏸ Alignment and sizing pass across the whole app, text included: things
   line up, share edges and baselines, and sit at the sizes the type and spacing scales set.
   Show before and after for each fix.
+  Thiago approved all seven fixes: one 16px library edge, picker cards on the 24px edge,
+  dialog spacing on the scale, the Repatch inset and fields, identity type roles (36 headline,
+  20 title), the 36px tray field and toast padding. The library's empty glyph now sits centred
+  with its message. The asset editors weren't reachable without game assets.
 - [ ] **P4b.4** ⏸ Installer. A new look for the Windows installer (`packaging/`), in the
   same identity. Packaging only: no change to what it installs or where.
 - [ ] **P4b.5** ⏸ Studio colours. The texture, mesh and material studios each take their
