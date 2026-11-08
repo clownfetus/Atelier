@@ -285,8 +285,8 @@ one is a set of taste calls: prototype the options, show them, and wait for his 
   at a glance what you're working on. Keep text and controls readable on every theme.
   Thiago chose the band: a 3px top edge, a header band tinted with the piece's hue, and the
   header icon or label in the piece colour. Controls, the stage and swatches stay neutral.
-  Texture has no studio of its own, so its Export options dialog carries the blue (Thiago to
-  confirm). Header text holds 5:1 or better on the band in all six presets, light and dark.
+  Texture has no studio of its own, so its Export options dialog carries the blue, as Thiago
+  confirmed. Header text holds 5:1 or better on the band in all six presets, light and dark.
 - [ ] **P4b.6** ⏸ Tray pieces. Adding something to the mod tray looks like clicking in a
   new piece: the added item seats into the tray with the glyph's contact, snap and settle,
   not a plain insert.
