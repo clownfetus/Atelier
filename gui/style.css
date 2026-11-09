@@ -801,6 +801,17 @@ progress:not([value]) { display: none; }
 .mat-row input[type=color] { width: 34px; height: 26px; padding: 1px; cursor: pointer;
                  background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--studio-shape-small); }
 .mat-row input[type=range] { flex: 1; min-width: 50px; accent-color: var(--acc); }
+/* Pipette beside each colour swatch (eyedropper.js), sized to the swatch it serves. */
+.eyedropper-btn { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0;
+                  background: var(--bg3); color: var(--muted); border: 1px solid var(--border2);
+                  border-radius: var(--studio-shape-xs); cursor: pointer; }
+.eyedropper-btn:hover, .eyedropper-btn[aria-pressed=true] { color: var(--text); border-color: var(--blue); }
+.eyedropper-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.mat-row .eyedropper-btn { width: 26px; height: 26px; border-radius: var(--studio-shape-small); }
+.vfx-stop .eyedropper-btn { width: 26px; height: 20px; }
+.theme-color .eyedropper-btn { margin-left: auto; }
+#viewport-box .vp-color-controls .eyedropper-btn { width: 40px; height: 40px; border-radius: var(--studio-shape-small); }
+.is-assembly .vp-color-controls .eyedropper-btn { width: 34px; height: 34px; }
 .mat-tag { font-size: var(--studio-text-micro); color: var(--muted); }
 .mat-num { width: 62px; background: var(--bg3); border: 1px solid var(--border);
            border-radius: var(--studio-shape-small); color: var(--text); font: inherit; font-size: var(--studio-text-detail); padding: 4px 8px; }
