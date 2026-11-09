@@ -52,7 +52,8 @@
       ring.setAttribute('cx', d.x); ring.setAttribute('cy', d.y);
       ring.setAttribute('r', f(Math.max(0, fx.ringR)));
       ring.setAttribute('stroke-width', f(Math.max(0, fx.ringW)));
-      ring.style.stroke = rgb(fx.ringC);
+      // Off's still poses reset the effects without a ripple colour; the ring is hidden then, so it keeps its last one.
+      if (fx.ringC) ring.style.stroke = rgb(fx.ringC);
       ring.style.opacity = fx.ringOp.toFixed(3);
     }
     function drawShape(id, o) {
