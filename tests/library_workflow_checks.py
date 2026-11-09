@@ -136,9 +136,11 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert target.locator('#library-preview-title').inner_text() == 'Texture 2'
         assert 'game_rel=Characters' in target.locator('#library-preview img').get_attribute('src')
         target.wait_for_function('document.querySelector("#library-preview img").naturalWidth > 0')
-        box = target.locator('#library-preview').bounding_box()
-        assert abs(box['x'] + box['width'] / 2 - 700) < 2
-        assert abs(box['y'] + box['height'] / 2 - 450) < 2
+        preview = target.locator('#library-preview')
+        preview.evaluate('dialog => Promise.allSettled(dialog.getAnimations().map(animation => animation.finished))')
+        box = preview.bounding_box()
+        assert abs(box['x'] + box['width'] / 2 - 700) < 2, box
+        assert abs(box['y'] + box['height'] / 2 - 450) < 2, box
         target.keyboard.press('Control+f')
         assert not search.evaluate('el=>el===document.activeElement'), 'Search must not steal dialog focus'
         target.keyboard.press('Escape')

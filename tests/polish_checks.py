@@ -76,12 +76,12 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         tab.locator('#grid-area .card').click(); tab.wait_for_selector('#library-hero.has-art')
         assert 'Fixture hero' in tab.locator('#library-hero h2').inner_text()
         assert tab.locator('html').get_attribute('data-library-direction') == 'forward'
-        tab.wait_for_timeout(300)
-        assert tab.evaluate("[...document.querySelectorAll('[style]')].every(n=>!n.style.viewTransitionName)")
+        transition_names_cleared = "() => [...document.querySelectorAll('[style]')].every(node => !node.style.viewTransitionName)"
+        tab.wait_for_function(transition_names_cleared, timeout=3000)
         tab.locator('#btn-back').click(); tab.wait_for_selector('.hero-portrait.loaded')
         tab.wait_for_function("document.getElementById('grid-area').getAttribute('aria-busy')==='false' && nav.path==='Characters'")
         assert tab.locator('html').get_attribute('data-library-direction') == 'back'
-        tab.wait_for_timeout(250)
+        tab.wait_for_function(transition_names_cleared, timeout=3000)
         tab.evaluate("pushNav({path:'Characters/1029/1029001'})"); tab.wait_for_selector('#grid-area .card.imported')
         tab.wait_for_selector('#library-hero.has-art')
         assert tab.locator('.card-type-badge').count() == 1
