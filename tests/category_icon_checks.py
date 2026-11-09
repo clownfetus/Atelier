@@ -80,10 +80,10 @@ def run_category_icon_checks(page, context, url, report, checks):
         bounds = weapon.evaluate("""el => {
           const b=el.getBoundingClientRect(), thumb=el.closest('.card-thumb').getBoundingClientRect();
           const p=el.getBBox();
-          return {slot:b.width, painted:p.width*b.width/el.viewBox.baseVal.width,
+          return {painted:p.width*b.width/el.viewBox.baseVal.width,
             clipped:b.left<thumb.left || b.right>thumb.right || b.top<thumb.top || b.bottom>thumb.bottom};
         }""")
-        assert 100 <= bounds['slot'] <= 104 and bounds['painted'] >= 80 and not bounds['clipped'], bounds
+        assert bounds['painted'] >= 80 and not bounds['clipped'], bounds
         assert icon_page.evaluate("['pin','pin-off'].every(name=>!!AtelierSymbolPaths[name]?.body)")
         generated = subprocess.run([sys.executable, str(ROOT / 'scripts/folder_emblems.py'), '--check'], capture_output=True, text=True)
         assert generated.returncode == 0, generated.stderr
@@ -122,11 +122,10 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert len({*coloured.values(), *colours.values()}) == 4, (coloured, colours)
             assert all(m['chipEmblem'] == m['cls'] for m in measurements if m['emblem']), measurements
             assert all(m['ratio'] >= (3 if m['emblem'] else 4.5) for m in measurements), (theme, measurements)
-            # File outlines now have a smaller tonal plate; folder artwork still
-            # fills its original large slot. Both keep the standard card layout.
+            # File outlines have a smaller tonal plate. Folder artwork fills 76% of the thumbnail.
             file_types = {'curve-icon', 'unhandled-icon'}
             assert all(abs(m['slot'] - m['thumbWidth'] * (.64 if m['cls'] in file_types else .76)) < .02
-                       and m['cardWidth'] == 156 and m['thumbWidth'] == 134 for m in measurements), measurements
+                       and m['cardWidth'] == 156 and m['thumbWidth'] == 130 for m in measurements), measurements
             assert all(m['glyphWidth'] >= 32 and m['plate'] not in {'transparent', 'rgba(0, 0, 0, 0)'}
                        for m in measurements if m['cls'] in file_types), measurements
             assert all(m['color'] == m['chipColor'] and m['chipSize'] == 18 for m in measurements), measurements

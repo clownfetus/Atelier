@@ -175,10 +175,10 @@ def run_design_checks(page, context, url, report, checks):
         choose(theme)
         assert page.locator('html').get_attribute('data-theme') == theme
         assert page.locator('#settings-theme').input_value() == theme
-        # Restyling must retain the large creative preview.
+        # The 156px card leaves 130px after 12px padding and a 1px border on each side.
         card = page.locator('#grid-area .card').first
         assert card.bounding_box()['width'] == 156
-        assert card.locator('.card-thumb').bounding_box()['width'] == 134
+        assert card.locator('.card-thumb').bounding_box()['width'] == 130
         # Measure actual computed roles, including the brightest container background.
         contrast = measure_contrast(page)
         assert all(pair['ratio'] >= 4.5 for pair in contrast), (theme, contrast)

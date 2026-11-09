@@ -21,6 +21,14 @@ def run_export_review_checks(page, context, url, report, checks):
         installs.append({'body': route.request.post_data_json, 'headers': route.request.headers})
         pending.append(route)
 
+    def wait_for_request(routes, name):
+        # The working glyph can appear before the request reaches its route handler.
+        for _ in range(100):
+            if routes:
+                break
+            review.wait_for_timeout(50)
+        assert len(routes) == 1, f'Expected one pending {name} request, got {len(routes)}'
+
     review.route('**/api/check_mod_conflict?**', conflict)
     review.route('**/api/install_mod', install)
     review.route('**/api/open_export_folder', lambda route: (reveals.append(route.request.url), route.fulfill(json={'ok': True})))
@@ -113,6 +121,7 @@ def run_export_review_checks(page, context, url, report, checks):
         review.locator('#export-review-confirm').click()
         review.wait_for_function("document.getElementById('export-review-title').textContent.startsWith('Checking')")
         review.evaluate('seedExportDraft()')
+        wait_for_request(held_checks, 'conflict check')
         held_checks.pop(0).fulfill(json={'default': False, 'mods': False})
         review.wait_for_function("document.activeElement.id === 'mat-save'")
         assert not installs
@@ -134,12 +143,7 @@ def run_export_review_checks(page, context, url, report, checks):
         assert 'Included changes · 1' in overlay.inner_text()
         review.locator('#export-review-confirm').click()
         review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'busy' && document.querySelector('.export-review-stage[data-glyph-state=busy]')")
-        # The build request leaves in the same task as the busy render; allow its interception to arrive.
-        for _ in range(50):
-            if pending:
-                break
-            review.wait_for_timeout(20)
-        assert len(pending) == 1
+        wait_for_request(pending, 'install')
         assert review.locator('#install-btn').is_disabled()
         assert overlay.locator('progress').count() == 0  # A build can't be counted, so there's no bar.
         # The build runs in the glyph, at the Stage tier.
@@ -190,6 +194,7 @@ def run_export_review_checks(page, context, url, report, checks):
         review.locator('#export-review-refresh').click()
         review.locator('#export-review-confirm').click()
         review.wait_for_function("document.querySelector('.export-review-stage[data-glyph-state=busy]') !== null")
+        wait_for_request(pending, 'install')
         pending.pop(0).fulfill(json={'ok': False, 'built': True, 'pak_path': 'D:/Fixture/exported/Review.pak',
                                    'applied': ['mat MI_Body'], 'error': 'Fixture copy denied'})
         review.wait_for_selector('#export-review-retry')
@@ -228,6 +233,7 @@ def run_export_review_checks(page, context, url, report, checks):
         conflict_response.update(default=False, mods=False)
         review.locator('#export-review-retry').click()
         review.wait_for_function("document.querySelector('.export-review-stage[data-glyph-state=busy]') !== null")
+        wait_for_request(pending, 'install')
         pending.pop(0).abort('failed')
         review.wait_for_selector('#export-review-retry')
         assert 'Your project edits are preserved' in overlay.inner_text()

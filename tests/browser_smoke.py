@@ -726,6 +726,7 @@ def main():
                 base_page.route(url + '/', original('index.html', 'text/html'))
                 base_page.route('**/static/app.js', original('app.js', 'text/javascript'))
                 base_page.route('**/static/style.css', original('style.css', 'text/css'))
+                base_page.route('**/static/vendor/lucide/lucide.min.js', original('vendor/lucide/lucide.min.js', 'text/javascript'))
                 base_page.goto(url)
                 base_page.wait_for_selector('#grid-area .folder-card, #grid-area .card')
                 base_page.screenshot(path=str(report / 'baseline-1400x900.png'))
