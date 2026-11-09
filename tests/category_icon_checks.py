@@ -1,7 +1,5 @@
 """Real card/category artwork and shared home-shortcut colors in both themes."""
 from pathlib import Path
-import subprocess
-import sys
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,13 +83,23 @@ def run_category_icon_checks(page, context, url, report, checks):
         }""")
         assert bounds['painted'] >= 80 and not bounds['clipped'], bounds
         assert icon_page.evaluate("['pin','pin-off'].every(name=>!!AtelierSymbolPaths[name]?.body)")
-        generated = subprocess.run([sys.executable, str(ROOT / 'scripts/folder_emblems.py'), '--check'], capture_output=True, text=True)
-        assert generated.returncode == 0, generated.stderr
-        # The icons are the drawings Thiago approved, and the generator is still the one that drew them.
-        for path in sorted((ROOT / 'docs/motion-v2/assets/emblems').glob('*.svg')):
-            shipped = (ROOT / 'gui/brand/emblems' / path.name).read_bytes().replace(b'\r\n', b'\n')
-            assert shipped == path.read_bytes().replace(b'\r\n', b'\n'), path.name
-        checks.append('Folder rules match whole names case-insensitively and give dropped categories the plain folder; icons are generated, match the approved drawings and stay accessible')
+        # Compare what ships with the approved SVGs. Regenerating curved paths depends on platform math.
+        approved = ROOT / 'docs/motion-v2/assets/emblems'
+        drawings = sorted(approved.glob('*.svg'))
+        assert len(drawings) == 34, drawings
+        for path in drawings:
+            svg = path.read_text(encoding='utf-8')
+            assert (ROOT / 'gui/brand/emblems' / path.name).read_text(encoding='utf-8') == svg, path.name
+            name, variant = path.stem.rsplit('-', 1)
+            size = 32 if variant == 'master' else 18
+            markup = icon_page.evaluate('([name, size]) => AtelierFolderEmblems.markup(name, size)', [name, size])
+            assert markup == svg.split('>', 1)[1].rsplit('</svg>', 1)[0], path.name
+        plain_folder = ET.parse(approved / 'folder-icon-master.svg')
+        plain_paths = [path.attrib['d'] for path in plain_folder.findall('.//{*}path')]
+        assert icon_page.locator('#folder-plain-template').evaluate(
+            "template => [...template.content.querySelectorAll('path')].map(path => path.getAttribute('d'))"
+        ) == plain_paths
+        checks.append('Folder rules match whole names case-insensitively and give dropped categories the plain folder; packaged and inline icons match the approved drawings and stay accessible')
 
         for theme in ('light', 'dark'):
             icon_page.locator('#settings-theme').select_option(theme, force=True)
