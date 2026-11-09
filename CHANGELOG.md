@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.0 — 2026-11-09
+
 - Motion system v2. The assembly glyph, built from Atelier's three pieces (a blue
   texture tile, a teal mesh block and a copper material disc), replaces the
   coloured ink and Krackle wherever Atelier is working. It tries fits while a job
