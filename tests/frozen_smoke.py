@@ -160,6 +160,7 @@ def main():
             page.wait_for_function("document.querySelectorAll('#grid-area .card').length === 6")
             page.wait_for_function("!document.querySelector('.overlay.active')")
             page.wait_for_function("document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width === 130")
+            page.wait_for_function("document.querySelector('.studio-brand > img')?.naturalWidth > 0")
             result['renderer'] = page.evaluate('navigator.userAgent')
             result['checks'].append('Actual frozen executable serves the interface in native WebView2')
             info = page.evaluate("""() => ({
@@ -174,7 +175,7 @@ def main():
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
                 emptyTray: document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width,
                 singleMark: [...document.querySelectorAll('.studio-brand > img, .studio-brand > [data-atelier-motion="glyph"]')]
-                  .filter(el => getComputedStyle(el).display !== 'none').length
+                  .filter(el => el.getClientRects().length && getComputedStyle(el).visibility === 'visible').length
             })""")
             assert all(info[k] for k in ('library', 'pins', 'exportReview', 'originalComparison', 'font')), info
             assert {'glyph', 'polish', 'viewportPoster'}.issubset(info['motions']), info
