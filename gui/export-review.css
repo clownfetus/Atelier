@@ -1,4 +1,8 @@
 .export-review-overlay { z-index: calc(var(--studio-layer-overlay) + 10); }
+/* The review and its overwrite confirmation keep their actions above export notifications. */
+body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toast-area {
+  z-index: calc(var(--studio-layer-overlay) - 1);
+}
 .export-review-modal { max-width: 720px !important; gap: 16px; --glyph-halo: var(--md-sys-color-surface-container); }
 .export-review-stage { position: relative; margin: -8px auto -4px; flex-shrink: 0; }
 /* With the stage in the dialog, long reports scroll inside the body so the outcome

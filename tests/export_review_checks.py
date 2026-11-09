@@ -201,6 +201,8 @@ def run_export_review_checks(page, context, url, report, checks):
         assert 'Export built; copy failed' in overlay.inner_text()
         assert 'Fixture copy denied' in overlay.inner_text()
         assert review.locator('#export-review-reveal').is_visible()
+        assert overlay.evaluate("""el => Number(getComputedStyle(el).zIndex) >
+          Number(getComputedStyle(document.getElementById('toast-area')).zIndex)"""), 'A toast can cover the retry controls'
         before = len(installs)
         review.evaluate("_activeProjectName = 'Other project'")
         review.locator('#export-review-retry').click()
