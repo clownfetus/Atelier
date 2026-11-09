@@ -50,7 +50,69 @@ def assert_lockups(tab):
         tab.set_viewport_size(size)
 
 
+EYEDROPPER_STUB = """
+  window.__eyedropper = {result: '#2A7F62', cancel: false, opened: 0};
+  window.EyeDropper = class {
+    open() { window.__eyedropper.opened++;
+      return window.__eyedropper.cancel ? Promise.reject(new DOMException('Cancelled', 'AbortError'))
+                                        : Promise.resolve({sRGBHex: window.__eyedropper.result}); }
+  };
+"""
+
+
+def run_eyedropper_checks(context, url, checks):
+    """The pipette beside each swatch applies a pick through the swatch's own handlers."""
+    tab = context.new_page(); errors = []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    try:
+        tab.add_init_script(EYEDROPPER_STUB)
+        tab.goto(url); tab.wait_for_selector('#grid-area .card')
+        state = tab.evaluate("""async () => {
+          const row = document.createElement('div'); row.className = 'mat-row';
+          row.innerHTML = '<span class="mat-color-well"><input type="color" id="probe-well" value="#ff0000" oninput="window.__inline = this.value"></span><input class="mat-hex">';
+          document.body.append(row);
+          const plain = document.createElement('input'); plain.type = 'color'; plain.value = '#000000'; plain.id = 'probe-plain';
+          const events = []; for (const t of ['input', 'change']) plain.addEventListener(t, e => events.push([t, e.target.value]));
+          document.body.append(plain);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          const well = document.getElementById('probe-well'), wellButton = well.parentElement.nextElementSibling;
+          wellButton.click(); await new Promise(resolve => setTimeout(resolve, 0));
+          const plainButton = plain.nextElementSibling;
+          plainButton.click(); await new Promise(resolve => setTimeout(resolve, 0));
+          window.__eyedropper.cancel = true; window.__eyedropper.result = '#111111';
+          plainButton.click(); await new Promise(resolve => setTimeout(resolve, 0));
+          const theme = document.querySelector('[data-theme-color="accent"]');
+          const result = {wellButton: wellButton?.className, wellValue: well.value, inline: window.__inline,
+            plainButton: plainButton?.className, plainValue: plain.value, events, opened: window.__eyedropper.opened,
+            pressed: plainButton.getAttribute('aria-pressed'), label: plainButton.getAttribute('aria-label'),
+            icon: !!plainButton.querySelector('svg.studio-icon'),
+            themeOrder: [...theme.parentElement.children].map(el => el.tagName.toLowerCase() + (el.className ? '.' + el.className : '')),
+            backdrop: !!document.getElementById('viewport-backdrop-color').nextElementSibling?.classList.contains('eyedropper-btn')};
+          row.remove(); plain.remove(); plainButton.remove(); return result;
+        }""")
+        assert state['wellButton'] == 'eyedropper-btn' and state['wellValue'] == '#2a7f62' and state['inline'] == '#2a7f62', state
+        assert state['plainButton'] == 'eyedropper-btn' and state['plainValue'] == '#2a7f62', state
+        assert state['events'] == [['input', '#2a7f62'], ['change', '#2a7f62']], state
+        assert state['opened'] == 3 and state['pressed'] == 'false' and state['icon'], state
+        assert state['label'] == 'Pick a colour from the screen', state
+        assert state['themeOrder'] == ['input', 'output', 'button.eyedropper-btn'], state
+        assert not state['backdrop'], state
+        # Without the engine's EyeDropper (Linux WebKitGTK), no pipettes appear.
+        bare = context.new_page()
+        try:
+            bare.add_init_script('delete window.EyeDropper')
+            bare.goto(url); bare.wait_for_selector('#grid-area .card')
+            assert bare.locator('.eyedropper-btn').count() == 0
+        finally:
+            bare.close()
+        assert not errors, errors
+        checks.append('Pipettes beside colour swatches apply a pick through the swatch handlers, keep it on cancel, and appear only where EyeDropper exists')
+    finally:
+        tab.close()
+
+
 def run_appearance_checks(page, context, url, report, checks):
+    run_eyedropper_checks(context, url, checks)
     tab = context.new_page()
     failures = []
     tab.on('pageerror', lambda error: failures.append(str(error)))
