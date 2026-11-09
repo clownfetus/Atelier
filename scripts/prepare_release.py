@@ -28,15 +28,22 @@ def asset_digest(asset):
     return value[7:]
 
 
-def split_changelog(document):
+def split_changelog(document, published=False):
+    # A published changelog only supplies release history. Releases up to 1.1.8 shipped one
+    # with an Unreleased section after every version, so those are skipped there, and the
+    # first copy of a repeated version wins.
     parts = re.split(r'(?m)(?=^## )', document)
     sections = {}
     for section in parts[1:]:
         heading = section.splitlines()[0][3:].strip()
         key = heading.split()[0]
+        if published and key == 'Unreleased':
+            continue
         if key != 'Unreleased':
             version(key)
         if key in sections:
+            if published:
+                continue
             raise ValueError('Duplicate changelog section: ' + key)
         sections[key] = section.strip()
     return parts[0].strip(), sections
@@ -50,10 +57,8 @@ def render_changelog(intro, sections):
 
 def merge_changelog_history(current, historical):
     intro, sections = split_changelog(current)
-    releases = {}
-    for document in (historical, current):
-        releases.update({key: section for key, section in split_changelog(document)[1].items()
-                         if key != 'Unreleased'})
+    releases = dict(split_changelog(historical, published=True)[1])
+    releases.update({key: section for key, section in sections.items() if key != 'Unreleased'})
     releases['Unreleased'] = sections.get('Unreleased', '## Unreleased')
     return render_changelog(intro, releases)
 

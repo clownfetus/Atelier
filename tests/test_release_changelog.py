@@ -51,6 +51,21 @@ class Preparation(unittest.TestCase):
         self.assertNotIn('Previous fix', result)
         self.assertLess(result.index('## 1.1.10'), result.index('## 1.1.7'))
 
+    def test_history_skips_repeated_unreleased_in_published_changelog(self):
+        # The published 1.1.8 changelog repeats Unreleased after every version.
+        current = document('- Pending.', '## 1.1.7\n\n- Corrected notes.')
+        historical = ('# Changelog\n\n## 1.1.8 — 2026-11-05\n\n- Shipped.\n\n'
+                      '## Unreleased\n\n- Stale one.\n\n## 1.1.7 — 2026-11-02\n\n- Old notes.\n\n'
+                      '## Unreleased\n\n- Stale two.\n')
+        result = P.merge_changelog_history(current, historical)
+        self.assertEqual(result.count('## Unreleased'), 1)
+        self.assertIn('- Pending.', result)
+        self.assertIn('- Shipped.', result)
+        self.assertIn('- Corrected notes.', result)
+        self.assertNotIn('Stale', result)
+        with self.assertRaises(ValueError):
+            P.split_changelog(historical)
+
 
 class Synchronization(unittest.TestCase):
     def setUp(self):
