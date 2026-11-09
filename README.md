@@ -28,6 +28,8 @@ before building it. Available for Windows and Linux.
   Settings → Preview motion.
 - **Send to Blender works on Blender 5.1.** Reinstall Atelier Live Bridge once after
   updating; Atelier tells you if Blender has an older copy.
+- **Pick colours from the screen.** A pipette beside every colour swatch applies the
+  colour you click straight away (Windows).
 
 See the [patch notes](docs/release-1.2.0.md) for details.
 

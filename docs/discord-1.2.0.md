@@ -10,6 +10,7 @@ Atelier's own mark now shows its work, and pop-ups open and close more calmly.
 • Only textures, meshes and materials keep a category colour now; every other category is neutral and told apart by its icon.
 • Full, Calm and Off motion settings, plus optional Motion sounds. Try it in Settings → Preview motion.
 • Send to Blender (live) works again on Blender 4.4 and newer, including 5.1. Reinstall Atelier Live Bridge once from Set up live Blender; Atelier tells you if Blender has an older copy.
+• On Windows, a pipette beside every colour swatch picks a colour from anywhere on screen and applies it straight away.
 
 Windows installer, portable ZIP and Linux AppImage, with source, screenshots and checksums.
 

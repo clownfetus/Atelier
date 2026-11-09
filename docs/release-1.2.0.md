@@ -62,6 +62,15 @@ completes. It's off by default and plays only in Full.
   **Set up live Blender** beside Send to Blender, download the add-on and install
   it in Blender over the old one. You only need to do this once.
 
+## Picking colours
+
+- Every colour swatch, in the material editor, Model Studio, VFX colour stops and
+  your custom theme, now has a pipette beside it on Windows. Click it, then click
+  anywhere on screen, and the colour applies straight away.
+- The colour picker's own eyedropper could lose a pick, because pressing Escape
+  there restores the old colour. The pipette has no picker to close. Press Escape
+  during a pick to cancel it and keep the colour you had.
+
 ## A few things to know
 
 - Showcase images now use a plain neutral backdrop. Showcase images you export

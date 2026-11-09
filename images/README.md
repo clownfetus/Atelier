@@ -1,6 +1,6 @@
 # Atelier 1.2.0 screenshots
 
-Captured on 8 November 2026 from the motion v2 source (`version` file 1.1.4) using the actual
+Captured on 9 November 2026 from the motion v2 source (`version` file 1.1.4) using the actual
 Bottle-served interface in Microsoft Edge at 1400 × 900. Captures are unedited:
 no compositing, simulated UI, cropping or image generation.
 

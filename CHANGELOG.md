@@ -32,6 +32,10 @@ The app, installers and update checker identify each release by its full number,
   one instead of importing with older material wiring. Install the new add-on once
   after updating, from Set up live Blender beside Send to Blender.
 
+- Every colour swatch has a pipette beside it on Windows. Click it, then click
+  anywhere on screen, and the colour applies straight away. The colour picker's
+  own eyedropper could lose a pick, because Escape there restores the old colour.
+
 - The full changelog groups shipped changes by version and stays up to date
   automatically after each release.
 
