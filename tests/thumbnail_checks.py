@@ -105,6 +105,7 @@ def run_thumbnail_checks(page, context, url, report, checks):
         tab.evaluate("() => previewLibraryCard(_makeCard(allItems[0]), document.activeElement)")
         assert tab.locator('#library-preview img').get_attribute('src') == skin_art['thumbnail']
         tab.locator('#library-preview-close').click()
+        tab.wait_for_function("!document.querySelector('#library-preview img').hasAttribute('src')")
         checks.append('Matched skin UI portraits use catalogue artwork in the grid and Quick preview, and only unmatched textures enter the decode queue')
 
         tab.evaluate("""path => {
@@ -113,10 +114,23 @@ def run_thumbnail_checks(page, context, url, report, checks):
         }""", skin_path)
         tab.wait_for_function("path => document.querySelector('img[data-game-rel=\"'+path+'\"]').src.includes('/api/preview?')", arg=skin_path)
         assert tab.evaluate("!allItems[0].thumbnail && !document.querySelector('#grid-area .card')._libraryCard.thumbnail")
-        tab.evaluate("() => previewLibraryCard(_makeCard(allItems[0]), document.activeElement)")
-        assert '/api/preview?' in tab.locator('#library-preview img').get_attribute('src')
+        # A close event can arrive after the same dialog has been reopened.
+        tab.evaluate("""() => {
+          const opener = document.activeElement;
+          const preview = () => previewLibraryCard(_makeCard(allItems[0]), opener);
+          preview();
+          const dialog = document.getElementById('library-preview');
+          const closed = new Promise(resolve => dialog.addEventListener('close', () => resolve(), {once: true}));
+          dialog.close();
+          preview();
+          return closed;
+        }""")
+        preview = tab.locator('#library-preview[open] img')
+        src = preview.get_attribute('src')
+        assert src and '/api/preview?' in src, src
+        preview.wait_for(state='visible')
         tab.locator('#library-preview-close').click()
-        checks.append('Editing a skin UI portrait switches the visible card and Quick preview to the project image')
+        checks.append('Editing a skin UI portrait switches the card and Quick preview to the project image, which stays visible when the preview is reopened quickly')
 
         artwork_state['missing'] = True
         requests.clear()

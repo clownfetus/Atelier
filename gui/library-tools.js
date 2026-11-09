@@ -149,6 +149,7 @@
       document.getElementById('library-preview-close').addEventListener('click', closePreview);
       previewDialog.addEventListener('click', e => { if (e.target === previewDialog) closePreview(); });
       previewDialog.addEventListener('close', () => {
+        if (previewDialog.open) return; // A previous close can arrive after a new preview opens.
         clearTimeout(previewTimer);
         const img = previewDialog.querySelector('img'); img.onload = img.onerror = null; img.removeAttribute('src');
         if (previewOpener?.isConnected) previewOpener.focus();
