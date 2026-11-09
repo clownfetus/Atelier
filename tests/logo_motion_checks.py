@@ -1,7 +1,7 @@
 """The header logo's entrance in the real app: once on launch, then the still mark. Never writes project data."""
-import subprocess
-import sys
 from pathlib import Path
+
+from scripts import brand_mark
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRANCE = '.studio-brand > [data-glyph-entrance]'
@@ -20,10 +20,17 @@ STILL = "(el => !el.hidden && getComputedStyle(el).visibility === 'visible' && g
 
 
 def run_logo_motion_checks(page, context, url, report, checks):
-    mark = subprocess.run([sys.executable, str(ROOT / 'scripts/brand_mark.py'), '--check'],
-                          capture_output=True, text=True)
-    assert mark.returncode == 0, mark.stdout + mark.stderr
-    checks.append('The A mark vector, interface PNG and application icons match scripts/brand_mark.py')
+    approved = ROOT / 'docs/motion-v2/assets'
+    for rel, generate in brand_mark.OUTPUTS.items():
+        path = ROOT / rel
+        current = path.read_bytes()
+        if path.suffix == '.svg':
+            assert current == (approved / path.name).read_bytes(), rel
+        else:
+            assert brand_mark.same_pixels(current, generate()), rel
+    stale_wordmarks = brand_mark.wordmark_problems()
+    assert not stale_wordmarks, stale_wordmarks
+    checks.append('The A mark vectors match the approved drawings, and the interface PNG and desktop icons match the generated pixels')
 
     tab = context.new_page()
     errors, pending_config = [], []
