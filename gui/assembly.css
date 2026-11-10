@@ -1,9 +1,9 @@
 /* Assembly borrows the application’s semantic Material roles. The character,
    real texture pixels and parameter swatches remain the workspace’s colour. */
-#viewport-head #viewport-modes { flex:none; margin-inline:auto 8px; }
-#viewport-head #viewport-modes button { min-width:68px; min-height:34px; padding:5px 12px; font-size:var(--studio-text-detail); }
-#viewport-box #viewport-modes button[aria-pressed=true] { background:var(--acc); color:var(--md-sys-color-on-primary); }
-#viewport-head:has(#viewport-modes) .vp-workspace-identity { flex:1; margin-right:0; }
+#viewport-view-actions { display:flex; flex:none; gap:8px; }
+#viewport-head #viewport-view-actions button { min-height:34px; padding:5px 12px; font-size:var(--studio-text-detail); white-space:nowrap; }
+#viewport-box #viewport-showcase[aria-pressed=true] { background:var(--acc); color:var(--md-sys-color-on-primary); }
+.is-assembly .vp-workspace-identity { flex:1; margin-right:0; }
 .assembly-resize { display:none; }
 #viewport-box.is-assembly,:root[data-theme] #viewport-box.is-assembly {
   --bg2:var(--md-sys-color-surface-container-low); --bg3:var(--md-sys-color-surface);
@@ -14,7 +14,7 @@
   --assembly-geometry-width:216px; --assembly-material-width:326px;
   width:min(98vw,1920px); height:97vh; border-top-width:2px;
 }
-#viewport-box.is-assembly.expanded { width:100vw; height:100vh; }
+#viewport-box.is-assembly.expanded,:root[data-theme] #viewport-box.is-assembly.expanded { width:100vw; height:100vh; }
 .is-assembly #viewport-body { display:grid; grid-template-columns:minmax(160px,var(--assembly-geometry-width)) minmax(0,1fr) minmax(260px,var(--assembly-material-width)); grid-template-rows:minmax(160px,1fr) auto; gap:1px; background:var(--border); }
 .is-assembly #viewport-head { min-height:62px; }
 .is-assembly .vp-workspace-label { font-family:var(--studio-display); letter-spacing:var(--studio-label-tracking); color:var(--acc); }
@@ -67,7 +67,7 @@
 .assembly-empty,.assembly-footnote { color:var(--muted); font-size:var(--studio-text-detail); line-height:1.65; }
 .assembly-footnote { font-size:var(--studio-text-micro); margin:24px 4px 0; }
 .is-assembly #viewport-stage { grid-column:2; grid-row:1; min-height:0; overflow:hidden; }
-.is-assembly #viewport-stage:has(.vp-menu[open]) { z-index:7; }
+.is-assembly #viewport-stage:has(.vp-menu[open]) { z-index:7; overflow:visible; }
 .is-assembly #viewport-canvas { inset:58px 0 0; height:calc(100% - 58px); }
 .is-assembly #viewport-inspect-tools { top:12px; left:16px; max-width:none; flex-wrap:nowrap; gap:4px; }
 .is-assembly #viewport-tools { top:12px; right:16px; gap:8px; }
@@ -118,7 +118,12 @@
 .is-assembly #viewport-materials > .vp-uv-toggle { padding:10px 16px; }
 .is-assembly #viewport-uv-toggle { min-height:30px; width:100%; font-size:var(--studio-text-micro); }
 .is-assembly #viewport-mat-section { display:flex; flex:1; min-height:0; flex-direction:column; overflow:auto; }
-.is-assembly #viewport-mat-section > :is(#viewport-mat-head,.vp-material-search,#viewport-mat-list,#viewport-material-empty) { display:none; }
+.is-assembly #viewport-mat-section > :is(#viewport-mat-head,#viewport-material-empty),
+.is-assembly #assembly-material-browse[aria-expanded=false] ~ :is(.vp-material-search,#viewport-mat-list) { display:none; }
+.is-assembly #viewport-mat-section > :is(.vp-material-search,#viewport-mat-list) { flex:none; }
+.is-assembly .vp-material-search { display:flex; }
+#viewport-box #assembly-material-browse { flex:none; justify-content:space-between; margin:12px 16px 0; min-height:34px; padding:5px 10px; font-size:var(--studio-text-detail); }
+#assembly-material-browse[aria-expanded=true] svg { transform:rotate(180deg); }
 .is-assembly #viewport-skin-card { display:none; }
 #assembly-material-context { padding:16px 24px; border-bottom:1px solid var(--border); }
 #assembly-material-context h3 { font:var(--studio-type-title); font-weight:600; margin:16px 0 8px; }
@@ -130,9 +135,12 @@
 .assembly-affected > span { flex:1 0 100%; font-size:var(--studio-text-micro); color:var(--muted); margin:0 0 4px; }
 #viewport-box .assembly-affected button { font-size:var(--studio-text-micro); padding:3px 8px; min-height:26px; }
 .assembly-reference-warning { color:var(--studio-warning); font-size:var(--studio-text-detail); line-height:1.6; margin:12px 0; }
+.assembly-material-details { margin-top:8px; }
+.assembly-material-details > summary { color:var(--muted); font-size:var(--studio-text-detail); padding:6px 0; cursor:pointer; }
 #viewport-box .assembly-primary { width:100%; min-height:34px; font-size:var(--studio-text-detail); border-color:var(--acc); color:var(--acc); background:transparent; }
 .is-assembly #viewport-material-editor { flex:none; overflow:visible; padding:16px 24px 8px; border:0; }
-.is-assembly #viewport-material-editor .vp-editor-title { display:none; }
+.is-assembly #viewport-material-editor .vp-editor-title { margin-bottom:12px; }
+.is-assembly #viewport-material-editor .vp-editor-title h3 { font-size:var(--studio-text-label); font-weight:600; }
 .is-assembly.assembly-unverified #viewport-material-editor { display:none; }
 .is-assembly .vp-color-label { font-size:var(--studio-text-detail); }
 .is-assembly .vp-color-field { margin-bottom:16px; }
@@ -152,9 +160,11 @@
 .assembly-material-resize { left:-4px; }
 .assembly-resize:hover,.assembly-resize:focus-visible { background:color-mix(in srgb,var(--acc) 35%,transparent); outline:none; }
 #viewport-box .assembly-geometry-reopen { display:none; position:absolute; top:55px; left:12px; z-index:3; min-height:28px; font-size:var(--studio-text-micro); padding:4px 8px; }
-.is-assembly.assembly-geometry-collapsed #viewport-body { grid-template-columns:0 minmax(0,1fr) minmax(260px,var(--assembly-material-width)); }
-.assembly-geometry-collapsed .assembly-geometry { visibility:hidden; }
-#viewport-box.is-assembly.assembly-geometry-collapsed .assembly-geometry-reopen { display:block; }
+@media (width > 850px) {
+  .is-assembly.assembly-geometry-collapsed #viewport-body { grid-template-columns:0 minmax(0,1fr) minmax(260px,var(--assembly-material-width)); }
+  .assembly-geometry-collapsed .assembly-geometry { visibility:hidden; }
+  #viewport-box.is-assembly.assembly-geometry-collapsed .assembly-geometry-reopen { display:block; }
+}
 .assembly-textures-collapsed #assembly-texture-cards,.assembly-textures-collapsed #assembly-texture-actions { display:none; }
 .assembly-textures-collapsed #assembly-textures-collapse svg { transform:rotate(180deg); }
 :root[data-motion-mode=off] #assembly-links,:root[data-motion=reduce] #assembly-links { display:none; }
@@ -168,8 +178,7 @@
 @media (max-width:1120px) {
   #viewport-head .vp-workspace-label { border:0; padding-right:0; }
   #viewport-head .vp-workspace-identity { gap:8px; }
-  #viewport-head #viewport-modes { margin-inline:0 4px; }
-  #viewport-head #viewport-modes button { min-width:60px; padding-inline:8px; }
+  #viewport-head #viewport-view-actions button { padding-inline:8px; }
   #viewport-unsaved { display:none; }
   #viewport-box.is-assembly,:root[data-theme] #viewport-box.is-assembly { --assembly-geometry-width:166px; --assembly-material-width:270px; }
   .is-assembly #viewport-model-menu > summary > svg { display:none; }
@@ -194,10 +203,17 @@
   .is-assembly #viewport-status { max-width:25%; }
   .is-assembly #viewport-navigation { display:none; }
 }
+@media (max-width:720px) {
+  .is-assembly #viewport-body { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(160px,1fr) auto minmax(120px,38%); }
+  .is-assembly #viewport-materials { grid-column:1; grid-row:3; height:auto; }
+  .is-assembly .assembly-material-resize { display:none; }
+}
 @media (max-height:760px) {
   .is-assembly #viewport-head { min-height:54px; }
   .assembly-texture-preview { height:48px; min-height:48px; }
   #assembly-texture-cards { min-height:112px; }
   .is-assembly #viewport-foot { min-height:46px; }
 }
+#viewport-box.is-assembly.assembly-panels-hidden #viewport-body { display:flex; }
+#viewport-box.is-assembly.assembly-panels-hidden :is(.assembly-geometry,.assembly-textures,#viewport-materials,#assembly-stage-selection,#assembly-links,#assembly-geometry-reopen) { display:none; }
 @media (prefers-reduced-motion:reduce) { #assembly-links { display:none; } }

@@ -169,6 +169,9 @@ async def main():
                     await page.locator('#viewport-model-menu').evaluate('e=>e.open=false')
                     material=next(m for m in state['materials'] if '/Weapons/' in m.get('mesh_game_rel','') and m.get('colors'))
                     await page.evaluate('key=>__studio.pick(key)',material['key'])
+                    show_colours=page.get_by_role('button',name='Show colour controls')
+                    await page.locator('#assembly-material-context .assembly-path').wait_for()
+                    if await show_colours.is_visible():await show_colours.click()
                     await page.locator('#viewport-material-editor .vp-advanced').evaluate('e=>e.open=true')
                     picker=page.locator('#viewport-material-editor input[type=color]').first
                     await picker.evaluate("e=>{e.value='#357aa8';e.dispatchEvent(new Event('input'));}")
@@ -190,7 +193,8 @@ async def main():
                 if args.visibility:
                     target=next((m for m in state['materials'] if 'Gen' in m.get('slot_name','')),None)
                     target=target or next((m for m in state['materials'] if '/Weapons/' in m.get('mesh_game_rel','')),state['materials'][0])
-                    key=target['key'];eye=page.locator('.vp-section-eye[data-section='+json.dumps(key)+']')
+                    await page.locator('#assembly-material-browse').click()
+                    key=target['key'];eye=page.locator('#viewport-mat-list .vp-section-eye[data-section='+json.dumps(key)+']')
                     result['hidden_target']={k:target[k] for k in ('mesh_game_rel','slot_name','slot_index')}
                     await eye.click();await page.wait_for_selector('#atelier-confirm')
                     assert 'in-game after' in await page.locator('#atelier-confirm-body').inner_text()
@@ -223,7 +227,8 @@ async def main():
                         (folder/'export.json').write_text(json.dumps(exported,indent=2),encoding='utf-8')
                         assert exported.get('ok') and not exported.get('skipped'),exported
                         result['export']=exported
-                    eye=page.locator('.vp-section-eye[data-section='+json.dumps(key)+']');await eye.click()
+                    await page.locator('#assembly-material-browse').click()
+                    await eye.click()
                     await page.wait_for_function('key=>!__studio.state().materials.find(m=>m.key===key).hidden',arg=key)
                     await page.wait_for_function("document.getElementById('viewport-status').textContent.includes('saved for export')",timeout=60000)
                     assert await page.locator('#atelier-confirm').count()==0

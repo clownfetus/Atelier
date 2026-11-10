@@ -64,11 +64,12 @@ async def main():
             left_material=next(row for row in state['materials'] if row.get('mesh_game_rel','').endswith('/SK_WP_1066001_Gun_L'))
             assert len(left_material.get('texture_urls',{}))==4 and left_material['game_rel']!=material['game_rel'],left_material
             results['independent_left_and_right_materials']=True
-            for mode in ('inspect','showcase'):
-                await page.locator('#viewport-'+mode).click();await page.wait_for_timeout(300)
-                await page.screenshot(path=str(args.report_dir/(mode+'.png')))
-            await page.locator('#viewport-inspect').click()
-            key=material['key'];eye=page.locator('.vp-section-eye[data-section='+json.dumps(key)+']')
+            await page.screenshot(path=str(args.report_dir/'assembly.png'))
+            await page.locator('#viewport-showcase').click();await page.wait_for_timeout(300)
+            await page.screenshot(path=str(args.report_dir/'showcase.png'))
+            await page.locator('#viewport-showcase').click()
+            await page.locator('#assembly-material-browse').click()
+            key=material['key'];eye=page.locator('#viewport-mat-list .vp-section-eye[data-section='+json.dumps(key)+']')
             results['hidden_target']={name:material[name] for name in ('mesh_game_rel','slot_name','slot_index')}
             await eye.click();await page.locator('#atelier-confirm-cancel').click()
             assert await page.evaluate('key=>__studio.state().materials.find(row=>row.key===key).visible',key)
@@ -85,7 +86,8 @@ async def main():
                 exported=await finish(await api('/api/install_mod',{'mod_name':'Dante and guns hidden verification','items':[body,left_gun,gun],'copy_to_mods':False,'background':True}))
                 results['export']=exported;assert exported.get('ok') and not exported.get('skipped'),exported
                 print('PASS combined imported body, weapon, hidden sections and texture packages',flush=True)
-            await page.locator('.vp-section-eye[data-section='+json.dumps(key)+']').click()
+            await page.locator('#assembly-material-browse').click()
+            await eye.click()
             await page.wait_for_function('key=>!__studio.state().materials.find(row=>row.key===key).hidden',arg=key)
             await page.wait_for_function("document.getElementById('viewport-status').textContent.includes('saved for export')")
             results['visibility_restored']=True;key=None

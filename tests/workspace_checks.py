@@ -164,7 +164,7 @@ def run_workspace_checks(context, url, report, checks):
         assert page.locator('#viewport-box').get_attribute('aria-modal') is None
         assert page.locator('#workspace-step-edit').get_attribute('aria-current') == 'step'
         assert page.locator('#viewport-mat-head h3').inner_text() == 'Choose a part'
-        assert page.locator('#viewport-modes').is_hidden()
+        assert page.locator('#viewport-view-actions').is_hidden()
         assert page.locator('#viewport-uv-toggle').is_hidden()
         page.locator('#viewport-model-menu > summary').click()
         assert page.locator('#viewport-blender-send').is_hidden()
@@ -337,7 +337,8 @@ def run_workspace_checks(context, url, report, checks):
         page.evaluate("AtelierViewport.open('1029001','Magik / Original costume')")
         page.wait_for_selector('#viewport-overlay.active')
         page.evaluate('__workspace.settled()')
-        assert page.locator('#viewport-modes').is_visible()
+        assert page.locator('#viewport-view-actions').is_visible()
+        assert page.locator('#viewport-box.is-assembly').is_visible()
         assert page.locator('#viewport-uv-toggle').is_visible()
         page.locator('#viewport-model-menu > summary').click()
         assert page.locator('#viewport-blender-send').is_visible()
@@ -347,7 +348,6 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('#viewport-wireframe').click()
         assert page.locator('#viewport-wireframe').get_attribute('aria-pressed') == 'true'
         page.locator('#viewport-settings-menu > summary').click()
-        page.locator('#viewport-assembly').click()
         page.locator('#viewport-close').click()
         page.locator('#project-chip').click()
         page.locator('#proj-grid [data-name="Smoke A"]').click()
@@ -356,10 +356,10 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('#page-workspace').click()
         page.wait_for_selector('#workspace-stage #viewport-overlay.active')
         page.evaluate('__workspace.settled()')
-        assert page.locator('#viewport-inspect').get_attribute('aria-pressed') == 'true'
+        assert not page.locator('#viewport-box.is-assembly').count()
         assert page.locator('#viewport-wireframe').get_attribute('aria-pressed') == 'false'
-        assert page.evaluate('localStorage.getItem("atelier.assembly")') == '1'
-        checks.append('Projects open in Library with full model tools; Workspace restores the saved costume and material set without losing the Library assembly preference')
+        assert page.locator('#assembly-material-browse').is_hidden()
+        checks.append('Library opens the full Assembly editor and the guided Workspace restores the saved costume and material set with its simpler controls')
 
         async_switch = r"""async start=>{
           const samples=[];

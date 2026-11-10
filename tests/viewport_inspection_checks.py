@@ -100,7 +100,7 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
     tab.route('**/api/skin_meshes?*', lambda route: route.fulfill(json=[
         {'name':name+' fixture','game_rel':'Characters/1029/1029001/Meshes/'+name} for name in ('Body','Cape')]))
     materials = {name:dict(game_rel='Characters/1029/1029001/Materials/'+name,
-        colors=[dict(name='Tint',rgba=[.6,.2,.15,1])],scalars=[],textures={},dyeable=name=='MI_Body') for name in ('MI_Body','MI_Cape','MI_Hair_01','MI_Hair_02')}
+        mapping_via='imports', colors=[dict(name='Tint',rgba=[.6,.2,.15,1])],scalars=[],textures={},dyeable=name=='MI_Body') for name in ('MI_Body','MI_Cape','MI_Hair_01','MI_Hair_02')}
     materials['MI_Unmapped']={'game_rel':None,'colors':[],'scalars':[],'textures':{},'mapping_error':'Fixture unknown slot'}
     tab.route('**/api/skin_materials', lambda route: route.fulfill(json={'ok':True,'materials':materials}))
     unmapped_reads=[]
@@ -123,6 +123,7 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         tab.evaluate("document.getElementById('settings-motion').value='full';document.getElementById('settings-motion').dispatchEvent(new Event('change'))")
         tab.wait_for_selector('#grid-area .card')
         tab.evaluate("AtelierViewport.open('1029001','Inspection fixtures — synthetic geometry')")
+        tab.locator('#assembly-material-browse').click()
         tab.wait_for_selector('.vp-mat'); tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none'")
         def settings():
             if not tab.locator('#viewport-settings-menu').evaluate('el=>el.open'):
@@ -204,6 +205,11 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
             assert tab.locator('#viewport-box').evaluate('el=>el.scrollWidth===el.clientWidth')
             settings()
             assert tab.locator('#viewport-settings-menu .vp-popover').evaluate('el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;}')
+            grid = tab.locator('#viewport-grid')
+            pressed = grid.get_attribute('aria-pressed')
+            grid.click()
+            assert grid.get_attribute('aria-pressed') != pressed
+            grid.click()
             tab.keyboard.press('Escape')
             tab.screenshot(path=str(report/f'viewer-compact-{width}.png'))
         checks.append('Studio adapts to narrow and short windows with reachable settings and no horizontal overflow')
@@ -274,9 +280,10 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         tab.locator('#viewport-view').select_option('perspective')
         tab.evaluate('__inspection.tint([.1,.8,.2])')
         tab.wait_for_function('__inspection.presentation().colors.some(c=>c.name==="MI_Body" && c.shown[1]>.2 && c.shown[1]<.8)')
-        tab.wait_for_timeout(180)
-        state=tab.evaluate('__inspection.presentation().colors.find(c=>c.name==="MI_Body")')
-        assert state['target']==state['shown']==[.1,.8,.2],state
+        tab.wait_for_function("""() => {
+          const state=__inspection.presentation().colors.find(c=>c.name==='MI_Body');
+          return state && [.1,.8,.2].every((value,i)=>state.target[i]===value && state.shown[i]===value);
+        }""")
         tab.evaluate('__inspection.swapMap([255,0,0])');tab.wait_for_timeout(60)
         tab.evaluate('__inspection.swapMap([0,0,255])')
         tab.wait_for_function('__inspection.presentation().colors.some(c=>c.name==="MI_Body" && c.mapMix<1)')

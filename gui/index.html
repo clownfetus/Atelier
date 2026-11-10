@@ -280,7 +280,10 @@
     <div id="viewport-head">
       <button class="vp-icon-button" id="viewport-back" title="Return to library" aria-label="Return to library"><i data-lucide="arrow-left" size="21"></i></button>
       <div class="vp-workspace-identity"><span class="vp-workspace-label"><i data-lucide="box" size="15"></i><span id="viewport-workspace-label">Model Studio</span></span><h2><img id="viewport-hero-logo" class="hero-emblem" alt="" hidden><span id="viewport-title">3D Preview</span></h2></div>
-      <div id="viewport-modes" class="vp-segment" role="group" aria-label="Workspace mode"><button id="viewport-inspect" aria-pressed="true">Inspect</button><button id="viewport-assembly" aria-pressed="false">Assembly</button><button id="viewport-showcase" aria-pressed="false">Showcase</button></div>
+      <div id="viewport-view-actions" role="group" aria-label="View options">
+        <button id="viewport-panels" type="button" aria-expanded="true" aria-controls="assembly-geometry viewport-materials assembly-textures">Hide panels</button>
+        <button id="viewport-showcase" type="button" aria-pressed="false">Showcase</button>
+      </div>
       <span id="viewport-unsaved" role="status"></span>
       <button id="viewport-mat-save" disabled>Save changes</button>
       <details id="viewport-capture-menu" class="vp-menu"><summary title="Capture an image or turntable"><i data-lucide="camera" size="18"></i><span>Capture</span></summary><div class="vp-popover vp-capture-panel">
@@ -339,7 +342,7 @@
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
-      <p id="viewport-showcase-note" hidden>Wireframe and dye regions are Inspect tools; Showcase shows the finished look.</p>
+      <p id="viewport-showcase-note" hidden>Turn off Showcase to use wireframe, dye regions or texture comparison.</p>
       <details class="vp-shortcuts"><summary>Navigation &amp; shortcuts</summary><p>Drag to orbit · Right-drag to pan · Scroll to zoom<br>F — fit · W — wireframe · G — grid<br>1 — front · 3 — right · 7 — top<br>Double-click a part to frame it.</p><span id="viewport-stats" role="status">No model loaded</span></details>
       </div></details>
         </div>
@@ -370,6 +373,7 @@
             <h3>Materials</h3>
             <span id="viewport-mat-count"></span>
           </div>
+          <button id="assembly-material-browse" type="button" aria-expanded="false" aria-controls="viewport-material-search viewport-mat-list" hidden>Browse materials <i data-lucide="chevron-down" size="16" aria-hidden="true"></i></button>
           <label class="vp-material-search"><i data-lucide="search" size="16"></i><input id="viewport-material-search" type="search" placeholder="Find a material" aria-label="Find a material"></label>
           <div id="viewport-mat-list" role="group" aria-label="Choose a material"></div>
           <div id="viewport-material-empty"><i data-lucide="mouse-pointer-2" size="25"></i><h3>Select a part to edit</h3><p>Click the model or choose a material above. Its controls will appear here.</p></div>

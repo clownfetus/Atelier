@@ -44,7 +44,7 @@ const visibilityBusy = new Set();
 let meshSlots = [];
 let heroId = '';
 let selectedMaterial = null;
-let assembly, workspaceMode = 'inspect', connectedEditorPending = false, assemblyRefreshTimer = 0;
+let assembly, connectedEditorPending = false, assemblyRefreshTimer = 0;
 const recolour = createViewportRecolour({
   materials:name => matsByName[name] || [], baseline:name => baselineMaps.get(name), loader:texLoader,
   fetch:(url, options) => projectFetch(url, options), retint:name => retint(name), note:(message, kind) => note(message, kind),
@@ -54,7 +54,6 @@ const recolour = createViewportRecolour({
     .map(([name, info]) => { info.tex_ver = {...info.tex_ver, [texture]:ver}; return applyMatTexture(name, texture, 'map', ver); })),
 });
 let preserveAnimationCamera = false;
-try { if (localStorage.getItem('atelier.assembly') === '1') workspaceMode = 'assembly'; } catch (_) {}
 
 function updateHeroLogo(id = heroId) {
   heroId = id;
@@ -248,7 +247,7 @@ function init() {
     pauseAnimation:()=>animation.pause(), resumeAnimation:state=>animation.resume(state)});
   assembly = createAssemblyView({
     state:()=>({data:matData, edited, selected:selectedMaterial, objects, metadata:meshMeta, project:viewportProject, loading:modelLoading || !!materialTask}),
-    camera, label:materialLabel, swatch:materialChipColor, fetch:projectFetch, url:projectUrl,
+    camera, label:materialLabel, group:materialGroup, swatch:materialChipColor, fetch:projectFetch, url:projectUrl,
     sectionControl:name=>matData[name] ? sectionEye(name) : null,
     projectAssets:()=>window.AtelierAssetEditors?.projectAssets() || [],
     choose:(name,surface)=>{inspection.selectSurface(surface);pickMaterial(name,false,surface);},
@@ -262,7 +261,11 @@ function init() {
     replaceMesh:editAssemblyMesh,
     effect:effect=>openConnectedEditor('vfx-overlay',()=>window.openVfxEditor?.(effect), false),
   });
-  for (const mode of ['inspect','assembly','showcase']) $('viewport-'+mode).addEventListener('click',()=>setWorkspaceMode(mode, true));
+  $('viewport-showcase').addEventListener('click', () => {
+    if (inspection.capturing()) return;
+    inspection.setShowcase($('viewport-showcase').getAttribute('aria-pressed') !== 'true');
+    assembly.sync();
+  });
 
   $('viewport-mat-save').addEventListener('click', saveEdits);
   $('viewport-mesh-edit').addEventListener('click',async()=>{
@@ -294,20 +297,6 @@ function init() {
   window.addEventListener('resize', onResize);
   new ResizeObserver(onResize).observe($('viewport-stage'));
   inited = true;
-}
-
-function setWorkspaceMode(mode, animate = false) {
-  if (inspection?.capturing()) return;
-  const changed = workspaceMode !== mode;
-  workspaceMode = mode;
-  inspection?.setShowcase(mode === 'showcase');
-  assembly?.setActive(mode === 'assembly');
-  for (const value of ['inspect','assembly','showcase']) $('viewport-'+value).setAttribute('aria-pressed',String(value === mode));
-  $('viewport-workspace-label').textContent = mode === 'assembly' ? 'Assembly View' : 'Model Studio';
-  if (!$('viewport-overlay').classList.contains('mounted')) {
-    try { localStorage.setItem('atelier.assembly',mode === 'assembly' ? '1' : '0'); } catch (_) {}
-  }
-  requestAnimationFrame(onResize);
 }
 
 // Only one transient menu is open; Escape returns focus before it can leave the workspace.
@@ -452,7 +441,9 @@ function clearModel() {
   inspection?.reset();
   refreshFoot();
   assembly?.reset();
-  setWorkspaceMode(workspaceMode === 'assembly' ? 'assembly' : 'inspect');
+  const guided = $('viewport-overlay').classList.contains('mounted');
+  assembly?.setActive(!guided);
+  $('viewport-workspace-label').textContent = guided ? 'Model Studio' : 'Assembly View';
 }
 
 // The studio exports the selected body and visible held weapons as one portable
@@ -883,7 +874,9 @@ function pickMaterial(name, openEditor = true, surface = null, textureSlot = nul
   }
   const info = matData[name];
   if (!info?.game_rel) { note('Material parameters are unavailable for this section.', 'warning'); return; }
-  if (assembly?.active() && !verifiedBinding(info)) { note('This material assignment is unverified. Inspect mode retains the preview controls.', 'warning'); return; }
+  if (assembly?.active() && !verifiedBinding(info) && !assembly.canEditCandidate(info)) {
+    note('Show the colour controls to edit the matched material.', 'warning'); return;
+  }
   if (hasPendingEdits()) { note('Save or revert your studio changes before opening the full editor.', 'warning'); $('viewport-mat-save').focus(); return; }
   if (typeof window.openMaterialEditor !== 'function') { $('viewport-material-editor').querySelector('input')?.focus(); return; }
   openConnectedEditor('material-overlay',()=>window.AtelierAssetEditors?.material({name:info.game_rel.split('/').pop(),game_rel:info.game_rel},textureSlot)
@@ -1339,7 +1332,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   if (!info) { recolour.discard(); return; }
   const name = selectedMaterial;
   const heading = document.createElement('div'); heading.className = 'vp-editor-title';
-  const title = document.createElement('h3'); title.textContent = materialGroup(name);
+  const title = document.createElement('h3'); title.textContent = assembly?.active() ? 'Colour controls' : materialGroup(name);
   const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'vp-editor-dismiss';
   dismiss.setAttribute('aria-label','Deselect material'); dismiss.title = 'Deselect material'; dismiss.innerHTML = '<i data-lucide="x" size="17"></i>';
   dismiss.addEventListener('click',()=>{selectedMaterial=null;buildPanel();$('viewport-mat-section').scrollTop=0;$('viewport-canvas').focus();});
@@ -1733,6 +1726,7 @@ async function open(skinId, title, preferredMesh=null, materialSet=null) {
     }
     body.root.visible=true;
     frameCamera();
+    assembly?.sync();
     setViewportLoaderState('ready');destroyViewportLoader();$('viewport-loading').style.display='none';
     note('Loading equipped weapons…','info');
     await loadAutomaticWeapons(gen);
@@ -1796,6 +1790,7 @@ async function openMesh(gameRel, name, skinId) {
     modelLoading=false;
     refreshBlenderBtn();
     buildObjectPanel();
+    assembly?.sync();
     frameCamera();
     $('viewport-status').textContent = name || '';
     setViewportLoaderState('ready');
@@ -1822,13 +1817,7 @@ function mount(host) {
   overlay.classList.toggle('mounted',!!host); overlay.classList.toggle('overlay',!host);
   box.setAttribute('role',host?'region':'dialog');
   if(host)box.removeAttribute('aria-modal');else box.setAttribute('aria-modal','true');
-  // Guided editing always opens the editable model; keep the full editor's preference.
-  if(host) {
-    workspaceMode='inspect';
-    if($('viewport-uv-toggle').getAttribute('aria-expanded')==='true')$('viewport-uv-toggle').click();
-  } else {
-    try { workspaceMode=localStorage.getItem('atelier.assembly')==='1'?'assembly':'inspect'; } catch(_) {workspaceMode='inspect';}
-  }
+  if(host && $('viewport-uv-toggle').getAttribute('aria-expanded')==='true')$('viewport-uv-toggle').click();
   $('viewport-mat-head').querySelector('h3').textContent=host?'Choose a part':'Materials';
   $('viewport-material-search').placeholder=host?'Find a part':'Find a material';
   $('viewport-material-search').setAttribute('aria-label',host?'Find a part':'Find a material');
