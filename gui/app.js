@@ -131,8 +131,8 @@ function leaveToast(el, remove) {
   remove();
 }
 
-function toastSpinner(msg) {
-  try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy'); }
+function toastSpinner(msg, options) {
+  try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy', options); }
   catch (_) { /* Static operation feedback remains available. */ }
   const el = document.createElement("div");
   el.className = "toast";
@@ -154,8 +154,8 @@ function renderTrayProgress() {
   for (const row of document.getElementById('tray-progress').children)
     row.hidden = row.dataset.project !== _activeProjectName;
 }
-function trayProgress(message, project = _activeProjectName) {
-  const row = toastSpinner(message);
+function trayProgress(message, project = _activeProjectName, options) {
+  const row = toastSpinner(message, options);
   row.dataset.project = project;
   document.getElementById('tray-progress').append(row);
   renderTrayProgress();
@@ -882,7 +882,7 @@ async function editAsset(item) {
     return;
   }
   suppressedImportGameRels.add(key);
-  const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project);
+  const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project, {asset: item.file_type});
   setStatus(`Preparing ${item.name} for editing…`);
   try {
     let res;

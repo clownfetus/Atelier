@@ -25,6 +25,8 @@ def run_review_followup_checks(context, url, report, checks):
         assert len(held) == 1
         assert tab.locator('#tray-progress .toast:visible').count() == 1
         assert 'Preparing T_Shared for editing' in tab.locator('#tray-progress').inner_text()
+        texture = tab.locator('#tray-progress [data-glyph-state=busy][data-glyph-tier=inline][data-glyph-asset=texture]')
+        texture.locator('[id^=glyph-band-]').first.wait_for(state='attached')
         assert tab.locator('#toast-area [data-operation-state=busy]').count() == 0
         tab.evaluate("_selectProject('Smoke B')")
         tab.locator('#page-library').click()
@@ -45,6 +47,16 @@ def run_review_followup_checks(context, url, report, checks):
         tab.locator('#page-library').click()
         tab.wait_for_function("atelierProject() === 'Smoke A'")
         checks.append('Duplicate edit clicks deduplicate within a project; the same asset loads independently across projects and stale completion preserves current status')
+
+        tab.route('**/api/material_params?*', lambda route: held.append(route))
+        tab.evaluate("handleAssetClick({game_rel:'Fixture/MI_Body',name:'MI_Body',file_type:'material'})")
+        material = tab.locator('#tray-progress [data-glyph-state=busy][data-glyph-tier=inline][data-glyph-asset=material]')
+        material.locator('[id^=glyph-shine-]').wait_for(state='attached')
+        assert len(held) == 3
+        held[2].fulfill(json={'ok': False, 'error': 'Fixture material unavailable'})
+        failure = tab.locator('#tray-progress .toast', has_text='Edit failed: Fixture material unavailable')
+        failure.locator('[data-glyph-state=error]:not([data-glyph-asset])').wait_for(state='visible')
+        checks.append('Asset preparation in the Mod tray plays the texture bands and material shine while the requests run')
         assert not errors, errors
     finally:
         tab.close()
