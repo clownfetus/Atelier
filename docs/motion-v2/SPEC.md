@@ -72,8 +72,9 @@ fill forward (§4.10, P4b.2), drawn as the piece itself. Status
 colours never appear on the brand mark outside the status glyph. Status is
 always icon + sentence + colour; colour is the third cue.
 
-Only texture, mesh and material carry colour in the interface (D2). Every other
-category is neutral and told apart by shape. The brand mark and the glyph's
+Texture, mesh and material use the brand colours (D2). Characters, UI and VFX
+folder emblems each have their own colour. The remaining category icons use the neutral
+ink and are told apart by shape. The brand mark and the glyph's
 pieces always use the exact hexes above, in every theme, and only a working loader
 adds the plates or the shine. Small UI icons use these
 values, because the exact hexes only reach 2.3–2.8:1 on Paper:
@@ -83,7 +84,10 @@ values, because the exact hexes only reach 2.3–2.8:1 on Paper:
 | Texture | `#6C98CA` | `#38679D` | `#5084C0` |
 | Mesh | `#5AAA9A` | `#386D63` | `#498D80` |
 | Material | `#DF8F6B` | `#A24B23` | `#D0602D` |
-| Any other category | Mist `#B4C0CE` (thin), Guide `#778BA3` (solid) | `#4E5F73` | `#6A7C90` |
+| Characters | `#62B6CC` solid | — | `#267E96` |
+| UI | `#AA98E8` solid | — | `#755CB4` |
+| VFX | `#D98BCB` solid | — | `#A95199` |
+| Other icons | Mist `#B4C0CE` (thin), Guide `#778BA3` (solid) | `#4E5F73` | `#6A7C90` |
 
 Themes (D3): the three piece colours never change with the theme, and the halo
 always equals the surface behind it. Status hues stay fixed and `theme.js` moves
@@ -212,7 +216,7 @@ canonical; never redraw by hand. Use `-master` at 32 px and up, `-small` below.
 - A piece next to a disc gets a concentric bite.
 - Textures, Meshes and Materials are the mark's own tile, block and disc, taken from
   `assets/brand_mark_v2.py`, so they change only when the mark does. They use the
-  colours in §2; every other icon is neutral.
+  colours in §2, which also lists the folder colours for Characters, UI and VFX.
 - The plain folder's front piece keeps its tip on hover, in Full motion only. Its
   back piece is opaque.
 

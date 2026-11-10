@@ -271,11 +271,11 @@ body {
 .card-icon.texture-folder-icon  { color: var(--studio-emblem-texture); }
 .card-icon.material-folder-icon { color: var(--studio-emblem-material); }
 .card-icon.mesh-folder-icon     { color: var(--studio-emblem-mesh); }
+.card-icon.char-icon            { color: var(--studio-emblem-character); }
+.card-icon.ui-folder-icon       { color: var(--studio-emblem-ui); }
+.card-icon.vfx-folder-icon      { color: var(--studio-emblem-vfx); }
 svg.card-icon.folder-icon { display: block; }
 .card-icon.folder-icon,
-.card-icon.char-icon,
-.card-icon.ui-folder-icon,
-.card-icon.vfx-folder-icon,
 .card-icon.text-folder-icon,
 .card-icon.nameplate-folder-icon,
 .card-icon.plugin-folder-icon,
