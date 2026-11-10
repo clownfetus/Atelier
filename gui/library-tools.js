@@ -26,8 +26,19 @@
       (status === 'all' || card.type === 'asset' && (status === 'edited' ? !!card.imported : !card.imported)));
   }
   const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
-  function sort(cards) {
-    if (prefs.sort === 'recommended') return cards;
+  function sort(cards, {home = false} = {}) {
+    if (prefs.sort === 'recommended') {
+      const roles = window.AtelierFolderEmblems?.roles;
+      const coloured = [], featured = [], rest = [];
+      for (const card of cards) {
+        const isFolder = card.type === 'folder';
+        const role = isFolder && roles?.[card.iconCls];
+        if (role && role !== 'neutral') coloured.push(card);
+        else if (isFolder && home && AtelierFolderIcons.isFeatured(card.name)) featured.push(card);
+        else rest.push(card);
+      }
+      return coloured.concat(featured, rest);
+    }
     const name = (a, b) => collator.compare(a.label, b.label);
     const folders = (a, b) => Number(b.type === 'folder') - Number(a.type === 'folder');
     return [...cards].sort((a, b) => folders(a, b) ||
@@ -176,5 +187,5 @@
     document.getElementById('library-preview-close').focus();
   }
   window.AtelierLibraryTools = Object.freeze({init, matches, filter, sort, resetFilters, hasFilters,
-    decorate, ready, supportsPreview, previewImage, closePreview, preferredSort: () => prefs.sort});
+    decorate, ready, supportsPreview, previewImage, closePreview});
 })();

@@ -21,20 +21,40 @@ def run_library_workflow_checks(page, context, url, report, checks):
         {'type': 'asset', 'name': 'Body', 'file_type': 'mesh', 'game_rel': 'Characters/1015/1015502/Meshes/Body', 'imported': False},
     ]
     fixtures = [{**item, 'rel_path': item.get('rel_path', item.get('game_rel'))} for item in fixtures]
-    def seed():
-        target.evaluate("""items => {
+    def seed(items=fixtures, path='Characters/1015/1015502'):
+        target.evaluate("""({items, path}) => {
           if(window.AtelierSearch?.scope()==='everywhere')document.getElementById('search-scope').click();
-          nav={path:'Characters/1015/1015502'};
+          nav={path};
           _pathLabels={'Characters/1015':'1015 — Storm','Characters/1015/1015502':'502 — Goddess of Thunder'};
           allItems=items; document.getElementById('search-input').value='';
           AtelierLibraryTools.resetFilters(false); buildGrid(items.map(_makeCard));
-        }""", fixtures)
+        }""", {'items': items, 'path': path})
     def names():
         return target.locator('#grid-area .card-name').all_text_contents()
     try:
         target.goto(url)
         target.wait_for_selector('#grid-area .card')
         prior = target.evaluate('key=>localStorage.getItem(key)', key)
+        sort = target.locator('#library-sort')
+        sort.select_option('recommended')
+        coloured = ['VFX', 'Icons', 'Meshes', 'Characters', 'UI', 'Materials', 'Textures']
+        for path, other in (('', ['Weapons', 'Maps']), ('Test folder', ['Maps', 'Weapons'])):
+            prefix = f'{path}/' if path else ''
+            mixed = [{'type': 'folder', 'name': name, 'rel_path': prefix + name}
+                     for name in ['Maps', 'Weapons', *coloured]]
+            texture_path = prefix + 'Detail'
+            mixed.append({'type': 'asset', 'name': 'Detail', 'file_type': 'texture',
+                          'game_rel': texture_path, 'rel_path': texture_path})
+            seed(mixed, path)
+            expected = coloured + other + ['Detail']
+            assert names() == expected, names()
+            target.evaluate("path => updateImportedCard(path, {token: 'priority-check'})", texture_path)
+            assert names() == expected, names()
+        sort.select_option('name')
+        assert names() == sorted(['Maps', 'Weapons', *coloured]) + ['Detail'], names()
+        sort.select_option('recommended')
+        checks.append('Recommended puts coloured folder icons first on Home and inside folders, including after import; Name A–Z sorts by name')
+
         seed()
         assert target.locator('#library-clear').is_hidden()
         search = target.locator('#search-input')

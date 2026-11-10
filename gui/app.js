@@ -499,18 +499,13 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   area.classList.toggle('home-categories',!nav.path);
   const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
-  let filtered = AtelierLibraryTools.filter(cards, q);
+  const filtered = AtelierLibraryTools.sort(AtelierLibraryTools.filter(cards, q), {home: !nav.path});
   document.getElementById('bulk-material-open').hidden = !filtered.some(card => card.file_type === 'material' && card.game_rel);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
   const countLabel = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
   if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('library-count'), countLabel);
   else document.getElementById('library-count').textContent = countLabel;
 
-  if (!nav.path && AtelierLibraryTools.preferredSort() === 'recommended') {
-    const isFeatured = c => c.type === "folder" && AtelierFolderIcons.isFeatured(c.name);
-    filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
-  }
-  filtered = AtelierLibraryTools.sort(filtered);
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -667,7 +662,8 @@ function updateImportedCard(gameRel, record) {
     const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
   }
   const q=_libraryQuery().toLowerCase();
-  const cards=AtelierLibraryTools.sort(AtelierLibraryTools.filter(allItems.map(_makeCard),q));
+  const filtered = AtelierLibraryTools.filter(allItems.map(_makeCard), q);
+  const cards = AtelierLibraryTools.sort(filtered, {home: !nav.path});
   if (!cards.length) {buildGrid(allItems.map(_makeCard));return;}
   const key=card=>card.rel_path||card.game_rel||card.label;
   const roots=new Map([...grid.querySelectorAll('.card')].map(node=>{
