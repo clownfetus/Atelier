@@ -7,9 +7,11 @@ it, so the vectors, the interface raster and the application icons cannot drift:
     python scripts/brand_mark.py          # rewrite the files
     python scripts/brand_mark.py --check  # fail if anything is out of date
 
-The master drawing is for 48 px and up. The small drawing has a smaller disc and a wider
-gap so the separations survive at 16, 24 and 32 px. Pieces are solid: no gradients, strokes
-or holes, and their colours never change with the theme.
+The master drawing is for a mark drawn 32 px tall and up. The small drawing, for anything
+smaller, has a smaller disc and a wider gap so the separations survive down to 16 px. The
+application icons switch by frame size instead: small in the 16, 24 and 32 px frames, master
+from 48 px. Pieces are solid: no gradients, strokes or holes, and their colours never change
+with the theme.
 
 The wordmarks are outlines, so this script never needs the font to check them. To redraw them:
 
@@ -43,7 +45,7 @@ MASTER = dict(
     mesh_lt=206.5, mesh_su=.498, mesh_lb=292.0, mesh_sl=.514, mesh_rt=305.0, mesh_rb=409.0,
     mesh_ktl=9.5, mesh_ktr=38.0, mesh_kbr=15.0, mesh_kbl=14.5, mesh_f1=12.5, mesh_f2=13.0,
 )
-# Small-size mark (<=24px): smaller disc and a wider gap so the separations survive
+# Small-size mark (under 32px): smaller disc and a wider gap so the separations survive
 # at 16px (gap 32u = 2px at 16px), softer corners, same pieces.
 SMALL = dict(
     MASTER, r=40.0, g=32.0, tile_k=14.0, notch_in=9.0, tile_f1=26.0, tile_f2=26.0, tile_kb=42.0,
