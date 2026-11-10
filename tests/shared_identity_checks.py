@@ -90,7 +90,7 @@ def run_shared_identity_checks(context, url, report, checks):
         assert tab.locator('#breadcrumbs .crumb.active').get_attribute('title').endswith(UI+'/1029304')
         assert tab.locator('#library-hero h2').inner_text() == 'Magik'
         assert 'Infernal Idol' in tab.locator('#library-hero p').inner_text()
-        assert tab.locator('#view3d-fab').evaluate('node=>!node.classList.contains("show")')
+        assert tab.locator('#library-inspect-costume').is_hidden()
         checks.append('Name and ID filters agree; keyboard navigation, breadcrumbs and banners retain the original UI location without enabling character-only editing actions')
 
         tab.evaluate('path=>AtelierLibraryPins.toggle({type:"folder",rel_path:path})', UI+'/1029304')

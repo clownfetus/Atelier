@@ -18,8 +18,8 @@ def run_home_layout_checks(page, context, url, report, checks):
                    {'name': f'Costume {j} with a longer name',
                     'path': f'Characters/{1000+i}/{1000+i}{j:03}', 'icon': art}
                    for j in range(12)]} for i in range(54)]
-    imported = [{'token': 'home-layout', 'name': 'T_Painted', 'file_type': 'texture',
-                 'game_rel': 'Characters/1000/1000000/Textures/T_Painted',
+    imported = [{'token': 'home-layout', 'name': 'T_Painted_D', 'file_type': 'texture',
+                 'game_rel': 'Characters/1000/1000000/Textures/T_Painted_D',
                  'char_id': '1000', 'skin_id': '1000000', 'char_name': names[0],
                  'skin_name': 'Costume 0', 'selected': True, 'modified': time.time()}]
     tab.route('**/fixture/home-card.png', lambda route: route.fulfill(body=raw.getvalue(), content_type='image/png'))

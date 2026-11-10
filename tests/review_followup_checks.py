@@ -90,7 +90,7 @@ def run_review_followup_checks(context, url, report, checks):
         assert tab.evaluate('_editsInFlight.size') == 2
         assert 'Ready to edit: T_First' in tab.locator('#tray-progress').inner_text()
         assert tab.locator('#sidebar-list .sidebar-empty').count() == 0
-        tab.wait_for_function('document.getElementById("sel-count").textContent === "1"')
+        tab.wait_for_function('document.getElementById("sel-count").textContent === "1 of 1 included"')
         snapshots[0].fulfill(json=[])
         tab.wait_for_timeout(100)
         assert tab.locator('#sidebar-list .sb-item').count() == 1

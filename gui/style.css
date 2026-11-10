@@ -358,7 +358,8 @@ svg.card-icon.folder-icon { display: block; }
   flex: 0 0 auto;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
 }
@@ -366,29 +367,24 @@ svg.card-icon.folder-icon { display: block; }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-inline-end: auto;
   color: var(--text);
   font: var(--studio-type-body);
   font-weight: 600;
   white-space: nowrap;
 }
 .mod-tray-title svg { color: var(--muted); flex: none; }
-.clear-all-btn {
-  display: inline-flex;
+#tray-selection {
+  grid-column: 1 / -1;
+  display: flex;
   align-items: center;
-  min-height: 28px;
-  background: transparent;
-  border: none;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--muted);
-  cursor: pointer;
   font: var(--studio-type-detail);
-  padding: 0 8px;
-  border-radius: var(--studio-shape-small);
-  transition: color var(--studio-motion-fast) var(--studio-easing), background var(--studio-motion-fast) var(--studio-easing);
-  flex-shrink: 0;
-  white-space: nowrap;
 }
-.clear-all-btn:hover { color: var(--md-sys-color-on-error-container); background: var(--md-sys-color-error-container); }
+#tray-selection[hidden], #tray-menu-btn[hidden] { display: none; }
+#tray-menu-btn, #tray-include-all { min-height: 28px; padding: 0 8px; font: var(--studio-type-detail); }
+#sel-count { font-variant-numeric: tabular-nums; }
 .sb-clear {
   width: 28px; height: 28px;
   border: none;
@@ -482,7 +478,6 @@ svg.card-icon.folder-icon { display: block; }
 #mod-name-input::placeholder { color: var(--muted); font-weight: 500; }
 #install-btn { width: 100%; justify-content: center; }
 
-#install-toggles { display: flex; flex-direction: column; gap: 4px; }
 .toggle-row {
   display: flex;
   align-items: center;
@@ -525,30 +520,6 @@ svg.card-icon.folder-icon { display: block; }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--blue); outline-offset: 1px; }
 /* An edited texture card under a dragged image: a plain outline in the text colour. */
 .card.texture-drop-target { outline: 2px solid var(--text); outline-offset: -4px; }
-#sel-count {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 7px;
-  border-radius: var(--studio-shape-small);
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  font: var(--studio-type-detail);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: background var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing);
-}
-#sel-count.active {
-  background: var(--md-sys-color-primary-container);
-  border-color: var(--acc);
-  color: var(--md-sys-color-on-primary-container);
-}
-
 /* ── overlay ── */
 .overlay {
   display: none;
@@ -1132,8 +1103,8 @@ progress:not([value]) { display: none; }
 .ctx-item.danger:hover { background: var(--md-sys-color-error-container); }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 4px; }
 
-/* ── 3D viewport trigger (floating, bottom-center) + in-popup Blender button share this pill look ── */
-#view3d-fab, #viewport-blender-btn {
+/* ── Blender action in the 3D viewport ── */
+#viewport-blender-btn {
   align-items: center; gap: 8px;
   padding: 9px 16px; border-radius: var(--studio-shape-medium);
   background: var(--acc); color: var(--md-sys-color-on-primary); border: none; cursor: pointer;
@@ -1141,15 +1112,8 @@ progress:not([value]) { display: none; }
   box-shadow: var(--studio-shadow);
   transition: background-color var(--studio-motion-fast) var(--studio-easing);
 }
-#view3d-fab:hover, #viewport-blender-btn:not(:disabled):hover { background: var(--studio-primary-hover); }
+#viewport-blender-btn:not(:disabled):hover { background: var(--studio-primary-hover); }
 #viewport-blender-btn:disabled { opacity: .5; cursor: default; filter: none; }
-
-#view3d-fab {
-  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
-  z-index: var(--studio-layer-float); display: none;
-}
-#view3d-fab.show { display: inline-flex; }
-body:has(#view3d-fab.show) #toast-area { bottom: 72px; }
 
 /* ── 3D viewport ── */
 #viewport-box {
@@ -1493,7 +1457,7 @@ select:focus-visible { border-color: var(--acc); }
 .studio-tooltip { position: fixed; inset: auto; margin: 0; max-width: min(340px, calc(100vw - 16px)); padding: 8px 12px; background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: var(--studio-shape-small); box-shadow: var(--studio-shadow); font: var(--studio-type-detail); white-space: pre-wrap; overflow-wrap: anywhere; z-index: var(--studio-layer-top); pointer-events: none; }
 .studio-tooltip[hidden] { display: none; }
 .ctx-item.danger, #setup-status.error { color: var(--md-sys-color-error); }
-.ctx-item.danger:hover, .sb-clear:hover, .clear-all-btn:hover, .proj-action-btn.danger:hover { color: var(--md-sys-color-on-error-container); }
+.ctx-item.danger:hover, .sb-clear:hover, .proj-action-btn.danger:hover { color: var(--md-sys-color-on-error-container); }
 #ctx-menu { border-radius: var(--studio-shape-medium); padding: 8px; }
 .mat-num, .mat-hex, .sh-pval { min-height: 28px; }
 .mat-row input[type=range] { min-height: 28px; }

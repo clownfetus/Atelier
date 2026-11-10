@@ -453,45 +453,27 @@ def _toast(title, body):
 
 
 def _explorer_reveal(path, select):
-    """Explorer, built as a QUOTED STRING command rather than an arg list: the list form mangles
-    '/select,<path with spaces>' (the install path has spaces), which makes Explorer open the file
-    itself or land on the wrong folder."""
+    if not select:
+        return open_path(path)
+
+    # Address the item in the shell directly. Explorer can land on its default folder when
+    # parsing /select on launch, and foregrounding a guessed window can raise the wrong folder.
     import ctypes
-    import threading
-    import time
-    p = os.path.abspath(path).replace("/", "\\")
-    cmd = ('explorer.exe /select,"%s"' % p) if select else ('explorer.exe "%s"' % p)
+    from ctypes import wintypes
 
-    user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
-    EnumProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_size_t, ctypes.c_size_t)
-    _CLS = ("CabinetWClass", "ExploreWClass")
-
-    def _explorer_hwnds():
-        found = []
-        buf = ctypes.create_unicode_buffer(64)
-
-        def cb(hwnd, _):
-            user32.GetClassNameW(hwnd, buf, 64)
-            if buf.value in _CLS and user32.IsWindowVisible(hwnd):
-                found.append(hwnd)
-            return True
-        user32.EnumWindows(EnumProc(cb), 0)
-        return found
-
-    before = set(_explorer_hwnds())
-    subprocess.Popen(cmd)
-
-    def _focus():
-        time.sleep(0.6)
-        after = _explorer_hwnds()
-        target = next((h for h in after if h not in before), None) or (after[0] if after else None)
-        if target:
-            fg_tid = user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), None)
-            our_tid = kernel32.GetCurrentThreadId()
-            user32.AttachThreadInput(fg_tid, our_tid, True)
-            user32.ShowWindow(target, 9)
-            user32.BringWindowToTop(target)
-            user32.SetForegroundWindow(target)
-            user32.AttachThreadInput(fg_tid, our_tid, False)
-
-    threading.Thread(target=_focus, daemon=True).start()
+    shell, ole = ctypes.windll.shell32, ctypes.windll.ole32
+    parse = shell.SHParseDisplayName
+    parse.argtypes = (wintypes.LPCWSTR, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+                      wintypes.DWORD, ctypes.c_void_p)
+    open_item = shell.SHOpenFolderAndSelectItems
+    open_item.argtypes = (ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p, wintypes.DWORD)
+    pidl = ctypes.c_void_p()
+    if ole.CoInitialize(None) >= 0:
+        try:
+            if parse(path, None, ctypes.byref(pidl), 0, None) == 0 and open_item(pidl, 0, None, 0) == 0:
+                return
+        finally:
+            if pidl:
+                ole.CoTaskMemFree(pidl)
+            ole.CoUninitialize()
+    open_path(os.path.dirname(path))

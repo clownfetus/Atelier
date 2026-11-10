@@ -17,6 +17,9 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
 .export-review-meta { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: var(--studio-text-label); }
 .export-review-meta dt { color: var(--muted); }
 .export-review-meta dd { margin: 0; overflow-wrap: anywhere; color: var(--text); }
+.export-review-destination { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.export-review-destination select { width: auto; max-width: 100%; }
+.export-review-destination small { flex-basis: 100%; }
 .export-review-summary { color: var(--text) !important; }
 .export-review-list { border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); }
 .export-review-list summary { padding: 10px 12px; cursor: pointer; color: var(--text); font-size: var(--studio-text-label); font-weight: 600; }

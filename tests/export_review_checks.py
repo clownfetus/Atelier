@@ -46,7 +46,6 @@ def run_export_review_checks(page, context, url, report, checks):
             mesh: {name:'Mesh', game_rel:'Characters/Fixture/SK_Body', file_type:'mesh', selected:false}
           };
           document.getElementById('mod-name-input').value = 'Review fixture';
-          document.getElementById('toggle-copy').checked = true;
           document.getElementById('toggle-password').checked = true;
           updateInstallBtn();
         }""")
@@ -91,6 +90,12 @@ def run_export_review_checks(page, context, url, report, checks):
         review.evaluate("window.AtelierViewport = savedExportViewport; document.getElementById('viewport-overlay').classList.remove('active')")
         review.locator('#install-btn').click()
         assert overlay.is_visible()
+        destination = overlay.get_by_role('combobox', name='Destination')
+        confirm = overlay.locator('#export-review-confirm')
+        assert destination.input_value() == 'export' and confirm.inner_text() == 'Export mod'
+        destination.select_option('install')
+        assert confirm.inner_text() == 'Export and install'
+        assert 'D:/Fixture/mods' in overlay.inner_text()
         assert 'Included changes · 2' in overlay.inner_text()
         assert 'Excluded changes · 2' in overlay.inner_text()
         assert 'Unsupported export type: audio' in overlay.inner_text()
@@ -110,6 +115,7 @@ def run_export_review_checks(page, context, url, report, checks):
         # A draft created after reviewing, or while the conflict request is in flight,
         # must not silently export the last saved material values.
         review.locator('#install-btn').click()
+        assert destination.input_value() == 'install'
         review.evaluate('seedExportDraft()')
         review.locator('#export-review-confirm').click()
         assert not installs and not conflicts

@@ -55,9 +55,10 @@
     }
   }
 
-  function banner(path, labels = {}, artwork = {}) {
+  function banner(path, labels = {}, artwork = {}, inspect = null) {
     window.AtelierCatalogueArt?.corner(path);
-    const args=[path,labels,artwork];bannerArgs=args;
+    const restoreInspectFocus = bannerArgs?.[0] === path && document.activeElement?.id === 'library-inspect-costume';
+    const args=[path,labels,artwork,inspect];bannerArgs=args;
     const host = document.getElementById('library-hero');
     if(!host)return;
     const current=()=>bannerArgs===args&&host.isConnected&&!host.hidden;
@@ -138,7 +139,19 @@
     const detail = document.createElement('p');
     detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
       ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
-    text.append(eyebrow, title, signature, detail); host.append(image, text);
+    text.append(eyebrow, title, signature);
+    if (inspect) {
+      const row = document.createElement('div'); row.className = 'library-hero-detail';
+      const button = document.createElement('button');
+      button.id = 'library-inspect-costume'; button.type = 'button'; button.className = 'btn';
+      button.innerHTML = '<i data-lucide="box" size="15"></i> Inspect in 3D';
+      button.addEventListener('click', inspect);
+      row.append(detail, button); text.append(row); host.append(image, text);
+      lucide.createIcons({nodes: [button]});
+      if (restoreInspectFocus) button.focus({preventScroll: true});
+    } else {
+      text.append(detail); host.append(image, text);
+    }
     nextSource();
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});

@@ -162,7 +162,7 @@ loader.loadAsync=async()=>{const root=new THREE.Group(),material=new THREE.MeshS
         }""")
         assert tab.locator('.sb-color-mosaic').count() == 1
         assert tab.locator('.sb-sparkline').count() == 1
-        assert tab.locator('#sel-count').inner_text() == '2'
+        assert tab.locator('#sel-count').inner_text() == '2 of 2 included'
         removal = tab.evaluate("""async () => {
           delete sidebarData.c; renderSidebar();
           await new Promise(requestAnimationFrame);

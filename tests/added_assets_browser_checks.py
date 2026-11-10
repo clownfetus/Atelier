@@ -38,10 +38,8 @@ def run_added_asset_checks(page, context, url, report, checks):
             tab.evaluate('async name => { await _selectProject(name); }', name)
             tab.locator('#page-library').click()
             open_button = tab.locator('#add-asset-open')
-            assert open_button.is_enabled() and tab.locator('#process-s-maps').is_disabled()
-            bounds = [tab.locator(selector).bounding_box() for selector in ('#add-asset-open', '#process-s-maps')]
-            assert abs(bounds[0]['y'] - bounds[1]['y']) < 2
-            assert bounds[0]['x'] + bounds[0]['width'] <= bounds[1]['x']
+            assert open_button.inner_text() == 'Add custom asset…'
+            assert open_button.is_enabled() and tab.locator('#process-s-maps').is_hidden()
             open_button.click()
             tab.locator('#add-asset-name').fill('MyPaint_D')
             tab.locator('#add-asset-files').set_input_files({'name': 'My paint.png', 'mimeType': 'image/png', 'buffer': image_bytes()})
@@ -62,7 +60,7 @@ def run_added_asset_checks(page, context, url, report, checks):
             tab.wait_for_function('gr => Object.values(sidebarData).some(row => row.game_rel === gr)', arg=texture)
             assert (root / (texture + '.png')).read_bytes() == image_bytes()
             assert tab.locator('#process-s-maps').is_enabled()
-            checks.append('Add asset sits beside Process S maps, browses real game folders and uploads image bytes to a named project texture')
+            checks.append('Add custom asset browses real game folders and uploads a named texture; Process S maps appears once a D map is in the tray')
 
             # The exact same destination reports an error and preserves the form and saved image.
             open_button.click(); tab.locator('#add-asset-name').fill('MyPaint_D')

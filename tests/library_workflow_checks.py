@@ -145,7 +145,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
         target.keyboard.press('Control+f')
         assert not search.evaluate('el=>el===document.activeElement'), 'Search must not steal dialog focus'
         target.keyboard.press('Escape')
-        target.wait_for_function('!document.getElementById("library-preview").open')
+        preview.wait_for(state='hidden')
         assert texture.evaluate('el=>el===document.activeElement')
         target.evaluate("window.AtelierViewport={openMesh:(...args)=>window.previewArgs=args}")
         body = cards.filter(has=target.locator('.card-name', has_text='Body'))
@@ -174,7 +174,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
         target.wait_for_selector('#library-preview[open]')
         assert '/api/preview?' in target.locator('#library-preview img').get_attribute('src') and not launches
         target.keyboard.press('Escape')
-        target.wait_for_function('!document.getElementById("library-preview").open')
+        preview.wait_for(state='hidden')
         menu = target.get_by_role('button', name='Open in default image app')
         for item in (texture, target.locator('#sidebar-list .sb-item[data-token="texture-2"]')):
             item.click(button='right')
@@ -184,9 +184,39 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert not target.locator('#toggle-import-open').count()
         checks.append('Texture clicks import or preview inside Atelier. Only the Library or Mod tray context menu opens the system image app')
 
+        explorer_path = 'Characters/1015/1015502/Textures/T_Explorer'
+        target.evaluate("""path => {
+          allItems.push({type:'asset', name:'Explorer texture', file_type:'texture', game_rel:path, rel_path:path});
+          buildGrid(allItems.map(_makeCard));
+        }""", explorer_path)
+        revealed = []
+
+        def prepare_for_explorer(route):
+            assert route.request.post_data_json['game_rel'] == explorer_path
+            route.fulfill(json={'ok': True, 'imported': {'game_rel': explorer_path, 'token': 'explorer',
+                          'name': 'Explorer texture', 'file_type': 'texture', 'selected': True}})
+
+        def reveal_texture(route):
+            revealed.append(parse_qs(urlsplit(route.request.url).query)['game_rel'][0])
+            assert len(imports) == 2
+            route.fulfill(json={'ok': True})
+
+        target.route('**/api/import_texture', prepare_for_explorer)
+        target.route('**/api/open_explorer?*', reveal_texture)
+        for item in (cards.filter(has_text='Explorer texture'), target.locator('.sb-item[data-token="explorer"]')):
+            item.click(button='right')
+            with target.expect_response('**/api/open_explorer?*'):
+                target.get_by_role('button', name='Open in Explorer').click()
+        assert revealed == [explorer_path, explorer_path]
+        checks.append('Explorer prepares a project texture on first use and reveals the same asset from the Mod tray without reimporting')
+
         # Navigation must retain actual keyboard focus across async folder requests.
         target.route('**/api/browse?*', lambda r: r.fulfill(json=fixtures))
         seed()
+        target.evaluate('renderGrid()')
+        target.evaluate('AtelierViewport.open = id => window.inspectedCostume = id')
+        target.locator('#library-hero').get_by_role('button', name='Inspect in 3D').click()
+        assert target.evaluate('inspectedCostume') == '1015502'
         cards.first.focus(); target.keyboard.press('Enter')
         target.wait_for_function("nav.path.endsWith('/Materials') && _gridStatus === 'ready'")
         assert cards.first.evaluate('el=>el===document.activeElement')

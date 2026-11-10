@@ -48,6 +48,9 @@ def run_skin_swapper_review_checks(page, context, url, report, checks):
           updateInstallBtn(); doInstallMod();
         }""", MESH)
         tab.wait_for_selector('#export-review-overlay.active input[name="export-format"]')
+        destination = tab.get_by_role('combobox', name='Destination')
+        assert destination.input_value() == 'export'
+        assert destination.locator('option[value="install"]').is_disabled()
         assert tab.locator('input[name="export-format"][value="standard"]').is_checked()
         tab.locator('input[name="export-format"][value="skin-swapper"]').check()
         tab.wait_for_selector('#skin-swapper-author')
@@ -68,6 +71,7 @@ def run_skin_swapper_review_checks(page, context, url, report, checks):
         tab.wait_for_function("document.getElementById('export-review-title').textContent.startsWith('Mod exported')")
         body = builds[0]
         assert (body['mod_name'], body['author'], body['skin_name']) == ('RedeemedRedux', 'Tendo', 'The Redeemed'), body
+        assert body['copy_to_mods'] is False
         assert body['meshes'] == [{'game_rel': MESH}] and 'hero_id' not in body and 'skin_id' not in body
         result = tab.locator('#export-review-overlay').inner_text()
         assert 'Galacta folder: /Game/Marvel/ProjectGalacta/Meshes/1024/1024503/RedeemedRedux' in result

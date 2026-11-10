@@ -99,7 +99,7 @@ def run_workspace_checks(context, url, report, checks):
         page.wait_for_function('window.__workspace && window.AtelierWorkspace')
         assert page.evaluate('atelierProject()') == 'Smoke A'
         assert page.locator('#page-library').inner_text() == 'Library'
-        assert page.locator('#page-workspace').inner_text() == 'Workspace'
+        assert page.locator('#page-workspace').inner_text() == 'Recolour costume'
         assert page.locator('#page-library').get_attribute('aria-current') == 'page'
         page.locator('#project-overlay').wait_for(state='hidden')
         assert page.locator('#workspace').is_hidden()
@@ -238,6 +238,8 @@ def run_workspace_checks(context, url, report, checks):
 
         page.locator('#workspace-review').click()
         page.wait_for_selector('#export-review-overlay.active')
+        assert page.locator('#export-review-title').inner_text() == 'Review mod'
+        assert page.get_by_role('combobox', name='Destination').input_value() == 'export'
         assert 'MI_Body' in page.locator('#export-review-overlay').inner_text()
         page.keyboard.press('Escape')
         page.wait_for_selector('#export-review-overlay.active', state='hidden')
