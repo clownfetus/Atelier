@@ -1,6 +1,7 @@
 """Assembly interactions in Chromium, using clearly labelled synthetic geometry."""
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 import json
 from PIL import Image
 
@@ -63,6 +64,18 @@ def run_assembly_checks(context, url, report, checks):
                     texture_roles={'basecolor':texture}, tex_ver={texture:'0'})
         route.fulfill(json={'ok':True,'materials':result})
     tab.route('**/api/skin_materials', materials)
+    image_actions = []
+    def import_texture(route):
+        path = route.request.post_data_json['game_rel']
+        image_actions.append(('prepare', path))
+        route.fulfill(json={'ok':True, 'imported':{'game_rel':path, 'token':'assembly-texture',
+                      'name':'T_Shared', 'file_type':'texture', 'selected':True}})
+    def open_texture(route):
+        path = parse_qs(urlsplit(route.request.url).query)['game_rel'][0]
+        image_actions.append(('open', path))
+        route.fulfill(json={'ok':True})
+    tab.route('**/api/import_texture', import_texture)
+    tab.route('**/api/open_with?*', open_texture)
     def save_material(route):
         material_saves.append(route.request.post_data_json)
         route.fulfill(json={'ok':True})
@@ -117,6 +130,7 @@ def run_assembly_checks(context, url, report, checks):
         assert all(abs(a-b)<1e-9 for a,b in zip(before['camera'],after['camera']))
         checks.append('Hiding and restoring panels gives the model more room and preserves the selected surface and camera')
         tab.locator('.assembly-texture-card').first.click()
+        assert not image_actions
         assert tab.locator('.assembly-section.is-related').count() == 3, 'Torso and two arms share the exact material texture'
         assert not tab.locator('.assembly-section.is-related').filter(has_text='Same').count(), 'Same texture filename in another folder is unrelated'
         tab.wait_for_function("[...document.querySelectorAll('.assembly-texture-preview img')].some(img=>img.complete&&img.naturalWidth)")
@@ -189,6 +203,13 @@ def run_assembly_checks(context, url, report, checks):
         handle = tab.get_by_role('separator',name='Resize material panel'); handle.focus(); handle.press('ArrowLeft')
         assert int(handle.get_attribute('aria-valuenow')) > 292
         checks.append('Collapsed Geometry leaves the model visible when the window narrows, and panels resize from the keyboard')
+        texture_card = tab.locator('.assembly-texture-card[data-slot="BaseColor"]')
+        texture_card.click(button='right')
+        with tab.expect_response('**/api/open_with?*'):
+            tab.get_by_role('button',name='Open in default image app').click()
+        assert image_actions == [('prepare',texture), ('open',texture)]
+        tab.wait_for_function("document.querySelector('.assembly-texture-card[data-slot=BaseColor]').textContent.includes('In project')")
+        checks.append('Assembly texture clicks select a slot. The context menu prepares the project image before opening it')
         tab.emulate_media(reduced_motion='reduce'); tab.locator('.assembly-section').first.click()
         assert not tab.locator('#assembly-links').is_visible()
         for theme in ('dark','light'):

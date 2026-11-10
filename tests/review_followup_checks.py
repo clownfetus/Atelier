@@ -17,7 +17,6 @@ def run_review_followup_checks(context, url, report, checks):
         tab.goto(url)
         tab.wait_for_selector('#grid-area .card, #grid-area .folder-card')
         tab.evaluate("""() => {
-            _openAfterImport = false;
             window.reviewItem = {game_rel:'Fixture/T_Shared',name:'T_Shared',file_type:'texture'};
             handleAssetClick(reviewItem); handleAssetClick(reviewItem);
         }""")
@@ -64,7 +63,6 @@ def run_review_followup_checks(context, url, report, checks):
         tab.wait_for_timeout(100)
         assert len(snapshots) == 1
         tab.evaluate("""() => {
-            _openAfterImport = false;
             for (const name of ['T_First','T_Second','T_Third'])
                 void editAsset({game_rel:'Fixture/'+name,name,file_type:'texture'});
         }""")

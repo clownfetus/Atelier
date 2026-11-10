@@ -31,7 +31,6 @@ let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/"
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
-let   _openAfterImport = _store.get("atelier.openAfterImport") !== "0"; // Settings → Behaviour toggle
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -762,6 +761,9 @@ function handleImportedFileAction(item) {
   window.AtelierRoster?.rememberEditor(item.game_rel,item.file_type,_activeProjectName);
   const ft = item.file_type || "texture";
   switch (ft) {
+    case "texture":
+      previewLibraryCard({type:'asset', imported:true, game_rel:item.game_rel, label:item.name}, document.activeElement);
+      return;
     case "material":
       openMaterialEditor(item);
       return;
@@ -780,8 +782,6 @@ function handleImportedFileAction(item) {
     case "mesh":
       window.AtelierMeshEdit?.open(item);
       return;
-    default:
-      projectFetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
 }
 
@@ -838,7 +838,7 @@ async function meshBlendExtract(game_rel, name, force = false) {
     (res.warnings || []).slice(0, 4).forEach(w => toast(w, "warning", 9000));
     refreshSidebarEntry(game_rel, name, skinIdFromPath(nav.path));
     renderGrid();
-    openBlend(game_rel);   // queuing a mesh means editing it now, same as a texture's auto "Open With"
+    openBlend(game_rel);   // This action explicitly opens the model in Blender.
   } catch (e) {
     setStatus("");
     t.resolve(`Error: ${e.message}`, "error");
@@ -876,8 +876,7 @@ async function editAsset(item) {
   if (_editsInFlight.has(key)) return;
   _editsInFlight.add(key);
   if (item.file_type === "vfx") {
-    // Reading Niagara parameters does not create a project edit. Open its editor
-    // immediately so disabling external auto-open cannot turn this click into a no-op.
+    // Reading Niagara parameters does not create a project edit.
     try { await openVfxEditor(item); }
     finally { _editsInFlight.delete(key); }
     return;
@@ -915,10 +914,11 @@ async function editAsset(item) {
       updateImportedCard(item.game_rel, imported);
       loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
       setStatus("");
-      if (_openAfterImport) {
+      if (item.file_type !== 'texture') {
         const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
         handleImportedFileAction(importedItem);
       }
+      return true;
     } else {
       suppressedImportGameRels.delete(key);
       loadingToast.resolve(`Edit failed: ${res.error}`, "error");
@@ -3757,16 +3757,9 @@ document.getElementById("setup-close").addEventListener("click", () => {
   _resumeLaunchCheck();
 });
 
-document.getElementById("toggle-import-open").checked = _openAfterImport;
 const blenderProjectTexturesToggle = document.getElementById('settings-blender-project-textures');
 blenderProjectTexturesToggle.checked = _store.get('atelier.blenderProjectTextures') !== '0';
 blenderProjectTexturesToggle.addEventListener('change', event => _store.set('atelier.blenderProjectTextures', event.target.checked ? '1' : '0'));
-_syncToggleRow("toggle-import-open");
-document.getElementById("toggle-import-open").addEventListener("change", e => {
-  _openAfterImport = e.target.checked;
-  _store.set("atelier.openAfterImport", _openAfterImport ? "1" : "0");
-  _syncToggleRow("toggle-import-open");
-});
 
 let _validateGen = 0;
 async function validateSetup() {
@@ -4094,6 +4087,7 @@ function _ctxShow(e, items) {
   e.preventDefault();
   e.stopPropagation();
   if (!items.length) return;
+  _ctxMenu.classList.toggle('over-viewport', !!e.currentTarget?.closest?.('#viewport-overlay.overlay'));
   // Asked back while it folds away: stop the fold and open afresh.
   if (_ctxMenu.dataset.folding) { window.AtelierMotion?.unfoldStop?.(_ctxMenu); delete _ctxMenu.dataset.folding; _ctxMenu.inert = false; }
   _ctxOpener = document.activeElement;
@@ -4191,6 +4185,23 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
   }
 }
 
+function textureEditorMenuItem(item) {
+  return {icon:'image', label:'Open in default image app', action:async () => {
+    const project = _activeProjectName, gameRel = item.game_rel;
+    const name = item.name || item.label || gameRel.split('/').pop();
+    if (!item.imported && !(await editAsset({file_type:'texture', game_rel:gameRel, name,
+      skin_id:skinIdFromPath(gameRel)}))) return;
+    if (project !== _activeProjectName) return;
+    try {
+      const result = await api(`/api/open_with?game_rel=${encodeURIComponent(gameRel)}`, {project});
+      if (!result.ok) throw Error(result.error || 'Check your system’s default image app.');
+      if (project === _activeProjectName) window.AtelierRoster?.rememberEditor(gameRel, 'texture', project);
+    } catch (error) {
+      if (project === _activeProjectName) toast(_matEscape(`${name} could not be opened. ${error.message}`), 'error');
+    }
+  }};
+}
+
 // Assembly uses the established editor/import/replacement operations. These
 // adapters add navigation context only; asset publication stays with each editor.
 window.AtelierAssetEditors = Object.freeze({
@@ -4204,14 +4215,12 @@ window.AtelierAssetEditors = Object.freeze({
     const group = row.closest('details'); if (group) group.open = true;
     row.scrollIntoView({block:'center'}); row.querySelector('button')?.focus();
   },
-  async texture(gameRel) {
-    const imported = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
-    if (imported) { handleImportedFileAction(imported); return; }
-    await editAsset({game_rel:gameRel,name:gameRel.split('/').pop(),file_type:'texture'});
-    if (!_openAfterImport) {
-      const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
-      if (record) handleImportedFileAction(record);
-    }
+  texture(gameRel) {
+    return editAsset({game_rel:gameRel, name:gameRel.split('/').pop(), file_type:'texture', skin_id:skinIdFromPath(gameRel)});
+  },
+  textureMenu(event, gameRel) {
+    const imported = Object.values(sidebarData).some(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    _ctxShow(event, [textureEditorMenuItem({game_rel:gameRel, imported})]);
   },
   replaceTexture(gameRel) {
     const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
@@ -4278,8 +4287,10 @@ function _ctxItemsCard(card) {
     });
     return items;
   }
-  if (card.file_type === "texture") items.push({icon: "refresh-cw", label: "Retry preview",
-    action: () => buildGrid(allItems.map(_makeCard), true)});
+  if (card.file_type === 'texture' && card.game_rel) {
+    items.push(textureEditorMenuItem(card));
+    items.push({icon:'refresh-cw', label:'Retry preview', action:() => buildGrid(allItems.map(_makeCard), true)});
+  }
   if (!card.imported) {
     if (card.file_type !== 'mesh') items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
     if (card.file_type === "mesh" && card.game_rel)
@@ -4322,6 +4333,7 @@ function _ctxItemsSidebar(item) {
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = item.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
   if (item.file_type === "texture" && item.game_rel) {
     if (items.length) items.push("sep");
+    items.push(textureEditorMenuItem({...item, imported:true}));
     items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = item.game_rel; _ctxFileInput.click(); } });
     items.push({ icon: "sliders-horizontal", label: "Export options…", action: () => openTexOpts(item) });
   }

@@ -362,10 +362,7 @@ def open_path(path):
 
 
 def open_with(path):
-    """'Open with...' — Linux has no universal chooser dialog, so this is the default handler."""
-    if IS_WINDOWS:
-        subprocess.Popen(["rundll32.exe", "shell32.dll,OpenAs_RunDLL", os.path.abspath(path)])
-        return
+    """Open a project image using the desktop's default file association."""
     open_path(os.path.abspath(path))
 
 

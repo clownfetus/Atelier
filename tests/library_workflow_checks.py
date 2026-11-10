@@ -1,5 +1,6 @@
 """Library filters, display preferences and read-only keyboard previews."""
 import base64
+from urllib.parse import parse_qs, urlsplit
 
 
 def run_library_workflow_checks(page, context, url, report, checks):
@@ -152,6 +153,36 @@ def run_library_workflow_checks(page, context, url, report, checks):
         assert target.evaluate('previewArgs[0]') == 'Characters/1015/1015502/Meshes/Body'
         assert not imports, imports
         checks.append('Arrow/Home/End navigation uses one active card; Space previews textures without importing, P opens mesh preview, Escape restores focus')
+
+        texture_path = fixtures[2]['game_rel']
+        launches = []
+        def import_texture(route):
+            body = route.request.post_data_json
+            assert body['game_rel'] == texture_path
+            route.fulfill(json={'ok':True, 'imported':{'game_rel':texture_path, 'token':'texture-2',
+                          'name':'Texture 2', 'file_type':'texture', 'selected':True}})
+        def open_image(route):
+            launches.append(parse_qs(urlsplit(route.request.url).query)['game_rel'][0])
+            route.fulfill(json={'ok':True})
+        target.route('**/api/import_texture', import_texture)
+        target.route('**/api/open_with?*', open_image)
+        target.route('**/api/preview?*', lambda r: r.fulfill(body=png, content_type='image/png'))
+        texture.click()
+        target.wait_for_function('_editsInFlight.size===0 && !!document.querySelector(".card.imported[data-library-path$=T_2]")')
+        assert not launches and preview.is_hidden()
+        texture.click()
+        target.wait_for_selector('#library-preview[open]')
+        assert '/api/preview?' in target.locator('#library-preview img').get_attribute('src') and not launches
+        target.keyboard.press('Escape')
+        target.wait_for_function('!document.getElementById("library-preview").open')
+        menu = target.get_by_role('button', name='Open in default image app')
+        for item in (texture, target.locator('#sidebar-list .sb-item[data-token="texture-2"]')):
+            item.click(button='right')
+            with target.expect_response('**/api/open_with?*'):
+                menu.click()
+        assert launches == [texture_path,texture_path] and len(imports) == 1
+        assert not target.locator('#toggle-import-open').count()
+        checks.append('Texture clicks import or preview inside Atelier. Only the Library or Mod tray context menu opens the system image app')
 
         # Navigation must retain actual keyboard focus across async folder requests.
         target.route('**/api/browse?*', lambda r: r.fulfill(json=fixtures))

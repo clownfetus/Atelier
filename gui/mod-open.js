@@ -5,7 +5,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const KINDS = [
-    ['texture', 'Textures', "Each one goes into your Mod tray as an edit of the game texture it replaces, ready to open in the texture editor."],
+    ['texture', 'Textures', 'Each one goes into your Mod tray. Right-click it to open it in your default image app.'],
     ['material', 'Materials', "Each one goes into your Mod tray with the mod's colours and numbers on the game's material."],
     ['mesh', 'Meshes', 'Read only for now. Save the JSON to see what the mod changes.'],
     ['animation', 'Animations', 'Read only for now. Save the JSON to see what the mod changes.'],

@@ -256,6 +256,10 @@ function init() {
     uv:surface=>inspection.inspectSurface(surface),
     editMaterial:(name,slot)=>pickMaterial(name,true,null,slot),
     editTexture:source=>editAssemblyTexture(source),
+    textureMenu:(event,source)=>{
+      if (hasPendingEdits()) { event.preventDefault(); focusPendingEdits(); return; }
+      window.AtelierAssetEditors?.textureMenu(event,source.game_rel);
+    },
     replaceTexture:source=>replaceAssemblyTexture(source),
     blender:gameRel=>{if(!hasPendingEdits())window.meshBlendExtract?.(gameRel,gameRel.split('/').pop());else focusPendingEdits();},
     replaceMesh:editAssemblyMesh,

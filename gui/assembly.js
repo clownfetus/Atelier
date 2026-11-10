@@ -262,8 +262,10 @@ export function createAssemblyView(api) {
   }
   function renderTextures(force = false) {
     const info = selectedInfo(), sources = boundTextures(info);
-    if (!info && api.state().selected && api.state().loading) return;
-    const signature = JSON.stringify([api.state().project, api.state().selected, sources, texturesCollapsed]);
+    const {project, selected, loading} = api.state();
+    if (!info && selected && loading) return;
+    const owners = sources.map(source => ownership(source.game_rel, source.custom));
+    const signature = JSON.stringify([project, selected, sources, owners, texturesCollapsed]);
     $('assembly-texture-count').textContent = sources.length ? String(sources.length) : '';
     $('assembly-texture-context').textContent = verifiedBinding(info) ? leaf(info.game_rel) : 'Select a verified material';
     if (signature === shelfSignature && !force) { renderTextureActions(); return; }
@@ -279,16 +281,18 @@ export function createAssemblyView(api) {
           imageObserver?.unobserve(entry.target); loadThumb(entry.target, entry.target.dataset.src);
         }
       }, {root:cards, rootMargin:'0px 100px'});
-      for (const source of sources) {
+      for (const [index, source] of sources.entries()) {
         const card = button('', () => selectTexture(source), 'assembly-texture-card');
+        if (!source.custom) card.addEventListener('contextmenu', event => api.textureMenu(event, source));
         card.dataset.asset = source.game_rel; card.dataset.slot = source.slot; card.setAttribute('aria-pressed', 'false');
-        card.title = `${source.slot}\n${source.game_rel}\n${ownership(source.game_rel, source.custom)}`;
+        card.title = `${source.slot}\n${source.game_rel}\n${owners[index]}`;
+        if (!source.custom) card.title += '\nRight-click to open in your default image app.';
         const preview = make('span', null, 'assembly-texture-preview');
         const img = make('img'); img.alt = ''; img.width = img.height = 80; img.decoding = 'async';
         img.dataset.src = thumbnailURL(source, info); preview.append(img, make('span', 'Preview unavailable', 'assembly-thumb-error'));
         card.append(preview, make('strong', roleLabel(source)), make('span', leaf(source.game_rel), 'assembly-texture-name'),
-          chip(ownership(source.game_rel, source.custom), source.custom || !!projectRecord(source.game_rel)));
-        card.setAttribute('aria-label', `${source.slot}: ${leaf(source.game_rel)}. ${ownership(source.game_rel, source.custom)}`);
+          chip(owners[index], owners[index] !== 'Game original'));
+        card.setAttribute('aria-label', `${source.slot}: ${leaf(source.game_rel)}. ${owners[index]}`);
         cards.append(card); imageObserver.observe(img);
       }
     }
@@ -308,8 +312,9 @@ export function createAssemblyView(api) {
       const source = texture;
       const replace = button('Replace texture', () => api.replaceTexture(source));
       replace.disabled = !projectRecord(source.game_rel);
-      replace.title = replace.disabled ? 'Edit this texture to add it to the project before replacing it.' : 'Replace this project texture using the existing image workflow';
-      host.append(button('Edit texture', () => api.editTexture(source)), replace);
+      replace.title = replace.disabled ? 'Add this texture to the edit list before replacing it.' : 'Replace this project texture with an image';
+      if (replace.disabled) host.append(button('Add to edit list', () => api.editTexture(source)));
+      host.append(replace);
     }
     if (info?.game_rel) host.append(button('Edit material slot', () => api.editMaterial(selected, texture.slot)));
     const path = make('span', texture.game_rel, 'assembly-texture-path'); path.title = texture.game_rel; host.append(path);

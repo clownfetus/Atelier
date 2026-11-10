@@ -1114,6 +1114,7 @@ progress:not([value]) { display: none; }
   display: none;
 }
 #ctx-menu.active { display: block; }
+#ctx-menu.over-viewport { z-index:calc(var(--studio-layer-workspace) + 1); }
 .ctx-item {
   display: flex;
   align-items: center;
