@@ -191,7 +191,7 @@ def _setup(context,url,report,checks):
                   const block=row.querySelector('.at-setup-block'),box=block.getBoundingClientRect(),css=getComputedStyle(row);
                   return {piece:block.dataset.piece,color:getComputedStyle(block.querySelector('svg').firstElementChild).fill,x:box.left+box.width/2,rule:css.borderBottomWidth};})""")
                 assert [b['piece'] for b in blocks]==['texture','mesh','material'],blocks
-                assert [b['color'] for b in blocks]==['rgb(108, 152, 202)','rgb(90, 170, 154)','rgb(223, 143, 107)'],blocks
+                assert [b['color'] for b in blocks]==['rgb(79, 128, 204)','rgb(69, 171, 145)','rgb(235, 154, 114)'],blocks
                 assert all(b['rule']=='0px' for b in blocks),blocks
                 centre=tab.evaluate("()=>{const box=document.getElementById('setup-save').getBoundingClientRect();return box.left+box.width/2}")
                 assert all(abs(b['x']-centre)<1 for b in blocks),(blocks,centre)
@@ -206,7 +206,7 @@ def _setup(context,url,report,checks):
                   const v=h.querySelector('svg').getAttribute('viewBox').split(' ').map(Number);return Math.abs(v[2]-440)<.01&&Math.abs(v[3]-300)<.01}""",timeout=8000)
                 mark=tab.evaluate("""()=>{const r=e=>e.getBoundingClientRect();const img=r(document.querySelector('#setup-hero .at-proj-lockup > img'));
                   const h=r(document.querySelector('#setup-hero [data-atelier-motion=glyph]'));
-                  const s=h.height/300;return [h.left+19.79*s-img.left,h.top+20*s-img.top,400.39*s-img.width,260*s-img.height]}""")
+                  const s=h.height/300,W=AtelierMotion.assembly.pieces.BRAND.W;return [h.left+(440-W)/2*s-img.left,h.top+20*s-img.top,W*s-img.width,260*s-img.height]}""")
                 assert all(abs(d)<.6 for d in mark),mark
                 assert tab.locator('#setup-page-title').inner_text()=='Ready to open Atelier'
                 assert tab.locator('#setup-path').is_hidden() and tab.locator('#setup-save').is_enabled()

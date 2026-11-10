@@ -43,7 +43,7 @@ window.__setMotion = mode => { window.__motion = mode; window.dispatchEvent(new 
 
 PAGE = """<!doctype html><html lang="en-GB"><meta charset="utf-8">
 <link rel="stylesheet" href="/static/motion/assembly/assembly.css">
-<style>:root{--bg:#0D151F;--glyph-halo:#0D151F;--status-complete:#7CC47F;--status-warning:#E6C35C;--status-error:#EC6A86}
+<style>:root{--bg:#0D151F;--glyph-halo:#0D151F;--status-complete:#B6EBA8;--status-warning:#E6C35C;--status-error:#EC6A86}
 body{background:#0D151F;margin:0}</style>
 <div id="root"></div>
 <script src="/static/motion/assembly/pieces.js"></script>

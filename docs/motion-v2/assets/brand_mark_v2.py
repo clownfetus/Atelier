@@ -1,38 +1,44 @@
-"""Construct the Atelier three-piece mark (D14) and the outlined wordmark.
+"""Construct the Atelier three-piece mark (D14, redrawn in D20) and the outlined wordmark.
+The same construction as scripts/brand_mark.py, which is what the app runs.
 
 Usage:  python brand_mark_v2.py <out_dir> [path/to/InterDisplay-SemiBold.otf]
 Needs:  nothing for the mark. The wordmarks also need: pip install uharfbuzz fonttools
 Writes: atelier-mark.svg, atelier-mark-small.svg, atelier-mark-pieces.json,
         plus atelier-wordmark.svg and atelier-wordmark-ink.svg when a font is given
 
-Construction (units; mark height H = 260, y down), lines and tangent arcs only:
+Construction (units; mark height H = 260, y down):
   disc radius r, gap g, bite radius R = r + g (bites are concentric with the disc)
-  texture tile: notch at the top left, vertical right edge into the bite, a large
-    rounded corner at the lower right, uneven corners
-  mesh block: leans "\\", its left edge is two lines, one above the bite and one below
+  texture tile: notch at the top left, a face leaning "/" into the bite, a large
+    rounded corner at the lower right. The lean is solved so the tile's top corner
+    sits exactly g from the mesh, which gives the A its apex.
+  mesh block: leans "\\", its left edge is two parallel lines, one above the bite and one below
+  the bites, their lips and the tile's lobe are tangent arcs; other corners ease into their curves
 
 atelier-mark-pieces.json holds the tile and mesh as sampled outlines for the engine,
 cut into named sections so a piece can morph onto a plain bar section by section.
 """
 import json
 import sys
-from math import acos, atan2, cos, hypot, pi, sin, sqrt, tan
+from math import acos, atan2, cos, hypot, pi, radians, sin, sqrt, tan
 from pathlib import Path
 
-BLUE, TEAL, COPPER = "#6C98CA", "#5AAA9A", "#DF8F6B"
+BLUE, TEAL, COPPER = "#4F80CC", "#45AB91", "#EB9A72"
 
 MASTER = dict(
-    cx=208.0, cy=146.0, r=50.0, g=14.0,
-    tile_xr=181.5, notch_x=43.5, notch_y=44.5, tile_k=10.5, notch_in=7.0, tile_f1=23.5,
-    tile_rb=57.0, tile_cbx=116.0, tile_f2=25.5, tile_kb=40.5,
-    mesh_lt=206.5, mesh_su=.498, mesh_lb=292.0, mesh_sl=.514, mesh_rt=305.0, mesh_rb=409.0,
-    mesh_ktl=9.5, mesh_ktr=38.0, mesh_kbr=15.0, mesh_kbl=14.5, mesh_f1=12.5, mesh_f2=13.0,
+    cx=202.0, cy=146.0, r=50.0, g=14.0,
+    tile_xr=175.5, tile_lean=7.081, notch_x=44.0, notch_y=44.0, tile_k=10.0, notch_in=7.0, tile_f1=18.0,
+    tile_rb=57.0, tile_cbx=110.0, tile_f2=22.0, tile_kb=40.0,
+    mesh_lt=199.332, mesh_su=.506, mesh_lb=285.088, mesh_sl=.506, mesh_rt=299.0, mesh_rb=403.0,
+    mesh_ktl=10.0, mesh_ktr=40.0, mesh_kbr=15.0, mesh_kbl=15.0, mesh_f1=18.0, mesh_f2=18.0,
+    ease=.35,
 )
-# Small-size mark (<=24px): smaller disc and a wider gap so the separations survive
-# at 16px (gap 32u = 2px at 16px), softer corners, same pieces.
+# Small-size mark (under 32px): smaller disc and a wider gap so the separations survive
+# at 16px (gap 32u = 2px at 16px), softer corners, same pieces. The wider gap needs its own,
+# shallower lean, and the mesh's upper inner edge sits 7.5u further right so that lean stays upright enough to read.
 SMALL = dict(
-    MASTER, r=40.0, g=32.0, tile_k=14.0, notch_in=9.0, tile_f1=26.0, tile_f2=26.0, tile_kb=42.0,
-    mesh_ktl=14.0, mesh_ktr=40.0, mesh_kbr=18.0, mesh_kbl=18.0, mesh_f1=14.0, mesh_f2=14.0,
+    MASTER, r=40.0, g=32.0, tile_lean=3.921, mesh_lt=206.832,
+    tile_k=14.0, notch_in=9.0, tile_f1=20.0, tile_f2=24.0, tile_kb=42.0,
+    mesh_ktl=14.0, mesh_ktr=42.0, mesh_kbr=18.0, mesh_kbl=18.0, mesh_f1=20.0, mesh_f2=20.0,
 )
 
 TILE_ORDER = ["top", "tr", "side", "bottom", "bl", "left", "notch"]
@@ -64,14 +70,33 @@ def _sweep(a0, a1, cw):
     return a0 + d
 
 
-def corner(p, v, q, r):
-    """Round the corner at v between p and q. Returns the arc as points, convex or concave alike."""
+def corner(p, v, q, r, ease=0.0):
+    """Round the corner at v between p and q. Returns the curve as points, convex or concave alike.
+
+    With ease 0 it's a circular arc of radius r. With ease above 0 the curve starts that much further
+    along each edge (0.35 is 35% further) and is a cubic that passes through the arc's midpoint, so the
+    corner reads as the same radius but turns gradually instead of all at once. Where an edge is too
+    short for that, the corner stays circular."""
     ax, ay = p[0] - v[0], p[1] - v[1]
     bx, by = q[0] - v[0], q[1] - v[1]
     la, lb = hypot(ax, ay), hypot(bx, by)
     ax, ay, bx, by = ax / la, ay / la, bx / lb, by / lb
     half = 0.5 * acos(max(-1, min(1, ax * bx + ay * by)))
     t = r / tan(half)
+    if ease:
+        t2 = min(t * (1 + ease), 0.45 * la, 0.45 * lb)
+        depth = r / sqrt(1 - cos(half) ** 2) - r  # how far the arc's midpoint sits from the vertex
+        h = (4 * t2 - 4 * depth / cos(half)) / 3
+        if t2 > t * 1.02 and 0 < h < t2:
+            B = [(v[0] + ax * t2, v[1] + ay * t2), (v[0] + ax * (t2 - h), v[1] + ay * (t2 - h)),
+                 (v[0] + bx * (t2 - h), v[1] + by * (t2 - h)), (v[0] + bx * t2, v[1] + by * t2)]
+            n = max(4, int(2.2 * t2 / 1.2))
+            out = []
+            for i in range(n + 1):
+                u = i / n
+                w = ((1 - u) ** 3, 3 * u * (1 - u) ** 2, 3 * u * u * (1 - u), u ** 3)
+                out.append((sum(w[j] * B[j][0] for j in range(4)), sum(w[j] * B[j][1] for j in range(4))))
+            return out
     s, e = (v[0] + ax * t, v[1] + ay * t), (v[0] + bx * t, v[1] + by * t)
     mx, my = ax + bx, ay + by
     ml = hypot(mx, my)
@@ -117,15 +142,23 @@ def _fillet_circle_bite(c2, R2, c, R, f):
     return fc, (c2[0] + (fc[0] - c2[0]) * k1, c2[1] + (fc[1] - c2[1]) * k1), (c[0] + (fc[0] - c[0]) * k2, c[1] + (fc[1] - c[1]) * k2)
 
 
+def face(P):
+    """The tile's face, as its top and bottom points: through x = tile_xr at the disc's centre height,
+    leaning tile_lean degrees with its top to the right."""
+    s, H = tan(radians(P["tile_lean"])), 260.0
+    return (P["tile_xr"] + s * P["cy"], 0.0), (P["tile_xr"] - s * (H - P["cy"]), H)
+
+
 def tile(P):
     """The tile's sections, clockwise from the top of the raised part."""
     H, c, R = 260.0, (P["cx"], P["cy"]), P["r"] + P["g"]
-    xr, nx, ny, k = P["tile_xr"], P["notch_x"], P["notch_y"], P["tile_k"]
-    inner = corner((0, ny), (nx, ny), (nx, 0), P["notch_in"])
-    top_left = corner((nx, ny), (nx, 0), (xr, 0), k)
-    tr = corner((nx, 0), (xr, 0), (xr, H), k)
-    # upper lip: right edge into the bite
-    fc1, l1, b1 = _fillet_line_bite((xr, 0), (xr, H), c, R, P["tile_f1"], 1)
+    nx, ny, k, e = P["notch_x"], P["notch_y"], P["tile_k"], P["ease"]
+    ft, fb = face(P)
+    inner = corner((0, ny), (nx, ny), (nx, 0), P["notch_in"], e)
+    top_left = corner((nx, ny), (nx, 0), ft, k, e)
+    tr = corner((nx, 0), ft, fb, k, e)
+    # upper lip: the face into the bite
+    fc1, l1, b1 = _fillet_line_bite(ft, fb, c, R, P["tile_f1"], 1)
     a0, a1 = _ang(fc1, l1), _ang(fc1, b1)
     lip1 = _arc(fc1, P["tile_f1"], a0, _sweep(a0, a1, True))
     # lower big corner, tangent to the bottom edge, and its fillet into the bite
@@ -137,8 +170,8 @@ def tile(P):
     lip2 = _arc(fc2, P["tile_f2"], a0, _sweep(a0, a1, True))
     a0 = _ang(c2, on_c2)
     big = _arc(c2, P["tile_rb"], a0, _sweep(a0, pi / 2, True))
-    bl = corner((c2[0], H), (0, H), (0, ny), P["tile_kb"])
-    shoulder = corner((0, H), (0, ny), (nx, ny), k)
+    bl = corner((c2[0], H), (0, H), (0, ny), P["tile_kb"], e)
+    shoulder = corner((0, H), (0, ny), (nx, ny), k, e)
     return dict(
         top=[top_left[-1], tr[0]], tr=tr,
         side=[tr[-1]] + lip1 + bite + lip2 + big,
@@ -153,11 +186,11 @@ def mesh(P):
     H, c, R = 260.0, (P["cx"], P["cy"]), P["r"] + P["g"]
     lt, lu = (P["mesh_lt"], 0.0), (P["mesh_lt"] + P["mesh_su"] * H, H)    # upper left line
     lb, ll = (P["mesh_lb"], H), (P["mesh_lb"] - P["mesh_sl"] * H, 0.0)    # lower left line
-    rt, rb = (P["mesh_rt"], 0.0), (P["mesh_rb"], H)
-    tr = corner(lt, rt, rb, P["mesh_ktr"])
-    br = corner(rt, rb, lb, P["mesh_kbr"])
-    bl = corner(rb, lb, ll, P["mesh_kbl"])
-    tl = corner(lu, lt, rt, P["mesh_ktl"])
+    rt, rb, e = (P["mesh_rt"], 0.0), (P["mesh_rb"], H), P["ease"]
+    tr = corner(lt, rt, rb, P["mesh_ktr"], e)
+    br = corner(rt, rb, lb, P["mesh_kbr"], e)
+    bl = corner(rb, lb, ll, P["mesh_kbl"], e)
+    tl = corner(lu, lt, rt, P["mesh_ktl"], e)
     # going up the left side, from the lower lip to the upper lip
     fc1, l1, b1 = _fillet_line_bite(lb, ll, c, R, P["mesh_f1"], 1)
     a0, a1 = _ang(fc1, l1), _ang(fc1, b1)

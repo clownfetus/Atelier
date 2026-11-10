@@ -265,11 +265,12 @@
 .at-setup-hero[hidden], .at-setup-page[hidden] { display: none; }
 .at-setup-hero, .at-setup-page { --glyph-halo: var(--surface); }
 /* The page's glyph stands in for the mark. Its host is the mark's box scaled up to the A's framed
-   440 x 300 units (the mark is 400.39 x 260), so the finished A lands exactly where the logo sits. */
+   440 x 300 units (the mark is 395.23 x 260, BRAND.W in pieces.js), so the finished A lands exactly
+   where the logo sits. */
 .at-proj-lockup:has(> .at-setup-check) > img { visibility: hidden; }
 .at-setup-check {
   position: absolute;
-  left: calc(var(--lockup-mark) * (400.39 - 440) / 520);
+  left: calc(var(--lockup-mark) * (395.23 - 440) / 520);
   top: calc(var(--lockup-mark) * (260 - 300) / 520);
   width: calc(var(--lockup-mark) * 440 / 260);
   height: calc(var(--lockup-mark) * 300 / 260);

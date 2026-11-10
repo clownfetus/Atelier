@@ -19,7 +19,7 @@ window.__isA = pose => {
 };
 window.__order = host => [...host.querySelectorAll('[data-piece]')].map(el => el.dataset.piece).join();
 window.__cat = e => ['blue', 'teal', 'disc'].every(id => P.CAT[id].every((v, i) => v === e.cols[id][i]));
-window.__green = e => ['blue', 'teal', 'disc'].every(id => e.cols[id].join() === '124,196,127');
+window.__green = e => ['blue', 'teal', 'disc'].every(id => e.cols[id].join() === '182,235,168');
 0;
 """
 
@@ -263,7 +263,7 @@ def _entrance(context, url, report, checks):
       __setMotion('calm');await __step(dt,3);out.doneOnce=done;return out}""", FRAME)
     assert r['done'] == 1 and r['doneOnce'] == 1 and r['t'] <= 1600, r
     assert r['colour'] and not r['flourish'] and r['clicks'] == 0, r
-    assert not r['shifted'] and r['size'] == ['50', '32'], r
+    assert not r['shifted'] and r['size'] == ['49', '32'], r
     assert not r['together'] and r['seq'] == ['blue', 'teal', 'disc', 'teal'], r
     assert r['exact'] and r['frames'] == 0 and r['order'] == 'blue,teal,disc', r
     assert r['second'] and r['again'] == 1, r
@@ -324,7 +324,7 @@ def _preview(context, url, report, checks):
         assert all(item == [state, asset] for item in shown), (label, shown)
     tab.locator('#motion-preview [data-preview-logo]').click()
     logo = tab.evaluate("()=>{const h=document.querySelector('.motion-preview-logo > span'),r=h.getBoundingClientRect();return {w:r.width,h:r.height,on:h.hasAttribute('data-glyph-entrance')}}")
-    assert logo == {'w': 50, 'h': 32, 'on': True}, logo
+    assert logo == {'w': 49, 'h': 32, 'on': True}, logo
     assert not errors, errors
     tab.close()
     checks.append('Glyph: Preview motion runs five states, three loaders and the logo entrance in Settings')

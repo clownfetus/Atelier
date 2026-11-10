@@ -221,7 +221,7 @@ def main():
                 })()""")
                 assert logo_motion == {'width': 49, 'state': 'settled', 'opacity': '1',
                                        'animations': 0, 'ready': 'true', 'visibleMarks': 1,
-                                       'visibleWidth': 50, 'startupAPI': True, 'clean': True}, logo_motion
+                                       'visibleWidth': 49, 'startupAPI': True, 'clean': True}, logo_motion
                 result['logo_entrance'] = logo_motion
                 empty_motion = window.evaluate_js("""(() => {
                   const host = document.createElement('div'); document.body.append(host);
