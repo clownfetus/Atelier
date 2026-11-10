@@ -50,8 +50,10 @@ Use semantic foreground/background pairs instead of adding hexadecimal colors to
 | Primary and accent | `#0D151F` | `#F4F6F8` |
 | Main text | `#0D151F` | `#F4F6F8` |
 | Supporting text | `#4E5F73` | `#B4C0CE` |
-| Hints and captions (`--md-sys-color-outline`) | `#6A7C90` | `#778BA3` |
+| Outlines, separators and quiet icons (`--md-sys-color-outline`) | `#6A7C90` | `#778BA3` |
 | Error sentences | `#C5193E` | `#EC6A86` |
+
+Captions, hints and the Working status line use Supporting text. The outline colour reaches 3:1 for borders, separators and icons but not 4.5:1 on every surface, so it never colours text; `tests/design_checks.py` keeps it on icons.
 
 The piece colours, `--atelier-texture` `#6C98CA`, `--atelier-mesh` `#5AAA9A` and `--atelier-material` `#DF8F6B`, never change with the theme. `--glyph-halo` is the surface behind the glyph: Canvas by default, and a host on another surface sets it to that surface.
 

@@ -54,7 +54,6 @@
   --status-complete: #419145;
   --status-warning: #9E7C18;
   --status-error: #E74165;
-  --status-working: #6A7C90;
   --status-complete-text: #337136;
   --status-warning-text: #7A6013;
   --status-error-text: #C5193E;
@@ -205,7 +204,6 @@
   --status-complete: #7CC47F;
   --status-warning: #E6C35C;
   --status-error: #EC6A86;
-  --status-working: #778BA3;
   --status-complete-text: #7CC47F;
   --status-warning-text: #E6C35C;
   --status-error-text: #EC6A86;

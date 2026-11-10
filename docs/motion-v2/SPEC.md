@@ -59,7 +59,7 @@ check includes them.
 | Surface | `#172331` | Cards, panels |
 | Paper | `#F4F6F8` | Primary text on dark; light canvas |
 | Mist | `#B4C0CE` | Body text on dark (9.9:1 on Charcoal) |
-| Guide | `#778BA3` | Rules, captions, Working status (not body text) |
+| Guide | `#778BA3` | Outlines, separators and quiet icons (3:1; never text) |
 | Complete green | `#7CC47F` | Success (hue 122°; mesh teal is 168°) |
 | Warning amber | `#E6C35C` | Warning (hue 45°; copper is 19°) |
 | Error rose | `#EC6A86` | Error (hue 347°) |
@@ -103,7 +103,7 @@ and it must pass `tests/design_checks.py`.
 | Rules | `#24323F` | `#DDE3EA` |
 | Text | Paper `#F4F6F8` | Charcoal `#0D151F` |
 | Muted text | Mist `#B4C0CE` | `#4E5F73` |
-| Hints and captions | Guide `#778BA3` | `#6A7C90` |
+| Outlines and quiet icons | Guide `#778BA3` | `#6A7C90` |
 | Accent | Paper `#F4F6F8` | Charcoal `#0D151F` |
 | Text on accent | Charcoal `#0D151F` | Paper `#F4F6F8` |
 | Info text | Mist `#B4C0CE` | `#4E5F73` |
@@ -111,7 +111,10 @@ and it must pass `tests/design_checks.py`.
 | Status icons and glyph: complete, warning, error | `#7CC47F`, `#E6C35C`, `#EC6A86` | `#419145`, `#9E7C18`, `#E74165` |
 
 In dark, rose sentences reach only 3.97:1 on Highest, so status sentences stay off
-that surface. Guide reaches only 3.96:1 on Raised, so it is never body text.
+that surface. Guide and its light equivalent `#6A7C90` reach 3:1 but not 4.5:1 on
+every surface (3.96:1 on Raised in dark, on Canvas in light), so they never colour
+text. Captions, hints and the Working status line use Muted text: Mist in dark,
+`#4E5F73` in light.
 
 ## 3. Geometry
 
