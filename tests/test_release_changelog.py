@@ -3,6 +3,7 @@ import base64
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -34,6 +35,35 @@ class Preparation(unittest.TestCase):
         result = P.prepare_changelog(document(), '1.1.8', '2026-11-05', ['Fix preview', 'Fix export'])
         self.assertIn('## 1.1.8 — 2026-11-05\n\n- Fix preview\n- Fix export', result)
         self.assertNotIn(INTRO, P.split_changelog(result)[1]['1.1.8'])
+
+    def test_plain_branch_merge_uses_the_merged_commit_titles(self):
+        with tempfile.TemporaryDirectory(prefix='atelier-changelog-merge-') as directory:
+            root = Path(directory)
+
+            def git(*args):
+                subprocess.run(['git', '-c', 'user.name=Release tests', '-c', 'user.email=tests@example.invalid', *args],
+                               cwd=root, check=True, capture_output=True)
+
+            git('init', '-q', '--initial-branch=main')
+            change = root / 'preview.txt'
+            change.write_text('original', encoding='utf-8')
+            git('add', 'preview.txt')
+            git('commit', '-qm', 'Previous release')
+            git('tag', 'v1.1.7')
+            git('switch', '-qc', 'preview')
+            change.write_text('updated', encoding='utf-8')
+            git('commit', '-qam', 'Fix preview')
+            git('switch', '-q', 'main')
+            git('merge', '--no-ff', '-qm', 'Merge branch preview', 'preview')
+            with patch.object(P, 'ROOT', root):
+                summaries = P.release_commit_summaries('v1.1.7')
+
+        result = P.prepare_changelog(document(), '1.1.8', '2026-11-05', summaries)
+        self.assertEqual(P.split_changelog(result)[1]['1.1.8'], '## 1.1.8 — 2026-11-05\n\n- Fix preview')
+
+    def test_empty_release_notes_stop_preparation(self):
+        with self.assertRaisesRegex(ValueError, 'No release notes'):
+            P.prepare_changelog(document(), '1.1.8', '2026-11-05', [])
 
     def test_existing_authored_release_keeps_notes_for_next_version(self):
         original = document('- Next version.', '## 1.1.8\n\n- Ready to ship.\n\n' + OLD)
