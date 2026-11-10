@@ -5,22 +5,32 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Folders with coloured icons stay at the top of the Library with every sort,
+  including a saved **Edited first** view. The selected sort orders items within
+  each group.
+
 ## 1.2.1 — 2026-11-10
 
-- Generate release notes from merged commits
-- Print brand bible v1.3 from a source page
-- Redraw the mark and refresh the piece colours (D20)
-- Put coloured folders first in Recommended library sort
-- Give Characters, UI and VFX folders distinct colours
-- Keep the outline colour off text
-- Simplify mod review and reveal texture folders
-- Use per-asset loaders in the Mod tray
-- Apply the Atelier brand guide to Assembly View
-- Open textures in the system image app from context menus
-- Unify mesh inspection in Assembly View
-- Design system: master mark from 32 px, as SPEC has it
-- Rebuild baked detail levels from authored Blender meshes
-- Keep the glyph drawing in Off after a Complete's ripple
+- Characters, UI and VFX have distinct folder icon colours. Choose
+  **Recommended** in the Library’s Sort menu to see coloured folders first.
+
+- Right-click a texture to open it in your default image app or reveal its
+  project file in Explorer on Windows. Atelier prepares the project copy when
+  needed.
+
+- Assembly View brings mesh surfaces, linked materials and UV inspection
+  together. Collapse the panels to give the model more room.
+
+- Blender mesh replacements can use authored geometry to rebuild baked detail
+  levels.
+
+- **Review mod** lets you choose **Export only** or **Export and install** in
+  the review itself. The Mod tray shows a loader for the type of asset it is
+  preparing.
+
+- The refreshed Atelier logo and palette appear in the app and installer.
+  The status glyph stays visible when Motion Off takes over after a success
+  animation.
 
 ## 1.2.0 — 2026-11-09
 

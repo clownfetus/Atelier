@@ -38,22 +38,37 @@ def run_library_workflow_checks(page, context, url, report, checks):
         sort = target.locator('#library-sort')
         sort.select_option('recommended')
         coloured = ['VFX', 'Icons', 'Meshes', 'Characters', 'UI', 'Materials', 'Textures']
-        for path, other in (('', ['Weapons', 'Maps']), ('Test folder', ['Maps', 'Weapons'])):
-            prefix = f'{path}/' if path else ''
-            mixed = [{'type': 'folder', 'name': name, 'rel_path': prefix + name}
-                     for name in ['Maps', 'Weapons', *coloured]]
+        neutral = ['Maps', 'Weapons']
+
+        def priority_items(prefix):
             texture_path = prefix + 'Detail'
-            mixed.append({'type': 'asset', 'name': 'Detail', 'file_type': 'texture',
-                          'game_rel': texture_path, 'rel_path': texture_path})
-            seed(mixed, path)
+            return [{'type': 'folder', 'name': name, 'rel_path': prefix + name}
+                    for name in neutral + coloured] + [
+                {'type': 'asset', 'name': 'Detail', 'file_type': 'texture',
+                 'game_rel': texture_path, 'rel_path': texture_path},
+            ]
+
+        for path, other in (('', ['Weapons', 'Maps']), ('Test folder', neutral)):
+            prefix = f'{path}/' if path else ''
+            seed(priority_items(prefix), path)
             expected = coloured + other + ['Detail']
             assert names() == expected, names()
-            target.evaluate("path => updateImportedCard(path, {token: 'priority-check'})", texture_path)
+            target.evaluate("path => updateImportedCard(path, {token: 'priority-check'})", prefix + 'Detail')
             assert names() == expected, names()
-        sort.select_option('name')
-        assert names() == sorted(['Maps', 'Weapons', *coloured]) + ['Detail'], names()
+
+        for mode in ('name', 'name-desc', 'type', 'edited'):
+            sort.select_option(mode)
+            descending = mode == 'name-desc'
+            assert names() == sorted(coloured, reverse=descending) + sorted(neutral, reverse=descending) + ['Detail'], names()
+
+        target.route('**/api/browse?*', lambda route: route.fulfill(json=priority_items('')))
+        target.reload()
+        target.wait_for_selector('#grid-area .card')
+        assert sort.input_value() == 'edited'
+        assert names() == sorted(coloured) + neutral + ['Detail'], names()
+        target.unroute('**/api/browse?*')
         sort.select_option('recommended')
-        checks.append('Recommended puts coloured folder icons first on Home and inside folders, including after import; Name A–Z sorts by name')
+        checks.append('Coloured folders lead every sort, including a saved Edited first view on Home after reload and Recommended after import')
 
         seed()
         assert target.locator('#library-clear').is_hidden()

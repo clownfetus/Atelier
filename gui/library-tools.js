@@ -27,24 +27,25 @@
   }
   const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
   function sort(cards, {home = false} = {}) {
-    if (prefs.sort === 'recommended') {
-      const roles = window.AtelierFolderEmblems?.roles;
-      const coloured = [], featured = [], rest = [];
-      for (const card of cards) {
-        const isFolder = card.type === 'folder';
-        const role = isFolder && roles?.[card.iconCls];
-        if (role && role !== 'neutral') coloured.push(card);
-        else if (isFolder && home && AtelierFolderIcons.isFeatured(card.name)) featured.push(card);
-        else rest.push(card);
-      }
-      return coloured.concat(featured, rest);
+    const recommended = prefs.sort === 'recommended';
+    const roles = window.AtelierFolderEmblems?.roles;
+    const coloured = [], featured = [], rest = [];
+    for (const card of cards) {
+      const isFolder = card.type === 'folder';
+      const role = isFolder && roles?.[card.iconCls];
+      if (role && role !== 'neutral') coloured.push(card);
+      else if (recommended && home && isFolder && AtelierFolderIcons.isFeatured(card.name)) featured.push(card);
+      else rest.push(card);
     }
+    if (recommended) return coloured.concat(featured, rest);
+
     const name = (a, b) => collator.compare(a.label, b.label);
     const folders = (a, b) => Number(b.type === 'folder') - Number(a.type === 'folder');
-    return [...cards].sort((a, b) => folders(a, b) ||
+    const compare = (a, b) => folders(a, b) ||
       (prefs.sort === 'type' ? collator.compare(a.file_type || '', b.file_type || '') :
         prefs.sort === 'edited' ? Number(!!b.imported) - Number(!!a.imported) : 0) ||
-      (prefs.sort === 'name-desc' ? -name(a, b) : name(a, b)));
+      (prefs.sort === 'name-desc' ? -name(a, b) : name(a, b));
+    return coloured.sort(compare).concat(rest.sort(compare));
   }
   function persist() {
     try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (_) {}
