@@ -5,6 +5,23 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.1 — 2026-11-10
+
+- Generate release notes from merged commits
+- Print brand bible v1.3 from a source page
+- Redraw the mark and refresh the piece colours (D20)
+- Put coloured folders first in Recommended library sort
+- Give Characters, UI and VFX folders distinct colours
+- Keep the outline colour off text
+- Simplify mod review and reveal texture folders
+- Use per-asset loaders in the Mod tray
+- Apply the Atelier brand guide to Assembly View
+- Open textures in the system image app from context menus
+- Unify mesh inspection in Assembly View
+- Design system: master mark from 32 px, as SPEC has it
+- Rebuild baked detail levels from authored Blender meshes
+- Keep the glyph drawing in Off after a Complete's ripple
+
 ## 1.2.0 — 2026-11-09
 
 - Motion system v2. The assembly glyph, built from Atelier's three pieces (a blue
