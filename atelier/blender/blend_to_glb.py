@@ -7,8 +7,9 @@ and that interferes with exporting clean skinning data.
 
     blender --background --python blend_to_glb.py -- <in.blend> <out.glb> [ratio]
 """
-import sys
 import json
+import os
+import sys
 
 import bpy
 
@@ -19,15 +20,29 @@ detail_options=json.loads(argv[3]) if len(argv)>3 and argv[3].startswith('{') el
 
 bpy.ops.wm.open_mainfile(filepath=src)
 
-for o in list(bpy.data.objects):
-    if o.name not in ("Armature", "SkeletalMesh"):
-        bpy.data.objects.remove(o, do_unlink=True)
+sys.path.insert(0, os.path.dirname(__file__))
+from import_geometry import authored_lods
 
-obj = bpy.data.objects.get("SkeletalMesh")
+donors = authored_lods(bpy.data.objects)
+level = detail_options.get('source_lod')
+if level is not None and (type(level) is not int or level not in donors):
+    raise ValueError(f'There is no authored mesh for detail level {level}.')
+obj = donors[level] if level is not None else bpy.data.objects.get('SkeletalMesh')
 if obj is None:
     raise SystemExit("no 'SkeletalMesh' object in the .blend -- do not rename it")
-print('ATELIER_IMPORT_OPTIONS '+obj.get('atelier_import_options','{}'))
+arm = bpy.data.objects.get('Armature')
+if arm is None:
+    raise SystemExit("no 'Armature' object in the .blend -- do not delete it; it is hidden, not unused")
+for o in list(bpy.data.objects):
+    if o not in (arm, obj):
+        bpy.data.objects.remove(o, do_unlink=True)
 
+print('ATELIER_AUTHORED_LODS '+json.dumps(sorted(donors)))
+if level is None:
+    print('ATELIER_IMPORT_OPTIONS '+obj.get('atelier_import_options','{}'))
+
+obj.hide_viewport = obj.hide_render = obj.hide_select = False
+obj.hide_set(False)
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
 if obj.mode != "OBJECT":
@@ -64,9 +79,6 @@ print(f"DECIMATE ratio={ratio} verts {before[0]}->{after[0]} polys {before[1]}->
 # what to write as a skin from the mesh's ARMATURE modifier, so without this the export
 # silently omits JOINTS/WEIGHTS and every vertex would come back unweighted. Added AFTER
 # the decimate is applied so the modifier stack order stays clean.
-arm = bpy.data.objects.get("Armature")
-if arm is None:
-    raise SystemExit("no 'Armature' object in the .blend -- do not delete it; it is hidden, not unused")
 arm.hide_viewport = False
 arm.hide_render = False
 arm.hide_select = False

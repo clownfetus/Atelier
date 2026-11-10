@@ -1336,11 +1336,18 @@ def transfer_weights_from_vanilla(mesh, lod, sec, positions):
     return src_gi[j], src_w[j], dist, src_pos
 
 
-def original_sections(mesh, lod_index, slots):
+def original_sections(mesh, lod_index, slots, *, material_map=None):
     """Section arrays from this LOD's original buffers for a partial replacement."""
+    if not slots:
+        return {}
     lod=mesh.lods[lod_index]
-    slot_names=material_slot_names(mesh.materials)
-    chosen=[(i,section) for i,section in enumerate(lod['sections']) if slot_names[section['mat']] in slots]
+    if material_map is None:
+        names = material_slot_names(mesh.materials)
+        section_slots = [names[section['mat']] for section in lod['sections']]
+    else:
+        from atelier.handlers.mesh_lods import replacement_slots
+        section_slots = replacement_slots(mesh, lod_index, material_map)
+    chosen=[(i,section) for i,section in enumerate(lod['sections']) if section_slots[i] in slots]
     if not chosen:return {}
     position=mesh.positions(lod);normal,tangent,tan_w=mesh.normals_tangents(lod)
     uv=mesh.uvs(lod);color=mesh.colors(lod);indices,weights=mesh.skin_weights(lod)
@@ -1357,7 +1364,8 @@ def original_sections(mesh, lod_index, slots):
     return result
 
 
-def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=None, repair_weights=False):
+def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=None, repair_weights=False,
+                    *, material_map=None):
     """Convert an edited .glb back into the per-section arrays rebuild_lod expects.
 
     `reweight` is {slot name: 'all'|'zero_weight'} from the graft sidecar: those sections have
@@ -1441,10 +1449,17 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
     # .blend still carries all of the materials, so scoping this to one LOD would reject
     # every ordinary multi-LOD build.
     slot_names = material_slot_names(mesh.materials)
-    known = set(slot_names)
+    if material_map is None:
+        known = set(slot_names)
+        section_slots = [slot_names[section['mat']] for section in lod['sections']]
+    else:
+        from atelier.handlers.mesh_lods import replacement_slots
+        section_slots = replacement_slots(mesh, lod_index, material_map)
+        known = set(section_slots)
     preserve_parts=set(preserve_parts or [])
-    if preserve_parts-known:raise ValueError('The saved untouched-part slots changed; import the replacement again')
-    preserved=original_sections(mesh,lod_index,preserve_parts)
+    if preserve_parts-known:
+        raise ValueError('The saved untouched-part slots changed. Import the replacement again.')
+    preserved=original_sections(mesh,lod_index,preserve_parts,material_map=material_map)
     if None in by_mat:
         raise ValueError('The exported model contains geometry without an assigned material. '
                          'It would be omitted from the rebuilt mesh. Assign every face to '
@@ -1460,7 +1475,7 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
     for section_index,sec in enumerate(lod["sections"]):
         if section_index in preserved:
             sections_in.append(preserved[section_index]);continue
-        slot = slot_names[sec["mat"]]
+        slot = section_slots[section_index]
         prims = by_mat.get(slot)
         if not prims:
             raise ValueError(f"no primitive in the glb uses material {slot!r} -- every "

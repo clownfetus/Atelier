@@ -1,10 +1,10 @@
-"""Keep authored material atlases when a sculpt deforms remapped game LODs.
+"""Preserve the material mapping of game LODs with baked atlases.
 
 Some lower LODs merge the face/body into a baked material and renumber the other
 sections through LODMaterialMap. Re-decimating the top LOD's named materials into
-those raw indices assigns unrelated geometry and bone palettes. Transfer a
-verified sculpt's deformation to the original lower surface instead, retaining
-its UV atlas, material map, topology, colours and skinning.
+those raw indices assigns unrelated geometry and bone palettes. An authored
+replacement can supply geometry for the mapped material slots. A verified
+sculpt can also deform the original lower surface while keeping its atlas.
 """
 import hashlib
 import json
@@ -61,6 +61,20 @@ def material_index(section, mapping):
     return mapping[index] if index < len(mapping) and mapping[index] >= 0 else index
 
 
+def replacement_slots(mesh, lod_index, mapping):
+    """Names a donor must use, in the target's original section order."""
+    from atelier.handlers.mesh import material_slot_names
+
+    names = material_slot_names(mesh.materials)
+    indices = [material_index(section, mapping) for section in mesh.lods[lod_index]['sections']]
+    if any(not 0 <= index < len(names) for index in indices):
+        raise ValueError('A lower detail material map references a missing material')
+    slots = [names[index] for index in indices]
+    if len(set(slots)) != len(slots):
+        raise ValueError('Authored detail meshes require a unique material slot for each section')
+    return slots
+
+
 def _triangles(mesh, lod, section):
     return np.frombuffer(mesh._blob(lod), '<u4' if lod['idx_stride'] == 4 else '<u2',
         section['num_tris']*3, lod['idx_off']+section['base_index']*lod['idx_stride']).reshape(-1, 3).astype('i8')
@@ -82,8 +96,8 @@ class Sculpt:
         totals = np.zeros_like(self.rest)
         counts = np.zeros(len(self.rest), 'i8')
         message = ('This mesh has baked materials in its lower detail levels. Keep the original '
-                   'topology and Atelier tracking attributes when sculpting it. Topology-changing '
-                   'replacements for its baked lower detail materials are not supported yet.')
+                   'topology and Atelier tracking attributes when sculpting it, or supply an '
+                   'authored mesh for each baked detail level.')
         if len(sections) != len(lod['sections']):
             raise ValueError(message)
         for before, after in zip(lod['sections'], sections):
