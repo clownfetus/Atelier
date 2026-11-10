@@ -5,6 +5,7 @@
   let source, operation, scope, factor, color, value, parameter, materialSource, sourceResults;
   let selectAll, selectNone, selectionCount, sourceTimer, searchRevision = 0;
   let project, sources, items = [], previewId, busy = false, opener, projectLine, materials = false;
+  let phase, counted, progress, stopWorking;
   const el = (...args) => window.AtelierJobDialogs.el(...args);
   function select(id, label, values) {
     const wrapper = el('label', label), input = el('select'); input.id = id;
@@ -52,7 +53,43 @@
   }
   function hide() {
     clearTimeout(sourceTimer); ++searchRevision;
+    stopMotion();
     overlay.classList.remove('active'); if (opener?.isConnected) opener.focus();
+  }
+  function stopMotion() {
+    stopWorking?.(); stopWorking = null;
+    progress?.remove(); progress = null;
+  }
+  function showMotion() {
+    stopMotion();
+    if (!busy || !overlay.classList.contains('active') || project !== window.atelierProject()) return;
+    if (phase === 'review' && counted) {
+      progress = el('div', undefined, 'bulk-review-progress');
+      const bar = el('progress'); bar.setAttribute('aria-label', 'Assets reviewed');
+      const count = el('span'); count.setAttribute('aria-hidden', 'true');
+      progress.append(bar, count); status.parentElement.before(progress);
+      updateCount();
+    } else {
+      stopWorking = window.AtelierMaterialSaveFeedback?.saving(phase === 'save' ? applyButton : status,
+        () => busy && overlay.classList.contains('active') && project === window.atelierProject(),
+        phase === 'save' && materials ? 'material' : undefined);
+    }
+  }
+  function updateCount() {
+    if (!progress || !counted) return;
+    const bar = progress.querySelector('progress'), label = `${counted.current} of ${counted.total} assets reviewed`;
+    bar.max = counted.total; bar.value = counted.current; bar.setAttribute('aria-valuetext', label);
+    progress.querySelector('span').textContent = label;
+  }
+  function updateJob(job) {
+    if (!busy || project !== window.atelierProject()) { stopMotion(); return; }
+    status.textContent = job.stage;
+    if (phase !== 'review') return;
+    const total = Number(job.total), current = Number(job.current);
+    const wasCounted = !!counted;
+    counted = total > 0 && Number.isFinite(total) && Number.isFinite(current)
+      ? {total, current: Math.max(0, Math.min(total, current))} : null;
+    if (wasCounted !== !!counted) showMotion(); else updateCount();
   }
   function searchSource() {
     invalidate(); clearTimeout(sourceTimer); const revision = ++searchRevision;
@@ -105,11 +142,12 @@
     choices.setAttribute('role', 'group'); choices.setAttribute('aria-label', 'Assets to edit');
     body = el('div', undefined, 'bulk-body'); body.id = 'bulk-results';
     status = el('p'); status.id = 'bulk-status'; status.setAttribute('role', 'status');
+    const feedback = el('div', undefined, 'bulk-feedback'); feedback.append(status);
     const actions = el('div', undefined, 'bulk-actions'), close = el('button', 'Close', 'btn'); close.id = 'bulk-close'; close.addEventListener('click', hide);
     const activity = el('button', 'Activity', 'btn'); activity.addEventListener('click', () => { hide(); document.getElementById('job-activity').click(); });
     previewButton = el('button', 'Review batch', 'btn'); previewButton.id = 'bulk-preview'; previewButton.addEventListener('click', preview);
     applyButton = el('button', 'Save reviewed edits', 'btn primary'); applyButton.id = 'bulk-apply'; applyButton.disabled = true; applyButton.addEventListener('click', apply);
-    actions.append(activity, close, previewButton, applyButton); panel.append(title, projectLine, intro, controls, hint, selectionTools, choices, body, status, actions); overlay.append(panel); document.body.append(overlay);
+    actions.append(activity, close, previewButton, applyButton); panel.append(title, projectLine, intro, controls, hint, selectionTools, choices, body, feedback, actions); overlay.append(panel); document.body.append(overlay);
     panel.addEventListener('keydown', event => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault(); event.stopPropagation();
@@ -121,6 +159,8 @@
       }
     });
     window.AtelierJobDialogs.trap(overlay, panel, hide);
+    window.addEventListener('atelier:project-assets', () => { if (project !== window.atelierProject()) stopMotion(); });
+    window.addEventListener('pagehide', stopMotion);
   }
   function inputSpec() {
     if (['reparent', 'replace_material'].includes(operation.value)) {
@@ -142,6 +182,7 @@
   function setBusy(value) {
     const focusedInside = panel.contains(document.activeElement);
     busy = value; panel.setAttribute('aria-busy', String(value));
+    if (!value) { stopMotion(); phase = null; counted = null; }
     controls.querySelectorAll('input,select').forEach(node => { node.disabled = value; });
     choices.querySelectorAll('input').forEach(node => { node.disabled = value; });
     const count = choices.querySelectorAll('input:checked').length;
@@ -151,7 +192,7 @@
         (!panel.contains(document.activeElement) || document.activeElement.disabled)) panel.focus();
   }
   async function run(path, payload) {
-    return window.AtelierJobs.run(path, {project, method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    return window.AtelierJobs.run(path, {project, method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload), onUpdate: updateJob});
   }
   async function preview() {
     if (busy) return;
@@ -161,6 +202,7 @@
       const selected = [...choices.querySelectorAll('input:checked')].map(input => input.value);
       if (!selected.length) throw new Error('Select at least one asset.');
       const edit = inputSpec(); previewId = null; setBusy(true); status.textContent = 'Reading selected assets…'; body.replaceChildren();
+      phase = 'review'; counted = null; showMotion();
       const result = await run('/api/bulk/preview', {items:selected, edit});
       if (!result.ok) throw new Error(result.error || 'Review failed');
       const table = el('table', undefined, 'bulk-results'), head = el('tr');
@@ -182,6 +224,7 @@
     try {
       if (project !== window.atelierProject()) throw new Error('Project changed. Close and reopen the batch editor.');
       setBusy(true); status.textContent = 'Saving reviewed project edits…';
+      phase = 'save'; counted = null; showMotion();
       const result = await run('/api/bulk/apply', {preview_id:previewId});
       previewId = null;
       if (!result.ok) throw new Error(result.error || 'Save failed');
@@ -193,7 +236,7 @@
   window.AtelierBulkEdit = {
     open(selection, projectName, options = {}) {
       if (!overlay) init();
-      if (busy) { overlay.classList.add('active'); panel.focus(); return; }
+      if (busy) { overlay.classList.add('active'); showMotion(); panel.focus(); return; }
       opener = document.activeElement; sources = selection; project = projectName;
       ++searchRevision; clearTimeout(sourceTimer); sourceResults.hidden = true;
       materials = options.kind === 'material';

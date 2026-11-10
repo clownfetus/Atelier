@@ -87,6 +87,8 @@ glyphs finishing together click once.
 | `../job-tools.js` | Activity rows: a glyph per job, kept across refreshes |
 | `../mod-open.js` | Open a mod: a glyph per outcome row |
 | `../viewport.js` | The 3D viewport's loader at Stage, on the dark stage |
+| `../add-asset.js` | The selected texture, mesh or material loader beside the status while a custom asset is prepared |
+| `../bulk-edit.js` | A rolling disc follows the review job's counts. Material saves use the material loader; other batches use the general working glyph |
 
 `docs/motion-v2/SURFACE_MAP.md` lists every surface with its tier and states.
 
@@ -107,6 +109,14 @@ edited corner, a plain triangle in the charge colour on edited rows, cards and p
 hide and reduced motion release active effects. View Transition names are transient and cleaned up
 after completion or cancellation. The request or close a transition belongs to never waits for it.
 
+`AtelierPolish.seat()` also seats saved edits in the Workspace's Your mod dock, including Undo;
+an existing edit only reseats when its saved version changes. `foldAway()` is the tray's inert
+departing copy, reused by Restore and unpinning. Newly pinned folders get the short settle;
+filters, label refreshes and initial hydration do not replay it. Quick Preview reuses the
+top-edge image reveal after the image loads. Off and OS reduced motion show these changes at once.
+Job glyphs and review bars are removed on hide, failure or completion, and resume the same
+operation when its dialog reopens. Result notifications keep their existing ownership.
+
 ## Checks
 
 Each flag runs one part of `tests/browser_smoke.py --report-dir <folder>`:
@@ -121,6 +131,7 @@ Each flag runs one part of `tests/browser_smoke.py --report-dir <folder>`:
 | `--inks-dial-only` | Charge fitting on every preset and the Motion dial |
 | `--logo-only`, `--empty-assets-only` | The logo entrance and the Mod tray's empty state |
 | `--polish-only`, `--retired-only` | Continuity, and that the retired surfaces stay gone |
+| `--motion-placements-only` | Custom assets, batch counts/saves, dock slots, pins and Quick Preview; Full, Calm, Off and lifecycle checks. Also included in `--polish-only` |
 | `--showcase-only` | Showcase views and the success click |
 
 `tests/test_inks.py` runs the colour maths in Node. `tests/desktop_smoke.py` and

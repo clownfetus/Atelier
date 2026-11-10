@@ -5,6 +5,10 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Added working animations to custom asset preparation and batch saves, real
+  progress to batch reviews, and motion when saved edits, pinned folders and
+  Quick Preview images appear or leave.
+
 - Folders with coloured icons stay at the top of the Library with every sort,
   including a saved **Edited first** view. The selected sort orders items within
   each group.

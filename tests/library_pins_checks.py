@@ -47,7 +47,7 @@ def run_library_pins_checks(page, context, url, report, checks):
         toggle_for(label).click()
 
     def assert_map_pin():
-        glyph = pins_page.locator('.library-pin-open[title="Maps"] svg')
+        glyph = pins_page.locator('#home-pins .library-pin-open[title="Maps"] svg')
         assert glyph.get_attribute('data-lucide') == 'folder-map'
         assert 'map-folder-icon' in glyph.get_attribute('class')
         assert glyph.bounding_box()['width'] == 18
@@ -96,7 +96,7 @@ def run_library_pins_checks(page, context, url, report, checks):
         wait_path('')
         assert pins_page.locator('.library-pins .library-pin-open').count() == 3
         assert_map_pin()
-        nested = pins_page.locator('.library-pin-open').filter(has_text='Magik materials')
+        nested = pins_page.locator('#home-pins .library-pin-open').filter(has_text='Magik materials')
         nested.focus()
         nested.press('Enter')
         wait_path('Characters/1029/1029100/Materials')
@@ -105,18 +105,19 @@ def run_library_pins_checks(page, context, url, report, checks):
         home()
         pins_page.locator('#search-scope').click()
         pins_page.locator('#search-input').fill('Magik')
-        assert pins_page.locator('.library-pin-open').count() == 1
-        assert 'Magik materials' in pins_page.locator('.library-pin-open').inner_text()
+        assert pins_page.locator('#home-pins .library-pin-open').count() == 1
+        assert 'Magik materials' in pins_page.locator('#home-pins .library-pin-open').inner_text()
         pins_page.locator('#search-input').fill('')
         # Pin toggles are keyboard controls beside the navigation button.
         toggle_for('Maps').focus()
         toggle_for('Maps').press('Space')
         assert toggle_for('Maps').get_attribute('aria-pressed') == 'false'
         assert pins_page.evaluate('nav.path') == ''
-        pins_page.locator('.library-pin-chip').filter(has_text='Magik materials').locator('.library-pin-remove').click()
+        pins_page.locator('#home-pins .library-pin-chip').filter(has_text='Magik materials').locator('.library-pin-remove').click()
         assert not pins_page.evaluate("AtelierLibraryPins.isPinned('Characters/1029/1029100/Materials')")
         assert pins_page.evaluate('document.activeElement.classList.contains("library-pin-open")')
-        pins_page.locator('.library-pin-remove').click()
+        # The departing chip finishes its fold outside the live navigation, inert and aria-hidden.
+        pins_page.locator('#home-pins .library-pin-remove').click()
         assert pins_page.locator('.library-pins').is_hidden()
         assert pins_page.evaluate('document.activeElement.matches("#grid-area button.card")')
         assert folder('Characters').count() == 1
@@ -139,7 +140,7 @@ def run_library_pins_checks(page, context, url, report, checks):
         assert pins_page.locator('.library-pins img:not(.hero-chip-art), .library-pins img[onerror]').count() == 0
         assert pins_page.locator('.library-pins .hero-chip-art').evaluate_all(
             "images=>images.every(img=>/^\\/api\\/catalogue\\/(hero\\/1029\\/(lord|avatar)|thumbnail\\/1029)$/.test(img.getAttribute('src')))")
-        assert pins_page.locator('.library-pin-open').first.inner_text().startswith('<img src=x')
+        assert pins_page.locator('#home-pins .library-pin-open').first.inner_text().startswith('<img src=x')
         assert not pins_page.evaluate('Boolean(window.pinInjected)')
         assert not pins_page.evaluate("AtelierLibraryPins.toggle({type:'asset',rel_path:'Fixture/Asset'})")
         pins_page.evaluate('key=>localStorage.setItem(key,"{broken JSON")', KEY)
@@ -158,7 +159,7 @@ def run_library_pins_checks(page, context, url, report, checks):
             secondary.evaluate("AtelierLibraryPins.toggle({type:'folder',rel_path:'Maps',label:'Maps',iconCls:'folder-icon'})")
             pins_page.wait_for_function("AtelierLibraryPins.isPinned('Maps')")
             assert toggle_for('Maps').get_attribute('aria-pressed') == 'true'
-            assert pins_page.locator('.library-pin-open').count() == 1
+            assert pins_page.locator('#home-pins .library-pin-open').count() == 1
             pin_folder('Maps')
             secondary.wait_for_function("!AtelierLibraryPins.isPinned('Maps')")
             assert secondary.locator('.library-pins').is_hidden()
@@ -177,8 +178,8 @@ def run_library_pins_checks(page, context, url, report, checks):
             folder('Maps', blocked).press('Enter')
             wait_path('Maps', blocked)
             home(blocked)
-            assert blocked.locator('.library-pin-open').count() == 1
-            blocked.locator('.library-pin-remove').click()
+            assert blocked.locator('#home-pins .library-pin-open').count() == 1
+            blocked.locator('#home-pins .library-pin-remove').click()
             assert blocked.evaluate('AtelierLibraryPins.list()') == []
         finally:
             blocked.close()
@@ -194,7 +195,7 @@ def run_library_pins_checks(page, context, url, report, checks):
             for theme in ('light', 'dark'):
                 pins_page.locator('#settings-theme').select_option(theme, force=True)
                 assert pins_page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-                assert pins_page.locator('.library-pin-open').count() == 3
+                assert pins_page.locator('#home-pins .library-pin-open').count() == 3
                 # Home uses the selected card size, including its pinned folder cards.
                 size=int(pins_page.locator('#library-size').input_value())
                 cards=pins_page.locator('#grid-area .card').evaluate_all(

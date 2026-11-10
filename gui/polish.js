@@ -3,6 +3,7 @@
   'use strict';
   const reduced = () => (window.AtelierMotionPolicy?.query() || matchMedia('(prefers-reduced-motion: reduce)')).matches;
   const mounts = new Map();
+  const seating = new Map();
   const drains = new Set();
   const clearDrains = () => { for (const dispose of [...drains]) dispose(); };
   function mount(host, {frames = [], duration = 160, state = 'idle', easing = window.AtelierMotion.ease.standard} = {}) {
@@ -22,6 +23,7 @@
   }
   const removals = new MutationObserver(() => {
     for (const [host, instance] of mounts) if (!host.isConnected) instance.destroy();
+    for (const [row, dispose] of seating) if (!row.isConnected) dispose();
   });
   removals.observe(document.documentElement, {childList:true, subtree:true});
   const play = (host, frames, duration = 160, easing = window.AtelierMotion.ease.standard) => {
@@ -102,16 +104,15 @@
   }
   // Tokens of the rows the last tray render added, so a confirmed save can tell a new piece from a re-save.
   let freshRows = new Set();
-  const seating = new Map();
   // A row arriving in the Mod tray clicks in like a glyph piece (P4b.6, SPEC 4.3's click): its slot opens while
   // the thumbnail travels in from the library's side (340 ms), comes in (110 ms), snaps 3 px past its well (80 ms),
   // recoils (110 ms) and rests (130 ms); at the impact the thumbnail squashes and the name, tick and delete wipe in.
   // A row saved over in place only re-seats: the snap, recoil and rest. Calm drops the squash; Off shows the row
-  // at once. Nothing fades. Called only once a save or import has really succeeded.
-  function seat(row, fresh) {
+  // at once. Nothing fades. Calls follow a confirmed saved edit or a real pin change.
+  function seat(row, fresh, {thumb = row.querySelector('.sb-thumb'), parts = row.querySelectorAll(':scope > .sb-info, :scope > .sb-check, :scope > .sb-clear'), horizontal = false, art = thumb?.firstElementChild || thumb} = {}) {
     seating.get(row)?.();
-    const curves = window.AtelierMotion?.assembly?.curves, thumb = row.querySelector('.sb-thumb');
-    if (!curves || !thumb || typeof row.animate !== 'function') return;
+    const curves = window.AtelierMotion?.assembly?.curves;
+    if (!curves || !thumb || typeof row.animate !== 'function' || reduced() || document.hidden || !row.getClientRects().length) return;
     const squash = window.AtelierMotionPolicy?.allows(3) !== false;
     const lead = fresh ? 450 : 0, T = lead + 320 + (squash ? 60 : 0), at = ms => ms / T;
     const run = (el, frames) => el.animate(frames, {duration: T, fill: 'backwards'});
@@ -128,7 +129,7 @@
       {offset: at(lead + 320), transform: 'none'}, ...(T > lead + 320 ? [{offset: 1, transform: 'none'}] : [])];
     const animations = [run(thumb, travel)];
     if (squash) {
-      const art = thumb.firstElementChild || thumb, hit = at(lead + 80);
+      const hit = at(lead + 80);
       animations.push(art.animate([{offset: 0, transform: 'none'}, {offset: hit, transform: 'none'},
         {offset: hit, transform: 'scale(.88,1.12)', easing: curves.punchBack}, {offset: Math.min(1, at(lead + 380)), transform: 'none'},
         ...(at(lead + 380) < 1 ? [{offset: 1, transform: 'none'}] : [])], {duration: T}));
@@ -140,10 +141,13 @@
         if (row.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) mounts.get(other)?.destroy();
       }
       row.style.overflow = 'hidden';
-      animations.push(run(row, [{offset: 0, height: '0px', paddingTop: '0px', paddingBottom: '0px', easing: curves.move},
-        {offset: at(340), height: h, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom}, {offset: 1, height: h, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom}]));
+      const closed = horizontal ? {flexBasis: '0px', minWidth: '0px', paddingLeft: '0px', paddingRight: '0px'}
+        : {height: '0px', paddingTop: '0px', paddingBottom: '0px'};
+      const open = horizontal ? {flexBasis: cs.flexBasis, minWidth: '0px', paddingLeft: cs.paddingLeft, paddingRight: cs.paddingRight}
+        : {height: h, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom};
+      animations.push(run(row, [{offset: 0, ...closed, easing: curves.move}, {offset: at(340), ...open}, {offset: 1, ...open}]));
       // A wipe, not a fade: the text is revealed from the impact by a clip.
-      for (const part of row.querySelectorAll(':scope > .sb-info, :scope > .sb-check, :scope > .sb-clear')) {
+      for (const part of parts) {
         animations.push(run(part, [{offset: 0, clipPath: 'inset(0 100% 0 0)'}, {offset: at(530), clipPath: 'inset(0 100% 0 0)', easing: curves.out},
           {offset: Math.min(1, at(770)), clipPath: 'inset(0 0 0 0)'}, ...(at(770) < 1 ? [{offset: 1, clipPath: 'inset(0 0 0 0)'}] : [])]));
       }
@@ -156,6 +160,28 @@
     };
     seating.set(row, dispose); drains.add(dispose);
     Promise.all(animations.map(a => a.finished)).then(dispose, dispose);
+  }
+  // A removed slot leaves the live controls immediately; its inert copy completes the tray's fold.
+  // Callers keep the disposer so a project switch, filter or Undo can clear an old departure.
+  function foldAway(row, rect, view) {
+    if (!row || !rect?.width || !rect.height || reduced() || document.hidden || typeof row.animate !== 'function') return () => {};
+    const foldMs = AtelierMotion.foldMs || 190, copy = row.cloneNode(true);
+    copy.classList.add('polish-ghost'); copy.inert = true; copy.setAttribute('aria-hidden', 'true');
+    for (const node of [copy, ...copy.querySelectorAll('*')]) {
+      for (const name of [...node.attributes].map(attribute => attribute.name))
+        if (name === 'id' || name === 'name' || name.startsWith('data-')) node.removeAttribute(name);
+    }
+    copy.querySelectorAll('.swatch-wipe').forEach(node => node.remove());
+    Object.assign(copy.style, {left: rect.x+'px', top: rect.y+'px', width: rect.width+'px', height: rect.height+'px',
+      margin: '0', overflow: 'hidden', clipPath: 'inset(0 100% 0 0)'});
+    document.body.append(copy);
+    const animation = play(copy, [{clipPath: 'inset(0 0 0 0)', translate: '0 0'},
+      {clipPath: 'inset(0 100% 0 0)', translate: '-6px 0'}], foldMs, AtelierMotion.ease.exit);
+    const watch = view && new MutationObserver(() => { if (view.hidden) dispose(); });
+    const dispose = () => { clearTimeout(timer); watch?.disconnect(); animation?.destroy(); copy.remove(); drains.delete(dispose); };
+    const timer = setTimeout(dispose, foldMs+20); drains.add(dispose);
+    watch?.observe(view, {attributes: true, attributeFilter: ['hidden']});
+    return dispose;
   }
   function fly(path) {
     requestAnimationFrame(() => {
@@ -208,17 +234,7 @@
         else if (dy) play(next,[{transform:`translateY(${dy}px)`},{transform:'none'}],120);
       } else {
         if (window.AtelierMotionPolicy?.allows(1) === false) continue;
-        const copy = entry.row.cloneNode(true); copy.classList.add('polish-ghost'); copy.inert=true; copy.setAttribute('aria-hidden','true');
-        copy.removeAttribute('id');copy.querySelectorAll('[id],[name]').forEach(node=>{node.removeAttribute('id');node.removeAttribute('name');});
-        copy.querySelectorAll('.swatch-wipe').forEach(node=>node.remove());
-        for (const node of [copy,...copy.querySelectorAll('[data-token],[data-game-rel],[data-library-path]')]) {
-          for (const name of ['data-token','data-game-rel','data-library-path']) node.removeAttribute(name);
-        }
-        Object.assign(copy.style,{left:entry.rect.x+'px',top:entry.rect.y+'px',width:entry.rect.width+'px',height:entry.rect.height+'px',margin:'0',overflow:'hidden',clipPath:'inset(0 100% 0 0)'});
-        document.body.append(copy);
-        const rowAnimation=play(copy,[{clipPath:'inset(0 0 0 0)',translate:'0 0'},{clipPath:'inset(0 100% 0 0)',translate:'-6px 0'}],foldMs,AtelierMotion.ease.exit);
-        const dispose=()=>{clearTimeout(timer);rowAnimation?.destroy();copy.remove();drains.delete(dispose);};
-        const timer=setTimeout(dispose,foldMs+20);drains.add(dispose);
+        foldAway(entry.row, entry.rect, list.closest('#body'));
       }
     }
   }
@@ -307,5 +323,5 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
-  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,swapImage,sidebarBefore,sidebarAfter,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
+  window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,seat,foldAway,swapImage,sidebarBefore,sidebarAfter,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

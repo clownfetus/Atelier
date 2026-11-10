@@ -5,6 +5,7 @@
   const iconNames = AtelierFolderIcons.symbols;
   const folderClasses = new Set(Object.keys(iconNames));
   const views = new Map();
+  const departures = new WeakMap();
   const pathLabels = new Map();
 
   function normalizePath(value) {
@@ -115,7 +116,7 @@
     button.title = action;
   }
 
-  function publish(persist = true) {
+  function publish(persist = true, animate = false) {
     if (persist) {
       try { localStorage.setItem(KEY, JSON.stringify({version: 1, pins})); } catch (_) { /* Session state still works. */ }
     }
@@ -123,7 +124,7 @@
     document.querySelectorAll('.library-pin-toggle[data-library-pin-path]').forEach(updateButton);
     for (const [container, options] of views) {
       if (!container.isConnected) views.delete(container);
-      else render(container, options);
+      else render(container, options, animate);
     }
     window.dispatchEvent(new CustomEvent('atelier:home-pins-changed', {detail: list()}));
   }
@@ -133,7 +134,7 @@
     if (!pin) return false;
     if (isPinned(pin.path)) pins = pins.filter(item => item.path !== pin.path);
     else pins.push(pin);
-    publish();
+    publish(true, true);
     const pinned = isPinned(pin.path);
     return pinned;
   }
@@ -142,7 +143,7 @@
     const normalized = normalizePath(path);
     if (!normalized || !isPinned(normalized)) return false;
     pins = pins.filter(pin => pin.path !== normalized);
-    publish();
+    publish(true, true);
     return true;
   }
 
@@ -165,8 +166,16 @@
     return wrapper;
   }
 
-  function render(container, options = {}) {
+  function render(container, options = {}, animate = false) {
     if (!container) return;
+    for (const dispose of departures.get(container) || []) dispose();
+    departures.delete(container);
+    const previous = new Map([...container.querySelectorAll('.library-pin-chip')].map(row =>
+      [row.dataset.pinPath, {row, rect: row.getBoundingClientRect()}]));
+    const focused = container.contains(document.activeElement) ? {
+      path: document.activeElement.closest('.library-pin-chip')?.dataset.pinPath,
+      remove: document.activeElement.classList.contains('library-pin-remove'),
+    } : null;
     for (const host of views.keys()) if (host !== container && !host.isConnected) views.delete(host);
     views.set(container, options);
     const query = String(options.filter || '').trim().toLowerCase();
@@ -176,6 +185,8 @@
     container.hidden = !shown.length;
     container.setAttribute('role', 'navigation');
     container.setAttribute('aria-label', 'Pinned folders');
+    if (animate) departures.set(container, [...previous].filter(([path]) => !isPinned(path))
+      .map(([, entry]) => window.AtelierPolish?.foldAway(entry.row, entry.rect, container.closest('#body')) || (() => {})));
     if (!shown.length) return;
     const heading = document.createElement('span');
     heading.className = 'library-pins-label';
@@ -183,9 +194,13 @@
     container.append(heading);
     const items = document.createElement('div');
     items.className = 'library-pins-items';
-    shown.forEach((pin, index) => {
+    shown.forEach(pin => {
+      const before = previous.get(pin.path)?.row, version = JSON.stringify(pin);
+      if (animate && before?.dataset.pinVersion === version) { items.append(before); return; }
       const chip = document.createElement('div');
       chip.className = 'library-pin-chip';
+      chip.dataset.pinPath = pin.path;
+      chip.dataset.pinVersion = version;
       const open = document.createElement('button');
       open.type = 'button';
       open.className = 'library-pin-open';
@@ -196,7 +211,7 @@
       const text = document.createElement('span');
       text.textContent = pin.label;
       open.append(text);
-      open.addEventListener('click', () => options.onNavigate?.(pin.path));
+      open.addEventListener('click', () => views.get(container)?.onNavigate?.(pin.path));
       const unpin = document.createElement('button');
       unpin.type = 'button';
       unpin.className = 'library-pin-remove';
@@ -204,6 +219,7 @@
       unpin.setAttribute('aria-label', `Unpin ${pin.label} (${pin.path}) from home`);
       unpin.append(glyph('x'));
       unpin.addEventListener('click', () => {
+        const index = [...container.querySelectorAll('.library-pin-chip')].indexOf(chip);
         remove(pin.path);
         const remaining = container.querySelectorAll('.library-pin-open');
         const next = remaining[Math.min(index, remaining.length - 1)] || document.querySelector('#grid-area button.card') || document.getElementById('search-input');
@@ -214,6 +230,9 @@
     });
     container.append(items);
     window.AtelierIcons?.createIcons({nodes: [container]});
+    if (focused?.path) items.querySelector(`[data-pin-path="${CSS.escape(focused.path)}"] .${focused.remove ? 'library-pin-remove' : 'library-pin-open'}`)?.focus({preventScroll: true});
+    if (animate) for (const chip of items.children) if (!previous.has(chip.dataset.pinPath))
+      window.AtelierPolish?.seat(chip, false, {thumb: chip, art: chip.querySelector('.card-icon')});
   }
 
   window.addEventListener('storage', event => {
@@ -221,7 +240,7 @@
     const next = decode(event.key === null ? null : event.newValue);
     if (!next) return;
     pins = next;
-    publish(false);
+    publish(false, true);
   });
   window.addEventListener('atelier:catalogue-updated', () => publish(false));
   window.AtelierLibraryPins = Object.freeze({decorate, render, list, isPinned, toggle, remove, makePinLabel, updateLabels});

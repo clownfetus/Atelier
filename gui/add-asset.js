@@ -5,14 +5,21 @@
   const prefixes = {texture: 'T_', mesh: 'SK_', material: 'MI_'};
   let overlay, panel, form, kind, name, mode, files, fileRow, fileNames, sourceRow, sourceLabel,
     source, folder, destination, status, submit, browser, browserItems, browserPath, useFolder,
-    up, closeButton, help, browseMode, browseLocation = '', browseRequest = 0, project, busy = false;
+    up, closeButton, help, browseMode, browseLocation = '', browseRequest = 0, project, busy = false, stopWorking;
   function gamePath(value) { return value.trim().replaceAll('\\', '/').replace(/^\/Game\/Marvel(?:\/|$)/, '').replace(/\/$/, ''); }
   function assetName() {
     const value = name.value.trim();
     const valid = kind.value === 'mesh' ? /^(SK_|SM_)/i : new RegExp('^' + prefixes[kind.value], 'i');
     return value && (valid.test(value) ? value : prefixes[kind.value] + value);
   }
-  function hide() { overlay.classList.remove('active'); document.getElementById('add-asset-open').focus(); }
+  function stopMotion() { stopWorking?.(); stopWorking = null; }
+  function showMotion() {
+    stopMotion();
+    if (busy && overlay.classList.contains('active') && project === atelierProject())
+      stopWorking = window.AtelierMaterialSaveFeedback?.saving(status,
+        () => busy && overlay.classList.contains('active') && project === atelierProject(), kind.value);
+  }
+  function hide() { stopMotion(); overlay.classList.remove('active'); document.getElementById('add-asset-open').focus(); }
   function message(text, error = false) { status.textContent = text; status.classList.toggle('is-error', error); }
   function refresh() {
     const upload = mode.value === 'file';
@@ -124,11 +131,12 @@
     const output = el('div', undefined, 'add-asset-destination'); destination = el('code'); destination.id = 'add-asset-path';
     output.append(el('span', 'New asset path'), destination);
     status = el('p', '', 'add-asset-status'); status.id = 'add-asset-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const feedback = el('div', undefined, 'add-asset-feedback'); feedback.append(status);
     const actions = el('div', undefined, 'add-asset-actions');
     closeButton = button('Cancel', hide); closeButton.dataset.close = 'true';
     submit = el('button', 'Add custom asset', 'btn primary'); submit.type = 'submit'; submit.id = 'add-asset-submit';
     actions.append(closeButton, submit);
-    form.append(columns, field('Source', 'add-asset-mode', mode), fileRow, sourceRow, help, folderRow, browser, output, status, actions);
+    form.append(columns, field('Source', 'add-asset-mode', mode), fileRow, sourceRow, help, folderRow, browser, output, feedback, actions);
     panel.append(form); overlay.append(panel); document.body.append(overlay);
     form.addEventListener('submit', add);
     kind.addEventListener('change', () => { files.value = ''; source.value = ''; browser.hidden = true; browseRequest++; refresh(); });
@@ -139,9 +147,8 @@
       refresh();
     });
     AtelierJobDialogs.trap(overlay, panel, hide);
-    window.addEventListener('atelier-job', event => {
-      if (busy && event.detail.kind === 'asset-add' && event.detail.project === project) message(event.detail.stage);
-    });
+    window.addEventListener('atelier:project-assets', () => { if (project !== atelierProject()) stopMotion(); });
+    window.addEventListener('pagehide', stopMotion);
   }
   async function add(event) {
     event.preventDefault();
@@ -158,12 +165,15 @@
     const controls = [...form.querySelectorAll('input,select,button')].filter(node => !node.dataset.close);
     const disabled = controls.map(node => node.disabled); controls.forEach(node => node.disabled = true);
     submit.textContent = 'Adding asset…'; closeButton.textContent = 'Hide'; message('Preparing your asset…'); panel.focus();
+    showMotion();
     try {
-      const result = await AtelierJobs.run('/api/assets/add', {method: 'POST', body, project});
+      const result = await AtelierJobs.run('/api/assets/add', {method: 'POST', body, project,
+        onUpdate: job => { if (project === atelierProject()) message(job.stage); else stopMotion(); }});
       if (!result.ok) throw Error(result.error || 'Could not add the asset.');
       hide(); window.dispatchEvent(new CustomEvent('atelier-asset-added', {detail: {...result, project}}));
     } catch (error) { message(error.message, true); }
     finally {
+      stopMotion();
       busy = false; controls.forEach((node, i) => node.disabled = disabled[i]); submit.textContent = 'Add asset';
       closeButton.textContent = 'Cancel';
       if (overlay.classList.contains('active')) submit.focus();
@@ -176,7 +186,7 @@
         project = atelierProject(); form.reset(); folder.value = path; browser.hidden = true; browseRequest++;
         message('The asset will be added to your Mod tray.'); refresh();
       }
-      overlay.classList.add('active'); panel.focus();
+      overlay.classList.add('active'); showMotion(); panel.focus();
     },
   });
 })();

@@ -10,7 +10,7 @@
     if (sizes.has(saved?.size)) prefs.size = saved.size;
     if (sorts.has(saved?.sort)) prefs.sort = saved.sort;
   } catch (_) {}
-  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewTimer;
+  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewTimer, previewReveal;
   const items = new WeakMap();
   const normalize = value => String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\\/g, '/');
   const words = query => normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -164,6 +164,7 @@
         if (previewDialog.open) return; // A previous close can arrive after a new preview opens.
         clearTimeout(previewTimer);
         const img = previewDialog.querySelector('img'); img.onload = img.onerror = null; img.removeAttribute('src');
+        previewReveal?.destroy(); previewReveal = null;
         if (previewOpener?.isConnected) previewOpener.focus();
       });
       previewDialog.addEventListener('keydown', e => { if (e.key === 'Escape') e.stopPropagation(); });
@@ -176,8 +177,13 @@
     previewDialog.querySelector('.library-preview-footer span').textContent = caption;
     const load = bust => {
       clearTimeout(previewTimer);
+      previewReveal?.destroy(); previewReveal = null;
       message.textContent = 'Loading preview…'; img.hidden = true; retry.hidden = true;
-      img.onload = () => { clearTimeout(previewTimer); img.hidden = false; message.textContent = ''; retry.hidden = true; };
+      img.onload = () => {
+        clearTimeout(previewTimer); img.hidden = false; message.textContent = ''; retry.hidden = true;
+        previewReveal = window.AtelierPolish?.play(img, [{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0)'}],
+          window.AtelierMotion.unfoldMs, window.AtelierMotion.ease.unfold);
+      };
       img.onerror = () => { clearTimeout(previewTimer); message.textContent = 'Preview unavailable. Try again after the thumbnail has loaded.'; retry.hidden = false; };
       previewTimer = setTimeout(() => { message.textContent = 'Preview is taking too long. You can retry or close it.'; retry.hidden = false; }, 20000);
       img.alt = label; img.src = src + (bust ? `${src.includes('?') ? '&' : '?'}_t=${Date.now()}` : '');

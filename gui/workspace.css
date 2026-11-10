@@ -82,6 +82,7 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 .workspace-slot { flex:0 0 260px; display:flex; align-items:center; gap:10px; min-height:56px; padding:10px 10px 10px 10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; }
 .workspace-slot--left-out { opacity:.6; }
 .workspace-slot-visual { flex:none; display:flex; align-items:center; gap:4px; min-width:40px; color:var(--text-muted); font-size:11px; }
+.workspace-slot-art { display:flex; align-items:center; gap:4px; }
 .workspace-slot-visual img { width:40px; height:40px; object-fit:cover; border-radius:6px; background:var(--surface-sunk); }
 .workspace-swatch { width:20px; height:20px; border-radius:50%; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--text) 18%, transparent); }
 .workspace-swatch--none { box-shadow:none; border:1px dashed var(--text-muted); box-sizing:border-box; }

@@ -24,6 +24,22 @@ bottom before starting Phase 3**: line numbers drift.
 | 14 | Startup stage (D17) | `gui/motion/surface-adapters.js:22` | `krackleStage.mount` with the logo's silhouette | Working beside the counted progress bar, with no silhouette, so the A never forms here. The logo entrance still follows (D8). Calm and Off keep the still logo and the bar | Stage |
 | 15 | Index failure (D17) | `gui/motion/surface-adapters.js:35` | `krackleStage.mount` | The X, with the notice's text unchanged | Stage |
 
+## Additional approved placements
+
+These reuse the finished motion system; the original migration inventory above stays historical.
+
+| Surface | Mounted from | Behaviour |
+| --- | --- | --- |
+| Add custom asset | `gui/add-asset.js` | Inline texture, mesh or material loader beside the preparation status, from the selected asset type |
+| Bulk review and save | `gui/bulk-edit.js` | The rolling disc follows the review job's own current/total. Uncounted review uses the working glyph. Saving materials uses the material loader; mixed, VFX and curve batches use general working |
+| Workspace: Your mod | `gui/workspace-dock.js` | New saves and Undo seat into their slots; changed saves reseat. Restore folds an inert departing copy. Refreshes and selection changes stay still |
+| Quick Preview | `gui/library-tools.js` | The loaded image opens downwards from its top edge, using the existing reveal timing |
+| Pinned folders | `gui/library-pins.js` | A newly pinned chip settles; an unpinned chip folds away. Initial display, filtering, catalogue updates and unchanged repaints do not replay the effect |
+
+These placements use the shared Full/Calm/Off policy, including OS reduced motion. They never
+form a success glyph themselves. Busy mounts are disposed when the operation ends, its dialog
+is hidden or its project is no longer current. A reopened dialog resumes its existing operation.
+
 ## Retired (10)
 
 | Surface | Where | Replacement |

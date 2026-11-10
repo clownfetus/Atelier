@@ -4,12 +4,14 @@
   const $ = id => document.getElementById(id);
   const changes = new Map();          // project|game_rel|mtime -> Promise of colour changes
   const restored = new Set();         // edits Restore removed, so their Undo can refresh the stage
-  let queue = Promise.resolve(), project = '';
+  let queue = Promise.resolve(), project = '', rendered = false;
+  let departures = [];
 
   const tray = () => window.AtelierModTray;
   const costume = item => [item.char_name, item.skin_name].filter(Boolean).join(' / ');
   const label = item => item.file_type === 'material' ? window.AtelierViewport?.label?.(item.name) || item.name : item.name;
   const kind = {texture:'Texture', material:'Colours', mesh:'Model', vfx:'Effect', curve:'Curve'};
+  const version = item => JSON.stringify([item.mtime, item.selected, item.file_type, item.name, item.char_name, item.skin_name]);
 
   // Original reads go through the game reader one at a time, and each saved version is read once.
   function colourChanges(item) {
@@ -34,8 +36,9 @@
   }
 
   function visual(item) {
-    const host = document.createElement('span');
-    host.className = 'workspace-slot-visual'; host.setAttribute('aria-hidden', 'true');
+    const frame = document.createElement('span'), host = document.createElement('span');
+    frame.className = 'workspace-slot-visual'; frame.setAttribute('aria-hidden', 'true');
+    host.className = 'workspace-slot-art'; frame.append(host);
     if (item.file_type === 'material') {
       colourChanges(item).then(list => {
         if (!list?.length) { host.textContent = list ? 'Settings' : ''; return; }
@@ -49,7 +52,7 @@
         }
         host.closest('li')?.setAttribute('data-changes', String(list.length));
       });
-      return host;
+      return frame;
     }
     const url = tray()?.preview(item);
     if (url) {
@@ -57,13 +60,15 @@
       image.onerror = () => image.remove();
       host.append(image);
     }
-    return host;
+    return frame;
   }
 
   function slot(item) {
     const li = document.createElement('li');
     li.className = 'workspace-slot' + (item.selected ? '' : ' workspace-slot--left-out');
     li.dataset.token = item.token; li.dataset.gameRel = item.game_rel;
+    li.dataset.savedVersion = String(item.mtime || '');
+    li.dataset.slotVersion = version(item);
     const text = document.createElement('span'); text.className = 'workspace-slot-text';
     const name = document.createElement('strong'); name.textContent = label(item);
     const sub = document.createElement('span');
@@ -92,6 +97,9 @@
 
   function render() {
     const active = window.atelierProject?.() || '';
+    const animate = rendered && active === project;
+    rendered = true;
+    departures.forEach(dispose => dispose()); departures = [];
     if (active !== project) { project = active; restored.clear(); }
     const items = (tray()?.items() || []).sort((a, b) =>
       costume(a).localeCompare(costume(b)) || label(a).localeCompare(label(b)));
@@ -99,8 +107,16 @@
     if (back.length) { back.forEach(rel => restored.delete(rel)); window.AtelierViewport?.reloadMaterials?.(); }
 
     const list = $('workspace-dock-list'), focused = document.activeElement?.closest?.('.workspace-slot')?.dataset.token;
-    list.replaceChildren(...items.map(slot));
-    if (focused) list.querySelector(`[data-token="${CSS.escape(focused)}"] .workspace-restore`)?.focus();
+    const previous = new Map([...list.children].map(row => [row.dataset.token, {row, rect: row.getBoundingClientRect()}]));
+    const added = [];
+    list.replaceChildren(...items.map(item => {
+      const before = animate ? previous.get(item.token) : undefined;
+      if (before?.row.dataset.slotVersion === version(item)) return before.row;
+      const next = slot(item);
+      if (animate && (!before || before.row.dataset.savedVersion !== next.dataset.savedVersion)) added.push({row: next, fresh: !before});
+      return next;
+    }));
+    if (focused) list.querySelector(`[data-token="${CSS.escape(focused)}"] .workspace-restore`)?.focus({preventScroll: true});
 
     const included = items.filter(item => item.selected).length, count = $('workspace-dock-count');
     if (window.AtelierPolish) window.AtelierPolish.count(count, items.length); else count.textContent = String(items.length);
@@ -110,6 +126,13 @@
       : included === items.length ? 'Everything here goes into your mod.'
       : `${included} of ${items.length} go into your mod. Choose which in Library’s Mod tray.`;
     $('workspace-review').disabled = !included;
+    if (animate) {
+      for (const [token, entry] of previous) if (!items.some(item => item.token === token))
+        departures.push(window.AtelierPolish?.foldAway(entry.row, entry.rect, $('workspace')) || (() => {}));
+      for (const {row, fresh} of added) window.AtelierPolish?.seat(row, fresh, {
+        thumb: row.querySelector('.workspace-slot-visual'), parts: row.querySelectorAll('.workspace-slot-text, .workspace-restore'), horizontal: true,
+      });
+    }
   }
 
   $('workspace-review').onclick = () => tray()?.review();
