@@ -380,7 +380,7 @@ function setViewportLoaderFallback(state) {
   slot.dataset.amState = state;
   const fallback = slot.querySelector('.viewport-loader-fallback');
   if (!fallback) return;
-  const icon = state === 'error' ? 'alert-triangle' : 'box';
+  const icon = state === 'error' ? 'x' : state === 'empty' ? 'alert-triangle' : 'box';
   if (fallback.dataset.icon === icon) return;
   fallback.dataset.icon = icon;
   fallback.innerHTML = `<i data-lucide="${icon}" size="72"></i>`;
@@ -1653,7 +1653,7 @@ function revertEdits() {
 }
 
 function note(msg, kind) {
-  if (!$('viewport-overlay').classList.contains('active') && typeof window.toast === 'function') window.toast(String(msg).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), kind);
+  if (msg && !$('viewport-overlay').classList.contains('active') && typeof window.toast === 'function') window.toast(String(msg).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), kind);
   $('viewport-status').textContent = msg;
   $('viewport-status').dataset.kind = kind || 'info';
 }
@@ -1680,7 +1680,7 @@ async function open(skinId, title, preferredMesh=null, materialSet=null) {
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(skinId,title);
   window.AtelierViewportIdentity?.show(skinId);
-  $('viewport-status').textContent = '';
+  note('');
   const posterOrigin = window.AtelierMotion?.viewportPoster?.source();
   inspection.show();
   $('viewport-loading').style.display = 'flex';
@@ -1769,7 +1769,7 @@ async function openMesh(gameRel, name, skinId) {
   const _cr = $('viewport-chroma-row'); if (_cr) _cr.style.display = 'none';
   $('viewport-title').textContent = studioTitle(_sk,name);
   window.AtelierViewportIdentity?.show(_sk, /characters\/(\d{4})\//i.exec(gameRel)?.[1]);
-  $('viewport-status').textContent = '';
+  note('');
   const posterOrigin = window.AtelierMotion?.viewportPoster?.source();
   inspection.show();
   $('viewport-loading').style.display = 'flex';
@@ -1881,8 +1881,8 @@ function focusPendingEdits() {
   if (!hasPendingEdits()) return;
   $('viewport-overlay').classList.add('active');
   const status = $('viewport-status');
-  status.textContent = saving || visibilityBusy.size ? 'Preview save in progress. Wait for it to finish before exporting.'
-    : 'Save or revert these unsaved preview recolours before exporting.';
+  note(saving || visibilityBusy.size ? 'Preview save in progress. Wait for it to finish before exporting.'
+    : 'Save or revert these unsaved preview recolours before exporting.', 'warning');
   status.setAttribute('role', 'status');
   const save = $('viewport-mat-save');
   if (!saving && !save.disabled && save.getClientRects().length) save.focus();

@@ -389,7 +389,12 @@
       <div id="viewport-playback"><select id="viewport-animation" aria-label="Standing idle animation"><option value="">Rest pose</option></select><button id="viewport-play" disabled aria-pressed="false">Play idle</button></div>
       <button id="viewport-capture-cancel" hidden>Cancel capture</button>
       <span id="viewport-navigation">Drag to orbit <span aria-hidden="true">·</span> Pan <span aria-hidden="true">·</span> Zoom</span>
-      <span id="viewport-status" role="status" aria-live="polite">Ready</span>
+      <div class="vp-status-line">
+        <span id="viewport-status" role="status" aria-live="polite">Ready</span>
+        <i class="vp-status-icon" data-outcome="success" data-lucide="check" size="18" aria-hidden="true"></i>
+        <i class="vp-status-icon" data-outcome="warning" data-lucide="alert-triangle" size="18" aria-hidden="true"></i>
+        <i class="vp-status-icon" data-outcome="error" data-lucide="x" size="18" aria-hidden="true"></i>
+      </div>
     </div>
   </div>
 </div>

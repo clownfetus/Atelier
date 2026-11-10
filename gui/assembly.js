@@ -28,7 +28,7 @@ export function createAssemblyView(api) {
     <div class="assembly-panel-head"><span class="assembly-number">01</span><h3>Geometry</h3><button id="assembly-geometry-collapse" class="assembly-icon" aria-label="Collapse geometry" aria-expanded="true"><i data-lucide="chevron-left" size="16"></i></button></div>
     <div class="assembly-geometry-content">
       <div class="assembly-project"><i data-lucide="folder" size="14"></i><span id="assembly-project"></span></div>
-      <label class="assembly-search"><i data-lucide="search" size="15"></i><input id="assembly-search" type="search" placeholder="Find part or material" aria-label="Find a surface or material"></label>
+      <label class="assembly-search"><i data-lucide="search" size="15"></i><input id="assembly-search" type="search" placeholder="Find a part" aria-label="Find a surface or material"></label>
       <div class="assembly-list-heading"><span>Visible surfaces</span><span id="assembly-section-count"></span></div>
       <div id="assembly-sections" role="group" aria-label="Mesh sections"></div>
       <div id="assembly-geometry-selection"></div>
@@ -65,6 +65,14 @@ export function createAssemblyView(api) {
 
   function button(label, action, cls = '') {
     const control = make('button', label, cls); control.type = 'button'; control.addEventListener('click', action); return control;
+  }
+  function referenceWarning(message, detail) {
+    const line = make('p', null, 'assembly-reference-warning'), icon = make('i'), text = make('span', message);
+    icon.dataset.lucide = 'alert-triangle'; icon.setAttribute('size', '18'); icon.setAttribute('aria-hidden', 'true');
+    if (detail) text.append(make('code', detail, 'assembly-error-detail'));
+    line.append(icon, text);
+    window.AtelierIcons?.createIcons({nodes:[line]});
+    return line;
   }
   function chip(text, changed = false) { return make('span', text, 'assembly-badge' + (changed ? ' is-project' : '')); }
   function projectRecord(path) { return api.projectAssets?.().find(item => assetKey(item.game_rel) === assetKey(path)); }
@@ -180,7 +188,8 @@ export function createAssemblyView(api) {
     if (info) swatch.style.background = api.swatch(selected, info);
     card.append(swatch, make('strong', trusted ? leaf(info.game_rel) : info?.slot_name || api.label(selected))); context.append(card);
     if (!trusted) {
-      context.append(chip('Reference unverified'), make('p', bindingNotice(info), 'assembly-reference-warning'));
+      context.append(chip('Reference unverified'), referenceWarning(
+        info?.mapping_error ? 'Could not verify this surface’s material link.' : bindingNotice(info), info?.mapping_error));
       if (info?.game_rel) {
         context.append(make('p', info.game_rel, 'assembly-path'),
           make('p', 'Saved colours apply to this material in your project.', 'assembly-empty'));
@@ -195,7 +204,7 @@ export function createAssemblyView(api) {
     }
     context.append(chip(ownership(info.game_rel), !!projectRecord(info.game_rel)),
       ...(edited[selected] ? [chip('Unsaved colours', true)] : []));
-    if (info.material_error) context.append(make('p', `Material properties unavailable: ${info.material_error}`, 'assembly-reference-warning'));
+    if (info.material_error) context.append(referenceWarning('Could not read this material’s properties. Reopen the preview to retry.', info.material_error));
     const path = make('p', info.game_rel, 'assembly-path'); path.title = info.game_rel; context.append(path);
     const materialNames = relatedMaterials(data, info.game_rel), affected = sections.filter(s => materialNames.includes(s.name));
     const used = make('div', null, 'assembly-affected');
@@ -264,17 +273,19 @@ export function createAssemblyView(api) {
     const info = selectedInfo(), sources = boundTextures(info);
     const {project, selected, loading} = api.state();
     if (!info && selected && loading) return;
-    const owners = sources.map(source => ownership(source.game_rel, source.custom));
+    const trusted = verifiedBinding(info), owners = sources.map(source => ownership(source.game_rel, source.custom));
     const signature = JSON.stringify([project, selected, sources, owners, texturesCollapsed]);
     $('assembly-texture-count').textContent = sources.length ? String(sources.length) : '';
-    $('assembly-texture-context').textContent = verifiedBinding(info) ? leaf(info.game_rel) : 'Select a verified material';
+    $('assembly-texture-context').textContent = trusted ? leaf(info.game_rel) : '';
     if (signature === shelfSignature && !force) { renderTextureActions(); return; }
     shelfSignature = signature; clearThumbnailWork();
     const cards = $('assembly-texture-cards'); cards.replaceChildren();
     if (texture && info) texture = sources.find(source => source.slot === texture.slot) || null;
     if (texturesCollapsed || !active) return;
     if (!sources.length) {
-      cards.append(make('p', info && verifiedBinding(info) ? 'No explicit texture bindings were reported for this material.' : 'Select a model surface to reveal its connected textures.', 'assembly-empty'));
+      const message = trusted ? 'No texture slots were found for this material.'
+        : selected ? 'Connected textures need a verified material link.' : 'Select a surface to see its connected textures.';
+      cards.append(make('p', message, 'assembly-empty'));
     } else {
       imageObserver = new IntersectionObserver(entries => {
         for (const entry of entries) if (entry.isIntersecting) {
@@ -351,7 +362,7 @@ export function createAssemblyView(api) {
         const open = button(effect.name, () => api.effect(effect)); open.title = `${effect.game_rel}\nReferenced by ${effect.sources.join(', ')}`; host.append(open);
       }
       if (!result.effects.length) host.append(make('p', 'No direct VFX references found for this selection.', 'assembly-empty'));
-      for (const warning of result.warnings) host.append(make('p', warning, 'assembly-reference-warning'));
+      for (const warning of result.warnings) host.append(referenceWarning(warning));
       host.append(make('p', result.scope, 'assembly-empty')); return;
     }
     host.append(make('p', 'Inspect the selected mesh and material’s package references. Effects that refer to a material from another asset are not indexed.', 'assembly-empty'));
@@ -366,7 +377,8 @@ export function createAssemblyView(api) {
         effectResults.set(key, result); effectsRequest = null; renderEffects();
       } catch (error) {
         if (controller.signal.aborted || key !== effectsKey) return;
-        effectsRequest = null; renderEffects(); host.append(make('p', error.message, 'assembly-reference-warning'));
+        effectsRequest = null; renderEffects();
+        host.append(referenceWarning('Could not read this mesh’s effect references. Try again.', error.message));
       }
     });
     inspect.disabled = !section?.mesh_game_rel || !!effectsRequest; host.append(inspect);

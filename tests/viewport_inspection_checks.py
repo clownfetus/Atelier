@@ -352,6 +352,17 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         tab.wait_for_function("document.getElementById('viewport-capture-cancel').hidden")
         assert same_vector(tab.evaluate('__inspection.state().position'),saved['position'])
         checks.append('Capture cancellation restores the camera and exits turntable rotation')
+        tab.evaluate('()=>{window.originalPosterEncoder=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=callback=>callback(null);}')
+        try:
+            tab.locator('#viewport-capture-menu summary').click()
+            tab.locator('#viewport-poster').click()
+            tab.wait_for_selector('#viewport-status[data-kind="error"]')
+            assert tab.locator('#viewport-status').text_content() == 'Poster could not be created. Image encoding failed'
+            assert tab.locator('.vp-status-icon[data-outcome="error"]').is_visible()
+            assert same_vector(tab.evaluate('__inspection.state().position'),saved['position'])
+        finally:
+            tab.evaluate('HTMLCanvasElement.prototype.toBlob=window.originalPosterEncoder;delete window.originalPosterEncoder')
+        checks.append('A failed capture keeps its error message and icon and restores the camera')
         if real_mesh:
             tab.route('**/api/model_gltf?*',lambda route:route.fulfill(body=real_mesh.read_bytes(),content_type='model/gltf-binary'))
             tab.evaluate('__inspection.useNative()')

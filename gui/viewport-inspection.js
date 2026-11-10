@@ -501,6 +501,9 @@ export function createViewportInspection(api) {
       near:camera.near, far:camera.far, fitOnResize, enabled:controls.enabled, min:controls.minDistance, max:controls.maxDistance};
     const animationState = api.pauseAnimation?.();
     controls.enabled = false; clearHover();
+    const captureType = turntable ? 'Turntable' : 'Poster';
+    let completed = false;
+    api.notify(`Capturing ${turntable ? 'turntable' : 'poster'}…`);
     try {
       const width = turntable ? 720 : 1400;
       renderer.setPixelRatio(1); renderer.setSize(width,width,false); camera.aspect = 1; camera.updateProjectionMatrix(); frame(true);
@@ -519,18 +522,21 @@ export function createViewportInspection(api) {
         if (turntable) {
           const length = new Uint8Array(4); new DataView(length.buffer).setUint32(0,blob.size,true);
           frames.push(length,blob);
-        } else download(blob, '.png');
-        $('viewport-status').textContent = `Capturing ${i+1} / ${turntable ? 48 : 1} frames…`;
+          api.notify(`Capturing ${i+1} of 48 turntable frames…`);
+        } else if (!controller.signal.aborted) download(blob, '.png');
         await new Promise(requestAnimationFrame);
       }
       if (turntable) {
-        $('viewport-status').textContent = 'Encoding turntable…';
+        api.notify('Encoding turntable…');
         const result = await api.fetch('/api/showcase_webp', {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:new Blob(frames), signal:controller.signal});
         if (!result.ok) throw Error((await result.json()).error || 'Turntable encoding failed');
         const blob = await result.blob();
         if (!controller.signal.aborted) download(blob, '.webp');
       }
-    } catch (error) { if (error.name !== 'AbortError') api.notify(error.message, 'warning'); }
+      completed = !controller.signal.aborted;
+    } catch (error) {
+      if (error.name !== 'AbortError') api.notify(`${captureType} could not be created. ${error.message}`, 'error');
+    }
     finally {
       const damping = controls.enableDamping; controls.enableDamping = false; controls.update();
       camera.position.copy(saved.position); camera.up.copy(saved.up); controls.target.copy(saved.target);
@@ -547,7 +553,8 @@ export function createViewportInspection(api) {
       if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
       $('viewport-expand').disabled = false;
       $('viewport-capture-cancel').hidden = true; api.refreshEdits?.(); refresh(); api.resize();
-      $('viewport-status').textContent = controller.signal.aborted ? 'Capture cancelled' : 'Capture finished';
+      if (controller.signal.aborted) api.notify('Capture cancelled');
+      else if (completed) api.notify(`${captureType} ready`, 'success');
     }
   }
   $('viewport-poster').addEventListener('click', () => captureShowcase(false));

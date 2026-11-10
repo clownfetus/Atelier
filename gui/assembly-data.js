@@ -6,7 +6,7 @@ export function verifiedBinding(info) {
 }
 
 export function bindingNotice(info) {
-  if (info?.material_set_override) return 'Preview material set. This counterpart was matched by name; its mesh assignment is unverified.';
+  if (info?.material_set_override) return 'This preview material was matched by name. Its link to the mesh is unverified.';
   if (info?.mapping_error) return info.mapping_error;
   if (info?.mapping_via === 'name') return 'Material matched by name. The mesh’s package reference could not be verified.';
   return 'The material reference for this surface is unavailable.';

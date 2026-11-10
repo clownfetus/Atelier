@@ -542,16 +542,14 @@ solid pieces with no holes, inside a 24-unit box. The texture, mesh and material
 their piece's shape and colour; the others share a neutral ink. Each ink moves only in lightness
 to read at 3:1 on cards and thumbnails in every theme.
 
-Showcase is an explicit Model Studio presentation mode. Disposable toon materials
+Showcase is a presentation toggle in Assembly View. Disposable toon materials
 reuse source textures but never modify editable materials. Every render restores
-the original material object (including material-array identity) in `finally`;
-failed captures restore the camera and controls too. Inspect comparison, dye and
-colour previews retain their original values. Showcase is not persisted and a
-new model starts in Inspect. Its backdrop uses a neutral centre, a smaller muted
-burst offset to the lower left, and sparse halftone dots at the edges. Coloured
-decoration leaves the central model area clear. The same drawing serves the
-live view, posters, turntables and Mod cards; it does not change model lighting
-or editable material values. Controls and text retain solid panel surfaces.
+the original material object (including material-array identity) in `finally`.
+Failed captures restore the camera and controls too. Texture comparison, dye and
+colour previews retain their original values. Library mesh and costume previews
+open in Assembly View.
+Showcase uses a neutral gradient for the live view, posters, turntables and Mod
+cards. Controls and text retain solid panel surfaces.
 
 Posters/turntables use the selected presentation mode. Mod cards request a clean
 Showcase capture only from a matching loaded project/skin without pending edits;

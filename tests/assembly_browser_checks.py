@@ -202,6 +202,7 @@ def run_assembly_checks(context, url, report, checks):
         tab.locator('#assembly-textures-collapse').click()
         handle = tab.get_by_role('separator',name='Resize material panel'); handle.focus(); handle.press('ArrowLeft')
         assert int(handle.get_attribute('aria-valuenow')) > 292
+        assert handle.evaluate('el=>getComputedStyle(el).outlineWidth') == '2px'
         checks.append('Collapsed Geometry leaves the model visible when the window narrows, and panels resize from the keyboard')
         texture_card = tab.locator('.assembly-texture-card[data-slot="BaseColor"]')
         texture_card.click(button='right')
@@ -221,6 +222,8 @@ def run_assembly_checks(context, url, report, checks):
             assert tab.locator('#viewport-workspace-label').text_content() == 'Assembly View'
             tab.locator('.assembly-section').first.click(); tab.wait_for_selector('.assembly-texture-card')
             tab.screenshot(path=str(report/f'assembly-{theme}-1600.png'))
+        assert_brand_presentation(tab)
+        checks.append('Assembly uses the approved mesh band, typography and contrast across all six presets in light and dark')
         tab.set_viewport_size({'width':1024,'height':768})
         tab.screenshot(path=str(report/'assembly-light-1024.png'))
         assert tab.locator('#viewport-box').evaluate('el=>el.scrollWidth<=el.clientWidth+2')
@@ -239,3 +242,38 @@ def run_assembly_checks(context, url, report, checks):
         tab.screenshot(path=str(report/'assembly-failure.png')); raise
     finally:
         tab.close()
+
+
+def assert_brand_presentation(tab):
+    for preset in ('darcula','repak','contrast','blueprint','comic','studio'):
+        for mode in ('dark','light'):
+            tab.evaluate('''([preset,mode])=>{
+              const select=document.getElementById('settings-theme');
+              select.value=mode;select.dispatchEvent(new Event('change'));
+              document.querySelector('[data-theme-preset="'+preset+'"]').click();
+            }''', [preset,mode])
+            tab.wait_for_function('([preset,mode])=>document.documentElement.dataset.palette===preset&&document.documentElement.dataset.theme===mode', arg=[preset,mode])
+            styles = tab.evaluate('''() => {
+              const css = (selector,pseudo) => getComputedStyle(document.querySelector(selector),pseudo);
+              const sample = document.createElement('canvas').getContext('2d',{willReadFrequently:true});
+              const rgb = value => { sample.fillStyle=value;sample.fillRect(0,0,1,1);
+                return 'rgb('+[...sample.getImageData(0,0,1,1).data].slice(0,3).join(',')+')'; };
+              const contrast = (a,b) => AtelierColourFit.contrast(rgb(a),rgb(b));
+              const head=css('#viewport-head').backgroundColor, title=css('#viewport-title');
+              const control=css('#viewport-panels'), box=css('#viewport-box'), save=css('#viewport-mat-save');
+              const path=css('.assembly-path'), divider=css('#viewport-wipe-line','::after');
+              return { edge:box.borderTopWidth, teal:box.borderTopColor==='rgb(90, 170, 154)',
+                header:contrast(title.color,head), label:contrast(css('.vp-workspace-label').color,head),
+                control:contrast(control.color,control.backgroundColor), size:control.fontSize, height:control.minHeight,
+                title:title.fontSize, path:path.fontFamily, divider:divider.backgroundColor===save.backgroundColor,
+                previewRadius:css('.assembly-texture-preview').borderTopLeftRadius,
+                swatchRadius:css('.assembly-material-swatch').borderTopLeftRadius,
+                handle:contrast(divider.backgroundColor,divider.borderTopColor),
+                complete:contrast(css('#viewport-status').color,css('#viewport-foot').backgroundColor) };
+            }''')
+            assert styles['edge'] == '3px' and styles['teal'], (preset,mode,styles)
+            assert styles['header'] >= 5 and styles['label'] >= 5, (preset,mode,styles)
+            assert styles['control'] >= 4.5 and styles['complete'] >= 4.5, (preset,mode,styles)
+            assert (styles['size'],styles['height'],styles['title']) == ('13px','36px','20px'), styles
+            assert (styles['previewRadius'],styles['swatchRadius']) == ('6px','4px'), styles
+            assert 'Fragment Mono' in styles['path'] and styles['divider'] and styles['handle'] >= 3, styles
