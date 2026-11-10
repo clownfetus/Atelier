@@ -1,10 +1,12 @@
 # Motion system v2: specification
 
 Every number here comes from `reference/motion-prototype.html` (the approved
-behaviour) and `../brand/Atelier_Brand_Bible_v1.2.pdf`. Where this file and the
-prototype disagree, the prototype wins: tell Thiago and fix this file. Where bible
-v1.2 draws the mark or describes the click differently (p.3, p.4, p.9, p.10), this
-file wins until the bible is updated (D14, D15, D20).
+behaviour) and `../brand/Atelier_Brand_Bible_v1.3.pdf`. Where this file and the
+prototype disagree, the prototype wins: tell Thiago and fix this file. Bible v1.3
+takes in D14, D15 and D20. It's printed from `../brand/bible.html` by
+`scripts/brand_bible.py`, which draws the artwork from `gui/brand/` and the glyph
+engine. Where the bible and this file disagree, this file wins: fix `bible.html`
+and reprint.
 
 Units: `u` = design units of the 480 × 400 glyph canvas (centre 240, 200). The
 master A is 260u tall. Angles in degrees, SVG convention (positive = clockwise).

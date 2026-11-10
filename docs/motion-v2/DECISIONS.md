@@ -576,7 +576,8 @@ From the identity review, three rounds on 10 Nov 2026. This redraws D14's mark w
   3.5:1 on Raised, so thin texture glyphs take `#6B95D4`; solid emblems still use the piece's
   own blue. The first loader plate follows the texture blue; the other plates and the disc's
   shine don't change. The A now holds tile and mesh one halo apart, so the glyph clearance check
-  counts more near frames in the moves into and out of it (tile-mesh 63, was 57). SPEC still
-  takes priority over bible v1.2 p.3 and p.4.
+  counts more near frames in the moves into and out of it (tile-mesh 63, was 57). Bible v1.3
+  draws the new mark, construction and colours, printed from `docs/brand/bible.html` by
+  `scripts/brand_bible.py`.
 - **Status:** chosen by Thiago, 10 Nov 2026, from the refinement gallery's "The recommendation,
   drawn", with the piece colours and Complete green. The built change awaits his review.

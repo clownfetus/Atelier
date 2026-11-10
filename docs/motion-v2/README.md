@@ -7,7 +7,7 @@ and nothing existing is overwritten (checked against `main` at `eaf4ec8`):
 
 ```
 CLAUDE.md                                  project notes Claude Code reads automatically
-docs/brand/Atelier_Brand_Bible_v1.2.pdf    the visual identity
+docs/brand/Atelier_Brand_Bible_v1.3.pdf    the visual identity
 docs/motion-v2/
   README.md                                this file
   START_HERE.md                            the prompt to paste into Claude Code

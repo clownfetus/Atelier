@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Atelier brand bible v1.3</title>
+<!--
+  The source of Atelier_Brand_Bible_v1.3.pdf. Print it with `python scripts/brand_bible.py`.
+  The artwork isn't copied in: the mark and wordmark come from gui/brand/, and every glyph pose is
+  drawn by the engine's own pieces.js, so the bible changes when they do. Numbers follow
+  docs/motion-v2/SPEC.md; where the two disagree, SPEC wins and this file is wrong.
+-->
+<style>
+@font-face { font-family: 'Inter'; src: url('../../gui/vendor/inter/InterVariable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Fragment Mono'; src: url('../../gui/vendor/fragment-mono/FragmentMono-Latin.woff2') format('woff2'); font-display: block; }
+@page { size: 1600px 900px; margin: 0; }
+:root {
+  --charcoal: #0D151F; --surface: #172331; --raised: #1C2936; --paper: #F4F6F8; --mist: #B4C0CE; --guide: #778BA3;
+  --rule: #2A394A; --inner: #24323F;
+  --blue: #4F80CC; --teal: #45AB91; --copper: #EB9A72;
+  --green: #B6EBA8; --amber: #E6C35C; --rose: #EC6A86;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--charcoal); }
+body { font-family: 'Inter', sans-serif; color: var(--paper); font-optical-sizing: auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media screen { body { display: grid; gap: 32px; justify-content: center; padding: 32px 0; background: #070B10; } }
+p { margin: 0; }
+
+/* The page frame: running head, title, subtitle, foot. */
+.slide { position: relative; width: 1600px; height: 900px; overflow: hidden; background: var(--charcoal); break-after: page; }
+.slide::before, .slide::after { content: ''; position: absolute; left: 80px; right: 80px; height: 1px; background: var(--rule); }
+.slide::before { top: 76px; }
+.slide::after { top: 831px; }
+.cover::before, .cover::after { display: none; }
+.label { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
+.sep { margin: 0 .55em; }
+.lc { text-transform: none; }
+.head, .foot { position: absolute; left: 80px; right: 80px; display: flex; justify-content: space-between; }
+.head { top: 45px; }
+.head > :last-child, .foot { color: var(--mist); }
+.foot { top: 845px; }
+h1 { position: absolute; left: 80px; top: 103px; margin: 0; font-size: 60px; line-height: 72px; font-weight: 600; letter-spacing: -.012em; }
+.sub { position: absolute; left: 80px; top: 186px; width: 1000px; font-size: 19px; line-height: 28px; color: var(--mist); }
+.abs { position: absolute; }
+.card { position: absolute; background: var(--surface); border-radius: 20px; }
+.mist { color: var(--mist); }
+.mono { font-family: 'Fragment Mono', monospace; }
+img { display: block; }
+
+/* Glyph art: the halo is the surface behind it (SPEC invariant 3). */
+.art svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.art .piece { stroke: var(--halo, var(--charcoal)); stroke-width: 28; stroke-linejoin: round; paint-order: stroke; }
+.card .art { --halo: var(--surface); }
+
+/* 02 foundation */
+.points { position: absolute; left: 80px; top: 398px; width: 760px; }
+.point { display: grid; grid-template-columns: 47px 1fr; margin-bottom: 26px; }
+.point .label { padding-top: 5px; color: var(--mist); }
+.point b { display: block; font-size: 19px; line-height: 26px; font-weight: 600; }
+.point span { display: block; font-size: 15px; line-height: 24px; color: var(--mist); }
+
+/* 03 symbol */
+.legend { position: relative; width: 560px; display: grid; grid-template-columns: 52px 1fr; }
+.legend .dot { width: 29px; height: 29px; border-radius: 50%; margin-top: 4px; }
+.legend h2 { margin: 0; font-size: 26px; line-height: 36px; font-weight: 600; }
+.legend h2 span { color: var(--mist); font-weight: 400; margin-right: 12px; }
+.legend p { font-size: 17px; line-height: 25px; color: var(--mist); margin-top: 6px; }
+.legend small { display: block; font-size: 15px; line-height: 22px; color: var(--mist); margin-top: 6px; opacity: 1; }
+
+/* 04 construction */
+.spec { position: absolute; left: 780px; top: 300px; width: 700px; border-collapse: collapse; }
+.spec td { padding: 0; height: 38px; vertical-align: middle; }
+.spec td:first-child { width: 127px; color: var(--mist); }
+.spec td:nth-child(2) { width: 146px; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.spec td:last-child { font-size: 15px; color: var(--mist); }
+.swatch-key { display: inline-block; width: 11px; height: 11px; background: var(--amber); margin-right: 6px; vertical-align: -1px; }
+
+/* 05 palette */
+.big { position: absolute; top: 255px; width: 461px; }
+.big .chip { height: 229px; border-radius: 16px; }
+.big .label { margin-top: 20px; }
+.big .hex { font-size: 26px; line-height: 32px; font-weight: 600; margin-top: 6px; }
+.big p { font-size: 15px; line-height: 22px; color: var(--mist); margin-top: 4px; }
+.small { position: absolute; top: 617px; width: 270px; }
+.small .chip { height: 63px; border-radius: 12px; border: 1px solid var(--rule); }
+.small .label { margin-top: 17px; }
+.small .label span { color: var(--mist); font-weight: 500; margin-left: 8px; }
+.small p { font-size: 15px; line-height: 22px; color: var(--mist); margin-top: 6px; }
+
+/* 06 roles */
+.roles { position: absolute; left: 36px; right: 36px; top: 62px; }
+.role { position: relative; display: grid; grid-template-columns: 48px 1fr auto; align-items: center; height: 82px; border-top: 1px solid var(--inner); }
+.role b { font-size: 19px; line-height: 26px; font-weight: 600; }
+.role b span { font-size: 15px; font-weight: 400; color: var(--mist); margin-left: 8px; }
+.role p { font-size: 15px; line-height: 22px; color: var(--mist); }
+.role .ratio { font-size: 12px; letter-spacing: .06em; color: var(--mist); white-space: nowrap; }
+.role .dot { width: 22px; height: 22px; border-radius: 50%; }
+.role svg { width: 22px; height: 22px; display: block; }
+.cardnote { position: absolute; left: 36px; right: 36px; font-size: 15px; line-height: 23px; color: var(--mist); }
+
+/* 07 type */
+.typerow { position: absolute; left: 80px; right: 80px; display: grid; grid-template-columns: 480px 1fr; border-top: 1px solid var(--rule); }
+.typerow .label { margin-top: 26px; }
+.typerow .spec2 { font-size: 15px; line-height: 22px; color: var(--mist); margin-top: 6px; }
+
+/* 08 scale */
+.sizes { position: absolute; left: 36px; right: 36px; top: 74px; height: 150px; display: flex; align-items: flex-end; gap: 64px; }
+.sizes figure { margin: 0; display: grid; justify-items: center; gap: 22px; }
+.sizes figcaption { color: var(--paper); }
+.pixels { image-rendering: pixelated; border-radius: 4px; }
+
+/* 09 motion */
+.step { position: absolute; top: 276px; width: 345px; height: 389px; }
+.step .num { position: absolute; left: 27px; top: 34px; color: var(--mist); }
+.step .ms { position: absolute; right: 27px; top: 28px; font-size: 22px; line-height: 30px; font-weight: 600; }
+.step h3 { position: absolute; left: 27px; top: 64px; margin: 0; font-size: 26px; line-height: 34px; font-weight: 600; }
+.step svg { position: absolute; left: 27px; top: 118px; width: 291px; height: 120px; overflow: visible; }
+.step code { position: absolute; left: 27px; top: 266px; font: 14px/22px 'Fragment Mono', monospace; background: var(--charcoal); border-radius: 4px; padding: 1px 7px; }
+.step p { position: absolute; left: 27px; right: 24px; top: 304px; font-size: 15px; line-height: 23px; color: var(--mist); }
+.note { position: absolute; top: 690px; width: 700px; font-size: 15px; line-height: 24px; color: var(--mist); }
+.note b { color: var(--paper); font-weight: 600; }
+
+/* 10 states */
+.state { position: absolute; width: 711px; }
+.state .art { position: absolute; left: 40px; width: 150px; }
+.state .txt { position: absolute; left: 233px; right: 30px; }
+.state h3 { margin: 0; font-size: 26px; line-height: 34px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+.state h3 svg { width: 22px; height: 22px; }
+.state p { font-size: 15px; line-height: 23px; color: var(--mist); margin-top: 6px; }
+.state small { display: block; font-size: 14px; line-height: 21px; color: var(--mist); margin-top: 8px; }
+.fits { position: absolute; left: 0; top: 0; bottom: 0; display: flex; align-items: center; gap: 28px; padding-left: 36px; }
+.fits figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
+.fits figure .art { width: 78px; height: 58px; }
+.fits figcaption { color: var(--mist); }
+
+/* 11 interface */
+.mock { position: absolute; left: 80px; top: 273px; width: 1100px; height: 475px; background: var(--raised); border-radius: 20px; overflow: hidden; }
+.mock .bar { position: absolute; left: 0; right: 0; top: 0; height: 64px; background: #1F2D3B; display: flex; align-items: center; padding: 0 32px; gap: 14px; }
+.mock .nav { margin-left: auto; display: flex; gap: 36px; color: var(--mist); }
+.mock .nav span:first-child { color: var(--paper); }
+.pane { position: absolute; top: 94px; height: 353px; background: var(--charcoal); border-radius: 16px; }
+.row { display: grid; grid-template-columns: 30px 22px 244px 1fr; align-items: center; height: 42px; font-size: 15px; }
+.row .d { width: 11px; height: 11px; border-radius: 50%; }
+.row .m { color: var(--mist); font-size: 14px; }
+.legendrow { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; height: 45px; border-top: 1px solid var(--inner); font-size: 16px; }
+.legendrow .d { width: 13px; height: 13px; border-radius: 50%; }
+.notes { position: absolute; left: 1220px; top: 279px; width: 300px; }
+.notes .label { margin-top: 22px; }
+.notes .label:first-child { margin-top: 0; }
+.notes p { font-size: 15px; line-height: 23px; color: var(--mist); margin-top: 6px; }
+
+/* 12 placements */
+.tile { position: absolute; top: 278px; width: 329px; height: 299px; border-radius: 20px; display: grid; place-items: center; }
+.tilecap { position: absolute; top: 593px; }
+.appicon { position: relative; border-radius: 24%; display: grid; place-items: center; }
+.lockup { position: absolute; top: 634px; width: 705px; height: 148px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+
+/* 13 voice */
+.voice { position: absolute; width: 709px; height: 148px; padding: 30px 32px; }
+.voice .label { margin-bottom: 14px; }
+.say { display: flex; align-items: center; gap: 12px; font-size: 19px; line-height: 28px; }
+.say svg { width: 18px; height: 18px; flex: none; }
+.say.no { color: var(--mist); font-size: 17px; text-decoration: line-through; margin-top: 8px; }
+.pattern { position: absolute; left: 80px; top: 624px; width: 1440px; height: 87px; display: flex; align-items: center; padding: 0 32px; gap: 14px; }
+.pattern .box { border: 1px solid var(--rule); border-radius: 8px; padding: 7px 14px; font-size: 19px; line-height: 24px; }
+.pattern .arrow { color: var(--mist); font-size: 17px; }
+
+/* 14 rules */
+.rules { position: absolute; top: 251px; width: 705px; height: 385px; padding: 30px 34px; }
+.rules li { display: flex; align-items: center; gap: 16px; height: 51px; border-top: 1px solid var(--inner); font-size: 17px; list-style: none; }
+.rules ul { margin: 16px 0 0; padding: 0; }
+.rules svg { width: 19px; height: 19px; flex: none; }
+
+/* 15 handoff */
+.steps { position: absolute; left: 80px; top: 245px; width: 765px; }
+.hand { display: grid; grid-template-columns: 70px 1fr; border-top: 1px solid var(--rule); padding: 18px 0 20px; }
+.hand .n { font-size: 26px; line-height: 32px; color: var(--mist); }
+.hand b { display: block; font-size: 20px; line-height: 30px; font-weight: 600; }
+.hand p { font-size: 15px; line-height: 23px; color: var(--mist); margin-top: 4px; }
+.hand code { font: 13px 'Fragment Mono', monospace; color: var(--paper); background: var(--surface); border-radius: 4px; padding: 1px 6px; }
+.changes { position: absolute; left: 893px; top: 245px; width: 627px; padding: 30px 32px 26px; }
+.changes ul { margin: 16px 0 0; padding-left: 18px; font-size: 15px; line-height: 23px; color: var(--paper); }
+.changes li { margin-bottom: 6px; }
+.changes li::marker { color: var(--mist); }
+.changes li.old { color: var(--mist); }
+</style>
+</head>
+<body>
+
+<!-- 01 cover -->
+<section class="slide cover">
+  <img class="abs" src="../../gui/brand/atelier-mark.svg" alt="" style="left:572px;top:168px;height:300px">
+  <img class="abs" src="../../gui/brand/atelier-wordmark.svg" alt="Atelier" style="left:629px;top:533px;height:55px">
+  <div class="label abs" style="left:80px;top:787px">Visual identity<span class="sep">/</span>Brand bible</div>
+  <p class="abs mist" style="left:80px;top:813px;font-size:17px;line-height:24px">A system for distinct parts coming together.</p>
+  <div class="label abs mist" style="right:80px;top:822px">2026<span class="sep">/</span>Identity v1.3</div>
+</section>
+
+<!-- 02 foundation -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>01<span class="sep">/</span>Foundation</span></div>
+  <h1>Pieces in place.</h1>
+  <p class="sub">The identity is an act of assembly, not a picture of a tool.</p>
+  <p class="abs mist" style="left:80px;top:271px;width:600px;font-size:19px;line-height:30px">Atelier makes complex asset work legible. Texture, mesh and material are separate things; their relationship becomes visible when they approach, align and click into place.</p>
+  <div class="points">
+    <div class="point"><span class="label">01</span><div><b>Three parts, one intention.</b><span>Each piece keeps its own silhouette. They meet; they never merge.</span></div></div>
+    <div class="point"><span class="label">02</span><div><b>Colour means asset type, until there’s a verdict.</b><span>Blue, teal and copper name things. Only an outcome recolours the pieces, and only in the status glyph.</span></div></div>
+    <div class="point"><span class="label">03</span><div><b>Motion reports the truth.</b><span>The pieces form the A only when a real event confirms success, never at the end of a timer.</span></div></div>
+  </div>
+  <div class="card" style="left:920px;top:271px;width:600px;height:500px">
+    <img class="abs" src="../../gui/brand/atelier-mark.svg" alt="" style="left:118px;top:110px;height:240px">
+    <div class="label abs" style="left:0;right:0;top:395px;text-align:center">Assembly first. Letter second.</div>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>02 / 15</span></div>
+</section>
+
+<!-- 03 symbol -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>02<span class="sep">/</span>Symbol</span></div>
+  <h1>The three-piece mark</h1>
+  <p class="sub">Each shape has one job, one colour and its own unbroken silhouette.</p>
+  <img class="abs" src="../../gui/brand/atelier-mark.svg" alt="" style="left:100px;top:290px;height:380px">
+  <div class="abs" style="left:790px;top:282px;display:grid;gap:38px">
+    <div class="legend"><div class="dot" style="background:var(--blue)"></div><div><h2><span>01</span>Texture</h2><p>Rounded tile with a notch at its top left, a vertical back and a face that leans towards the mesh. Carries the weight.</p><small>Holds its seat while the others close in.</small></div></div>
+    <div class="legend"><div class="dot" style="background:var(--teal)"></div><div><h2><span>02</span>Mesh</h2><p>Block leaning towards the tile, its two inner edges parallel. Gives direction.</p><small>Comes in last, from the upper right, and makes the click.</small></div></div>
+    <div class="legend"><div class="dot" style="background:var(--copper)"></div><div><h2><span>03</span>Material</h2><p>A perfect circle seated in both bites. Touches nothing.</p><small>Settles into the bites as the A closes.</small></div></div>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>03 / 15</span></div>
+</section>
+
+<!-- 04 construction -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>03<span class="sep">/</span>Construction</span></div>
+  <h1>An A you discover</h1>
+  <p class="sub">The A lives in the leaning edges and the gap at the top, never in an outline or a crossbar.</p>
+  <div class="card" style="left:80px;top:247px;width:640px;height:480px">
+    <svg id="construction" class="abs" style="left:52px;top:30px;width:536px;height:390px" aria-label="Construction of the master mark"></svg>
+    <div class="label abs mist" style="left:0;right:0;top:442px;text-align:center">Dashed box = clearspace (<span class="lc">r</span> on every side)</div>
+  </div>
+  <div class="abs" style="left:780px;top:252px;font-size:26px;line-height:34px;font-weight:600">Construction</div>
+  <table class="spec">
+    <tr><td class="label">Height</td><td>H = 260u</td><td>Master grid. Everything below is in these units.</td></tr>
+    <tr><td class="label">Disc</td><td>r = 50u</td><td>The unit of clearspace.</td></tr>
+    <tr><td class="label">Gap</td><td>g = 14u</td><td><span class="swatch-key"></span>Round the disc, and between tile and mesh at the top.</td></tr>
+    <tr><td class="label">Bites</td><td>R = r + g = 64u</td><td>Both concentric with the disc.</td></tr>
+    <tr><td class="label">Notch</td><td>44 × 44u</td><td>The tile’s top left.</td></tr>
+    <tr><td class="label">Corners</td><td>k = 7–40u</td><td>Eased: each turns gradually into its curve.</td></tr>
+    <tr><td class="label">Lips</td><td>f = 18–22u</td><td>Tangent arcs where a bite meets a straight edge.</td></tr>
+    <tr><td class="label">Tile lean</td><td>7.081°</td><td>The face only; the back stays vertical.</td></tr>
+    <tr><td class="label">Mesh lean</td><td>26.8°</td><td>Both inner edges, parallel. The outer edge is 21.8°.</td></tr>
+  </table>
+  <p class="abs mist" style="left:780px;top:658px;width:560px;font-size:16px;line-height:24px">Extended, the tile’s face and the mesh’s upper inner edge meet 9u above the mark: that apex is the implied A. The lean isn’t chosen; it’s solved so the tile’s top corner sits exactly g from the mesh. If a bite isn’t concentric with the disc, or any gap varies, the mark is wrong. Don’t adjust it by eye.</p>
+  <div class="foot label"><span>Identity v1.3</span><span>04 / 15</span></div>
+</section>
+
+<!-- 05 palette -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>04<span class="sep">/</span>Palette</span></div>
+  <h1>Rich, softened colour</h1>
+  <p class="sub">Not pastel. Not neon. Flat opaque fills on a dark neutral canvas, spread in lightness so they stay apart in grey.</p>
+  <div class="big" style="left:80px"><div class="chip" style="background:var(--blue)"></div><div class="label">Texture<span class="sep">/</span>Blue</div><div class="hex">#4F80CC</div><p>Category colour. Textures only. L* 53.</p></div>
+  <div class="big" style="left:569px"><div class="chip" style="background:var(--teal)"></div><div class="label">Mesh<span class="sep">/</span>Teal</div><div class="hex">#45AB91</div><p>Category colour. Meshes only. L* 64.</p></div>
+  <div class="big" style="left:1059px"><div class="chip" style="background:var(--copper)"></div><div class="label">Material<span class="sep">/</span>Copper</div><div class="hex">#EB9A72</div><p>Category colour. Materials only. L* 71.</p></div>
+  <div class="small" style="left:80px"><div class="chip" style="background:var(--charcoal)"></div><div class="label">Charcoal<span>#0D151F</span></div><p>Canvas. Ink on light UI.</p></div>
+  <div class="small" style="left:373px"><div class="chip" style="background:var(--surface)"></div><div class="label">Surface<span>#172331</span></div><p>Cards and panels.</p></div>
+  <div class="small" style="left:665px"><div class="chip" style="background:var(--paper)"></div><div class="label">Paper<span>#F4F6F8</span></div><p>Primary text. Light canvas.</p></div>
+  <div class="small" style="left:958px"><div class="chip" style="background:var(--mist)"></div><div class="label">Mist<span>#B4C0CE</span></div><p>Body text and captions on dark. 9.9:1.</p></div>
+  <div class="small" style="left:1250px"><div class="chip" style="background:var(--guide)"></div><div class="label">Guide<span>#778BA3</span></div><p>Rules and quiet icons. Never text.</p></div>
+  <div class="foot label"><span>Identity v1.3</span><span>05 / 15</span></div>
+</section>
+
+<!-- 06 colour roles -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>05<span class="sep">/</span>Colour roles</span></div>
+  <h1>Colour has one job each</h1>
+  <p class="sub">Category colours say what something is. Status colours say how it ended. A status colour can take over the glyph, but only after the shape has already said it.</p>
+  <div class="card" style="left:80px;top:282px;width:700px;height:465px">
+    <div class="label abs" style="left:36px;top:31px">Category: what it is</div>
+    <div class="roles">
+      <div class="role"><div class="dot" style="background:var(--blue)"></div><div><b>Texture</b><p>Asset dots, legends, the mark.</p></div><span class="ratio">4.6 : 1</span></div>
+      <div class="role"><div class="dot" style="background:var(--teal)"></div><div><b>Mesh</b><p>Asset dots, legends, the mark.</p></div><span class="ratio">6.5 : 1</span></div>
+      <div class="role"><div class="dot" style="background:var(--copper)"></div><div><b>Material</b><p>Asset dots, legends, the mark.</p></div><span class="ratio">8.2 : 1</span></div>
+    </div>
+    <p class="cardnote" style="top:330px">Never on buttons or links. On a progress bar, only as the material disc itself. Always on the app icon, lockups and static mark.</p>
+  </div>
+  <div class="card" style="left:820px;top:282px;width:700px;height:465px">
+    <div class="label abs" style="left:36px;top:31px">Status: what is happening</div>
+    <div class="roles">
+      <div class="role"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--guide)" stroke-width="2" stroke-dasharray="3 3.2"/></svg><div><b>Working<span>Mist #B4C0CE</span></b><p>The sentence in Mist. Pieces keep their category colours while they work.</p></div><span class="ratio">9.9 : 1</span></div>
+      <div class="role"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Complete<span>Green #B6EBA8</span></b><p>Hue 107°, well clear of mesh teal (165°). The A turns green, then back.</p></div><span class="ratio">13.5 : 1</span></div>
+      <div class="role"><svg viewBox="0 0 22 22"><path d="M11 2.2l9.4 16.4H1.6z" fill="var(--amber)" stroke="var(--amber)" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 8.4v4.6" stroke="var(--surface)" stroke-width="2.2" stroke-linecap="round"/><circle cx="11" cy="15.8" r="1.25" fill="var(--surface)"/></svg><div><b>Warning<span>Amber #E6C35C</span></b><p>Hue 45°, clear of copper (20°). The whole ! turns amber.</p></div><span class="ratio">10.8 : 1</span></div>
+      <div class="role"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--rose)"/><path d="M7.6 7.6l6.8 6.8M14.4 7.6l-6.8 6.8" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round"/></svg><div><b>Error<span>Rose #EC6A86</span></b><p>Hue 347°, cooler than copper. The whole X turns rose.</p></div><span class="ratio">6.1 : 1</span></div>
+    </div>
+    <p class="cardnote" style="top:412px">Status always ships as icon + sentence + colour. Colour is the third cue, not the first.</p>
+  </div>
+  <p class="abs mist" style="left:80px;top:770px;font-size:14px;line-height:20px">Contrast measured against Charcoal #0D151F. On Surface #172331 every pair stays at or above 4.5 : 1 except the blue (4.0 : 1), so thin texture icons in dark UI take #6B95D4.</p>
+  <div class="foot label"><span>Identity v1.3</span><span>06 / 15</span></div>
+</section>
+
+<!-- 07 typography -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>06<span class="sep">/</span>Typography</span></div>
+  <h1>Quiet typography, confident geometry</h1>
+  <p class="sub">One family: Inter, with Inter Display for large sizes. Only uppercase labels get letter-spacing.</p>
+  <div class="card" style="left:80px;top:243px;width:560px;height:169px">
+    <img class="abs" src="../../gui/brand/atelier-wordmark.svg" alt="Atelier" style="left:118px;top:38px;height:52px">
+    <div class="label abs mist" style="left:0;right:0;top:114px;text-align:center">Wordmark. Outlined, never typed</div>
+  </div>
+  <p class="abs mist" style="left:700px;top:279px;width:610px;font-size:17px;line-height:25px">Inter Display SemiBold at +110 tracking, converted to outlines. The A is a crossbarless Λ with the material disc where the crossbar would be: the wordmark’s single custom move, and it repeats the mark’s idea. Minimum size: 12px cap height. Below that, use the mark alone.</p>
+  <div class="typerow" style="top:435px;height:94px"><div><div class="label">Display</div><div class="spec2">Inter Display SemiBold · 40–64px · lh 1.05 · −1.2%</div></div><div style="font-size:48px;line-height:50px;font-weight:600;letter-spacing:-.012em;margin-top:20px">Build a better asset.</div></div>
+  <div class="typerow" style="top:529px;height:79px"><div><div class="label">Heading</div><div class="spec2">Inter SemiBold · 20–28px · lh 1.2 · 0</div></div><div style="font-size:27px;line-height:32px;font-weight:600;margin-top:22px">Matching mesh to texture</div></div>
+  <div class="typerow" style="top:608px;height:71px"><div><div class="label">Body</div><div class="spec2">Inter Regular · 15–17px · lh 1.5 · 0</div></div><div class="mist" style="font-size:17px;line-height:26px;margin-top:22px">Asset materials are ready to export. Bindings were preserved for all three assets.</div></div>
+  <div class="typerow" style="top:679px;height:76px"><div><div class="label">Label</div><div class="spec2">Inter SemiBold, uppercase · 11–13px · +9%</div></div><div class="label" style="margin-top:28px">Textures<span class="sep">/</span>Meshes<span class="sep">/</span>Materials</div></div>
+  <div class="foot label"><span>Identity v1.3</span><span>07 / 15</span></div>
+</section>
+
+<!-- 08 scale -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>07<span class="sep">/</span>Scale</span></div>
+  <h1>Built to survive 16px</h1>
+  <p class="sub">Two drawings of the same mark. Use the master at 32px and above, and the small mark below 32px.</p>
+  <div class="card" style="left:80px;top:255px;width:771px;height:304px">
+    <div class="label abs" style="left:36px;top:30px">Master: 32px and up</div>
+    <div class="sizes">
+      <figure><img src="../../gui/brand/atelier-mark.svg" alt="" style="height:128px"><figcaption class="label">128px</figcaption></figure>
+      <figure><img src="../../gui/brand/atelier-mark.svg" alt="" style="height:48px"><figcaption class="label">48px</figcaption></figure>
+      <figure><img src="../../gui/brand/atelier-mark.svg" alt="" style="height:32px"><figcaption class="label">32px</figcaption></figure>
+    </div>
+    <p class="abs mist" style="left:36px;top:250px;font-size:15px;line-height:22px">g = 14u, r = 50u, lips 18–22u. At 16px the gap becomes 0.9px and closes up.</p>
+  </div>
+  <div class="card" style="left:888px;top:255px;width:632px;height:304px">
+    <div class="label abs" style="left:36px;top:30px">Small: under 32px</div>
+    <div class="sizes">
+      <figure><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:64px"><figcaption class="label">64px</figcaption></figure>
+      <figure><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:24px"><figcaption class="label">24px</figcaption></figure>
+      <figure><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:16px"><figcaption class="label">16px</figcaption></figure>
+    </div>
+    <p class="abs mist" style="left:36px;top:250px;font-size:15px;line-height:22px">g = 32u, r = 40u, lean 3.921°, lips 20–24u. Gaps stay a full 2px at 16px.</p>
+  </div>
+  <div class="card" style="left:80px;top:588px;width:1440px;height:132px">
+    <div class="label abs" style="left:36px;top:58px">16px, enlarged 5×</div>
+    <canvas class="pixels abs" data-mark="../../gui/brand/atelier-mark.svg" style="left:290px;top:16px"></canvas>
+    <div class="label abs mist" style="left:465px;top:58px">Master</div>
+    <canvas class="pixels abs" data-mark="../../gui/brand/atelier-mark-small.svg" style="left:575px;top:16px"></canvas>
+    <div class="label abs" style="left:750px;top:58px">Small</div>
+    <p class="abs mist" style="left:850px;top:42px;width:560px;font-size:15px;line-height:23px">Enlarged from real 16px renders. In the master the gap drops below a pixel and the disc smears into the tile edge. The small mark keeps a clean dark ring round the disc.</p>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>08 / 15</span></div>
+</section>
+
+<!-- 09 motion -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>08<span class="sep">/</span>Motion</span></div>
+  <h1>Approach. Click. Settle.</h1>
+  <p class="sub">How the pieces fit on a confirmed success, in about a second. Bring them in, wind up, hit hard, let it ring. The green arrives on contact.</p>
+  <div class="card step" style="left:80px"><span class="num label">01</span><span class="ms">340ms</span><h3>To the seats</h3><svg data-curve="0.65,0,0.35,1"></svg><code>cubic-bezier(0.65, 0, 0.35, 1)</code><p>All three together: tile to its seat, disc 8u right of its seat, mesh 46u right and 60u up.</p></div>
+  <div class="card step" style="left:445px"><span class="num label">02</span><span class="ms">110ms</span><h3>Mesh in</h3><svg data-curve="0.16,1,0.3,1"></svg><code>cubic-bezier(0.16, 1, 0.3, 1)</code><p>The mesh comes to 16u right of its seat, already wound up. The disc waits.</p></div>
+  <div class="card step" style="left:811px"><span class="num label">03</span><span class="ms">80ms</span><h3>Snap</h3><svg data-curve="0.9,0,1,0.5"></svg><code>cubic-bezier(0.9, 0, 1, 0.5)</code><p>The mesh presses 3u past its seat as the disc seats. Only a confirmed success triggers this.</p></div>
+  <div class="card step" style="left:1176px"><span class="num label">04</span><span class="ms">240ms</span><h3>Recoil + rest</h3><svg data-curve="0.2,0.9,0.4,1"></svg><code>cubic-bezier(0.2, 0.9, 0.4, 1)</code><p>Back to 1u out of the seat (110ms), then ease home (130ms). One rebound, never two.</p></div>
+  <p class="note" style="left:80px"><b>On contact:</b> the disc squashes to 0.88 × 1.12 and springs back (300ms). The glyph punches to 104.5% (70ms out, 260ms back). A green ripple leaves the disc (620ms). Green spreads outwards: disc, tile +60ms, mesh +120ms, 220ms each; 160ms after the effects, the A returns to its own colours (380ms). Optional sound: tick, thump, two-note chime.</p>
+  <p class="note" style="left:820px"><b>Reduced motion:</b> no travel, punch or ripple. The glyph cross-fades to each state’s pose (150ms out, 150ms in), the only fade the system allows. Complete still turns green, then returns. The icon and text carry the rest.</p>
+  <div class="foot label"><span>Identity v1.3</span><span>09 / 15</span></div>
+</section>
+
+<!-- 10 motion states -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>09<span class="sep">/</span>Motion states</span></div>
+  <h1>The animation cannot lie</h1>
+  <p class="sub">The pieces only take a meaningful shape when a real build, import or export event arrives. Until then they keep trying.</p>
+  <div class="card state" style="left:80px;top:268px;height:180px">
+    <div class="art" data-pose="head" style="top:28px;height:120px"></div>
+    <div class="txt" style="top:28px"><h3><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--guide)" stroke-width="2" stroke-dasharray="3 3.2"/></svg>Working</h3><p>The pieces keep trying to fit: dock, test the fit, tap, hold, then try another. A known asset type gets its own loader.</p><small>Never A, ! or X. Never a percentage unless it’s measured.</small></div>
+  </div>
+  <div class="card state" style="left:809px;top:268px;height:180px">
+    <div class="art" data-pose="master" data-fill="green" style="top:28px;height:120px"></div>
+    <div class="txt" style="top:28px"><h3><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Complete</h3><p>All three come in together, then the hard snap, squash, punch and ripple, with green spreading from the disc. Then the A takes back its colours.</p><small>The only state that forms the A.</small></div>
+  </div>
+  <div class="card state" style="left:80px;top:462px;height:180px">
+    <div class="art" data-pose="warning" data-fill="amber" style="top:22px;height:126px"></div>
+    <div class="txt" style="top:26px"><h3><svg viewBox="0 0 22 22"><path d="M11 2.2l9.4 16.4H1.6z" fill="var(--amber)" stroke="var(--amber)" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 8.4v4.6" stroke="var(--surface)" stroke-width="2.2" stroke-linecap="round"/><circle cx="11" cy="15.8" r="1.25" fill="var(--surface)"/></svg>Warning</h3><p>A balancing act: disc down as the dot, mesh stood on it, tile set on top slightly off-centre. Turns amber, catches its balance, keeps wobbling.</p><small>Always paired with the specific warning text.</small></div>
+  </div>
+  <div class="card state" style="left:809px;top:462px;height:180px">
+    <div class="art" data-pose="error" data-fill="rose" style="top:22px;height:126px"></div>
+    <div class="txt" style="top:26px"><h3><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--rose)"/><path d="M7.6 7.6l6.8 6.8M14.4 7.6l-6.8 6.8" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round"/></svg>Error</h3><p>Tile and mesh flatten into bars and cross over each other at ±42°; the disc pins them. Clamps shut, turns rose.</p><small>No shaking. No particles. Always say why.</small></div>
+  </div>
+  <div class="card" style="left:80px;top:656px;width:1440px;height:112px">
+    <div class="fits">
+      <span class="label" style="width:120px">Wrong fits</span>
+      <figure><div class="art" data-pose="head" data-frame="fit"></div><figcaption class="label">Head</figcaption></figure>
+      <figure><div class="art" data-pose="bench" data-frame="fit"></div><figcaption class="label">Bench</figcaption></figure>
+      <figure><div class="art" data-pose="ramp" data-frame="fit"></div><figcaption class="label">Ramp</figcaption></figure>
+      <span class="label" style="width:96px;margin-left:34px">At rest</span>
+      <figure><div class="art" data-pose="rest" data-frame="fit" style="width:110px"></div><figcaption class="label">Row</figcaption></figure>
+    </div>
+    <p class="abs mist" style="left:877px;top:22px;width:530px;font-size:15px;line-height:23px">Physical, never faded. Pieces move one at a time on planned curves that keep a 14u gap. Layer order is fixed (tile back, mesh middle, disc front), so nothing re-stacks. A move is never cut off.</p>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>10 / 15</span></div>
+</section>
+
+<!-- 11 interface -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>10<span class="sep">/</span>Interface</span></div>
+  <h1>An identity that knows when to stop</h1>
+  <p class="sub">Interface chrome stays neutral. Colour appears only where it names an asset type; progress is Paper on Surface, pushed by the copper disc.</p>
+  <div class="mock">
+    <div class="bar">
+      <img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:24px">
+      <img src="../../gui/brand/atelier-wordmark.svg" alt="Atelier" style="height:15px;margin-left:4px">
+      <div class="nav label"><span>Assets</span><span>Materials</span><span>Export</span></div>
+    </div>
+    <div class="pane" style="left:32px;width:608px">
+      <div class="art abs" data-pose="head" style="--halo:var(--charcoal);left:30px;top:30px;width:110px;height:86px"></div>
+      <div class="abs" style="left:179px;top:44px;font-size:26px;line-height:34px;font-weight:600">Building mod</div>
+      <div class="abs mist" style="left:179px;top:82px;font-size:15px">hero_skin_v3 · started 14:02</div>
+      <div class="abs" style="left:32px;right:32px;top:146px;height:1px;background:var(--inner)"></div>
+      <div class="abs" style="left:32px;right:32px;top:160px">
+        <div class="row"><svg viewBox="0 0 22 22" width="18" height="18"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--charcoal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="d" style="background:var(--blue)"></span><span>Texture imported</span><span class="m mono">body_diffuse.png</span></div>
+        <div class="row"><svg viewBox="0 0 22 22" width="18" height="18"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--guide)" stroke-width="2" stroke-dasharray="3 3.2"/></svg><span class="d" style="background:var(--teal)"></span><span>Matching mesh to texture</span><span class="m">LOD 2 of 3</span></div>
+        <div class="row"><svg viewBox="0 0 22 22" width="18" height="18"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--guide)" stroke-width="2"/></svg><span class="d" style="background:var(--copper)"></span><span class="mist">Bind material</span><span class="m">waiting</span></div>
+      </div>
+      <div class="abs" style="left:32px;right:32px;top:298px;height:4px;border-radius:2px;background:var(--inner)"></div>
+      <div class="abs" style="left:32px;width:242px;top:298px;height:4px;border-radius:2px;background:var(--paper)"></div>
+      <svg class="abs" viewBox="0 0 20 20" style="left:265px;top:290px;width:20px;height:20px"><circle cx="10" cy="10" r="6.6" fill="var(--copper)" stroke="var(--charcoal)" stroke-width="2.4" paint-order="stroke"/></svg>
+      <div class="abs label mist" style="left:32px;top:322px">Measured: 4 of 9 steps</div>
+      <div class="abs label mist" style="right:32px;top:322px">No estimate</div>
+    </div>
+    <div class="pane" style="left:664px;width:404px">
+      <div class="abs" style="left:32px;top:30px;font-size:26px;line-height:34px;font-weight:600">Asset types</div>
+      <div class="abs" style="left:32px;right:32px;top:82px">
+        <div class="legendrow"><span class="d" style="background:var(--blue)"></span><span>Textures</span><span>12</span></div>
+        <div class="legendrow"><span class="d" style="background:var(--teal)"></span><span>Meshes</span><span>3</span></div>
+        <div class="legendrow"><span class="d" style="background:var(--copper)"></span><span>Materials</span><span>4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="label">Coloured dots</div><p>Asset type only. Every stage row says what it’s working on.</p>
+    <div class="label">Status icons</div><p>Neutral shapes for state: done, working, waiting.</p>
+    <div class="label">Progress bar</div><p>Paper on a quiet track, rolled forward by the material disc. Only for counted steps; with nothing to count, there’s no bar, only the working glyph.</p>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>11 / 15</span></div>
+</section>
+
+<!-- 12 placements -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>11<span class="sep">/</span>Placements</span></div>
+  <h1>One system, many surfaces</h1>
+  <p class="sub">Dark is preferred and light is supported. The mark never changes colour; only the canvas and the wordmark ink do.</p>
+  <div class="tile" style="left:80px;background:var(--surface)">
+    <div class="appicon" style="width:180px;height:180px;background:var(--charcoal);box-shadow:inset 0 0 0 1px var(--rule)"><img src="../../gui/brand/atelier-mark.svg" alt="" style="width:135px"></div>
+  </div>
+  <div class="label tilecap" style="left:80px">App icon<span class="sep">/</span>Dark</div>
+  <div class="tile" style="left:439px;background:var(--paper)">
+    <div class="appicon" style="width:180px;height:180px;background:var(--paper);box-shadow:inset 0 0 0 1px #DDE3EA"><img src="../../gui/brand/atelier-mark.svg" alt="" style="width:135px"></div>
+  </div>
+  <div class="label tilecap" style="left:439px">App icon<span class="sep">/</span>Light</div>
+  <div class="tile" style="left:796px;background:var(--surface)">
+    <div style="display:flex;align-items:flex-end;gap:30px">
+      <figure style="margin:0;display:grid;justify-items:center;gap:12px"><div class="appicon" style="width:32px;height:32px;background:var(--charcoal);box-shadow:inset 0 0 0 1px var(--rule)"><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="width:26.6px"></div><figcaption class="label mist">32</figcaption></figure>
+      <figure style="margin:0;display:grid;justify-items:center;gap:12px"><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:16px"><figcaption class="label mist">16</figcaption></figure>
+      <figure style="margin:0;display:grid;justify-items:center;gap:12px"><img src="../../gui/brand/atelier-mark-small.svg" alt="" style="height:24px"><figcaption class="label mist">Avatar</figcaption></figure>
+    </div>
+  </div>
+  <div class="label tilecap" style="left:796px">Small mark<span class="sep">/</span>Favicon &amp; avatar</div>
+  <div class="lockup" style="left:80px;background:var(--surface)">
+    <img src="../../gui/brand/atelier-mark.svg" alt="" style="height:70.2px"><img src="../../gui/brand/atelier-wordmark.svg" alt="Atelier" style="height:26px;margin-left:33.8px">
+  </div>
+  <div class="lockup" style="left:815px;background:var(--paper)">
+    <img src="../../gui/brand/atelier-mark.svg" alt="" style="height:70.2px"><img src="../../gui/brand/atelier-wordmark-ink.svg" alt="Atelier" style="height:26px;margin-left:33.8px">
+  </div>
+  <p class="abs mist" style="left:80px;top:797px;font-size:14px;line-height:20px">Horizontal lockup: mark height = 2.7 × wordmark cap height, gap = 1.3 × cap height. The app icon is the master on Charcoal at 48px and up, and the small mark in the 16, 24 and 32px frames.</p>
+  <div class="foot label"><span>Identity v1.3</span><span>12 / 15</span></div>
+</section>
+
+<!-- 13 voice -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>12<span class="sep">/</span>Voice</span></div>
+  <h1>Clear, capable, never ornamental</h1>
+  <p class="sub">Atelier speaks like a useful creative tool, not a tech manifesto. Say what happened, to which asset, and what to do next.</p>
+  <div class="card voice" style="left:80px;top:283px"><div class="label">Clear</div><div class="say"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Build complete. Three assets exported.</div><div class="say no"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Woohoo! Your masterpiece is ready ✨</div></div>
+  <div class="card voice" style="left:811px;top:283px"><div class="label">Specific</div><div class="say"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Texture imported. Material binding preserved.</div><div class="say no"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Everything looks good!</div></div>
+  <div class="card voice" style="left:80px;top:453px"><div class="label">Helpful</div><div class="say"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Mesh could not be read. Check hero_body.fbx exists and isn’t locked.</div><div class="say no"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Oops, something went wrong.</div></div>
+  <div class="card voice" style="left:811px;top:453px"><div class="label">Restrained</div><div class="say"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Exports to four formats.</div><div class="say no"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Revolutionary creative synergy.</div></div>
+  <div class="card pattern"><span class="label" style="width:200px">Message pattern</span><span class="box">What happened</span><span class="arrow">→</span><span class="box">To which asset</span><span class="arrow">→</span><span class="box">What to do next</span><span class="mist" style="margin-left:26px;font-size:15px">Drop the third part when there’s nothing to do. Never drop the second.</span></div>
+  <div class="foot label"><span>Identity v1.3</span><span>13 / 15</span></div>
+</section>
+
+<!-- 14 rules -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>13<span class="sep">/</span>Rules</span></div>
+  <h1>What to protect</h1>
+  <p class="sub">Consistency comes from constraints, not from repeating decorative motifs.</p>
+  <div class="card rules" style="left:80px">
+    <div class="label">Keep</div>
+    <ul>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Three opaque pieces, each with a 14u halo</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Bites concentric with the disc, every gap exactly g</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>The small mark below 32px</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Category colours on the app icon, lockups and static mark</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>The A only on a confirmed success event</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="var(--green)"/><path d="M6.6 11.3l3 3 5.8-6.3" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Shape first, then status colour; the sentence says it at once</li>
+    </ul>
+  </div>
+  <div class="card rules" style="left:815px">
+    <div class="label">Avoid</div>
+    <ul>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Fades, dissolves or re-stacking layers</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Status colours on the brand mark outside the status glyph</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Working poses that look like A, ! or X</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Gradients, bevels, glow, wireframes, cubes, batteries</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>Letter-spacing on lowercase text</li>
+      <li><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="none" stroke="var(--guide)" stroke-width="1.6"/><path d="M8 8l6 6M14 8l-6 6" stroke="var(--guide)" stroke-width="1.6" stroke-linecap="round"/></svg>A timed loop standing in for progress</li>
+    </ul>
+  </div>
+  <div class="foot label"><span>Identity v1.3</span><span>14 / 15</span></div>
+</section>
+
+<!-- 15 handoff -->
+<section class="slide">
+  <div class="head label"><span>Atelier<span class="sep">/</span>Brand system 01</span><span>14<span class="sep">/</span>Handoff</span></div>
+  <h1>From system to application</h1>
+  <p class="sub">A production handoff needs working behaviour, not just lovely screenshots.</p>
+  <div class="steps">
+    <div class="hand"><span class="n">01</span><div><b>Freeze the mark</b><p>Canonical assets: <code>atelier-mark.svg</code>, <code>atelier-mark-small.svg</code>, <code>atelier-wordmark.svg</code>, generated by <code>scripts/brand_mark.py</code>. Regenerate; never redraw or retype.</p></div></div>
+    <div class="hand"><span class="n">02</span><div><b>Wire the states</b><p>Work until an event arrives, then success → A + green, warning → !, error → X. The reference is <code>docs/motion-v2/SPEC.md</code>.</p></div></div>
+    <div class="hand"><span class="n">03</span><div><b>Test the scales</b><p>16, 24, 48 and 128px in dark and light. Confirm the switch to the small mark below 32px.</p></div></div>
+    <div class="hand"><span class="n">04</span><div><b>Verify accessibility</b><p>Text pairs ≥ 4.5 : 1 (page 06), the reduced-motion path, a 2px Paper focus ring with 2px offset, status never by colour alone.</p></div></div>
+  </div>
+  <div class="card changes">
+    <div class="label">Changed in v1.3</div>
+    <ul>
+      <li>The mark redrawn: a notched tile whose face leans until it sits one halo from the mesh, so the A’s apex closes to 9u above the mark</li>
+      <li>Corners ease into their curves; the mesh’s inner edges run parallel</li>
+      <li>Piece colours spread in lightness: #4F80CC, #45AB91, #EB9A72</li>
+      <li>Complete green lifts to #B6EBA8, well apart from copper for colour-blind viewers; the A returns to its colours after the click</li>
+      <li>Complete brings all three in together; three wrong fits (Head, Bench, Ramp), a row at rest and per-asset loaders</li>
+      <li>Small mark below 32px; Guide never colours text</li>
+      <li class="old">v1.2: wrong fits, the heavier click, the ! and X, fixed layer order. v1.1: grid, small mark, Inter, status split from category</li>
+    </ul>
+  </div>
+  <div class="label abs mist" style="left:80px;top:787px">Identity v1.3<span class="sep">/</span>Source: motion v2 SPEC, D14–D20</div>
+  <div class="foot label"><span>Identity v1.3</span><span>15 / 15</span></div>
+</section>
+
+<script src="../../gui/motion/assembly/pieces.js"></script>
+<script src="../../gui/motion/assembly/planner.js"></script>
+<script>
+(async () => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const A = window.AtelierMotion.assembly.pieces;
+  const el = (name, attrs, parent) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); parent?.append(e); return e; };
+  const fits = Object.fromEntries(A.fits().map(f => [f.name.toLowerCase(), f.contact]));
+  const poses = {...fits, rest: A.rest(), master: A.POSES.master, warning: A.POSES.warning, error: A.POSES.error};
+  const rgb = c => `rgb(${c.join(',')})`;
+  const fills = {
+    cat: {blue: rgb(A.CAT.blue), teal: rgb(A.CAT.teal), disc: rgb(A.CAT.disc)},
+    green: 'var(--green)', amber: 'var(--amber)', rose: 'var(--rose)',
+  };
+  // Glyph poses, drawn as the glyph's view draws them: each piece's outline, placed and turned.
+  for (const host of document.querySelectorAll('.art[data-pose]')) {
+    const pose = poses[host.dataset.pose], fill = fills[host.dataset.fill || 'cat'];
+    const colour = id => (typeof fill === 'string' ? fill : fill[id]);
+    const box = host.dataset.frame === 'fit' ? [70, 80, 340, 240] : A.frameOf(pose, 16);
+    const svg = el('svg', {viewBox: box.join(' '), preserveAspectRatio: 'xMidYMid meet'}, host);
+    for (const id of ['blue', 'teal']) {
+      const o = pose[id];
+      el('path', {d: A.piecePath(id, o), transform: `translate(${o.x} ${o.y}) rotate(${o.rot || 0})`, fill: colour(id), class: 'piece'}, svg);
+    }
+    const d = pose.disc;
+    el('circle', {cx: d.x, cy: d.y, r: d.r, fill: colour('disc'), class: 'piece'}, svg);
+  }
+
+  // Easing curves on page 09.
+  for (const svg of document.querySelectorAll('svg[data-curve]')) {
+    const [x1, y1, x2, y2] = svg.dataset.curve.split(',').map(Number), W = 242, H = 110, L = 0, T = 5;
+    svg.setAttribute('viewBox', '0 0 291 120');
+    const P = (x, y) => `${L + x * W} ${T + (1 - y) * H}`;
+    el('rect', {x: L, y: T, width: W, height: H, fill: 'none', stroke: 'var(--rule)', 'stroke-dasharray': '2 3'}, svg);
+    el('path', {d: `M${P(0, 0)}L${P(x1, y1)}M${P(1, 1)}L${P(x2, y2)}`, stroke: 'var(--guide)', 'stroke-width': 1.2, fill: 'none'}, svg);
+    for (const [x, y] of [[x1, y1], [x2, y2]]) { const [cx, cy] = P(x, y).split(' '); el('circle', {cx, cy, r: 3.2, fill: 'var(--guide)'}, svg); }
+    el('path', {d: `M${P(0, 0)}C${P(x1, y1)} ${P(x2, y2)} ${P(1, 1)}`, stroke: 'var(--paper)', 'stroke-width': 3, fill: 'none', 'stroke-linecap': 'round'}, svg);
+  }
+
+  // The construction drawing on page 04, in the master's own units.
+  {
+    const svg = document.getElementById('construction');
+    const r = 50, R = 64, cx = 202, cy = 146, W = 395.23, apex = [194.759, -9.038];
+    svg.setAttribute('viewBox', `${-r - 12} ${-r - 12} ${W + 2 * r + 24} ${260 + 2 * r + 24}`);
+    el('image', {href: '../../gui/brand/atelier-mark.svg', x: 0, y: 0, width: W, height: 260}, svg);
+    el('rect', {x: -r, y: -r, width: W + 2 * r, height: 260 + 2 * r, fill: 'none', stroke: 'var(--guide)', 'stroke-width': 1.4, 'stroke-dasharray': '3 5'}, svg);
+    el('circle', {cx, cy, r: R, fill: 'none', stroke: 'var(--paper)', 'stroke-width': 1.4, 'stroke-dasharray': '5 4', opacity: .75}, svg);
+    // The two legs of the A, traced along the drawn edges and stopping where a bite takes over: the
+    // tile's face, and the mesh's two parallel inner edges (scripts/brand_mark.py, MASTER).
+    const guide = {stroke: 'var(--paper)', 'stroke-width': 1.4, 'stroke-dasharray': '1.5 4', 'stroke-linecap': 'round', fill: 'none'};
+    const lean = Math.tan(7.081 * Math.PI / 180);
+    const face = y => 175.5 + lean * (cy - y), upper = y => 199.332 + .506 * y, lower = y => 285.088 - .506 * (260 - y);
+    const crossings = f => { const ys = []; let was = null; for (let y = -20; y <= 260; y += .1) { const inside = Math.hypot(f(y) - cx, y - cy) < R; if (was !== null && inside !== was) ys.push(y); was = inside; } return ys; };
+    const pt = (f, y) => `${f(y).toFixed(2)} ${y.toFixed(2)}`;
+    const [faceIn, faceOut] = crossings(face), [upperIn] = crossings(upper), lowerOut = crossings(lower).pop();
+    el('path', {d: `M${apex} L${pt(face, faceIn)} M${pt(face, faceOut)} L${pt(face, 260)}`, ...guide}, svg);
+    el('path', {d: `M${apex} L${pt(upper, upperIn)} M${pt(lower, lowerOut)} L${pt(lower, 260)}`, ...guide}, svg);
+    el('circle', {cx: apex[0], cy: apex[1], r: 4.2, fill: 'var(--paper)'}, svg);
+    // Radius, centre, and the gap marks: round the disc and between tile and mesh at the top.
+    el('path', {d: `M${cx} ${cy}H${cx + r}`, stroke: 'var(--paper)', 'stroke-width': 1.6}, svg);
+    el('circle', {cx, cy, r: 3.2, fill: 'var(--charcoal)'}, svg);
+    el('path', {d: `M${cx - R} ${cy}H${cx - r}`, stroke: 'var(--amber)', 'stroke-width': 4}, svg);
+    el('path', {d: 'M192.01 9.83L206.01 9.44', stroke: 'var(--amber)', 'stroke-width': 4}, svg);
+  }
+
+  // Real 16px renders, enlarged without smoothing (page 08).
+  for (const canvas of document.querySelectorAll('canvas[data-mark]')) {
+    const img = new Image();
+    img.src = canvas.dataset.mark;
+    await img.decode();
+    const h = 16, markW = h * (canvas.dataset.mark.includes('small') ? 393.68 : 395.23) / 260, pad = 2, big = 20;
+    const small = document.createElement('canvas'); small.width = Math.ceil(markW) + 2 + 2 * pad; small.height = h + 2 * pad;
+    const s = small.getContext('2d');
+    s.fillStyle = '#0D151F'; s.fillRect(0, 0, small.width, small.height);
+    s.drawImage(img, (small.width - markW) / 2, pad, markW, h);
+    canvas.width = small.width * big; canvas.height = small.height * big;
+    const c = canvas.getContext('2d'); c.imageSmoothingEnabled = false;
+    c.drawImage(small, 0, 0, canvas.width, canvas.height);
+    canvas.style.width = `${small.width * 5}px`; canvas.style.height = `${small.height * 5}px`;
+  }
+  await document.fonts.ready;
+  await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
+  document.body.dataset.ready = 'true';
+})();
+</script>
+</body>
+</html>
