@@ -68,7 +68,9 @@ def prepare_changelog(changelog, release_version, date, summaries):
     if release_version not in sections:
         pending = sections.get('Unreleased', '').partition('\n')[2].strip()
         notes = pending or '\n'.join('- ' + entry for entry in summaries)
-        sections[release_version] = f'## {release_version} — {date}\n\n{notes}'.strip()
+        if not notes:
+            raise ValueError('No release notes found. Add notes under Unreleased in CHANGELOG.md.')
+        sections[release_version] = f'## {release_version} — {date}\n\n{notes}'
         sections['Unreleased'] = '## Unreleased'
     return render_changelog(intro, sections)
 
@@ -88,6 +90,19 @@ def release_summaries(log, previous_tree):
         if title and title not in entries:
             entries.append(title)
     return entries
+
+
+def release_commit_summaries(previous_tag):
+    previous_tree = git('rev-parse', previous_tag + '^{tree}')
+    revision = f'{previous_tag}..HEAD'
+    # A plain branch merge can hide every change from the first-parent history.
+    for traversal in (['--first-parent'], []):
+        log = subprocess.check_output(['git', 'log', *traversal, '--format=%T%x1f%s%x1f%b%x1e', revision],
+                                      cwd=ROOT, text=True, encoding='utf-8')
+        entries = release_summaries(log, previous_tree)
+        if entries:
+            return entries
+    return []
 
 
 def needs_full_checks(changed):
@@ -167,9 +182,7 @@ def main():
         if len(raw) > 4 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != asset_digest(previous_changelog):
             raise ValueError('Published changelog failed its release digest.')
         changelog = merge_changelog_history(changelog, raw.decode('utf-8'))
-    log = subprocess.check_output(['git', 'log', '--first-parent', '--format=%T%x1f%s%x1f%b%x1e',
-                                   f"{context['previous_tag']}..HEAD"], cwd=ROOT, text=True, encoding='utf-8')
-    entries = release_summaries(log, git('rev-parse', context['previous_tag'] + '^{tree}'))
+    entries = release_commit_summaries(context['previous_tag'])
     today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     changelog = prepare_changelog(changelog, release_version, today, entries)
     (ROOT / 'CHANGELOG.md').write_text(changelog, encoding='utf-8')
