@@ -102,7 +102,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
             imported.append({'game_rel':gr,'name':gr.split('/')[-1],'file_type':'texture','token':gr.split('/')[-1],'selected':True})
             route.fulfill(json={'ok':True})
         tab.route('**/api/import_texture',import_texture)
-        tab.evaluate("async()=>{_openAfterImport=false;await renderGrid();window.__steadyGrid=document.querySelector('#grid-area .grid');window.__steadyImages=[...__steadyGrid.querySelectorAll('img')];window.__steadyBanner=document.getElementById('library-hero').firstChild;}")
+        tab.evaluate("async()=>{await renderGrid();window.__steadyGrid=document.querySelector('#grid-area .grid');window.__steadyImages=[...__steadyGrid.querySelectorAll('img')];window.__steadyBanner=document.getElementById('library-hero').firstChild;}")
         for index,name in enumerate(('T_One','T_Two')):
             tab.locator(f'.card[data-library-path="Fixture/{name}"]').click()   # one click edits; no confirmation
             tab.wait_for_function('count=>document.querySelectorAll("#grid-area .card.imported").length===count',arg=index+1)

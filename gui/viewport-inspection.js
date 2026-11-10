@@ -19,6 +19,7 @@ export function createViewportInspection(api) {
   // The inspector module, CPU wireframe and source image are requested only on opening UV X-Ray.
   let uvInspector = null, uvSurface = null, uvOpen = false, uvRequest = 0;
   async function openUV() {
+    if (showcaseMode && !uvOpen) return;
     const request = ++uvRequest;
     uvOpen = !uvOpen;
     $('viewport-uv-toggle').setAttribute('aria-expanded', String(uvOpen));
@@ -44,7 +45,7 @@ export function createViewportInspection(api) {
   // Showcase keeps its own floor toggle so its default look stays floorless.
   let showcaseMode=false,showcaseBackdrop=null,showcaseGrid=false;
   // Inspection overlays would leak into Showcase captures, so Showcase disables them with a reason.
-  const inspectOnly=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
+  const editingControls=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
   // The default backdrop is the mode's own; plain colour and transparent replace the art.
@@ -57,13 +58,13 @@ export function createViewportInspection(api) {
     const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height);
   }
   function setShowcase(value){
-    showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));$('viewport-inspect').setAttribute('aria-pressed',String(!showcaseMode));
+    showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));
     $('viewport-stage').classList.toggle('vp-showcase',showcaseMode);showcaseBackdrop?.remove();showcaseBackdrop=null;
     $('viewport-backdrop').options[0].textContent=showcaseMode?'Showcase art':'Studio';
     $('viewport-showcase-note').hidden=!showcaseMode;
     if (showcaseMode && uvOpen) openUV();
     $('viewport-uv-toggle').disabled = showcaseMode;
-    $('viewport-uv-toggle').title = showcaseMode ? 'UV X-Ray is available in Inspect mode' : 'Inspect a surface\'s texture and mesh UV layout';
+    $('viewport-uv-toggle').title = showcaseMode ? 'Turn off Showcase to use UV X-Ray' : 'Inspect a surface\'s texture and mesh UV layout';
     if(showcaseMode){
       clearHover();drawShowcase();
     }
@@ -169,9 +170,9 @@ export function createViewportInspection(api) {
     for (const id of ['viewport-poster','viewport-turntable']) $(id).disabled ||= !api.ready();
     for (const id of ['viewport-edited','viewport-original','viewport-wipe']) $(id).disabled = !Object.keys(api.materials().data).length;
     $('viewport-regions').disabled = !Object.values(api.materials().data).some(d => d.dyeable);
-    for (const [id,title] of inspectOnly) {
+    for (const [id,title] of editingControls) {
       $(id).disabled ||= showcaseMode;
-      $(id).title = showcaseMode ? 'Inspect mode only: Showcase shows the finished look' : title;
+      $(id).title = showcaseMode ? 'Turn off Showcase to use this control' : title;
     }
     $('viewport-show-all').disabled = objects.every(o => o.root.visible);
   }
@@ -374,7 +375,7 @@ export function createViewportInspection(api) {
     if (event.buttons || capture) { clearHover(); return; }
     hovered = pick(event)?.name || null;
     const hint = $('viewport-hover'); hint.hidden = !hovered;
-    hint.textContent = hovered ? `${api.label(hovered)} · ${uvOpen ? 'Click to inspect UVs' : 'Click to edit'} · Double-click to frame` : '';
+    hint.textContent = hovered ? `${api.label(hovered)} · ${uvOpen ? 'Click to inspect UVs' : 'Click to select'} · Double-click to frame` : '';
   });
   renderer.domElement.addEventListener('pointerleave', clearHover);
   renderer.domElement.addEventListener('pointerdown', event => { down = {x:event.clientX, y:event.clientY, button:event.button}; });
@@ -487,7 +488,7 @@ export function createViewportInspection(api) {
     $('viewport-capture-menu').open = false; $('viewport-capture-cancel').hidden = false;
     $('viewport-tools').inert = true; $('viewport-inspect-tools').inert = true;
     $('viewport-materials').inert = true;
-    for (const id of ['assembly-geometry','assembly-textures','viewport-modes']) if ($(id)) $(id).inert = true;
+    for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = true;
     $('viewport-playback').inert = true; $('viewport-capture-menu').inert = true;
     $('viewport-fit').disabled = true; api.refreshEdits?.();
     const blenderDisabled = $('viewport-blender-btn').disabled;
@@ -500,6 +501,9 @@ export function createViewportInspection(api) {
       near:camera.near, far:camera.far, fitOnResize, enabled:controls.enabled, min:controls.minDistance, max:controls.maxDistance};
     const animationState = api.pauseAnimation?.();
     controls.enabled = false; clearHover();
+    const captureType = turntable ? 'Turntable' : 'Poster';
+    let completed = false;
+    api.notify(`Capturing ${turntable ? 'turntable' : 'poster'}…`);
     try {
       const width = turntable ? 720 : 1400;
       renderer.setPixelRatio(1); renderer.setSize(width,width,false); camera.aspect = 1; camera.updateProjectionMatrix(); frame(true);
@@ -518,18 +522,21 @@ export function createViewportInspection(api) {
         if (turntable) {
           const length = new Uint8Array(4); new DataView(length.buffer).setUint32(0,blob.size,true);
           frames.push(length,blob);
-        } else download(blob, '.png');
-        $('viewport-status').textContent = `Capturing ${i+1} / ${turntable ? 48 : 1} frames…`;
+          api.notify(`Capturing ${i+1} of 48 turntable frames…`);
+        } else if (!controller.signal.aborted) download(blob, '.png');
         await new Promise(requestAnimationFrame);
       }
       if (turntable) {
-        $('viewport-status').textContent = 'Encoding turntable…';
+        api.notify('Encoding turntable…');
         const result = await api.fetch('/api/showcase_webp', {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:new Blob(frames), signal:controller.signal});
         if (!result.ok) throw Error((await result.json()).error || 'Turntable encoding failed');
         const blob = await result.blob();
         if (!controller.signal.aborted) download(blob, '.webp');
       }
-    } catch (error) { if (error.name !== 'AbortError') api.notify(error.message, 'warning'); }
+      completed = !controller.signal.aborted;
+    } catch (error) {
+      if (error.name !== 'AbortError') api.notify(`${captureType} could not be created. ${error.message}`, 'error');
+    }
     finally {
       const damping = controls.enableDamping; controls.enableDamping = false; controls.update();
       camera.position.copy(saved.position); camera.up.copy(saved.up); controls.target.copy(saved.target);
@@ -541,12 +548,13 @@ export function createViewportInspection(api) {
       $('viewport-tools').inert = false; $('viewport-inspect-tools').inert = false;
       $('viewport-materials').inert = false;
       $('viewport-playback').inert = false; $('viewport-capture-menu').inert = false;
-      for (const id of ['assembly-geometry','assembly-textures','viewport-modes']) if ($(id)) $(id).inert = false;
+      for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = false;
       $('viewport-blender-btn').disabled = blenderDisabled;
       if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
       $('viewport-expand').disabled = false;
       $('viewport-capture-cancel').hidden = true; api.refreshEdits?.(); refresh(); api.resize();
-      $('viewport-status').textContent = controller.signal.aborted ? 'Capture cancelled' : 'Capture finished';
+      if (controller.signal.aborted) api.notify('Capture cancelled');
+      else if (completed) api.notify(`${captureType} ready`, 'success');
     }
   }
   $('viewport-poster').addEventListener('click', () => captureShowcase(false));

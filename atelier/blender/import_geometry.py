@@ -7,6 +7,21 @@ This helper changes only the disposable imported object, never the source file.
 import math
 
 
+def authored_lods(objects):
+    """Find meshes explicitly marked as Blender donors for a cooked detail level."""
+    levels = {}
+    for obj in objects:
+        if 'atelier_lod' not in obj:
+            continue
+        level = obj['atelier_lod']
+        if type(level) is not int or level < 1 or obj.type != 'MESH' or not obj.data.polygons:
+            raise ValueError('Set atelier_lod to a positive detail level on a mesh with faces.')
+        if level in levels:
+            raise ValueError(f'Only one mesh can supply detail level {level}.')
+        levels[level] = obj
+    return levels
+
+
 def bake_geometry(obj, api=None):
     if api is None:
         import bpy as api

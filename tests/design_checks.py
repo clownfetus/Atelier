@@ -48,6 +48,24 @@ def assert_type_system(page):
     assert fonts['largeText'] - fonts['largeDisplay'] > 10, fonts
 
 
+def assert_outline_off_text():
+    # The outline colour reaches 3:1, not 4.5:1, so it may colour icons and separators but never text.
+    outline = r'var\(--(?:md-sys-color-outline|border2|bd)\)'
+    rule = re.compile(r'([^{}]+)\{([^{}]*)\}')
+    text_colour = re.compile(r'(?:^|[;\s])color\s*:\s*' + outline)
+    for path in source_files('*.css'):
+        css = re.sub(r'/\*.*?\*/', '', path.read_text(encoding='utf-8'), flags=re.S)
+        for selectors, body in rule.findall(css):
+            if not text_colour.search(body):
+                continue
+            for selector in selectors.split(','):
+                selector = selector.strip()
+                assert re.search(r'(?:^|\s)i$|icon|\.sep$', selector), (path.name, selector)
+    inline = re.compile(r'(?<![-\w])color\s*:\s*' + outline)
+    for path in source_files('*.js', '*.html'):
+        assert not inline.search(path.read_text(encoding='utf-8')), path.name
+
+
 def measure_contrast(page):
     return page.evaluate('''() => {
       const css = getComputedStyle(document.documentElement);
@@ -169,6 +187,8 @@ def run_design_checks(page, context, url, report, checks):
     page.wait_for_function('document.fonts.check("14px Inter")')
     assert_type_system(page)
     checks.append('Inter is the interface face, optical size follows the text, only uppercase labels are tracked')
+    assert_outline_off_text()
+    checks.append('The outline colour colours icons and separators, never text')
     page.evaluate("pushNav({path:'Foundation checks'})")
     assert page.evaluate('document.querySelector(".studio-brand img").naturalWidth') > 0
     for theme in ('light', 'dark'):

@@ -91,13 +91,46 @@
       glyph = null; stageHost.replaceChildren();
     }
   }
-  function metadata(snapshot) {
+  const exportLabel = copyToMods => copyToMods ? 'Export and install' : 'Export mod';
+
+  function destinationChoice(snapshot) {
+    const field = el('div', undefined, 'export-review-destination');
+    const select = el('select', undefined, 'setup-input');
+    select.setAttribute('aria-label', 'Destination');
+    const exportOnly = el('option', 'Export only'); exportOnly.value = 'export';
+    const install = el('option', 'Export and install'); install.value = 'install';
+    install.disabled = !snapshot.modsPath;
+    select.append(exportOnly, install); select.value = snapshot.copyToMods ? 'install' : 'export';
+    const path = el('small', snapshot.modsPath, 'export-review-path');
+    path.hidden = !snapshot.copyToMods;
+    select.addEventListener('change', () => {
+      const copyToMods = select.value === 'install';
+      current.snapshot = Object.freeze({...current.snapshot, copyToMods});
+      current.callbacks.rememberDestination?.(copyToMods);
+      path.hidden = !copyToMods;
+      actions.querySelector('#export-review-confirm').textContent = exportLabel(copyToMods);
+    });
+    field.append(select, path);
+    if (!snapshot.modsPath) {
+      const settings = el('button', 'Set mods folder…', 'btn'); settings.type = 'button';
+      settings.addEventListener('click', () => { hide(); current.callbacks.settings(); });
+      field.append(settings);
+    }
+    return field;
+  }
+
+  function metadata(snapshot, editable = false) {
     const dl = el('dl', undefined, 'export-review-meta');
+    const destination = editable ? destinationChoice(snapshot) :
+      snapshot.copyToMods ? 'Export folder + ' + snapshot.modsPath : 'Export folder';
     for (const [label, value] of [
       ['Project', snapshot.project || 'Default project'], ['Mod filename', snapshot.modName],
-      ['Destination', snapshot.copyToMods ? 'Export folder + ' + snapshot.modsPath : 'Export folder'],
+      ['Destination', destination],
       ['Password protection', snapshot.protected ? 'Enabled' : 'Off'],
-    ]) dl.append(el('dt', label), el('dd', value));
+    ]) {
+      const detail = el('dd'); detail.append(value);
+      dl.append(el('dt', label), detail);
+    }
     body.append(dl);
   }
   function list(heading, items, getText, open = false) {
@@ -180,8 +213,9 @@
     }
     button('Cancel', hide);
     button('Refresh review', callbacks.refresh).id = 'export-review-refresh';
-    const build = button('Build Skin Swapper mod', () => {
-      const chosen = options(); current.retry = () => offer.build(chosen); offer.build(chosen);
+    const build = button(exportLabel(snapshot.copyToMods), () => {
+      const chosen = options(), reviewed = current.snapshot;
+      current.retry = () => offer.build(chosen, reviewed); current.retry();
     }, true);
     build.id = 'export-review-confirm'; build.disabled = true;
     let timer = 0, request = 0;
@@ -207,11 +241,11 @@
   function renderReview(note) {
     const { snapshot, callbacks } = current; busy = false;
     const offer = callbacks.skinSwapper, swapper = !!offer && current.format === 'skin-swapper';
-    reset(swapper ? 'Review Skin Swapper mod' : 'Review export', 'review'); metadata(snapshot);
+    reset(swapper ? 'Review Skin Swapper mod' : 'Review mod', 'review'); metadata(snapshot, true);
     if (offer) formatChoice(offer);
     if (swapper) { renderSkinSwapper(offer, note); return; }
     const countLabel = snapshot.included.length + (snapshot.included.length === 1 ? ' asset' : ' assets');
-    const summary = el('p', countLabel + ' will be submitted. Only saved project edits are exported.', 'export-review-summary');
+    const summary = el('p', countLabel + ' will be exported. Only saved project edits are included.', 'export-review-summary');
     body.append(summary);
     list('Included changes', snapshot.included, item =>
       (item.name || item.game_rel.split('/').pop()) + ' · ' + item.file_type + '\n' + item.game_rel, true);
@@ -221,9 +255,9 @@
     }
     button('Cancel', hide);
     button('Refresh review', callbacks.refresh).id = 'export-review-refresh';
-    button('Export ' + countLabel, () => {
-      current.retry = callbacks.confirm;
-      callbacks.confirm();
+    button(exportLabel(snapshot.copyToMods), () => {
+      const reviewed = current.snapshot;
+      current.retry = () => callbacks.confirm(reviewed); current.retry();
     }, true).id = 'export-review-confirm';
   }
   function renderResult() {
@@ -256,7 +290,7 @@
     if(built)disposeCard=window.AtelierModCards?.mount(body,snapshot,result,{reveal:callbacks.reveal,builtAt:current.builtAt,anchor:status,entrance});
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
-    if (!result.ok) button('Retry export', current.retry || callbacks.confirm, true).id = 'export-review-retry';
+    if (!result.ok) button('Retry export', current.retry || (() => callbacks.confirm(snapshot)), true).id = 'export-review-retry';
   }
   window.AtelierExportReview = {
     open(snapshot, callbacks, note) {

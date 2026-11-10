@@ -32,7 +32,14 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===0")
         tab.locator('#toast-area .toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
         checks.append('Deleting an edit offers Undo and restores the byte-identical file through the real project routes')
-        tab.locator('#clear-all-btn').click();tab.locator('#atelier-confirm-ok').click()
+        tab.get_by_role('button', name='Exclude all', exact=True).click()
+        assert tab.locator('#sel-count').inner_text() == '0 of 2 included'
+        assert tab.locator('.sb-item').count() == 2 and tab.locator('#install-btn').is_disabled()
+        tab.get_by_role('button', name='Include all', exact=True).click()
+        assert tab.locator('#sel-count').inner_text() == '2 of 2 included'
+        tab.get_by_role('button', name='Mod tray actions').click()
+        tab.get_by_role('button', name='Remove all edits…').click()
+        tab.locator('#atelier-confirm-ok').click()
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===0")
         undo=tab.locator('#toast-area .toast-undo');undo.wait_for();undo.hover()
         assert undo.locator('..').evaluate("el=>el.style.getPropertyValue('--toast-duration')")=='10000ms'
@@ -45,7 +52,7 @@ window.__trustViewport={seed(){generation++;viewportProject=atelierProject();edi
         tab.wait_for_function("document.querySelectorAll('.sb-item').length===1")
         assert tab.locator('.polish-ghost').count()==0
         tab.locator('#toast-area .toast-undo').click();tab.wait_for_function("document.querySelectorAll('.sb-item').length===2")
-        checks.append('Clear All uses one Undo batch, hover pauses its ten-second toast and reduced motion omits the row dissolve')
+        checks.append('Inclusion controls leave edits in place; Remove all edits uses one Undo batch, hover pauses its toast and reduced motion omits the row transition')
 
         tab.locator('#menu-btn').focus()
         tab.evaluate("() => {window.answer=AtelierDialog.confirm({title:'<img src=x>',body:'<script>unsafe</script>',tone:'danger'});}")

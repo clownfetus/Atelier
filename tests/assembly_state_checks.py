@@ -219,7 +219,18 @@ def _policy(context, url, report, checks):
     assert change['wobbling'] and change['stopped'] and change['x'] < .01, change
     assert not errors, errors
     tab.close()
-    checks.append('Glyph: Calm has no flourish or travelling loader, Off has still poses and a cross-fade, a setting change lands then applies')
+    # Off after a Complete has drawn its ripple: the still poses reset the effects, and the glyph keeps drawing.
+    tab, errors = open_glyph_page(context, url, clock=True)
+    tab.evaluate(HELPERS)
+    after = tab.evaluate("""async dt=>{const g=__mount(128,{state:'busy'}),e=g.engine;await __step(dt,40);g.set('success');let t=0,ring=false;
+      while(!e.settled&&t<6000){await __step(dt);t+=dt;ring=ring||e.fx.ringOp>0}
+      __setMotion('off');g.set('warning');t=0;while(!e.settled&&t<3000){await __step(dt);t+=dt}
+      const out={ring,settled:e.settled,state:e.state,opacity:e.opacity??1,shown:e.view.svg.style.opacity};g.destroy();return out}""", FRAME)
+    assert after['ring'] and after['settled'] and after['state'] == 'warning', after
+    assert after['opacity'] == 1 and after['shown'] == '', after
+    assert not errors, errors
+    tab.close()
+    checks.append('Glyph: Calm has no flourish or travelling loader, Off has still poses and a cross-fade (after a ripple too), a setting change lands then applies')
 
 
 def _hidden(context, url, report, checks):

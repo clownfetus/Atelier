@@ -446,11 +446,41 @@ def t_directory_fallback_still_selects_parent():
         shutil.rmtree(tmp)
 
 
+def t_windows_reveal_uses_item_and_parent():
+    import ctypes
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
+
+    path = os.path.abspath(os.path.join('Project, recolour', 'Textures', 'T_Body.png'))
+
+    def parse(filename, context, result, flags, attributes):
+        assert filename == path
+        ctypes.cast(result, ctypes.POINTER(ctypes.c_void_p))[0] = 42
+        return 0
+
+    shell = SimpleNamespace(SHParseDisplayName=Mock(side_effect=parse),
+                            SHOpenFolderAndSelectItems=Mock(return_value=0))
+    ole = SimpleNamespace(CoInitialize=Mock(return_value=0), CoTaskMemFree=Mock(), CoUninitialize=Mock())
+    with patch.object(ctypes, 'windll', SimpleNamespace(shell32=shell, ole32=ole), create=True), \
+            patch.object(R.hostos, 'open_path') as open_path:
+        R.hostos._explorer_reveal(path, True)
+        pidl, count, items, flags = shell.SHOpenFolderAndSelectItems.call_args.args
+        assert (pidl.value, count, items, flags) == (42, 0, None, 0)
+        ole.CoTaskMemFree.assert_called_once_with(pidl)
+        ole.CoUninitialize.assert_called_once()
+        open_path.assert_not_called()
+
+        shell.SHOpenFolderAndSelectItems.return_value = -1
+        R.hostos._explorer_reveal(path, True)
+        open_path.assert_called_once_with(os.path.dirname(path))
+
+
 for n, f in [("missing file is reported, not silent", t_missing_path_reports),
              ("empty path is reported", t_no_path_reports),
              ("existing file succeeds", t_existing_path_ok),
              ("a reveal error is reported", t_reveal_failure_is_reported),
-             ("falls back to the parent folder", t_directory_fallback_still_selects_parent)]:
+             ("falls back to the parent folder", t_directory_fallback_still_selects_parent),
+             ("Explorer selects the exact item or opens its parent", t_windows_reveal_uses_item_and_parent)]:
     check(n, f)
 
 

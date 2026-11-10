@@ -187,8 +187,12 @@ def main():
                 page.wait_for_timeout(250)
                 page.screenshot(path=str(report/f'native-viewer-{theme}.png'))
             if args.design_checks:
+                page.locator('#assembly-material-browse').click()
                 body=page.locator('.vp-material-select').filter(has_text='Body')
                 (body.first if body.count() else page.locator('.vp-material-select').first).click()
+                page.locator('#assembly-material-context .assembly-path').wait_for()
+                show_colours = page.get_by_role('button', name='Show colour controls')
+                if show_colours.is_visible():show_colours.click()
                 assert page.locator('#viewport-material-editor').is_visible()
                 assert not page.locator('.vp-advanced').evaluate('el=>el.open')
                 page.mouse.move(1,1);page.wait_for_timeout(500)

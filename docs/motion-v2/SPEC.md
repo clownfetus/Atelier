@@ -59,7 +59,7 @@ check includes them.
 | Surface | `#172331` | Cards, panels |
 | Paper | `#F4F6F8` | Primary text on dark; light canvas |
 | Mist | `#B4C0CE` | Body text on dark (9.9:1 on Charcoal) |
-| Guide | `#778BA3` | Rules, captions, Working status (not body text) |
+| Guide | `#778BA3` | Outlines, separators and quiet icons (3:1; never text) |
 | Complete green | `#7CC47F` | Success (hue 122°; mesh teal is 168°) |
 | Warning amber | `#E6C35C` | Warning (hue 45°; copper is 19°) |
 | Error rose | `#EC6A86` | Error (hue 347°) |
@@ -72,8 +72,9 @@ fill forward (§4.10, P4b.2), drawn as the piece itself. Status
 colours never appear on the brand mark outside the status glyph. Status is
 always icon + sentence + colour; colour is the third cue.
 
-Only texture, mesh and material carry colour in the interface (D2). Every other
-category is neutral and told apart by shape. The brand mark and the glyph's
+Texture, mesh and material use the brand colours (D2). Characters, UI and VFX
+folder emblems each have their own colour. The remaining category icons use the neutral
+ink and are told apart by shape. The brand mark and the glyph's
 pieces always use the exact hexes above, in every theme, and only a working loader
 adds the plates or the shine. Small UI icons use these
 values, because the exact hexes only reach 2.3–2.8:1 on Paper:
@@ -83,7 +84,10 @@ values, because the exact hexes only reach 2.3–2.8:1 on Paper:
 | Texture | `#6C98CA` | `#38679D` | `#5084C0` |
 | Mesh | `#5AAA9A` | `#386D63` | `#498D80` |
 | Material | `#DF8F6B` | `#A24B23` | `#D0602D` |
-| Any other category | Mist `#B4C0CE` (thin), Guide `#778BA3` (solid) | `#4E5F73` | `#6A7C90` |
+| Characters | `#62B6CC` solid | — | `#267E96` |
+| UI | `#AA98E8` solid | — | `#755CB4` |
+| VFX | `#D98BCB` solid | — | `#A95199` |
+| Other icons | Mist `#B4C0CE` (thin), Guide `#778BA3` (solid) | `#4E5F73` | `#6A7C90` |
 
 Themes (D3): the three piece colours never change with the theme, and the halo
 always equals the surface behind it. Status hues stay fixed and `theme.js` moves
@@ -103,7 +107,7 @@ and it must pass `tests/design_checks.py`.
 | Rules | `#24323F` | `#DDE3EA` |
 | Text | Paper `#F4F6F8` | Charcoal `#0D151F` |
 | Muted text | Mist `#B4C0CE` | `#4E5F73` |
-| Hints and captions | Guide `#778BA3` | `#6A7C90` |
+| Outlines and quiet icons | Guide `#778BA3` | `#6A7C90` |
 | Accent | Paper `#F4F6F8` | Charcoal `#0D151F` |
 | Text on accent | Charcoal `#0D151F` | Paper `#F4F6F8` |
 | Info text | Mist `#B4C0CE` | `#4E5F73` |
@@ -111,7 +115,10 @@ and it must pass `tests/design_checks.py`.
 | Status icons and glyph: complete, warning, error | `#7CC47F`, `#E6C35C`, `#EC6A86` | `#419145`, `#9E7C18`, `#E74165` |
 
 In dark, rose sentences reach only 3.97:1 on Highest, so status sentences stay off
-that surface. Guide reaches only 3.96:1 on Raised, so it is never body text.
+that surface. Guide and its light equivalent `#6A7C90` reach 3:1 but not 4.5:1 on
+every surface (3.96:1 on Raised in dark, on Canvas in light), so they never colour
+text. Captions, hints and the Working status line use Muted text: Mist in dark,
+`#4E5F73` in light.
 
 ## 3. Geometry
 
@@ -209,7 +216,7 @@ canonical; never redraw by hand. Use `-master` at 32 px and up, `-small` below.
 - A piece next to a disc gets a concentric bite.
 - Textures, Meshes and Materials are the mark's own tile, block and disc, taken from
   `assets/brand_mark_v2.py`, so they change only when the mark does. They use the
-  colours in §2; every other icon is neutral.
+  colours in §2, which also lists the folder colours for Characters, UI and VFX.
 - The plain folder's front piece keeps its tip on hover, in Full motion only. Its
   back piece is opaque.
 

@@ -1,6 +1,7 @@
 """Assembly interactions in Chromium, using clearly labelled synthetic geometry."""
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 import json
 from PIL import Image
 
@@ -12,11 +13,11 @@ window.__assembly = {
  orbitAndOpen:()=>{controls.rotateLeft(.12);const before=window.__assembly.state();document.querySelector('#assembly-material-context .assembly-primary').click();return before;},
  state:()=>({camera:camera.position.toArray(),target:controls.target.toArray(),selected:selectedMaterial,raf,
    canvas:[renderer.domElement.width,renderer.domElement.height,renderer.domElement.clientWidth,renderer.domElement.clientHeight],
-   surface:assembly.selectedSurface()?.object?.name,project:viewportProject,mode:workspaceMode,decodes:window.__assemblyDecodes||0}),
+   surface:assembly.selectedSurface()?.object?.name,project:viewportProject,decodes:window.__assemblyDecodes||0}),
  point:()=>{const p=new THREE.Vector3(0,1.5,.3).project(camera),r=renderer.domElement.getBoundingClientRect();
    return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};},
 };
-loader.loadAsync = async()=>{
+loader.loadAsync = async url=>{
  window.__assemblyDecodes=(window.__assemblyDecodes||0)+1;
  const root=new THREE.Group(),materials=[0,1,2,3].map(i=>{const m=new THREE.MeshStandardMaterial();m.name=['MI_Body','MI_Trim','MI_Same','MI_Unknown'][i];return m;});
  const add=(name,geometry,xyz,material)=>{const mesh=new THREE.Mesh(geometry,materials[material]);mesh.name=name;mesh.position.set(...xyz);root.add(mesh);return mesh;};
@@ -27,6 +28,7 @@ loader.loadAsync = async()=>{
    add('Leg fixture '+side,new THREE.CapsuleGeometry(.16,.72,6,12),[side*.23,.48,0],2);
  }
  add('Unverified fixture',new THREE.SphereGeometry(.1,12,8),[.5,2.3,0],3);
+ if (url.includes('SK_StandaloneFixture')) return {scene:root,animations:[]};
  const associations=new Map(materials.map((m,i)=>[m,{materials:i}]));
  return {scene:root,animations:[],parser:{associations,json:{materials:materials.map(m=>({name:m.name}))}}};
 };
@@ -36,7 +38,7 @@ loader.loadAsync = async()=>{
 def run_assembly_checks(context, url, report, checks):
     tab = context.new_page()
     tab.set_viewport_size({'width':1600, 'height':1000})
-    errors, thumbnails, effects_reads = [], [], []
+    errors, thumbnails, effects_reads, material_saves = [], [], [], []
     tab.on('pageerror', lambda error: errors.append(str(error)))
     tab.on('console', lambda message: errors.append(message.text) if message.type == 'error' and 'Shader Error' in message.text else None)
     tab.route('**/static/viewport.js', lambda route: route.fulfill(body=(ROOT/'gui/viewport.js').read_text(encoding='utf-8') + HOOK, content_type='text/javascript'))
@@ -62,6 +64,22 @@ def run_assembly_checks(context, url, report, checks):
                     texture_roles={'basecolor':texture}, tex_ver={texture:'0'})
         route.fulfill(json={'ok':True,'materials':result})
     tab.route('**/api/skin_materials', materials)
+    image_actions = []
+    def import_texture(route):
+        path = route.request.post_data_json['game_rel']
+        image_actions.append(('prepare', path))
+        route.fulfill(json={'ok':True, 'imported':{'game_rel':path, 'token':'assembly-texture',
+                      'name':'T_Shared', 'file_type':'texture', 'selected':True}})
+    def open_texture(route):
+        path = parse_qs(urlsplit(route.request.url).query)['game_rel'][0]
+        image_actions.append(('open', path))
+        route.fulfill(json={'ok':True})
+    tab.route('**/api/import_texture', import_texture)
+    tab.route('**/api/open_with?*', open_texture)
+    def save_material(route):
+        material_saves.append(route.request.post_data_json)
+        route.fulfill(json={'ok':True})
+    tab.route('**/api/material_save', save_material)
     tab.route('**/api/material_params?*', lambda route: route.fulfill(json={'ok':True,'colors':[{'name':'BaseTint','rgba':[.1,.3,.65,1]}],'scalars':[],'textures':{'Normal':'Textures/T_Normal'},'texture_classes':{'Normal':'Texture2D'}}))
     tab.route('**/api/dye_info?*', lambda route: route.fulfill(json={'dyeable':False}))
     tab.route('**/api/mesh_add', lambda route: route.fulfill(json={'ok':True,'game_rel':MESH,'state':'original'}))
@@ -74,17 +92,45 @@ def run_assembly_checks(context, url, report, checks):
     try:
         tab.goto(url); tab.wait_for_function('window.__assembly && window.atelierProject?.()')
         tab.wait_for_selector('#grid-area .card')
-        tab.evaluate("AtelierViewport.open('1029001','Assembly verification · synthetic mannequin')")
-        tab.wait_for_selector('.vp-mat'); tab.wait_for_function("document.getElementById('viewport-canvas').getAttribute('aria-busy')==='false'")
-        tab.locator('#viewport-assembly').click()
+        tab.evaluate("localStorage.setItem('atelier.assembly','0')")
+        open_mesh = "mesh=>AtelierViewport.openMesh(mesh,'Assembly verification · synthetic mannequin')"
+        tab.evaluate(open_mesh, 'Meshes/SK_StandaloneFixture')
         tab.wait_for_selector('.assembly-section')
+        assert tab.locator('#viewport-workspace-label').text_content() == 'Assembly View'
+        tab.locator('#viewport-close').click()
+        tab.evaluate(open_mesh, MESH)
+        tab.wait_for_selector('.assembly-section')
+        tab.wait_for_function("document.getElementById('viewport-canvas').getAttribute('aria-busy')==='false'")
         assert not thumbnails and not effects_reads, 'Opening Assembly must not extract every texture or effect'
+        search = tab.get_by_role('searchbox', name='Find a surface or material')
+        search.fill('Torso fixture')
+        assert tab.locator('.assembly-section').count() == 1
+        search.fill('')
+        browse = tab.get_by_role('button', name='Browse materials')
+        browse.click()
+        tab.locator('#viewport-material-search').fill('Trim')
+        assert tab.locator('.vp-material-select:visible').count() == 1
+        tab.locator('#viewport-material-search').fill('')
+        browse.click()
+        checks.append('Standalone and costume meshes open directly in Assembly, with surface search and the grouped material browser')
         point = tab.evaluate('__assembly.point()'); tab.mouse.click(point['x'],point['y'])
         tab.wait_for_selector('.assembly-texture-card')
         assert tab.locator('.assembly-texture-card').count() == 4
         assert tab.evaluate('__assembly.state().surface') == 'Torso fixture'
         assert tab.locator('#assembly-material-context').inner_text().count('Materials/MI_Body') >= 1
+        before = tab.evaluate('__assembly.state()')
+        tab.get_by_role('button', name='Hide panels').click()
+        assert tab.locator('#assembly-geometry').is_hidden() and tab.locator('#viewport-materials').is_hidden()
+        assert tab.locator('#assembly-textures').is_hidden()
+        tab.wait_for_function('width=>__assembly.state().canvas[2]>width',arg=before['canvas'][2])
+        tab.get_by_role('button', name='Show panels').click()
+        tab.wait_for_selector('.assembly-texture-card')
+        after = tab.evaluate('__assembly.state()')
+        assert before['surface'] == after['surface'] and before['decodes'] == after['decodes']
+        assert all(abs(a-b)<1e-9 for a,b in zip(before['camera'],after['camera']))
+        checks.append('Hiding and restoring panels gives the model more room and preserves the selected surface and camera')
         tab.locator('.assembly-texture-card').first.click()
+        assert not image_actions
         assert tab.locator('.assembly-section.is-related').count() == 3, 'Torso and two arms share the exact material texture'
         assert not tab.locator('.assembly-section.is-related').filter(has_text='Same').count(), 'Same texture filename in another folder is unrelated'
         tab.wait_for_function("[...document.querySelectorAll('.assembly-texture-preview img')].some(img=>img.complete&&img.naturalWidth)")
@@ -116,7 +162,16 @@ def run_assembly_checks(context, url, report, checks):
         assert 'Reference unverified' in tab.locator('#assembly-material-context').inner_text()
         assert not tab.locator('.assembly-texture-card').count()
         assert tab.locator('#viewport-material-editor').is_hidden()
-        checks.append('Unverified mappings expose their limitation; custom images open the existing material slot editor')
+        assert 'Materials/MI_Unknown' in tab.locator('#assembly-material-context').inner_text()
+        tab.get_by_role('button', name='Show colour controls').click()
+        hex_colour = tab.locator('#viewport-material-editor .vp-hex').first
+        hex_colour.fill('#2E69A4')
+        hex_colour.press('Tab')
+        tab.locator('#viewport-mat-save').click()
+        tab.wait_for_function("document.getElementById('viewport-mat-save').disabled")
+        assert [save['game_rel'] for save in material_saves] == ['Materials/MI_Unknown']
+        assert not tab.locator('.assembly-texture-card').count()
+        checks.append('Unverified references show the save target before exposing colour controls. Connected texture slots still require verified references')
         tab.locator('.assembly-section').filter(has_text='Body').first.click()
         tab.wait_for_selector('.assembly-texture-card')
         tab.get_by_role('button',name='Inspect UVs',exact=True).click()
@@ -136,13 +191,26 @@ def run_assembly_checks(context, url, report, checks):
         assert before['selected'] == after['selected'] and after['decodes'] == before['decodes']+1
         assert all(abs(a-b)<1e-9 for a,b in zip(before['camera'],after['camera']))
         checks.append('UV inspection uses the selected primitive; replacement handoff retains the scene and changed geometry refreshes without moving the camera')
-        tab.locator('#assembly-geometry-collapse').click(); assert tab.locator('#assembly-geometry-reopen').is_visible()
+        tab.locator('#assembly-geometry-collapse').click()
+        tab.set_viewport_size({'width':800,'height':768})
+        tab.wait_for_function("document.getElementById('viewport-canvas').clientWidth > 300")
+        assert tab.locator('#assembly-geometry-reopen').is_hidden()
+        tab.set_viewport_size({'width':1600,'height':1000})
+        assert tab.locator('#assembly-geometry-reopen').is_visible()
         tab.locator('#assembly-geometry-reopen').click()
         tab.locator('#assembly-textures-collapse').click(); assert tab.locator('#assembly-texture-cards').is_hidden()
         tab.locator('#assembly-textures-collapse').click()
         handle = tab.get_by_role('separator',name='Resize material panel'); handle.focus(); handle.press('ArrowLeft')
         assert int(handle.get_attribute('aria-valuenow')) > 292
-        checks.append('Geometry and textures collapse, and panel resizing works from the keyboard')
+        assert handle.evaluate('el=>getComputedStyle(el).outlineWidth') == '2px'
+        checks.append('Collapsed Geometry leaves the model visible when the window narrows, and panels resize from the keyboard')
+        texture_card = tab.locator('.assembly-texture-card[data-slot="BaseColor"]')
+        texture_card.click(button='right')
+        with tab.expect_response('**/api/open_with?*'):
+            tab.get_by_role('button',name='Open in default image app').click()
+        assert image_actions == [('prepare',texture), ('open',texture)]
+        tab.wait_for_function("document.querySelector('.assembly-texture-card[data-slot=BaseColor]').textContent.includes('In project')")
+        checks.append('Assembly texture clicks select a slot. The context menu prepares the project image before opening it')
         tab.emulate_media(reduced_motion='reduce'); tab.locator('.assembly-section').first.click()
         assert not tab.locator('#assembly-links').is_visible()
         for theme in ('dark','light'):
@@ -151,9 +219,11 @@ def run_assembly_checks(context, url, report, checks):
             tab.evaluate("AtelierViewport.open('1029001','Assembly verification · synthetic mannequin')")
             tab.wait_for_selector('.assembly-section')
             tab.wait_for_function("document.getElementById('viewport-canvas').getAttribute('aria-busy')==='false'")
-            assert tab.locator('#viewport-assembly').get_attribute('aria-pressed') == 'true'
+            assert tab.locator('#viewport-workspace-label').text_content() == 'Assembly View'
             tab.locator('.assembly-section').first.click(); tab.wait_for_selector('.assembly-texture-card')
             tab.screenshot(path=str(report/f'assembly-{theme}-1600.png'))
+        assert_brand_presentation(tab)
+        checks.append('Assembly uses the approved mesh band, typography and contrast across all six presets in light and dark')
         tab.set_viewport_size({'width':1024,'height':768})
         tab.screenshot(path=str(report/'assembly-light-1024.png'))
         assert tab.locator('#viewport-box').evaluate('el=>el.scrollWidth<=el.clientWidth+2')
@@ -162,11 +232,48 @@ def run_assembly_checks(context, url, report, checks):
         assert tab.locator('#assembly-geometry').evaluate('el=>el.getBoundingClientRect().width<190'), 'Compact panel widths must override theme defaults'
         tab.locator('#viewport-showcase').click()
         assert tab.locator('#viewport-stage').evaluate('el=>el.classList.contains("vp-showcase")')
-        tab.locator('#viewport-inspect').click(); assert not tab.locator('#viewport-box').evaluate('el=>el.classList.contains("is-assembly")')
-        checks.append('Assembly persists as an optional mode, supports light/dark and reduced motion, fits 1024px, and returns to Inspect and Showcase')
+        assert tab.locator('#viewport-uv-toggle').is_disabled()
+        tab.locator('#viewport-showcase').click()
+        assert tab.locator('#viewport-uv-toggle').is_enabled() and tab.locator('.assembly-section').first.is_visible()
+        checks.append('Assembly supports light/dark and reduced motion, fits 1024px, and keeps the editing layout when toggling Showcase')
         assert not errors,errors
     except Exception:
         (report/'assembly-failure.json').write_text(json.dumps({'state':tab.evaluate('__assembly.state()'),'errors':errors},indent=2))
         tab.screenshot(path=str(report/'assembly-failure.png')); raise
     finally:
         tab.close()
+
+
+def assert_brand_presentation(tab):
+    for preset in ('darcula','repak','contrast','blueprint','comic','studio'):
+        for mode in ('dark','light'):
+            tab.evaluate('''([preset,mode])=>{
+              const select=document.getElementById('settings-theme');
+              select.value=mode;select.dispatchEvent(new Event('change'));
+              document.querySelector('[data-theme-preset="'+preset+'"]').click();
+            }''', [preset,mode])
+            tab.wait_for_function('([preset,mode])=>document.documentElement.dataset.palette===preset&&document.documentElement.dataset.theme===mode', arg=[preset,mode])
+            styles = tab.evaluate('''() => {
+              const css = (selector,pseudo) => getComputedStyle(document.querySelector(selector),pseudo);
+              const sample = document.createElement('canvas').getContext('2d',{willReadFrequently:true});
+              const rgb = value => { sample.fillStyle=value;sample.fillRect(0,0,1,1);
+                return 'rgb('+[...sample.getImageData(0,0,1,1).data].slice(0,3).join(',')+')'; };
+              const contrast = (a,b) => AtelierColourFit.contrast(rgb(a),rgb(b));
+              const head=css('#viewport-head').backgroundColor, title=css('#viewport-title');
+              const control=css('#viewport-panels'), box=css('#viewport-box'), save=css('#viewport-mat-save');
+              const path=css('.assembly-path'), divider=css('#viewport-wipe-line','::after');
+              return { edge:box.borderTopWidth, teal:box.borderTopColor==='rgb(90, 170, 154)',
+                header:contrast(title.color,head), label:contrast(css('.vp-workspace-label').color,head),
+                control:contrast(control.color,control.backgroundColor), size:control.fontSize, height:control.minHeight,
+                title:title.fontSize, path:path.fontFamily, divider:divider.backgroundColor===save.backgroundColor,
+                previewRadius:css('.assembly-texture-preview').borderTopLeftRadius,
+                swatchRadius:css('.assembly-material-swatch').borderTopLeftRadius,
+                handle:contrast(divider.backgroundColor,divider.borderTopColor),
+                complete:contrast(css('#viewport-status').color,css('#viewport-foot').backgroundColor) };
+            }''')
+            assert styles['edge'] == '3px' and styles['teal'], (preset,mode,styles)
+            assert styles['header'] >= 5 and styles['label'] >= 5, (preset,mode,styles)
+            assert styles['control'] >= 4.5 and styles['complete'] >= 4.5, (preset,mode,styles)
+            assert (styles['size'],styles['height'],styles['title']) == ('13px','36px','20px'), styles
+            assert (styles['previewRadius'],styles['swatchRadius']) == ('6px','4px'), styles
+            assert 'Fragment Mono' in styles['path'] and styles['divider'] and styles['handle'] >= 3, styles

@@ -65,7 +65,7 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 #workspace #viewport-head { min-height:60px; padding:10px 16px; }
 #workspace :is(#viewport-close,#viewport-back,#viewport-expand,.vp-workspace-label) { display:none; }
 /* Workspace exposes colour editing and comparison. The full model tools are in Library. */
-#workspace :is(#viewport-modes,.vp-uv-toggle,#viewport-skin-card,#viewport-mesh-edit,#viewport-blender-send,#viewport-blender-btn,.vp-blender-help,.vp-source-name,.vp-material-edit,.vp-mat-dl,#viewport-wireframe,#viewport-regions) { display:none; }
+#workspace :is(#viewport-view-actions,.vp-uv-toggle,#viewport-skin-card,#viewport-mesh-edit,#viewport-blender-send,#viewport-blender-btn,.vp-blender-help,.vp-source-name,.vp-material-edit,.vp-mat-dl,#viewport-wireframe,#viewport-regions) { display:none; }
 #workspace #viewport-playback:has(#viewport-play:disabled) { display:none; }
 #workspace #viewport-status { margin-left:auto; }
 #workspace #viewport-head #viewport-mat-save { background:var(--drop); border-color:var(--drop); color:var(--on-drop); }
@@ -92,7 +92,7 @@ body[data-page=workspace] #menu-btn { margin-left:auto; }
 .workspace-slot-text span { color:var(--text-muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .workspace-restore { flex:none; min-height:32px; padding:0 10px; font-size:13px; }
 #workspace-dock button:focus-visible { outline:2px solid var(--drop); outline-offset:2px; }
-@media(max-width:1100px) { #workspace { padding:16px; gap:16px; } #workspace #viewport-head { flex-wrap:wrap; } #workspace #viewport-modes { order:3; } .workspace-choice-heading { align-items:flex-start; flex-direction:column; } }
+@media(max-width:1100px) { #workspace { padding:16px; gap:16px; } #workspace #viewport-head { flex-wrap:wrap; } .workspace-choice-heading { align-items:flex-start; flex-direction:column; } }
 @media(max-height:800px) { #workspace { padding-top:16px; gap:16px; } }
 @media(max-width:800px) {
   .workspace-heading { align-items:flex-start; flex-wrap:wrap; gap:10px; }

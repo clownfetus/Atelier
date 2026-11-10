@@ -110,6 +110,31 @@ class MappedLods(unittest.TestCase):
         self.assertEqual(mesh_lods.material_index({'mat':0}, [-1]), 0)
         self.assertEqual(mesh_lods.material_index({'mat':3}, [2]), 3)
 
+    def test_donor_uses_baked_material_name_and_retains_the_raw_section(self):
+        model, _ = self.fixture()
+        donor = copy.deepcopy(model)
+        donor.materials[0]['slot_name'] = 'BakedAtlas'
+        shift = np.array([0, 2, 0], 'f4')
+        donor.positions = lambda lod: model.positions(model.lods[1]) + shift
+        with tempfile.TemporaryDirectory() as temporary:
+            path = str(Path(temporary)/'donor.glb')
+            mesh.export_glb(donor, 1, path)
+            section = mesh.glb_to_sections(model, 1, path, material_map=[2])[0]
+            self.assertEqual(section['mat'], 0)
+            self.assertEqual(section['bonemap'], model.section_bonemap(model.lods[1]['sections'][0]))
+            np.testing.assert_allclose(section['positions'], donor.positions(donor.lods[1]), atol=1e-5)
+            preserved = mesh.glb_to_sections(model, 1, path, preserve_parts={'BakedAtlas'}, material_map=[2])[0]
+            np.testing.assert_array_equal(preserved['positions'], model.positions(model.lods[1]))
+            mesh.export_glb(model, 1, path)
+            with self.assertRaisesRegex(ValueError, 'silently dropped'):
+                mesh.glb_to_sections(model, 1, path, material_map=[2])
+
+    def test_two_raw_sections_cannot_share_one_donor_material(self):
+        model, _ = self.fixture()
+        model.lods[1]['sections'] = model.lods[0]['sections']
+        with self.assertRaisesRegex(ValueError, 'unique material slot'):
+            mesh_lods.replacement_slots(model, 1, [2, 2])
+
     def test_material_map_cache_is_tied_to_both_package_files(self):
         from atelier import tools
         with tempfile.TemporaryDirectory() as temporary:

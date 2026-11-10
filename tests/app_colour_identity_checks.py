@@ -111,7 +111,7 @@ def recent(page, sid, *, project=None, with_ids=True):
 def controls(page):
     return page.evaluate("""()=>{
       const selectors=['#hero-roster .roster-skin','#hero-roster .roster-open','.roster-filters .btn',
-        '#continue-ribbon .btn','#search-input','#search-scope','#settings-theme','#toggle-copy + .switch-track'];
+        '#continue-ribbon .btn','#search-input','#search-scope','#settings-theme','#toggle-password + .switch-track'];
       const properties=['backgroundColor','color','borderTopColor','accentColor','outlineColor'];
       return {roles:Object.fromEntries(['--acc','--bg','--bg2','--bg3','--text','--border',
         '--md-sys-color-primary','--md-sys-color-on-primary'].map(key=>[key,getComputedStyle(document.documentElement).getPropertyValue(key)])),

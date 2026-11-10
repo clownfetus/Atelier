@@ -54,12 +54,11 @@
   --status-complete: #419145;
   --status-warning: #9E7C18;
   --status-error: #E74165;
-  --status-working: #6A7C90;
   --status-complete-text: #337136;
   --status-warning-text: #7A6013;
   --status-error-text: #C5193E;
-  /* Only texture, mesh and material carry colour; every other category is told apart by shape (D2).
-     Thin glyphs reach 4.5:1. Solid folder emblems reach 3:1, and folder-emblems.js refits them per theme. */
+  /* Thin file glyphs reach 4.5:1. Solid folder emblems reach 3:1,
+     and folder-emblems.js refits them per theme. */
   --studio-icon-texture: #38679D;
   --studio-icon-mesh: #386D63;
   --studio-icon-material: #A24B23;
@@ -67,6 +66,9 @@
   --studio-emblem-texture: #5084C0;
   --studio-emblem-mesh: #498D80;
   --studio-emblem-material: #D0602D;
+  --studio-emblem-character: #267E96;
+  --studio-emblem-ui: #755CB4;
+  --studio-emblem-vfx: #A95199;
   --studio-emblem-neutral: #6A7C90;
   --studio-scrim: rgb(20 24 30 / 40%);
   /* One elevation scale: resting cards, floating menus/popups/toasts, and dialogs. */
@@ -205,7 +207,6 @@
   --status-complete: #7CC47F;
   --status-warning: #E6C35C;
   --status-error: #EC6A86;
-  --status-working: #778BA3;
   --status-complete-text: #7CC47F;
   --status-warning-text: #E6C35C;
   --status-error-text: #EC6A86;
@@ -216,6 +217,9 @@
   --studio-emblem-texture: var(--atelier-texture);
   --studio-emblem-mesh: var(--atelier-mesh);
   --studio-emblem-material: var(--atelier-material);
+  --studio-emblem-character: #62B6CC;
+  --studio-emblem-ui: #AA98E8;
+  --studio-emblem-vfx: #D98BCB;
   --studio-emblem-neutral: var(--atelier-guide);
   --studio-scrim: rgb(0 0 0 / 56%);
   /* Near-black surfaces need far denser shadows before elevation reads at all. */

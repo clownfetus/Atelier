@@ -208,7 +208,7 @@ def main():
             assert page.evaluate('__uvReal.snapshot()')==snapshot
             page.screenshot(path=str(report/'real-model-uv-xray.png'))
             page.click('#viewport-showcase');assert page.is_hidden('#viewport-uv-panel') and page.is_disabled('#viewport-uv-toggle')
-            page.click('#viewport-inspect');assert not page.is_disabled('#viewport-uv-toggle')
+            page.click('#viewport-showcase');assert not page.is_disabled('#viewport-uv-toggle')
             assert not result['page_errors'],result['page_errors']
             page.evaluate('AtelierViewport.close()');browser.close()
             assert hashes()==before,'Project files changed during inspection'

@@ -26,12 +26,12 @@ let   suppressChangeToastUntil = Date.now() + 5000;
 let   suppressedImportGameRels = new Set();
 let   _pathLabels = {};      // "Characters/1234" -> "1234 — Spider-Man" (cached from browse results)
 const _folderArtwork = {};  // Reuse the catalogue artwork already shown on folder cards.
-let   _modsFolderSet   = false; // whether a mods folder is configured (gates "Copy to %s/")
-let   _modsFolderPath  = "";    // configured mods folder, for the "Copy to %s/" label
+let   _modsFolderSet   = false;
+let   _modsFolderPath  = "";
+let   _copyToMods      = false; // Last destination chosen in mod review this session.
 let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
-let   _openAfterImport = _store.get("atelier.openAfterImport") !== "0"; // Settings → Behaviour toggle
 
 // ── handler registry ──────────────────────────────────────────────────────────
 const ASSET_HANDLERS = {
@@ -116,9 +116,9 @@ async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Co
 
 // Reveal in the file manager. The endpoint reports why it could not, so surface that instead of
 // firing and forgetting — a silent no-op here was reported as "Open in Explorer does nothing".
-async function revealInExplorer(gameRel) {
+async function revealInExplorer(gameRel, project) {
   try {
-    const r = await projectFetch(`/api/open_explorer?game_rel=${encodeURIComponent(gameRel)}`);
+    const r = await projectFetch(`/api/open_explorer?game_rel=${encodeURIComponent(gameRel)}`, {}, project);
     const d = await r.json();
     if (!d.ok) toast(d.error || "Could not open the file manager", "warning", 6000);
   } catch (e) {
@@ -132,8 +132,8 @@ function leaveToast(el, remove) {
   remove();
 }
 
-function toastSpinner(msg) {
-  try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy'); }
+function toastSpinner(msg, options) {
+  try { if (window.AtelierExportFeedback) return window.AtelierExportFeedback.toast(msg, 'info', 0, 'busy', options); }
   catch (_) { /* Static operation feedback remains available. */ }
   const el = document.createElement("div");
   el.className = "toast";
@@ -155,8 +155,8 @@ function renderTrayProgress() {
   for (const row of document.getElementById('tray-progress').children)
     row.hidden = row.dataset.project !== _activeProjectName;
 }
-function trayProgress(message, project = _activeProjectName) {
-  const row = toastSpinner(message);
+function trayProgress(message, project = _activeProjectName, options) {
+  const row = toastSpinner(message, options);
   row.dataset.project = project;
   document.getElementById('tray-progress').append(row);
   renderTrayProgress();
@@ -346,8 +346,6 @@ function renderBreadcrumbs() {
 
   lucide.createIcons({ nodes: [bc] });
   requestAnimationFrame(() => { bc.scrollLeft = bc.scrollWidth; });
-  // The skin-level Model Studio entry belongs to skin folders only.
-  document.getElementById("view3d-fab").classList.toggle("show", !!skinIdFromPath(nav.path));
 }
 
 // ── grid rendering ────────────────────────────────────────────────────────────
@@ -399,6 +397,15 @@ let _gridThumbs = null;
 let _gridStatus = 'ready';
 let _gridRenderedPath = '';
 const libraryLoading = document.querySelector('#grid-area > .library-loading');
+function renderLibraryBanner(path) {
+  const skinId = skinIdFromPath(path);
+  const inspect = skinId ? () => {
+    if (window.AtelierViewport) window.AtelierViewport.open(skinId, `3D Preview — ${skinId}`);
+    else toast("3D viewport failed to load", "warning");
+  } : null;
+  return window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork, inspect);
+}
+
 function showLibraryLoading(area) {
   if (!area.querySelector('.library-loading')) area.replaceChildren(libraryLoading.cloneNode(true));
 }
@@ -442,7 +449,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
       document.querySelector('.overlay.active, dialog[open]');
     const commit = () => {
       if (requestId !== _gridRequest || project !== _activeProjectName) return;
-      const bannerReady = window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
+      const bannerReady = renderLibraryBanner(path);
       const category = path.split('/').reverse().map(part=>folderIconCls(part)).find(cls=>cls!=='folder-icon') || 'folder-icon';
       document.getElementById('library-category-line').className = 'card-icon ' + category;
       window.AtelierRoster?.show(!path, selectedPath=>pushNav({path:selectedPath}), {
@@ -469,7 +476,7 @@ async function renderGrid(focusPath = null, direction = 'forward') {
     const failure = document.createElement("div"); failure.id = "empty-state";
     failure.textContent = e.message; area.replaceChildren(failure);
     area.setAttribute('aria-busy', 'false');
-    window.AtelierContinuity?.banner(path, _pathLabels, _folderArtwork);
+    renderLibraryBanner(path);
     renderBreadcrumbs();
     window.AtelierEmptyGlyph?.mount(failure, "error");
     document.getElementById("library-count").textContent = "Could not load assets";
@@ -492,18 +499,13 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   area.classList.toggle('home-categories',!nav.path);
   const q = _libraryQuery().toLowerCase();
   const focusPath = navigationFocus || (area.contains(document.activeElement) ? document.activeElement.closest('.card')?.dataset.libraryPath : null);
-  let filtered = AtelierLibraryTools.filter(cards, q);
+  const filtered = AtelierLibraryTools.sort(AtelierLibraryTools.filter(cards, q), {home: !nav.path});
   document.getElementById('bulk-material-open').hidden = !filtered.some(card => card.file_type === 'material' && card.game_rel);
   const narrowed = !!q || AtelierLibraryTools.hasFilters();
   const countLabel = `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${narrowed ? ` of ${cards.length}` : ""}`;
   if (window.AtelierPolish) window.AtelierPolish.count(document.getElementById('library-count'), countLabel);
   else document.getElementById('library-count').textContent = countLabel;
 
-  if (!nav.path && AtelierLibraryTools.preferredSort() === 'recommended') {
-    const isFeatured = c => c.type === "folder" && AtelierFolderIcons.isFeatured(c.name);
-    filtered = [...filtered.filter(isFeatured), ...filtered.filter(c => !isFeatured(c))];
-  }
-  filtered = AtelierLibraryTools.sort(filtered);
   document.getElementById("import-all-btn").disabled = !filtered.some(c => c.type === 'asset' && c.file_type === 'texture');
 
   if (!filtered.length) {
@@ -660,7 +662,8 @@ function updateImportedCard(gameRel, record) {
     const image=button.querySelector('img[data-game-rel]');if(image)image.dataset.token=record.token;
   }
   const q=_libraryQuery().toLowerCase();
-  const cards=AtelierLibraryTools.sort(AtelierLibraryTools.filter(allItems.map(_makeCard),q));
+  const filtered = AtelierLibraryTools.filter(allItems.map(_makeCard), q);
+  const cards = AtelierLibraryTools.sort(filtered, {home: !nav.path});
   if (!cards.length) {buildGrid(allItems.map(_makeCard));return;}
   const key=card=>card.rel_path||card.game_rel||card.label;
   const roots=new Map([...grid.querySelectorAll('.card')].map(node=>{
@@ -762,6 +765,9 @@ function handleImportedFileAction(item) {
   window.AtelierRoster?.rememberEditor(item.game_rel,item.file_type,_activeProjectName);
   const ft = item.file_type || "texture";
   switch (ft) {
+    case "texture":
+      previewLibraryCard({type:'asset', imported:true, game_rel:item.game_rel, label:item.name}, document.activeElement);
+      return;
     case "material":
       openMaterialEditor(item);
       return;
@@ -780,8 +786,6 @@ function handleImportedFileAction(item) {
     case "mesh":
       window.AtelierMeshEdit?.open(item);
       return;
-    default:
-      projectFetch(`/api/open_with?game_rel=${encodeURIComponent(item.game_rel)}`);
   }
 }
 
@@ -838,7 +842,7 @@ async function meshBlendExtract(game_rel, name, force = false) {
     (res.warnings || []).slice(0, 4).forEach(w => toast(w, "warning", 9000));
     refreshSidebarEntry(game_rel, name, skinIdFromPath(nav.path));
     renderGrid();
-    openBlend(game_rel);   // queuing a mesh means editing it now, same as a texture's auto "Open With"
+    openBlend(game_rel);   // This action explicitly opens the model in Blender.
   } catch (e) {
     setStatus("");
     t.resolve(`Error: ${e.message}`, "error");
@@ -876,14 +880,13 @@ async function editAsset(item) {
   if (_editsInFlight.has(key)) return;
   _editsInFlight.add(key);
   if (item.file_type === "vfx") {
-    // Reading Niagara parameters does not create a project edit. Open its editor
-    // immediately so disabling external auto-open cannot turn this click into a no-op.
+    // Reading Niagara parameters does not create a project edit.
     try { await openVfxEditor(item); }
     finally { _editsInFlight.delete(key); }
     return;
   }
   suppressedImportGameRels.add(key);
-  const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project);
+  const loadingToast = trayProgress(`Preparing ${item.name} for editing…`, project, {asset: item.file_type});
   setStatus(`Preparing ${item.name} for editing…`);
   try {
     let res;
@@ -915,10 +918,11 @@ async function editAsset(item) {
       updateImportedCard(item.game_rel, imported);
       loadingToast.resolve(`Ready to edit: ${item.name}`, "success");
       setStatus("");
-      if (_openAfterImport) {
+      if (item.file_type !== 'texture') {
         const importedItem = allItems.find(i => i.game_rel === item.game_rel) || item;
         handleImportedFileAction(importedItem);
       }
+      return true;
     } else {
       suppressedImportGameRels.delete(key);
       loadingToast.resolve(`Edit failed: ${res.error}`, "error");
@@ -2481,13 +2485,6 @@ function _shownTextures() {
   return allItems.filter(i => i.type === 'asset' && i.file_type === 'texture' && paths.has(i.game_rel));
 }
 
-document.getElementById("view3d-fab").addEventListener("click", () => {
-  const sid = skinIdFromPath(nav.path);
-  if (!sid) { toast("Open a skin folder first", "info"); return; }
-  if (window.AtelierViewport) window.AtelierViewport.open(sid, `3D Preview — ${sid}`);
-  else toast("3D viewport failed to load", "warning");
-});
-
 document.getElementById("import-all-btn").addEventListener("click", () => {
   const shown   = _shownTextures();
   const pending = shown.filter(i => !i.imported);
@@ -2897,7 +2894,6 @@ function renderSidebar() {
   window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail:{project:_activeProjectName}}));
   window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
   const list = document.getElementById("sidebar-list");
-  document.getElementById('clear-all-btn').style.display = Object.keys(sidebarData).length ? '' : 'none';
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
   const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
   const previousRows = window.AtelierPolish?.sidebarBefore(list);
@@ -3043,11 +3039,6 @@ function _flushSelection(project) {
   return pending ? _persistSelection(project, pending) : Promise.resolve();
 }
 
-function _modsTopFolderName() {
-  const parts = (_modsFolderPath || "").replace(/\\/g, "/").split("/").filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "~mods";
-}
-
 function _syncToggleRow(id) {
   const cb = document.getElementById(id);
   cb.closest(".toggle-row").classList.toggle("on", cb.checked);
@@ -3058,23 +3049,18 @@ let _exportReviewChecking = false;
 const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
 
 function updateInstallBtn() {
-  const sel = Object.values(sidebarData).filter(i => i.selected).length;
-  const badge = document.getElementById("sel-count");
+  const items = Object.values(sidebarData);
+  const sel = items.filter(i => i.selected).length;
+  const edited = items.length;
   const count = document.getElementById("sel-count-value");
   if (window.AtelierPolish) window.AtelierPolish.count(count, sel); else count.textContent = `${sel}`;
-  badge.classList.toggle("active", sel > 0);
-  const edited = Object.keys(sidebarData).length;
+  document.getElementById("sel-count-total").textContent = ` of ${edited} included`;
+  document.getElementById("tray-selection").hidden = edited === 0;
+  document.getElementById("tray-menu-btn").hidden = edited === 0;
+  document.getElementById("tray-include-all").textContent = sel === edited ? "Exclude all" : "Include all";
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
-
-  const copyRow = document.getElementById("toggle-copy-row");
-  const copyCb  = document.getElementById("toggle-copy");
-  copyRow.classList.toggle("disabled", !_modsFolderSet);
-  copyCb.disabled = !_modsFolderSet;
-  if (!_modsFolderSet) copyCb.checked = false;
-  document.getElementById("toggle-copy-label").textContent = `Copy to ${_modsTopFolderName()}/`;
-  copyRow.title = _modsFolderSet ? "" : "Set a mods folder first (Menu → Settings)";
-  _syncToggleRow("toggle-copy");
+  if (!_modsFolderSet) _copyToMods = false;
 
   const pwRow = document.getElementById("toggle-password-row");
   const pwCb  = document.getElementById("toggle-password");
@@ -3087,13 +3073,9 @@ function updateInstallBtn() {
   _syncToggleRow("toggle-password");
 }
 
-document.getElementById("toggle-copy-row").addEventListener("click", e => {
-  if (document.getElementById("toggle-copy").disabled) { e.preventDefault(); openPaths(); }
-});
 document.getElementById("toggle-password-row").addEventListener("click", e => {
   if (document.getElementById("toggle-password").disabled) { e.preventDefault(); openPaths(); }
 });
-document.getElementById("toggle-copy").addEventListener("change", () => _syncToggleRow("toggle-copy"));
 document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
 // `extra` swaps the build endpoint and adds its fields, e.g. a Skin Swapper build; every guard,
@@ -3172,7 +3154,8 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
 function _captureExportReview() {
   const items = Object.values(sidebarData).map(item => ({...item}));
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
-  const copyToMods = document.getElementById("toggle-copy").checked && _modsFolderSet;
+  const modsPath = _modsFolderSet ? _modsFolderPath : "";
+  const copyToMods = _copyToMods && !!modsPath;
   const protectedMod = document.getElementById("toggle-password").checked && !!_protectionPassword;
   const included = [], excluded = [];
   for (const item of items) {
@@ -3181,15 +3164,15 @@ function _captureExportReview() {
     if (reason) excluded.push(Object.freeze({...item, reason}));
     else included.push(Object.freeze(item));
   }
+  // Destination is chosen in review. The fingerprint tracks the project and settings it relies on.
   const fingerprint = JSON.stringify({
-    project: _activeProjectName, modName, copyToMods, protectedMod,
-    modsPath: _modsFolderPath,
+    project: _activeProjectName, modName, protectedMod, modsPath,
     revision: _sidebarRequest,
     items: items.sort((a,b) => String(a.game_rel).localeCompare(String(b.game_rel))),
   });
   return Object.freeze({project: _activeProjectName, modName, included: Object.freeze(included),
     excluded: Object.freeze(excluded), skipped: excluded.filter(i => i.selected).length,
-    copyToMods, modsPath: _modsFolderPath, protected: protectedMod, fingerprint});
+    copyToMods, modsPath, protected: protectedMod, fingerprint});
 }
 
 function _exportReviewCurrent(snapshot, password) {
@@ -3311,27 +3294,23 @@ async function doInstallMod() {
     window.AtelierExportReview?.notice("No assets are selected. Close this review and select the changes to export.");
     return;
   }
-  if (document.getElementById("toggle-copy").checked && !_modsFolderSet) {
-    toast("Set a mods folder first — opening Settings…", "info");
-    openPaths();
-    return;
-  }
   const snapshot = _captureExportReview();
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
   const password = snapshot.protected ? _protectionPassword : "";
   if (!window.AtelierExportReview) { await _confirmExportReview(snapshot, password); return; }
   const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
-    confirm: () => _confirmExportReview(snapshot, password), refresh: doInstallMod, settings: openPaths,
+    confirm: reviewed => _confirmExportReview(reviewed, password), refresh: doInstallMod, settings: openPaths,
+    rememberDestination: copyToMods => { _copyToMods = copyToMods; },
     skinSwapper: swapper && {
       ...swapper,
       plan: options => api("/api/skin_swapper/plan", {
         project: snapshot.project, method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mod_name: snapshot.modName, ...options }),
       }),
-      build: options => {
+      build: (options, reviewed) => {
         try { localStorage.setItem("atelier.skinSwapper.author", options.author || ""); } catch (_) {}
-        return _confirmExportReview(snapshot, password, { endpoint: "/api/skin_swapper/build", body: options });
+        return _confirmExportReview(reviewed, password, { endpoint: "/api/skin_swapper/build", body: options });
       },
     },
     reveal: async () => {
@@ -3356,7 +3335,7 @@ document.getElementById("confirm-overwrite-ok").addEventListener("click", async 
 });
 
 document.getElementById("install-btn").addEventListener("click", doInstallMod);
-document.getElementById("sel-count").addEventListener("click", toggleSelectAll);
+document.getElementById("tray-include-all").addEventListener("click", toggleSelectAll);
 
 // The workspace's Your mod dock is another view of this tray: same edits, same Delete-to-trash
 // with Undo, same export review. It never keeps a list of its own.
@@ -3435,10 +3414,10 @@ async function performClearImported(item) {
   }
 }
 
-document.getElementById("clear-all-btn").addEventListener("click", async () => {
+async function removeAllEdits() {
   const count = Object.keys(sidebarData).length;
-  if (!count) { toast("No edited assets to clear", "info"); return; }
-  if (!(await _confirmAction(`All ${count} edited asset${count !== 1 ? "s" : ""} will be moved to the project trash for 7 days. The project keeps at most 20 trash entries.`, 'Delete all edits?', 'Delete all'))) return;
+  if (!count) return;
+  if (!(await _confirmAction(`All ${count} edited asset${count !== 1 ? "s" : ""} will be moved to the project trash for 7 days. The project keeps at most 20 trash entries.`, 'Remove all edits?', 'Remove all'))) return;
   const project = _activeProjectName;
   try {
     const res = await api("/api/delete_all_imported", {
@@ -3459,6 +3438,13 @@ document.getElementById("clear-all-btn").addEventListener("click", async () => {
   } catch (e) {
     toast(`Error: ${e.message}`, "warning");
   }
+}
+
+document.getElementById("tray-menu-btn").addEventListener("click", e => {
+  _ctxShow({ preventDefault: () => e.preventDefault(), stopPropagation: () => e.stopPropagation(),
+    currentTarget: e.currentTarget }, [
+    { icon: "trash-2", label: "Remove all edits…", danger: true, action: removeAllEdits },
+  ]);
 });
 
 // ── pak index warnings ───────────────────────────────────────────────────────
@@ -3594,7 +3580,7 @@ async function checkSetup() {
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
     _protectionPassword = statusRes.password_prefill || "";
-    document.getElementById("toggle-copy").checked = _modsFolderSet;
+    _copyToMods = _modsFolderSet;
     if (statusRes.configured) {
       _setSetupLoading(false, 'success', revision);
       return false;
@@ -3757,16 +3743,9 @@ document.getElementById("setup-close").addEventListener("click", () => {
   _resumeLaunchCheck();
 });
 
-document.getElementById("toggle-import-open").checked = _openAfterImport;
 const blenderProjectTexturesToggle = document.getElementById('settings-blender-project-textures');
 blenderProjectTexturesToggle.checked = _store.get('atelier.blenderProjectTextures') !== '0';
 blenderProjectTexturesToggle.addEventListener('change', event => _store.set('atelier.blenderProjectTextures', event.target.checked ? '1' : '0'));
-_syncToggleRow("toggle-import-open");
-document.getElementById("toggle-import-open").addEventListener("change", e => {
-  _openAfterImport = e.target.checked;
-  _store.set("atelier.openAfterImport", _openAfterImport ? "1" : "0");
-  _syncToggleRow("toggle-import-open");
-});
 
 let _validateGen = 0;
 async function validateSetup() {
@@ -4020,7 +3999,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
         // another machine), so it could never have loaded. Say where it now points.
         toast(`Mods folder re-pointed to the game's own ~mods:\n${res.mods_folder}`, "info", 9000);
       }
-      if (!wasModsSet && _modsFolderSet) document.getElementById("toggle-copy").checked = true;
+      if (!wasModsSet && _modsFolderSet) _copyToMods = true;
       if (wasPaths && _resumeLaunchCheck()) {
         toast("Settings saved", "success");
       } else if (wasPaths) {
@@ -4094,6 +4073,7 @@ function _ctxShow(e, items) {
   e.preventDefault();
   e.stopPropagation();
   if (!items.length) return;
+  _ctxMenu.classList.toggle('over-viewport', !!e.currentTarget?.closest?.('#viewport-overlay.overlay'));
   // Asked back while it folds away: stop the fold and open afresh.
   if (_ctxMenu.dataset.folding) { window.AtelierMotion?.unfoldStop?.(_ctxMenu); delete _ctxMenu.dataset.folding; _ctxMenu.inert = false; }
   _ctxOpener = document.activeElement;
@@ -4191,6 +4171,37 @@ async function replaceTextureFromFile(file,game_rel,project=_activeProjectName) 
   }
 }
 
+async function prepareTextureForOpen(item, project) {
+  const gameRel = item.game_rel;
+  const name = item.name || item.label || gameRel.split('/').pop();
+  if (!item.imported && !(await editAsset({file_type:'texture', game_rel:gameRel, name,
+    skin_id:skinIdFromPath(gameRel)}))) return false;
+  return project === _activeProjectName;
+}
+
+function explorerMenuItem(item) {
+  return {icon:'folder-open', label:'Open in Explorer', action:async () => {
+    const project = _activeProjectName;
+    if (item.file_type === 'texture' && !(await prepareTextureForOpen(item, project))) return;
+    await revealInExplorer(item.game_rel, project);
+  }};
+}
+
+function textureEditorMenuItem(item) {
+  return {icon:'image', label:'Open in default image app', action:async () => {
+    const project = _activeProjectName, gameRel = item.game_rel;
+    const name = item.name || item.label || gameRel.split('/').pop();
+    if (!(await prepareTextureForOpen(item, project))) return;
+    try {
+      const result = await api(`/api/open_with?game_rel=${encodeURIComponent(gameRel)}`, {project});
+      if (!result.ok) throw Error(result.error || 'Check your system’s default image app.');
+      if (project === _activeProjectName) window.AtelierRoster?.rememberEditor(gameRel, 'texture', project);
+    } catch (error) {
+      if (project === _activeProjectName) toast(_matEscape(`${name} could not be opened. ${error.message}`), 'error');
+    }
+  }};
+}
+
 // Assembly uses the established editor/import/replacement operations. These
 // adapters add navigation context only; asset publication stays with each editor.
 window.AtelierAssetEditors = Object.freeze({
@@ -4204,14 +4215,13 @@ window.AtelierAssetEditors = Object.freeze({
     const group = row.closest('details'); if (group) group.open = true;
     row.scrollIntoView({block:'center'}); row.querySelector('button')?.focus();
   },
-  async texture(gameRel) {
-    const imported = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
-    if (imported) { handleImportedFileAction(imported); return; }
-    await editAsset({game_rel:gameRel,name:gameRel.split('/').pop(),file_type:'texture'});
-    if (!_openAfterImport) {
-      const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
-      if (record) handleImportedFileAction(record);
-    }
+  texture(gameRel) {
+    return editAsset({game_rel:gameRel, name:gameRel.split('/').pop(), file_type:'texture', skin_id:skinIdFromPath(gameRel)});
+  },
+  textureMenu(event, gameRel) {
+    const imported = Object.values(sidebarData).some(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
+    const item = {game_rel:gameRel, file_type:'texture', imported};
+    _ctxShow(event, [textureEditorMenuItem(item), explorerMenuItem(item)]);
   },
   replaceTexture(gameRel) {
     const record = Object.values(sidebarData).find(item=>item.game_rel.toLowerCase() === gameRel.toLowerCase());
@@ -4278,8 +4288,11 @@ function _ctxItemsCard(card) {
     });
     return items;
   }
-  if (card.file_type === "texture") items.push({icon: "refresh-cw", label: "Retry preview",
-    action: () => buildGrid(allItems.map(_makeCard), true)});
+  if (card.file_type === 'texture' && card.game_rel) {
+    items.push(textureEditorMenuItem(card));
+    items.push(explorerMenuItem(card));
+    items.push({icon:'refresh-cw', label:'Retry preview', action:() => buildGrid(allItems.map(_makeCard), true)});
+  }
   if (!card.imported) {
     if (card.file_type !== 'mesh') items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
     if (card.file_type === "mesh" && card.game_rel)
@@ -4292,8 +4305,7 @@ function _ctxItemsCard(card) {
     items.push({icon:'box',label:'Replace model…',action:()=>window.AtelierMeshEdit?.open({game_rel:card.game_rel,name:card.label})});
   if (card.file_type === "mesh" && card.game_rel)
     items.push({ icon: "download", label: "Open in Blender", action: () => openBlend(card.game_rel) });
-  if (card.game_rel)
-    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => revealInExplorer(card.game_rel) });
+  if (card.game_rel && card.file_type !== 'texture') items.push(explorerMenuItem(card));
   if (card.game_rel)
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = card.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
   if (card.imported && card.file_type === "texture" && card.game_rel) {
@@ -4316,12 +4328,12 @@ function _ctxItemsSidebar(item) {
   }
   if (item.file_type === "mesh" && item.game_rel)
     items.push({ icon: "box", label: "Open in Blender", action: () => openBlend(item.game_rel) });
-  if (item.game_rel)
-    items.push({ icon: "folder-open", label: "Open in Explorer", action: () => revealInExplorer(item.game_rel) });
+  if (item.game_rel) items.push(explorerMenuItem({...item, imported:true}));
   if (item.game_rel)
     items.push({ icon: "compass", label: "Find in Atelier", action: () => { const p = item.game_rel.split("/"); pushNav({ path: p.slice(0, -1).join("/") }); } });
   if (item.file_type === "texture" && item.game_rel) {
     if (items.length) items.push("sep");
+    items.push(textureEditorMenuItem({...item, imported:true}));
     items.push({ icon: "image-plus", label: "Replace with Image", action: () => { _ctxFileTarget = item.game_rel; _ctxFileInput.click(); } });
     items.push({ icon: "sliders-horizontal", label: "Export options…", action: () => openTexOpts(item) });
   }

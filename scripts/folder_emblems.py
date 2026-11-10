@@ -27,15 +27,25 @@ import brand_mark as mark
 ROOT = Path(__file__).resolve().parents[1]
 EMBLEMS = ROOT / 'gui' / 'brand' / 'emblems'
 
-# SPEC section 2, solid emblems. Only texture, mesh and material carry colour (D2). These reach 3:1 on
-# the Atelier preset's cards; other themes get them lifted or deepened at runtime, with the hue held.
+# Solid emblem colours from SPEC section 2. Other themes fit these for 3:1 contrast
+# on the cards and thumbnails while keeping the hue.
 EMBLEM_INKS = {
     'texture': {'dark': '#6C98CA', 'light': '#5084C0'},
     'mesh': {'dark': '#5AAA9A', 'light': '#498D80'},
     'material': {'dark': '#DF8F6B', 'light': '#D0602D'},
+    'character': {'dark': '#62B6CC', 'light': '#267E96'},
+    'ui': {'dark': '#AA98E8', 'light': '#755CB4'},
+    'vfx': {'dark': '#D98BCB', 'light': '#A95199'},
     'neutral': {'dark': '#778BA3', 'light': '#6A7C90'},
 }
-ROLES = {'texture-folder-icon': 'texture', 'mesh-folder-icon': 'mesh', 'material-folder-icon': 'material'}
+ROLES = {
+    'texture-folder-icon': 'texture',
+    'mesh-folder-icon': 'mesh',
+    'material-folder-icon': 'material',
+    'char-icon': 'character',
+    'ui-folder-icon': 'ui',
+    'vfx-folder-icon': 'vfx',
+}
 
 G = 1.4
 MASTER = dict(d=0.0, k=2.2, f=.55)
@@ -260,7 +270,7 @@ CORE_PIECES = {
     'material-folder-icon': [D(12, 12, 10)],
 }
 
-NEUTRAL = [
+OTHER_FOLDERS = [
     ('folder-icon', 'Folder', [P([(2, 3), (9.2, 3), (11.8, 5.6), (22, 5.6), (22, 9), (2, 9)], k=.8), P([(2, 10.4), (22, 10.4), (20.4, 21.5), (2, 21.5)])]),
     ('char-icon', 'Characters', [D(12, 6.6, 4.8), P(BODY, [halo(12, 6.6, 4.8)])]),
     ('ui-folder-icon', 'UI', [P(R(2, 2.5, 9.2, 21.5)), P(R(10.6, 2.5, 22, 9.5)), P(R(10.6, 10.9, 22, 21.5))]),
@@ -277,7 +287,7 @@ NEUTRAL = [
     ('language-folder-icon', 'Languages', [P([(1.5, 2), (15.5, 2), (15.5, 12.5), (7.5, 12.5), (3, 16.6), (3, 12.5), (1.5, 12.5)], k=.8), P([(16.9, 6), (22.5, 6), (22.5, 18.5), (21, 18.5), (21, 22.5), (17, 18.5), (8.8, 18.5), (8.8, 13.9), (16.9, 13.9)], k=.8)]),
 ]
 LABELS = {'texture-folder-icon': 'Textures', 'mesh-folder-icon': 'Meshes', 'material-folder-icon': 'Materials'}
-ALL = [(c, LABELS[c], CORE_PIECES[c]) for c in LABELS] + NEUTRAL
+ALL = [(c, LABELS[c], CORE_PIECES[c]) for c in LABELS] + OTHER_FOLDERS
 
 
 def svg(pieces, spec):

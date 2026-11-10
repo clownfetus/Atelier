@@ -114,7 +114,6 @@ def main():
                 if time.monotonic()>deadline:raise TimeoutError('Real character did not finish loading')
                 page.wait_for_timeout(500)
             page.evaluate('__assemblyReal.rest()')
-            page.locator('#viewport-assembly').click()
             page.wait_for_selector('.assembly-section')
             page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
             state=page.evaluate('__assemblyReal.state()')

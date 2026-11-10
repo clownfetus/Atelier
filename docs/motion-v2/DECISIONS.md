@@ -64,6 +64,9 @@ from the recommendation, follow the answer and update `SPEC.md` to match.
   Confirmed by Thiago, 7 Nov 2026.
 - **Status:** confirmed
 
+Characters, UI and VFX folder emblems now have distinct colours. The palette
+is in SPEC §2.
+
 ## D3 · Themes and custom palettes
 
 - **Today:** Atelier, Darcula and Repak X presets, each light and dark, plus up

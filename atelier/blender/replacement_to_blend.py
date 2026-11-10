@@ -85,12 +85,15 @@ if not options['keep_skeleton']:
     bpy.data.objects.remove(armature,do_unlink=True);armature=donor;armature.name='Armature'
 widgets={bone.custom_shape for obj in bpy.data.objects if obj.type=='ARMATURE' and obj.pose
          for bone in obj.pose.bones if bone.custom_shape}
+sys.path.insert(0, os.path.dirname(__file__))
+from import_geometry import authored_lods, bake_geometry
+
+donors = authored_lods(obj for obj in bpy.data.objects if obj not in before)
+donor_objects = set(donors.values())
 meshes=[obj for obj in bpy.data.objects if obj not in before and obj not in widgets and obj.type=='MESH'
-        and not obj.hide_render and obj.visible_get() and len(obj.data.polygons)]
+        and obj not in donor_objects and not obj.hide_render and obj.visible_get() and len(obj.data.polygons)]
 if not meshes:raise ValueError('The selected file contains no mesh geometry')
 bpy.ops.object.select_all(action='DESELECT')
-sys.path.insert(0, os.path.dirname(__file__))
-from import_geometry import bake_geometry
 geometry_reports = []
 for obj in meshes:
     geometry_reports.append(bake_geometry(obj))
@@ -233,8 +236,25 @@ if missing_indices:
     bpy.ops.object.select_all(action='DESELECT');preserved.select_set(True);replacement.select_set(True)
     bpy.context.view_layer.objects.active=replacement;bpy.ops.object.join()
     preserved_parts=missing
+for level, donor in donors.items():
+    donor.hide_viewport = donor.hide_render = donor.hide_select = False
+    donor.hide_set(False)
+    bake_geometry(donor)
+    # The template already owns the top-level materials, so Blender may suffix
+    # those names when it appends the source. Baked materials have their own names.
+    for slot in donor.material_slots:
+        if not slot.material:
+            continue
+        name = slot.material.name
+        original_name = name if name in stock_names else re.sub(r'\.\d{3}$', '', name)
+        if original_name in stock_names:
+            slot.material = stock_materials[stock_names[original_name]]
+    donor.name = f'Atelier LOD {level}'
+    donor.select_set(False)
+    donor.hide_viewport = donor.hide_render = donor.hide_select = True
 for obj in list(bpy.data.objects):
-    if obj not in (armature,replacement):bpy.data.objects.remove(obj,do_unlink=True)
+    if obj not in (armature,replacement) and obj not in donor_objects:
+        bpy.data.objects.remove(obj,do_unlink=True)
 replacement.name='SkeletalMesh';replacement.parent=None
 replacement['atelier_import_options']=json.dumps(options)
 armature.hide_viewport=armature.hide_render=armature.hide_select=True

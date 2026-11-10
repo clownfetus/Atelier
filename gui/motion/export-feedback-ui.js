@@ -12,13 +12,13 @@
     }
   });
 
-  function mountSlot(slot, state, quiet) {
+  function mountSlot(slot, state, {quiet, asset} = {}) {
     if (!slot || !window.AtelierMotion?.glyph) return null;
     const host = slot.lastElementChild;
     let glyph = null, still = false;
     const place = () => {
       still = !!quiet?.(state);
-      glyph = window.AtelierMotion.glyph.mount(host, {state, ...(still ? {still, reducedMotion: 'reduce'} : {})});
+      glyph = window.AtelierMotion.glyph.mount(host, {state, asset, ...(still ? {still, reducedMotion: 'reduce'} : {})});
     };
     const entry = {
       set(next) {
@@ -52,7 +52,7 @@
   function begin(button, project = window.atelierProject?.(), {quiet} = {}) {
     runs.get(button)?.dispose();
     const slot = button.querySelector('.export-feedback-slot');
-    const run = {glyph: mountSlot(slot, 'busy', quiet), timer: null, disposed: false};
+    const run = {glyph: mountSlot(slot, 'busy', {quiet}), timer: null, disposed: false};
     run.dispose = () => {
       if (run.disposed) return;
       run.disposed = true;
@@ -78,7 +78,7 @@
     };
   }
 
-  function toast(msg, type, duration, state, {quiet} = {}) {
+  function toast(msg, type, duration, state, options) {
     const el = document.createElement('div');
     el.className = `toast export-feedback-toast ${type}`;
     el.setAttribute('role', 'status'); el.setAttribute('aria-atomic', 'true');
@@ -97,7 +97,7 @@
     el.append(slot, label);
     document.getElementById('toast-area').appendChild(el);
     window.AtelierIcons?.createIcons({nodes: [slot]});
-    let motion = mountSlot(slot, state, quiet);
+    let motion = mountSlot(slot, state, options);
 
     let disposed = false, timer = null, remaining = duration, start = Date.now();
     const remove = el.remove.bind(el);

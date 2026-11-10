@@ -27,7 +27,7 @@ def run_viewport_loading_checks(page, context, url, report, checks):
         requests.append(route.request.headers['x-atelier-preview'])
         if mode[0]=='materials': held.append(route);return
         info={
-            'game_rel':'Characters/1029/1029001/Materials/MI_Body','colors':[{'name':'Fresh tint','rgba':[1,1,1,1]}],
+            'game_rel':'Characters/1029/1029001/Materials/MI_Body','mapping_via':'imports','colors':[{'name':'Fresh tint','rgba':[1,1,1,1]}],
             'scalars':[],'textures':{'BaseColor':'Characters/Test/SlowMap'} if mode[0] in ('textures','shared') else {}}
         route.fulfill(json={'ok':True,'materials':{name:info for name in (
             ('MI_Body','MI_Hair_01','MI_Hair_02') if mode[0]=='shared' else ('MI_Body',))}})
@@ -71,6 +71,7 @@ def run_viewport_loading_checks(page, context, url, report, checks):
         assert any('/api/texture_png?' in url for url in failed),failed
         mode[0]='ready'
         tab.evaluate("AtelierViewport.open('1029001','Replacement model')")
+        tab.locator('#assembly-material-browse').click()
         tab.wait_for_selector('.vp-mat')
         tab.wait_for_function("!/Loading materials|Loading textures/.test(document.getElementById('viewport-status').textContent)")
         tab.locator('.vp-material-select').click()

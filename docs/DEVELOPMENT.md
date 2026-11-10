@@ -129,8 +129,10 @@ On Linux: `.venv/bin/python scripts/build.py --platform linux` (see [LINUX.md](L
 labels. Only import-table material bindings enable connected editing; legacy
 name matches and selected recolour counterparts stay visibly unverified.
 `texture_sources` preserves custom slot URLs and identifies derived eye defaults.
-The optional workspace borrows Model Studio’s renderer, colour controls, UV
-inspector and animation controller, and uses the existing asset editors for saves.
+Mesh and costume previews open in Assembly View. Browse materials opens the
+grouped material list and Hide panels gives the model the full canvas. Assembly
+uses the existing colour controls, UV inspector, animation controller and asset
+editors.
 
 `/api/assembly_thumbnail` limits card images to 160px. The client loads visible
 cards with two readers, aborts obsolete requests and retains at most 48 previews.

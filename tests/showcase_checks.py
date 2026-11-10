@@ -51,11 +51,10 @@ window.__showcase={
             if value == 'full':
                 assert tab.locator('#viewport-showcase').get_attribute('aria-pressed') == 'true'
                 tab.screenshot(path=str(report/'workflow-showcase-mode.png'))
-                tab.locator('#viewport-showcase').click()
             assert tab.evaluate('__inspection.presentation().showcase')
             assert tab.evaluate("__renderTypes.includes('MeshToonMaterial')")
             assert tab.locator('.vp-showcase-backdrop').is_visible()
-            tab.locator('#viewport-inspect').click();tab.wait_for_timeout(50)
+            tab.locator('#viewport-showcase').click();tab.wait_for_timeout(50)
             assert tab.evaluate('__showcase.restored()') and tab.evaluate('__showcase.snapshot()')==baseline
         assert not writes,writes
         checks.append('Showcase renders disposable toon materials in Full/Calm/Off, then restores the exact source material objects and serialized values without project writes')
@@ -69,20 +68,19 @@ window.__showcase={
         checks.append('Showcase stands on a neutral gradient with no dots or burst; the same drawing serves live and exported views')
         def setting(id,value,event='change'):
             tab.evaluate('([id,value,event])=>{const e=document.getElementById(id);e.value=value;e.dispatchEvent(new Event(event));}',[id,value,event])
-        tab.locator('#viewport-inspect').click()
         inspect_grid=tab.evaluate('__inspection.presentation().grid')
         tab.locator('#viewport-showcase').click()
         showcase_grid=tab.evaluate('__inspection.presentation().grid')
         tab.locator('#viewport-grid').evaluate('e=>e.click()')
         assert tab.evaluate('__inspection.presentation().grid')!=showcase_grid
-        tab.locator('#viewport-inspect').click()
+        tab.locator('#viewport-showcase').click()
         assert tab.evaluate('__inspection.presentation().grid')==inspect_grid
         tab.locator('#viewport-showcase').click()
         assert tab.evaluate('__inspection.presentation().grid')!=showcase_grid
         tab.locator('#viewport-grid').evaluate('e=>e.click()')
         for id in ('viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'):
             assert tab.locator('#'+id).is_disabled()
-            assert 'Inspect' in tab.locator('#'+id).get_attribute('title')
+            assert 'Turn off Showcase' in tab.locator('#'+id).get_attribute('title')
         setting('viewport-backdrop','solid');setting('viewport-backdrop-color','#35594d','input')
         assert not tab.locator('.vp-showcase-backdrop').count()
         assert tab.locator('#viewport-stage').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(53, 89, 77)'
@@ -94,11 +92,11 @@ window.__showcase={
         tab.wait_for_function('__inspection.presentation().targets===0')
         assert tab.evaluate('__inspection.presentation().targets')==0
         setting('viewport-backdrop','gradient')
-        checks.append('Showcase settings preserve separate Inspect/Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison/wireframe/dye controls')
+        checks.append('Showcase settings preserve separate Assembly and Showcase grids, expose a solid backdrop, apply lighting and bloom, and explain disabled comparison, wireframe and dye controls')
         for theme in ['dark','light']:
             tab.evaluate("theme=>{const p=document.getElementById('settings-theme');p.value=theme;p.dispatchEvent(new Event('change'));}",theme)
-            tab.locator('#viewport-showcase').click();tab.screenshot(path=str(report/f'showcase-{theme}.png'),animations='disabled')
-        tab.locator('#viewport-inspect').click()
+            tab.screenshot(path=str(report/f'showcase-{theme}.png'),animations='disabled')
+        tab.locator('#viewport-showcase').click()
         before=tab.evaluate('__inspection.state()');tab.evaluate('window.cardPoster=__showcase.poster()');after=tab.evaluate('__inspection.state()')
         assert before['materials']==after['materials'] and tab.evaluate('__showcase.restored()')
         assert tab.evaluate('[cardPoster.width,cardPoster.height]')==[1000,1000]
@@ -111,7 +109,7 @@ window.__showcase={
         }""")
         tab.wait_for_timeout(50);assert not tab.locator('#no-canvas-card .mod-card').count()
         tab.evaluate('disposeNoCanvas();document.getElementById("no-canvas-card").remove()')
-        tab.evaluate("const native=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI');};try{document.getElementById('viewport-showcase').click();document.getElementById('viewport-inspect').click();}finally{Element.prototype.animate=native;}")
+        tab.evaluate("const native=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI');};try{const toggle=document.getElementById('viewport-showcase');toggle.click();toggle.click();}finally{Element.prototype.animate=native;}")
         assert tab.evaluate('__audio.created')==0 and not tab.evaluate('AtelierFoley.enabled()')
         motion('full')
         tab.evaluate("const c=document.getElementById('settings-foley');c.checked=true;c.dispatchEvent(new Event('change'));document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));")
@@ -158,8 +156,9 @@ window.__showcase={
         tab.keyboard.press('Escape')
         tab.evaluate("AtelierViewport.open('1029001','Synthetic Showcase fixture')");tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none'")
         assert not tab.evaluate('__inspection.presentation().showcase')
+        assert tab.locator('#viewport-box.is-assembly').is_visible()
         assert not writes and not errors,(writes,errors)
-        checks.append('Showcase is session presentation only: reopening returns to Inspect and captures preserve the camera and editable source materials')
+        checks.append('Showcase is session presentation only. Reopening returns to Assembly and captures preserve the camera and editable source materials')
     finally:
         if stored is not None:tab.evaluate("values=>{for(const [key,value] of Object.entries(values)){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}}",stored)
         tab.close()

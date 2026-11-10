@@ -17,7 +17,7 @@ def run_surfaces_checks(page,context,url,report,checks):
         assert tab.evaluate("document.fonts.load('600 24px Inter').then(f=>f.length>0)")
         assert tab.locator('#explorer').evaluate('el=>getComputedStyle(el).borderRadius')=='6px'
         assert 'Mod tray' in tab.locator('#sidebar-header').inner_text()
-        assert 'Build mod' in tab.locator('#install-btn').inner_text()
+        assert 'Review mod' in tab.locator('#install-btn').inner_text()
         tab.evaluate("document.getElementById('toast-area').replaceChildren();toast('Caption fixture','success',60000);for(let i=0;i<4;i++)toast('Caption fixture','success',60000)")
         assert tab.locator('.toast-repeat').inner_text()=='×5'
         assert tab.locator('.toast-repeat').evaluate("n=>getComputedStyle(n).fontSize")!='0px'

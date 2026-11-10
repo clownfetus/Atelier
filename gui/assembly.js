@@ -14,7 +14,9 @@ const roleLabel = source => ({basecolor:'Diffuse', specular:'Specular', normal:'
 
 export function createAssemblyView(api) {
   const box = $('viewport-box'), body = $('viewport-body'), stage = $('viewport-stage');
+  const panels = $('viewport-panels'), materialBrowse = $('assembly-material-browse');
   let active = false, sections = [], surface = null, texture = null, lastMaterial = null;
+  let candidateMaterial = null;
   let query = '', effectsKey = '', effectsRequest = null, effectResults = new Map(), materialFocus = false;
   let thumbnails = new Map(), thumbPending = new Map(), thumbQueue = [], thumbReaders = 0, thumbGeneration = 0;
   let imageObserver = null, shelfSignature = '', syncFrame = 0, linkTimer = 0;
@@ -26,7 +28,7 @@ export function createAssemblyView(api) {
     <div class="assembly-panel-head"><span class="assembly-number">01</span><h3>Geometry</h3><button id="assembly-geometry-collapse" class="assembly-icon" aria-label="Collapse geometry" aria-expanded="true"><i data-lucide="chevron-left" size="16"></i></button></div>
     <div class="assembly-geometry-content">
       <div class="assembly-project"><i data-lucide="folder" size="14"></i><span id="assembly-project"></span></div>
-      <label class="assembly-search"><i data-lucide="search" size="15"></i><input id="assembly-search" type="search" placeholder="Find a surface" aria-label="Find an assembly surface"></label>
+      <label class="assembly-search"><i data-lucide="search" size="15"></i><input id="assembly-search" type="search" placeholder="Find a part" aria-label="Find a surface or material"></label>
       <div class="assembly-list-heading"><span>Visible surfaces</span><span id="assembly-section-count"></span></div>
       <div id="assembly-sections" role="group" aria-label="Mesh sections"></div>
       <div id="assembly-geometry-selection"></div>
@@ -64,6 +66,14 @@ export function createAssemblyView(api) {
   function button(label, action, cls = '') {
     const control = make('button', label, cls); control.type = 'button'; control.addEventListener('click', action); return control;
   }
+  function referenceWarning(message, detail) {
+    const line = make('p', null, 'assembly-reference-warning'), icon = make('i'), text = make('span', message);
+    icon.dataset.lucide = 'alert-triangle'; icon.setAttribute('size', '18'); icon.setAttribute('aria-hidden', 'true');
+    if (detail) text.append(make('code', detail, 'assembly-error-detail'));
+    line.append(icon, text);
+    window.AtelierIcons?.createIcons({nodes:[line]});
+    return line;
+  }
   function chip(text, changed = false) { return make('span', text, 'assembly-badge' + (changed ? ' is-project' : '')); }
   function projectRecord(path) { return api.projectAssets?.().find(item => assetKey(item.game_rel) === assetKey(path)); }
   function ownership(path, custom = false) { return custom ? 'Project image' : projectRecord(path) ? 'In project' : 'Game original'; }
@@ -86,7 +96,8 @@ export function createAssemblyView(api) {
     list.replaceChildren();
     const groups = new Map();
     for (const section of sections) {
-      if (query && !`${api.label(section.name)} ${section.owner.name} ${section.mesh_game_rel}`.toLowerCase().includes(query)) continue;
+      if (query && ![api.label(section.name), api.group(section.name), section.object.name,
+        section.owner.name, section.mesh_game_rel, data[section.name]?.game_rel].join(' ').toLowerCase().includes(query)) continue;
       if (!groups.has(section.owner)) groups.set(section.owner, []);
       groups.get(section.owner).push(section);
     }
@@ -142,22 +153,32 @@ export function createAssemblyView(api) {
     }
     const actions = make('div', null, 'assembly-geometry-actions');
     const uv = button('Inspect UVs', () => api.uv(surface || picked));
-    uv.disabled = !picked.material.visible;
+    const uvToggle = $('viewport-uv-toggle');
+    uv.disabled = !picked.material.visible || uvToggle.disabled;
+    if (uvToggle.disabled) uv.title = uvToggle.title;
     const blender = button('Edit in Blender', () => api.blender(picked.mesh_game_rel));
     const replace = button('Replace model', () => api.replaceMesh(picked.mesh_game_rel));
     actions.append(uv, blender, replace); detail.append(actions);
   }
 
+  function canEditCandidate(info) {
+    return !!info?.game_rel && candidateMaterial === info;
+  }
+
   function renderMaterial() {
     const {data, selected, edited} = api.state(), info = data[selected];
     const section = currentSection(), trusted = verifiedBinding(info);
-    context.replaceChildren(); box.classList.toggle('assembly-unverified', !!selected && !trusted);
+    const editingCandidate = canEditCandidate(info);
+    const detailsOpen = context.dataset.material === selected && context.querySelector('.assembly-material-details')?.open;
+    context.dataset.material = selected || '';
+    context.replaceChildren();
+    box.classList.toggle('assembly-unverified', !!selected && !trusted && !editingCandidate);
     if (selected && !info && api.state().loading) {
       context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'), make('p', 'Reading material references…', 'assembly-empty'));return;
     }
     if (!selected) {
-      context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'), make('h3', 'Follow the surface'),
-        make('p', 'Choose a part of the model. Its material, shader and connected textures will appear here.', 'assembly-empty'));
+      context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'), make('h3', 'Select a surface'),
+        make('p', 'Select a surface on the model or browse materials above.', 'assembly-empty'));
       return;
     }
     context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'));
@@ -167,14 +188,23 @@ export function createAssemblyView(api) {
     if (info) swatch.style.background = api.swatch(selected, info);
     card.append(swatch, make('strong', trusted ? leaf(info.game_rel) : info?.slot_name || api.label(selected))); context.append(card);
     if (!trusted) {
-      context.append(chip('Reference unverified'), make('p', bindingNotice(info), 'assembly-reference-warning'));
-      if (info?.game_rel) context.append(make('p', `Preview candidate: ${info.game_rel}`, 'assembly-path'));
-      context.append(make('p', 'Connected editing is available when the mesh’s material reference is verified. Inspect mode retains the existing preview controls.', 'assembly-empty'));
+      context.append(chip('Reference unverified'), referenceWarning(
+        info?.mapping_error ? 'Could not verify this surface’s material link.' : bindingNotice(info), info?.mapping_error));
+      if (info?.game_rel) {
+        context.append(make('p', info.game_rel, 'assembly-path'),
+          make('p', 'Saved colours apply to this material in your project.', 'assembly-empty'));
+        if (!editingCandidate) context.append(button('Show colour controls', () => {
+          if (selectedInfo() !== info) return;
+          candidateMaterial = info;
+          renderMaterial();
+          $('viewport-material-editor').querySelector('input, summary')?.focus();
+        }, 'assembly-primary'));
+      }
       return;
     }
     context.append(chip(ownership(info.game_rel), !!projectRecord(info.game_rel)),
       ...(edited[selected] ? [chip('Unsaved colours', true)] : []));
-    if (info.material_error) context.append(make('p', `Material properties unavailable: ${info.material_error}`, 'assembly-reference-warning'));
+    if (info.material_error) context.append(referenceWarning('Could not read this material’s properties. Reopen the preview to retry.', info.material_error));
     const path = make('p', info.game_rel, 'assembly-path'); path.title = info.game_rel; context.append(path);
     const materialNames = relatedMaterials(data, info.game_rel), affected = sections.filter(s => materialNames.includes(s.name));
     const used = make('div', null, 'assembly-affected');
@@ -189,10 +219,13 @@ export function createAssemblyView(api) {
     shader.append(make('dt', 'Shader'), make('dd', info.surface?.parent || 'Not reported'),
       make('dt', 'Texture slots'), make('dd', String(boundTextures(info).length)));
     if (info.surface?.blend) shader.append(make('dt', 'Blend'), make('dd', info.surface.blend.replace('BLEND_', '')));
-    context.append(shader, button('Edit material', () => api.editMaterial(selected), 'assembly-primary'));
-    if (info.visibility_warning) context.append(make('p', info.visibility_warning, 'assembly-empty'));
+    const details = make('details', null, 'assembly-material-details');
+    details.open = !!detailsOpen;
+    details.append(make('summary', 'Material details'), used, shader);
+    if (info.visibility_warning) details.append(make('p', info.visibility_warning, 'assembly-empty'));
     const inferred = (info.texture_sources || []).filter(source => source.inferred);
-    if (inferred.length) context.append(make('p', `${inferred.length} preview shader default${inferred.length === 1 ? '' : 's'} omitted from connected slots: ${inferred.map(s=>s.slot).join(', ')}.`, 'assembly-empty'));
+    if (inferred.length) details.append(make('p', `${inferred.length} preview shader default${inferred.length === 1 ? '' : 's'} omitted from connected slots: ${inferred.map(s=>s.slot).join(', ')}.`, 'assembly-empty'));
+    context.append(button('Edit material', () => api.editMaterial(selected), 'assembly-primary'), details);
   }
 
   // Small CPU thumbnails are shared by URL and project, capped at 48 images. Two
@@ -238,33 +271,39 @@ export function createAssemblyView(api) {
   }
   function renderTextures(force = false) {
     const info = selectedInfo(), sources = boundTextures(info);
-    if (!info && api.state().selected && api.state().loading) return;
-    const signature = JSON.stringify([api.state().project, api.state().selected, sources, texturesCollapsed]);
+    const {project, selected, loading} = api.state();
+    if (!info && selected && loading) return;
+    const trusted = verifiedBinding(info), owners = sources.map(source => ownership(source.game_rel, source.custom));
+    const signature = JSON.stringify([project, selected, sources, owners, texturesCollapsed]);
     $('assembly-texture-count').textContent = sources.length ? String(sources.length) : '';
-    $('assembly-texture-context').textContent = verifiedBinding(info) ? leaf(info.game_rel) : 'Select a verified material';
+    $('assembly-texture-context').textContent = trusted ? leaf(info.game_rel) : '';
     if (signature === shelfSignature && !force) { renderTextureActions(); return; }
     shelfSignature = signature; clearThumbnailWork();
     const cards = $('assembly-texture-cards'); cards.replaceChildren();
     if (texture && info) texture = sources.find(source => source.slot === texture.slot) || null;
     if (texturesCollapsed || !active) return;
     if (!sources.length) {
-      cards.append(make('p', info && verifiedBinding(info) ? 'No explicit texture bindings were reported for this material.' : 'Select a model surface to reveal its connected textures.', 'assembly-empty'));
+      const message = trusted ? 'No texture slots were found for this material.'
+        : selected ? 'Connected textures need a verified material link.' : 'Select a surface to see its connected textures.';
+      cards.append(make('p', message, 'assembly-empty'));
     } else {
       imageObserver = new IntersectionObserver(entries => {
         for (const entry of entries) if (entry.isIntersecting) {
           imageObserver?.unobserve(entry.target); loadThumb(entry.target, entry.target.dataset.src);
         }
       }, {root:cards, rootMargin:'0px 100px'});
-      for (const source of sources) {
+      for (const [index, source] of sources.entries()) {
         const card = button('', () => selectTexture(source), 'assembly-texture-card');
+        if (!source.custom) card.addEventListener('contextmenu', event => api.textureMenu(event, source));
         card.dataset.asset = source.game_rel; card.dataset.slot = source.slot; card.setAttribute('aria-pressed', 'false');
-        card.title = `${source.slot}\n${source.game_rel}\n${ownership(source.game_rel, source.custom)}`;
+        card.title = `${source.slot}\n${source.game_rel}\n${owners[index]}`;
+        if (!source.custom) card.title += '\nRight-click to open in your default image app.';
         const preview = make('span', null, 'assembly-texture-preview');
         const img = make('img'); img.alt = ''; img.width = img.height = 80; img.decoding = 'async';
         img.dataset.src = thumbnailURL(source, info); preview.append(img, make('span', 'Preview unavailable', 'assembly-thumb-error'));
         card.append(preview, make('strong', roleLabel(source)), make('span', leaf(source.game_rel), 'assembly-texture-name'),
-          chip(ownership(source.game_rel, source.custom), source.custom || !!projectRecord(source.game_rel)));
-        card.setAttribute('aria-label', `${source.slot}: ${leaf(source.game_rel)}. ${ownership(source.game_rel, source.custom)}`);
+          chip(owners[index], owners[index] !== 'Game original'));
+        card.setAttribute('aria-label', `${source.slot}: ${leaf(source.game_rel)}. ${owners[index]}`);
         cards.append(card); imageObserver.observe(img);
       }
     }
@@ -284,8 +323,9 @@ export function createAssemblyView(api) {
       const source = texture;
       const replace = button('Replace texture', () => api.replaceTexture(source));
       replace.disabled = !projectRecord(source.game_rel);
-      replace.title = replace.disabled ? 'Edit this texture to add it to the project before replacing it.' : 'Replace this project texture using the existing image workflow';
-      host.append(button('Edit texture', () => api.editTexture(source)), replace);
+      replace.title = replace.disabled ? 'Add this texture to the edit list before replacing it.' : 'Replace this project texture with an image';
+      if (replace.disabled) host.append(button('Add to edit list', () => api.editTexture(source)));
+      host.append(replace);
     }
     if (info?.game_rel) host.append(button('Edit material slot', () => api.editMaterial(selected, texture.slot)));
     const path = make('span', texture.game_rel, 'assembly-texture-path'); path.title = texture.game_rel; host.append(path);
@@ -302,7 +342,7 @@ export function createAssemblyView(api) {
     api.highlight(active && selected ? texture || materialFocus ? {names} : {names:new Set([selected]), section:picked} : null);
     selection.replaceChildren();
     if (!selected) {
-      selection.append(make('span', 'ASSEMBLY', 'assembly-eyebrow'), make('strong', 'Every surface has a story.'), make('span', 'Select a part to follow its resources.'));
+      selection.append(make('span', 'Select a surface to see its material and textures.'));
     } else {
       selection.append(make('strong', api.label(selected)), make('span', '→', 'assembly-connection-arrow'),
         make('span', verifiedBinding(info) ? leaf(info.game_rel) : 'Reference unverified'),
@@ -322,7 +362,7 @@ export function createAssemblyView(api) {
         const open = button(effect.name, () => api.effect(effect)); open.title = `${effect.game_rel}\nReferenced by ${effect.sources.join(', ')}`; host.append(open);
       }
       if (!result.effects.length) host.append(make('p', 'No direct VFX references found for this selection.', 'assembly-empty'));
-      for (const warning of result.warnings) host.append(make('p', warning, 'assembly-reference-warning'));
+      for (const warning of result.warnings) host.append(referenceWarning(warning));
       host.append(make('p', result.scope, 'assembly-empty')); return;
     }
     host.append(make('p', 'Inspect the selected mesh and material’s package references. Effects that refer to a material from another asset are not indexed.', 'assembly-empty'));
@@ -337,14 +377,15 @@ export function createAssemblyView(api) {
         effectResults.set(key, result); effectsRequest = null; renderEffects();
       } catch (error) {
         if (controller.signal.aborted || key !== effectsKey) return;
-        effectsRequest = null; renderEffects(); host.append(make('p', error.message, 'assembly-reference-warning'));
+        effectsRequest = null; renderEffects();
+        host.append(referenceWarning('Could not read this mesh’s effect references. Try again.', error.message));
       }
     });
     inspect.disabled = !section?.mesh_game_rel || !!effectsRequest; host.append(inspect);
   }
 
   function pulse() {
-    if (!active || !surface || !verifiedBinding(selectedInfo())) return;
+    if (!active || panels.getAttribute('aria-expanded') === 'false' || !surface || !verifiedBinding(selectedInfo())) return;
     clearTimeout(linkTimer); links.classList.remove('is-linking');
     if (window.AtelierMotionPolicy?.allows(1) === false || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const bounds = new THREE.Box3().setFromObject(surface.object), point = bounds.getCenter(new THREE.Vector3()).project(api.camera);
@@ -401,21 +442,35 @@ export function createAssemblyView(api) {
   }
   mountResize(geometryResize, '--assembly-geometry-width', 160, 300, 1);
   mountResize(resourceResize, '--assembly-material-width', 260, 460, -1);
+  function setPanelsVisible(visible) {
+    if (panels.getAttribute('aria-expanded') === String(visible)) return;
+    panels.setAttribute('aria-expanded', String(visible));
+    panels.textContent = visible ? 'Hide panels' : 'Show panels';
+    box.classList.toggle('assembly-panels-hidden', !visible);
+    api.resize();
+  }
+  panels.addEventListener('click', () => setPanelsVisible(panels.getAttribute('aria-expanded') === 'false'));
+  materialBrowse.addEventListener('click', () => {
+    materialBrowse.setAttribute('aria-expanded', String(materialBrowse.getAttribute('aria-expanded') === 'false'));
+  });
   function setActive(value) {
     active = !!value; box.classList.toggle('is-assembly', active);
-    geometry.hidden = shelf.hidden = context.hidden = resourceResize.hidden = selection.hidden = links.hidden = focusPanel.hidden = !active;
+    geometry.hidden = shelf.hidden = context.hidden = resourceResize.hidden = selection.hidden = links.hidden = focusPanel.hidden = materialBrowse.hidden = !active;
     if (!active) { clearThumbnailWork(); effectsRequest?.abort(); effectsRequest = null; api.highlight(null); }
     else { shelfSignature = ''; layout(); sync(); }
   }
   function reset() {
     surface = texture = null; materialFocus = false; lastMaterial = null; sections = []; effectsKey = ''; effectResults.clear();
+    candidateMaterial = null;
+    setPanelsVisible(true);
+    materialBrowse.setAttribute('aria-expanded', 'false');
     effectsRequest?.abort(); effectsRequest = null; query = ''; $('assembly-search').value = '';
     releaseThumbnails(); shelfSignature = ''; clearTimeout(linkTimer); links.classList.remove('is-linking'); api.highlight(null); schedule();
   }
   window.addEventListener('atelier:project-assets', schedule);
   window.addEventListener('pagehide', () => { reset(); cancelAnimationFrame(syncFrame); });
   setActive(false);
-  return {setActive, sync:schedule, reset, surfacePicked(hit) { surface = hit; texture = null; materialFocus = false; lastMaterial = hit.name; schedule(); requestAnimationFrame(pulse); },
+  return {setActive, sync:schedule, reset, canEditCandidate, surfacePicked(hit) { surface = hit; texture = null; materialFocus = false; lastMaterial = hit.name; schedule(); requestAnimationFrame(pulse); },
     invalidateReferences() {effectsRequest?.abort();effectsRequest=null;effectResults.clear();},
     active:() => active, selectedSurface:() => hitSection(sections, surface) ? surface : currentSection()};
 }

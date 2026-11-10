@@ -123,11 +123,14 @@ def run_category_icon_checks(page, context, url, report, checks):
               });
             }""")
             assert len(measurements) == 19, measurements
-            # Only texture, mesh and material carry colour; the other fourteen emblems share one neutral (D2).
+            # Brand-piece and highlighted folder emblems each have their own colour.
             colours = {m['cls']: m['color'] for m in measurements if m['emblem']}
-            coloured = {cls: colours.pop(cls) for cls in ('texture-folder-icon', 'mesh-folder-icon', 'material-folder-icon')}
-            assert len(colours) == 14 and len(set(colours.values())) == 1, colours
-            assert len({*coloured.values(), *colours.values()}) == 4, (coloured, colours)
+            coloured = {cls: colours.pop(cls) for cls in (
+                'texture-folder-icon', 'mesh-folder-icon', 'material-folder-icon',
+                'char-icon', 'ui-folder-icon', 'vfx-folder-icon',
+            )}
+            assert len(colours) == 11 and len(set(colours.values())) == 1, colours
+            assert len({*coloured.values(), *colours.values()}) == 7, (coloured, colours)
             assert all(m['chipEmblem'] == m['cls'] for m in measurements if m['emblem']), measurements
             assert all(m['ratio'] >= (3 if m['emblem'] else 4.5) for m in measurements), (theme, measurements)
             # File outlines have a smaller tonal plate. Folder artwork fills 76% of the thumbnail.
@@ -153,6 +156,6 @@ def run_category_icon_checks(page, context, url, report, checks):
             assert all(a == b for a, b in glyphs), glyphs
             icon_page.screenshot(path=str(report / f'category-icons-{theme}.png'), animations='disabled')
         assert not errors, errors
-        checks.append('All 17 folder icons and the file glyphs read on their plates in both themes; only texture, mesh and material carry colour, and 18px home chips use the small drawing in the same colour')
+        checks.append('Six folder emblems have distinct colours, all icons meet contrast targets in both themes, and 18px home chips match the folder colours')
     finally:
         icon_page.close()

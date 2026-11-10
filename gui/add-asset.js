@@ -86,7 +86,7 @@
     overlay = el('div', undefined, 'overlay'); overlay.id = 'add-asset-overlay';
     panel = el('section', undefined, 'modal add-asset-modal'); panel.tabIndex = -1;
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'add-asset-title');
-    const heading = el('h2', 'Add asset'); heading.id = 'add-asset-title';
+    const heading = el('h2', 'Add custom asset'); heading.id = 'add-asset-title';
     panel.append(heading, el('p', 'Add a texture, mesh or material with your own name and a folder in the game files. It will appear in your Mod tray.', 'add-asset-help'));
     form = el('form', undefined, 'add-asset-form');
     kind = el('select');
@@ -126,7 +126,7 @@
     status = el('p', '', 'add-asset-status'); status.id = 'add-asset-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const actions = el('div', undefined, 'add-asset-actions');
     closeButton = button('Cancel', hide); closeButton.dataset.close = 'true';
-    submit = el('button', 'Add asset', 'btn primary'); submit.type = 'submit'; submit.id = 'add-asset-submit';
+    submit = el('button', 'Add custom asset', 'btn primary'); submit.type = 'submit'; submit.id = 'add-asset-submit';
     actions.append(closeButton, submit);
     form.append(columns, field('Source', 'add-asset-mode', mode), fileRow, sourceRow, help, folderRow, browser, output, status, actions);
     panel.append(form); overlay.append(panel); document.body.append(overlay);

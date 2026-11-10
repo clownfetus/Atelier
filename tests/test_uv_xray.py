@@ -301,7 +301,7 @@ window.__uvTest = {
             page.click('#viewport-showcase')
             self.assertTrue(page.is_hidden('#viewport-uv-panel'))
             self.assertTrue(page.is_disabled('#viewport-uv-toggle'))
-            page.click('#viewport-inspect')
+            page.click('#viewport-showcase')
             self.assertFalse(page.is_disabled('#viewport-uv-toggle'))
             self.assertEqual(page.evaluate('__uvTest.snapshot()'),before,'Inspection must not mutate UVs, indices or recolour drafts')
             self.assertFalse(writes,'UV inspection must not write project assets')
