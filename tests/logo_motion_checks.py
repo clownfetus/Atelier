@@ -20,6 +20,9 @@ STILL = "(el => !el.hidden && getComputedStyle(el).visibility === 'visible' && g
 
 
 def run_logo_motion_checks(page, context, url, report, checks):
+    # The header carries the master mark 32.4 px tall; its width follows the drawing.
+    mark_w, mark_h = brand_mark._mark_size(brand_mark.MASTER)
+    header_width = 32.4 * mark_w / mark_h
     approved = ROOT / 'docs/motion-v2/assets'
     for rel, generate in brand_mark.OUTPUTS.items():
         path = ROOT / rel
@@ -46,7 +49,7 @@ def run_logo_motion_checks(page, context, url, report, checks):
           return {{hidden: document.querySelector('.studio-brand > img').hidden, width: box.width, height: box.height,
                    tier: host.dataset.glyphTier, states: host.dataset.glyphState}};
         }}""")
-        assert playing['hidden'] and abs(playing['width'] - 50.08) < .1 and abs(playing['height'] - 32.4) < .1, playing
+        assert playing['hidden'] and abs(playing['width'] - header_width) < .1 and abs(playing['height'] - 32.4) < .1, playing
         tab.wait_for_function(f"!document.querySelector('{ENTRANCE}')", timeout=4000)
         assert tab.evaluate(STILL), 'The still mark did not come back'
         assert abs(tab.evaluate('logoLabel() - logoLabelBefore')) < .5, 'The wordmark moved'
@@ -84,7 +87,7 @@ def run_logo_motion_checks(page, context, url, report, checks):
           const img = document.querySelector('.studio-brand > img');
           return {{entrance: !!document.querySelector('{ENTRANCE}'), shown: getComputedStyle(img).visibility, width: img.getBoundingClientRect().width}};
         }}""")
-        assert held == {'entrance': False, 'shown': 'hidden', 'width': held['width']} and abs(held['width'] - 50.08) < .1, held
+        assert held == {'entrance': False, 'shown': 'hidden', 'width': held['width']} and abs(held['width'] - header_width) < .1, held
         tab.evaluate("AtelierLogoEntranceUI.startupDone()")
         assert tab.locator(ENTRANCE).count() == 1
         tab.evaluate("AtelierLogoEntranceUI.startupDone()")

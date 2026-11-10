@@ -1516,9 +1516,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
    angle), so text on it keeps the contrast the theme already gives it, in every preset. Chroma
    falls as the surface lightens, so pale bands stay inside the colour gamut and keep their hue;
    a white surface steps just below white, since white itself can't carry a hue. */
-#texopt-overlay .modal { --studio-piece: var(--atelier-texture); --studio-piece-hue: 252.3; --studio-piece-ink: var(--studio-icon-texture); --studio-band-base: var(--md-sys-color-surface-container); }
-#viewport-overlay.overlay #viewport-box { --studio-piece: var(--atelier-mesh); --studio-piece-hue: 179.1; --studio-piece-ink: var(--studio-icon-mesh); --studio-band-base: var(--bg2); }
-#material-overlay .mat-modal { --studio-piece: var(--atelier-material); --studio-piece-hue: 44.8; --studio-piece-ink: var(--studio-icon-material); --studio-band-base: var(--md-sys-color-surface-container); }
+#texopt-overlay .modal { --studio-piece: var(--atelier-texture); --studio-piece-hue: 258.9; --studio-piece-ink: var(--studio-icon-texture); --studio-band-base: var(--md-sys-color-surface-container); }
+#viewport-overlay.overlay #viewport-box { --studio-piece: var(--atelier-mesh); --studio-piece-hue: 173.5; --studio-piece-ink: var(--studio-icon-mesh); --studio-band-base: var(--bg2); }
+#material-overlay .mat-modal { --studio-piece: var(--atelier-material); --studio-piece-hue: 46.8; --studio-piece-ink: var(--studio-icon-material); --studio-band-base: var(--md-sys-color-surface-container); }
 #texopt-overlay .modal, #viewport-overlay.overlay #viewport-box, #material-overlay .mat-modal { border-top: 3px solid var(--studio-piece); }
 #texopt-overlay .setup-head, #viewport-overlay.overlay #viewport-head, #material-overlay .mat-head {
   background: var(--studio-band-base);

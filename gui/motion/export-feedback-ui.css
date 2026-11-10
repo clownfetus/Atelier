@@ -21,7 +21,7 @@
    so the glyph takes its halo from the button and its status colours from the opposite theme. */
 #install-btn {
   --glyph-halo: var(--acc);
-  --status-complete: #7CC47F;
+  --status-complete: #B6EBA8;
   --status-warning: #E6C35C;
   --status-error: #EC6A86;
 }

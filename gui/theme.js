@@ -28,12 +28,12 @@
     light: {
       status: {complete: '#419145', warning: '#9e7c18', error: '#e74165'},
       sentence: {complete: '#337136', warning: '#7a6013', error: '#c5193e'},
-      icon: {texture: '#38679d', mesh: '#386d63', material: '#a24b23', neutral: '#4e5f73'},
+      icon: {texture: '#3364b1', mesh: '#2d6f5e', material: '#a74718', neutral: '#4e5f73'},
     },
     dark: {
-      status: {complete: '#7cc47f', warning: '#e6c35c', error: '#ec6a86'},
-      sentence: {complete: '#7cc47f', warning: '#e6c35c', error: '#ec6a86'},
-      icon: {texture: '#6c98ca', mesh: '#5aaa9a', material: '#df8f6b', neutral: '#b4c0ce'},
+      status: {complete: '#b6eba8', warning: '#e6c35c', error: '#ec6a86'},
+      sentence: {complete: '#b6eba8', warning: '#e6c35c', error: '#ec6a86'},
+      icon: {texture: '#6b95d4', mesh: '#45ab91', material: '#eb9a72', neutral: '#b4c0ce'},
     },
   };
   const defaults = () => ({preset: 'studio', custom: {}, saved: []});

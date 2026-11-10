@@ -262,7 +262,7 @@ def assert_brand_presentation(tab):
               const head=css('#viewport-head').backgroundColor, title=css('#viewport-title');
               const control=css('#viewport-panels'), box=css('#viewport-box'), save=css('#viewport-mat-save');
               const path=css('.assembly-path'), divider=css('#viewport-wipe-line','::after');
-              return { edge:box.borderTopWidth, teal:box.borderTopColor==='rgb(90, 170, 154)',
+              return { edge:box.borderTopWidth, teal:box.borderTopColor==='rgb(69, 171, 145)',
                 header:contrast(title.color,head), label:contrast(css('.vp-workspace-label').color,head),
                 control:contrast(control.color,control.backgroundColor), size:control.fontSize, height:control.minHeight,
                 title:title.fontSize, path:path.fontFamily, divider:divider.backgroundColor===save.backgroundColor,

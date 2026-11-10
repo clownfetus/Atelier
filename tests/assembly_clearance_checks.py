@@ -17,7 +17,12 @@ TIMELINE = [('working', 5.5), ('success', 7.0), ('working', 4.6), ('warning', 7.
 # Frames with a pair under 13.8u, of 1515, in the prototype on 7 November 2026. Most of the last two are the
 # X and leaving it, where the disc is pinned on the crossing. The rest are the two brisk moves, Complete and
 # the opening out of an outcome, where all three move together (SPEC invariant 4).
-BASELINE = {'tm': 57, 'td': 162, 'md': 168}
+# Tile-mesh re-measured on 10 November 2026 for the D20 drawing (it was 57; the same engine with the D14
+# outlines gives 45). The A now holds the tile and mesh one halo apart instead of 31u, so the moves that
+# start or end in it spend more frames near that line: Complete's move in and the opening out of it add
+# one to three frames each (closest new frame 11.1u), and the X forming adds a run. Tile-disc and
+# mesh-disc came down (150 and 144), and keep the prototype's ceilings.
+BASELINE = {'tm': 63, 'td': 162, 'md': 168}
 OPENED = int(.48 * FPS)  # The opening takes 420 ms; after it, Working and the loaders never overlap.
 
 # brandRing and plainRing are the engine's own outline samplers: this measures what is drawn.

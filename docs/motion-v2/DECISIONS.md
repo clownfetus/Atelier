@@ -538,3 +538,46 @@ From the P2.8 checkpoint.
   glyph mounted straight into a result starts from the row. The click plays once per moment,
   and never at Micro or in Calm.
 - **Status:** approved by Thiago, 7 Nov 2026, with both recommended changes.
+
+## D20 · The mark's apex and the piece colours
+
+From the identity review, three rounds on 10 Nov 2026. This redraws D14's mark without replacing it.
+
+- **Today:** D14's drawing. The tile's face is upright, so it and the mesh's inner edge, extended,
+  meet 50u above the mark: the A's legs never close, and 31u separates tile from mesh at the top.
+  Twelve corner radii, several of them near-misses (9.5, 10.5). The pieces sit within 5 L* of each
+  other (62, 64 and 67), so in greyscale and one-colour use they become one grey, and under
+  deuteranopia Complete green is ΔE00 4.8 from copper.
+- **Explored:** an audit with three directions (Refit, Kerf, Toile), a fourth (Fitting), then a
+  refinement of the Keystone in three directions where geometry was the only variable: Lean
+  Keystone, Stronger A and Optical Perfection. Each was compared at 128 to 16 px, in one colour, in
+  the real header and taskbar, and assembled by the shipped engine.
+- **Recommended:** keep the Keystone, and draw Stronger A with Optical Perfection's corrections.
+  - The tile's face leans until its top corner is exactly one halo from the mesh: 7.081°, or
+    3.921° in the small drawing with its wider gap. The legs then meet 9u above the mark (37u
+    small). The lean is solved, so a later change can't quietly reopen the apex.
+  - Twelve radii become a few related ones, the four lips round the disc are evened out so it no
+    longer looks pushed towards the mesh, the mesh's inner edges are parallel, the shoulder is
+    square, and corners ease into their curves. SPEC's "lines and tangent arcs only" no longer
+    holds: the bites, their lips and the tile's lobe stay tangent arcs; every other corner eases.
+  - The audit's colour fixes come with it. The pieces spread to L* 53, 64 and 71 (`#4F80CC`,
+    `#45AB91`, `#EB9A72`), each hue within 5° of before. Complete green in dark lifts to
+    `#B6EBA8`, 10.7 from copper under deuteranopia; light's `#419145` stays. Model Studio's
+    success green in dark follows it.
+  - What it gives up: it doesn't answer "chunky", since the bulk stays, and at 24 px and below
+    it looks almost the same as D14.
+- **Decision:** as recommended, as drawn, with the piece colours and Complete green. The audit's
+  other proposals (neutral edited marker, smaller folder emblems, tighter wordmark,
+  shape-coded categories) are not part of this.
+
+  Knock-on changes: the mark is 395.23u wide instead of 401.84 and the tile 192.04 instead of
+  181.5; the logo entrance and the setup page's glyph take the width from the drawing. Fitted
+  inks are re-derived from the new hues at their old lightness. In dark, the blue reaches only
+  3.5:1 on Raised, so thin texture glyphs take `#6B95D4`; solid emblems still use the piece's
+  own blue. The first loader plate follows the texture blue; the other plates and the disc's
+  shine don't change. The A now holds tile and mesh one halo apart, so the glyph clearance check
+  counts more near frames in the moves into and out of it (tile-mesh 63, was 57). Bible v1.3
+  draws the new mark, construction and colours, printed from `docs/brand/bible.html` by
+  `scripts/brand_bible.py`.
+- **Status:** chosen by Thiago, 10 Nov 2026, from the refinement gallery's "The recommendation,
+  drawn", with the piece colours and Complete green. The built change awaits his review.

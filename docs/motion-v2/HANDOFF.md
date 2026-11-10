@@ -24,7 +24,7 @@ the app, swap every Krackle surface over, then delete Krackle.
 4. `DECISIONS.md`: the calls the bible and the app disagree on, or that Phase 0
    turned up. Phase 0 is getting them answered.
 5. `SURFACE_MAP.md`: every Krackle surface, where it's mounted, what it becomes.
-6. `../brand/Atelier_Brand_Bible_v1.2.pdf`: the visual identity, for context.
+6. `../brand/Atelier_Brand_Bible_v1.3.pdf`: the visual identity, for context.
    Pages 9 and 10 cover motion.
 
 The repo's own `docs/DESIGN_SYSTEM.md`, `docs/DEVELOPMENT.md` and

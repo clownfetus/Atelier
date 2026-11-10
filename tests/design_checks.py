@@ -95,8 +95,8 @@ ATELIER_SURFACES = {
              '--border': '#24323F', '--acc': '#F4F6F8', '--md-sys-color-error': '#EC6A86'},
 }
 STATUS_BASES = {'light': {'complete': '#419145', 'warning': '#9E7C18', 'error': '#E74165'},
-                'dark': {'complete': '#7CC47F', 'warning': '#E6C35C', 'error': '#EC6A86'}}
-PIECE_COLOURS = {'--atelier-texture': '#6C98CA', '--atelier-mesh': '#5AAA9A', '--atelier-material': '#DF8F6B'}
+                'dark': {'complete': '#B6EBA8', 'warning': '#E6C35C', 'error': '#EC6A86'}}
+PIECE_COLOURS = {'--atelier-texture': '#4F80CC', '--atelier-mesh': '#45AB91', '--atelier-material': '#EB9A72'}
 
 
 def assert_theme_tokens(page, mode, preset):

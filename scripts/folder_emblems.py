@@ -30,9 +30,9 @@ EMBLEMS = ROOT / 'gui' / 'brand' / 'emblems'
 # Solid emblem colours from SPEC section 2. Other themes fit these for 3:1 contrast
 # on the cards and thumbnails while keeping the hue.
 EMBLEM_INKS = {
-    'texture': {'dark': '#6C98CA', 'light': '#5084C0'},
-    'mesh': {'dark': '#5AAA9A', 'light': '#498D80'},
-    'material': {'dark': '#DF8F6B', 'light': '#D0602D'},
+    'texture': {'dark': '#4F80CC', 'light': '#5182CD'},
+    'mesh': {'dark': '#45AB91', 'light': '#3A8F7A'},
+    'material': {'dark': '#EB9A72', 'light': '#D75B1E'},
     'character': {'dark': '#62B6CC', 'light': '#267E96'},
     'ui': {'dark': '#AA98E8', 'light': '#755CB4'},
     'vfx': {'dark': '#D98BCB', 'light': '#A95199'},
