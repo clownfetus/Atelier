@@ -184,10 +184,28 @@ def t_plugin_assets_extract_by_full_path():
         "ensure_work_base no longer routes plugin assets through the full-path extractor"
 
 
+def t_the_uassettool_fallback_names_a_plugin_asset_by_its_mount_path():
+    """A plugin asset in a patch container reaches UAssetTool by its real mount path.
+
+    retoc cannot unpack patch containers, so a MarvelGAS asset there (most hero-ability VFX since
+    the October patches) is extracted by UAssetTool. Its virtual path's 'Plugins/MarvelGAS' root is
+    Atelier's own, and as a filter it matched no packages: the ability could not be edited at all.
+    The mount path is an exact lookup in the tool. Main-mount assets keep the game_rel they use now.
+    """
+    with sandbox() as sb:
+        write_asset(sb.paks, "Patch_-Windows_1.1.1_P.utoc", "../../../Marvel/Plugins/MarvelGAS/Content",
+                    "Marvel/VFX", "MI_Ability.uasset")
+        write_asset(sb.paks, "pakchunkMain-Windows.utoc", "../../../Marvel/Content/Marvel", "UI", "T_Icon.uasset")
+        import atelier.handlers.texture as TX
+        got = TX.uat_filter(["Plugins/MarvelGAS/Marvel/VFX/MI_Ability", "UI/T_Icon"])
+        assert got == ["--filter", "Marvel/Plugins/MarvelGAS/Content/Marvel/VFX/MI_Ability", "UI/T_Icon"], got
+
+
 for t in (t_plugin_paths_get_their_own_root, t_plugin_path_rebuilds_to_a_real_pak_path,
           t_non_plugin_mounts_are_unchanged, t_a_plugin_asset_no_longer_shadows_its_twin,
           t_pak_game_path_round_trips_through_the_index, t_the_plugins_folder_is_browsable_and_pinned,
-          t_extraction_predicts_the_real_on_disk_path, t_plugin_assets_extract_by_full_path):
+          t_extraction_predicts_the_real_on_disk_path, t_plugin_assets_extract_by_full_path,
+          t_the_uassettool_fallback_names_a_plugin_asset_by_its_mount_path):
     check(t.__doc__.splitlines()[0].strip() if t.__doc__ else t.__name__, t)
 
 
