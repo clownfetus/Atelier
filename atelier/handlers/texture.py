@@ -662,11 +662,20 @@ def uat_filter(game_rels):
     tool writes one asset's bytes to the other's path, which is the substitution text.py
     documents for the hero-ability StringTables.
 
+    Plugin assets are the exception: their game_rel starts with Atelier's synthetic
+    'Plugins/<Name>' root (index.plugin_root), which the tool never sees, so as a filter it
+    matches no packages. They go by their full mount path instead, which the tool resolves by
+    direct lookup (verified 2026-11-11: Marvel/Plugins/MarvelGAS/Content/Marvel/VFX/... extracts
+    exactly the one asset). That matters because retoc cannot unpack patch containers, and since
+    the October patches about half of MarvelGAS, most hero-ability VFX among it, lives in them —
+    UAssetTool is the only extractor those assets have.
+
     Long batches go through the patterns-FILE form the tool also accepts. 500 paths is ~40 KB of
     command line and Windows caps at ~32 KB, so a large import would otherwise fail on the
     argument list rather than on anything real.
     """
-    pats = sorted({str(g).replace("\\", "/") for g in game_rels if g})
+    rels = {str(g).replace("\\", "/") for g in game_rels if g}
+    pats = sorted(pak_game_path(g) if is_plugin_asset(g) else g for g in rels)
     if not pats:
         return []
     if sum(len(x) + 1 for x in pats) > 8000:
