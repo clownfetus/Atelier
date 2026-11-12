@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.2 — 2026-11-12
+
 - Library folders with nothing to list no longer appear at any level, so opening
   a folder always leads somewhere. Folders holding assets your project has
   imported or added stay visible, and existing pins still open.
