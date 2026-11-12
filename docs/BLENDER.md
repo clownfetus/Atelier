@@ -587,6 +587,15 @@ parts and the Armature survives the KEEP-list cleanup both scripts already do.
 safety net for a genuinely missing Color Attribute (e.g. manually deleted in Blender), which
 cannot be recovered after the fact and must not silently default to white either.
 
+### 3.26 A group input's default is not the value on its node
+`material_nodes.wire_material` assigns the material's node group to its group node first and
+adds the group's inputs afterwards. Blender creates each new input on that node at the socket
+type's default (black, 0), and setting the interface `default_value` changes only the group's
+own default, never a node that already exists. So the group panel showed Base Tint white and
+Metallic 1 while the node the material renders with held black and 0: the base colour multiplied
+by a black tint rendered black, and Metallic, Normal Intensity and Roughness Power were all zero.
+After building the group, every unlinked input now copies its default onto the node. `tests/native_blender_materials.py` checks the node, not the interface.
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;

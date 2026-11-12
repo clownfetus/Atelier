@@ -199,6 +199,14 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
     material.use_backface_culling=not surface.get('two_sided',False)
     if hasattr(material,'surface_render_method'):material.surface_render_method='DITHERED'
     elif hasattr(material,'blend_method'):material.blend_method='HASHED' if record.get('hidden') or re.search('translucent|masked',surface.get('blend_mode',''),re.I) else 'OPAQUE'
+    # The group node existed before its inputs, so each input started at Blender's type
+    # default (black, 0); only the group's own default held the material's value.
+    # Carry each value onto the node the material renders with.
+    inputs={socket.identifier:socket for socket in shader.inputs}
+    for item in group.interface.items_tree:
+        socket=inputs.get(getattr(item,'identifier',None))
+        if getattr(item,'in_out',None)=='INPUT' and socket is not None and not socket.is_linked and hasattr(item,'default_value'):
+            socket.default_value=item.default_value
     auxiliary=[name for name in textures if name not in used]
     material['atelier_material']=record.get('mi') or ''
     material['atelier_parent']=surface.get('parent','')
