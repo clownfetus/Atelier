@@ -606,6 +606,16 @@ comes straight from ORM green (or `Roughness` / `ScleraRoughness`, else 0.6); `R
 stays on the group as an unconnected source value. Metallic is still ORM blue × the game's
 `Metallic` (spelt `Metailic` in the game's parameters).
 
+### 3.28 Effect materials need the preview's visibility rule in Blender too
+Some sections are game effects with no base colour, such as Black Panther's
+`MI_1026001_Armour` (translucent, `Alpha` 0). The 3D preview leaves them out through
+`material_preview.effect_surface` ("Disabled game effect", "Animated game effect"), but the
+Blender graph never applied that rule, so the effect rendered as an opaque white shell over the
+body. Every Blender material now has Atelier's own **Alpha** input, first in the group and limited
+to 0 to 1, multiplied into the surface's alpha. `meshmat.build_manifest` records `effect_hidden`
+with the same rule, and those materials, like sections hidden for export, start at Alpha 0.
+Raising it shows the surface without changing the game's own `Alpha` value.
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;

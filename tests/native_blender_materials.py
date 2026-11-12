@@ -83,5 +83,29 @@ with tempfile.TemporaryDirectory(prefix='atelier-native-materials-', dir=report.
     assert node_values(hair)['Value · RoughnessPower'] == 0, node_values(hair)
     checks.append({'name': 'roughness comes from ORM green, and RoughnessPower never makes a mirror'})
 
+    # Every material has Atelier's own Alpha first, 0 to 1, driving the surface's alpha.
+    # Game effects the app's preview leaves out, and hidden sections, start at 0.
+    armour, armour_report = wire('MI_Fixture_Armour', {
+        'colors': [{'name': 'Fresnel Color', 'rgba': [.5, 0, 1, 1]}], 'scalars': [{'name': 'Alpha', 'value': 0.0}],
+        'maps': [], 'effect_hidden': 'Disabled game effect',
+        'surface': {'blend_mode': 'BLEND_TranslucentGreyTransmittance', 'two_sided': True, 'opacity': 1}})
+    section, _ = wire('MI_Fixture_Section', {
+        'colors': [], 'scalars': [], 'maps': [{'param': 'BaseColor', 'role': 'basecolor', 'path': base}],
+        'surface': {'blend_mode': 'BLEND_Opaque'}, 'hidden': True})
+    expected = {body: 1, hair: 1, armour: 0, section: 0}
+    for material, start in expected.items():
+        first = next(item for item in group_node(material).node_tree.interface.items_tree
+                     if getattr(item, 'in_out', None) == 'INPUT')
+        assert first.name == 'Alpha' and (first.min_value, first.max_value) == (0, 1), (material.name, first.name)
+        assert node_values(material)['Alpha'] == start, (material.name, node_values(material))
+        source = principled(material).inputs['Alpha'].links[0].from_socket
+        driven = source.name == 'Alpha' and source.node.type == 'GROUP_INPUT' or any(
+            link.from_socket.name == 'Alpha' and link.from_node.type == 'GROUP_INPUT'
+            for link in group_node(material).node_tree.links if link.to_node == source.node)
+        assert driven, (material.name, source.node.bl_idname)
+    assert armour_report['effect_hidden'] == 'Disabled game effect', armour_report
+    checks.append({'name': 'every material has an Alpha input; hidden effects and sections start at 0',
+                   'materials': len(expected)})
+
 report.write_text(json.dumps({'ok': True, 'blender': bpy.app.version_string, 'checks': checks}, indent=2) + '\n')
 print('ATELIER_MATERIALS_NATIVE_OK', report)

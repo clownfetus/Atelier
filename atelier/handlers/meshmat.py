@@ -354,6 +354,19 @@ def extract_textures_to_project(tex_game_rels, root=None):
     return result
 
 
+def effect_hidden(parameters):
+    """Why the app's 3D preview leaves this game effect out, or ''. Blender starts it at Alpha 0.
+
+    Same rule as the viewport (material_preview.effect_surface). The snapshot has already
+    merged the parent chain, so no further parents are read here.
+    """
+    from atelier.handlers.material_preview import effect_surface
+    if not parameters or parameters.get('material_error'):
+        return ''
+    surface = effect_surface(parameters, lambda _path: {}, lambda _name: []).get('surface') or {}
+    return surface.get('preview_omitted') or ''
+
+
 def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
     """Resolve materials + textures, stage the textures, and return the manifest dict that
     glb_to_blend.py consumes to wire the .blend's shader nodes."""
@@ -394,7 +407,8 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
         out_slots[slot_names[index]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
             'gameplay_tags': list(rec.get('gameplay_tags', [])),
-            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
+            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden),
+            'effect_hidden':effect_hidden(rec.get('parameters'))}
         from atelier.handlers.meshtextures import source_maps
         maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))
         if not rec["mi"]:

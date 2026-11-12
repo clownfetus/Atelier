@@ -105,6 +105,24 @@ class BlenderPort(unittest.TestCase):
         self.assertEqual({key:value['mi'] for key,value in result['slots'].items()},
                          {'Shared':self.child, 'Shared__slot_1':self.parent})
 
+    def test_manifest_marks_game_effects_the_preview_leaves_out(self):
+        def parameters(blend, alpha=None, textures=None, parent='M_Fixture'):
+            return {'surface':{'blend_mode':blend,'parent':parent},'textures':textures or {},
+                    'scalars':[] if alpha is None else [{'name':'Alpha','value':alpha}]}
+        rows = {'Armour':parameters('BLEND_TranslucentGreyTransmittance', 0.0),
+                'Visor':parameters('BLEND_Translucent', 0.0, {'BaseColor':'Textures/T_Visor_D'}),
+                'Glow':parameters('BLEND_Additive', parent='M_StdAdv'),
+                'Body':parameters('BLEND_Opaque', 0.0)}
+        model = types.SimpleNamespace(materials=[{'slot_name':name} for name in rows])
+        slots = [{'slot':name, 'mi':self.child, 'maps':[], 'parameters':row} for name,row in rows.items()]
+        with patch.object(meshmat, 'resolve_mesh_materials', return_value=slots), \
+                patch.object(meshmat, 'resolve_mesh_textures', side_effect=lambda value:value), \
+                patch.object(meshmat, 'extract_textures_to_project', return_value={}):
+            result = meshmat.build_manifest('Meshes/SK_Body', model)
+        self.assertEqual({key:value['effect_hidden'] for key,value in result['slots'].items()},
+                         {'Armour':'Disabled game effect', 'Visor':'', 'Glow':'Animated game effect', 'Body':''})
+        self.assertEqual(meshmat.effect_hidden({'material_error':'unreadable', **rows['Armour']}), '')
+
     def test_texture_rename_preserves_inline_mips_without_interpreting_pixels_as_headers(self):
         injected=self.root/'encoded.uasset';injected.write_bytes(b'header')
         payload=b'properties'+bytes(range(256))*4+b'inline mips'
