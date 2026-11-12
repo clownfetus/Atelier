@@ -218,7 +218,19 @@ def run_home_folder_checks(context, url, report, checks):
             page.locator('#grid-area .card').filter(has=page.get_by_text('UI', exact=True)).click()
             page.wait_for_function('nav.path==="UI" && _gridStatus==="ready"')
             assert page.locator('#grid-area .card-name').all_text_contents() == ['Textures']
+            # A pin made before its folder was hidden still opens, and can still be removed.
+            page.evaluate("AtelierLibraryPins.toggle({type:'folder',rel_path:'Helpers',label:'Helpers'})")
+            page.evaluate("pushNav({path:''})")
+            page.wait_for_function('nav.path==="" && _gridStatus==="ready"')
+            assert 'Helpers' not in page.locator('#grid-area .card-name').all_text_contents()
+            page.locator('.library-pin-open[title="Helpers"]').click()
+            page.wait_for_function('nav.path==="Helpers" && _gridStatus==="ready"')
+            assert 'Empty folder' in page.locator('#empty-state').inner_text()
+            page.evaluate("pushNav({path:''})")
+            page.wait_for_function('nav.path==="" && _gridStatus==="ready"')
+            page.locator('.library-pin-remove[aria-label*="Helpers"]').click()
+            assert page.evaluate("!AtelierLibraryPins.isPinned('Helpers')")
             assert not errors, errors
-            checks.append('Library Home hides empty and unsupported-only folders and absent curated sections; populated folders and project-added folders remain browsable')
+            checks.append('Library Home hides empty and unsupported-only folders and absent curated sections; populated folders and project-added folders remain browsable, and a pin to a hidden folder still opens and can be removed')
         finally:
             page.close()
