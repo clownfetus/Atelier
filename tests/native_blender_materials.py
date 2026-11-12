@@ -70,5 +70,18 @@ with tempfile.TemporaryDirectory(prefix='atelier-native-materials-', dir=report.
     checks.append({'name': 'material values reach the group node, not only the group defaults',
                    'inputs': len(values)})
 
+    # Roughness is ORM green itself; RoughnessPower (0 on most bodies, skin and hair) is kept
+    # as a visible value but never scales or replaces it.
+    roughness = principled(body).inputs['Roughness'].links[0].from_socket
+    assert roughness.node.bl_idname == 'ShaderNodeSeparateColor', roughness.node.bl_idname
+    assert roughness.identifier == roughness.node.outputs[1].identifier, roughness.name
+    hair, _ = wire('MI_Fixture_Hair', {
+        'colors': [], 'scalars': [{'name': 'RoughnessPower', 'value': 0.0}],
+        'maps': [{'param': 'BaseColor', 'role': 'basecolor', 'path': base}], 'surface': {'blend_mode': 'BLEND_Opaque'}})
+    fallback = principled(hair).inputs['Roughness'].links[0].from_socket
+    assert fallback.node.type == 'VALUE' and round(fallback.default_value, 4) == .6, (fallback.node.type, fallback.default_value)
+    assert node_values(hair)['Value · RoughnessPower'] == 0, node_values(hair)
+    checks.append({'name': 'roughness comes from ORM green, and RoughnessPower never makes a mirror'})
+
 report.write_text(json.dumps({'ok': True, 'blender': bpy.app.version_string, 'checks': checks}, indent=2) + '\n')
 print('ATELIER_MATERIALS_NATIVE_OK', report)

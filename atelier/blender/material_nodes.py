@@ -161,12 +161,15 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
             group.links.new(region,equal.inputs[0]);diffuse=mix(diffuse,target,equal.outputs[0],'MIX')
 
     orm=texture('orm');ao=texture('ao')
+    # Roughness comes from the ORM green channel as it is. The game's RoughnessPower stays
+    # visible on the group but is not a roughness: it is 0 on most bodies, all skin and hair,
+    # and multiplying or substituting it turned those surfaces into mirrors (BLENDER.md §3.27).
     if orm:
         channels=separate(orm['color']);diffuse=mix(diffuse,channels[0])
-        group.links.new(math('MULTIPLY',channels[1],scalar('RoughnessPower')),bsdf.inputs['Roughness'])
+        group.links.new(channels[1],bsdf.inputs['Roughness'])
         group.links.new(math('MULTIPLY',channels[2],scalar('Metallic','Metailic')),bsdf.inputs['Metallic'])
     else:
-        group.links.new(scalar('Roughness','ScleraRoughness','RoughnessPower',default=.6),bsdf.inputs['Roughness'])
+        group.links.new(scalar('Roughness','ScleraRoughness',default=.6),bsdf.inputs['Roughness'])
         group.links.new(scalar('Metallic',default=0),bsdf.inputs['Metallic'])
     if ao:diffuse=mix(diffuse,ao['color'])
     group.links.new(diffuse,bsdf.inputs['Base Color'])

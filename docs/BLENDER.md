@@ -596,6 +596,16 @@ Metallic 1 while the node the material renders with held black and 0: the base c
 by a black tint rendered black, and Metallic, Normal Intensity and Roughness Power were all zero.
 After building the group, every unlinked input now copies its default onto the node. `tests/native_blender_materials.py` checks the node, not the interface.
 
+### 3.27 `RoughnessPower` is not a roughness
+The Blender graph used to compute roughness as ORM green × `RoughnessPower`, and fell back to
+`RoughnessPower` itself when a material had no ORM map. Across Black Panther's ten skins the value
+is 0 on 34 material instances (bodies, all skin, hair and thin-film materials) and 0.05 to 0.2 on
+most of the rest, so both forms rendered those surfaces as mirrors. The master materials' formula
+is not readable from the cooked data, and the app's 3D preview ignores the value. Roughness now
+comes straight from ORM green (or `Roughness` / `ScleraRoughness`, else 0.6); `RoughnessPower`
+stays on the group as an unconnected source value. Metallic is still ORM blue × the game's
+`Metallic` (spelt `Metailic` in the game's parameters).
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;
