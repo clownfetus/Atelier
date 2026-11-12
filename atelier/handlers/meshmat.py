@@ -237,6 +237,23 @@ def _degenerate(png, limit=16):
         return False
 
 
+def _declared_small(png, work_base):
+    """True when the game texture itself declares the decoded size, so a tiny decode is real.
+
+    A few shared textures genuinely are tiny: T_Common_N is a 4x4 flat normal (no bulk data).
+    A failed mip recovery decodes far smaller than the size its header declares."""
+    if not work_base:
+        return False
+    from atelier.handlers.texture import texture_info
+    declared = texture_info(work_base)
+    try:
+        from PIL import Image
+        w, h = Image.open(png).size
+    except Exception:
+        return False
+    return bool(declared) and 0 < declared["w"] <= w and 0 < declared["h"] <= h
+
+
 def _is_black_placeholder(png):
     """True for a uniformly black texture -- MR fills unused MI slots with shared dummies like
     T_Common_LinearBlack / T_Common_Black. That means 'this master has no such map', NOT 'this
@@ -278,6 +295,18 @@ def extract_textures_to_project(tex_game_rels, root=None):
 
     def _one(gr):
         dst = project_base(gr, root)
+        source = []
+
+        def work_base():
+            if not source:
+                source.append(ensure_work_base(gr, prefer_exact=True))
+            return source[0]
+
+        def husk(png):
+            # A tiny decode is a failed mip recovery's husk, unless the game texture itself
+            # declares that size. The source is only looked up for a tiny image.
+            return _degenerate(png) and not _declared_small(png, work_base())
+
         if os.path.normcase(os.path.realpath(root)) != os.path.normcase(os.path.realpath(project_root)):
             for src in (project_base(gr,project_root)+'.png', project_base_legacy(gr,project_root)+'.png'):
                 if os.path.isfile(src):
@@ -291,7 +320,7 @@ def extract_textures_to_project(tex_game_rels, root=None):
                 # ...unless it is the 4x4 husk of a failed mip recovery. Nobody paints one of
                 # those, so it is a broken extract rather than an edit worth protecting; fall
                 # through and re-decode, reporting the refresh.
-                if cand.endswith(".png") and _degenerate(cand):
+                if cand.endswith(".png") and husk(cand):
                     print(f"[meshmat] refreshing unusable {os.path.basename(cand)}", file=sys.stderr)
                     break
                 return gr, {"path": cand, "status": "existing", "readonly": ro or bool(hdr_project_info(cand[:-4]))}
@@ -308,17 +337,17 @@ def extract_textures_to_project(tex_game_rels, root=None):
         # A cached 4x4 is the signature of a failed mip recovery (see texture.decode_dds), not a
         # real texture -- handing one over as "editable" invites painting it and injecting a
         # destroyed map. Drop it and decode again; the cache predates the caller either way.
-        if os.path.exists(png) and _degenerate(png):
+        if os.path.exists(png) and husk(png):
             os.remove(png)
         if not os.path.exists(png):
-            wb = ensure_work_base(gr,prefer_exact=True)
+            wb = work_base()
             if not wb:
                 return gr, {"path": None, "status": "missing", "readonly": False}
             png = decode_to_png(cache_base, wb)
-        if not png or not os.path.exists(png) or _degenerate(png):
+        if not png or not os.path.exists(png) or husk(png):
             from atelier.handlers.meshimages import recover_inline_hdr
-            # Reuse the source lookup when a stale PNG was already present.
-            if 'wb' not in locals():wb=ensure_work_base(gr,prefer_exact=True)
+            # Reuses the source lookup when a stale PNG was already present.
+            wb = work_base()
             hdr_record=recover_inline_hdr(wb,cache_base) if wb else None
             if hdr_record:
                 os.makedirs(os.path.dirname(dst),exist_ok=True)

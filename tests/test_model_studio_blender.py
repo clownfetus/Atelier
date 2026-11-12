@@ -346,6 +346,28 @@ class BlenderPort(unittest.TestCase):
         self.assertEqual(result['bad']['status'],'failed')
         self.assertEqual(Image.open(result['good']['path']).getpixel((0,0)),(255,0,0))
 
+    def test_a_texture_the_game_ships_at_4x4_is_not_a_failed_recovery(self):
+        # The game's T_Common_N is a genuine 4x4 flat normal. A failed mip recovery decodes to the
+        # same 4x4 tail, but far below the size its header declares.
+        decoded=[]
+        def decode(dst,base):
+            decoded.append(base);path=dst+'.png';Path(path).parent.mkdir(parents=True,exist_ok=True)
+            Image.new('RGBA',(4,4),(128,128,0,255)).save(path);return path
+        declared={'T_Common_N':{'w':4,'h':4,'fmt':'BC5','mips':1},'T_Stripped_D':{'w':4096,'h':4096,'fmt':'DXT1','mips':12}}
+        with patch('atelier.handlers.texture.ensure_work_base',side_effect=lambda gr,**kw:gr), \
+             patch('atelier.handlers.texture.decode_to_png',side_effect=decode), \
+             patch('atelier.handlers.texture.texture_info',side_effect=lambda base:declared[base]), \
+             patch('atelier.handlers.meshimages.recover_inline_hdr',return_value=None), \
+             patch.object(meshmat,'CACHE_3DVIEW',str(self.root/'cache')):
+            first=meshmat.extract_textures_to_project(['T_Common_N','T_Stripped_D'])
+            again=meshmat.extract_textures_to_project(['T_Common_N'])
+        self.assertEqual(first['T_Common_N']['status'],'extracted')
+        self.assertEqual(Image.open(first['T_Common_N']['path']).size,(4,4))
+        self.assertEqual(first['T_Stripped_D']['status'],'failed')
+        # Kept as the project's texture, not refreshed as a husk on the next export.
+        self.assertEqual(again['T_Common_N']['status'],'existing')
+        self.assertEqual(decoded.count('T_Common_N'),1)
+
     def test_standalone_texture_is_an_independent_copy_of_the_project_edit(self):
         source=Path(config.project_base('Textures/T_Edited')+'.png');source.parent.mkdir(parents=True)
         Image.new('RGB',(32,32),(17,31,49)).save(source)

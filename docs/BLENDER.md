@@ -452,7 +452,11 @@ that is precisely the stripped-top-mip path the function exists to avoid: **ever
 the mesh decoded to 4×4**. It looks like a harmless decode quirk right up until someone paints
 one and injects a destroyed normal map. Now mapped: BC1/BC3→DXT1/DXT5, BC4→ATI1, BC5→ATI2,
 BC6H/BC7→DX10 with the DXGI format. `meshmat` also treats an existing <16 px PNG as a failed
-decode and re-extracts it, so caches poisoned before the fix heal themselves.
+decode and re-extracts it, so caches poisoned before the fix heal themselves. The exception is a
+texture whose own header declares that size: the shared `T_Common_N` is a genuine 4×4 flat
+normal, and rejecting it stopped the portable export and Edit in Blender for every skin whose
+material uses it (Black Panther 1026301's gems). A failed recovery decodes far below its
+declared size, so `_declared_small` tells the two apart with `texture.texture_info`.
 
 ### 3.20 Blender does not save painted pixels of LINKED images
 Painting a texture and saving the `.blend` **loses the paint**: Blender keeps edits to linked
