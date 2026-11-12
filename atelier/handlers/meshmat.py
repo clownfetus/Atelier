@@ -34,6 +34,7 @@ from atelier.tools import uat
 _ROLE_ALIASES = {
     "basecolor": "basecolor", "base": "basecolor", "diffuse": "basecolor", "albedo": "basecolor",
     "basecolormap": "basecolor", "basecolortexture": "basecolor", "diffusemap": "basecolor",
+    "diffusetex": "basecolor",
     "normal": "normal", "normalmap": "normal", "normals": "normal", "normaltexture": "normal",
     "orm": "orm", "ormmap": "orm", "ormtexture": "orm", "maskmap": "orm", "mrao": "orm", "arm": "orm",
     "emissive": "emissive", "emissivemap": "emissive", "emission": "emissive",
@@ -55,6 +56,26 @@ def _canon(name):
 def texture_role(param_name):
     """Surface role, or None for an auxiliary game-effect group input."""
     return _ROLE_ALIASES.get(_canon(param_name))
+
+
+# The game's own texture suffix -> role, for parameters no alias names (M_Standard_PBR's
+# BaseColorMap_b / NormalMap_b, a weapon's Base_Test / NorTex). Used only for a role the
+# material has no texture for, so a cloak's BackBaseColor never displaces its BaseColor.
+_SUFFIX_ROLES = {"d": "basecolor", "n": "normal"}
+
+
+def suffix_roles(maps):
+    """Give unnamed T_*_D / T_*_N maps the base colour / normal role the material lacks."""
+    present = {mp["role"] for mp in maps if mp["role"]}
+    for mp in maps:
+        if mp["role"]:
+            continue
+        name = os.path.splitext(os.path.basename(mp.get("game_rel") or ""))[0]
+        role = _SUFFIX_ROLES.get(name.rsplit("_", 1)[-1].casefold()) if "_" in name else None
+        if role and role not in present:
+            mp["role"] = role
+            present.add(role)
+    return maps
 
 
 def _index_candidates(asset_name):
@@ -156,6 +177,7 @@ def resolve_mesh_textures(slots):
         for param, tex_gr in sorted(cache[mi].get('textures', {}).items()):
             rec["maps"].append({"param": param, "role": texture_role(param), "game_rel": tex_gr,
                                 'uv': 1 if '(uv1)' in param.casefold() or _canon(param)=='anisotropybrightness' else 0})
+        suffix_roles(rec["maps"])
     return slots
 
 

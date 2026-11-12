@@ -616,6 +616,17 @@ to 0 to 1, multiplied into the surface's alpha. `meshmat.build_manifest` records
 with the same rule, and those materials, like sections hidden for export, start at Alpha 0.
 Raising it shows the surface without changing the game's own `Alpha` value.
 
+### 3.29 Some masters give their diffuse and normal maps other names
+`meshmat._ROLE_ALIASES` matches texture parameters by name, and shared masters do not all use
+the usual names. `M_Common_Crystal` calls its diffuse `DiffuseTex`, so Black Panther's gem
+necklace and arm gems lost their colour (white base colour) in Blender and the 3D preview.
+`DiffuseTex` is now an alias. For parameters no alias names (`M_Standard_PBR`'s
+`BaseColorMap_b` / `NormalMap_b`, a weapon's `Base_Test` / `NorTex`), `meshmat.suffix_roles`
+reads the game's own texture suffix: a `T_*_D` map becomes the base colour and `T_*_N` the
+normal, but only when the material has no texture in that role, so a cloak's `BackBaseColor`
+never displaces its `BaseColor`. The suffix fallback applies to the Blender manifest; the 3D
+preview still assigns roles by parameter name alone.
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;
