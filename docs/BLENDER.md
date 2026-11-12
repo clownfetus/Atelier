@@ -616,6 +616,12 @@ to 0 to 1, multiplied into the surface's alpha. `meshmat.build_manifest` records
 with the same rule, and those materials, like sections hidden for export, start at Alpha 0.
 Raising it shows the surface without changing the game's own `Alpha` value.
 
+The rule reads every uniform alpha switch, including ability-scoped ones: skin 1026301's
+`MI_1026301_Equip_08` overlay (white face mask and stripes in Blender) has no `Alpha` scalar but
+is switched off by `102601Alpha` = 0. Shaping values such as `Step1_Alpha` or `Smooth Alpha` are
+not switches. Across Black Panther's ten skins the rule hides six effect materials and no
+weapon, glass or eye-highlight material.
+
 ### 3.29 Some masters give their diffuse and normal maps other names
 `meshmat._ROLE_ALIASES` matches texture parameters by name, and shared masters do not all use
 the usual names. `M_Common_Crystal` calls its diffuse `DiffuseTex`, so Black Panther's gem
