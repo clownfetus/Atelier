@@ -5,6 +5,16 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Library folders with nothing to list no longer appear at any level, so opening
+  a folder always leads somewhere. Folders holding assets your project has
+  imported or added stay visible, and existing pins still open.
+
+- Fixed Blender material defaults, gem textures and effect visibility. Hidden
+  effects can be revealed with the material's Alpha input.
+
+- Fixed extraction of plugin assets in game patch containers, so affected
+  ability effects can be edited and recoloured.
+
 ## 1.2.1 — 2026-11-10
 
 - Generate release notes from merged commits
@@ -57,10 +67,6 @@ The app, installers and update checker identify each release by its full number,
 
 - The full changelog groups shipped changes by version and stays up to date
   automatically after each release.
-
-- Library folders with nothing to list no longer appear at any level, so opening
-  a folder always leads somewhere. Folders holding assets your project has
-  imported or added stay visible, and existing pins still open.
 
 ## 1.1.8 — 5 November 2026
 
