@@ -77,6 +77,11 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
     colors={c['name']:c['rgba'] for c in record.get('colors',[])}
     scalars={s['name']:s['value'] for s in record.get('scalars',[])}
     values={};textures={};used=set();auxiliary=[]
+    # Atelier's own visibility control, first in the list. Game effects the app's preview
+    # leaves out, and sections hidden for export, start at 0; 0 to 1 sets the surface's alpha.
+    hidden=bool(record.get('hidden') or record.get('effect_hidden'))
+    visibility=_input(group,'Alpha','NodeSocketFloat',0 if hidden else 1)
+    visibility.min_value=0;visibility.max_value=1
     for name,rgba in colors.items():
         key='Colour · '+name;_input(group,key,'NodeSocketColor',tuple(rgba));values[name.casefold()]=source.outputs[key]
     for name,value in scalars.items():
@@ -161,12 +166,15 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
             group.links.new(region,equal.inputs[0]);diffuse=mix(diffuse,target,equal.outputs[0],'MIX')
 
     orm=texture('orm');ao=texture('ao')
+    # Roughness comes from the ORM green channel as it is. The game's RoughnessPower stays
+    # visible on the group but is not a roughness: it is 0 on most bodies, all skin and hair,
+    # and multiplying or substituting it turned those surfaces into mirrors (BLENDER.md §3.27).
     if orm:
         channels=separate(orm['color']);diffuse=mix(diffuse,channels[0])
-        group.links.new(math('MULTIPLY',channels[1],scalar('RoughnessPower')),bsdf.inputs['Roughness'])
+        group.links.new(channels[1],bsdf.inputs['Roughness'])
         group.links.new(math('MULTIPLY',channels[2],scalar('Metallic','Metailic')),bsdf.inputs['Metallic'])
     else:
-        group.links.new(scalar('Roughness','ScleraRoughness','RoughnessPower',default=.6),bsdf.inputs['Roughness'])
+        group.links.new(scalar('Roughness','ScleraRoughness',default=.6),bsdf.inputs['Roughness'])
         group.links.new(scalar('Metallic',default=0),bsdf.inputs['Metallic'])
     if ao:diffuse=mix(diffuse,ao['color'])
     group.links.new(diffuse,bsdf.inputs['Base Color'])
@@ -181,24 +189,30 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
     if emissive:emission=mix(emission,colour('EmissiveColor','EmissionColor'))
     group.links.new(emission,bsdf.inputs.get('Emission Color') or bsdf.inputs.get('Emission'))
     if bsdf.inputs.get('Emission Strength'):group.links.new(scalar('EmissiveStrength','GlowStrength'),bsdf.inputs['Emission Strength'])
-    opacity=texture('opacity');surface=record.get('surface',{})
-    alpha=opacity['color'] if opacity else base['alpha'] if base else scalar(default=1)
-    alpha=math('MULTIPLY',alpha,scalar('OpacityMultiplier','Opacity',default=surface.get('opacity',1)))
-    if re.search('masked',surface.get('blend_mode',''),re.I):alpha=math('GREATER_THAN',alpha,surface.get('mask_clip',.3333))
-    if opacity or re.search('translucent|masked|additive',surface.get('blend_mode',''),re.I):group.links.new(alpha,bsdf.inputs['Alpha'])
+    opacity=texture('opacity');surface=record.get('surface',{});alpha=None
+    if opacity or re.search('translucent|masked|additive',surface.get('blend_mode',''),re.I):
+        alpha=opacity['color'] if opacity else base['alpha'] if base else scalar(default=1)
+        alpha=math('MULTIPLY',alpha,scalar('OpacityMultiplier','Opacity',default=surface.get('opacity',1)))
+        if re.search('masked',surface.get('blend_mode',''),re.I):alpha=math('GREATER_THAN',alpha,surface.get('mask_clip',.3333))
     specular=texture('specular')
     if specular:group.links.new(specular['color'],bsdf.inputs.get('Specular IOR Level') or bsdf.inputs.get('Specular'))
     anisotropy=texture('anisotropy');shift=texture('anisotropy_rotation')
     if anisotropy and bsdf.inputs.get('Anisotropic IOR Level'):group.links.new(anisotropy['color'],bsdf.inputs['Anisotropic IOR Level'])
     if shift and bsdf.inputs.get('Anisotropic Rotation'):group.links.new(shift['color'],bsdf.inputs['Anisotropic Rotation'])
     highlight=texture('highlight')
-    if highlight:
-        group.links.new(math('MULTIPLY',highlight['color'],scalar('HighlightIntensity')),bsdf.inputs['Alpha'])
-    if record.get('hidden'):
-        group.links.new(scalar(default=0),bsdf.inputs['Alpha'])
+    if highlight:alpha=math('MULTIPLY',highlight['color'],scalar('HighlightIntensity'))
+    group.links.new(source.outputs['Alpha'] if alpha is None else math('MULTIPLY',alpha,source.outputs['Alpha']),bsdf.inputs['Alpha'])
     material.use_backface_culling=not surface.get('two_sided',False)
     if hasattr(material,'surface_render_method'):material.surface_render_method='DITHERED'
-    elif hasattr(material,'blend_method'):material.blend_method='HASHED' if record.get('hidden') or re.search('translucent|masked',surface.get('blend_mode',''),re.I) else 'OPAQUE'
+    elif hasattr(material,'blend_method'):material.blend_method='HASHED' if hidden or re.search('translucent|masked',surface.get('blend_mode',''),re.I) else 'OPAQUE'
+    # The group node existed before its inputs, so each input started at Blender's type
+    # default (black, 0); only the group's own default held the material's value.
+    # Carry each value onto the node the material renders with.
+    inputs={socket.identifier:socket for socket in shader.inputs}
+    for item in group.interface.items_tree:
+        socket=inputs.get(getattr(item,'identifier',None))
+        if getattr(item,'in_out',None)=='INPUT' and socket is not None and not socket.is_linked and hasattr(item,'default_value'):
+            socket.default_value=item.default_value
     auxiliary=[name for name in textures if name not in used]
     material['atelier_material']=record.get('mi') or ''
     material['atelier_parent']=surface.get('parent','')
@@ -210,4 +224,5 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
         node.location=(-850+(index%5)*210,-220-(index//5)*180)
     return {'material':material.name,'textures':len(textures),'connected_textures':len(textures),
             'shader_textures':len(used),'auxiliary':auxiliary,'parent':surface.get('parent',''),
-            'hidden':bool(record.get('hidden')),'presentation_only_hidden':bool(record.get('presentation_only_hidden'))}
+            'hidden':bool(record.get('hidden')),'presentation_only_hidden':bool(record.get('presentation_only_hidden')),
+            'effect_hidden':record.get('effect_hidden') or ''}
