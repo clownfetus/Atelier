@@ -61,7 +61,7 @@ def skin_meshes(skin_id):
 
 def cooked_slots(game_rel):
     from atelier.handlers.texture import ensure_work_base
-    from atelier.handlers.mesh import skeletal_name_table, resolve_materials
+    from atelier.handlers.mesh import skeletal_name_table, resolve_materials, material_fnames
     from atelier.handlers.meshsurvey import find_extras
     from atelier.handlers.meshmat import resolve_mesh_materials
     config.validate_game_rel(game_rel)
@@ -75,7 +75,10 @@ def cooked_slots(game_rel):
     extras = find_extras(Path(base + '.uexp').read_bytes())
     mesh = SimpleNamespace(materials=resolve_materials(extras['materials'], names))
     slots = resolve_mesh_materials(game_rel, mesh, base)
-    return [{**s, "index": i} for i, s in enumerate(slots)]
+    # Spell each slot as the game and the native slot table do (MI_X_1, not MI_X), so a
+    # section the viewport names can be hidden.
+    names = material_fnames(mesh.materials)
+    return [{**s, 'slot': names[i] if s['slot'] else s['slot'], "index": i} for i, s in enumerate(slots)]
 
 
 def embedded_weapon_slots(body, weapons):
@@ -248,7 +251,7 @@ def preview_bindings(game_rel, requested):
 def material_bindings(skin_id, meshes):
     """Exact own-skin slots, or unambiguous recolour counterparts on the same rig."""
     from atelier.paths import skin_entries
-    from atelier.handlers.meshvisibility import hidden_sections
+    from atelier.handlers.meshvisibility import hidden_sections, is_saved
     if not isinstance(meshes, list) or len(meshes) > 32:
         raise ValueError('Invalid model list')
     for record in meshes:
@@ -303,6 +306,6 @@ def material_bindings(skin_id, meshes):
                 elif matches:
                     binding['material_warning'] = 'This recolour has ambiguous material variants; the mesh material was kept.'
             sections = binding.get('shared_slots') or [binding]
-            binding['hidden'] = all(any(s.get('slot_index') == section.get('slot_index') and
-                                       s.get('slot_name') == section['slot_name'] for s in saved) for section in sections)
+            binding['hidden'] = all(any(is_saved(s, section.get('slot_index'), section['slot_name']) for s in saved)
+                                    for section in sections)
             yield binding

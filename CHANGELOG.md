@@ -19,6 +19,9 @@ The app, installers and update checker identify each release by its full number,
   preview. A part whose material slot repeats another's name, such as one of
   Spider-Man's lobby armour pieces, used to show untextured grey.
 
+- Those parts can now be hidden too. Hiding one used to fail with "The model
+  slots changed". Sections you have already hidden stay hidden.
+
 ## 1.2.2 — 2026-11-12
 
 - Library folders with nothing to list no longer appear at any level, so opening

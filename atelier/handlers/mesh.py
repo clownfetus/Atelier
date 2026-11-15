@@ -355,15 +355,27 @@ def material_slot_names(materials):
     return result
 
 
+def fname(name, number):
+    """An FName as the game spells it. Its number is kept apart: 2 reads "_1", 0 adds nothing."""
+    return f'{name}_{number - 1}' if number else name
+
+
+def fname_base(text):
+    """The name-table entry of an FName spelt in full. Unreal stores a trailing "_N"
+    without a leading zero as the number, so MI_X_1 is MI_X, while MI_X_03 stays whole."""
+    match = re.fullmatch(r'(.+)_(0|[1-9]\d{0,8})', text)
+    return match[1] if match else text
+
+
 def material_fnames(materials):
     """Slot names as the game spells them, as the native preview and its slot table do.
 
-    FName keeps its numeric suffix apart (number 2 reads "_1"), so one cooked mesh can
-    use MI_X and MI_X_1. Viewport previews use these; the Blender round trip keeps
-    material_slot_names, whose keys existing .blend files already carry.
+    One cooked mesh can use MI_X and MI_X_1. Viewport previews and Atelier's own slot
+    list use these; the Blender round trip keeps material_slot_names, whose keys
+    existing .blend files already carry.
     """
-    return [(f"{m['slot_name']}_{m['slot_name_number'] - 1}" if m.get('slot_name_number', 0) > 0 else m['slot_name'])
-            if m.get('slot_name') else f'mat_{i}' for i, m in enumerate(materials)]
+    return [fname(m['slot_name'], m.get('slot_name_number', 0)) if m.get('slot_name') else f'mat_{i}'
+            for i, m in enumerate(materials)]
 
 
 def resolve_materials(mats, names):
@@ -375,7 +387,7 @@ def resolve_materials(mats, names):
         for index, number in m.get('tag_names', []):
             if not 0 <= index < len(names) or number < 0:
                 raise ValueError('Invalid material gameplay-tag name')
-            tags.append(names[index] + ('_' + str(number-1) if number else ''))
+            tags.append(fname(names[index], number))
         m['gameplay_tags'] = tags
     return mats
 

@@ -40,7 +40,7 @@ class BufferMesh:
         self._layout = [{'blob': lod['buf']} for lod in self.lods]
 
 
-def fixture(base):
+def fixture(base, materials=None):
     base.parent.mkdir(parents=True, exist_ok=True)
     # The same slot occurs in TWO sections in each LOD. The old helper's next()
     # silently edited just the first section; a second visible island survived.
@@ -51,7 +51,7 @@ def fixture(base):
                      'sections': [{'mat': 0, 'base_index': 0, 'num_tris': 1, 'base_vertex': 0},
                                   {'mat': 0, 'base_index': 3, 'num_tris': 1, 'base_vertex': 3},
                                   {'mat': 1, 'base_index': 6, 'num_tris': 1, 'base_vertex': 6}]})
-    doc = {'materials': [{'slot_name': 'MI_Body'}, {'slot_name': 'MI_Hair'}], 'lods': lods}
+    doc = {'materials': materials or [{'slot_name': 'MI_Body'}, {'slot_name': 'MI_Hair'}], 'lods': lods}
     Path(str(base)+'.uasset').write_bytes(json.dumps(doc).encode())
     data = struct.pack('<9H', *range(9)) + b'opaque vertices, weights and morphs'.ljust(46,b'!')
     Path(str(base)+'.uexp').write_bytes(data)
@@ -318,6 +318,48 @@ class Studio(unittest.TestCase):
              patch('atelier.paths.pak_game_path',return_value='Marvel/Content/Marvel/'+self.gr):
             restored=meshedit.stage_mesh(self.gr,str(self.root/'restored'))
         for ext,data in before.items():self.assertEqual(Path(restored['uasset'][:-7]+ext).read_bytes(),data)
+
+    def test_numbered_slot_hides_by_its_full_name_and_exports_only_that_slot(self):
+        # Spider-Man's lobby mesh spells slot 6 MI_1036803_Equip_03_1: slot 2's name with
+        # FName number 2. The viewport sends that full name, but Atelier's own slot list
+        # dropped the number, so hiding the part failed with "The model slots changed".
+        numbered = [{'slot_name': 'MI_Body', 'slot_name_number': 0}, {'slot_name': 'MI_Body', 'slot_name_number': 2}]
+        source = self.root/'original/SK_Body'; fixture(source, numbered)
+        mi = 'Characters/1029/1029001/Materials/MI_Body'
+        extras = {'materials': [{'pkg_idx': -1, 'slot_name_idx': 0, 'slot_name_number': number, 'imported_slot_name_idx': 0}
+                                for number in (0, 2)]}
+        resolved = lambda game_rel, model, base: [{'slot': m['slot_name'], 'mi': mi, 'via': 'imports'} for m in model.materials]
+        with patch('atelier.handlers.texture.ensure_work_base', return_value=str(source)), \
+             patch.object(mesh, 'skeletal_name_table', return_value=(0, ['MI_Body'])), \
+             patch('atelier.handlers.meshsurvey.find_extras', return_value=extras), \
+             patch.object(meshmat, 'resolve_mesh_materials', side_effect=resolved), \
+             patch.object(meshstudio, 'complete_mesh_source', return_value='fixture'):
+            self.assertEqual([s['slot'] for s in meshstudio.cooked_slots(self.gr)], ['MI_Body', 'MI_Body_1'])
+            meshvisibility.set_hidden(self.gr, 1, 'MI_Body_1', True)
+        self.assertEqual(meshvisibility.hidden_sections(self.gr), [{'slot_index': 1, 'slot_name': 'MI_Body_1', 'material': mi}])
+
+        def staged(name, sections=None):
+            target = self.root/name/'SK_Body'; fixture(target, numbered)
+            with patch.object(mesh, 'Mesh', side_effect=BufferMesh), \
+                 patch('atelier.handlers.texture.find_extracted', return_value=str(source)):
+                meshvisibility.apply_to_staged(self.gr, str(target)+'.uasset', sections)
+            return [struct.unpack_from('<9H', model._blob(lod), lod['idx_off']) for model in [BufferMesh(str(target))] for lod in model.lods]
+        self.assertEqual(staged('stage'), [(0, 1, 2, 3, 4, 5, 6, 6, 6)]*3)
+        # Saved before Atelier read FName numbers: the bare name, at the same index.
+        self.assertEqual(staged('older', [{'slot_index': 1, 'slot_name': 'MI_Body'}]), [(0, 1, 2, 3, 4, 5, 6, 6, 6)]*3)
+        with self.assertRaisesRegex(ValueError, 'do not match'):
+            staged('other', [{'slot_index': 1, 'slot_name': 'MI_Hair'}])
+        self.assertFalse(meshvisibility.is_saved({'slot_index': 2, 'slot_name': 'MI_Body'}, 2, 'MI_Body_03'))
+
+        # Blender gets the same section at Alpha 0.
+        rows = [{'slot': 'MI_Body', 'mi': mi, 'via': 'imports', 'maps': [], 'parameters': {}} for _ in numbered]
+        with patch.object(meshmat, 'resolve_mesh_materials', return_value=rows), \
+             patch.object(meshmat, 'resolve_mesh_textures', side_effect=lambda value: value), \
+             patch.object(meshmat, 'extract_textures_to_project', return_value={}), \
+             patch('atelier.handlers.meshtextures.source_maps', return_value=[]):
+            manifest = meshmat.build_manifest(self.gr, BufferMesh(str(source)))
+        self.assertEqual({name: slot['hidden'] for name, slot in manifest['slots'].items()},
+                         {'MI_Body': False, 'MI_Body__slot_1': True})
 
     def test_stage_rejects_partial_lods_without_mutating_files(self):
         source=self.root/'original/SK_Body';fixture(source)
