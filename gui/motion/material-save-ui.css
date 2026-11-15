@@ -1,6 +1,8 @@
 /* What a save shows: the glyph beside its Save button while it runs, and its result in a toast. */
 .material-save-badge { flex: 0 0 90px; width: 90px; height: 44px; pointer-events: none; }
 #viewport-head .material-save-badge { flex-basis: 74px; width: 74px; height: 36px; }
+/* Texture export options keep the badge's height, so the footer doesn't jump while a save runs. */
+#texopt-overlay .modal-row { align-items: center; min-height: 44px; }
 
 .material-save-slot {
   display: inline-flex;

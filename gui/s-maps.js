@@ -7,8 +7,21 @@
   wrap.title = hint.textContent = PAIRING;
   let busy = false, hasDiffuse = false, plan = null, project = '', overlay, panel, rows, status, applyButton;
   const el = (tag, text, cls) => window.AtelierJobDialogs.el(tag, text, cls);
+  // While S maps are planned or processed, the Mod tray's progress area shows the texture loader (D16),
+  // as it does while an asset is prepared for editing. It reports the wait only: the result is the
+  // existing toast. Planning hands straight to processing, so the row carries on across that step.
+  let trayRow = null, trayDrop = 0;
+  function trayWork() {
+    clearTimeout(trayDrop);
+    if (busy && !trayRow) {
+      try { trayRow = window.trayProgress?.('Processing S maps…', project, {asset: 'texture'}) || null; }
+      catch (_) { trayRow = null; }
+    } else if (!busy && trayRow) {
+      trayDrop = setTimeout(() => { if (!busy) { trayRow?.remove(); trayRow = null; } }, 0);
+    }
+  }
   function setBusy(value) {
-    busy = value; button.disabled = busy || !hasDiffuse;
+    busy = value; trayWork(); button.disabled = busy || !hasDiffuse;
     wrap.hidden = !hasDiffuse;
     button.textContent = busy ? 'Processing S maps…' : 'Process S maps';
     if (applyButton) applyButton.disabled = busy || !plan ||

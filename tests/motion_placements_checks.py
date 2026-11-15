@@ -1,7 +1,12 @@
-"""The five extra motion placements: real controls with held, explicitly simulated job results."""
+"""The extra motion placements: real controls with held, explicitly simulated job results."""
 from io import BytesIO
+from time import monotonic
 
 from PIL import Image, ImageDraw
+
+# Requests the editor checks hold open, so the glyph beside each control can be seen while it runs.
+EDITOR_HOLDS = ('material_custom_texture', 'material_replace', 'material_reset', 'dye_download',
+                'mat_textures_download', 'curve_reset', 'vfx_reset', 'world_reset', 'text_reset', 'asset_opts')
 
 
 def run_motion_placements_checks(context, url, report, checks):
@@ -227,6 +232,333 @@ def run_motion_placements_checks(context, url, report, checks):
             assert tab.evaluate('__effects.length') == 0
             tab.evaluate("document.getElementById('workspace').hidden=false")
         checks.append('Your mod seats new saves and Undo, reseats changed saves, folds Restore and keeps unchanged/selection-only/project-switch/hidden refreshes still in Full, Calm and Off')
+        assert not errors, errors
+    finally:
+        if stored:
+            tab.evaluate("saved=>{for(const [key,value] of Object.entries(saved)){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}}", stored)
+        tab.close()
+    run_editor_motion_placements_checks(context, url, report, checks)
+
+
+def run_editor_motion_placements_checks(context, url, report, checks):
+    """Loaders beside editor, recolour, mesh and S-map work; images opening on their plates; Activity rows; no fades."""
+    tab = context.new_page()
+    errors, held = [], []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    picture = BytesIO(); Image.new('RGB', (64, 64), '#4F80CC').save(picture, format='PNG')
+    jobs = {'jobs': []}
+    tab.route('**/api/imported', lambda route: route.fulfill(json=[]))
+    tab.route('**/api/jobs', lambda route: route.fulfill(json=jobs))
+    tab.route('**/api/material_params?*', lambda route: route.fulfill(json={
+        'ok': True, 'colors': [{'name': 'Region 1 - ColorA', 'rgba': [.25, .5, .75, 1]}], 'scalars': []}))
+    tab.route('**/api/dye_info?*', lambda route: route.fulfill(json={
+        'dyeable': True, 'used': {'1': 1}, 'coverage': {'1': 100}, 'overlay': {'1': '#4F80CC'}, 'regions': {}}))
+    tab.route('**/api/asset_opts?*', lambda route: route.fulfill(json={'ok': True, 'opts': {}}))
+    tab.route('**/api/dye_preview', lambda route: route.fulfill(body=picture.getvalue(), content_type='image/png'))
+    tab.route('**/api/dye_overlay?*', lambda route: route.fulfill(body=picture.getvalue(), content_type='image/png'))
+    for path in EDITOR_HOLDS:
+        tab.route(f'**/api/{path}', lambda route: held.append(route))
+
+    def wait_held(count):
+        deadline = monotonic() + 5
+        while len(held) < count and monotonic() < deadline:
+            tab.wait_for_timeout(10)
+        assert len(held) >= count, (len(held), count)
+
+    def badge(overlay):
+        return tab.locator(f'#{overlay} .material-save-badge')
+
+    def gone(selector):
+        tab.wait_for_function('selector=>!document.querySelector(selector)', arg=selector)
+
+    def busy_while(start, overlay, asset, download=False):
+        count = len(held)
+        tab.evaluate(f'() => {{ window.__pending = {start}; }}')
+        wait_held(count + 1)
+        shown = badge(overlay)
+        assert shown.count() == 1, (start, shown.count())
+        assert shown.get_attribute('data-glyph-state') == 'busy', start
+        assert shown.get_attribute('data-glyph-asset') == asset, (start, shown.get_attribute('data-glyph-asset'))
+        route = held.pop()
+        if download: route.fulfill(status=500, body='')
+        else: route.fulfill(json={'ok': False, 'error': 'Fixture request failed.'})
+        gone(f'#{overlay} .material-save-badge')
+
+    def effects():
+        return tab.evaluate('__effects.map(effect=>({frames:effect.frames,selector:effect.selector}))')
+
+    stored = None
+    try:
+        tab.goto(url)
+        tab.wait_for_function("window.AtelierMaterialSaveFeedback && window.AtelierMeshEdit && window.AtelierSMapsUI && window.atelierProject?.() && !document.querySelector('.overlay.active')")
+        tab.bring_to_front()
+        stored = tab.evaluate("Object.fromEntries(['atelier.motion'].map(key=>[key,localStorage.getItem(key)]))")
+        tab.evaluate("""() => {
+          window.__effects=[];
+          const animate=Element.prototype.animate;
+          Element.prototype.animate=function(...args){
+            const result=animate.apply(this,args);
+            const selector=['#dye-prev','.job-row','.job-row *'].find(selector=>this.matches(selector));
+            if(selector)__effects.push({selector,frames:result.effect.getKeyframes()});
+            return result;
+          };
+          AtelierJobs.run=(path,options)=>new Promise(resolve=>window.__job={path,options,resolve});
+          window.AtelierDialog={confirm:async()=>true};
+          window.__mode=value=>{const control=document.getElementById('settings-motion');control.value=value;control.dispatchEvent(new Event('change'));};
+          window.__finish=async result=>{__job.resolve(result);await new Promise(resolve=>setTimeout(resolve,0));};
+          window.__settle=async()=>{
+            const animations=document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity);
+            animations.forEach(a=>a.finish());await Promise.allSettled(animations.map(a=>a.finished));
+          };
+          window.__dyeLoaded=()=>{const img=document.getElementById('dye-prev');return !!img&&img.complete&&img.naturalWidth>0;};
+        }""")
+
+        for mode in ('full', 'calm', 'off'):
+            tab.evaluate('__mode', mode)
+            tab.evaluate("__effects=[];openMaterialEditor({name:'MI_Fixture',game_rel:'Fixture/MI_Fixture'})")
+            tab.wait_for_function("document.getElementById('dye-prev')?.dataset.url && __dyeLoaded()")
+            tab.wait_for_timeout(50)
+            opened = [effect for effect in effects() if effect['selector'] == '#dye-prev']
+            assert bool(opened) == (mode != 'off'), (mode, opened)
+            if opened:
+                assert opened[0]['frames'][0]['clipPath'] == 'inset(0px 0px 100%)'
+                assert not any('opacity' in frame for frame in opened[0]['frames'])
+            tab.evaluate("__effects=[];dyeView('regions')")
+            tab.wait_for_function("document.getElementById('dye-prev')?.src.includes('dye_overlay') && __dyeLoaded()")
+            tab.wait_for_timeout(50)
+            assert bool(effects()) == (mode != 'off'), mode
+            tab.evaluate("__effects=[];dyeView('preview')")
+            tab.wait_for_function("document.getElementById('dye-prev')?.dataset.url && __dyeLoaded()")
+            tab.wait_for_timeout(50)
+            assert bool(effects()) == (mode != 'off'), mode
+            # A live colour change swaps the picture in place; a repaint of the same picture stays still.
+            tab.evaluate("__effects=[];window.__before=document.getElementById('dye-prev').dataset.url;dyeRefresh(0)")
+            tab.wait_for_function("document.getElementById('dye-prev').dataset.url!==__before && __dyeLoaded()")
+            tab.evaluate("window.__plate=document.getElementById('dye-prev');renderMatEditor();dyeRefresh(0)")
+            tab.wait_for_function("document.getElementById('dye-prev')!==__plate && document.getElementById('dye-prev').dataset.url && __dyeLoaded()")
+            tab.wait_for_timeout(50)
+            assert not effects(), (mode, effects())
+
+            busy_while("matCustomTextureUpload({editor:matEditor,slot:'Diffuse',project:_activeProjectName},new File(['x'],'fixture.png',{type:'image/png'}))",
+                       'material-overlay', 'texture')
+            assert tab.locator('#mat-status').inner_text() == 'Error: Fixture request failed.'
+            busy_while('dyeDownload()', 'material-overlay', 'texture', download=True)
+            assert tab.locator('#mat-status').inner_text() == 'Download failed'
+            busy_while('matTexturesDownload()', 'material-overlay', 'texture', download=True)
+            busy_while("(document.getElementById('mat-source-path').value='Fixture/MI_Source',replaceMaterialFromSource())", 'material-overlay', 'material')
+            assert not tab.evaluate("document.getElementById('mat-body').inert")
+            busy_while('resetMaterial()', 'material-overlay', 'material')
+            if mode == 'full':
+                # Requests that overlap in one editor share its glyph until the last one ends.
+                count = len(held)
+                tab.evaluate("() => { window.__a=dyeDownload(); window.__b=matTexturesDownload(); }")
+                wait_held(count + 2)
+                assert badge('material-overlay').count() == 1
+                assert badge('material-overlay').get_attribute('data-glyph-asset') == 'texture'
+                held.pop().fulfill(status=500, body='')
+                tab.wait_for_timeout(50)
+                assert badge('material-overlay').count() == 1
+                held.pop().fulfill(status=500, body='')
+                gone('#material-overlay .material-save-badge')
+            tab.evaluate('closeMaterialEditor(true)')
+            tab.locator('#material-overlay.active').wait_for(state='detached')
+
+            tab.evaluate("""() => {
+              curveEditor={game_rel:'Fixture/Curve',name:'Fixture curve',channels:{},stops:[],dirty:{}};
+              document.getElementById('curve-overlay').classList.add('active');
+            }""")
+            busy_while('resetCurve()', 'curve-overlay', None)
+            assert tab.locator('#curve-status').inner_text() == 'Error: Fixture request failed.'
+            tab.evaluate("curveEditor=null;document.getElementById('curve-overlay').classList.remove('active')")
+            tab.evaluate("""() => {
+              vfxEditor={game_rel:'Fixture/NS_Fixture',name:'Fixture effect',groups:[],scalars:[],vectors:[]};
+              document.getElementById('vfx-overlay').classList.add('active');
+            }""")
+            busy_while('resetVfx()', 'vfx-overlay', None)
+            assert not tab.evaluate("document.getElementById('vfx-body').inert || document.getElementById('vfx-save').disabled")
+            tab.evaluate("vfxEditor=null;document.getElementById('vfx-overlay').classList.remove('active')")
+            for editor, overlay in (('worldEditor', 'world'), ('textEditor', 'text')):
+                tab.evaluate(f"{editor}={{game_rel:'Fixture/{overlay}',name:'Fixture {overlay}'}};document.getElementById('{overlay}-overlay').classList.add('active')")
+                busy_while(f"document.getElementById('{overlay}-reset').click()", f'{overlay}-overlay', None)
+                assert tab.locator(f'#{overlay}-status').inner_text() == 'Fixture request failed.'
+                tab.evaluate(f"{editor}=null;document.getElementById('{overlay}-overlay').classList.remove('active')")
+            tab.evaluate("texOpts={game_rel:'Fixture/T_Fixture',name:'T_Fixture',opts:{}};document.getElementById('texopt-overlay').classList.add('active')")
+            row = tab.locator('#texopt-overlay .modal-row')
+            still_height = row.bounding_box()['height']
+            count = len(held)
+            tab.evaluate('() => { window.__pending = saveTexOpts(); }')
+            wait_held(count + 1)
+            assert badge('texopt-overlay').get_attribute('data-glyph-asset') == 'texture'
+            # Sub-pixel rounding from the dialog's unfold can differ by a fraction of a pixel.
+            saving_height = row.bounding_box()['height']
+            assert abs(saving_height - still_height) < 0.5, ('The export options footer must not jump while it saves', mode, still_height, saving_height)
+            if mode == 'full':
+                tab.locator('#texopt-overlay .modal').screenshot(path=str(report / 'motion-texture-options.png'))
+            held.pop().fulfill(json={'ok': False, 'error': 'Fixture request failed.'})
+            gone('#texopt-overlay .material-save-badge')
+            tab.evaluate("texOpts=null;document.getElementById('texopt-overlay').classList.remove('active')")
+        checks.append('Material editor uploads, bakes and packs use the texture loader, and replace and reset the material loader. Other editors reset with the working glyph, export options save with the texture loader, and overlapping requests share one glyph in Full, Calm and Off')
+        checks.append('The dye preview opens from the top of its plate when the editor opens or its view changes, and stays still for live colour changes, repaints of the same picture and Off')
+
+        tab.evaluate("window.AtelierViewport={hasPendingEdits:()=>false,close:async()=>{},focusPendingEdits(){},openMesh(){}}")
+        target = "{game_rel:'Fixture/Meshes/SK_Fixture',name:'SK_Fixture'}"
+        for mode in ('full', 'calm', 'off'):
+            tab.evaluate('__mode', mode)
+            tab.evaluate(f'AtelierMeshEdit.open({target})')
+            tab.wait_for_selector('#mesh-edit-overlay.active')
+            tab.evaluate("() => { window.__pending = AtelierMeshEdit.replace([new File(['x'],'fixture.fbx')]); }")
+            shown = badge('mesh-edit-overlay')
+            assert shown.get_attribute('data-glyph-state') == 'busy' and shown.get_attribute('data-glyph-asset') == 'mesh'
+            assert tab.evaluate("__job.path") == '/api/mesh_replace'
+            if mode == 'full':
+                tab.locator('#mesh-edit-overlay .modal').screenshot(path=str(report / 'motion-mesh-replace.png'))
+            tab.keyboard.press('Escape')
+            assert shown.count() == 0
+            tab.evaluate(f'AtelierMeshEdit.open({target})')
+            assert shown.count() == 1
+            tab.evaluate("_activeProjectName='Smoke B';window.dispatchEvent(new Event('atelier:project-assets'))")
+            assert shown.count() == 0
+            tab.evaluate("_activeProjectName='Smoke A'")
+            tab.evaluate("__finish({ok:false,error:'Fixture model could not be read.'})")
+            assert shown.count() == 0
+            assert 'could not be read' in tab.locator('#mesh-edit-status').inner_text()
+            assert tab.locator('#mesh-replace-choose').is_enabled()
+            tab.keyboard.press('Escape')
+        checks.append('Replacing a mesh shows the mesh loader beside its status; hiding, reopening, project changes and failures clean it up in Full, Calm and Off')
+
+        for mode in ('full', 'calm', 'off'):
+            tab.evaluate('__mode', mode)
+            tab.evaluate("""async () => {
+              const {createViewportRecolour} = await import('/static/viewport-recolour.js');
+              const state = window.__recolour = {posts: []};
+              const reply = body => ({ok: true, json: async () => body});
+              const api = {
+                fetch(path, options = {}) {
+                  if (path.startsWith('/api/texture_recolour/preview')) return Promise.resolve({ok: false, json: async () => ({error: 'Preview held for the check.'})});
+                  if (options.method === 'POST') return new Promise(resolve => state.posts.push(body => resolve(reply(body))));
+                  return Promise.resolve(reply({ok: false}));
+                },
+                materials: () => [], retint() {}, applied: async () => {}, note() {}, rebuild() {}, reload() {},
+              };
+              const box = createViewportRecolour(api).section('Body', {texture_roles: {basecolor: 'Fixture/T_Body_D'}});
+              box.id = 'motion-recolour';
+              Object.assign(box.style, {position: 'fixed', left: '16px', top: '16px', width: '320px', zIndex: 9999, padding: '16px', background: 'var(--bg2)'});
+              document.body.append(box);
+              const picker = box.querySelector('input[type=color]'); picker.value = '#c04020'; picker.dispatchEvent(new Event('input'));
+            }""")
+            tab.wait_for_function("document.querySelector('#motion-recolour .vp-recolour-status').textContent==='Preview held for the check.'")
+            tab.evaluate("document.querySelector('#motion-recolour .vp-recolour-apply').click()")
+            shown = tab.locator('#motion-recolour .vp-recolour-feedback .material-save-badge')
+            assert shown.get_attribute('data-glyph-state') == 'busy' and shown.get_attribute('data-glyph-asset') == 'texture'
+            assert shown.get_attribute('data-glyph-tier') == 'inline'
+            assert tab.locator('#motion-recolour .vp-recolour-status').inner_text() == 'Saving recolour…'
+            if mode == 'full':
+                tab.locator('#motion-recolour').screenshot(path=str(report / 'motion-recolour-save.png'))
+            tab.evaluate("__recolour.posts.shift()({ok:false,error:'Fixture recolour failed.'})")
+            gone('#motion-recolour .material-save-badge')
+            assert tab.locator('#motion-recolour .vp-recolour-status').inner_text() == 'Fixture recolour failed.'
+            # Asking to replace other edits ends this wait; the replacing save is its own.
+            tab.evaluate("""() => {
+              window.AtelierDialog={confirm:()=>new Promise(resolve=>window.__confirm=resolve)};
+              const apply=document.querySelector('#motion-recolour .vp-recolour-apply'); apply.disabled=false; apply.click();
+            }""")
+            assert shown.count() == 1
+            tab.evaluate("window.__confirm=null;__recolour.posts.shift()({needs_replace:true})")
+            tab.wait_for_function('!!window.__confirm')
+            assert shown.count() == 0
+            tab.evaluate('__confirm(true)')
+            tab.wait_for_function("__recolour.posts.length===1")
+            assert shown.count() == 1
+            tab.evaluate("__recolour.posts.shift()({ok:false,error:'Fixture recolour failed.'})")
+            gone('#motion-recolour .material-save-badge')
+            tab.evaluate("window.AtelierDialog={confirm:async()=>true};document.getElementById('motion-recolour').remove()")
+        checks.append('Saving a recolour shows the texture loader beside its status, ends it for the replace question and on failure, in Full, Calm and Off')
+
+        tray = '#tray-progress .export-feedback-toast'
+        for mode in ('full', 'calm', 'off'):
+            tab.evaluate('__mode', mode)
+            tab.evaluate("() => { AtelierSMapsUI.update([{file_type:'texture',game_rel:'Fixture/T_Fixture_D'}]); window.__pending=AtelierSMapsUI.process(); }")
+            glyph = tab.locator(f'{tray} [data-atelier-motion="glyph"]')
+            assert glyph.get_attribute('data-glyph-state') == 'busy' and glyph.get_attribute('data-glyph-asset') == 'texture'
+            assert tab.locator(f'{tray} .export-feedback-message').inner_text() == 'Processing S maps…'
+            assert tab.evaluate('__job.path') == '/api/s_maps/plan'
+            tab.evaluate(f"window.__trayRow=document.querySelector('{tray}')")
+            tab.evaluate("__finish({ok:true,plan_id:'fixture-plan',pairs:[],skipped:[]})")
+            tab.wait_for_timeout(20)
+            assert tab.evaluate('__job.path') == '/api/s_maps/process'
+            assert tab.evaluate(f"document.querySelector('{tray}')===__trayRow"), 'Planning hands to processing without restarting the loader'
+            tab.evaluate("__finish({ok:false,error:'Fixture S maps could not be processed.'})")
+            gone(tray)
+            tab.evaluate("document.querySelectorAll('#toast-area .toast').forEach(toast=>toast.remove())")
+        checks.append('Processing S maps shows the texture loader in the Mod tray from planning to the result, without restarting between them, in Full, Calm and Off')
+
+        def job(name, stage='Working'):
+            return {'id': name, 'kind': 'fixture', 'label': 'Fixture ' + name, 'state': 'running', 'stage': stage,
+                    'project': tab.evaluate('atelierProject()')}
+
+        def open_activity():
+            # The panel takes its baseline from the refresh its own button starts.
+            with tab.expect_response('**/api/jobs'):
+                tab.locator('#job-activity').click()
+            tab.wait_for_selector('#job-overlay.active .job-row')
+            tab.wait_for_timeout(100)
+
+        for mode in ('full', 'calm', 'off'):
+            tab.evaluate('__mode', mode)
+            jobs['jobs'] = [job(f'{mode}-a')]
+            tab.evaluate('__effects=[];AtelierJobs.refresh()')
+            open_activity()
+            assert not effects(), 'Opening Activity shows its rows as they are'
+            jobs['jobs'] = [job(f'{mode}-b'), job(f'{mode}-a')]
+            tab.evaluate('AtelierJobs.refresh()')
+            seated = effects()
+            assert bool(seated) == (mode != 'off'), (mode, seated)
+            assert not any('opacity' in frame for effect in seated for frame in effect['frames'])
+            assert any('scale(' in frame.get('transform', '') for effect in seated for frame in effect['frames']) == (mode == 'full')
+            if mode == 'full':
+                tab.locator('#job-overlay .modal').screenshot(path=str(report / 'motion-activity-seat.png'))
+            tab.evaluate('__settle()')
+            jobs['jobs'] = [job(f'{mode}-b', 'Still working'), job(f'{mode}-a')]
+            tab.evaluate('__effects=[];AtelierJobs.refresh()')
+            assert not effects(), 'A progress repaint keeps rows still'
+            tab.keyboard.press('Escape')
+            jobs['jobs'] = [job(f'{mode}-c'), job(f'{mode}-b'), job(f'{mode}-a')]
+            tab.evaluate('AtelierJobs.refresh()')
+            open_activity()
+            tab.evaluate('AtelierJobs.refresh()')
+            assert not effects(), 'Jobs that arrived while Activity was closed are shown still'
+            tab.keyboard.press('Escape')
+        jobs['jobs'] = []
+        checks.append('A job that starts while Activity is open seats into the list (squash in Full only, still in Off); opening, progress repaints and closed refreshes stay still')
+
+        for mode in ('full', 'off'):
+            tab.evaluate('__mode', mode)
+            result = tab.evaluate("""() => {
+              const row=document.createElement('div');row.className='mat-row flash';row.textContent='Region 1';document.body.append(row);
+              const running=row.getAnimations({subtree:true}), flash=running.map(animation=>animation.effect.getKeyframes());
+              running.forEach(animation=>animation.cancel());
+              const hidden=getComputedStyle(row,'::before').clipPath;row.remove();
+              const wrap=document.createElement('div');wrap.className='folder-card-wrap';
+              const pin=document.createElement('button');pin.className='library-pin-toggle';wrap.append(pin);document.body.append(wrap);
+              const style=getComputedStyle(pin),rest={opacity:style.opacity,clip:style.clipPath,transition:style.transitionProperty};
+              pin.focus();const focused=getComputedStyle(pin).clipPath;wrap.remove();
+              const rules=[...document.styleSheets].flatMap(sheet=>{try{return [...sheet.cssRules];}catch(_){return [];}});
+              const rule=selector=>rules.find(item=>item.selectorText===selector)?.style;
+              const glow=rule('#viewport-skin-card::before'),shown=rule('#viewport-box.has-skin-colour #viewport-skin-card::before');
+              return {flash,hidden,rest,focused,glow:{opacity:glow.opacity,clip:glow.clipPath,transition:glow.transitionProperty},
+                shown:{opacity:shown.opacity,clip:shown.clipPath,transition:shown.transitionProperty}};
+            }""")
+            assert result['hidden'] == 'inset(0px 100% 0px 0px)', result
+            assert bool(result['flash']) == (mode == 'full'), result
+            for frames in result['flash']:
+                assert any('clipPath' in frame for frame in frames) and not any('opacity' in frame or 'backgroundColor' in frame for frame in frames), frames
+            assert result['rest']['opacity'] == '1' and 'opacity' not in result['rest']['transition'], result
+            assert result['rest']['clip'] == 'inset(0px -8px 100%)', result
+            if mode == 'off':
+                assert result['focused'] == 'inset(-8px)', result
+            for side in ('glow', 'shown'):
+                assert not result[side]['opacity'] and 'opacity' not in result[side]['transition'] and result[side]['clip'], result
+        checks.append('Finding a region folds its highlight away, and the costume glow and folder pin unfold, all without fading')
         assert not errors, errors
     finally:
         if stored:

@@ -824,8 +824,15 @@ progress:not([value]) { display: none; }
 .dye-sw { width: 13px; height: 13px; border-radius: var(--studio-shape-xs); border: 1px solid var(--border2); flex: 0 0 auto; }
 .dye-legend-name { color: var(--text); }
 .dye-legend-pct { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-.mat-row.flash { animation: matflash 1.1s var(--studio-easing); }
-@keyframes matflash { 0%, 40% { background: var(--md-sys-color-secondary-container); } 100% { background: transparent; } }
+/* Finding a region marks its rows. The highlight holds, then folds back into the row's left edge, the side
+   rows arrive from, in the fold's 190 ms. It never fades or blends (P4b.7). Off shows no highlight, as before. */
+.mat-row.flash { position: relative; isolation: isolate; }
+.mat-row.flash::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--md-sys-color-secondary-container); clip-path: inset(0 100% 0 0); animation: matflash 1.1s linear both; }
+@keyframes matflash {
+  0%, 82.7% { clip-path: inset(0); animation-timing-function: var(--studio-easing-exit); }
+  100% { clip-path: inset(0 100% 0 0); }
+}
 
 /* colour notation field (hex / 0-255 / float) */
 .mat-hex { width: 118px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--studio-shape-small);

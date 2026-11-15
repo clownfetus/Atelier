@@ -7,12 +7,17 @@
   border: 1px solid var(--border); border-radius: var(--studio-shape-small);
   background: var(--md-sys-color-surface-container-lowest); color: var(--muted);
   cursor: pointer;
-  opacity: 0; pointer-events: none;
-  transition: opacity var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing);
+  /* Hidden, it is folded into its top edge. On hover or focus it unfolds downwards like any pop-up (280 ms,
+     6 px, P4b.7) and folds back up when the pointer leaves (190 ms). It never fades; Off cuts. */
+  clip-path: inset(0 -8px 100% -8px); translate: 0 -6px; pointer-events: none;
+  transition: clip-path var(--studio-motion-fold) var(--studio-easing-exit), translate var(--studio-motion-fold) var(--studio-easing-exit),
+    background-color var(--studio-motion-fast) var(--studio-easing);
 }
 .folder-card-wrap:hover > .library-pin-toggle,
 .folder-card-wrap:focus-within > .library-pin-toggle,
-.library-pin-toggle[aria-pressed="true"] { opacity: 1; pointer-events: auto; }
+.library-pin-toggle[aria-pressed="true"] { clip-path: inset(-8px); translate: 0 0; pointer-events: auto;
+  transition: clip-path var(--studio-motion-unfold) var(--studio-easing-unfold), translate var(--studio-motion-unfold) var(--studio-easing-unfold),
+    background-color var(--studio-motion-fast) var(--studio-easing); }
 .library-pin-toggle[aria-pressed="true"] { color: var(--md-sys-color-on-primary-container); background: var(--md-sys-color-primary-container); border-color: var(--acc); }
 .library-pin-toggle:hover { color: var(--acc); }
 .library-pin-toggle svg { width: 16px; height: 16px; pointer-events: none; }

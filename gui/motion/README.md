@@ -89,6 +89,10 @@ glyphs finishing together click once.
 | `../viewport.js` | The 3D viewport's loader at Stage, on the dark stage |
 | `../add-asset.js` | The selected texture, mesh or material loader beside the status while a custom asset is prepared |
 | `../bulk-edit.js` | A rolling disc follows the review job's counts. Material saves use the material loader; other batches use the general working glyph |
+| `../app.js` (`editorWorking`) | Beside an editor's Save while its own request runs: saves and resets, the material editor's replace (material loader) and its uploads, bakes and packs (texture loader), and texture export options (texture loader). Overlapping requests share one glyph. Opening an editor shows none |
+| `../viewport-recolour.js` | The texture loader beside the status while a recolour saves |
+| `../mesh-edit.js` | The mesh loader beside the status while a mesh replacement runs |
+| `../s-maps.js` | A Mod tray progress row with the texture loader while S maps are planned and processed |
 
 `docs/motion-v2/SURFACE_MAP.md` lists every surface with its tier and states.
 
@@ -113,7 +117,9 @@ after completion or cancellation. The request or close a transition belongs to n
 an existing edit only reseats when its saved version changes. `foldAway()` is the tray's inert
 departing copy, reused by Restore and unpinning. Newly pinned folders get the short settle;
 filters, label refreshes and initial hydration do not replay it. Quick Preview reuses the
-top-edge image reveal after the image loads. Off and OS reduced motion show these changes at once.
+top-edge image reveal after the image loads, as do Assembly View's texture thumbnails and the dye
+preview when it arrives on its plate. A job that starts while Activity is open seats into the list
+with `seat()`, its glyph taking the squash. Off and OS reduced motion show these changes at once.
 Job glyphs and review bars are removed on hide, failure or completion, and resume the same
 operation when its dialog reopens. Result notifications keep their existing ownership.
 
@@ -131,7 +137,7 @@ Each flag runs one part of `tests/browser_smoke.py --report-dir <folder>`:
 | `--inks-dial-only` | Charge fitting on every preset and the Motion dial |
 | `--logo-only`, `--empty-assets-only` | The logo entrance and the Mod tray's empty state |
 | `--polish-only`, `--retired-only` | Continuity, and that the retired surfaces stay gone |
-| `--motion-placements-only` | Custom assets, batch counts/saves, dock slots, pins and Quick Preview; Full, Calm, Off and lifecycle checks. Also included in `--polish-only` |
+| `--motion-placements-only` | Custom assets, batch counts/saves, dock slots, pins, Quick Preview, editor and export-option loaders, recolour, mesh replacement, S maps, the dye preview, Activity rows and the replaced fades; Full, Calm, Off and lifecycle checks. Also included in `--polish-only`. Assembly View's thumbnails are in `--assembly-only` |
 | `--showcase-only` | Showcase views and the success click |
 
 `tests/test_inks.py` runs the colour maths in Node. `tests/desktop_smoke.py` and

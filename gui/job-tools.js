@@ -9,6 +9,24 @@
   // before the glyph moves to it (D7). The row's text updates at once.
   const shownStates = new Map();
   const rowGlyphs=new Map();
+  // A job that starts while Activity is open seats into the list like a Mod tray piece (P4b.6): its slot
+  // opens, the row snaps in and its glyph squashes at the impact, and the text wipes in. Opening the panel,
+  // progress repaints and a project change show the rows as they are. shownJobs is null until the open
+  // panel has a baseline.
+  let shownJobs = null, shownProject = null;
+  function seatNewRows(project) {
+    const rows = [...body.querySelectorAll('.job-row')];
+    const open = overlay?.classList.contains('active');
+    if (open && shownJobs && shownProject === project) {
+      for (const row of rows) if (!shownJobs.has(row.dataset.jobId)) {
+        const glyph = row.querySelector('.job-state-glyph');
+        try { window.AtelierPolish?.seat(row, true, {thumb: row, art: glyph || row, parts: row.querySelectorAll(':scope > :not(.job-state)')}); }
+        catch (_) { /* Presentation is optional. */ }
+      }
+    }
+    shownJobs = open ? new Set(rows.map(row => row.dataset.jobId)) : null;
+    shownProject = open ? project : null;
+  }
   function jobGlyph(job) {
     if (active.has(job.state)) return 'busy';
     if (job.state === 'succeeded') return (job.result?.skipped || []).length ? 'warning' : 'success';
@@ -129,6 +147,7 @@
       body.append(row);
     }
     for (const [id, kept] of rowGlyphs) if (!kept.used) { try { kept.glyph.destroy(); } catch (_) {} rowGlyphs.delete(id); }
+    seatNewRows(window.atelierProject());
     updateActivity();
     if (focusJob) {
       const row = [...body.querySelectorAll('.job-row')].find(node => node.dataset.jobId === focusJob);
@@ -164,14 +183,16 @@
     dismiss.append(icon); header.append(title, dismiss);
     body = el('div', undefined, 'job-body');
     const close = el('button', 'Close', 'btn');
-    const hide = () => { overlay.classList.remove('active'); activityButton.focus(); };
+    const hide = () => { overlay.classList.remove('active'); shownJobs = null; activityButton.focus(); };
     dismiss.addEventListener('click', hide);
     close.addEventListener('click', hide);
     panel.append(header, body, close); overlay.append(panel); document.body.append(overlay);
     window.lucide?.createIcons({nodes: [dismiss]});
     activityButton.addEventListener('click', async () => {
-      overlay.classList.add('active'); panel.focus();
+      overlay.classList.add('active'); panel.focus(); shownJobs = null;
       try { await refresh(); } catch (error) { body.replaceChildren(el('p', error.message, 'warning')); }
+      // The rows the panel opened on are its baseline, even when the refresh found nothing new to draw.
+      if (overlay.classList.contains('active') && !shownJobs) seatNewRows(window.atelierProject());
     });
     window.AtelierJobDialogs.trap(overlay, panel, hide);
     timer = setTimeout(tick, 400);

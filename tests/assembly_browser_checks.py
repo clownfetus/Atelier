@@ -113,9 +113,22 @@ def run_assembly_checks(context, url, report, checks):
         tab.locator('#viewport-material-search').fill('')
         browse.click()
         checks.append('Standalone and costume meshes open directly in Assembly, with surface search and the grouped material browser')
+        tab.evaluate("""() => {
+          window.__thumbOpenings=[];
+          const animate=Element.prototype.animate;
+          Element.prototype.animate=function(...args){
+            const result=animate.apply(this,args);
+            if(this.matches('.assembly-texture-preview img'))__thumbOpenings.push(result.effect.getKeyframes());
+            return result;
+          };
+        }""")
         point = tab.evaluate('__assembly.point()'); tab.mouse.click(point['x'],point['y'])
         tab.wait_for_selector('.assembly-texture-card')
         assert tab.locator('.assembly-texture-card').count() == 4
+        tab.wait_for_function('__thumbOpenings.length>0')
+        opening = tab.evaluate('__thumbOpenings[0]')
+        assert opening[0]['clipPath'] == 'inset(0px 0px 100%)' and not any('opacity' in frame for frame in opening), opening
+        checks.append('Assembly View texture thumbnails open downwards from their top edge once loaded, without a fade')
         assert tab.evaluate('__assembly.state().surface') == 'Torso fixture'
         assert tab.locator('#assembly-material-context').inner_text().count('Materials/MI_Body') >= 1
         before = tab.evaluate('__assembly.state()')
