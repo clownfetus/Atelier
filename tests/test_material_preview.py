@@ -134,6 +134,21 @@ class Effects(unittest.TestCase):
         enabled = {**effect, 'scalars': [{'name': 'Alpha', 'value': 1}]}
         self.assertEqual(effect_surface(enabled, None, None), enabled)
 
+    def test_ability_scoped_alpha_switch_disables_an_effect(self):
+        # Black Panther 1026301's armour overlay: no base colour, switched off by 102601Alpha.
+        overlay = {'surface': {'parent': 'M_1026301_Armour_01', 'blend_mode': 'BLEND_TranslucentGreyTransmittance', 'opacity': 1},
+                   'scalars': [{'name': 'Step1_Alpha', 'value': 2.0}, {'name': '102601Alpha', 'value': 0.0},
+                               {'name': 'Smooth Alpha', 'value': 3.0}]}
+        self.assertEqual(effect_surface(overlay, None, None)['surface']['preview_omitted'], 'Disabled game effect')
+        shaping = {**overlay, 'scalars': [{'name': 'Step1_Alpha', 'value': 0.0}, {'name': 'Smooth Alpha', 'value': 0.0}]}
+        self.assertEqual(effect_surface(shaping, None, None), shaping)
+        on = {**overlay, 'scalars': [{'name': '102601Alpha', 'value': 1.0}]}
+        self.assertEqual(effect_surface(on, None, None), on)
+        # A child switching its parent's ability alpha on stays visible.
+        parent = {'surface': {'blend_mode': 'BLEND_Translucent', 'parent': 'M_Armour'}, 'scalars': [{'name': 'Alpha', 'value': 0}]}
+        child = {'surface': {'parent': 'MI_Armour', 'blend_mode': 'BLEND_Translucent'}, 'scalars': [{'name': '102601Alpha', 'value': 1}]}
+        self.assertEqual(effect_surface(child, lambda _: parent, lambda _: ['Armour/MI_Armour']), child)
+
 
 class EyeRoutes(unittest.TestCase):
     def call(self, original=False, body=None):

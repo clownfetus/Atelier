@@ -232,10 +232,26 @@ class Studio(unittest.TestCase):
         self.assertEqual([row['slot_index'] for row in out],[0,1])
 
     def test_texture_aliases_are_canonical_and_masks_are_not_albedo(self):
-        for name in ('DiffuseMap','Base Color Map','albedo'):
+        for name in ('DiffuseMap','Base Color Map','albedo','DiffuseTex'):
             self.assertEqual(meshmat.texture_role(name),'basecolor')
         self.assertEqual(meshmat.texture_role('OpacityMask'),'opacity')
         self.assertEqual(meshmat.texture_role('DyeingTexture'),'dye')
+
+    def test_unnamed_diffuse_and_normal_maps_follow_the_game_texture_suffix(self):
+        snapshots={
+            'MI_Gem':{'textures':{'DiffuseTex':'Textures/T_Gem_D','Normal':'Textures/T_Gem_N','Roughness':'Textures/T_Gem_ORM'}},
+            'MI_Stone':{'textures':{'BaseColorMap_b':'Textures/T_Stone_D','NormalMap_b':'Textures/T_Stone_N',
+                                    'CombinedMask_b':'Textures/T_Stone_MRO'}},
+            'MI_Cloak':{'textures':{'BaseColor':'Textures/T_Cloak_D','BackBaseColor':'Textures/T_CloakBack_D',
+                                    'BaseNormal':'Textures/T_Cloak_N','Blend_Normal':'Textures/T_Detail_N'}}}
+        slots=[{'slot':name,'mi':name} for name in snapshots]
+        with patch.object(meshmat,'material_snapshot',side_effect=snapshots.get),patch.object(meshmat.jobs,'progress'):
+            meshmat.resolve_mesh_textures(slots)
+        roles={row['mi']:{mp['param']:mp['role'] for mp in row['maps']} for row in slots}
+        self.assertEqual(roles['MI_Gem'],{'DiffuseTex':'basecolor','Normal':'normal','Roughness':None})
+        self.assertEqual(roles['MI_Stone'],{'BaseColorMap_b':'basecolor','NormalMap_b':'normal','CombinedMask_b':None})
+        # A role the material already has is never taken over; one unnamed map fills a missing role.
+        self.assertEqual(roles['MI_Cloak'],{'BaseColor':'basecolor','BackBaseColor':None,'BaseNormal':'normal','Blend_Normal':None})
 
     def test_translucent_surface_preserves_opacity_sidedness_and_parent(self):
         doc={'Exports':[{'Data':[{'Name':'Parent','Value':-1},

@@ -452,7 +452,11 @@ that is precisely the stripped-top-mip path the function exists to avoid: **ever
 the mesh decoded to 4×4**. It looks like a harmless decode quirk right up until someone paints
 one and injects a destroyed normal map. Now mapped: BC1/BC3→DXT1/DXT5, BC4→ATI1, BC5→ATI2,
 BC6H/BC7→DX10 with the DXGI format. `meshmat` also treats an existing <16 px PNG as a failed
-decode and re-extracts it, so caches poisoned before the fix heal themselves.
+decode and re-extracts it, so caches poisoned before the fix heal themselves. The exception is a
+texture whose own header declares that size: the shared `T_Common_N` is a genuine 4×4 flat
+normal, and rejecting it stopped the portable export and Edit in Blender for every skin whose
+material uses it (Black Panther 1026301's gems). A failed recovery decodes far below its
+declared size, so `_declared_small` tells the two apart with `texture.texture_info`.
 
 ### 3.20 Blender does not save painted pixels of LINKED images
 Painting a texture and saving the `.blend` **loses the paint**: Blender keeps edits to linked
@@ -586,6 +590,52 @@ parts and the Armature survives the KEEP-list cleanup both scripts already do.
 (rather than wrong-but-present data) when the vanilla LOD has a colour buffer — a residual
 safety net for a genuinely missing Color Attribute (e.g. manually deleted in Blender), which
 cannot be recovered after the fact and must not silently default to white either.
+
+### 3.26 A group input's default is not the value on its node
+`material_nodes.wire_material` assigns the material's node group to its group node first and
+adds the group's inputs afterwards. Blender creates each new input on that node at the socket
+type's default (black, 0), and setting the interface `default_value` changes only the group's
+own default, never a node that already exists. So the group panel showed Base Tint white and
+Metallic 1 while the node the material renders with held black and 0: the base colour multiplied
+by a black tint rendered black, and Metallic, Normal Intensity and Roughness Power were all zero.
+After building the group, every unlinked input now copies its default onto the node. `tests/native_blender_materials.py` checks the node, not the interface.
+
+### 3.27 `RoughnessPower` is not a roughness
+The Blender graph used to compute roughness as ORM green × `RoughnessPower`, and fell back to
+`RoughnessPower` itself when a material had no ORM map. Across Black Panther's ten skins the value
+is 0 on 34 material instances (bodies, all skin, hair and thin-film materials) and 0.05 to 0.2 on
+most of the rest, so both forms rendered those surfaces as mirrors. The master materials' formula
+is not readable from the cooked data, and the app's 3D preview ignores the value. Roughness now
+comes straight from ORM green (or `Roughness` / `ScleraRoughness`, else 0.6); `RoughnessPower`
+stays on the group as an unconnected source value. Metallic is still ORM blue × the game's
+`Metallic` (spelt `Metailic` in the game's parameters).
+
+### 3.28 Effect materials need the preview's visibility rule in Blender too
+Some sections are game effects with no base colour, such as Black Panther's
+`MI_1026001_Armour` (translucent, `Alpha` 0). The 3D preview leaves them out through
+`material_preview.effect_surface` ("Disabled game effect", "Animated game effect"), but the
+Blender graph never applied that rule, so the effect rendered as an opaque white shell over the
+body. Every Blender material now has Atelier's own **Alpha** input, first in the group and limited
+to 0 to 1, multiplied into the surface's alpha. `meshmat.build_manifest` records `effect_hidden`
+with the same rule, and those materials, like sections hidden for export, start at Alpha 0.
+Raising it shows the surface without changing the game's own `Alpha` value.
+
+The rule reads every uniform alpha switch, including ability-scoped ones: skin 1026301's
+`MI_1026301_Equip_08` overlay (white face mask and stripes in Blender) has no `Alpha` scalar but
+is switched off by `102601Alpha` = 0. Shaping values such as `Step1_Alpha` or `Smooth Alpha` are
+not switches. Across Black Panther's ten skins the rule hides six effect materials and no
+weapon, glass or eye-highlight material.
+
+### 3.29 Some masters give their diffuse and normal maps other names
+`meshmat._ROLE_ALIASES` matches texture parameters by name, and shared masters do not all use
+the usual names. `M_Common_Crystal` calls its diffuse `DiffuseTex`, so Black Panther's gem
+necklace and arm gems lost their colour (white base colour) in Blender and the 3D preview.
+`DiffuseTex` is now an alias. For parameters no alias names (`M_Standard_PBR`'s
+`BaseColorMap_b` / `NormalMap_b`, a weapon's `Base_Test` / `NorTex`), `meshmat.suffix_roles`
+reads the game's own texture suffix: a `T_*_D` map becomes the base colour and `T_*_N` the
+normal, but only when the material has no texture in that role, so a cloak's `BackBaseColor`
+never displaces its `BaseColor`. The suffix fallback applies to the Blender manifest; the 3D
+preview still assigns roles by parameter name alone.
 
 ## 4. Design constraints (deliberate, enforced)
 

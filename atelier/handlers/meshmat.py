@@ -34,6 +34,7 @@ from atelier.tools import uat
 _ROLE_ALIASES = {
     "basecolor": "basecolor", "base": "basecolor", "diffuse": "basecolor", "albedo": "basecolor",
     "basecolormap": "basecolor", "basecolortexture": "basecolor", "diffusemap": "basecolor",
+    "diffusetex": "basecolor",
     "normal": "normal", "normalmap": "normal", "normals": "normal", "normaltexture": "normal",
     "orm": "orm", "ormmap": "orm", "ormtexture": "orm", "maskmap": "orm", "mrao": "orm", "arm": "orm",
     "emissive": "emissive", "emissivemap": "emissive", "emission": "emissive",
@@ -55,6 +56,26 @@ def _canon(name):
 def texture_role(param_name):
     """Surface role, or None for an auxiliary game-effect group input."""
     return _ROLE_ALIASES.get(_canon(param_name))
+
+
+# The game's own texture suffix -> role, for parameters no alias names (M_Standard_PBR's
+# BaseColorMap_b / NormalMap_b, a weapon's Base_Test / NorTex). Used only for a role the
+# material has no texture for, so a cloak's BackBaseColor never displaces its BaseColor.
+_SUFFIX_ROLES = {"d": "basecolor", "n": "normal"}
+
+
+def suffix_roles(maps):
+    """Give unnamed T_*_D / T_*_N maps the base colour / normal role the material lacks."""
+    present = {mp["role"] for mp in maps if mp["role"]}
+    for mp in maps:
+        if mp["role"]:
+            continue
+        name = os.path.splitext(os.path.basename(mp.get("game_rel") or ""))[0]
+        role = _SUFFIX_ROLES.get(name.rsplit("_", 1)[-1].casefold()) if "_" in name else None
+        if role and role not in present:
+            mp["role"] = role
+            present.add(role)
+    return maps
 
 
 def _index_candidates(asset_name):
@@ -156,6 +177,7 @@ def resolve_mesh_textures(slots):
         for param, tex_gr in sorted(cache[mi].get('textures', {}).items()):
             rec["maps"].append({"param": param, "role": texture_role(param), "game_rel": tex_gr,
                                 'uv': 1 if '(uv1)' in param.casefold() or _canon(param)=='anisotropybrightness' else 0})
+        suffix_roles(rec["maps"])
     return slots
 
 
@@ -215,6 +237,23 @@ def _degenerate(png, limit=16):
         return False
 
 
+def _declared_small(png, work_base):
+    """True when the game texture itself declares the decoded size, so a tiny decode is real.
+
+    A few shared textures genuinely are tiny: T_Common_N is a 4x4 flat normal (no bulk data).
+    A failed mip recovery decodes far smaller than the size its header declares."""
+    if not work_base:
+        return False
+    from atelier.handlers.texture import texture_info
+    declared = texture_info(work_base)
+    try:
+        from PIL import Image
+        w, h = Image.open(png).size
+    except Exception:
+        return False
+    return bool(declared) and 0 < declared["w"] <= w and 0 < declared["h"] <= h
+
+
 def _is_black_placeholder(png):
     """True for a uniformly black texture -- MR fills unused MI slots with shared dummies like
     T_Common_LinearBlack / T_Common_Black. That means 'this master has no such map', NOT 'this
@@ -256,6 +295,18 @@ def extract_textures_to_project(tex_game_rels, root=None):
 
     def _one(gr):
         dst = project_base(gr, root)
+        source = []
+
+        def work_base():
+            if not source:
+                source.append(ensure_work_base(gr, prefer_exact=True))
+            return source[0]
+
+        def husk(png):
+            # A tiny decode is a failed mip recovery's husk, unless the game texture itself
+            # declares that size. The source is only looked up for a tiny image.
+            return _degenerate(png) and not _declared_small(png, work_base())
+
         if os.path.normcase(os.path.realpath(root)) != os.path.normcase(os.path.realpath(project_root)):
             for src in (project_base(gr,project_root)+'.png', project_base_legacy(gr,project_root)+'.png'):
                 if os.path.isfile(src):
@@ -269,7 +320,7 @@ def extract_textures_to_project(tex_game_rels, root=None):
                 # ...unless it is the 4x4 husk of a failed mip recovery. Nobody paints one of
                 # those, so it is a broken extract rather than an edit worth protecting; fall
                 # through and re-decode, reporting the refresh.
-                if cand.endswith(".png") and _degenerate(cand):
+                if cand.endswith(".png") and husk(cand):
                     print(f"[meshmat] refreshing unusable {os.path.basename(cand)}", file=sys.stderr)
                     break
                 return gr, {"path": cand, "status": "existing", "readonly": ro or bool(hdr_project_info(cand[:-4]))}
@@ -286,17 +337,17 @@ def extract_textures_to_project(tex_game_rels, root=None):
         # A cached 4x4 is the signature of a failed mip recovery (see texture.decode_dds), not a
         # real texture -- handing one over as "editable" invites painting it and injecting a
         # destroyed map. Drop it and decode again; the cache predates the caller either way.
-        if os.path.exists(png) and _degenerate(png):
+        if os.path.exists(png) and husk(png):
             os.remove(png)
         if not os.path.exists(png):
-            wb = ensure_work_base(gr,prefer_exact=True)
+            wb = work_base()
             if not wb:
                 return gr, {"path": None, "status": "missing", "readonly": False}
             png = decode_to_png(cache_base, wb)
-        if not png or not os.path.exists(png) or _degenerate(png):
+        if not png or not os.path.exists(png) or husk(png):
             from atelier.handlers.meshimages import recover_inline_hdr
-            # Reuse the source lookup when a stale PNG was already present.
-            if 'wb' not in locals():wb=ensure_work_base(gr,prefer_exact=True)
+            # Reuses the source lookup when a stale PNG was already present.
+            wb = work_base()
             hdr_record=recover_inline_hdr(wb,cache_base) if wb else None
             if hdr_record:
                 os.makedirs(os.path.dirname(dst),exist_ok=True)
@@ -354,6 +405,19 @@ def extract_textures_to_project(tex_game_rels, root=None):
     return result
 
 
+def effect_hidden(parameters):
+    """Why the app's 3D preview leaves this game effect out, or ''. Blender starts it at Alpha 0.
+
+    Same rule as the viewport (material_preview.effect_surface). The snapshot has already
+    merged the parent chain, so no further parents are read here.
+    """
+    from atelier.handlers.material_preview import effect_surface
+    if not parameters or parameters.get('material_error'):
+        return ''
+    surface = effect_surface(parameters, lambda _path: {}, lambda _name: []).get('surface') or {}
+    return surface.get('preview_omitted') or ''
+
+
 def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
     """Resolve materials + textures, stage the textures, and return the manifest dict that
     glb_to_blend.py consumes to wire the .blend's shader nodes."""
@@ -394,7 +458,8 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
         out_slots[slot_names[index]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
             'gameplay_tags': list(rec.get('gameplay_tags', [])),
-            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden)}
+            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden),
+            'effect_hidden':effect_hidden(rec.get('parameters'))}
         from atelier.handlers.meshtextures import source_maps
         maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))
         if not rec["mi"]:

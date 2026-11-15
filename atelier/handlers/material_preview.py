@@ -77,9 +77,12 @@ def effect_surface(params, read_parent, find_parent, visited=()):
         return params
     textures = params.get('textures') or {}
     scalars = {row['name'].casefold(): row['value'] for row in params.get('scalars', [])}
+    # The effect's uniform switches: Alpha, and ability-scoped ones such as 102601Alpha.
+    # Step1_Alpha, Smooth Alpha and the like shape the effect and are not switches.
+    switches = [value for name, value in scalars.items() if re.fullmatch(r'\d*alpha', name)]
     reason = None
     if not textures.get('BaseColor'):
-        if scalars.get('alpha') == 0:
+        if any(value == 0 for value in switches):
             reason = 'Disabled game effect'
         elif surface.get('parent', '').casefold() in ('m_bpstdmoani', 'm_stdadv'):
             reason = 'Animated game effect'
@@ -89,7 +92,7 @@ def effect_surface(params, read_parent, find_parent, visited=()):
                 parent = effect_surface(read_parent(matches[0]), read_parent, find_parent, (*visited, matches[0].casefold()))
                 reason = (parent.get('surface') or {}).get('preview_omitted')
                 # A child can explicitly turn its parent's uniform alpha on.
-                if reason == 'Disabled game effect' and scalars.get('alpha', 0) != 0:
+                if reason == 'Disabled game effect' and switches and all(value != 0 for value in switches):
                     reason = None
     return {**params, 'surface': {**surface, 'opacity': 0, 'preview_omitted': reason}} if reason else params
 

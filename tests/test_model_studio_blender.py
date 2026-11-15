@@ -105,6 +105,24 @@ class BlenderPort(unittest.TestCase):
         self.assertEqual({key:value['mi'] for key,value in result['slots'].items()},
                          {'Shared':self.child, 'Shared__slot_1':self.parent})
 
+    def test_manifest_marks_game_effects_the_preview_leaves_out(self):
+        def parameters(blend, alpha=None, textures=None, parent='M_Fixture'):
+            return {'surface':{'blend_mode':blend,'parent':parent},'textures':textures or {},
+                    'scalars':[] if alpha is None else [{'name':'Alpha','value':alpha}]}
+        rows = {'Armour':parameters('BLEND_TranslucentGreyTransmittance', 0.0),
+                'Visor':parameters('BLEND_Translucent', 0.0, {'BaseColor':'Textures/T_Visor_D'}),
+                'Glow':parameters('BLEND_Additive', parent='M_StdAdv'),
+                'Body':parameters('BLEND_Opaque', 0.0)}
+        model = types.SimpleNamespace(materials=[{'slot_name':name} for name in rows])
+        slots = [{'slot':name, 'mi':self.child, 'maps':[], 'parameters':row} for name,row in rows.items()]
+        with patch.object(meshmat, 'resolve_mesh_materials', return_value=slots), \
+                patch.object(meshmat, 'resolve_mesh_textures', side_effect=lambda value:value), \
+                patch.object(meshmat, 'extract_textures_to_project', return_value={}):
+            result = meshmat.build_manifest('Meshes/SK_Body', model)
+        self.assertEqual({key:value['effect_hidden'] for key,value in result['slots'].items()},
+                         {'Armour':'Disabled game effect', 'Visor':'', 'Glow':'Animated game effect', 'Body':''})
+        self.assertEqual(meshmat.effect_hidden({'material_error':'unreadable', **rows['Armour']}), '')
+
     def test_texture_rename_preserves_inline_mips_without_interpreting_pixels_as_headers(self):
         injected=self.root/'encoded.uasset';injected.write_bytes(b'header')
         payload=b'properties'+bytes(range(256))*4+b'inline mips'
@@ -327,6 +345,28 @@ class BlenderPort(unittest.TestCase):
             result=meshmat.extract_textures_to_project(['good','bad'])
         self.assertEqual(result['bad']['status'],'failed')
         self.assertEqual(Image.open(result['good']['path']).getpixel((0,0)),(255,0,0))
+
+    def test_a_texture_the_game_ships_at_4x4_is_not_a_failed_recovery(self):
+        # The game's T_Common_N is a genuine 4x4 flat normal. A failed mip recovery decodes to the
+        # same 4x4 tail, but far below the size its header declares.
+        decoded=[]
+        def decode(dst,base):
+            decoded.append(base);path=dst+'.png';Path(path).parent.mkdir(parents=True,exist_ok=True)
+            Image.new('RGBA',(4,4),(128,128,0,255)).save(path);return path
+        declared={'T_Common_N':{'w':4,'h':4,'fmt':'BC5','mips':1},'T_Stripped_D':{'w':4096,'h':4096,'fmt':'DXT1','mips':12}}
+        with patch('atelier.handlers.texture.ensure_work_base',side_effect=lambda gr,**kw:gr), \
+             patch('atelier.handlers.texture.decode_to_png',side_effect=decode), \
+             patch('atelier.handlers.texture.texture_info',side_effect=lambda base:declared[base]), \
+             patch('atelier.handlers.meshimages.recover_inline_hdr',return_value=None), \
+             patch.object(meshmat,'CACHE_3DVIEW',str(self.root/'cache')):
+            first=meshmat.extract_textures_to_project(['T_Common_N','T_Stripped_D'])
+            again=meshmat.extract_textures_to_project(['T_Common_N'])
+        self.assertEqual(first['T_Common_N']['status'],'extracted')
+        self.assertEqual(Image.open(first['T_Common_N']['path']).size,(4,4))
+        self.assertEqual(first['T_Stripped_D']['status'],'failed')
+        # Kept as the project's texture, not refreshed as a husk on the next export.
+        self.assertEqual(again['T_Common_N']['status'],'existing')
+        self.assertEqual(decoded.count('T_Common_N'),1)
 
     def test_standalone_texture_is_an_independent_copy_of_the_project_edit(self):
         source=Path(config.project_base('Textures/T_Edited')+'.png');source.parent.mkdir(parents=True)

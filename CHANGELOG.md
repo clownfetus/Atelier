@@ -21,6 +21,18 @@ The app, installers and update checker identify each release by its full number,
   including a saved **Edited first** view. The selected sort orders items within
   each group.
 
+## 1.2.2 — 2026-11-12
+
+- Library folders with nothing to list no longer appear at any level, so opening
+  a folder always leads somewhere. Folders holding assets your project has
+  imported or added stay visible, and existing pins still open.
+
+- Fixed Blender material defaults, gem textures and effect visibility. Hidden
+  effects can be revealed with the material's Alpha input.
+
+- Fixed extraction of plugin assets in game patch containers, so affected
+  ability effects can be edited and recoloured.
+
 ## 1.2.1 — 2026-11-10
 
 - Characters, UI and VFX have distinct folder icon colours. Choose
