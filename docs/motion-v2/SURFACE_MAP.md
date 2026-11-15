@@ -47,6 +47,7 @@ These reuse the finished motion system; the original migration inventory above s
 | Region highlight | `gui/style.css` (`matflash`) | Finding a region holds the highlight, then folds it back into the row's left edge in 190 ms instead of fading it. Off shows no highlight, as before |
 | Costume glow | `gui/viewport.css` | Model Studio's skin glow opens downwards from its top edge when the colour is known and folds back up when it goes, instead of fading |
 | Folder pin button | `gui/library-pins.css` | On hover or focus the pin unfolds downwards like a pop-up (280 ms, 6 px) and folds back up (190 ms), instead of fading |
+| Upscaled artwork | `gui/catalogue-art.js` | When the sharper copy of the Library banner's art or Model Studio's skin card finishes while the art is on screen, it opens downwards over the original from its top edge, with the image swap an edited texture uses. A copy that was already waiting, or that arrives while the art is still opening, swaps in at once |
 
 These placements use the shared Full/Calm/Off policy, including OS reduced motion. They never
 form a success glyph themselves. Busy mounts are disposed when the operation ends, its dialog

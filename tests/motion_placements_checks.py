@@ -1,6 +1,7 @@
 """The extra motion placements: real controls with held, explicitly simulated job results."""
 from io import BytesIO
 from time import monotonic
+from urllib.parse import urlsplit
 
 from PIL import Image, ImageDraw
 
@@ -33,8 +34,10 @@ def run_motion_placements_checks(context, url, report, checks):
           const animate=Element.prototype.animate;
           Element.prototype.animate=function(...args){
             const result=animate.apply(this,args);
-            if(this.matches('#library-preview img,.workspace-slot,.workspace-slot *, .library-pin-chip,.library-pin-chip *'))
-              __effects.push({el:this,animation:result,frames:result.effect.getKeyframes(),duration:result.effect.getTiming().duration});
+            if(this.matches('#library-preview img,.workspace-slot,.workspace-slot *, .library-pin-chip,.library-pin-chip *, #library-hero .image-swap, #viewport-skin-card .image-swap'))
+              __effects.push({el:this,animation:result,frames:result.effect.getKeyframes(),duration:result.effect.getTiming().duration,src:this.getAttribute('src'),
+                box:this.matches('.image-swap')?[this,this.parentElement.querySelector(':scope > img:not(.image-swap)')].map(node=>{const r=node.getBoundingClientRect();return [r.left,r.top,r.width,r.height];}):null});
+            if(window.__holdSwap&&this.matches('.image-swap')){result.pause();result.currentTime=__holdSwap;}
             return result;
           };
           AtelierJobs.run=(path,options)=>new Promise(resolve=>window.__job={path,options,resolve});
@@ -192,6 +195,90 @@ def run_motion_placements_checks(context, url, report, checks):
         assert tab.locator('#library-preview img').evaluate('image=>image.getAnimations().length') == 0
         tab.evaluate('AtelierLibraryTools.closePreview()')
         checks.append('Quick Preview reveals the loaded image from the top without a fade, cancels on close and stays still in Off and OS reduced motion')
+
+        # Catalogue art's sharper copy: the first check finds it still being made, a later one finds it ready. The
+        # sharper copy is blue, so a held swap shows which picture is where.
+        def png(size, colour):
+            data = BytesIO(); Image.new('RGB', size, colour).save(data, 'PNG')
+            return data.getvalue()
+        old_colour, new_colour = (182, 64, 80), (64, 100, 182)
+        pictures = {path: (png(size, old_colour), png(tuple(n * 4 for n in size), new_colour)) for path, size in
+                    (('/api/catalogue/hero/1029/story', (344, 120)), ('/api/catalogue/banner/1029100', (848, 192)))}
+        upscale = {'ready': False, 'heads': 0}
+        def catalogue(route):
+            parts = urlsplit(route.request.url)
+            if parts.path not in pictures:
+                route.fulfill(status=404)
+                return
+            if route.request.method == 'HEAD':
+                upscale['heads'] += 1
+            route.fulfill(body=pictures[parts.path]['upscale=4' in parts.query], content_type='image/png',
+                          headers={'X-Atelier-Upscale': 'ready' if upscale['ready'] else 'pending', 'Cache-Control': 'no-cache'})
+        def becomes_ready():
+            deadline = monotonic() + 10
+            while not upscale['heads'] and monotonic() < deadline:
+                tab.wait_for_timeout(50)
+            assert upscale['heads'], 'Visible catalogue art must be checked for a sharper copy'
+            upscale['ready'] = True
+        def swaps():
+            return tab.evaluate('__effects.filter(effect=>effect.box).map(effect=>({frames:effect.frames,box:effect.box,src:effect.src}))')
+        def assert_swap(found, where):
+            assert len(found) == 1, (where, found)
+            frames = found[0]['frames']
+            assert [frame['clipPath'] for frame in frames] == ['inset(0px)', 'inset(100% 0px 0px)'], (where, frames)
+            assert not any('opacity' in frame for frame in frames), (where, frames)
+            assert 'upscale' not in found[0]['src'], ('The outgoing copy must show the original art', where, found[0])
+            outgoing, incoming = found[0]['box']
+            assert all(abs(a - b) < 1 for a, b in zip(outgoing, incoming)), ('The outgoing copy must sit exactly over the art', where, found[0]['box'])
+        near = lambda pixel, colour: sum(abs(a - b) for a, b in zip(pixel, colour)) < 30
+        tab.route('**/api/catalogue/**', catalogue)
+        art = "document.querySelector('#library-hero .library-hero-art:not(.image-swap)')"
+        for mode, ready_first in (('full', False), ('calm', False), ('off', False), ('full', True)):
+            tab.evaluate('__mode', mode)
+            upscale.update(ready=ready_first, heads=0)
+            hold = mode == 'full' and not ready_first
+            tab.evaluate("hold=>{__effects=[];window.__holdSwap=hold?60:0;AtelierContinuity.banner('Characters/1029');}", hold)
+            if not ready_first:
+                tab.wait_for_function(art + '?.naturalWidth===344')
+                becomes_ready()
+            if hold:
+                # Held part-way: the sharper art shows above the cut and the original below it, under the banner's copy.
+                tab.wait_for_function("document.querySelector('#library-hero .image-swap')?.getAnimations()[0]?.playState==='paused'", timeout=15000)
+                held = tab.evaluate("""() => {
+                  const copy=document.querySelector('#library-hero .image-swap'),rect=copy.getBoundingClientRect(),host=document.getElementById('library-hero').getBoundingClientRect();
+                  return {cut:parseFloat(getComputedStyle(copy).clipPath.slice(6))/100,top:rect.top,height:rect.height,x:host.left+host.width*.8};
+                }""")
+                assert .1 < held['cut'] < .9, held
+                shot = Image.open(BytesIO(tab.screenshot(scale='css'))).convert('RGB')
+                tab.locator('#library-hero').screenshot(path=str(report / 'motion-upscale-swap-held.png'))
+                above = shot.getpixel((round(held['x']), round(held['top'] + held['height'] * held['cut'] / 2)))
+                below = shot.getpixel((round(held['x']), round(held['top'] + held['height'] * (1 + held['cut']) / 2)))
+                assert near(above, new_colour) and near(below, old_colour), (held, above, below)
+                tab.evaluate("window.__holdSwap=0;document.querySelector('#library-hero .image-swap').getAnimations()[0].play()")
+            tab.wait_for_function(art + "?.naturalWidth===1376 && !document.querySelector('#library-hero .image-swap')", timeout=15000)
+            if mode == 'off' or ready_first:
+                assert not swaps(), ('A sharper copy already waiting, or arriving in Off, replaces the art at once', mode, swaps())
+            else:
+                assert_swap(swaps(), mode)
+        # Model Studio's skin card takes the same swap, with its sharpened nameplate as the source.
+        assert tab.evaluate("!document.getElementById('viewport-skin-card')")
+        tab.evaluate('__mode', 'full')
+        upscale.update(ready=False, heads=0)
+        tab.evaluate("""() => {
+          __effects=[];window.__holdSwap=0;
+          const card=document.createElement('figure');card.id='viewport-skin-card';
+          Object.assign(card.style,{position:'fixed',left:'16px',top:'16px',width:'320px',margin:'0',zIndex:'9999'});
+          const image=document.createElement('img');image.alt='';card.append(image);document.body.append(card);
+          image.src='/api/catalogue/banner/1029100?sharp=1';
+        }""")
+        card = "document.querySelector('#viewport-skin-card img:not(.image-swap)')"
+        tab.wait_for_function(card + '?.naturalWidth===848')
+        becomes_ready()
+        tab.wait_for_function(card + "?.naturalWidth===3392 && !document.querySelector('#viewport-skin-card .image-swap')", timeout=15000)
+        assert_swap(swaps(), 'skin card')
+        tab.evaluate("document.getElementById('viewport-skin-card').remove()")
+        tab.unroute('**/api/catalogue/**')
+        checks.append('Sharper catalogue art (the library banner and the skin card) that arrives while it is on screen opens down over the original from its top edge in Full and Calm, new art above the cut and the original below; in Off, or when it was already waiting, it replaces the art at once and leaves no copy behind')
 
         tab.evaluate("""() => {
           document.getElementById('body').hidden=true;document.getElementById('workspace').hidden=false;

@@ -12,9 +12,10 @@ The app, installers and update checker identify each release by its full number,
 - Material replacements, resets, custom textures and texture downloads, editor
   resets, texture export options, recolour saves, mesh replacements and S-map
   processing now show the working animation while they run. Assembly View
-  thumbnails and the dye preview open into place, new Activity jobs click into
-  the list, and the last fades (the region highlight, the costume glow and the
-  folder pin button) now fold instead.
+  thumbnails and the dye preview open into place, sharper Library and Model
+  Studio artwork opens over the original when it finishes, new Activity jobs
+  click into the list, and the last fades (the region highlight, the costume
+  glow and the folder pin button) now fold instead.
 
 - Folders with coloured icons stay at the top of the Library with every sort,
   including a saved **Edited first** view. The selected sort orders items within
