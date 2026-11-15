@@ -126,6 +126,28 @@ class PreviewAnimation(unittest.TestCase):
             self.assertEqual(np.frombuffer(binary, '<u4', 1, indices['byteOffset'])[0], 2)
             np.testing.assert_allclose(np.frombuffer(binary, '<f4', 3, values['byteOffset']), expected)
 
+    def test_repeated_slot_names_bind_like_the_native_preview(self):
+        # Spider-Man's lobby mesh uses the slot FName MI_1036803_Equip_03 twice, the second
+        # with FName number 2. The native slot table spells it MI_1036803_Equip_03_1; the
+        # preview's old __slot_6 key matched nothing there, so that part rendered untextured.
+        from atelier import import_server
+        from atelier.handlers import meshstudio
+        self.model.materials = [{'slot_name': 'MI_Equip_03', 'slot_name_number': 0},
+                                {'slot_name': 'MI_Equip_03', 'slot_name_number': 2}]
+        names = lambda g: [m['name'] for m in g['materials']]
+        preview = names(self.export(for_preview=True)[0])
+        self.assertEqual(preview, ['MI_Equip_03', 'MI_Equip_03_1'])
+        # Blender keeps the keys existing .blend files already carry.
+        self.assertEqual(names(self.export()[0]), ['MI_Equip_03', 'MI_Equip_03__slot_1'])
+        material = 'Characters/1036/1036803/Materials/Lobby/MI_Equip_03'
+        native = [{'index': 0, 'slot': 'MI_Equip_03', 'mi': material, 'via': 'imports'},
+                  {'index': 1, 'slot': 'MI_Equip_03_1', 'mi': material, 'via': 'imports'}]
+        requested = [{'key': f'body::{index}', 'name': name, 'material_index': index} for index, name in enumerate(preview)]
+        with patch.object(import_server, 'mesh_slots', return_value=native):
+            bindings = meshstudio.preview_bindings('Characters/1036/1036803/Meshes/SK_Body', requested)
+        self.assertEqual([(b.get('slot_index'), b.get('game_rel'), b.get('mapping_error')) for b in bindings],
+                         [(0, material, None), (1, material, None)])
+
     def test_editing_export_keeps_its_existing_coordinate_and_name_contract(self):
         self.model.lods[0]['col_off'] = None
         g, binary = self.export()

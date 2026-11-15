@@ -15,6 +15,10 @@ The app, installers and update checker identify each release by its full number,
   same skeleton transforms and numbered bone names as the game's animation
   decoder, and older previews rebuild automatically.
 
+- Every part of an edited or replaced model keeps its textures in the 3D
+  preview. A part whose material slot repeats another's name, such as one of
+  Spider-Man's lobby armour pieces, used to show untextured grey.
+
 ## 1.2.2 — 2026-11-12
 
 - Library folders with nothing to list no longer appear at any level, so opening

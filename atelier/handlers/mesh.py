@@ -215,7 +215,8 @@ def _try_extras(d, o, limit):
         tags = [struct.unpack_from('<ii', d, o + 4 + i*8) for i in range(ntag)]
         o += 4 + ntag * 8
         mats.append({"pkg_idx": pkg, "pkg_off": pkg_off,
-                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0], 'tag_names': tags})
+                     "slot_name_idx": slot[0], "slot_name_number": slot[1],
+                     "imported_slot_name_idx": imported[0], 'tag_names': tags})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)
@@ -352,6 +353,17 @@ def material_slot_names(materials):
         seen.add(key)
         result.append(key)
     return result
+
+
+def material_fnames(materials):
+    """Slot names as the game spells them, as the native preview and its slot table do.
+
+    FName keeps its numeric suffix apart (number 2 reads "_1"), so one cooked mesh can
+    use MI_X and MI_X_1. Viewport previews use these; the Blender round trip keeps
+    material_slot_names, whose keys existing .blend files already carry.
+    """
+    return [(f"{m['slot_name']}_{m['slot_name_number'] - 1}" if m.get('slot_name_number', 0) > 0 else m['slot_name'])
+            if m.get('slot_name') else f'mat_{i}' for i, m in enumerate(materials)]
 
 
 def resolve_materials(mats, names):
@@ -1634,7 +1646,7 @@ _AXIS_Q = np.array([-0.7071067811865476, 0.0, 0.0, 0.7071067811865476])   # -90 
 # Viewport previews must match CUE4Parse's glTF exporter and AnimationCommand's
 # atelier-gltf-local tracks. Blender's editing/cooking round trip uses _AXIS_R.
 _PREVIEW_AXIS = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], "f8")
-PREVIEW_VERSION = 1
+PREVIEW_VERSION = 2  # 2: material names keep their FName numbers (material_fnames)
 
 
 def is_current_preview(path):
@@ -1786,7 +1798,8 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False, for_preview=Fals
     # four missing names made the mesh fail to rebuild at all -- it was not editable before
     # this. Slot names are unique where asset names are not, which is exactly why they are
     # the key (S3.9, S3.18).
-    slot_names = material_slot_names(mesh.materials)
+    # Previews bind each material to the native slot table by name (meshstudio.preview_bindings).
+    slot_names = material_fnames(mesh.materials) if for_preview else material_slot_names(mesh.materials)
     materials_json = [
         # doubleSided so Blender's importer doesn't backface-cull thin geometry (skirts,
         # capes, hair cards) while the mesh is being edited -- purely a display aid, since
