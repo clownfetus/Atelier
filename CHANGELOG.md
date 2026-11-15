@@ -5,6 +5,11 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Blender no longer renders materials without a glow map as solid white. A
+  material's emissive colour only tints its glow map, as in the game, and stays
+  editable on the material. Send to Blender asks for the updated Atelier Live
+  Bridge add-on.
+
 ## 1.2.2 — 2026-11-12
 
 - Library folders with nothing to list no longer appear at any level, so opening
