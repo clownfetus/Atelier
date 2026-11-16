@@ -24,7 +24,7 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             get_import_root, get_active_project, set_active_project,
                             project_base, project_base_legacy, project_game_rel,
                             get_mods_folder, save_mods_folder,
-                            save_blender_path)
+                            save_blender_path, get_image_editor, save_image_editor)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
 _THREE_DAYS    = 3 * 24 * 3600
@@ -1159,7 +1159,14 @@ def api_setup_status():
                        "aes_prefill":   aes_prefill,
                        "usmap_prefill": usmap_prefill,
                        "mods_prefill":  get_mods_folder(),
-                       "blender_prefill": blender_path_suggestion()})
+                       "blender_prefill": blender_path_suggestion(),
+                       **_image_editor_fields()})
+
+def _image_editor_fields():
+    """The Settings image editor and the name texture menus show for it ("" when unset)."""
+    editor = get_image_editor()
+    return {"image_editor": editor,
+            "image_editor_name": hostos.app_display_name(editor) if editor else ""}
 
 @app.post("/api/pick_folder")
 def api_pick_folder():
@@ -1236,6 +1243,30 @@ def api_pick_blender_file():
     except Exception as e:
         return json.dumps({"ok": False, "path": "", "error": str(e)})
 
+@app.get("/api/validate_image_editor")
+def api_validate_image_editor():
+    path = request.query.get("path", "").strip()
+    response.content_type = "application/json"
+    if not path:
+        return json.dumps({"status": "empty"})
+    if not os.path.exists(path):
+        return json.dumps({"status": "missing"})
+    if not hostos.is_app_executable(path):
+        return json.dumps({"status": "invalid"})
+    return json.dumps({"status": "ok"})
+
+@app.post("/api/pick_image_editor")
+def api_pick_image_editor():
+    body    = request.json or {}
+    initial = body.get("initial") or ""
+    response.content_type = "application/json"
+    try:
+        patterns = ("*.exe",) if hostos.IS_WINDOWS else ()
+        return json.dumps({"ok": True, "path": hostos.pick_file(
+            "Select your image editor", patterns, initial)})
+    except Exception as e:
+        return json.dumps({"ok": False, "path": "", "error": str(e)})
+
 @app.get("/api/blender_status")
 def api_blender_status():
     """Cheap pre-flight for anything about to shell out to Blender. Frontend calls this before
@@ -1283,6 +1314,8 @@ def api_save_paks():
     mods_folder = (body.get("mods_folder") or "").strip()
     has_blender = "blender_path" in body           # only touch blender config when the field was sent
     blender_path = (body.get("blender_path") or "").strip()
+    has_editor = "image_editor" in body            # likewise for the image editor
+    image_editor = (body.get("image_editor") or "").strip()
     if not path:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": "no path provided"})
@@ -1302,6 +1335,10 @@ def api_save_paks():
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error":
                            f"The Blender path must be an existing {BLENDER_NAMES[0]} file."})
+    if has_editor and image_editor and not hostos.is_app_executable(image_editor):
+        response.content_type = "application/json"
+        return json.dumps({"ok": False, "error": "The image editor must be an existing program"
+                           + (" (.exe) file." if hostos.IS_WINDOWS else " file.")})
     paks_path, err = _validate_and_build_paks(path)
     if err:
         response.content_type = "application/json"
@@ -1330,6 +1367,8 @@ def api_save_paks():
             save_mods_folder(target)
         if has_blender:
             save_blender_path(blender_path)          # empty string clears it
+        if has_editor:
+            save_image_editor(image_editor)          # empty string clears it
 
         # One call writes AES_KEY.txt (for UAssetTool), io_lib.AES_KEY (for our own pak reader)
         # and drops the in-memory index. The DISK index cache needs no special handling: its key
@@ -1363,7 +1402,7 @@ def api_save_paks():
 
         response.content_type = "application/json"
         return json.dumps({"ok": True, "mods_folder": get_mods_folder(),
-                           "mods_folder_reset": mods_reset})
+                           "mods_folder_reset": mods_reset, **_image_editor_fields()})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -3038,11 +3077,17 @@ def api_open_with():
         from atelier.handlers.hdr_texture import project_info as hdr_project_info
         if hdr_project_info(_import_base(gr)):
             path = _import_base(gr) + '.dds'
+    response.content_type = "application/json"
     if path:
         abs_path = os.path.abspath(path)
         if os.path.exists(abs_path):
-            hostos.open_with(abs_path)
-    response.content_type = "application/json"
+            # The image editor chosen in Settings, else the desktop's default image app.
+            editor = get_image_editor()
+            try:
+                hostos.open_with(abs_path, editor or None)
+            except Exception:
+                return json.dumps({"ok": False, "error": "Check the image editor in Settings." if editor
+                                   else "Check your system’s default image app."})
     return json.dumps({"ok": True})
 
 # ── Blender mesh editing ──────────────────────────────────────────────────────

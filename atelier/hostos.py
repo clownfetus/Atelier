@@ -361,9 +361,78 @@ def open_path(path):
     subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def open_with(path):
-    """Open a project image using the desktop's default file association."""
-    open_path(os.path.abspath(path))
+def is_app_executable(path):
+    """True for an existing program file the person picked to open images with: an .exe on
+    Windows, an executable file elsewhere. Atelier only starts it when they choose to open a
+    texture in it."""
+    if not path or not os.path.isfile(path):
+        return False
+    if IS_WINDOWS:
+        return path.lower().endswith(".exe")
+    return os.access(path, os.X_OK)
+
+
+def _exe_description(path):
+    """The FileDescription (else ProductName) a Windows program carries, or ""."""
+    import ctypes
+    from ctypes import wintypes
+    ver = ctypes.WinDLL("version")
+    ver.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+    ver.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+    ver.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p]
+    ver.GetFileVersionInfoW.restype = wintypes.BOOL
+    ver.VerQueryValueW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR,
+                                   ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.UINT)]
+    ver.VerQueryValueW.restype = wintypes.BOOL
+    size = ver.GetFileVersionInfoSizeW(path, None)
+    if not size:
+        return ""
+    data = ctypes.create_string_buffer(size)
+    if not ver.GetFileVersionInfoW(path, 0, size, data):
+        return ""
+    value, length = ctypes.c_void_p(), wintypes.UINT()
+    pairs = []
+    if ver.VerQueryValueW(data, "\\VarFileInfo\\Translation", ctypes.byref(value), ctypes.byref(length)):
+        words = (wintypes.WORD * (length.value // 2)).from_address(value.value)
+        pairs = [(words[i], words[i + 1]) for i in range(0, len(words) - 1, 2)]
+    pairs += [(0x0409, 0x04B0), (0x0409, 0x04E4)]   # US English, Unicode / Western
+    for field in ("FileDescription", "ProductName"):
+        for lang, codepage in pairs:
+            key = f"\\StringFileInfo\\{lang:04x}{codepage:04x}\\{field}"
+            if (ver.VerQueryValueW(data, key, ctypes.byref(value), ctypes.byref(length))
+                    and length.value and value.value):
+                text = ctypes.wstring_at(value.value, length.value).split("\x00", 1)[0].strip()
+                if text:
+                    return text
+    return ""
+
+
+def app_display_name(path):
+    """A short name for a program, for menu labels: its Windows description ("Adobe Photoshop
+    2025"), else its file name without the extension. Never raises."""
+    stem = os.path.splitext(os.path.basename(path or ""))[0]
+    name = ""
+    if IS_WINDOWS and path:
+        try:
+            name = _exe_description(path)
+        except Exception:
+            name = ""
+    name = " ".join("".join(ch for ch in (name or stem) if ch.isprintable()).split())
+    return name[:40].rstrip() or "your image editor"
+
+
+def open_with(path, app=None):
+    """Open a project image in the chosen image editor, or with the desktop's default file
+    association when none is set. Raises when the editor is no longer there."""
+    path = os.path.abspath(path)
+    if not app:
+        return open_path(path)
+    app = os.path.abspath(app)
+    if not is_app_executable(app):
+        raise FileNotFoundError(app)
+    extra = {} if IS_WINDOWS else {"start_new_session": True}
+    subprocess.Popen([app, path], cwd=os.path.dirname(app), stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **extra)
 
 
 def notify(title, body):

@@ -433,6 +433,15 @@ def get_blender_path():
 def save_blender_path(path):
     _save_config(blender_path=path.replace("\\", "/") if path else None)
 
+def get_image_editor():
+    """The program textures open in from the right-click menu, set in Settings. Empty string when
+    unset: textures then open in the desktop's default image app. Read fresh from disk each call so
+    edits in Settings take effect without a restart."""
+    return (_load_config().get("image_editor", "") or "").replace("\\", "/")
+
+def save_image_editor(path):
+    _save_config(image_editor=path.replace("\\", "/") if path else None)
+
 def _prereq_issues(need_tool=True):
     issues = []
     if not has_pak_files(PAKS):

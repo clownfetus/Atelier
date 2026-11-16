@@ -29,6 +29,7 @@ const _folderArtwork = {};  // Reuse the catalogue artwork already shown on fold
 let   _modsFolderSet   = false;
 let   _modsFolderPath  = "";
 let   _copyToMods      = false; // Last destination chosen in mod review this session.
+let   _imageEditorName = "";  // Settings → Image editor, as texture menus name it ("" = default image app)
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
 
@@ -3600,6 +3601,7 @@ async function checkSetup() {
     }
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
+    _imageEditorName   = statusRes.image_editor_name || "";
     _copyToMods = _modsFolderSet;
     if (statusRes.configured) {
       _setSetupLoading(false, 'success', revision);
@@ -3648,6 +3650,7 @@ function _applySetupMode() {
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
   document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
+  document.getElementById("setup-image-editor-row").style.display = paths ? "" : "none";
   document.getElementById("setup-mounts-row").style.display      = paths ? "" : "none";
   document.getElementById("setup-mounts-section").style.display  = paths ? "" : "none";
   document.getElementById("setup-tools-section").style.display   = paths ? "" : "none";
@@ -3677,6 +3680,8 @@ async function openPaths() {
     document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
     document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
     document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
+    document.getElementById("setup-image-editor").value = statusRes.image_editor || "";
+    _imageEditorName = statusRes.image_editor_name || "";
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
   if (revision !== _setupLoadingRevision || !document.getElementById('setup-overlay').classList.contains('active')) return;
@@ -3795,6 +3800,7 @@ async function validateSetup() {
 
   let modsStatus = "";
   let blenderStatus = "";
+  let editorStatus = "";
   if (_pathsMode) {
     const mods = document.getElementById("setup-mods").value.trim();
     if (mods) {
@@ -3810,6 +3816,14 @@ async function validateSetup() {
         const r = await projectFetch(`/api/validate_blender?path=${encodeURIComponent(blender)}`);
         const d = await r.json();
         blenderStatus = d.status;
+      } catch (_) {}
+    }
+    const editor = document.getElementById("setup-image-editor").value.trim();
+    if (editor) {
+      try {
+        const r = await projectFetch(`/api/validate_image_editor?path=${encodeURIComponent(editor)}`);
+        const d = await r.json();
+        editorStatus = d.status;
       } catch (_) {}
     }
   }
@@ -3877,6 +3891,9 @@ async function validateSetup() {
     const blenderEl = document.getElementById("setup-blender");
     blenderEl.classList.toggle("setup-valid",   blenderOk);
     blenderEl.classList.toggle("setup-invalid", blenderBad);
+    const editorEl = document.getElementById("setup-image-editor");
+    editorEl.classList.toggle("setup-valid",   editorStatus === "ok");
+    editorEl.classList.toggle("setup-invalid", editorStatus === "invalid" || editorStatus === "missing");
   }
   _setupPresent(setup => setup?.validation({pakOk, usmapOk, keyOk, pakBad, usmapBad, keyBad}));
 }
@@ -3886,6 +3903,7 @@ document.getElementById("setup-usmap").addEventListener("input", validateSetup);
 document.getElementById("setup-aes").addEventListener("input", validateSetup);
 document.getElementById("setup-mods").addEventListener("input", validateSetup);
 document.getElementById("setup-blender").addEventListener("input", validateSetup);
+document.getElementById("setup-image-editor").addEventListener("input", validateSetup);
 document.getElementById("setup-paste-key").addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
@@ -3968,6 +3986,24 @@ document.getElementById("setup-blender-browse").addEventListener("click", async 
   btn.disabled = false;
 });
 
+document.getElementById("setup-image-editor-browse").addEventListener("click", async () => {
+  const initial = document.getElementById("setup-image-editor").value.trim();
+  const btn = document.getElementById("setup-image-editor-browse");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/pick_image_editor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initial }),
+    });
+    if (res.ok && res.path) {
+      document.getElementById("setup-image-editor").value = res.path;
+      validateSetup();
+    }
+  } catch (e) {}
+  btn.disabled = false;
+});
+
 
 function _resetSaveBtn() {
   const btn = document.getElementById("setup-save");
@@ -3989,6 +4025,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   if (_pathsMode) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
     payload.blender_path    = document.getElementById("setup-blender").value.trim();
+    payload.image_editor    = document.getElementById("setup-image-editor").value.trim();
   }
   const btn = document.getElementById("setup-save");
   btn.disabled = true;
@@ -4009,6 +4046,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       _resetSaveBtn();
       _modsFolderPath      = res.mods_folder || "";
       _modsFolderSet       = !!res.mods_folder;
+      _imageEditorName     = res.image_editor_name || "";
       if (res.mods_folder_reset) {
         // The old mods folder wasn't under this game's Paks dir (e.g. a path carried over from
         // another machine), so it could never have loaded. Say where it now points.
@@ -4203,13 +4241,15 @@ function explorerMenuItem(item) {
 }
 
 function textureEditorMenuItem(item) {
-  return {icon:'image', label:'Open in default image app', action:async () => {
+  // The image editor chosen in Settings names the item. Without one, the system's default app opens it.
+  const editor = _imageEditorName;
+  return {icon:'image', label:editor ? `Open in ${_matEscape(editor)}` : 'Open in default image app', action:async () => {
     const project = _activeProjectName, gameRel = item.game_rel;
     const name = item.name || item.label || gameRel.split('/').pop();
     if (!(await prepareTextureForOpen(item, project))) return;
     try {
       const result = await api(`/api/open_with?game_rel=${encodeURIComponent(gameRel)}`, {project});
-      if (!result.ok) throw Error(result.error || 'Check your system’s default image app.');
+      if (!result.ok) throw Error(result.error || (editor ? 'Check the image editor in Settings.' : 'Check your system’s default image app.'));
       if (project === _activeProjectName) window.AtelierRoster?.rememberEditor(gameRel, 'texture', project);
     } catch (error) {
       if (project === _activeProjectName) toast(_matEscape(`${name} could not be opened. ${error.message}`), 'error');
