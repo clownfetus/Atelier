@@ -16,7 +16,7 @@ from wsgiref.util import setup_testing_defaults
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 _app_data = tempfile.TemporaryDirectory(prefix="atelier-reliability-")
 os.environ["ATELIER_DATA_DIR"] = _app_data.name
-from atelier import config as C, operations as O, storage as S
+from atelier import config as C, jobs as J, operations as O, storage as S
 from atelier.handlers import texture as T, world as W, material as M, container_merge as CM
 from atelier.web import routes as R
 
@@ -292,6 +292,32 @@ class Reliability(unittest.TestCase):
         self.assertEqual(len(list((journals[0].parent / 'backup').iterdir())), 3)
         S.publish_files(triple(self.root / 'new/Other'), str(self.mods))
         self.assertTrue(all(Path(p).read_bytes().startswith(b'old') for p in old))
+
+    def test_publication_the_game_still_locks_blocks_only_that_folder(self):
+        # A re-export while the game holds the mod's .pak open cannot be rolled back, and a restart
+        # with the game still running cannot recover it. Start-up used to raise there, so every job
+        # request, export, import and the Activity list answered with an HTML 500 until the game closed.
+        old = triple(self.mods / "Demo_9999999_P", b"old")
+        sources = triple(self.root / "new/Demo_9999999_P", b"new")
+        real_replace = S.os.replace
+        def game_holds_pak(src, dst):
+            if str(dst) == old[0]:
+                raise PermissionError(13, "The process cannot access the file", dst)
+            return real_replace(src, dst)
+        log = io.StringIO()
+        with patch.object(S.os, "replace", game_holds_pak), patch.object(sys, "stderr", log), \
+             patch.multiple(C, ASSETS_MODS=str(self.out), get_mods_folder=lambda: str(self.mods)), \
+             patch.object(J, "_instance", None):
+            with self.assertRaises(S.PublicationRecoveryError):
+                S.publish_files(sources, str(self.mods))
+            self.assertIsInstance(J.manager(), J.JobManager)      # Atelier restarts, game running
+            with self.assertRaises(S.PublicationRecoveryError) as refused:
+                S.publish_files(sources, str(self.mods))          # that folder still waits
+        self.assertIn(str(self.mods), log.getvalue())
+        self.assertIn("Close Marvel Rivals", str(refused.exception))
+        S.publish_files(sources, str(self.mods))                  # game closed: recover, then publish
+        self.assertTrue(all(Path(p).read_bytes().startswith(b"new") for p in old))
+        self.assertEqual(list(self.mods.glob(".atelier-publish-*")), [])
 
     def test_concurrent_archives_keep_independent_downloads(self):
         import concurrent.futures

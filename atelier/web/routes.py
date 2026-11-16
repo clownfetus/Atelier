@@ -94,7 +94,10 @@ class _ProjectScopePlugin:
                 if route.rule == '/api/viewport_cancel':
                     return callback(*args, **kwargs)
                 # Validate asset paths before they can reach any cache/project join.
-                gr = body.get("game_rel") or request.query.get("game_rel") or request.forms.get("game_rel")
+                # Only uploads carry form fields; reading forms from a JSON body re-parses it under
+                # Bottle's 100 KB limit, so a large export failed here (see _read_large_json).
+                form = request.forms if request.content_type.startswith("multipart/") else {}
+                gr = body.get("game_rel") or request.query.get("game_rel") or form.get("game_rel")
                 if gr:
                     _c.validate_game_rel(gr)
                 asset_lists = [body.get(k, []) for k in ("game_rels", "items")]

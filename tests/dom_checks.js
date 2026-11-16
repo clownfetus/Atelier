@@ -377,6 +377,16 @@ await (async () => {
 
   api = realApi; projectFetch = realFetch; delete globalThis.AtelierDialog; delete globalThis.FormData;
   matEditor = null;
+
+  // A job reply the page cannot read names its HTTP status, so a bug report says which failure it was.
+  const realFetchFn = fetch;
+  globalThis.FormData = class {};
+  fetch = async () => ({ ok: false, status: 413, json: async () => { throw new SyntaxError("Unexpected token '<'"); } });
+  let unreadable = "";
+  try { await window.AtelierJobs.run("/api/install_mod", { method: "POST", body: "{}" }); }
+  catch (error) { unreadable = error.message; }
+  fetch = realFetchFn; delete globalThis.FormData;
+  if (!unreadable.includes("HTTP 413")) throw new Error("an unreadable job reply must name its HTTP status: " + unreadable);
   console.log("DOM smoke: all render paths OK");
 })();   // a rejection here is unhandled, so node exits non-zero with the error
 })();

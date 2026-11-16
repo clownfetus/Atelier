@@ -61,7 +61,7 @@
     const response = await window.atelierFetch(path, options, project);
     let result;
     try { result = await response.json(); }
-    catch (_) { throw new Error('The server returned an unreadable job response.'); }
+    catch (_) { throw new Error(`The server returned an unreadable job response (HTTP ${response.status}).`); }
     if (!response.ok) throw new Error(result.error || 'Job request failed');
     return result;
   }

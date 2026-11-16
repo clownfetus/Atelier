@@ -85,6 +85,7 @@ def recover_publications(destination):
     Caller must hold the publication lock. Unknown/incomplete journals are retained
     for inspection; no path supplied by a journal is trusted outside its directory.
     """
+    public = os.fspath(destination)
     destination = _filesystem_path(destination)
     if not os.path.isdir(destination):
         return
@@ -99,9 +100,15 @@ def recover_publications(destination):
             continue  # preparation had not reached the point where any output could change
         with open(journal, encoding="utf-8") as f:
             data = json.load(f)
-        if data["state"] != "committed":
-            _rollback(folder, destination, data["entries"])
-        shutil.rmtree(folder)
+        try:
+            if data["state"] != "committed":
+                _rollback(folder, destination, data["entries"])
+            shutil.rmtree(folder)
+        except OSError as error:
+            # Usually the game holding a mod's .pak open. The backups stay until this succeeds.
+            raise PublicationRecoveryError(
+                f"An earlier install in {public} is still locked ({error}). "
+                "Close Marvel Rivals if it is running, then try again.") from error
 
 
 def publish_files(sources, destination):

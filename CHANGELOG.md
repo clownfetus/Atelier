@@ -5,6 +5,12 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Fixed exports failing with "The server returned an unreadable job response".
+  Exports of about a thousand assets or more now build. If an earlier install
+  in your mods folder is still locked, for example because Marvel Rivals is
+  running, only installs into that folder wait, and they ask you to close the
+  game and try again. Other server errors now show what went wrong.
+
 ## 1.2.3 — 2026-11-16
 
 - Removed the **Mod card** from finished builds. The export result now ends at
