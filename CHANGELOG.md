@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.3 — 2026-11-16
+
 - Removed the **Mod card** from finished builds. The export result now ends at
   the outcome, the output paths and the build report.
 
