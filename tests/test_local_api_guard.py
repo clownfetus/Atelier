@@ -260,5 +260,61 @@ console.log('PASS projectFetch content types');
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
 
+class ApiErrorReplies(unittest.TestCase):
+    """The page reads every /api reply as JSON. Bottle's HTML error pages reached the export dialog
+    as "The server returned an unreadable job response", hiding both a too-large export and an
+    unexpected server error."""
+
+    def reply(self, *args, **kwargs):
+        status, payload = http(*args, **kwargs)
+        return status, json.loads(payload)
+
+    def test_export_listing_thousands_of_assets_is_read_in_full(self):
+        # About 1,000 asset paths passed Bottle's 100 KB default and came back as an HTML 413.
+        items = ['Characters/1050/1050800/Textures/T_1050_1050800_Body_D_%04d' % i for i in range(3000)]
+        counted = lambda body: {'ok': True, 'count': len(body['items'])}
+        with patch.object(R, '_install_mod_payload', side_effect=counted):
+            status, payload = post_json('/api/install_mod', {'mod_name': 'Big', 'items': items})
+        self.assertEqual(status, 200, payload)
+        self.assertEqual(json.loads(payload), {'ok': True, 'count': 3000})
+
+    def test_request_over_the_limit_says_so_in_json(self):
+        from atelier.web.app import _MAX_JSON_BYTES
+        body = b'[' + b' ' * _MAX_JSON_BYTES + b']'
+        status, reply = self.reply('/api/install_mod', 'POST', body, 'application/json')
+        self.assertEqual(status, 413)
+        self.assertFalse(reply['ok'])
+        self.assertIn('too large', reply['error'])
+
+    def test_large_json_cap_leaves_multi_file_uploads_on_disk(self):
+        # Raising Bottle's MEMFILE_MAX for every body would keep each of these files in memory and
+        # refuse the upload once they add up past it ("Memory limit reached"), as for a mesh sent
+        # with its textures.
+        from bottle import BaseRequest
+        from atelier.web.app import _MAX_JSON_BYTES
+        image = b'\0' * (_MAX_JSON_BYTES // 2 + 1)
+        body = b''.join(f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="files"; '
+                        f'filename="T_{i}.png"\r\nContent-Type: image/png\r\n\r\n'.encode() + image + b'\r\n'
+                        for i in range(2)) + f'--{BOUNDARY}--\r\n'.encode()
+        env = {}
+        setup_testing_defaults(env)
+        env.update(REQUEST_METHOD='POST', CONTENT_TYPE=f'multipart/form-data; boundary={BOUNDARY}',
+                   CONTENT_LENGTH=str(len(body)), **{'wsgi.input': io.BytesIO(body)})
+        self.assertEqual(len(BaseRequest(env).files.getall('files')), 2)
+
+    def test_unexpected_server_error_says_what_failed_in_json(self):
+        locked = PermissionError(5, 'Access is denied', 'Demo_9999999_P.pak')
+        with patch.object(R.jobs, 'manager', side_effect=locked):
+            status, reply = self.reply('/api/jobs')
+        self.assertEqual(status, 500)
+        self.assertFalse(reply['ok'])
+        self.assertIn('Access is denied', reply['error'])
+
+    def test_unknown_api_route_answers_json(self):
+        status, reply = self.reply('/api/no_such_route')
+        self.assertEqual(status, 404)
+        self.assertFalse(reply['ok'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

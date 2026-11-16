@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -270,7 +271,13 @@ def manager():
             from atelier.config import DATA_ROOT, ASSETS_MODS, get_mods_folder
             from atelier.storage import recover_destination
             for destination in {ASSETS_MODS, get_mods_folder()} - {None, ""}:
-                recover_destination(destination)
+                # Every publication recovers its folder again first, so a folder that cannot be
+                # recovered yet blocks only publishing there, not every job and the Activity list.
+                try:
+                    recover_destination(destination)
+                except Exception as error:
+                    print(f"[jobs] Recovery of {destination} deferred to its next install: {error}",
+                          file=sys.stderr)
             _instance = JobManager(os.path.join(DATA_ROOT, "_jobs"))
         return _instance
 

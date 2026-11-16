@@ -2,7 +2,7 @@ import os
 import hashlib
 import json
 from pathlib import Path
-from bottle import Bottle, HTTPResponse, ServerAdapter, request
+from bottle import BaseRequest, Bottle, HTTPError, HTTPResponse, ServerAdapter, request, response
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, make_server
 from socketserver import ThreadingMixIn
 
@@ -19,6 +19,33 @@ def _configured_port():
 
 PORT = _configured_port()
 app  = Bottle()
+
+# Bottle reads at most MEMFILE_MAX bytes (100 KB) of a JSON body and answers anything larger with
+# 413. An export lists every included asset path, so about 1,000 assets went past it. Only JSON
+# bodies get this larger cap: raising MEMFILE_MAX itself would keep every uploaded file up to that
+# size in memory, and Bottle refuses an upload once those files add up past it, so a mesh sent with
+# a few large textures would stop uploading.
+_MAX_JSON_BYTES = 32 * 1024 * 1024
+_JSON_TYPES = ("application/json", "application/json-rpc")
+
+
+def _api_error(error):
+    """Answer every /api failure in JSON, the only reply the page can read.
+
+    Bottle's HTML error page reached the export dialog as "The server returned an unreadable job
+    response", hiding a too-large request and an unexpected exception alike. The traceback of an
+    unexpected exception still goes to the session log."""
+    if not request.path.startswith("/api/"):
+        return Bottle.default_error_handler(app, error)
+    response.content_type = "application/json"
+    if error.exception is not None:
+        message = "Atelier hit an unexpected error: " + (str(error.exception) or type(error.exception).__name__)
+    else:
+        message = str(error.body or error.status_line)
+    return json.dumps({"ok": False, "error": message})
+
+
+app.default_error_handler = _api_error
 
 # The API has no login: being on 127.0.0.1 is the only credential, so every request must provably
 # come from this machine's own Atelier page. Any website the user visits can aim requests at
@@ -75,6 +102,21 @@ def _reject_foreign_requests():
         status, message = rejection
         raise HTTPResponse(json.dumps({"ok": False, "error": message}), status=status,
                            headers={"Content-Type": "application/json"})
+
+
+@app.hook("before_request")
+def _read_large_json():
+    """Parse a JSON body over Bottle's MEMFILE_MAX, up to _MAX_JSON_BYTES, into the cache that
+    request.json reads. Smaller bodies take Bottle's own path."""
+    content_type = request.environ.get("CONTENT_TYPE", "").partition(";")[0].strip().lower()
+    if content_type not in _JSON_TYPES or request.content_length <= BaseRequest.MEMFILE_MAX:
+        return
+    if request.content_length > _MAX_JSON_BYTES:
+        raise HTTPError(413, f"This request is too large for Atelier (over {_MAX_JSON_BYTES // 2**20} MB).")
+    try:
+        request.environ["bottle.request.json"] = json.loads(request.body.read())
+    except ValueError:
+        raise HTTPError(400, "Invalid JSON") from None
 
 
 def frontend_url(gui_dir):
