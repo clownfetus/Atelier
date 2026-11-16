@@ -29,7 +29,6 @@ const _folderArtwork = {};  // Reuse the catalogue artwork already shown on fold
 let   _modsFolderSet   = false;
 let   _modsFolderPath  = "";
 let   _copyToMods      = false; // Last destination chosen in mod review this session.
-let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
 
@@ -94,16 +93,33 @@ async function api(path, opts = {}) {
   }
 }
 
-// The small glyph beside an editor's Save button while it saves. Panels themselves stay still.
-// The setup page has its own glyph.
-function editorWorking(overlayId, current, kind = 'saving') {
+// The small glyph beside an editor's Save button while a request from its own controls runs: a save,
+// a reset, a replacement, an upload or a bake. Opening an editor shows none, and panels stay still.
+// The setup page has its own glyph. `asset` names a loader only where the request really is that
+// asset's (D16); the material editor's own saves are the material's. Requests that overlap in one
+// editor share its glyph, which goes when the last of them ends.
+const _editorBusy = new Map();
+function editorWorking(overlayId, current, kind = 'saving', asset) {
   if (kind !== 'saving' || overlayId === 'setup-overlay') return () => {};
   const overlay = document.getElementById(overlayId), panel = overlay?.querySelector('.modal');
-  const live = () => current() && overlay.classList.contains('active');
-  let badge = null;
-  try { badge = window.AtelierMaterialSaveFeedback?.saving(panel?.querySelector('[id$="-save"]'), live, overlayId === 'material-overlay' ? 'material' : undefined); }
-  catch (_) { /* Presentation is optional. */ }
-  return () => { try { badge?.(); } catch (_) { /* Presentation is optional. */ } };
+  let shared = _editorBusy.get(overlayId);
+  if (!shared) {
+    const live = () => current() && overlay.classList.contains('active');
+    let badge = null;
+    try { badge = window.AtelierMaterialSaveFeedback?.saving(panel?.querySelector('[id$="-save"]'), live, asset ?? (overlayId === 'material-overlay' ? 'material' : undefined)); }
+    catch (_) { /* Presentation is optional. */ }
+    shared = {badge, holders: 0};
+    _editorBusy.set(overlayId, shared);
+  }
+  shared.holders++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--shared.holders > 0) return;
+    if (_editorBusy.get(overlayId) === shared) _editorBusy.delete(overlayId);
+    try { shared.badge?.(); } catch (_) { /* Presentation is optional. */ }
+  };
 }
 
 async function _confirmAction(body, title = 'Discard edits?', confirmLabel = 'Continue', tone = 'danger') {
@@ -1200,6 +1216,17 @@ function _dyeOverrides() {
 }
 
 let _dyeTimer = null;
+// A dye preview arriving on its empty plate (the editor opening, or switching between Dyed and Region map)
+// opens downwards out of the plate's top edge, as library thumbnails do (P4b.7). A live colour drag swaps
+// the picture at once, and a repaint that shows the same picture again stays still.
+const _dyeShown = new WeakMap();
+function _dyeShow(editor, img, src, key) {
+  const arriving = !img.currentSrc && _dyeShown.get(editor) !== key;
+  _dyeShown.set(editor, key);
+  if (arriving) img.addEventListener('load', () => window.AtelierPolish?.play(img, [{clipPath:'inset(0 0 100% 0)'}, {clipPath:'inset(0)'}],
+    window.AtelierMotion?.unfoldMs || 280, window.AtelierMotion?.ease?.unfold), {once:true});
+  img.src = src;
+}
 function dyeRefresh(delay = 140) {
   if (!matEditor || !matEditor.dyeable) return;
   clearTimeout(_dyeTimer);
@@ -1213,30 +1240,33 @@ function dyeRefresh(delay = 140) {
     // and no colour drag needs to re-render it.
     if (matEditor.dyeView === "regions") {
       const want = `/api/dye_overlay?game_rel=${encodeURIComponent(gr)}&size=512`;
-      if (img.dataset.src !== want) { img.dataset.src = want; img.src = want; }
+      if (img.dataset.src !== want) { img.dataset.src = want; _dyeShow(editor, img, want, want); }
       return;
     }
     img.dataset.src = "";
+    const overrides = _dyeOverrides(), dyeOff = !!matEditor.dyeOff;
     try {
       const r = await projectFetch("/api/dye_preview", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_rel: gr, size: 512, overrides: _dyeOverrides(),
-                               dye_off: !!matEditor.dyeOff }),
+        body: JSON.stringify({ game_rel: gr, size: 512, overrides,
+                               dye_off: dyeOff }),
       });
       if (!r.ok || matEditor !== editor || revision !== _dyePreviewRevision) return;
       const b = await r.blob();
       if (matEditor !== editor || revision !== _dyePreviewRevision || !img.isConnected) return;
       if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
       const u = URL.createObjectURL(b);
-      img.dataset.url = u; img.src = u;
+      img.dataset.url = u; _dyeShow(editor, img, u, JSON.stringify([gr, overrides, dyeOff]));
     } catch (e) { /* leave the last good preview up */ }
   }, delay);
 }
 
 async function dyeDownload() {
   if (!matEditor) return;
+  const editor = matEditor, project = _activeProjectName;
   const st = document.getElementById("mat-status");
   st.textContent = "Baking dyed texture…";
+  const stopWorking = editorWorking('material-overlay', () => matEditor === editor && project === _activeProjectName, 'saving', 'texture');
   try {
     const r = await projectFetch("/api/dye_download", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1253,6 +1283,7 @@ async function dyeDownload() {
     st.textContent = "Downloaded " + a.download;
     toast("Baked dyed texture", "success");
   } catch (e) { st.textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 }
 
 // The legend is the half of the ID-mask answer a picture alone can't give: which NUMBER on the map
@@ -1423,9 +1454,11 @@ async function matCustomTextureUpload({ editor, slot, project }, file) {
   fd.append("game_rel", editor.game_rel);
   fd.append("slot", slot);
   fd.append("file", file);
+  const stopWorking = editorWorking('material-overlay', current, 'saving', 'texture');
   let res;
   try { res = await (await projectFetch("/api/material_custom_texture", { method: "POST", body: fd }, project)).json(); }
   catch (e) { res = { ok: false, error: e.message }; }
+  finally { stopWorking(); }
   if (!current()) return;
   if (!res.ok) { st.textContent = "Error: " + (res.error || "could not add the image"); return; }
   editor.custom = res.custom_textures || {};
@@ -1458,8 +1491,10 @@ async function matCustomTextureClear(i) {
 
 async function matTexturesDownload() {
   if (!matEditor) return;
+  const editor = matEditor, project = _activeProjectName;
   const st = document.getElementById("mat-status");
   st.textContent = "Packing this material's textures…";
+  const stopWorking = editorWorking('material-overlay', () => matEditor === editor && project === _activeProjectName, 'saving', 'texture');
   try {
     const r = await projectFetch("/api/mat_textures_download", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1480,6 +1515,7 @@ async function matTexturesDownload() {
     st.textContent = "Downloaded " + a.download + " — SLOTS.txt inside says which file is which.";
     toast("Packed every texture this material uses", "success");
   } catch (e) { st.textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 }
 
 function dyeView(mode) {
@@ -1682,6 +1718,7 @@ async function replaceMaterialFromSource() {
   _materialSaving.add(editor); _matRefreshDirty();
   document.getElementById("mat-body").inert = true;
   status.textContent = "Replacing material…";
+  const stopWorking = editorWorking('material-overlay', current);
   try {
     const res = await api("/api/material_replace", { project, method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1702,6 +1739,7 @@ async function replaceMaterialFromSource() {
     loadMaterialDye({ game_rel: editor.game_rel }, () => current() && revision === _materialOpenRevision, project);
   } catch (error) { if (current()) status.textContent = "Error: " + error.message; }
   finally {
+    stopWorking();
     _materialSaving.delete(editor);
     if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
   }
@@ -1835,6 +1873,7 @@ async function resetMaterial() {
   _materialSaving.add(editor); _matRefreshDirty();
   if (structural) document.getElementById("mat-body").inert = true;
   document.getElementById("mat-status").textContent = "Resetting…";
+  const stopWorking = editorWorking('material-overlay', current);
   try {
     const res = await api("/api/material_reset", {
       project,
@@ -1861,6 +1900,7 @@ async function resetMaterial() {
     } else { document.getElementById("mat-status").textContent = "Error: " + (res.error || "reset failed"); }
   } catch (e) { if (current()) document.getElementById("mat-status").textContent = "Error: " + e.message; }
   finally {
+    stopWorking();
     _materialSaving.delete(editor);
     if (current()) { document.getElementById("mat-body").inert = false; _matRefreshDirty(); }
   }
@@ -2068,6 +2108,8 @@ async function resetCurve() {
   const c = curveEditor; if (!c) return;
   if (!(await _confirmAction("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.", 'Restore curve?', 'Restore'))) return;
   document.getElementById("curve-status").textContent = "Resetting…";
+  const project = _activeProjectName;
+  const stopWorking = editorWorking('curve-overlay', () => curveEditor === c && project === _activeProjectName);
   try {
     const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: c.game_rel }) });
@@ -2075,6 +2117,7 @@ async function resetCurve() {
       document.getElementById("curve-status").textContent = "Reset to vanilla."; toast(`Reset: ${c.name}`, "info"); }
     else document.getElementById("curve-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 }
 
 async function closeCurveEditor(force = false) {
@@ -2433,6 +2476,7 @@ async function resetVfx() {
   _vfxSaving.add(v); document.getElementById('vfx-body').inert = true;
   document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = true;
   document.getElementById("vfx-status").textContent = "Resetting…";
+  const stopWorking = editorWorking('vfx-overlay', current);
   try {
     const res = await api("/api/vfx_reset", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: v.game_rel }) });
@@ -2446,6 +2490,7 @@ async function resetVfx() {
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
   finally {
+    stopWorking();
     _vfxSaving.delete(v); document.getElementById('vfx-body').inert = false;
     document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
   }
@@ -3039,11 +3084,6 @@ function _flushSelection(project) {
   return pending ? _persistSelection(project, pending) : Promise.resolve();
 }
 
-function _syncToggleRow(id) {
-  const cb = document.getElementById(id);
-  cb.closest(".toggle-row").classList.toggle("on", cb.checked);
-}
-
 let _exportRunningCount = 0;
 let _exportReviewChecking = false;
 const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
@@ -3061,26 +3101,11 @@ function updateInstallBtn() {
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
   if (!_modsFolderSet) _copyToMods = false;
-
-  const pwRow = document.getElementById("toggle-password-row");
-  const pwCb  = document.getElementById("toggle-password");
-  const hasPw = !!_protectionPassword;
-  pwRow.classList.toggle("disabled", !hasPw);
-  pwCb.disabled = !hasPw;
-  if (!hasPw) pwCb.checked = false;
-  pwRow.title = hasPw ? "Encrypt the mod with the protection password set in Settings"
-                      : "Set a protection password first (Menu → Settings)";
-  _syncToggleRow("toggle-password");
 }
-
-document.getElementById("toggle-password-row").addEventListener("click", e => {
-  if (document.getElementById("toggle-password").disabled) { e.preventDefault(); openPaths(); }
-});
-document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
 // `extra` swaps the build endpoint and adds its fields, e.g. a Skin Swapper build; every guard,
 // review state and result path stays the same as a standard export.
-async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName, review = null, extra = null) {
+async function _runInstall(modName, exportable, skipped, copyToMods, project = _activeProjectName, review = null, extra = null) {
   _exportRunningCount++;
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
@@ -3102,7 +3127,6 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
       body: JSON.stringify({
         mod_name: modName,
         items: exportable.map(i => i.game_rel),
-        password,
         copy_to_mods: copyToMods,
         ...(extra?.body || {}),
       }),
@@ -3156,7 +3180,6 @@ function _captureExportReview() {
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
   const modsPath = _modsFolderSet ? _modsFolderPath : "";
   const copyToMods = _copyToMods && !!modsPath;
-  const protectedMod = document.getElementById("toggle-password").checked && !!_protectionPassword;
   const included = [], excluded = [];
   for (const item of items) {
     const reason = !item.selected ? "Not selected" : !item.game_rel ? "Missing game asset path" :
@@ -3166,18 +3189,17 @@ function _captureExportReview() {
   }
   // Destination is chosen in review. The fingerprint tracks the project and settings it relies on.
   const fingerprint = JSON.stringify({
-    project: _activeProjectName, modName, protectedMod, modsPath,
+    project: _activeProjectName, modName, modsPath,
     revision: _sidebarRequest,
     items: items.sort((a,b) => String(a.game_rel).localeCompare(String(b.game_rel))),
   });
   return Object.freeze({project: _activeProjectName, modName, included: Object.freeze(included),
     excluded: Object.freeze(excluded), skipped: excluded.filter(i => i.selected).length,
-    copyToMods, modsPath, protected: protectedMod, fingerprint});
+    copyToMods, modsPath, fingerprint});
 }
 
-function _exportReviewCurrent(snapshot, password) {
-  return snapshot.fingerprint === _captureExportReview().fingerprint &&
-    (!snapshot.protected || password === _protectionPassword);
+function _exportReviewCurrent(snapshot) {
+  return snapshot.fingerprint === _captureExportReview().fingerprint;
 }
 
 function _blockExportForDrafts(snapshot = null) {
@@ -3214,10 +3236,10 @@ function _blockExportForDrafts(snapshot = null) {
   return true;
 }
 
-async function _confirmExportReview(snapshot, password, extra = null) {
+async function _confirmExportReview(snapshot, extra = null) {
   if (_exportReviewChecking || _exportRunningCount) return;
   if (_blockExportForDrafts(snapshot)) return;
-  if (!_exportReviewCurrent(snapshot, password)) {
+  if (!_exportReviewCurrent(snapshot)) {
     window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
     return;
   }
@@ -3226,7 +3248,7 @@ async function _confirmExportReview(snapshot, password, extra = null) {
   const proceed = async () => {
     // This check also covers a project/selection change while overwrite confirmation was open.
     if (_blockExportForDrafts(snapshot)) return;
-    if (!_exportReviewCurrent(snapshot, password)) {
+    if (!_exportReviewCurrent(snapshot)) {
       _exportReviewChecking = false; updateInstallBtn();
       window.AtelierExportReview?.cancelCheck(snapshot);
       window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
@@ -3234,7 +3256,7 @@ async function _confirmExportReview(snapshot, password, extra = null) {
     }
     _exportReviewChecking = false;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, password, snapshot.project, snapshot, extra);
+      snapshot.copyToMods, snapshot.project, snapshot, extra);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -3296,11 +3318,10 @@ async function doInstallMod() {
   }
   const snapshot = _captureExportReview();
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
-  const password = snapshot.protected ? _protectionPassword : "";
-  if (!window.AtelierExportReview) { await _confirmExportReview(snapshot, password); return; }
+  if (!window.AtelierExportReview) { await _confirmExportReview(snapshot); return; }
   const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
-    confirm: reviewed => _confirmExportReview(reviewed, password), refresh: doInstallMod, settings: openPaths,
+    confirm: reviewed => _confirmExportReview(reviewed), refresh: doInstallMod, settings: openPaths,
     rememberDestination: copyToMods => { _copyToMods = copyToMods; },
     skinSwapper: swapper && {
       ...swapper,
@@ -3310,7 +3331,7 @@ async function doInstallMod() {
       }),
       build: (options, reviewed) => {
         try { localStorage.setItem("atelier.skinSwapper.author", options.author || ""); } catch (_) {}
-        return _confirmExportReview(reviewed, password, { endpoint: "/api/skin_swapper/build", body: options });
+        return _confirmExportReview(reviewed, { endpoint: "/api/skin_swapper/build", body: options });
       },
     },
     reveal: async () => {
@@ -3579,7 +3600,6 @@ async function checkSetup() {
     }
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
-    _protectionPassword = statusRes.password_prefill || "";
     _copyToMods = _modsFolderSet;
     if (statusRes.configured) {
       _setSetupLoading(false, 'success', revision);
@@ -3627,7 +3647,6 @@ function _applySetupMode() {
   document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial configuration";
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
-  document.getElementById("setup-password-row").style.display = paths ? "" : "none";
   document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-mounts-row").style.display      = paths ? "" : "none";
   document.getElementById("setup-mounts-section").style.display  = paths ? "" : "none";
@@ -3653,12 +3672,10 @@ async function openPaths() {
     outcome = statusRes.error ? 'error' : statusRes.paks_prefill ? 'success' : 'warning';
     _modsFolderSet      = !!(statusRes.mods_prefill);
     _modsFolderPath     = statusRes.mods_prefill || "";
-    _protectionPassword = statusRes.password_prefill || "";
     document.getElementById("setup-path").value     = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value      = aes  || statusRes.aes_prefill  || "";
     document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
     document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
-    document.getElementById("setup-password").value = statusRes.password_prefill || "";
     document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
@@ -3971,7 +3988,6 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const payload = { path, aes_key, usmap_path: usmapPath };
   if (_pathsMode) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
-    payload.export_password = document.getElementById("setup-password").value;
     payload.blender_path    = document.getElementById("setup-blender").value.trim();
   }
   const btn = document.getElementById("setup-save");
@@ -3993,7 +4009,6 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       _resetSaveBtn();
       _modsFolderPath      = res.mods_folder || "";
       _modsFolderSet       = !!res.mods_folder;
-      _protectionPassword  = res.export_password || "";
       if (res.mods_folder_reset) {
         // The old mods folder wasn't under this game's Paks dir (e.g. a path carried over from
         // another machine), so it could never have loaded. Say where it now points.
@@ -4451,6 +4466,8 @@ async function saveTexOpts() {
   if (!texOpts) return;
   const st = document.getElementById("texopt-status");
   st.textContent = "Saving…";
+  const editor = texOpts;
+  const stopWorking = editorWorking('texopt-overlay', () => texOpts === editor, 'saving', 'texture');
   // Every key is sent, including the ones now off — the server removes any value equal to its
   // default, which is how an option switched back to its default stops being stored at all.
   const opts = { blank: false, no_mips: false, lq_twin: false, lod_group: "" };
@@ -4461,10 +4478,12 @@ async function saveTexOpts() {
       body: JSON.stringify({ game_rel: texOpts.game_rel, opts }),
     });
     if (!res.ok) { st.textContent = "Error: " + (res.error || "save failed"); return; }
+    stopWorking();
     toast(`Export options saved: ${texOpts.name}`, "success");
     closeTexOpts();
     loadSidebar();
   } catch (e) { st.textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 }
 
 function closeTexOpts() {
@@ -5216,7 +5235,6 @@ function openRepatcher() {
   document.getElementById("repatch-lockrow").style.display = "none";
   document.getElementById("repatch-unlock").value = "";
   document.getElementById("repatch-stage").checked = false;
-  document.getElementById("repatch-pw").value = "";
   document.getElementById("repatch-run").disabled = true;
   const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = "";
   document.getElementById("repatch-overlay").classList.add("active");
@@ -5238,16 +5256,15 @@ document.getElementById("repatch-run").addEventListener("click", async () => {
   const res = document.getElementById("repatch-result");
   res.style.display = "block"; res.innerHTML = '<span class="muted">Repatching…</span>';
   const stage = document.getElementById("repatch-stage").checked;
-  const pw = document.getElementById("repatch-pw").value.trim();
   try {
     const r = await (window.AtelierJobs?.run || api)("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage, password: pw }) });
+      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }) });
     if (r.locked) { res.innerHTML = '<span class="warning">Wrong or missing password.</span>'; btn.disabled = false; return; }
     if (!r.ok) { res.innerHTML = '<span class="warning">Failed: ' + (r.error || "unknown") + '</span>'; btn.disabled = false; return; }
     const m = r.manifest || {};
     res.innerHTML = '<b>✓ Repatched</b> — ' + r.mod + '<br><span class="muted">' +
       (m.materials || 0) + ' materials · ' + (m.textures || 0) + ' textures · ' + (m.skipped || 0) + ' skipped' +
-      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · password protected' : '') +
+      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') +
       '</span><br><a href="#" id="repatch-open">Open export folder</a>';
     const oa = document.getElementById("repatch-open");
     if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });
@@ -5728,6 +5745,8 @@ document.getElementById("world-reset").addEventListener("click", async () => {
   if (!worldEditor) return;
   if (!(await _confirmAction("Restore this level's original lighting, fog and grading? This deletes the project's saved level edits and discards the current draft.", 'Restore level?', 'Restore'))) return;
   const st = document.getElementById("world-status"); st.textContent = "Resetting…";
+  const editor = worldEditor, project = _activeProjectName;
+  const stopWorking = editorWorking('world-overlay', () => worldEditor === editor && project === _activeProjectName);
   try {
     const res = await api("/api/world_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: worldEditor.game_rel }) });
@@ -5740,6 +5759,7 @@ document.getElementById("world-reset").addEventListener("click", async () => {
     toast("Reset " + worldEditor.name, "success");
     await renderGrid();
   } catch (e) { st.textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 });
 
 // ── Text / StringTable editor ─────────────────────────────────────────────────
@@ -5833,6 +5853,8 @@ document.getElementById("text-reset").addEventListener("click", async () => {
   if (!textEditor) return;
   if (!(await _confirmAction("Restore this string table's original text? This deletes the project's saved text edits and discards the current draft.", 'Restore text?', 'Restore'))) return;
   const st = document.getElementById("text-status"); st.textContent = "Resetting…";
+  const editor = textEditor, project = _activeProjectName;
+  const stopWorking = editorWorking('text-overlay', () => textEditor === editor && project === _activeProjectName);
   try {
     const res = await api("/api/text_reset", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: textEditor.game_rel }) });
@@ -5843,4 +5865,5 @@ document.getElementById("text-reset").addEventListener("click", async () => {
     toast("Reset " + textEditor.name, "success");
     await renderGrid();
   } catch (e) { st.textContent = "Error: " + e.message; }
+  finally { stopWorking(); }
 });

@@ -89,8 +89,7 @@ See the [patch notes](docs/release-1.1.3.md) for details and verification limits
 - **Swap a whole material.** Search installed materials by character, skin, name
   or path, use one on another asset, and restore the target's game defaults.
 - **Present your work.** Model Studio's Inspect and Showcase views offer
-  editable previews and cel-lit presentation. Create posters and turntables;
-  completed builds can produce a shareable Mod card.
+  editable previews and cel-lit presentation. Create posters and turntables.
 - **Recover deleted edits.** Project trash keeps deleted edits and export
   options together. Undo is available immediately, with seven days of recovery.
 - **Make Atelier yours.** The assembled A logo, comic-inspired surfaces,
@@ -170,10 +169,6 @@ physics assets are retained; a different shape may need weight adjustments.
 ![Model Studio inspecting Magik from an isolated game installation](images/model-studio.png)
 
 ![The same model in Showcase presentation](images/showcase.png)
-
-A completed build's **Mod card** records its actual asset counts and version/date.
-Copy the image or save a PNG. Cards use a matching loaded Showcase capture, or
-clearly labelled catalogue artwork when a capture is unavailable.
 
 ## Material editing
 
@@ -336,8 +331,7 @@ fallbacks. Menu → Settings keeps the full configuration form, palettes and mot
    **Edit this asset** on a texture to add it to the project. Right-click the
    imported texture and choose **Replace with Image** to supply your image.
 3. Select the assets to include under **Mod tray** and enter a mod filename.
-   Enable **Copy to ~mods/** to install into your configured mods folder. Optional
-   **Password Protect** uses the protection password from Settings.
+   Enable **Copy to ~mods/** to install into your configured mods folder.
 4. Click **Build mod**, review the included assets and destination, then confirm.
 
 Open **Activity** to review job progress and results or cancel work before file

@@ -105,6 +105,7 @@ def main():
     parser.add_argument('--viewport-only', action='store_true', help='Run model inspection, capture, loading and material safety checks')
     parser.add_argument('--viewport-loading-only', action='store_true', help='Run viewport cancellation, roster avatar and hero logo checks')
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
+    parser.add_argument('--motion-placements-only', action='store_true', help='Check asset/batch feedback, workspace slots, pins and preview reveals in every motion mode')
     parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
@@ -118,7 +119,7 @@ def main():
     parser.add_argument('--logo-only', action='store_true', help="Check the header logo's entrance")
     parser.add_argument('--empty-assets-only', action='store_true', help="Check the Mod tray's empty state")
     parser.add_argument('--retired-only', action='store_true', help='Check the surfaces motion v2 retired stay gone')
-    parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
+    parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, posters and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
@@ -194,6 +195,13 @@ def main():
                     return
                 from browser_startup import enter_library_on_startup
                 enter_library_on_startup(context)
+                if args.motion_placements_only:
+                    from motion_placements_checks import run_motion_placements_checks
+                    run_motion_placements_checks(context, url, report, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
                 page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(error.stack or str(error)))
                 page.add_init_script("""
@@ -420,6 +428,8 @@ def main():
 
                 if args.polish_only:
                     from polish_checks import run_polish_checks
+                    from motion_placements_checks import run_motion_placements_checks
+                    run_motion_placements_checks(context, url, report, checks)
                     run_polish_checks(page, context, url, report, checks)
                     assert not errors, errors
                     (report / 'results.json').write_text(json.dumps({'checks':checks,'page_errors':errors},indent=2))
@@ -571,6 +581,8 @@ def main():
                 from appearance_checks import run_appearance_checks
                 run_appearance_checks(page, context, url, report, checks)
                 from polish_checks import run_polish_checks
+                from motion_placements_checks import run_motion_placements_checks
+                run_motion_placements_checks(context, url, report, checks)
                 run_polish_checks(page, context, url, report, checks)
                 from viewport_inspection_checks import run_viewport_inspection_checks
                 run_viewport_inspection_checks(page, context, url, report, checks, args.mesh, args.idle)

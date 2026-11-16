@@ -13,9 +13,8 @@ and originating project header. Run the full browser suite before a PR.
 Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
 WebAudio context (no test sounds reach the speakers). It checks disposable toon
 materials while rendering, exact source identity/JSON after Inspect, camera
-restoration on successful/failed captures, clipboard/download/folder actions,
-warning/failure cards and Full/Calm/Off/OS/hidden audio gates. The pure Node card
-data harness runs under `test_mod_cards.py`; HTTP tests verify `/api/app_info`.
+restoration on successful/failed captures and Full/Calm/Off/OS/hidden audio
+gates. HTTP tests verify `/api/app_info`.
 
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
@@ -850,7 +849,7 @@ source revision. The earlier per-phase counts above describe those earlier runs.
 
 ## Review and follow-up
 
-See [RELIABILITY.md](RELIABILITY.md) for the fixes, evidence, API compatibility and remaining limitations. Before release, manually validate representative texture/material/dye, VFX/curve/text, world, Blender, protected-mod and repatch workflows with a supported game version. In-game verification remains a separate release gate.
+See [RELIABILITY.md](RELIABILITY.md) for the fixes, evidence, API compatibility and remaining limitations. Before release, manually validate representative texture/material/dye, VFX/curve/text, world, Blender, locked-mod opening and repatch workflows with a supported game version. In-game verification remains a separate release gate.
 
 ## Native export, managed jobs and bulk editing (15 October 2026)
 

@@ -433,14 +433,6 @@ def get_blender_path():
 def save_blender_path(path):
     _save_config(blender_path=path.replace("\\", "/") if path else None)
 
-def get_export_password():
-    """The default 'Protection Password' set in Settings, used when Password Protect is toggled
-    on for Install Mod. Read fresh from disk so edits in Settings take effect without a restart."""
-    return _load_config().get("export_password", "") or ""
-
-def save_export_password(password):
-    _save_config(export_password=password or None)
-
 def _prereq_issues(need_tool=True):
     issues = []
     if not has_pak_files(PAKS):

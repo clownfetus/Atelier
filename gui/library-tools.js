@@ -10,7 +10,7 @@
     if (sizes.has(saved?.size)) prefs.size = saved.size;
     if (sorts.has(saved?.sort)) prefs.sort = saved.sort;
   } catch (_) {}
-  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewTimer;
+  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewTimer, previewReveal;
   const items = new WeakMap();
   const normalize = value => String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\\/g, '/');
   const words = query => normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -27,24 +27,25 @@
   }
   const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
   function sort(cards, {home = false} = {}) {
-    if (prefs.sort === 'recommended') {
-      const roles = window.AtelierFolderEmblems?.roles;
-      const coloured = [], featured = [], rest = [];
-      for (const card of cards) {
-        const isFolder = card.type === 'folder';
-        const role = isFolder && roles?.[card.iconCls];
-        if (role && role !== 'neutral') coloured.push(card);
-        else if (isFolder && home && AtelierFolderIcons.isFeatured(card.name)) featured.push(card);
-        else rest.push(card);
-      }
-      return coloured.concat(featured, rest);
+    const recommended = prefs.sort === 'recommended';
+    const roles = window.AtelierFolderEmblems?.roles;
+    const coloured = [], featured = [], rest = [];
+    for (const card of cards) {
+      const isFolder = card.type === 'folder';
+      const role = isFolder && roles?.[card.iconCls];
+      if (role && role !== 'neutral') coloured.push(card);
+      else if (recommended && home && isFolder && AtelierFolderIcons.isFeatured(card.name)) featured.push(card);
+      else rest.push(card);
     }
+    if (recommended) return coloured.concat(featured, rest);
+
     const name = (a, b) => collator.compare(a.label, b.label);
     const folders = (a, b) => Number(b.type === 'folder') - Number(a.type === 'folder');
-    return [...cards].sort((a, b) => folders(a, b) ||
+    const compare = (a, b) => folders(a, b) ||
       (prefs.sort === 'type' ? collator.compare(a.file_type || '', b.file_type || '') :
         prefs.sort === 'edited' ? Number(!!b.imported) - Number(!!a.imported) : 0) ||
-      (prefs.sort === 'name-desc' ? -name(a, b) : name(a, b)));
+      (prefs.sort === 'name-desc' ? -name(a, b) : name(a, b));
+    return coloured.sort(compare).concat(rest.sort(compare));
   }
   function persist() {
     try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (_) {}
@@ -163,6 +164,7 @@
         if (previewDialog.open) return; // A previous close can arrive after a new preview opens.
         clearTimeout(previewTimer);
         const img = previewDialog.querySelector('img'); img.onload = img.onerror = null; img.removeAttribute('src');
+        previewReveal?.destroy(); previewReveal = null;
         if (previewOpener?.isConnected) previewOpener.focus();
       });
       previewDialog.addEventListener('keydown', e => { if (e.key === 'Escape') e.stopPropagation(); });
@@ -175,8 +177,13 @@
     previewDialog.querySelector('.library-preview-footer span').textContent = caption;
     const load = bust => {
       clearTimeout(previewTimer);
+      previewReveal?.destroy(); previewReveal = null;
       message.textContent = 'Loading preview…'; img.hidden = true; retry.hidden = true;
-      img.onload = () => { clearTimeout(previewTimer); img.hidden = false; message.textContent = ''; retry.hidden = true; };
+      img.onload = () => {
+        clearTimeout(previewTimer); img.hidden = false; message.textContent = ''; retry.hidden = true;
+        previewReveal = window.AtelierPolish?.play(img, [{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0)'}],
+          window.AtelierMotion.unfoldMs, window.AtelierMotion.ease.unfold);
+      };
       img.onerror = () => { clearTimeout(previewTimer); message.textContent = 'Preview unavailable. Try again after the thumbnail has loaded.'; retry.hidden = false; };
       previewTimer = setTimeout(() => { message.textContent = 'Preview is taking too long. You can retry or close it.'; retry.hidden = false; }, 20000);
       img.alt = label; img.src = src + (bust ? `${src.includes('?') ? '&' : '?'}_t=${Date.now()}` : '');

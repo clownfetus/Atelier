@@ -187,10 +187,6 @@
         </span>
         Review mod
       </button>
-      <label class="toggle-row" id="toggle-password-row" title="Encrypt the mod with the protection password set in Settings">
-        <span class="switch"><input type="checkbox" id="toggle-password"><span class="switch-track"></span></span>
-        Password protect
-      </label>
     </div>
   </aside>
 </div>
@@ -648,12 +644,6 @@
           <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-field" id="setup-password-row" style="display:none">
-        <div class="setup-label"><span>Protection password — optional, for the Password protect toggle</span></div>
-        <div class="setup-row">
-          <input id="setup-password" type="text" class="setup-input" placeholder="Password" maxlength="64" spellcheck="false">
-        </div>
-      </div>
       <div class="setup-section" id="setup-mounts-section" style="display:none">Installed content</div>
       <div class="setup-field" id="setup-mounts-row" style="display:none">
         <div class="setup-label"><span>Content mounts Atelier read from your paks</span></div>
@@ -853,10 +843,6 @@
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" id="repatch-stage"> Stage as project in editor
         <span class="muted" style="font-size:11px">(load assets pre-edited, to remix)</span>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px" class="muted">
-        Password protect repatch
-        <input id="repatch-pw" class="setup-input repatch-field" type="text" placeholder="leave blank for none">
       </label>
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
       <div id="repatch-result" style="display:none;font-size:12px;line-height:1.6"></div>
@@ -1071,8 +1057,6 @@
 <script src="/static/motion/spinner-glyph.js"></script>
 <script src="/static/motion/progress-disc.js"></script>
 <script src="/static/motion/motion-preview.js"></script>
-<script src="/static/mod-card-data.js"></script>
-<script src="/static/mod-cards.js"></script>
 <script src="/static/vfx-motionboard-data.js"></script>
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>

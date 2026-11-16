@@ -1,9 +1,9 @@
-"""Optional SOFT mod-lock (anti-theft deterrent, NOT encryption). On export, Atelier can embed a
-marker in a mod's .ucas: the literal tag `UE5SCO` + the password REVERSED + `UE5SCO` again. On
-unpack (repatch/import), Atelier scans the mod's files for that tag; if present it prompts for the
-password, reverses the input, and compares it to the stored (reversed) code — unlocking only on a
-match. The marker sits in the offset-indexed .ucas tail so it's inert to the game but recoverable by
-anyone with a hex editor: this deters casual theft *inside Atelier*, it does not protect the data."""
+"""Reads the SOFT mod-lock that older Atelier releases could write (a deterrent, NOT encryption).
+Those releases appended a marker to a mod's .ucas: the literal tag `UE5SCO` + the password
+REVERSED + `UE5SCO` again. Atelier no longer writes it, because the game now flags containers that
+carry it. On unpack (open/repatch), Atelier still scans a mod's files for the tag; if present it
+asks for the password, reverses the input, and compares it to the stored (reversed) code. Repatch
+rebuilds the container from its assets, so a repatched copy never carries the marker."""
 import os, zipfile
 from atelier.config import dir_glob
 
@@ -75,26 +75,3 @@ def unlock(mod_source, entered):
     """True if `entered` opens the mod (or the mod isn't locked at all)."""
     code = lock_code(mod_source)
     return code is None or verify(entered, code)
-
-def embed(mod_base, password):
-    """Append the lock marker to mod_base.ucas. Strips any existing marker first (no dupes)."""
-    ucas = mod_base + ".ucas"
-    if not password or not os.path.exists(ucas):
-        return False
-    strip(mod_base)
-    with open(ucas, "ab") as f:
-        f.write(TAG + _rev(password).encode("utf-8") + TAG)
-    return True
-
-def strip(mod_base):
-    """Remove the lock marker from mod_base.ucas if present."""
-    ucas = mod_base + ".ucas"
-    if not os.path.exists(ucas):
-        return
-    b = open(ucas, "rb").read()
-    i = b.find(TAG)
-    if i < 0:
-        return
-    j = b.find(TAG, i + len(TAG))
-    if j > i:
-        open(ucas, "wb").write(b[:i] + b[j + len(TAG):])

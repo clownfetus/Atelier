@@ -135,7 +135,7 @@ def run_viewer_followup_checks(page,context,url,report,checks,*,reuse_page=False
         tab.screenshot(path=str(report/'editing-card-border.png'))
         checks.append('Edited grid assets have a three-pixel contrasting border and an explicit Edited marker')
         tab.evaluate("""() => {
-          window.followupExport={project:atelierProject(),modName:'Completed build',copyToMods:true,modsPath:'D:/Test/mods',protected:false,included:[],excluded:[],skipped:0};
+          window.followupExport={project:atelierProject(),modName:'Completed build',copyToMods:true,modsPath:'D:/Test/mods',included:[],excluded:[],skipped:0};
           AtelierExportReview.open(followupExport,{refresh(){},confirm(){},settings(){}});
           AtelierExportReview.finish(followupExport,{ok:true,installed_dir:'D:/Test/mods',applied:['tex T_Painted'],skipped:[]});
         }""")

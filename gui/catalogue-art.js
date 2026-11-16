@@ -161,10 +161,18 @@
         if (!current() || !response.ok) return;
         const status = response.headers.get('X-Atelier-Upscale');
         if (status === 'ready') {
-          // Decode the replacement first; the original stays visible until it is ready.
+          // Decode the replacement first; the original stays visible until it is ready. A sharper copy that
+          // arrives while the art is on screen opens down over it from its top edge (the image swap); one that
+          // was already waiting, or that lands while the art is still opening, replaces it at once so the art
+          // never opens twice.
           url.searchParams.set('upscale', '4');
           const sharp = new Image();
-          sharp.onload = () => { if (current()) image.src = url.pathname + url.search; };
+          sharp.onload = () => {
+            if (!current()) return;
+            const src = url.pathname + url.search, polish = window.AtelierPolish;
+            if (attempt > 0 && polish?.swapImage && !image.getAnimations?.().length) polish.swapImage(image, src);
+            else image.src = src;
+          };
           sharp.src = url.href;
           return;
         }
@@ -176,7 +184,9 @@
     setTimeout(check, 0);
   }
   document.addEventListener('load', event => {
-    if (event.target instanceof HTMLImageElement && event.target.matches('.library-hero-art, #viewport-skin-card img'))
+    // The image swap's outgoing copy is decoration; only the real image is watched.
+    if (event.target instanceof HTMLImageElement &&
+        event.target.matches('.library-hero-art:not(.image-swap), #viewport-skin-card img:not(.image-swap)'))
       watchBanner(event.target);
   }, true);
   function tray(items) {

@@ -238,8 +238,15 @@ export function createAssemblyView(api) {
   function releaseThumbnails() {
     clearThumbnailWork(); for (const url of thumbnails.values()) URL.revokeObjectURL(url); thumbnails.clear();
   }
+  // A thumbnail opens downwards out of its top edge once its image has loaded, as the library's do (P4b.7).
+  // No fade and no travel; Off and reduced motion show it at once.
+  function showThumb(img, src) {
+    img.addEventListener('load', () => window.AtelierPolish?.play(img, [{clipPath:'inset(0 0 100% 0)'}, {clipPath:'inset(0)'}],
+      window.AtelierMotion?.unfoldMs || 280, window.AtelierMotion?.ease?.unfold), {once:true});
+    img.src = src;
+  }
   function loadThumb(img, url) {
-    if (thumbnails.has(url)) { img.src = thumbnails.get(url); return; }
+    if (thumbnails.has(url)) { showThumb(img, thumbnails.get(url)); return; }
     thumbQueue.push({img, url, generation:thumbGeneration}); pumpThumbs();
   }
   function pumpThumbs() {
@@ -255,7 +262,7 @@ export function createAssemblyView(api) {
         const url = URL.createObjectURL(blob);
         if (thumbnails.has(item.url)) URL.revokeObjectURL(url);
         else thumbnails.set(item.url, url);
-        item.img.src = thumbnails.get(item.url);
+        showThumb(item.img, thumbnails.get(item.url));
         while (thumbnails.size > 48) { const key = thumbnails.keys().next().value; URL.revokeObjectURL(thumbnails.get(key)); thumbnails.delete(key); }
       }).catch(error => {
         if (error.name !== 'AbortError' && item.img.isConnected) {

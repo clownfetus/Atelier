@@ -24,7 +24,6 @@ from atelier.config import (ROOT, ASSETS, IMPORT_ROOT, PROJECTS_ROOT, WORK_IMPOR
                             get_import_root, get_active_project, set_active_project,
                             project_base, project_base_legacy, project_game_rel,
                             get_mods_folder, save_mods_folder,
-                            get_export_password, save_export_password,
                             save_blender_path)
 
 _USMAP_PATTERN = re.compile(r'^5\.3\.2-\d+\+\+\+depot_marvel\+S\d+\.\d+_release-Marvel\.usmap$')
@@ -1160,7 +1159,6 @@ def api_setup_status():
                        "aes_prefill":   aes_prefill,
                        "usmap_prefill": usmap_prefill,
                        "mods_prefill":  get_mods_folder(),
-                       "password_prefill": get_export_password(),
                        "blender_prefill": blender_path_suggestion()})
 
 @app.post("/api/pick_folder")
@@ -1283,8 +1281,6 @@ def api_save_paks():
     usmap_path = body.get("usmap_path", "").strip()
     has_mods   = "mods_folder" in body            # only touch mods config when the field was sent
     mods_folder = (body.get("mods_folder") or "").strip()
-    has_pw     = "export_password" in body        # only touch password config when the field was sent
-    export_password = (body.get("export_password") or "").strip()
     has_blender = "blender_path" in body           # only touch blender config when the field was sent
     blender_path = (body.get("blender_path") or "").strip()
     if not path:
@@ -1332,8 +1328,6 @@ def api_save_paks():
             except OSError:
                 pass
             save_mods_folder(target)
-        if has_pw:
-            save_export_password(export_password)   # empty string clears it
         if has_blender:
             save_blender_path(blender_path)          # empty string clears it
 
@@ -1369,8 +1363,7 @@ def api_save_paks():
 
         response.content_type = "application/json"
         return json.dumps({"ok": True, "mods_folder": get_mods_folder(),
-                           "mods_folder_reset": mods_reset,
-                           "export_password": get_export_password()})
+                           "mods_folder_reset": mods_reset})
     except Exception as e:
         response.content_type = "application/json"
         return json.dumps({"ok": False, "error": str(e)})
@@ -3262,7 +3255,6 @@ def _install_mod_payload(body):
     mod_name     = _mod_stem(body.get("mod_name"))
     items        = body.get("items", [])
     copy_to_mods = bool(body.get("copy_to_mods"))
-    password     = (body.get("password") or "").strip() or None
     if not items:
         return {"ok": False, "error": "no items selected"}
     if copy_to_mods and not get_mods_folder():
@@ -3275,7 +3267,7 @@ def _install_mod_payload(body):
             _split_export_items(items)
         result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                            curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, password=password, mesh_items=mesh_items,
+                           text_items=text_items, mesh_items=mesh_items,
                            asset_opts=_project_meta.get_asset_opts(get_import_root()),
                            allow_unsafe_world=bool(body.get("allow_unsafe_world")))
         if not result.get("ok"):
@@ -3333,7 +3325,6 @@ def _skin_swapper_payload(body):
     from atelier import skin_swapper
     mod_name = body.get("mod_name")
     copy_to_mods = bool(body.get("copy_to_mods"))
-    password = (body.get("password") or "").strip() or None
     if copy_to_mods and not get_mods_folder():
         return {"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
                 "need_mods_folder": True}
@@ -3341,7 +3332,7 @@ def _skin_swapper_payload(body):
     os.makedirs(out_dir, exist_ok=True)
     try:
         result = skin_swapper.build(mod_name, body.get("meshes") or [], body.get("skin_name"),
-                                    body.get("author"), out_dir, password)
+                                    body.get("author"), out_dir)
         if not result.get("ok"):
             return {"ok": False, "error": result.get("error", "build failed"),
                     "problems": result.get("problems") or []}
@@ -3374,7 +3365,7 @@ def api_pick_mod_file():
 
 @app.post("/api/repatch")
 def api_repatch():
-    """Repatch a picked mod for the current patch. body: {path, unlock, stage_as_project, password}."""
+    """Repatch a picked mod for the current patch. body: {path, unlock, stage_as_project}."""
     body = request.json or {}
     if body.get("background"):
         return _submit_job("repatch", "Repatch mod", lambda job: _repatch_payload(body))
@@ -3404,7 +3395,6 @@ def _repatch_payload(body):
         r = repatch_mod(src, out_base,
                         unlock=(body.get("unlock") or None),
                         stage_as_project=bool(body.get("stage_as_project")),
-                        relock=((body.get("password") or "").strip() or None),
                         work_dir=os.path.join(work, "repatch"))
         if r.get("locked"):
             return {"ok": False, "locked": True, "error": r.get("error")}

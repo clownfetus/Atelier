@@ -172,15 +172,6 @@ def run_catalogue_identity_checks(context, url, report, checks):
         tab.evaluate('matEditor=previousTextureEditor;closeMaterialEditor(true)')
         checks.append('Custom texture location fields preview the exact package, retain rejected input, save with the originating project, and ignore a response after another editor opens')
 
-        tab.evaluate("""() => {
-          const host=document.createElement('div');host.id='identity-mod-card';document.body.append(host);
-          window.identityCardDispose=AtelierModCards.mount(host,{project:'Smoke A',modName:'Identity fixture',included:[{game_rel:'Characters/1029/1029100/Materials/MI_Body'}]},
-            {ok:true,applied:['mat MI_Body'],skipped:[]});
-        }""")
-        tab.wait_for_selector('#identity-mod-card canvas[data-hero-badge="1029"]', state='attached')
-        tab.evaluate('identityCardDispose();document.getElementById("identity-mod-card").remove()')
-        checks.append('Completed single-hero Mod cards include that hero’s verified KO emblem; missing optional images never block editing')
-
         # The first response can precede the CPU worker. The same visible image must upgrade
         # after completion, without navigating or rebuilding the rest of the library.
         for kind, dimensions in (('story', (344,120)), ('hero-nameplate', (848,192)), ('nameplate', (848,192))):

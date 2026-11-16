@@ -229,7 +229,10 @@
 .vp-curve-custom > summary::-webkit-details-marker { display:none; }
 .vp-curve-custom > summary svg:last-child { margin-left:auto; transition:transform var(--studio-motion-fast) var(--studio-easing); }
 .vp-curve-custom[open] > summary svg:last-child { transform:rotate(180deg); }
-.vp-recolour-status { min-height:1.4em; margin:12px 0 0; font-size:var(--studio-text-detail); color:var(--muted); }
+/* The status, with the texture loader beside it while a recolour saves (Model Studio's 74 x 36 badge). */
+.vp-recolour-feedback { display:flex; align-items:center; gap:8px; min-width:0; margin:12px 0 0; }
+.vp-recolour-feedback .material-save-badge { flex-basis:74px; width:74px; height:36px; }
+.vp-recolour-status { flex:1; min-width:0; min-height:1.4em; margin:0; font-size:var(--studio-text-detail); color:var(--muted); }
 .vp-advanced { border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-top:8px; }
 #viewport-box .vp-advanced > summary { font-size:var(--studio-text-body); font-weight:500; cursor:pointer; padding:19px 0; display:flex; justify-content:space-between; align-items:center; }
 #viewport-box .vp-advanced[open] > summary svg { transform:rotate(90deg); }
@@ -362,9 +365,13 @@
 #viewport-skin-card img { display:block; width:100%; height:100%; }
 #viewport-skin-card.is-nameplate img { object-fit:contain; filter:drop-shadow(0 6px 12px rgb(0 0 0 / .3)); }
 #viewport-skin-card.is-story img { object-fit:cover; object-position:center 30%; border-radius:var(--studio-shape-medium); }
-#viewport-skin-card::before { content:''; position:absolute; inset:-14px -20px; z-index:-1; opacity:0; transition:opacity 300ms var(--studio-easing);
+/* The skin's glow opens downwards out of its top edge once the colour is known, and folds back up when it
+   goes (P4b.7), like a picture arriving. It never fades; Off cuts. */
+#viewport-skin-card::before { content:''; position:absolute; inset:-14px -20px; z-index:-1; clip-path:inset(0 0 100% 0);
+  transition:clip-path var(--studio-motion-fold) var(--studio-easing-exit);
   background:radial-gradient(closest-side,color-mix(in srgb,var(--vp-skin-colour) 38%,transparent),transparent); }
-#viewport-box.has-skin-colour #viewport-skin-card::before { opacity:1; }
+#viewport-box.has-skin-colour #viewport-skin-card::before { clip-path:inset(0);
+  transition:clip-path var(--studio-motion-unfold) var(--studio-easing-unfold); }
 #viewport-skin-card:not([hidden]) + #viewport-mat-section #viewport-mat-head { padding-top:16px; }
 @media (max-height:760px) { #viewport-skin-card { display:none; } }
 /* Embedded Model Studio can be short even in a tall window. Give its controls

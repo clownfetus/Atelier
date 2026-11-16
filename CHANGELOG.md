@@ -5,6 +5,32 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Removed the **Mod card** from finished builds. The export result now ends at
+  the outcome, the output paths and the build report.
+
+- Removed **Password protect**. Since the latest game patch, the game flags mods
+  that carry Atelier's lock, so Atelier no longer adds it to any export: the
+  toggle under **Review mod**, the protection password in Settings and the
+  repatch password are gone. Re-export any mod you locked with an earlier
+  release. A locked mod still asks for its password when you open or repatch
+  it, and the repatched copy is never locked.
+
+- Added working animations to custom asset preparation and batch saves, real
+  progress to batch reviews, and motion when saved edits, pinned folders and
+  Quick Preview images appear or leave.
+
+- Material replacements, resets, custom textures and texture downloads, editor
+  resets, texture export options, recolour saves, mesh replacements and S-map
+  processing now show the working animation while they run. Assembly View
+  thumbnails and the dye preview open into place, sharper Library and Model
+  Studio artwork opens over the original when it finishes, new Activity jobs
+  click into the list, and the last fades (the region highlight, the costume
+  glow and the folder pin button) now fold instead.
+
+- Folders with coloured icons stay at the top of the Library with every sort,
+  including a saved **Edited first** view. The selected sort orders items within
+  each group.
+
 - Blender no longer renders materials without a glow map as solid white. A
   material's emissive colour only tints its glow map, as in the game, and stays
   editable on the material. Send to Blender asks for the updated Atelier Live
@@ -36,20 +62,26 @@ The app, installers and update checker identify each release by its full number,
 
 ## 1.2.1 — 2026-11-10
 
-- Generate release notes from merged commits
-- Print brand bible v1.3 from a source page
-- Redraw the mark and refresh the piece colours (D20)
-- Put coloured folders first in Recommended library sort
-- Give Characters, UI and VFX folders distinct colours
-- Keep the outline colour off text
-- Simplify mod review and reveal texture folders
-- Use per-asset loaders in the Mod tray
-- Apply the Atelier brand guide to Assembly View
-- Open textures in the system image app from context menus
-- Unify mesh inspection in Assembly View
-- Design system: master mark from 32 px, as SPEC has it
-- Rebuild baked detail levels from authored Blender meshes
-- Keep the glyph drawing in Off after a Complete's ripple
+- Characters, UI and VFX have distinct folder icon colours. Choose
+  **Recommended** in the Library’s Sort menu to see coloured folders first.
+
+- Right-click a texture to open it in your default image app or reveal its
+  project file in Explorer on Windows. Atelier prepares the project copy when
+  needed.
+
+- Assembly View brings mesh surfaces, linked materials and UV inspection
+  together. Collapse the panels to give the model more room.
+
+- Blender mesh replacements can use authored geometry to rebuild baked detail
+  levels.
+
+- **Review mod** lets you choose **Export only** or **Export and install** in
+  the review itself. The Mod tray shows a loader for the type of asset it is
+  preparing.
+
+- The refreshed Atelier logo and palette appear in the app and installer.
+  The status glyph stays visible when Motion Off takes over after a success
+  animation.
 
 ## 1.2.0 — 2026-11-09
 

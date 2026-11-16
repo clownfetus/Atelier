@@ -6,6 +6,8 @@
 .mesh-edit-notes { margin:12px 0 0;padding-left:24px; }
 .mesh-edit-notes li + li { margin-top:8px; }
 .mesh-edit-path { font-size:var(--studio-text-micro)!important; }
+.mesh-edit-feedback { display:flex;align-items:center;gap:8px;min-width:0; }
+.mesh-edit-feedback #mesh-edit-status { flex:1;min-width:0; }
 .mesh-edit-actions { display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap; }
 .mesh-edit-actions [hidden] { display:none; }
 .mesh-import-options { margin:0;padding:12px 16px;display:flex;flex-direction:column;gap:16px;border:1px solid var(--border);border-radius:var(--studio-shape-medium);min-width:0; }

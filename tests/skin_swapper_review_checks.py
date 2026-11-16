@@ -39,7 +39,7 @@ def run_skin_swapper_review_checks(page, context, url, report, checks):
         tab.evaluate("""mesh => {
           try { localStorage.removeItem('atelier.skinSwapper.author'); } catch (_) {}
           _pathLabels['Characters/1024'] = 'Hela'; _pathLabels['Characters/1024/1024503'] = 'The Redeemed';
-          _modsFolderSet = false; _protectionPassword = '';
+          _modsFolderSet = false;
           sidebarData = {
             mesh: {name: 'SK_1024_1024503', game_rel: mesh, file_type: 'mesh', selected: true},
             tex: {name: 'T_Body_D', game_rel: 'Characters/1024/1024503/Textures/T_Body_D', file_type: 'texture', selected: true},

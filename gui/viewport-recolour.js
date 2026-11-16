@@ -206,12 +206,21 @@ export function createViewportRecolour(api) {
     }
   }
 
+  // The texture loader beside the status while the recolour saves (D16). It reports the wait only:
+  // the status line and the note carry the result.
+  function working(status) {
+    try { return window.AtelierMaterialSaveFeedback?.saving(status, () => status.isConnected, 'texture') || (() => {}); }
+    catch (_) { return () => {}; }
+  }
+
   async function apply(name, info, controls, replace = false) {
     const draft = drafts.get(name); if (!draft) return;
     controls.apply.disabled = true; controls.status.textContent = 'Saving recolour…';
+    let stopWorking = working(controls.status);
     try {
       const result = await api.fetch('/api/texture_recolour', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({game_rel:textureOf(info), ...draft, replace})}).then(r => r.json());
+      stopWorking(); stopWorking = () => {};
       if (result.needs_replace) {
         const ok = await window.AtelierDialog.confirm({title:'Replace edited texture?', confirmLabel:'Replace', tone:'danger',
           body:'This texture has edits made another way, such as painting or a replacement. Recolouring replaces them with the game texture plus this colour.'});
@@ -227,7 +236,7 @@ export function createViewportRecolour(api) {
       await window.loadSidebar?.();
     } catch (error) {
       controls.status.textContent = error.message;
-    } finally { api.rebuild(); }
+    } finally { stopWorking(); api.rebuild(); }
   }
 
   function field(label, name, input, tag = 'label') {
@@ -273,7 +282,8 @@ export function createViewportRecolour(api) {
     const restore = iconButton('vp-recolour-restore', 'rotate-ccw', 'Restore original texture');
     restore.hidden = !saved?.edited || drafts.has(name);
     actions.append(applyButton, cancel, restore);
-    box.append(actions, status);
+    const feedback = document.createElement('div'); feedback.className = 'vp-recolour-feedback'; feedback.append(status);
+    box.append(actions, feedback);
     const controls = {apply:applyButton, status};
 
     const changed = () => {

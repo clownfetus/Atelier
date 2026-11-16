@@ -1151,7 +1151,7 @@ _build_lock = threading.Lock()  # legacy staging helpers still share scratch fil
 
 
 def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-              world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None,
+              world_items=None, text_items=None, mesh_items=None, asset_opts=None,
               allow_unsafe_world=False):
     """Build privately, validate every container, then publish with rollback.
 
@@ -1176,7 +1176,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
         staged_out = os.path.join(work, "output")
         os.makedirs(staged_out)
         result = _build_mod_staged(mod_name, tex_items, mat_items, staged_out, force,
-                                   curve_items, vfx_items, world_items, text_items, password,
+                                   curve_items, vfx_items, world_items, text_items,
                                    mesh_items, asset_opts, stage_dir=os.path.join(work, "assets"),
                                    allow_unsafe_world=allow_unsafe_world)
         if not result.get("ok"):
@@ -1198,7 +1198,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
 
 
 def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-                      world_items=None, text_items=None, password=None, mesh_items=None, asset_opts=None,
+                      world_items=None, text_items=None, mesh_items=None, asset_opts=None,
                       stage_dir=None, allow_unsafe_world=False):
     """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
     edits + StringTable (text) edits + Blender mesh edits into one mod. tex_items: [game_rel];
@@ -1350,10 +1350,6 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
             raise
         except Exception as e:
             skipped.append(f"pak-combine skipped (kept separate paks): {e}")
-    if password:                                         # optional soft mod-lock on the exported mod
-        from atelier.handlers import modlock
-        for p in ([pak] + world_out):
-            if p and p.endswith(".pak"): modlock.embed(p[:-4], password)
     return {"ok": True, "applied": applied, "skipped": skipped, "pak": pak, "world_mods": world_out}
 
 # ── CLI commands ───────────────────────────────────────────────────────────────

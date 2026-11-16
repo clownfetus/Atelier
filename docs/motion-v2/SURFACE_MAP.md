@@ -24,6 +24,35 @@ bottom before starting Phase 3**: line numbers drift.
 | 14 | Startup stage (D17) | `gui/motion/surface-adapters.js:22` | `krackleStage.mount` with the logo's silhouette | Working beside the counted progress bar, with no silhouette, so the A never forms here. The logo entrance still follows (D8). Calm and Off keep the still logo and the bar | Stage |
 | 15 | Index failure (D17) | `gui/motion/surface-adapters.js:35` | `krackleStage.mount` | The X, with the notice's text unchanged | Stage |
 
+## Additional approved placements
+
+These reuse the finished motion system; the original migration inventory above stays historical.
+
+| Surface | Mounted from | Behaviour |
+| --- | --- | --- |
+| Add custom asset | `gui/add-asset.js` | Inline texture, mesh or material loader beside the preparation status, from the selected asset type |
+| Bulk review and save | `gui/bulk-edit.js` | The rolling disc follows the review job's own current/total. Uncounted review uses the working glyph. Saving materials uses the material loader; mixed, VFX and curve batches use general working |
+| Workspace: Your mod | `gui/workspace-dock.js` | New saves and Undo seat into their slots; changed saves reseat. Restore folds an inert departing copy. Refreshes and selection changes stay still |
+| Quick Preview | `gui/library-tools.js` | The loaded image opens downwards from its top edge, using the existing reveal timing |
+| Pinned folders | `gui/library-pins.js` | A newly pinned chip settles; an unpinned chip folds away. Initial display, filtering, catalogue updates and unchanged repaints do not replay the effect |
+| Material editor work | `gui/app.js` (`editorWorking`) | Beside Save: the texture loader while a custom texture uploads or textures bake or pack for download; the material loader while the material is replaced or reset. Requests that overlap in one editor share its glyph until the last one ends |
+| Other editors' resets | `gui/app.js` | Curve, VFX, level and text Reset show the working glyph beside Save, as their saves already do |
+| Texture export options | `gui/app.js` (`saveTexOpts`) | The texture loader beside Save while the options save. The footer keeps the badge's height, so it doesn't jump |
+| Recolour texture | `gui/viewport-recolour.js` | The texture loader beside the status while a recolour saves. It ends when the "Replace edited texture?" question opens; the replacing save shows its own. Previews during a drag stay text only |
+| Replace mesh | `gui/mesh-edit.js` | The mesh loader beside the status while the `mesh-replace` job runs, with Add custom asset's lifecycle |
+| Process S maps | `gui/s-maps.js` | A Mod tray progress row with the texture loader from planning to the result. Planning hands to processing without restarting it. The result stays the existing toast |
+| Assembly View textures | `gui/assembly.js` | Each texture thumbnail opens downwards from its top edge once loaded, as library thumbnails do |
+| Dye preview | `gui/app.js` (`_dyeShow`) | The preview opens downwards over its plate when the editor opens or Dyed and Region map switch. Live colour changes swap in place; a repaint of the same picture stays still |
+| Activity rows | `gui/job-tools.js` | A job that starts while Activity is open seats into the list: the slot opens, the row snaps in, its glyph squashes at the impact (Full only) and the text wipes in. Opening the panel, progress repaints, closed refreshes and project changes stay still |
+| Region highlight | `gui/style.css` (`matflash`) | Finding a region holds the highlight, then folds it back into the row's left edge in 190 ms instead of fading it. Off shows no highlight, as before |
+| Costume glow | `gui/viewport.css` | Model Studio's skin glow opens downwards from its top edge when the colour is known and folds back up when it goes, instead of fading |
+| Folder pin button | `gui/library-pins.css` | On hover or focus the pin unfolds downwards like a pop-up (280 ms, 6 px) and folds back up (190 ms), instead of fading |
+| Upscaled artwork | `gui/catalogue-art.js` | When the sharper copy of the Library banner's art or Model Studio's skin card finishes while the art is on screen, it opens downwards over the original from its top edge, with the image swap an edited texture uses. A copy that was already waiting, or that arrives while the art is still opening, swaps in at once |
+
+These placements use the shared Full/Calm/Off policy, including OS reduced motion. They never
+form a success glyph themselves. Busy mounts are disposed when the operation ends, its dialog
+is hidden or its project is no longer current. A reopened dialog resumes its existing operation.
+
 ## Retired (10)
 
 | Surface | Where | Replacement |

@@ -135,7 +135,7 @@ def run_review_followup_checks(context, url, report, checks):
         tab.wait_for_selector('#grid-area .card, #grid-area .folder-card')
         tab.wait_for_function('window.reviewTrayReady')
         tab.evaluate("""mesh => {
-            _modsFolderSet=false; _protectionPassword='';
+            _modsFolderSet=false;
             sidebarData={mesh:{name:'SK_1024_1024503',game_rel:mesh,file_type:'mesh',selected:true},
                 texture:{name:'T_Test',game_rel:'Fixture/T_Test',file_type:'texture',selected:true}};
             document.getElementById('mod-name-input').value='RetryRegression';
