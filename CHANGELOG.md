@@ -11,6 +11,11 @@ The app, installers and update checker identify each release by its full number,
   running, only installs into that folder wait, and they ask you to close the
   game and try again. Other server errors now show what went wrong.
 
+- Choose your image editor, such as Photoshop or GIMP, under **Settings →
+  Paths**. Right-clicking a texture then offers **Open in** your editor, so it
+  opens there in one step without changing your system's default image app.
+  Leave the setting blank to keep using the default app.
+
 ## 1.2.3 — 2026-11-16
 
 - Removed the **Mod card** from finished builds. The export result now ends at

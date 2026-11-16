@@ -38,7 +38,7 @@
   }
   const NOTES = {
     busy: 'Completed assets are kept if you cancel. Hide this view to keep working; Activity shows the result.',
-    success: 'Right-click a texture in the Mod tray to open it in your default image app.',
+    success: 'Right-click a texture in the Mod tray to open it in your image app.',
     warning: 'Textures that did not import stay in the library. Edit all again to retry just those.',
     error: 'Nothing was added to the Mod tray.',
     cancelled: '',

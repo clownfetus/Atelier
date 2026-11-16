@@ -329,7 +329,10 @@ fallbacks. Menu → Settings keeps the full configuration form, palettes and mot
    the open project and its edit count; click it to switch projects.
 2. Browse to the assets you want to change. Edit material parameters, or use
    **Edit this asset** on a texture to add it to the project. Right-click the
-   imported texture and choose **Replace with Image** to supply your image.
+   imported texture and choose **Replace with Image** to supply your image, or
+   open it in your image app to paint over it. Choose an image editor, such as
+   Photoshop, under **Menu → Settings → Paths** and the menu opens textures in it;
+   leave it blank to use your system's default image app.
 3. Select the assets to include under **Mod tray** and enter a mod filename.
    Enable **Copy to ~mods/** to install into your configured mods folder.
 4. Click **Build mod**, review the included assets and destination, then confirm.

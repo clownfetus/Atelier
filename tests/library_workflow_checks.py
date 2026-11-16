@@ -217,6 +217,17 @@ def run_library_workflow_checks(page, context, url, report, checks):
                 menu.click()
         assert launches == [texture_path,texture_path] and len(imports) == 1
         assert not target.locator('#toggle-import-open').count()
+        # Settings → Image editor names the item after the chosen program, as text, never markup.
+        target.evaluate("_imageEditorName = 'Paint <b>Thing</b>'")
+        for item in (texture, target.locator('#sidebar-list .sb-item[data-token="texture-2"]')):
+            item.click(button='right')
+            named = target.locator('#ctx-menu .ctx-item', has_text='Open in Paint <b>Thing</b>')
+            assert not target.locator('#ctx-menu b').count() and not menu.count()
+            with target.expect_response('**/api/open_with?*'):
+                named.click()
+        target.evaluate("_imageEditorName = ''")
+        assert launches == [texture_path] * 4 and len(imports) == 1
+        checks.append('The texture menu names the image editor chosen in Settings and opens the texture with it')
         checks.append('Texture clicks import or preview inside Atelier. Only the Library or Mod tray context menu opens the system image app')
 
         explorer_path = 'Characters/1015/1015502/Textures/T_Explorer'

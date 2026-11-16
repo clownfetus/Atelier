@@ -304,7 +304,7 @@ export function createAssemblyView(api) {
         if (!source.custom) card.addEventListener('contextmenu', event => api.textureMenu(event, source));
         card.dataset.asset = source.game_rel; card.dataset.slot = source.slot; card.setAttribute('aria-pressed', 'false');
         card.title = `${source.slot}\n${source.game_rel}\n${owners[index]}`;
-        if (!source.custom) card.title += '\nRight-click to open in your default image app.';
+        if (!source.custom) card.title += '\nRight-click to open in your image app.';
         const preview = make('span', null, 'assembly-texture-preview');
         const img = make('img'); img.alt = ''; img.width = img.height = 80; img.decoding = 'async';
         img.dataset.src = thumbnailURL(source, info); preview.append(img, make('span', 'Preview unavailable', 'assembly-thumb-error'));
