@@ -170,7 +170,7 @@ def main():
                 originalComparison: typeof materialDirtyCount === 'function',
                 motions: Object.keys(AtelierMotion).sort(),
                 beatMs: AtelierMotion.beatMs, exitMs: AtelierMotion.exitMs,
-                modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley && window.AtelierModCards),
+                modernFeedback: !!(window.AtelierMotionPolicy && window.AtelierFoley),
                 font: document.fonts.check('14px Inter'),
                 logo: document.querySelector('.studio-brand > img').naturalWidth,
                 emptyTray: document.querySelector('.sidebar-empty > .empty-state-glyph')?.getBoundingClientRect().width,

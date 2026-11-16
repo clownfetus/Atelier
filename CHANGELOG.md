@@ -5,6 +5,9 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Removed the **Mod card** from finished builds. The export result now ends at
+  the outcome, the output paths and the build report.
+
 - Removed **Password protect**. Since the latest game patch, the game flags mods
   that carry Atelier's lock, so Atelier no longer adds it to any export: the
   toggle under **Review mod**, the protection password in Settings and the

@@ -102,13 +102,6 @@ window.__showcase={
         assert tab.evaluate('[cardPoster.width,cardPoster.height]')==[1000,1000]
         assert all(abs(a-b)<1e-10 for a,b in zip(before['position'],after['position']))
         assert tab.evaluate('__showcase.failedPoster()') and tab.evaluate('__showcase.snapshot()')==baseline
-        tab.evaluate("""() => {
-          const host=document.createElement('div');host.id='no-canvas-card';document.body.append(host);
-          const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=()=>null;
-          try{window.disposeNoCanvas=AtelierModCards.mount(host,{project:'Smoke A',modName:'Fallback',included:[{skin_id:'1029001'}]},{ok:true,applied:[],skipped:[]});}finally{HTMLCanvasElement.prototype.getContext=original;}
-        }""")
-        tab.wait_for_timeout(50);assert not tab.locator('#no-canvas-card .mod-card').count()
-        tab.evaluate('disposeNoCanvas();document.getElementById("no-canvas-card").remove()')
         tab.evaluate("const native=Element.prototype.animate;Element.prototype.animate=()=>{throw Error('No WAAPI');};try{const toggle=document.getElementById('viewport-showcase');toggle.click();toggle.click();}finally{Element.prototype.animate=native;}")
         assert tab.evaluate('__audio.created')==0 and not tab.evaluate('AtelierFoley.enabled()')
         motion('full')
@@ -132,28 +125,6 @@ window.__showcase={
         assert tab.evaluate("AtelierFoley.click()") is False
         tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));document.getElementById('settings-foley').checked=false;document.getElementById('settings-foley').dispatchEvent(new Event('change'))")
         checks.append('Sound is off by default; opted in, a success plays its click once and stays silent in Calm, Off, OS reduced motion and hidden documents')
-        tab.evaluate("""() => {
-          window.cardReveal=0;window.cardSnapshot={project:'Smoke A',modName:'Fixture <card>',included:[{game_rel:'Characters/1029/1029001/Textures/T_A',file_type:'texture',name:'T_A'}],excluded:[],skipped:0,copyToMods:false};
-          const callbacks={confirm(){},refresh(){},settings(){},reveal(){cardReveal++;}};
-          AtelierExportReview.open(cardSnapshot,callbacks);AtelierExportReview.finish(cardSnapshot,{ok:true,applied:['tex T_A','tex T_B','mat MI_Body','combined 2 containers into one pak'],skipped:[]});
-        }""")
-        tab.wait_for_selector('.mod-card');tab.evaluate('AtelierViewport.close()')
-        # The card is the build's payoff: open by default, directly after the outcome line.
-        assert tab.evaluate("(card => card.open && card.previousElementSibling?.classList.contains('export-review-summary'))(document.querySelector('.mod-card'))")
-        tab.wait_for_function("document.querySelector('.mod-card-total')?.textContent === '3'", timeout=5000)
-        assert tab.locator('.mod-card-stats').inner_text()=='3 assets · 2 textures · 1 material',tab.locator('.mod-card-stats').text_content()
-        assert tab.locator('.mod-card p',has_text='Showcase capture').count()==1
-        tab.locator('.mod-card button',has_text='Open export folder').click();assert tab.evaluate('cardReveal')==1
-        with tab.expect_download() as download:tab.locator('.mod-card button',has_text='Save PNG').click()
-        download.value.save_as(str(report/'mod-card.png'))
-        tab.evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{write:async items=>window.copiedTypes=items[0].types}})")
-        tab.locator('.mod-card button',has_text='Copy image').click();tab.wait_for_function("window.copiedTypes?.includes('image/png')")
-        tab.evaluate("AtelierExportReview.finish(cardSnapshot,{ok:true,applied:['tex T_A'],skipped:['T_B failed']})")
-        tab.wait_for_selector('.mod-card[data-warning=true]');assert '1 skipped' in tab.locator('.mod-card-stats').text_content()
-        tab.evaluate("AtelierExportReview.finish(cardSnapshot,{ok:false,error:'Fixture build failure',applied:[],skipped:[]})")
-        tab.wait_for_timeout(150);assert not tab.locator('.mod-card').count()
-        checks.append('Mod cards use completed applied counts, a matching Showcase capture and local build version/date; copy/save/reveal work, warnings carry skipped counts and failed builds offer no card')
-        tab.keyboard.press('Escape')
         tab.evaluate("AtelierViewport.open('1029001','Synthetic Showcase fixture')");tab.wait_for_function("document.getElementById('viewport-loading').style.display==='none'")
         assert not tab.evaluate('__inspection.presentation().showcase')
         assert tab.locator('#viewport-box.is-assembly').is_visible()

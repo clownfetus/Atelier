@@ -119,7 +119,7 @@ def main():
     parser.add_argument('--logo-only', action='store_true', help="Check the header logo's entrance")
     parser.add_argument('--empty-assets-only', action='store_true', help="Check the Mod tray's empty state")
     parser.add_argument('--retired-only', action='store_true', help='Check the surfaces motion v2 retired stay gone')
-    parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, cards and opt-in foley')
+    parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, posters and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
     parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')

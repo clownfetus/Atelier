@@ -92,7 +92,7 @@ Palette selection, custom drafts and named palettes use version 2 of `atelier.ap
 
 Global select/option/optgroup roles theme filters and editors as well as Settings. Supporting engines progressively opt into [customizable native selects](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select) using `appearance: base-select` and `::picker(select)`: popup surfaces, checkmarks, selected, hover and keyboard focus states use semantic roles while retaining real HTML select behavior. Older WebView2 falls back to its OS picker, with explicit text/background roles and `color-scheme`; OS-owned hover/highlight and native color-picker chrome cannot be fully styled with page CSS. App context menus, dialogs and delegated title tooltips use the same roles. Tooltips retain accessible descriptions/names, restore title fallbacks on dismissal and support Escape without consuming keyboard navigation.
 
-Use 120ms (`--studio-motion-fast`) for small state changes and 200ms (`--studio-motion-standard`) for entering surfaces; durations and easings come from `tokens.css`, never literals. Large surfaces travelling into place use `--studio-easing-emphasized`. Things that land use a damped spring: `--studio-spring-snappy` (ζ .72, about 4% overshoot, 340ms) for toasts, update reminders and folder flaps, and `--studio-spring-bouncy` (ζ .5, about 16%, 610ms) for the mod card. Springs are sampled `linear()` step responses with overshoot-bezier fallbacks where `linear()` is unsupported; `AtelierMotion.ease` and `AtelierMotion.springMs` expose the same values to WAAPI. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input and animating layout in the asset grid. At the user's updated request, the 3D viewer starts a compatible standing idle on repeat; Play, Pause and Rest pose remain available. The camera rotates only during a requested turntable capture. Both `prefers-reduced-motion: reduce` and Settings → Motion → Reduce motion select static interface presentation.
+Use 120ms (`--studio-motion-fast`) for small state changes and 200ms (`--studio-motion-standard`) for entering surfaces; durations and easings come from `tokens.css`, never literals. Large surfaces travelling into place use `--studio-easing-emphasized`. Things that land use a damped spring: `--studio-spring-snappy` (ζ .72, about 4% overshoot, 340ms) for toasts, update reminders and folder flaps, and `--studio-spring-bouncy` (ζ .5, about 16%, 610ms) which nothing uses at present. Springs are sampled `linear()` step responses with overshoot-bezier fallbacks where `linear()` is unsupported; `AtelierMotion.ease` and `AtelierMotion.springMs` expose the same values to WAAPI. Dialogs fade/translate 4px; controls use color and border feedback without shape morphing. Cards and portraits stay still on hover and press. Local folder-flap motion and truthful loading/save/export feedback remain. Avoid delaying input and animating layout in the asset grid. At the user's updated request, the 3D viewer starts a compatible standing idle on repeat; Play, Pause and Rest pose remain available. The camera rotates only during a requested turntable capture. Both `prefers-reduced-motion: reduce` and Settings → Motion → Reduce motion select static interface presentation.
 
 ## Continuity and presentation preferences
 
@@ -414,8 +414,7 @@ page label that matches one known playable hero establishes ownership. Numeric
 filenames alone, alternate forms, ambiguous labels and partial names are ignored.
 Lord portraits decorate breadcrumbs, pinned character folders, included Mod tray
 heroes and Continue, falling back to the avatar and then the hero portrait.
-Single-hero Mod cards may use the verified hero KO emblem; it is not evidence of
-a costume or bundle match. Square nameplate badges supply skin fallbacks.
+Square nameplate badges supply skin fallbacks.
 
 Run `.venv\\Scripts\\python.exe scripts/update_catalogue_seed.py` before a release.
 It uses the normal catalogue parser and cached item metadata, writes only the
@@ -554,20 +553,10 @@ the original material object (including material-array identity) in `finally`.
 Failed captures restore the camera and controls too. Texture comparison, dye and
 colour previews retain their original values. Library mesh and costume previews
 open in Assembly View.
-Showcase uses a neutral gradient for the live view, posters, turntables and Mod
-cards. Controls and text retain solid panel surfaces.
+Showcase uses a neutral gradient for the live view, posters and turntables.
+Controls and text retain solid panel surfaces.
 
-Posters/turntables use the selected presentation mode. Mod cards request a clean
-Showcase capture only from a matching loaded project/skin without pending edits;
-otherwise they use labelled catalogue artwork or skip the optional card. Their
-counts come from completed applied entries, excluding packaging summaries and
-including explicitly reported generated textures. Version comes from the local
-build, and date is captured when the build finishes. Warning cards carry the
-cracked ring/skipped count; failed builds have no card. All lettering sits on a
-Paper footer. Cards are client canvases and never enter mod/project payloads.
-The card is the export payoff: it opens directly under the outcome line rather than after the
-build report. After a fresh build in Full it flips down onto the result on the bouncy spring and
-its asset total rolls up; reopening the result, Calm and Off show it at rest.
+Posters/turntables use the selected presentation mode.
 
 Opt-in foley synthesizes three brief stage sounds with WebAudio. It defaults off,
 requires Full and a visible document, starts only after an enabled user gesture,
