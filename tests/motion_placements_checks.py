@@ -181,7 +181,7 @@ def run_motion_placements_checks(context, url, report, checks):
                 assert effects[0]['frames'][0]['clipPath'] == 'inset(0px 0px 100%)'
                 assert not any('opacity' in frame for frame in effects[0]['frames'])
             tab.evaluate('AtelierLibraryTools.closePreview()')
-            tab.wait_for_function("!document.querySelector('#library-preview').open")
+            tab.wait_for_selector('#library-preview:not([open]) img:not([src])', state='attached')
             assert tab.locator('#library-preview img').evaluate('image=>image.getAnimations().length') == 0
         tab.emulate_media(reduced_motion='reduce')
         tab.evaluate("__mode('full');__effects=[];AtelierLibraryTools.previewImage({label:'Reduced preview',path:'Fixture',src:'/motion-image.png',caption:''})")
