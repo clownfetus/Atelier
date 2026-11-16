@@ -209,7 +209,7 @@ for the recipient. A built executable is distinct from an installer/release test
 
 Windows source/Chromium/WebView2 coverage is not an in-game release certification.
 Validate representative texture/material/dye, VFX/curve/text, world, Blender,
-protected-mod and repatch workflows against a supported game version before a
+locked-mod opening and repatch workflows against a supported game version before a
 release. Linux/macOS desktop behavior and installer upgrades need their own runs.
 
 Operation/publication locks coordinate one Python process. Three-file container

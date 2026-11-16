@@ -133,7 +133,7 @@ window.__showcase={
         tab.evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));document.getElementById('settings-foley').checked=false;document.getElementById('settings-foley').dispatchEvent(new Event('change'))")
         checks.append('Sound is off by default; opted in, a success plays its click once and stays silent in Calm, Off, OS reduced motion and hidden documents')
         tab.evaluate("""() => {
-          window.cardReveal=0;window.cardSnapshot={project:'Smoke A',modName:'Fixture <card>',included:[{game_rel:'Characters/1029/1029001/Textures/T_A',file_type:'texture',name:'T_A'}],excluded:[],skipped:0,copyToMods:false,protected:false};
+          window.cardReveal=0;window.cardSnapshot={project:'Smoke A',modName:'Fixture <card>',included:[{game_rel:'Characters/1029/1029001/Textures/T_A',file_type:'texture',name:'T_A'}],excluded:[],skipped:0,copyToMods:false};
           const callbacks={confirm(){},refresh(){},settings(){},reveal(){cardReveal++;}};
           AtelierExportReview.open(cardSnapshot,callbacks);AtelierExportReview.finish(cardSnapshot,{ok:true,applied:['tex T_A','tex T_B','mat MI_Body','combined 2 containers into one pak'],skipped:[]});
         }""")

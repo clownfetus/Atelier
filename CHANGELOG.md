@@ -5,6 +5,13 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Removed **Password protect**. Since the latest game patch, the game flags mods
+  that carry Atelier's lock, so Atelier no longer adds it to any export: the
+  toggle under **Review mod**, the protection password in Settings and the
+  repatch password are gone. Re-export any mod you locked with an earlier
+  release. A locked mod still asks for its password when you open or repatch
+  it, and the repatched copy is never locked.
+
 - Added working animations to custom asset preparation and batch saves, real
   progress to batch reviews, and motion when saved edits, pinned folders and
   Quick Preview images appear or leave.

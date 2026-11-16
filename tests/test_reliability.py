@@ -216,13 +216,13 @@ class Reliability(unittest.TestCase):
 
     def test_config_setters_preserve_each_others_fields(self):
         jobs = [lambda: C.save_mods_folder("mods"), lambda: C.save_blender_path("blender"),
-                lambda: C.save_export_password("test-only"), lambda: C.set_active_project("B")]
+                lambda: C.save_usmap_checked_at(123), lambda: C.set_active_project("B")]
         workers = [threading.Thread(target=fn) for fn in jobs]
         for worker in workers: worker.start()
         for worker in workers: worker.join()
         cfg = C._load_config()
         self.assertEqual(cfg, {"mods_folder": "mods", "blender_path": "blender",
-                               "export_password": "test-only", "active_project": "B"})
+                               "usmap_checked_at": 123, "active_project": "B"})
 
     def test_missing_output_does_not_remove_installed_mod(self):
         old = triple(self.mods / "Demo_9999999_P", b"old")

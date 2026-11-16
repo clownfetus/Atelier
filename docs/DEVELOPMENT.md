@@ -850,7 +850,7 @@ source revision. The earlier per-phase counts above describe those earlier runs.
 
 ## Review and follow-up
 
-See [RELIABILITY.md](RELIABILITY.md) for the fixes, evidence, API compatibility and remaining limitations. Before release, manually validate representative texture/material/dye, VFX/curve/text, world, Blender, protected-mod and repatch workflows with a supported game version. In-game verification remains a separate release gate.
+See [RELIABILITY.md](RELIABILITY.md) for the fixes, evidence, API compatibility and remaining limitations. Before release, manually validate representative texture/material/dye, VFX/curve/text, world, Blender, locked-mod opening and repatch workflows with a supported game version. In-game verification remains a separate release gate.
 
 ## Native export, managed jobs and bulk editing (15 October 2026)
 

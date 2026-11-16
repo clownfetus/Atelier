@@ -336,8 +336,7 @@ fallbacks. Menu → Settings keeps the full configuration form, palettes and mot
    **Edit this asset** on a texture to add it to the project. Right-click the
    imported texture and choose **Replace with Image** to supply your image.
 3. Select the assets to include under **Mod tray** and enter a mod filename.
-   Enable **Copy to ~mods/** to install into your configured mods folder. Optional
-   **Password Protect** uses the protection password from Settings.
+   Enable **Copy to ~mods/** to install into your configured mods folder.
 4. Click **Build mod**, review the included assets and destination, then confirm.
 
 Open **Activity** to review job progress and results or cancel work before file

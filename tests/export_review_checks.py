@@ -38,7 +38,7 @@ def run_export_review_checks(page, context, url, report, checks):
         review.wait_for_selector('#grid-area .card')
         review.evaluate("""() => {
           _activeProjectName = 'Review Ω';
-          _modsFolderSet = true; _modsFolderPath = 'D:/Fixture/mods'; _protectionPassword = 'secret-review-password';
+          _modsFolderSet = true; _modsFolderPath = 'D:/Fixture/mods';
           sidebarData = {
             material: {name:'Body <img src=x>', game_rel:'Characters/Fixture/MI_Body', file_type:'material', selected:true},
             texture: {name:'Body texture', game_rel:'Characters/Fixture/T_Body', file_type:'texture', selected:true},
@@ -46,7 +46,6 @@ def run_export_review_checks(page, context, url, report, checks):
             mesh: {name:'Mesh', game_rel:'Characters/Fixture/SK_Body', file_type:'mesh', selected:false}
           };
           document.getElementById('mod-name-input').value = 'Review fixture';
-          document.getElementById('toggle-password').checked = true;
           updateInstallBtn();
         }""")
         overlay = review.locator('#export-review-overlay')
@@ -101,7 +100,7 @@ def run_export_review_checks(page, context, url, report, checks):
         assert 'Unsupported export type: audio' in overlay.inner_text()
         assert 'Not selected' in overlay.inner_text()
         assert 'Characters/Fixture/MI_Body' in overlay.inner_text()
-        assert 'secret-review-password' not in overlay.inner_text()
+        assert 'Password' not in overlay.inner_text()  # exports can no longer be locked
         assert overlay.locator('img').count() == 0
         assert not installs and not conflicts
         review.keyboard.press('Shift+Tab')
@@ -179,7 +178,7 @@ def run_export_review_checks(page, context, url, report, checks):
         assert conflicts[-1]['x-atelier-project'] == quote('Review Ω', safe='')
         assert request['body'] == {
             'mod_name': 'Review fixture', 'items': ['Characters/Fixture/MI_Body'],
-            'password': 'secret-review-password', 'copy_to_mods': True, 'background': True,
+            'copy_to_mods': True, 'background': True,
         }
         pending.pop(0).fulfill(json={'ok': True, 'pak_path': 'D:/Fixture/exported/Review.pak',
                                    'installed_dir': 'D:/Fixture/mods', 'applied': ['mat MI_Body'],
@@ -319,7 +318,7 @@ def run_import_dialog_glyph_checks(context, url, report, checks):
         tab.close()
 
 
-SNAPSHOT = """{project:'Smoke A', modName:'Glyph fixture', copyToMods:false, modsPath:'', protected:false, skipped:0, excluded:[],
+SNAPSHOT = """{project:'Smoke A', modName:'Glyph fixture', copyToMods:false, modsPath:'', skipped:0, excluded:[],
   included:[{name:'Body', game_rel:'Characters/1015/1015101/Materials/MI_1015101_Body', file_type:'material'},
             {name:'Equip', game_rel:'Characters/1015/1015101/Texture/T_1015101_Equip_01_D', file_type:'texture'}]}"""
 

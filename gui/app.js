@@ -29,7 +29,6 @@ const _folderArtwork = {};  // Reuse the catalogue artwork already shown on fold
 let   _modsFolderSet   = false;
 let   _modsFolderPath  = "";
 let   _copyToMods      = false; // Last destination chosen in mod review this session.
-let   _protectionPassword = ""; // Settings → Protection Password (gates "Password Protect")
 let   _pathsMode     = false; // setup overlay opened as the editable Settings panel (vs first-run)
 let   _pendingOverwriteConfirm = null;
 
@@ -3085,11 +3084,6 @@ function _flushSelection(project) {
   return pending ? _persistSelection(project, pending) : Promise.resolve();
 }
 
-function _syncToggleRow(id) {
-  const cb = document.getElementById(id);
-  cb.closest(".toggle-row").classList.toggle("on", cb.checked);
-}
-
 let _exportRunningCount = 0;
 let _exportReviewChecking = false;
 const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
@@ -3107,26 +3101,11 @@ function updateInstallBtn() {
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
   if (!_modsFolderSet) _copyToMods = false;
-
-  const pwRow = document.getElementById("toggle-password-row");
-  const pwCb  = document.getElementById("toggle-password");
-  const hasPw = !!_protectionPassword;
-  pwRow.classList.toggle("disabled", !hasPw);
-  pwCb.disabled = !hasPw;
-  if (!hasPw) pwCb.checked = false;
-  pwRow.title = hasPw ? "Encrypt the mod with the protection password set in Settings"
-                      : "Set a protection password first (Menu → Settings)";
-  _syncToggleRow("toggle-password");
 }
-
-document.getElementById("toggle-password-row").addEventListener("click", e => {
-  if (document.getElementById("toggle-password").disabled) { e.preventDefault(); openPaths(); }
-});
-document.getElementById("toggle-password").addEventListener("change", () => _syncToggleRow("toggle-password"));
 
 // `extra` swaps the build endpoint and adds its fields, e.g. a Skin Swapper build; every guard,
 // review state and result path stays the same as a standard export.
-async function _runInstall(modName, exportable, skipped, copyToMods, password, project = _activeProjectName, review = null, extra = null) {
+async function _runInstall(modName, exportable, skipped, copyToMods, project = _activeProjectName, review = null, extra = null) {
   _exportRunningCount++;
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
@@ -3148,7 +3127,6 @@ async function _runInstall(modName, exportable, skipped, copyToMods, password, p
       body: JSON.stringify({
         mod_name: modName,
         items: exportable.map(i => i.game_rel),
-        password,
         copy_to_mods: copyToMods,
         ...(extra?.body || {}),
       }),
@@ -3202,7 +3180,6 @@ function _captureExportReview() {
   const modName = document.getElementById("mod-name-input").value.trim() || _activeProjectName || "ModFilename";
   const modsPath = _modsFolderSet ? _modsFolderPath : "";
   const copyToMods = _copyToMods && !!modsPath;
-  const protectedMod = document.getElementById("toggle-password").checked && !!_protectionPassword;
   const included = [], excluded = [];
   for (const item of items) {
     const reason = !item.selected ? "Not selected" : !item.game_rel ? "Missing game asset path" :
@@ -3212,18 +3189,17 @@ function _captureExportReview() {
   }
   // Destination is chosen in review. The fingerprint tracks the project and settings it relies on.
   const fingerprint = JSON.stringify({
-    project: _activeProjectName, modName, protectedMod, modsPath,
+    project: _activeProjectName, modName, modsPath,
     revision: _sidebarRequest,
     items: items.sort((a,b) => String(a.game_rel).localeCompare(String(b.game_rel))),
   });
   return Object.freeze({project: _activeProjectName, modName, included: Object.freeze(included),
     excluded: Object.freeze(excluded), skipped: excluded.filter(i => i.selected).length,
-    copyToMods, modsPath, protected: protectedMod, fingerprint});
+    copyToMods, modsPath, fingerprint});
 }
 
-function _exportReviewCurrent(snapshot, password) {
-  return snapshot.fingerprint === _captureExportReview().fingerprint &&
-    (!snapshot.protected || password === _protectionPassword);
+function _exportReviewCurrent(snapshot) {
+  return snapshot.fingerprint === _captureExportReview().fingerprint;
 }
 
 function _blockExportForDrafts(snapshot = null) {
@@ -3260,10 +3236,10 @@ function _blockExportForDrafts(snapshot = null) {
   return true;
 }
 
-async function _confirmExportReview(snapshot, password, extra = null) {
+async function _confirmExportReview(snapshot, extra = null) {
   if (_exportReviewChecking || _exportRunningCount) return;
   if (_blockExportForDrafts(snapshot)) return;
-  if (!_exportReviewCurrent(snapshot, password)) {
+  if (!_exportReviewCurrent(snapshot)) {
     window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
     return;
   }
@@ -3272,7 +3248,7 @@ async function _confirmExportReview(snapshot, password, extra = null) {
   const proceed = async () => {
     // This check also covers a project/selection change while overwrite confirmation was open.
     if (_blockExportForDrafts(snapshot)) return;
-    if (!_exportReviewCurrent(snapshot, password)) {
+    if (!_exportReviewCurrent(snapshot)) {
       _exportReviewChecking = false; updateInstallBtn();
       window.AtelierExportReview?.cancelCheck(snapshot);
       window.AtelierExportReview?.notice("The project, selected edits or export settings changed. Refresh the review before exporting.");
@@ -3280,7 +3256,7 @@ async function _confirmExportReview(snapshot, password, extra = null) {
     }
     _exportReviewChecking = false;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, password, snapshot.project, snapshot, extra);
+      snapshot.copyToMods, snapshot.project, snapshot, extra);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -3342,11 +3318,10 @@ async function doInstallMod() {
   }
   const snapshot = _captureExportReview();
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
-  const password = snapshot.protected ? _protectionPassword : "";
-  if (!window.AtelierExportReview) { await _confirmExportReview(snapshot, password); return; }
+  if (!window.AtelierExportReview) { await _confirmExportReview(snapshot); return; }
   const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
-    confirm: reviewed => _confirmExportReview(reviewed, password), refresh: doInstallMod, settings: openPaths,
+    confirm: reviewed => _confirmExportReview(reviewed), refresh: doInstallMod, settings: openPaths,
     rememberDestination: copyToMods => { _copyToMods = copyToMods; },
     skinSwapper: swapper && {
       ...swapper,
@@ -3356,7 +3331,7 @@ async function doInstallMod() {
       }),
       build: (options, reviewed) => {
         try { localStorage.setItem("atelier.skinSwapper.author", options.author || ""); } catch (_) {}
-        return _confirmExportReview(reviewed, password, { endpoint: "/api/skin_swapper/build", body: options });
+        return _confirmExportReview(reviewed, { endpoint: "/api/skin_swapper/build", body: options });
       },
     },
     reveal: async () => {
@@ -3625,7 +3600,6 @@ async function checkSetup() {
     }
     _modsFolderSet     = !!(statusRes.mods_prefill);
     _modsFolderPath    = statusRes.mods_prefill || "";
-    _protectionPassword = statusRes.password_prefill || "";
     _copyToMods = _modsFolderSet;
     if (statusRes.configured) {
       _setSetupLoading(false, 'success', revision);
@@ -3673,7 +3647,6 @@ function _applySetupMode() {
   document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial configuration";
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
-  document.getElementById("setup-password-row").style.display = paths ? "" : "none";
   document.getElementById("setup-blender-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-mounts-row").style.display      = paths ? "" : "none";
   document.getElementById("setup-mounts-section").style.display  = paths ? "" : "none";
@@ -3699,12 +3672,10 @@ async function openPaths() {
     outcome = statusRes.error ? 'error' : statusRes.paks_prefill ? 'success' : 'warning';
     _modsFolderSet      = !!(statusRes.mods_prefill);
     _modsFolderPath     = statusRes.mods_prefill || "";
-    _protectionPassword = statusRes.password_prefill || "";
     document.getElementById("setup-path").value     = statusRes.paks_prefill  || "";
     document.getElementById("setup-aes").value      = aes  || statusRes.aes_prefill  || "";
     document.getElementById("setup-usmap").value    = usmapPath || statusRes.usmap_prefill || "";
     document.getElementById("setup-mods").value     = statusRes.mods_prefill || "";
-    document.getElementById("setup-password").value = statusRes.password_prefill || "";
     document.getElementById("setup-blender").value  = statusRes.blender_prefill || "";
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
@@ -4017,7 +3988,6 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   const payload = { path, aes_key, usmap_path: usmapPath };
   if (_pathsMode) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
-    payload.export_password = document.getElementById("setup-password").value;
     payload.blender_path    = document.getElementById("setup-blender").value.trim();
   }
   const btn = document.getElementById("setup-save");
@@ -4039,7 +4009,6 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       _resetSaveBtn();
       _modsFolderPath      = res.mods_folder || "";
       _modsFolderSet       = !!res.mods_folder;
-      _protectionPassword  = res.export_password || "";
       if (res.mods_folder_reset) {
         // The old mods folder wasn't under this game's Paks dir (e.g. a path carried over from
         // another machine), so it could never have loaded. Say where it now points.
@@ -5266,7 +5235,6 @@ function openRepatcher() {
   document.getElementById("repatch-lockrow").style.display = "none";
   document.getElementById("repatch-unlock").value = "";
   document.getElementById("repatch-stage").checked = false;
-  document.getElementById("repatch-pw").value = "";
   document.getElementById("repatch-run").disabled = true;
   const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = "";
   document.getElementById("repatch-overlay").classList.add("active");
@@ -5288,16 +5256,15 @@ document.getElementById("repatch-run").addEventListener("click", async () => {
   const res = document.getElementById("repatch-result");
   res.style.display = "block"; res.innerHTML = '<span class="muted">Repatching…</span>';
   const stage = document.getElementById("repatch-stage").checked;
-  const pw = document.getElementById("repatch-pw").value.trim();
   try {
     const r = await (window.AtelierJobs?.run || api)("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage, password: pw }) });
+      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }) });
     if (r.locked) { res.innerHTML = '<span class="warning">Wrong or missing password.</span>'; btn.disabled = false; return; }
     if (!r.ok) { res.innerHTML = '<span class="warning">Failed: ' + (r.error || "unknown") + '</span>'; btn.disabled = false; return; }
     const m = r.manifest || {};
     res.innerHTML = '<b>✓ Repatched</b> — ' + r.mod + '<br><span class="muted">' +
       (m.materials || 0) + ' materials · ' + (m.textures || 0) + ' textures · ' + (m.skipped || 0) + ' skipped' +
-      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') + (pw ? ' · password protected' : '') +
+      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') +
       '</span><br><a href="#" id="repatch-open">Open export folder</a>';
     const oa = document.getElementById("repatch-open");
     if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });

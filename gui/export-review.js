@@ -126,7 +126,6 @@
     for (const [label, value] of [
       ['Project', snapshot.project || 'Default project'], ['Mod filename', snapshot.modName],
       ['Destination', destination],
-      ['Password protection', snapshot.protected ? 'Enabled' : 'Off'],
     ]) {
       const detail = el('dd'); detail.append(value);
       dl.append(el('dt', label), detail);

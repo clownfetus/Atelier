@@ -30,13 +30,13 @@ def run_export_motion_checks(page, context, url, report, checks):
           updateInstallBtn();
         }""")
         args = {'name': 'Motion fixture', 'items': [{'game_rel': 'Characters/Fixture/MI_Body'}],
-                'skipped': 0, 'copy': True, 'password': 'test-password', 'project': 'Motion Ω'}
+                'skipped': 0, 'copy': True, 'project': 'Motion Ω'}
 
         def run_export(payload, expected, client_skipped=0, abort=False):
             response.update(value=payload, abort=abort)
             motion_page.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el=>el.remove())")
             motion_page.evaluate("""args => _runInstall(args.name, args.items, args.skipped,
-              args.copy, args.password, args.project)""", dict(args, skipped=client_skipped))
+              args.copy, args.project)""", dict(args, skipped=client_skipped))
             assert motion_page.locator('#install-btn-motion-host').get_attribute('data-glyph-state') == expected
             assert motion_page.locator(f'#toast-area [data-glyph-state="{expected}"]').count() > 0
             assert motion_page.locator('#install-btn').is_enabled()
@@ -44,7 +44,7 @@ def run_export_motion_checks(page, context, url, report, checks):
         run_export({'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}, 'success')
         assert requests[-1]['headers']['x-atelier-project'] == quote(args['project'], safe='')
         assert requests[-1]['body'] == {'mod_name': args['name'], 'items': ['Characters/Fixture/MI_Body'],
-                                        'password': 'test-password', 'copy_to_mods': True, 'background': True}
+                                        'copy_to_mods': True, 'background': True}
         run_export({'ok': True, 'pak_path': 'fixture/Mod_P.pak', 'skipped': []}, 'warning', client_skipped=1)
         run_export({'ok': True, 'installed_dir': 'fixture/mods', 'skipped': ['A', 'B', 'C', 'D', 'E']}, 'warning')
         assert '+1 more' in motion_page.locator('#toast-area').inner_text()
@@ -77,7 +77,7 @@ def run_export_motion_checks(page, context, url, report, checks):
                 name = f'Motion {failure} <img src=x onerror="window.presentationInjected=true"> & Ω'
                 before = len(requests)
                 motion_page.evaluate("""args => _runInstall(args.name, args.items, args.skipped,
-                  args.copy, args.password, args.project)""", dict(args, name=name))
+                  args.copy, args.project)""", dict(args, name=name))
                 assert len(requests) == before + 1, failure
                 assert requests[-1]['body']['mod_name'] == name
                 assert motion_page.locator('#install-btn').is_enabled(), failure
@@ -96,10 +96,10 @@ def run_export_motion_checks(page, context, url, report, checks):
         pending = []
         motion_page.route('**/api/install_mod', lambda route: pending.append(route))
         motion_page.evaluate("""() => { window.firstMotionExport = _runInstall('First',
-          [{game_rel:'Characters/Fixture/First'}], 0, false, '', 'Motion Ω'); }""")
+          [{game_rel:'Characters/Fixture/First'}], 0, false, 'Motion Ω'); }""")
         motion_page.wait_for_function("document.getElementById('install-btn-motion-host').dataset.glyphState === 'busy'")
         motion_page.evaluate("""() => { window.secondMotionExport = _runInstall('Second',
-          [{game_rel:'Characters/Fixture/Second'}], 0, false, '', 'Motion Ω'); }""")
+          [{game_rel:'Characters/Fixture/Second'}], 0, false, 'Motion Ω'); }""")
         motion_page.wait_for_timeout(50)
         assert len(pending) == 2, len(pending)
         pending[1].fulfill(json={'ok': True, 'skipped': ['Fixture skipped']})
@@ -111,7 +111,7 @@ def run_export_motion_checks(page, context, url, report, checks):
         motion_page.wait_for_function("!document.getElementById('install-btn-motion-host').dataset.glyphState", timeout=4000)
         # A completion from an old project must not turn the new project's button into success.
         motion_page.evaluate("""() => { window.oldProjectExport = _runInstall('Old project',
-          [{game_rel:'Characters/Fixture/Old'}], 0, false, '', 'Motion Ω'); }""")
+          [{game_rel:'Characters/Fixture/Old'}], 0, false, 'Motion Ω'); }""")
         motion_page.wait_for_timeout(50)
         assert len(pending) == 3
         motion_page.evaluate("_activeProjectName = 'Smoke B'; updateInstallBtn()")

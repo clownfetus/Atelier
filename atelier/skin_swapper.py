@@ -592,7 +592,7 @@ def audit_stage(stage, entries):
         raise RuntimeError("The Skin Swapper stage is not clean: " + "; ".join(problems))
 
 
-def build(mod_folder, meshes, skin_name, author, out_dir, password=None):
+def build(mod_folder, meshes, skin_name, author, out_dir):
     """Build one IoStore container holding each mesh and its config, then publish it to out_dir."""
     from atelier import jobs
     from atelier.config import USMAP
@@ -630,9 +630,6 @@ def build(mod_folder, meshes, skin_name, author, out_dir, password=None):
         r = uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage), "--usmap", USMAP])
         if not os.path.exists(base + ".utoc"):
             return {"ok": False, "error": "create_mod_iostore failed: " + _uat_error(r, "no container")}
-        if password:
-            from atelier.handlers import modlock
-            modlock.embed(base, password)
         sources = container_files(base)
         jobs.begin_publication()
         artifacts = publish_files(sources, out_dir)

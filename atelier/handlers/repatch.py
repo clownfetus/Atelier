@@ -49,10 +49,10 @@ def _resolve_source(mod_source, work):
             if os.path.exists(base + ext): shutil.copy(base + ext, src)
     return src
 
-def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, relock=None, work_dir=None):
+def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, work_dir=None):
     """Repatch one mod → out_base.{pak,ucas,utoc}. Returns {ok, applied, skipped, manifest, pak}.
-    unlock: password to open a password-protected source mod. stage_as_project: ALSO load each asset
-    into the active project (pre-edited) for remixing. relock: password to lock the repatched output."""
+    unlock: password to open a mod an older Atelier locked; the repatched output is never locked.
+    stage_as_project: ALSO load each asset into the active project (pre-edited) for remixing."""
     from atelier.handlers import modlock
     if modlock.is_locked(mod_source) and not modlock.unlock(mod_source, unlock):
         return {"ok": False, "locked": True,
@@ -138,7 +138,4 @@ def repatch_mod(mod_source, out_base, unlock=None, stage_as_project=False, reloc
     if not os.path.exists(out_base + ".utoc"):
         return {"ok": False, "error": "create_mod_iostore failed", "applied": applied,
                 "skipped": skipped, "manifest": manifest}
-    if relock:
-        from atelier.handlers import modlock
-        modlock.embed(out_base, relock)
     return {"ok": True, "applied": applied, "skipped": skipped, "manifest": manifest, "pak": out_base + ".pak"}

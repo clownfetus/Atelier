@@ -354,8 +354,8 @@ baseline; resetting to game defaults remains a separate persistence action.
 Partial saves and edits made during a save retain the remaining draft. The 3D
 editor provides saved-color comparison swatches and an explicit unsaved count.
 
-Export first reviews included names/types/paths, exclusions and reasons, project,
-destination and protection state; passwords are never displayed. Confirmation,
+Export first reviews included names/types/paths, exclusions and reasons, project
+and destination. Confirmation,
 overwrite and retry revalidate the captured project, selection and settings.
 Unsaved material/viewport drafts and in-flight saves return focus to the relevant
 editor without discarding changes. The build remains indeterminate because the
