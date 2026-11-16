@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.4 — 2026-11-16
+
 - Fixed exports failing with "The server returned an unreadable job response".
   Exports of about a thousand assets or more now build. If an earlier install
   in your mods folder is still locked, for example because Marvel Rivals is
