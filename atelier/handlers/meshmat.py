@@ -422,12 +422,13 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
     """Resolve materials + textures, stage the textures, and return the manifest dict that
     glb_to_blend.py consumes to wire the .blend's shader nodes."""
     slots = resolve_mesh_textures(resolve_mesh_materials(mesh_game_rel, mesh, work_base))
-    from atelier.handlers.mesh import material_slot_names
+    from atelier.handlers.mesh import material_slot_names, material_fnames
     slot_names = material_slot_names(mesh.materials)
+    fnames = material_fnames(mesh.materials)
     files = extract_textures_to_project(
         [mp["game_rel"] for rec in slots for mp in rec["maps"]], root=root)
     out_slots, warnings, incomplete = {}, [], []
-    from atelier.handlers.meshvisibility import hidden_sections
+    from atelier.handlers.meshvisibility import hidden_sections, is_saved
     hidden=hidden_sections(mesh_game_rel)
     for index, rec in enumerate(slots):
         if not rec["slot"]:
@@ -458,7 +459,7 @@ def build_manifest(mesh_game_rel, mesh, work_base=None, root=None):
                          "path": os.path.abspath(f["path"]), "readonly": bool(f.get("readonly"))})
         out_slots[slot_names[index]] = {"mi": rec["mi"], "maps": maps, **rec.get('parameters', {}),
             'gameplay_tags': list(rec.get('gameplay_tags', [])),
-            'hidden':any(s['slot_index']==index and s['slot_name']==rec['slot'] for s in hidden),
+            'hidden':any(is_saved(s,index,fnames[index]) for s in hidden),
             'effect_hidden':effect_hidden(rec.get('parameters'))}
         from atelier.handlers.meshtextures import source_maps
         maps.extend(source_maps(mesh_game_rel,rec['mi'],root=root))

@@ -31,6 +31,18 @@ def hidden_sections(game_rel, root=None):
     return raw
 
 
+def is_saved(saved, slot_index, slot_name):
+    """Whether a saved hidden section is this slot: the same index and full slot FName.
+
+    Sections saved before Atelier read FName numbers carry the bare name (MI_X for the
+    game's MI_X_1), which is still this slot at the same index.
+    """
+    from atelier.handlers.mesh import fname_base
+    name = saved.get('slot_name')
+    return (saved.get('slot_index') == slot_index and isinstance(name, str) and isinstance(slot_name, str)
+            and name in (slot_name, fname_base(slot_name)))
+
+
 def set_hidden(game_rel, slot_index, slot_name, hidden):
     from atelier.handlers.meshstudio import cooked_slots, complete_mesh_source
     if type(slot_index) is not int or type(hidden) is not bool or not isinstance(slot_name, str):
@@ -70,7 +82,7 @@ def set_hidden(game_rel, slot_index, slot_name, hidden):
 
 def apply_to_staged(game_rel, uasset, sections=None):
     """Patch and read back the staged copy; never mutate extracted or project meshes."""
-    from atelier.handlers.mesh import Mesh
+    from atelier.handlers.mesh import Mesh, material_fnames
     sections = hidden_sections(game_rel) if sections is None else sections
     if not sections:
         return []
@@ -89,9 +101,10 @@ def apply_to_staged(game_rel, uasset, sections=None):
     if not mesh._layout or any(r.get('blob') == 'missing' for r in mesh._layout) or len(mesh.lods) != len(mesh._layout):
         raise ValueError('Cannot verify every cooked LOD for this mesh; visibility export was stopped.')
     indices = set()
+    names = material_fnames(mesh.materials)
     for section in sections:
         index = section.get('slot_index')
-        if type(index) is not int or not 0 <= index < len(mesh.materials) or mesh.materials[index]['slot_name'] != section.get('slot_name'):
+        if type(index) is not int or not 0 <= index < len(mesh.materials) or not is_saved(section, index, names[index]):
             raise ValueError('Saved hidden sections do not match the current cooked mesh slots. Reopen and restore them.')
         indices.add(index)
     applied = []

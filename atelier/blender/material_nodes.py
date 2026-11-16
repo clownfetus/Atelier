@@ -185,8 +185,9 @@ def wire_material(material, record, image_node=image_node, normal_builder=normal
         nmap=normal_builder(group,proxy,bsdf,-250)
         if nmap:group.links.new(scalar('NormalIntensity'),nmap.inputs['Strength'])
     emissive=texture('emissive')
-    emission=emissive['color'] if emissive else colour('EmissiveColor','EmissionColor',default=(0,0,0,1))
-    if emissive:emission=mix(emission,colour('EmissiveColor','EmissionColor'))
+    # EmissiveColor tints the emissive mask, as in the game and the 3D preview. Without a mask
+    # nothing glows: many bodies set the tint to white, which lit the whole surface (§3.30).
+    emission=mix(emissive['color'],colour('EmissiveColor','EmissionColor')) if emissive else colour(default=(0,0,0,1))
     group.links.new(emission,bsdf.inputs.get('Emission Color') or bsdf.inputs.get('Emission'))
     if bsdf.inputs.get('Emission Strength'):group.links.new(scalar('EmissiveStrength','GlowStrength'),bsdf.inputs['Emission Strength'])
     opacity=texture('opacity');surface=record.get('surface',{});alpha=None

@@ -91,7 +91,9 @@ class Replacement(unittest.TestCase):
                 Path(args[2]).write_bytes(b'new model');Path(args[3]).write_text(json.dumps({'vertices':3}))
             else:Path(args[1]).write_bytes(b'preview')
             return label+'_OK'
-        def preview(mesh,lod,path,**options):Path(path).write_bytes(b'preview')
+        def preview(mesh,lod,path,**options):
+            self.assertTrue(options['for_preview'])
+            Path(path).write_bytes(b'preview')
         with patch.object(meshedit,'_resolve_base',return_value='vanilla'),patch.object(meshedit,'extract_blend'), \
              patch.object(meshedit,'_run_blender',side_effect=blender),patch.object(meshedit,'stage_mesh',return_value={'applied':[{}],'uasset':'staged.uasset'}), \
              patch('atelier.handlers.meshsurvey.probe',return_value={'status':'ok','warnings':[]}), \
@@ -102,6 +104,21 @@ class Replacement(unittest.TestCase):
         self.assertEqual(Path(base+'.mesh.glb').read_bytes(),b'preview')
         self.assertEqual(json.loads(Path(base+'.mesh.json').read_text())['state'],'replacement')
         self.assertEqual(result['validation']['lods'],1)
+
+    def test_revert_also_publishes_a_native_idle_compatible_preview(self):
+        from atelier.handlers import mesh
+        from test_blender_import import FakeMesh
+        base=C.project_base(self.gr);Path(base).parent.mkdir(parents=True)
+        Path(base+'.blend').write_bytes(b'previous model')
+        def extract(game_rel, **options):
+            Path(options['blend_path']).write_bytes(b'original model')
+        with patch.object(meshedit,'_resolve_base',return_value='vanilla'), \
+             patch.object(meshedit,'extract_blend',side_effect=extract), \
+             patch.object(mesh,'Mesh',return_value=FakeMesh()):
+            M.revert(self.gr)
+        self.assertTrue(M.is_original(self.gr))
+        self.assertTrue(mesh.is_current_preview(base+'.mesh.glb'))
+        self.assertEqual(Path(base+'.blend').read_bytes(),b'original model')
 
 
 if __name__=='__main__':unittest.main()

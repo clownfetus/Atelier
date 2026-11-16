@@ -5,6 +5,23 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- Blender no longer renders materials without a glow map as solid white. A
+  material's emissive colour only tints its glow map, as in the game, and stays
+  editable on the material. Send to Blender asks for the updated Atelier Live
+  Bridge add-on.
+
+- Edited and replaced models keep their shape when the idle animation plays in
+  the 3D preview, including straight after Edit in Blender. Previews now use the
+  same skeleton transforms and numbered bone names as the game's animation
+  decoder, and older previews rebuild automatically.
+
+- Every part of an edited or replaced model keeps its textures in the 3D
+  preview. A part whose material slot repeats another's name, such as one of
+  Spider-Man's lobby armour pieces, used to show untextured grey.
+
+- Those parts can now be hidden too. Hiding one used to fail with "The model
+  slots changed". Sections you have already hidden stay hidden.
+
 ## 1.2.2 — 2026-11-12
 
 - Library folders with nothing to list no longer appear at any level, so opening

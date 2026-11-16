@@ -85,10 +85,12 @@ class Recovery(unittest.TestCase):
         M.revert(gr);self.assertTrue(M.is_original(gr))
         base=C.project_base(gr);Path(base+'.blend').write_bytes(b'user sculpt')
         self.assertFalse(M.is_original(gr))
-        from atelier.handlers import meshedit
+        from atelier.handlers import meshedit,mesh
+        from test_blender_import import FakeMesh
         def extract(game_rel,**options):Path(options['blend_path']).write_bytes(b'original')
-        def blender(script,args,label):Path(args[1]).write_bytes(b'original preview')
-        with patch.object(meshedit,'_resolve_base',return_value='source'),patch.object(meshedit,'extract_blend',side_effect=extract),patch.object(meshedit,'_run_blender',side_effect=blender):M.revert(gr)
+        # The restored preview comes from the original mesh in the idle's convention, not from Blender.
+        with patch.object(meshedit,'_resolve_base',return_value='source'),patch.object(meshedit,'extract_blend',side_effect=extract),patch.object(mesh,'Mesh',return_value=FakeMesh()):M.revert(gr)
+        self.assertTrue(mesh.is_current_preview(base+'.mesh.glb'))
         self.assertTrue(M.is_original(gr));Path(base+'.blend').write_bytes(b'new sculpt');self.assertFalse(M.is_original(gr))
         self.assertEqual(len([row for row in browse.all_imported() if row['file_type']=='mesh']),1)
 

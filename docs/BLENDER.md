@@ -637,6 +637,16 @@ normal, but only when the material has no texture in that role, so a cloak's `Ba
 never displaces its `BaseColor`. The suffix fallback applies to the Blender manifest; the 3D
 preview still assigns roles by parameter name alone.
 
+### 3.30 `EmissiveColor` is a tint, not a glow
+`EmissiveColor` multiplies a material's emissive mask. Without a mask it lights nothing, in the
+game or in the 3D preview (`viewport-materials.applyEmissive`). The Blender graph wired it
+straight into Emission whenever a material had no emissive map, at strength 1 unless the
+material set `EmissiveStrength`. While the group node held Blender's type defaults (§3.26) that
+colour was black; once the node carried the material's values, every surface with a white tint
+and no mask rendered solid white, such as Hulk's `MI_1011300_10110_Body_02`. A material with no
+emissive map now has black emission and keeps `EmissiveColor` on the group as an unconnected
+value. With a mask, emission is still mask × `EmissiveColor` at the material's strength.
+
 ## 4. Design constraints (deliberate, enforced)
 
 1. **BoneMaps are never resized.** Edits may only weight bones a section already used;

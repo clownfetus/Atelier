@@ -215,7 +215,8 @@ def _try_extras(d, o, limit):
         tags = [struct.unpack_from('<ii', d, o + 4 + i*8) for i in range(ntag)]
         o += 4 + ntag * 8
         mats.append({"pkg_idx": pkg, "pkg_off": pkg_off,
-                     "slot_name_idx": slot[0], "imported_slot_name_idx": imported[0], 'tag_names': tags})
+                     "slot_name_idx": slot[0], "slot_name_number": slot[1],
+                     "imported_slot_name_idx": imported[0], 'tag_names': tags})
     if o + 4 > limit:
         return None
     (nbone,) = struct.unpack_from("<I", d, o)
@@ -354,6 +355,29 @@ def material_slot_names(materials):
     return result
 
 
+def fname(name, number):
+    """An FName as the game spells it. Its number is kept apart: 2 reads "_1", 0 adds nothing."""
+    return f'{name}_{number - 1}' if number else name
+
+
+def fname_base(text):
+    """The name-table entry of an FName spelt in full. Unreal stores a trailing "_N"
+    without a leading zero as the number, so MI_X_1 is MI_X, while MI_X_03 stays whole."""
+    match = re.fullmatch(r'(.+)_(0|[1-9]\d{0,8})', text)
+    return match[1] if match else text
+
+
+def material_fnames(materials):
+    """Slot names as the game spells them, as the native preview and its slot table do.
+
+    One cooked mesh can use MI_X and MI_X_1. Viewport previews and Atelier's own slot
+    list use these; the Blender round trip keeps material_slot_names, whose keys
+    existing .blend files already carry.
+    """
+    return [fname(m['slot_name'], m.get('slot_name_number', 0)) if m.get('slot_name') else f'mat_{i}'
+            for i, m in enumerate(materials)]
+
+
 def resolve_materials(mats, names):
     for m in mats:
         m["slot_name"] = names[m["slot_name_idx"]] if 0 <= m["slot_name_idx"] < len(names) else None
@@ -363,7 +387,7 @@ def resolve_materials(mats, names):
         for index, number in m.get('tag_names', []):
             if not 0 <= index < len(names) or number < 0:
                 raise ValueError('Invalid material gameplay-tag name')
-            tags.append(names[index] + ('_' + str(number-1) if number else ''))
+            tags.append(fname(names[index], number))
         m['gameplay_tags'] = tags
     return mats
 
@@ -1623,7 +1647,7 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
 # ── glTF export ─────────────────────────────────────────────────────────────────
 # UE is left-handed, Z-up, centimetres. glTF is right-handed, Y-up, metres. The map
 # (x,y,z) -> (x,z,-y) is a proper rotation (determinant +1: -90 deg about X), not a
-# reflection, which is what makes this simple -- no triangle-winding flip is needed, and
+# reflection. Winding is corrected separately below, and
 # the whole skinned hierarchy converts by rotating ONLY the root bone's local transform
 # (translation and rotation) and leaving every other bone's LOCAL (parent-relative)
 # transform untouched (just /100 on translations for cm->m): each child inherits the
@@ -1631,6 +1655,23 @@ def glb_to_sections(mesh, lod_index, glb_path, reweight=None, preserve_parts=Non
 # component space) only need that same single rotation applied directly, not per-bone.
 _AXIS_R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]], "f8")
 _AXIS_Q = np.array([-0.7071067811865476, 0.0, 0.0, 0.7071067811865476])   # -90 deg about X, XYZW
+# Viewport previews must match CUE4Parse's glTF exporter and AnimationCommand's
+# atelier-gltf-local tracks. Blender's editing/cooking round trip uses _AXIS_R.
+_PREVIEW_AXIS = np.array([[1, 0, 0], [0, 0, 1], [0, 1, 0]], "f8")
+PREVIEW_VERSION = 2  # 2: material names keep their FName numbers (material_fnames)
+
+
+def is_current_preview(path):
+    """Read only the GLB JSON header, so old preview caches are rebuilt once."""
+    try:
+        with open(path, 'rb') as stream:
+            magic, version, total, length, chunk = struct.unpack('<5I', stream.read(20))
+            if (magic, version, chunk) != (0x46546C67, 2, 0x4E4F534A) or length > total - 20:
+                return False
+            document = json.loads(stream.read(length))
+        return document.get('asset', {}).get('extras', {}).get('atelierPreviewVersion') == PREVIEW_VERSION
+    except (OSError, ValueError, TypeError, AttributeError, struct.error):
+        return False
 
 
 def _qmul(a, b):
@@ -1651,16 +1692,25 @@ def _qmat(q):
         [2*(x*z-y*w),   2*(y*z+x*w),   1-2*(x*x+y*y)]])
 
 
-def _bone_world_matrices(bones):
+def _bone_world_matrices(bones, *, for_preview=False):
     """4x4 world matrices for every bone, and the glTF-space local TRS used to build the
-    node hierarchy (root converted, everyone else passed through -- see module note)."""
+    node hierarchy (editing convention by default, native idle convention for previews)."""
     world = [None] * len(bones)
     node_trs = []
     for i, b in enumerate(bones):
         t = np.array(b["translation"], "f8") / 100.0
         q = np.array(b["rotation"], "f8")
         s = np.array(b["scale"], "f8")
-        if b["parent"] == -1:
+        if for_preview:
+            # Match the pinned CUE4Parse Gltf.CreateBonesRecursive exactly:
+            # swap Y/Z on EVERY local translation and quaternion, omit scale.
+            # This is its exported bind convention, not a physical basis change;
+            # AnimationCommand carries physical motion through these same binds.
+            t = _PREVIEW_AXIS @ t
+            q = q[[0, 2, 1, 3]]
+            q /= np.linalg.norm(q)
+            s = np.ones(3)
+        elif b["parent"] == -1:
             t = _AXIS_R @ t
             q = _qmul(_AXIS_Q, q)
         node_trs.append((t, q, s))
@@ -1671,16 +1721,21 @@ def _bone_world_matrices(bones):
     return world, node_trs
 
 
-def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
+def export_glb(mesh, lod_index, out_path, *, with_morphs=False, for_preview=False):
     """Write a fully skinned glTF binary for one LOD: real bone hierarchy (names, rest
     pose, inverse bind matrices), one primitive per material section, true UV channel
-    count, vertex colors, and up to 8 bone influences via JOINTS_0/1 + WEIGHTS_0/1."""
+    count, vertex colors, and up to 8 bone influences via JOINTS_0/1 + WEIGHTS_0/1.
+    for_preview selects the native viewer/idle convention; leave it off for the
+    Blender editing/cooking round trip, whose inverse is glb_to_sections."""
     lod = mesh.lods[lod_index]
     n = lod["num_verts"]
-    pos = (mesh.positions(lod).astype("f8") / 100.0) @ _AXIS_R.T
+    axis = _PREVIEW_AXIS if for_preview else _AXIS_R
+    pos = (mesh.positions(lod).astype("f8") / 100.0) @ axis.T
     normal, tangent, tan_w = mesh.normals_tangents(lod)
-    normal = normal.astype("f8") @ _AXIS_R.T
-    tangent = tangent.astype("f8") @ _AXIS_R.T
+    normal = normal.astype("f8") @ axis.T
+    tangent = tangent.astype("f8") @ axis.T
+    if for_preview:
+        tan_w = -tan_w  # A reflection reverses the tangent frame's handedness.
     uv = mesh.uvs(lod)
     color = mesh.colors(lod)
     local_idx, weight = mesh.skin_weights(lod)
@@ -1690,7 +1745,7 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
         bonemap = np.asarray(mesh.section_bonemap(sec), np.uint16)
         global_idx[lo:hi] = bonemap[local_idx[lo:hi]]
 
-    world, node_trs = _bone_world_matrices(mesh.bones)
+    world, node_trs = _bone_world_matrices(mesh.bones, for_preview=for_preview)
     # glTF matrices are column-major. Serialising NumPy's row-major array put
     # translations in the last row; Blender then created every bone at (0,0,0)
     # and posing deformed the mesh into spikes despite correct vertex groups.
@@ -1734,7 +1789,7 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
         ids=target['indices'];use=(ids>=lo)&(ids<hi);indices=(ids[use]-lo).astype('<u4')
         columns=slice(3,6) if normal_delta else slice(0,3)
         values=target['deltas'][use,columns]
-        values=(values.astype('f8')@_AXIS_R.T)/(1 if normal_delta else 100)
+        values=(values.astype('f8')@axis.T)/(1 if normal_delta else 100)
         nonzero=np.any(values!=0,axis=1);indices=indices[nonzero];values=values[nonzero].astype('<f4')
         entry={'componentType':F32,'count':hi-lo,'type':'VEC3'}
         if not normal_delta:
@@ -1755,7 +1810,8 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
     # four missing names made the mesh fail to rebuild at all -- it was not editable before
     # this. Slot names are unique where asset names are not, which is exactly why they are
     # the key (S3.9, S3.18).
-    slot_names = material_slot_names(mesh.materials)
+    # Previews bind each material to the native slot table by name (meshstudio.preview_bindings).
+    slot_names = material_fnames(mesh.materials) if for_preview else material_slot_names(mesh.materials)
     materials_json = [
         # doubleSided so Blender's importer doesn't backface-cull thin geometry (skirts,
         # capes, hair cards) while the mesh is being edited -- purely a display aid, since
@@ -1777,7 +1833,8 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
         # _AXIS_R only rotates axes (det +1), so it cannot fix this -- without the swap,
         # every front face is culled on import and only interior back faces render,
         # reading as an inside-out / concave mesh. glb_to_sections swaps back on rebuild.
-        idx = idx.reshape(-1, 3)[:, [0, 2, 1]].reshape(-1)
+        if not for_preview:  # The native preview's reflection already reverses winding.
+            idx = idx.reshape(-1, 3)[:, [0, 2, 1]].reshape(-1)
         attrs = {
             "POSITION":  accessor(pos[lo:hi].astype("f4"), F32, "VEC3", ARRAY, minmax=True),
             '_ATELIER_MORPH_REST':accessor(mesh.positions(lod)[lo:hi].astype('f4'),F32,'VEC3',ARRAY),
@@ -1808,7 +1865,12 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
         if morph_targets:
             primitives[-1]['targets']=[{'POSITION':sparse_morph(target,lo,hi),'NORMAL':sparse_morph(target,lo,hi,True)} for target in morph_targets]
 
-    nodes = [{"name": b["name"], "children": [], "translation": t.tolist(),
+    # FName stores its numeric suffix separately (number 1 means "_0"). Idle
+    # tracks use the full name; Blender's legacy round trip uses base names.
+    def bone_name(b):
+        return f'{b["name"]}_{b["number"] - 1}' if for_preview and b.get('number', 0) else b['name']
+
+    nodes = [{"name": bone_name(b), "children": [], "translation": t.tolist(),
              "rotation": q.tolist(), "scale": s.tolist()}
              for b, (t, q, s) in zip(mesh.bones, node_trs)]
     for i, b in enumerate(mesh.bones):
@@ -1833,6 +1895,9 @@ def export_glb(mesh, lod_index, out_path, *, with_morphs=False):
     if morph_names:
         gltf['meshes'][0]['extras']={'targetNames':morph_names}
         gltf['meshes'][0]['weights']=[0]*len(morph_names)
+    if for_preview:
+        gltf['asset']['extras'] = {'atelierPreviewVersion': PREVIEW_VERSION,
+                                   'animationSpace': 'atelier-gltf-local'}
 
     json_bytes = json.dumps(gltf).encode("utf-8")
     while len(json_bytes) % 4: json_bytes += b" "

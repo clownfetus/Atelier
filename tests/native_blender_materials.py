@@ -107,5 +107,30 @@ with tempfile.TemporaryDirectory(prefix='atelier-native-materials-', dir=report.
     checks.append({'name': 'every material has an Alpha input; hidden effects and sections start at 0',
                    'materials': len(expected)})
 
+    # EmissiveColor tints a material's emissive mask; on its own it is not a glow. Many
+    # bodies set it to white with no mask, which lit the whole surface white. As in the 3D
+    # preview, a material with no emissive map emits nothing and keeps the colour editable.
+    def emission(material):
+        bsdf = principled(material)
+        return bsdf.inputs.get('Emission Color') or bsdf.inputs['Emission']
+
+    plain, _ = wire('MI_Fixture_Plain', {
+        'colors': [{'name': 'EmissiveColor', 'rgba': [1, 1, 1, 1]}], 'scalars': [],
+        'maps': [{'param': 'BaseColor', 'role': 'basecolor', 'path': base}], 'surface': {'blend_mode': 'BLEND_Opaque'}})
+    unlit = emission(plain).links[0].from_socket
+    assert unlit.node.type == 'RGB' and rounded(unlit.default_value) == (0, 0, 0, 1), (unlit.node.type, rounded(unlit.default_value))
+    assert node_values(plain)['Colour · EmissiveColor'] == (1, 1, 1, 1), node_values(plain)
+    glowing, _ = wire('MI_Fixture_Glow', {
+        'colors': [{'name': 'EmissiveColor', 'rgba': [1, .5, 0, 1]}], 'scalars': [{'name': 'EmissiveStrength', 'value': 4.0}],
+        'maps': [{'param': 'BaseColor', 'role': 'basecolor', 'path': base},
+                 {'param': 'Emissive', 'role': 'emissive', 'path': png('T_Fixture_E', (1, 1, 1, 1))}],
+        'surface': {'blend_mode': 'BLEND_Opaque'}})
+    tint = emission(glowing).links[0].from_node
+    tinted = {link.from_socket.name for link in group_node(glowing).node_tree.links if link.to_node == tint}
+    assert tint.bl_idname == 'ShaderNodeMixRGB' and tinted == {'Texture · Emissive', 'Colour · EmissiveColor'}, (tint.bl_idname, tinted)
+    strength = principled(glowing).inputs['Emission Strength'].links[0].from_socket
+    assert strength.name == 'Value · EmissiveStrength', strength.name
+    checks.append({'name': 'only an emissive map glows; EmissiveColor tints it and stays editable'})
+
 report.write_text(json.dumps({'ok': True, 'blender': bpy.app.version_string, 'checks': checks}, indent=2) + '\n')
 print('ATELIER_MATERIALS_NATIVE_OK', report)
