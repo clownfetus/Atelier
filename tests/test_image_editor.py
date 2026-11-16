@@ -136,6 +136,16 @@ class ImageEditor(unittest.TestCase):
         self.assertIn("image editor must be an existing program", data["error"])
         self.assertEqual(C.get_image_editor(), "")
 
+    def test_browse_asks_for_a_program(self):
+        with patch.object(H, "pick_file", return_value="C:/Apps/Paint Thing.exe") as pick:
+            status, data = call("POST", "/api/pick_image_editor", {"initial": "C:/Apps/Old.exe"})
+        self.assertEqual((status, data), (200, {"ok": True, "path": "C:/Apps/Paint Thing.exe"}))
+        pick.assert_called_once_with("Select your image editor", ("*.exe",) if H.IS_WINDOWS else (),
+                                     "C:/Apps/Old.exe")
+        with patch.object(H, "pick_file", side_effect=RuntimeError("dialog unavailable")):
+            data = call("POST", "/api/pick_image_editor", {})[1]
+        self.assertEqual(data, {"ok": False, "path": "", "error": "dialog unavailable"})
+
     def test_setup_status_names_the_editor(self):
         C.save_image_editor(str(self.editor))
         data = call("GET", "/api/setup_status")[1]
