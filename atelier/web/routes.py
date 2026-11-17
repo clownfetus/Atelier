@@ -11,6 +11,7 @@ from atelier import preview
 from atelier import import_server
 from atelier import changelog
 from atelier import updates
+from atelier import retired_cache
 from atelier.storage import publish_files, container_files, PublicationRecoveryError
 from contextlib import ExitStack
 from functools import wraps
@@ -2643,6 +2644,7 @@ def _migrate_legacy_imports():
     print(f"[migrate] moved {len(files)} files from imported/ to projects/Default/", flush=True)
 
 _migrate_legacy_imports()
+retired_cache.start(_CACHE)
 os.makedirs(PROJECTS_ROOT, exist_ok=True)
 _observer = Observer()
 _observer.schedule(_PNGHandler(), PROJECTS_ROOT, recursive=True)
