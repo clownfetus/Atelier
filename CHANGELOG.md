@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.5 — 2026-11-18
+
 - Atelier now frees the disk space left behind by older versions. From 0.3.3,
   Atelier kept a copy of the game's files in `_cache\vanilla_paks` for 3D
   previews. Nothing has used it since 1.1.3, but after a game patch it could
