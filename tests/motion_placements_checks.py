@@ -113,6 +113,13 @@ def run_motion_placements_checks(context, url, report, checks):
                         tab.locator('.bulk-modal').screenshot(path=str(report / f'motion-bulk-review-{theme}.png'))
                     for width, height in ((1024, 768), (800, 600), (560, 768)):
                         tab.set_viewport_size({'width': width, 'height': height})
+                        # Let the progress disc's ResizeObserver update the SVG for the new size.
+                        tab.wait_for_function("""() => {
+                          const bar = document.querySelector('.bulk-review-progress progress');
+                          const disc = document.querySelector('.bulk-review-progress .progress-disc');
+                          const width = bar?.offsetWidth;
+                          return width > 0 && Number(disc?.getAttribute('width')) === width;
+                        }""")
                         assert tab.locator('.bulk-modal').evaluate('panel=>panel.scrollWidth<=panel.clientWidth')
                     tab.set_viewport_size({'width': 1400, 'height': 900})
                 tab.evaluate("__finish({ok:true,preview_id:'fixture-review',changed_assets:1,changed_values:1,assets:[{game_rel:'Fixture/Asset',changes:1}]})")
