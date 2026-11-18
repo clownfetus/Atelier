@@ -378,6 +378,9 @@ jobs:
           compression-level: 0
   update:
     needs: [prepare, bundle]
+    # An optional installer skip propagates through bundle under implicit success().
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' && needs.bundle.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -425,6 +428,9 @@ jobs:
 
   publish:
     needs: [prepare, bundle, update]
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' &&
+      needs.bundle.result == 'success' && needs.update.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
@@ -483,7 +489,9 @@ jobs:
 
   sync-changelog:
     needs: [prepare, publish]
-    if: needs.publish.outputs.published == 'true'
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' &&
+      needs.publish.result == 'success' && needs.publish.outputs.published == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
