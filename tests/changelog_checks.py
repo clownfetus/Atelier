@@ -48,8 +48,13 @@ def run_changelog_checks(context, url, report, checks):
             tab.locator('#settings-theme').select_option(theme, force=True)
             for width, height in ((1400, 900), (1024, 768), (540, 600)):
                 tab.set_viewport_size({'width': width, 'height': height})
-                assert tab.locator('#changelog-done').is_visible()
-                assert tab.locator('#changelog-done').evaluate('el => {const r=el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}')
+                # The unfold can still clip the button after the dialog becomes visible.
+                tab.wait_for_function("""() => {
+                    const button = document.getElementById('changelog-done');
+                    const {x, y, width, height} = button.getBoundingClientRect();
+                    return width > 0 && height > 0 &&
+                        button.contains(document.elementFromPoint(x + width / 2, y + height / 2));
+                }""")
                 assert tab.locator('#changelog-body').evaluate('el => el.scrollHeight > el.clientHeight')
                 assert tab.locator('.changelog-modal').evaluate('el => {const r=el.getBoundingClientRect(); return r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth;}')
                 tab.screenshot(path=str(report / f'changelog-{theme}-{width}x{height}.png'))
