@@ -13,6 +13,8 @@ import { textureRoles, applySurface, emissiveColorIndex as pickEmissiveIdx, appl
 import { attachmentRig, bindWeapon, updateWeapon, pairedWeapon, embeddedWeaponMaterials, weaponSide } from './viewport-attachments.js';
 import { createAssemblyView } from './assembly.js';
 import { createViewportRecolour } from './viewport-recolour.js';
+import { createSkinVfxEditor } from './skin-vfx.js';
+import { skinVfxTarget } from './skin-vfx-data.js';
 import { verifiedBinding } from './assembly-data.js';
 
 const $ = id => document.getElementById(id);
@@ -36,7 +38,7 @@ const texPending = new Map();
 let renderer, scene, camera, controls, grid, modelRoot;
 let raf = 0, inited = false;
 let inspection, soloSnapshot = null, soloTarget = null, materialReturnObserver = null;
-let animation, lastFrame = 0;
+let animation, skinVfx, lastFrame = 0;
 let materialTask = null;
 let materialLoad = null;
 let modelLoad = null, modelLoading = false;
@@ -245,6 +247,7 @@ function init() {
     tintOriginal, textureRoles, applySurface, pickMaterial, label:materialLabel, notify:note, resize:onResize,
     ready:()=>!modelLoading && !materialTask && !animation.loading() && !saving && !visibilityBusy.size, refreshEdits:refreshFoot,
     pauseAnimation:()=>animation.pause(), resumeAnimation:state=>animation.resume(state)});
+  skinVfx = createSkinVfxEditor(projectFetch);
   assembly = createAssemblyView({
     state:()=>({data:matData, edited, selected:selectedMaterial, objects, metadata:meshMeta, project:viewportProject, loading:modelLoading || !!materialTask}),
     camera, label:materialLabel, group:materialGroup, swatch:materialChipColor, fetch:projectFetch, url:projectUrl,
@@ -340,6 +343,7 @@ function animate() {
   }
   controls.update();
   inspection.render();
+  skinVfx.drawGuide(camera, !inspection.capturing() && $('viewport-showcase').getAttribute('aria-pressed') !== 'true');
 }
 
 function disposeTree(obj) {
@@ -411,6 +415,7 @@ function setViewportLoaderState(state) {
 }
 
 function clearModel() {
+  skinVfx?.setModel(null);
   connectedEditorPending = false; clearTimeout(assemblyRefreshTimer);
   modelLoading=false;
   if (modelLoad) {
@@ -681,10 +686,25 @@ function syncAttachments() {
   }
 }
 
+function refreshSkinVfxModel() {
+  const options = objects.flatMap((object, i) => {
+    if (object.kind === 'weapon') return [];
+    const target = skinVfxTarget(meshMeta[i]?.game_rel);
+    return target && target.skin === Number(meshSkin) ? [{target, object}] : [];
+  });
+  const rigs = options.filter(({object}) => object.loaded && object.rig?.nodes.size);
+  const active = rigs.find(({object}) => object.root.visible) || rigs[0];
+  skinVfx.setModel(active ? {
+    ...active.target, rig: active.object.rig, project: viewportProject,
+    forms: options.map(({target}) => target.form),
+  } : null);
+}
+
 // One row per top-level mesh loaded into modelRoot. Toggling hides/shows that mesh and re-frames
 // the camera — some skins carry extra objects (unused attachments, effects meshes, etc.) that are
 // wildly oversized or offset, which blows up the auto-framed scale and makes orbit/pan feel broken.
 function buildObjectPanel() {
+  refreshSkinVfxModel();
   const list = $('viewport-obj-list');
   list.innerHTML = '';
   for (const o of objects) {
@@ -1857,14 +1877,15 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
     const menu = document.querySelector('#viewport-box .vp-menu[open]');
     if (menu) {menu.open=false;menu.querySelector('summary').focus();return;}
+    if (skinVfx?.dismiss()) return;
     close();
   }
   else if(!$('viewport-overlay').classList.contains('mounted') || $('viewport-box').contains(e.target)) inspection?.keydown(e);
 });
 
 window.addEventListener('beforeunload', event => {
-  if (saving || visibilityBusy.size || Object.values(edited).some(params => Object.keys(params).length)) {
-    event.preventDefault(); event.returnValue = 'Preview recolours have unsaved changes.';
+  if (saving || visibilityBusy.size || skinVfx?.dirty() || Object.values(edited).some(params => Object.keys(params).length)) {
+    event.preventDefault(); event.returnValue = 'Model Studio has unsaved changes.';
   }
 });
 window.addEventListener('pagehide', () => {

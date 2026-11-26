@@ -8,6 +8,7 @@
 - [Edit textures and materials](#textures-and-materials)
 - [Edit effects and materials in batches](#batch-edits-and-effects)
 - [Export for Project Galacta’s Skin Swapper](#skin-swapper-mods)
+- [Author Skin VFX attachments](#skin-vfx-attachments)
 
 ## First-run setup
 
@@ -217,3 +218,18 @@ insufficient. The Companion App manages `skins.txt`. If this format is disabled
 by Project Galacta, the build review explains why.
 
 [Skin Swapper integration testing](skin-swapper-testing.md)
+
+## Skin VFX attachments
+
+With Project Galacta v1.6.0, open a rigged costume in **Model Studio → Skin VFX**.
+Search for a Niagara system or paste its object path, then choose a target bone.
+Expand **Placement and playback** to set the bone-local offset, rotation, scale,
+loop and form. Use VFX Lab in game to preview the particles.
+
+Use **Export setup** to save a `GalactaVFX_*.json` file in the game's
+`Saved/GalactaVFX` folder. On Windows, that is
+`%LOCALAPPDATA%\Marvel\Saved\GalactaVFX`. Build it under **Skin VFX** in the
+Galacta Companion App, then scan and write to game from **Manifest**. Use
+**Open setup** to edit files from Atelier and VFX Lab for the costume you have open.
+
+[Project Galacta Skin VFX guide](https://projectgalacta.dev/docs/skin-vfx/)

@@ -127,6 +127,7 @@ def main():
     parser.add_argument('--texture-workflows-only', action='store_true', help='Check HDR selection and optional Blender project texture copies')
     parser.add_argument('--model-export-only', action='store_true', help='Check Model Studio Blender export controls, jobs, failure and retry')
     parser.add_argument('--assembly-only', action='store_true', help='Check connected Assembly surface selection, references and editor continuity')
+    parser.add_argument('--skin-vfx-only', action='store_true', help='Check Skin VFX authoring and the Galacta JSON hand-off')
     parser.add_argument('--workspace-only', action='store_true', help='Check Projects, embedded workspace, costume persistence and twenty skin switches')
     parser.add_argument('--navigation-only', action='store_true', help='Check project form recovery, selection focus and interruptible Workspace loading')
     args = parser.parse_args()
@@ -275,6 +276,15 @@ def main():
                     (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
                     for check in checks:
                         print('PASS ' + check)
+                    browser.close()
+                    return
+
+                if args.skin_vfx_only:
+                    from skin_vfx_browser_checks import run_skin_vfx_checks
+                    run_skin_vfx_checks(context, url, report, checks)
+                    assert not errors, errors
+                    (report / 'results.json').write_text(json.dumps({'checks': checks, 'page_errors': errors}, indent=2))
+                    for check in checks: print('PASS ' + check)
                     browser.close()
                     return
 
@@ -723,6 +733,8 @@ def main():
                     checks.append('Real decoded GLB renders; three reopen/close cycles stop animation and release geometry')
                 from assembly_browser_checks import run_assembly_checks
                 run_assembly_checks(context, url, report, checks)
+                from skin_vfx_browser_checks import run_skin_vfx_checks
+                run_skin_vfx_checks(context, url, report, checks)
                 assert not errors, errors
 
                 # Capture the original frontend against the same deterministic fixture data.

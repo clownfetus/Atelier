@@ -40,6 +40,7 @@
 <link rel="stylesheet" href="/static/motion/surfaces.css">
 <link rel="stylesheet" href="/static/motion/export-feedback-ui.css">
 <link rel="stylesheet" href="/static/viewport.css">
+<link rel="stylesheet" href="/static/skin-vfx.css">
 <link rel="stylesheet" href="/static/assembly.css">
 <link rel="stylesheet" href="/static/motion/material-save-ui.css">
 <link rel="stylesheet" href="/static/motion/empty-glyph.css">
@@ -340,6 +341,7 @@
       </div></details>
         </div>
         <canvas id="viewport-canvas" tabindex="0" aria-label="3D model. Drag to orbit, right-drag to pan, scroll to zoom. F fits the model; 1, 3 and 7 select front, right and top views; W toggles wireframe; G toggles grid." aria-describedby="viewport-navigation"></canvas>
+        <div id="skin-vfx-guide" aria-hidden="true" hidden><span class="skin-vfx-guide-link"></span><span class="skin-vfx-guide-bone"></span><span class="skin-vfx-guide-point"></span></div>
         <div id="viewport-appearance" hidden><span class="viewport-appearance-glyph" aria-hidden="true"></span><span>Loading model appearance…</span></div>
         <div id="viewport-hidden" hidden><span>All objects are hidden</span><button id="viewport-show-hidden">Show all objects</button></div>
         <div id="viewport-hover" hidden></div>
@@ -359,8 +361,65 @@
         </div>
       </div>
       <aside id="viewport-materials" aria-label="Material inspector">
-        <div class="vp-uv-toggle"><button id="viewport-uv-toggle" aria-expanded="false" aria-controls="viewport-uv-panel" title="Inspect a surface's texture and mesh UV layout">UV X-Ray</button></div>
+        <div class="vp-uv-toggle">
+          <button id="viewport-uv-toggle" aria-expanded="false" aria-controls="viewport-uv-panel" title="Inspect a surface's texture and mesh UV layout">UV X-Ray</button>
+          <button id="viewport-skin-vfx-toggle" type="button" aria-expanded="false" aria-controls="viewport-skin-vfx-panel" hidden>Skin VFX</button>
+        </div>
         <section id="viewport-uv-panel" aria-label="UV X-Ray inspector" hidden></section>
+        <section id="viewport-skin-vfx-panel" aria-label="Skin VFX" hidden>
+          <header class="skin-vfx-header skin-vfx-row">
+            <label class="skin-vfx-field">Setup name<input id="skin-vfx-name" type="text" autocomplete="off"></label>
+            <button id="skin-vfx-open" type="button">Open setup</button>
+            <input id="skin-vfx-file" type="file" accept=".json,application/json" hidden>
+          </header>
+          <div class="skin-vfx-editor">
+            <div class="skin-vfx-row">
+              <label class="skin-vfx-field">Effects<select id="skin-vfx-selection"></select></label>
+              <button id="skin-vfx-add" type="button">Add effect</button>
+            </div>
+            <p id="skin-vfx-empty" class="skin-vfx-hint">Add an effect to attach a Niagara system to this costume.</p>
+            <div id="skin-vfx-entry" hidden>
+              <label class="skin-vfx-field">Effect name<input id="skin-vfx-entry-name" type="text" autocomplete="off"></label>
+              <label class="skin-vfx-field">Niagara system<input id="skin-vfx-system" type="text" autocomplete="off" spellcheck="false" placeholder="Search or paste an object path" aria-controls="skin-vfx-results"></label>
+              <div id="skin-vfx-results" class="skin-vfx-results" role="group" aria-label="Niagara system results" hidden></div>
+              <label class="skin-vfx-field">Target bone<input id="skin-vfx-bone" type="text" list="skin-vfx-bones" autocomplete="off" spellcheck="false" placeholder="Find a bone"></label>
+              <datalist id="skin-vfx-bones"></datalist>
+              <p id="skin-vfx-preview-note" class="skin-vfx-hint" hidden></p>
+              <details id="skin-vfx-placement" class="skin-vfx-options">
+                <summary>Placement and playback</summary>
+                <div class="skin-vfx-option-fields">
+                  <div id="skin-vfx-transforms"></div>
+                  <div class="skin-vfx-row">
+                    <label class="skin-vfx-field">Apply to<select id="skin-vfx-form"></select></label>
+                    <label class="skin-vfx-check"><input id="skin-vfx-loop" type="checkbox"> Loop effect</label>
+                  </div>
+                  <button id="skin-vfx-mirror" type="button">Mirror placement</button>
+                </div>
+              </details>
+              <div class="skin-vfx-entry-actions">
+                <button id="skin-vfx-duplicate" type="button">Duplicate effect</button>
+                <button id="skin-vfx-remove" type="button">Remove effect</button>
+              </div>
+            </div>
+            <details id="skin-vfx-mesh-options" class="skin-vfx-options">
+              <summary>Limit to a Skin Swapper mesh</summary>
+              <label class="skin-vfx-field skin-vfx-option-fields">Skin Swapper mesh path<input id="skin-vfx-mesh" type="text" autocomplete="off" spellcheck="false" placeholder="Optional"></label>
+            </details>
+          </div>
+          <footer class="skin-vfx-footer">
+            <p id="skin-vfx-status" role="status" hidden></p>
+            <div class="skin-vfx-row">
+              <button id="skin-vfx-new" type="button" hidden>New setup</button>
+              <button id="skin-vfx-export" type="button" disabled>Export setup</button>
+            </div>
+            <details class="skin-vfx-handoff">
+              <summary>Build in Galacta</summary>
+              <p>Save the JSON in the game's <code>Saved/GalactaVFX</code> folder, then open <strong>Skin VFX</strong> in the Galacta Companion App.</p>
+              <p>On Windows, open <code>%LOCALAPPDATA%\Marvel\Saved\GalactaVFX</code>.</p>
+              <p>Use VFX Lab to preview the particles in game.</p>
+            </details>
+          </footer>
+        </section>
         <div id="viewport-mat-section">
           <div id="viewport-mat-head">
             <h3>Materials</h3>
