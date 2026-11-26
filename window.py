@@ -32,6 +32,7 @@ if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
             os.environ.pop(_var, None)
 
 from atelier import hostos
+from atelier.window_game import GameControls
 from atelier.window_theme import WindowTheme
 from atelier.web.app import PORT, frontend_url
 
@@ -125,6 +126,8 @@ def main():
     window = webview.create_window("Atelier", URL, width=1400, height=900,
                                    background_color=appearance._background(), js_api=appearance)
     appearance._attach(window)
+    game = GameControls()
+    window.expose(game.game_status, game.launch_game)
     close_started = threading.Event()
     close_ready = threading.Event()
 

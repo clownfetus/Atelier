@@ -119,8 +119,22 @@ body {
   margin-left: 12px;
   transition: border-color var(--studio-motion-fast) var(--studio-easing), background var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing);
 }
-.menu-btn:hover { border-color: var(--acc); background: var(--bg2); color: var(--text); }
+.menu-btn:not([aria-disabled="true"]):hover { border-color: var(--acc); background: var(--bg2); color: var(--text); }
 .menu-btn svg, .crumb svg { width: 18px; height: 18px; flex-shrink: 0; }
+#launch-game { justify-content: center; gap: 6px; min-width: 136px; white-space: nowrap; }
+#launch-game[aria-disabled="true"] { cursor: default; }
+#launch-game[data-state="ready"], #launch-game[data-state="running"] { color: var(--text); }
+#launch-game[data-state="starting"] { cursor: progress; }
+.launch-game-play {
+  width: 18px; height: 18px; display: grid; place-items: center;
+}
+.launch-game-play::before {
+  content: ""; width: 9px; height: 12px; background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+#launch-game [data-lucide="check-circle"],
+#launch-game[data-state="running"] .launch-game-play { display: none; }
+#launch-game[data-state="running"] [data-lucide="check-circle"] { display: block; color: var(--status-complete); }
 #searchbar {
   position: relative;
   display: flex;
@@ -1456,7 +1470,7 @@ select:focus-visible { border-color: var(--acc); }
 .btn, .nav-btn, .card, .menu-btn, .ctx-item, .proj-card {
   transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing), box-shadow var(--studio-motion-fast) var(--studio-easing);
 }
-.btn:not(:disabled):active, .menu-btn:active { box-shadow: inset 0 0 0 1px currentColor; }
+.btn:not(:disabled):active, .menu-btn:not([aria-disabled="true"]):active { box-shadow: inset 0 0 0 1px currentColor; }
 .btn.danger { color: var(--md-sys-color-error); border-color: var(--md-sys-color-error); }
 .btn.danger.primary { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); border-color: transparent; }
 .ctx-item { width: 100%; border: 0; background: transparent; font-family: inherit; text-align: left; min-height: 36px; }
@@ -1504,11 +1518,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
   #sidebar { width: 260px; }
 }
 @media (max-width: 760px) {
-  body[data-page=library] #topbar { height: auto; flex-wrap: wrap; row-gap: 8px; padding-block: 8px; }
-  body[data-page=library] .topbar-navigation { flex-basis: 100%; }
+  #topbar { height: auto; flex-wrap: wrap; row-gap: 8px; padding-block: 8px; }
+  .topbar-navigation { flex-basis: 100%; }
   #topbar #searchbar { flex: 1 1 0; }
   #search-input { flex: 1 1 auto; }
   #search-results { left: 0; right: auto; }
+}
+@media (max-width: 600px) {
+  #topbar #searchbar { flex-basis: 100%; }
+  #launch-game { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

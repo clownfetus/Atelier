@@ -68,6 +68,11 @@
     <kbd>Ctrl+F</kbd>
     <div id="search-results" role="listbox" aria-label="Search results" hidden></div>
   </div>
+  <button class="menu-btn" id="launch-game" type="button" aria-disabled="true" title="Launch Marvel Rivals from the desktop app">
+    <span class="launch-game-play" aria-hidden="true"></span>
+    <i data-lucide="check-circle" size="16"></i>
+    <span id="launch-game-label" aria-live="polite">Launch game</span>
+  </button>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
 </div>
 
@@ -1067,6 +1072,7 @@
 <script src="/static/vfx-motionboard-data.js"></script>
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/launch-game.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>
