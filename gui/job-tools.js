@@ -215,9 +215,11 @@
     async run(path, options = {}) {
       // onUpdate receives each job snapshot, for a page that shows the stage in its own status line.
       const {project = window.atelierProject(), onUpdate, ...opts} = options;
-      const form=opts.body instanceof FormData;
-      const input = form ? null : JSON.parse(opts.body || '{}');
-      const result = await request(path, {...opts, body:form ? opts.body : JSON.stringify({...input, background: true})}, project);
+      if ((opts.method || 'GET').toUpperCase() === 'POST' && !(opts.body instanceof FormData)) {
+        const input = JSON.parse(opts.body || '{}');
+        opts.body = JSON.stringify({...input, background: true});
+      }
+      const result = await request(path, opts, project);
       // Keep old callers and fixture responses compatible.
       if (!result.job_id) return result;
       if (result.job) notify(result.job);

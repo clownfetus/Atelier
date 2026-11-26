@@ -121,6 +121,7 @@ def main():
     parser.add_argument('--retired-only', action='store_true', help='Check the surfaces motion v2 retired stay gone')
     parser.add_argument('--showcase-only',action='store_true',help='Check Showcase material restoration, posters and opt-in foley')
     parser.add_argument('--changelog-only', action='store_true', help='Check offline upgrade notes and acknowledgement')
+    parser.add_argument('--mod-repair-only', action='store_true', help='Check the startup scan and Repatch repair controls')
     parser.add_argument('--updates-only', action='store_true', help='Check staged updates, restart choice and recoverable errors')
     parser.add_argument('--identity-only', action='store_true', help='Check Home layout, artwork identity, card sizes and saved Heroes preference')
     parser.add_argument('--shared-identity-only', action='store_true', help='Check named ID folders, search, pins and template picking in every content branch')
@@ -179,6 +180,13 @@ def main():
                                               device_scale_factor=args.device_scale_factor)
                 context.route('**/api/**', fixtures)
                 context.route('https://**', lambda route: route.fulfill(json={}))
+                if args.mod_repair_only:
+                    from startup_update_checks import run_mod_repair_checks
+                    run_mod_repair_checks(context, url, report, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    browser.close()
+                    return
                 if args.navigation_only:
                     from navigation_checks import run_navigation_checks
                     run_navigation_checks(context, url, report, checks)
@@ -236,8 +244,9 @@ def main():
                     page.screenshot(path=str(report / f'current-{width}x{height}.png'))
                 checks.append('UI loads at three desktop sizes without uncaught JavaScript errors')
                 checks.append('Configured startup does not wait for remote key/mapping downloads')
-                from startup_update_checks import run_startup_update_checks
+                from startup_update_checks import run_mod_repair_checks, run_startup_update_checks
                 run_startup_update_checks(context, url, report, checks)
+                run_mod_repair_checks(context, url, report, checks)
 
                 from changelog_checks import run_changelog_checks
                 run_changelog_checks(context, url, report, checks)

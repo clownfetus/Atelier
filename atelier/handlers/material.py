@@ -72,10 +72,10 @@ def _mat_params(d, *, precision=5):
     vp = _gn(_ex_props(ex), "VectorParameterValues")
     sp = _gn(_ex_props(ex), "ScalarParameterValues")
     colors, scalars = [], []
-    for e in (vp or {}).get("Value", []):
+    for e in (vp or {}).get("Value") or ():
         nm = _mat_pname(e); lc = _mat_color(e)
         if nm and lc: colors.append({"name": nm, "rgba": [number(lc[k]) for k in "RGBA"]})
-    for e in (sp or {}).get("Value", []):
+    for e in (sp or {}).get("Value") or ():
         nm = _mat_pname(e); pv = _gn(e["Value"], "ParameterValue")
         if nm and pv is not None and not isinstance(pv.get("Value"), (list, dict)):
             scalars.append({"name": nm, "value": number(pv.get("Value"))})
@@ -149,7 +149,7 @@ def _apply_mat_edits(d, colors, scalars):
     ex = d["Exports"][0]
     vp = _gn(_ex_props(ex), "VectorParameterValues")
     sp = _gn(_ex_props(ex), "ScalarParameterValues")
-    for e in (vp or {}).get("Value", []):
+    for e in (vp or {}).get("Value") or ():
         nm = _mat_pname(e)
         if nm in colors:
             lc = _mat_color(e)
@@ -157,7 +157,7 @@ def _apply_mat_edits(d, colors, scalars):
                 mark_changed(e, _gn(e["Value"], "ParameterValue"))
                 r, g, b, a = colors[nm]
                 lc["R"], lc["G"], lc["B"], lc["A"] = float(r), float(g), float(b), float(a)
-    for e in (sp or {}).get("Value", []):
+    for e in (sp or {}).get("Value") or ():
         nm = _mat_pname(e)
         if nm in scalars:
             pv = _gn(e["Value"], "ParameterValue")
@@ -583,35 +583,52 @@ def reset_material(game_rel):
     _publish_replacement(game_rel, d)
     return read_material(game_rel)
 
-def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
-    """Rebase saved values onto current vanilla, never serialize an old project package.
+def _compile_material(document, json_path, compiled, mapping):
+    with open(json_path, "w", encoding="utf-8") as stream:
+        json.dump(document, stream)
+    os.makedirs(os.path.dirname(compiled), exist_ok=True)
+    result = uat(["from_json", json_path, compiled, mapping])
+    if result.returncode != 0 or not os.path.isfile(compiled):
+        raise RuntimeError("Material build failed: " +
+                           ((result.stderr or result.stdout or "from_json produced no uasset").strip()[-500:]))
 
-    Custom textures assigned to the material's slots (custom_texture) are built and staged with it.
-    The repatcher passes use_project=False and so ships none: it rebuilds a mod from that mod's own
-    material values, which name no project images."""
+
+def _publish_material(compiled, destination):
+    sources = [compiled[:-7] + ext for ext in (".uasset", ".uexp", ".ubulk", ".uptnl")
+               if os.path.isfile(compiled[:-7] + ext)]
+    publish_files(sources, destination)
+
+
+def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
+    """Rebase saved values onto current vanilla, keeping the current cooked package.
+
+    Custom textures assigned to the material's slots are built and staged alongside it.
+    Direct callers may supply name-keyed edits without using saved project files.
+    """
     from atelier.handlers.texture import ensure_work_base, missing_reason
     from atelier.handlers import custom_texture
+    from atelier.handlers.material_rebuild import parameter_values, transfer_parameters
+
     custom = custom_texture.assignments(game_rel) if use_project else {}
-    saved_colors, saved_scalars = {}, {}
+    colors, scalars = colors or {}, scalars or {}
+    edits = {}
     source, parent = game_rel, None
     project_bases = (project_base(game_rel), project_base_legacy(game_rel)) if use_project else ()
     for base in project_bases:
         if os.path.isfile(base + ".json"):
             with open(base + ".json", encoding="utf-8-sig") as stream:
                 saved = json.load(stream)
-                if not _holds_nothing(saved):  # one saved while the mapping was out of date has no edits
-                    _require_decoded(saved, game_rel)
-                cols, scals = _mat_params(saved, precision=None)
+            if not _holds_nothing(saved):
+                _require_decoded(saved, game_rel)
+                edits = parameter_values(saved["Exports"][0])
                 if saved.get(_SOURCE_KEY):
                     source = _material_path(saved[_SOURCE_KEY])
                 if saved.get(_PARENT_KEY):
                     parent = _material_path(saved[_PARENT_KEY], allow_base=True)
-            saved_colors = {c["name"]: c["rgba"] for c in cols}
-            saved_scalars = {s["name"]: s["value"] for s in scals}
             break
-    # Explicit callers (including the repatcher) override project values.
-    saved_colors.update(colors or {})
-    saved_scalars.update(scalars or {})
+    # Explicit editor values keep their name-keyed behaviour and take precedence over project values.
+    explicit = {"scalar": scalars, "vector": colors}
+    edits = {key: value for key, value in edits.items() if key[1] not in explicit[key[0]]}
     pak_gr = pak_game_path(game_rel)
     out_ua = os.path.join(stage, *pak_gr.split("/")) + ".uasset"
     os.makedirs(os.path.dirname(out_ua), exist_ok=True)
@@ -638,30 +655,25 @@ def stage_material(stage, game_rel, colors, scalars, *, use_project=True):
             d.pop(_PARENT_KEY, None)
         if parent or source != game_rel:
             _check_project_parents({game_rel: d})
+        if edits:
+            transfer_parameters(d["Exports"][0], edits,
+                                missing_message="Current material no longer has saved parameters: ")
         current_colors, current_scalars = _mat_params(d)
-        missing = sorted((saved_colors.keys() - {c["name"] for c in current_colors}) |
-                         (saved_scalars.keys() - {s["name"] for s in current_scalars}))
+        missing = sorted((colors.keys() - {c["name"] for c in current_colors}) |
+                         (scalars.keys() - {s["name"] for s in current_scalars}))
         if missing:
             raise RuntimeError("Current material no longer has saved parameters: " + ", ".join(missing))
-        _apply_mat_edits(d, saved_colors, saved_scalars)
+        _apply_mat_edits(d, colors, scalars)
         textures = custom_texture.apply(d, game_rel, custom, os.path.join(temporary, "custom"))
-        with open(jp, "w", encoding="utf-8") as stream:
-            json.dump(d, stream)
         compiled = os.path.join(temporary, "compiled", os.path.basename(out_ua))
-        os.makedirs(os.path.dirname(compiled))
-        result = uat(["from_json", jp, compiled, USMAP])
-        if result.returncode != 0 or not os.path.isfile(compiled):
-            raise RuntimeError("Material build failed: " +
-                               ((result.stderr or result.stdout or "from_json produced no uasset").strip()[-500:]))
+        _compile_material(d, jp, compiled, USMAP)
         # Failed conversions never leave partial packages in the shared stage. Custom textures go
-        # in first: an orphaned texture is inert, a material pointing at a missing one is not.
+        # in first: an orphaned texture is inert while a missing reference would break the material.
         for files, tex_gr in textures:
             tex_ua = os.path.join(stage, *pak_game_path(tex_gr).split("/")) + ".uasset"
             os.makedirs(os.path.dirname(tex_ua), exist_ok=True)
             publish_files(files, os.path.dirname(tex_ua))
-        sources = [compiled[:-7] + ext for ext in (".uasset", ".uexp", ".ubulk", ".uptnl")
-                   if os.path.isfile(compiled[:-7] + ext)]
-        publish_files(sources, os.path.dirname(out_ua))
+        _publish_material(compiled, os.path.dirname(out_ua))
     if textures:
         return f"{os.path.basename(game_rel)} (+{len(textures)} custom texture{'s' if len(textures) != 1 else ''})"
     return os.path.basename(game_rel)

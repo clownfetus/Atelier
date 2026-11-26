@@ -1,4 +1,5 @@
 """Atomic sidecar writes and recoverable publication of complete mod file sets."""
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -173,6 +174,14 @@ def publish_files(sources, destination):
 def recover_destination(destination):
     with _publish_lock:
         recover_publications(destination)
+
+
+@contextmanager
+def publication_scope(destination):
+    """Inspect a recovered destination and publish against it before another Atelier write."""
+    with _publish_lock:
+        recover_publications(destination)
+        yield
 
 
 def _project_target(root, relative):

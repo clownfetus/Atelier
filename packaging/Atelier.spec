@@ -35,6 +35,12 @@ datas += [(str(script), 'atelier/blender/atelier_live_bridge')
 # upscale.py loads its weights from beside the package (<_MEIPASS>/atelier/models when frozen).
 datas += [(str(item), 'atelier/models') for item in (ROOT / 'atelier/models').iterdir() if item.is_file()]
 datas += [(str(item), 'atelier/vendor/meshoptimizer') for item in (ROOT / 'atelier/vendor/meshoptimizer').iterdir() if item.is_file()]
+# Package the same hash-checked, import-free repair file on each platform.
+from atelier.file_fixer import module_digest
+module_digest()
+repair_vendor = ROOT / 'atelier/vendor/file_fixer'
+datas += [(str(repair_vendor / name), 'atelier/vendor/file_fixer')
+          for name in ('file_fixer.wasm', 'THIRD_PARTY_NOTICES.txt', 'RUST-COPYRIGHT.html')]
 binaries = compatibility_binaries()
 hiddenimports = [
     'io_lib',

@@ -1220,6 +1220,10 @@ progress:not([value]) { display: none; }
 .repatch-modal { width: 560px; max-width: 92vw; padding: 0; gap: 0; }
 .repatch-modal .shader-head { padding: 16px 24px; }
 .repatch-body { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+.repatch-repair-results { display: grid; gap: 12px; max-height: 36vh; overflow: auto; font-size: 12px; }
+.repatch-repair-results:empty { display: none; }
+.repatch-repair-item { display: grid; justify-items: start; gap: 6px; overflow-wrap: anywhere; }
+#mod-repair-notice { flex-wrap: wrap; }
 .repatch-field { flex: none; width: 100%; height: var(--studio-control-height); box-sizing: border-box; padding: 0 12px; }
 .shader-head .sb-clear { margin-left: auto; }
 
