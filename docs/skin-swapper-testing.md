@@ -5,7 +5,7 @@ Skin Swapper mod you can load in the Companion App. Each of your integration con
 listed with how Atelier meets it and how you can check it.
 
 Skin Swapper export is included in current Atelier releases. For normal use,
-follow the [Skin Swapper walkthrough](../README.md#skin-swapper-mods). This guide
+follow the [Skin Swapper walkthrough](USER_GUIDE.md#skin-swapper-mods). This guide
 keeps the Galacta integration test in a separate data directory; it does not
 replace an installed Atelier or modify its projects.
 

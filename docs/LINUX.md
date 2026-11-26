@@ -77,7 +77,7 @@ artifact hashes. Live Blender and model-replacement workflows need separate Linu
 verification; the desktop gate does not establish those results. In-game rendering remains
 unverified.
 
-HDR cubemap inputs and limits are described in the [HDR guide](../README.md#hdr-cubemaps).
+HDR cubemap inputs and limits are described in the [HDR guide](USER_GUIDE.md#hdr-cubemaps).
 Blender uses tone-mapped cubemap previews. Windows source verification of HDR
 readback does not establish Linux game rendering.
 
