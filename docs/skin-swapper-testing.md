@@ -12,7 +12,7 @@ replace an installed Atelier or modify its projects.
 ## What you need
 
 - Windows 10 or 11, 64-bit, with Marvel Rivals installed.
-- 64-bit [Python 3.12](https://www.python.org/downloads/) with the `py` launcher.
+- 64-bit [Python 3.15](https://www.python.org/downloads/) with the `py` launcher.
 - [Git](https://git-scm.com/), or the [ZIP of main](https://github.com/clownfetus/Atelier/archive/refs/heads/main.zip).
 - [Blender](https://www.blender.org/) 4.5 to 5.1, used to edit or rebuild a mesh.
 - Microsoft Edge WebView2. Windows 11 already has it.
@@ -33,30 +33,31 @@ replace the example with your current installation path. The script reuses its
 bundled template automatically, including when native tools are already installed
 in the test directory. `-Template` is an optional publisher override naming a
 folder holding both template files. `-DataDir` is where this test copy
-of Atelier keeps its settings, projects, exports, logs and tools. Put it on the same drive as
-the game: the 3D viewer hardlinks the game's containers so that installed mods stay out of
-its reads, and hardlinks only work within one drive.
+of Atelier keeps its settings, projects, exports, logs and tools. Choose a
+writable folder separate from the data directory used by your installed Atelier.
 
-The script:
+Setup prepares the test checkout in this order.
 
-1. creates `.venv` with Python 3.12 and installs `requirements.txt`;
-2. copies native tools from the current installation supplied with `-ToolsFrom`.
-   Without that option, the script falls back to its hash-pinned historical 0.4.1
-   installer and extracts it without running it. Use current installed tools for
-   testing current model workflows;
-3. reuses a complete template already in `<DataDir>\Tools\Galacta`, or copies the
-   pair from the supplied installation, and prints both SHA-256 hashes;
-4. asks Atelier whether Skin Swapper export is available. It should print
-   `Available: template installed, Galacta switch on.`;
-5. with `-Launch`, opens Atelier in a desktop window.
+1. Creates `.venv` with Python 3.15 if needed and installs `requirements.txt`.
+2. Copies native tools from the current installation supplied with `-ToolsFrom`.
+   Without that option, it fetches and builds the versions pinned in the checkout.
+   Source builds use the [native toolchain prerequisites](DEVELOPMENT.md#recreate-the-environment).
+3. Reuses a complete template already in `<DataDir>\Tools\Galacta`, or copies the
+   pair from the supplied installation, and prints both SHA-256 hashes.
+4. Asks Atelier whether Skin Swapper export is available. It should print
+   `Available: template installed, Galacta switch on.`
+5. Opens Atelier in a desktop window if you pass `-Launch`.
 
 Nothing is written to the game folder, the registry or an installed Atelier. The template
 stays in `<DataDir>`, outside the checkout, and git ignores `GAL_ConfigTemplate.*` everywhere.
 
+If you reuse a checkout whose `.venv` was created with an older Python, recreate
+the environment with Python 3.15 before running the script.
+
 To start Atelier again later:
 
 ```powershell
-.\Start-AtelierDev.ps1 -Mode Desktop -DataDir 'D:\AtelierGalactaTest'
+.\scripts\Start-AtelierDev.ps1 -Mode Desktop -DataDir 'D:\AtelierGalactaTest'
 ```
 
 ## First run

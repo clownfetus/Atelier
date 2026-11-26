@@ -11,10 +11,10 @@
 
 ## First-run setup
 
-On Windows, run `AtelierSetup.exe` from the latest release. The desktop window
-uses the Microsoft Edge WebView2 runtime. The installer is unsigned, so Windows
-may show an unrecognised-app notice. On Linux, download the x86-64 AppImage and
-follow the [Linux setup guide](LINUX.md#install-and-update).
+Choose your download under **Assets** on the [latest release](https://github.com/clownfetus/Atelier/releases/latest).
+On Windows, run `AtelierSetup.exe`. The desktop window uses the Microsoft Edge
+WebView2 runtime. The installer is unsigned, so Windows may show an unrecognised-app
+notice. On Linux, choose the x86-64 AppImage and follow the [Linux setup guide](LINUX.md#install-and-update).
 
 1. In Atelier, follow **Find the game → Unlock the paks → Make it yours**.
    Select your Marvel Rivals installation. In Steam, right-click the game and

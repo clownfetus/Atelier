@@ -2,27 +2,29 @@
 
 ## Install and update
 
-1. Download `Atelier-<version>-x86_64.AppImage` from an
-   [official release](https://github.com/clownfetus/Atelier/releases).
-2. Install your distribution's WebKitGTK 4.1 and GObject Introspection 2.0 runtimes,
-   plus `zenity` for file/folder pickers. On Ubuntu 24.04 or newer:
+1. Under **Assets** on the [latest release](https://github.com/clownfetus/Atelier/releases/latest),
+   download the file ending in `-x86_64.AppImage`.
+2. Install your distribution’s WebKitGTK 4.1 and GObject Introspection 2.0 runtimes,
+   `zenity` for file and folder pickers, and FUSE 2 for mounting the AppImage.
+   On Ubuntu 24.04:
 
    ```sh
-   sudo apt install gir1.2-webkit2-4.1 libgirepository-2.0-0 zenity
+   sudo apt install gir1.2-webkit2-4.1 libgirepository-2.0-0 zenity libfuse2t64
    ```
 
    Install Blender for Blender workflows.
-3. Mark the downloaded file executable and open it. For example, once you have
-   downloaded the 1.1.2 asset:
+3. Mark the downloaded file executable in its file properties, then open it.
+   From a terminal in the download folder, use the exact filename you downloaded.
 
    ```sh
-   chmod +x Atelier-1.1.2-x86_64.AppImage
-   ./Atelier-1.1.2-x86_64.AppImage
+   appimage='Atelier-<version>-x86_64.AppImage'  # replace <version> with the downloaded version
+   chmod +x "./$appimage"
+   "./$appimage"
    ```
 
 4. Follow **Find the game → Unlock the paks → Make it yours**. Choose the game
-   installation and supply a current mapping and AES key if automatic retrieval
-   is unavailable. Set the mods folder and Blender executable in **Menu → Settings**.
+   installation, then follow the [first-run setup guide](USER_GUIDE.md#first-run-setup)
+   for paths, mods and the manual key and mapping steps.
 
 To update a build with the in-app updater, choose **Download Update**, then
 **Restart and Update** when ready. Atelier replaces the writable AppImage and
@@ -34,18 +36,19 @@ live in `~/.local/share/Atelier` by default, independently of the downloaded fil
 Do not delete that data directory when replacing the AppImage. If you use
 `XDG_DATA_HOME` or `ATELIER_HOME`, keep the same value across launches.
 
-The AppImage needs FUSE 2 to mount normally. If FUSE is unavailable, use the
-same downloaded filename with `--appimage-extract-and-run`:
+If FUSE 2 is unavailable, use the same `appimage` value from step 3 and launch
+with `--appimage-extract-and-run`.
 
 ```sh
-./Atelier-1.1.2-x86_64.AppImage --appimage-extract-and-run
+"./$appimage" --appimage-extract-and-run
 ```
 
 ## Desktop dependencies and feature support
 
-Releases build on Ubuntu 24.04 (glibc 2.39) with Python 3.15 and run on that or anything newer:
-current Fedora, Arch, Debian 13 and Ubuntu. The AppImage does not bundle WebKitGTK, Blender or
-zenity. Package names vary by distribution. On Arch:
+The x86-64 AppImage is built on Ubuntu 24.04 with glibc 2.39 and Python 3.15.
+Use a distribution with glibc 2.39 or newer and the desktop dependencies listed
+above. Install Blender separately for model editing. Package names vary by
+distribution. On Arch:
 
 ```sh
 sudo pacman -S webkit2gtk-4.1 zenity fuse2
@@ -148,7 +151,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the broader development workflow.
 
 ```bash
 .venv/bin/python scripts/build.py --platform linux          # -> dist/Atelier-<version>-x86_64.AppImage
-.venv/bin/python scripts/build.py --platform linux --version 1.2.0
 ```
 
 `build.py` installs the toolchain, freezes with `packaging/Atelier.spec` (including the bundled

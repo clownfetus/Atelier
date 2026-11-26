@@ -1,9 +1,10 @@
 # Preparing a public release
 
-For normal updates, use **Actions → Release Atelier** or push a numeric `v*` tag.
-See [automatic releases and in-app updates](automatic-releases.md) for the release
-controls, signing, patch compatibility and verification. The candidate procedure
-below remains available for historical/manual verification.
+Successful **Checks** on `main` queue a patch release. For a manual release, use
+**Actions → Release Atelier** or push a version tag in the `vMAJOR.MINOR.PATCH`
+format. See [automatic releases and in-app updates](automatic-releases.md) for
+the release controls, signing, patch compatibility and verification. The
+candidate procedure below remains available for manual verification.
 
 Dispatch `.github/workflows/release-candidate.yml` against the release commit (or push a
 `codex/release-*` / `release/*-candidate` branch). It builds the Windows installer and the Linux
@@ -98,8 +99,8 @@ After building, run the frozen smoke against the emitted executable path:
 This opens the actual frozen program in a hidden WebView2 window and connects
 Playwright to that window. It creates fresh, isolated test data under the report
 directory and refuses to stop or replace an application already using either
-port. The run checks module loading, all six motion sets, both themes, the local
-font/logo and the original-material route's path validation. The screenshots,
+port. The run checks module loading, the assembly glyph, both themes, the local
+font and logo, and the original-material route’s path validation. The screenshots,
 results and disposable profile remain in the report directory. Use a new report
 directory for each run.
 

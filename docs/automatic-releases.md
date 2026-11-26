@@ -1,9 +1,9 @@
 # Releasing Atelier
 
-Use **Actions → Release Atelier → Run workflow** on `main`, enter the next
-numeric version (for example `1.1.4`), and leave **Publish** enabled. Alternatively,
-push a tag such as `v1.1.4` on the intended commit. Both paths run the same release
-workflow. A version must be higher than the latest stable GitHub release.
+For a manual release, use **Actions → Release Atelier → Run workflow** on
+`main`. Enter a numeric version higher than the latest stable GitHub release
+and leave **Publish** enabled. To select a commit by tag, push a tag in the
+`vMAJOR.MINOR.PATCH` format on that commit. Both paths run the same workflow.
 
 The action builds Windows and Linux, checks the actual packaged applications,
 tests upgrading from the current published version, and creates the release.

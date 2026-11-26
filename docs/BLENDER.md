@@ -2,30 +2,38 @@
 
 ## Send to Blender or export a portable scene
 
-Model Studio → **Model → Send to Blender (live)** adds the visible body and held
-weapons to an already open Blender scene. Install **Atelier Live Bridge** once:
-open **Set up live Blender** beside the action, download the bundled ZIP, then
-in Blender 4.2 or newer choose **Preferences → Add-ons → Install from Disk**.
-Use the top-right drop-down for **Install from Disk**, select the ZIP, enable the
-extension, and keep Blender open. Blender also accepts the ZIP by drag-and-drop;
-see its [extension installation guide](https://docs.blender.org/manual/en/4.2/editors/preferences/extensions.html). Installation is
-explicit; Atelier never installs or executes an arbitrary add-on for you.
-Use one enabled Blender session at a time. Save your Blender file after sending.
-When updating Atelier, download its bundled extension again and install that ZIP
-to keep both sides compatible; a local ZIP install has no automatic update feed.
-If Blender is running an older copy, Send to Blender stops and asks for the
-current one rather than importing with older material wiring.
+### Send a model into an open Blender scene
 
-**Export portable .blend** creates a standalone scene with packed textures and
-opens it in Blender. It does not require the extension. The mesh card's existing
-editing workflow remains the route for round-tripping geometry into a game mod.
-Live-send does not save a `.blend`, overwrite project paint, or install a mod.
-It reports completion only after Blender acknowledges the import; material
-warnings appear in Activity. Game animation, physics and full shader behavior
-are not recreated by either export route.
+1. Open a costume in Model Studio. In the **Model** menu, open
+   **Set up live Blender** and download **Atelier Live Bridge**.
+2. In Blender 4.2 or newer, open **Edit → Preferences → Add-ons**. In the
+   top-right menu, choose **Install from Disk**, select the downloaded ZIP and
+   enable the extension. Blender also accepts the ZIP by drag-and-drop.
+   [Blender’s installation guide](https://docs.blender.org/manual/en/4.2/editors/preferences/extensions.html)
+3. Keep one Blender session open with the extension enabled. In Atelier, use
+   **Model → Send to Blender (live)** to add the visible body and held weapons
+   to the open scene. Save your Blender file when you want to keep the scene.
 
-For **Edit in Blender**, right-click an installed `SK_*` mesh. This creates a
-project `.blend` for the mod rebuild workflow; **Open in Blender** reopens it.
+Atelier waits for Blender to acknowledge the import. Check **Activity** for
+material warnings. After updating Atelier, download and install its bundled
+Live Bridge ZIP again. Blender’s locally installed extension needs that manual
+update. Atelier prompts for the newer copy if Blender is running an older one.
+
+### Save a portable scene
+
+Set the Blender executable under **Menu → Settings → Paths**. In Model Studio,
+choose **Model → Export portable .blend** to save and open a standalone scene
+with packed textures and connected materials. You can use this export with
+Blender alone. Both scene workflows preserve the deformation rig for modelling
+and approximate the material appearance. Game animation and physics stay in
+the game.
+
+### Edit a mesh for a mod
+
+Set the Blender executable under **Paths**, then right-click an installed
+`SK_*` mesh and choose **Edit in Blender**. Save your changes to the project
+`.blend` to use them when building the mod. **Open in Blender** reopens the
+saved project file.
 Choose **Menu → Settings → Behavior → Add model textures to the project when
 opening in Blender** before extracting. With the switch on (the default), linked
 project textures can be painted and included in the mod. Save painted images in
@@ -35,10 +43,9 @@ become project texture edits. Existing painted project files are preserved.
 Portable scenes and live send pack their images independently of this switch.
 HDR cubemaps appear in Blender as tone-mapped previews, not HDR reflection nodes.
 
-Blender 4.2 is the extension's declared minimum. The 1.1.1 generated-geometry
-import, acknowledgement and saved-scene probe ran on Blender 5.1.2; this is not
-an in-game rendering check. Linux model workflows (native AtelierNative, no Wine)
-remain outside that Windows verification. See [Linux setup](LINUX.md).
+The recorded Atelier 1.1.1 verification checked generated-geometry import,
+acknowledgement and scene saving on Windows with Blender 5.1.2. For Linux
+feature support and verification scope, see [Linux setup](LINUX.md#desktop-dependencies-and-feature-support).
 
 The extension ships inside both packaged platforms and is downloadable from the
 same local interface in source builds. Its `build-inputs.json` records the

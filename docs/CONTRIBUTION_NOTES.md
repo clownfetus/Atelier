@@ -1,5 +1,8 @@
 # Atelier studio modernization: maintainer handoff
 
+This handoff records the Atelier 0.4 contribution and its verification. For
+the current development setup, see [Run from source](DEVELOPMENT.md#run-from-source).
+
 For 0.4, start with [CHANGELOG.md](../CHANGELOG.md) and
 [the release notes](release-0.4.0.md). They cover Model Studio, mesh replacement
 and morph preservation, texture recovery, stable import thumbnails, and final
@@ -102,38 +105,35 @@ the deliberately disabled unsafe world round-trip fallback.
 
 ## Run from source on Windows
 
-Use 64-bit Python 3.12, Node.js for JavaScript checks, and Microsoft Edge WebView2
-for the desktop shell. From the checkout, in PowerShell:
+Use 64-bit Python 3.15, Node.js for JavaScript checks, and Microsoft Edge WebView2
+for the desktop shell. See the [current prerequisites](DEVELOPMENT.md#recreate-the-environment)
+for native tool builds. From the checkout, in PowerShell:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.15 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m playwright install chromium
 
-# Choose a separate local NTFS directory, preferably on the game's drive.
-$atelierReviewData = Join-Path $env:LOCALAPPDATA 'AtelierReview'
-.\Install-AtelierTools.ps1 -DataDir $atelierReviewData
-.\Start-AtelierDev.ps1 -Mode Browser -Port 8770 -DataDir $atelierReviewData
+# Choose a separate local NTFS directory for the review.
+$atelierReviewData = Join-Path $env:USERPROFILE 'AtelierReview'
+.\scripts\Start-AtelierDev.ps1 -Mode Browser -Port 8770 -DataDir $atelierReviewData
 ```
 
-Open `http://127.0.0.1:8770`. Configure the game's Paks directory and current
-mapping through Setup/Settings. Set the mod destination to a new **test-mods**
+Open `http://127.0.0.1:8770`. Choose your Marvel Rivals installation in the setup
+wizard. Set the mod destination to a new **test-mods**
 folder inside the review data directory. Use one running instance per data
 directory. Ctrl+C stops the browser-mode server; CSS/JS changes only require a
 reload, while Python changes require a restart.
 
-The tool installer bootstraps the pinned upstream bundle, verifies download
-hashes and preserves existing local files. Its custom shader retoc is required;
-an ordinary generic retoc binary is not interchangeable. Advanced native checks
-also need compatible AtelierMesh, Blender and shader compiler tools as described
-in [DEVELOPMENT.md](DEVELOPMENT.md). Tools, keys, mappings, configuration and
-extracted game assets are external dependencies, not contribution contents.
+The launcher builds and verifies the pinned toolchain on first run. See the
+[native tool setup](DEVELOPMENT.md#native-tools) for commands and prerequisites.
+Keep generated project files and caches in the review data directory.
 
 After stopping browser mode, launch the desktop shell against the same isolated
 data directory:
 
 ```powershell
-.\Start-AtelierDev.ps1 -Mode Desktop -Port 8778 -DataDir $atelierReviewData
+.\scripts\Start-AtelierDev.ps1 -Mode Desktop -Port 8778 -DataDir $atelierReviewData
 ```
 
 Desktop mode defaults to port 8767; `-Port 8778` gives this review instance its

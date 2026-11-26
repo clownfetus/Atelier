@@ -1,20 +1,14 @@
 # Local development and reliability checks
 
-`test_inks.py` (a dependency-free Node colour harness) and `inks_dial_checks.py`
-in the full browser suite cover the measured charge colour. Use `--inks-dial-only`
-for the focused browser run. It checks all palettes, measured surfaces, legacy
-preference migration and OS reduced motion.
+Atelier uses Bottle, vanilla JavaScript, Three.js and pywebview. Start with
+the [source launch steps](#run-from-source) and the [pinned prerequisites](#recreate-the-environment).
+For design decisions, see the [design system](DESIGN_SYSTEM.md).
 
-Wave 4b adds `--surfaces-only`: File-byte upload fixtures, caption/shape/font
-checks, real-progress launch presentation and policy gates. Native WebView2 smoke
-uploads a pathless File to a disposable fixture endpoint and verifies its bytes
-and originating project header. Run the full browser suite before a PR.
-
-Wave 4c adds `--showcase-only`, with labelled synthetic geometry and a fake
-WebAudio context (no test sounds reach the speakers). It checks disposable toon
-materials while rendering, exact source identity/JSON after Inspect, camera
-restoration on successful/failed captures and Full/Calm/Off/OS/hidden audio
-gates. HTTP tests verify `/api/app_info`.
+Run the full browser suite for interface changes. For focused checks,
+`tests/browser_smoke.py --glyph-only --report-dir <folder>` covers the assembly
+glyph and **Preview motion**. `--glyph-surfaces-only` covers the surrounding
+interface motion. `--showcase-only` checks Showcase materials, camera restoration
+and audio behaviour using synthetic geometry and a simulated audio context.
 
 Desktop upgrades retain the existing WebView profile. The launcher uses a URL
 derived from the bundled HTML, and both HTML and frontend assets disable HTTP
@@ -33,9 +27,10 @@ The frozen smoke checks the first native navigation before reloading, and accept
 `atelier.upgrade-canary` set to `preserve-me`. Profiles are copied into isolated
 test data; the supplied original is never changed.
 
-This branch includes the environment/baseline and critical reliability work, plus the Phase 2 Material 3 foundation. The application still uses Bottle, vanilla JavaScript, Three.js and pywebview. Project sidecars, Unreal paths and mod container formats are unchanged. See [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) for theme, component, icon and artwork-cache decisions.
-
 ## Run from source
+
+Set up [Python and the toolchain](#recreate-the-environment) first. Windows
+uses the PowerShell launcher below. For Linux, follow the [Linux source setup](LINUX.md#run-from-source).
 
 ```powershell
 .\scripts\Start-AtelierDev.ps1                      # browser mode: http://127.0.0.1:8767
@@ -84,8 +79,9 @@ source and SHA-256 hashes; none are committed. See [`toolchain/README.md`](../to
 .\.venv\Scripts\python.exe scripts\toolchain.py outdated              # newer upstream releases
 ```
 
-A first run of the app fetches the AES key and the current mappings itself; Setup only needs the
-game's Paks folder (detected from Steam) and, for Blender features, a Blender executable.
+On first run, select your Marvel Rivals installation. The wizard fetches the
+current key and mapping when available. See [first-run setup](USER_GUIDE.md#first-run-setup)
+for manual setup and Blender paths.
 
 ## Build a release
 
@@ -113,7 +109,6 @@ tag-triggered and automatic releases share the same serialized release queue.
 
 ```powershell
 .\BUILD.bat                    # Windows: dist\AtelierSetup.exe
-.\BUILD.bat --version 1.2.0     # set the version first
 ```
 
 On Linux: `.venv/bin/python scripts/build.py --platform linux` (see [LINUX.md](LINUX.md)).
@@ -401,7 +396,7 @@ Use these report directories for the current phase:
 .\.venv\Scripts\python.exe tests/browser_smoke.py `
   --report-dir 'D:\AtelierDev\phase-2\browser-checks' `
   --mesh 'D:\AtelierDev\phase-0-1\native-checks\mesh\Marvel\Content\Marvel\Characters\1029\1029100\Meshes\10291\SK_10291_1029100.glb'
-.\Start-AtelierDev.ps1 -Mode Browser -Port 8770 -DataDir 'D:\AtelierDev\phase-0-1'
+.\scripts\Start-AtelierDev.ps1 -Mode Browser -Port 8770 -DataDir 'D:\AtelierDev\phase-0-1'
 ```
 
 Open `http://127.0.0.1:8770`, switch the appearance selector, browse Characters and a skin folder, then open a material/3D preview and verify export controls. The isolated destination remains `test-mods`. Optional portrait metadata checks run in the background at launch; the image cache is independent of projects and exports. Cached artwork works offline; uncached artwork falls back to a symbol if unavailable. Restart Python after changes to the catalogue parser or browse routes.
