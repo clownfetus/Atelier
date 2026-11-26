@@ -18,6 +18,8 @@
 
 ![Magik’s Amethyst Armor in Atelier’s Model Studio, with a 3D preview and material controls](images/model-studio.png)
 
+<a name="features"></a>
+
 ## What you can do
 
 - **Find a costume or part by name.** Browse heroes and their costumes, or search
@@ -39,7 +41,8 @@
 ## Quick start
 
 1. Open the [latest release](https://github.com/clownfetus/Atelier/releases/latest).
-   Run `AtelierSetup.exe` on Windows or grab the x86-64 AppImage and follow the
+   Under **Assets**, choose `AtelierSetup.exe` for Windows or the x86-64
+   AppImage for Linux. Run the Windows installer or follow the
    [Linux setup guide](docs/LINUX.md#install-and-update).
 2. Launch Atelier, select your Marvel Rivals installation and follow the setup
    wizard.
@@ -60,8 +63,10 @@ local files**. If Atelier asks for an unlock key or mapping file, follow the
 
 - [User guide](docs/USER_GUIDE.md) for step-by-step help with setup, editing
   and building mods.
-- [Blender setup](docs/BLENDER.md#send-to-blender-or-export-a-portable-scene)
-  for the Live Bridge, portable scenes and editing meshes.
+- <a name="model-studio-and-showcase"></a>[Preview and edit models](docs/USER_GUIDE.md#model-studio-and-showcase)
+  · [Blender setup](docs/BLENDER.md#send-to-blender-or-export-a-portable-scene)
+- <a name="add-an-asset-at-a-custom-path"></a>[Add your own assets](docs/USER_GUIDE.md#add-an-asset-at-a-custom-path)
+  · <a name="replace-a-material"></a>[Replace a material](docs/USER_GUIDE.md#replace-a-material)
 - <a name="hdr-cubemaps"></a>[Import HDR cubemaps](docs/USER_GUIDE.md#hdr-cubemaps)
   · <a name="process-s-maps"></a>[Process S maps](docs/USER_GUIDE.md#process-s-maps)
   · <a name="skin-swapper-mods"></a>[Export for Skin Swapper](docs/USER_GUIDE.md#skin-swapper-mods)
@@ -74,7 +79,7 @@ local files**. If Atelier asks for an unlock key or mapping file, follow the
 ## Development
 
 [Run from source](docs/DEVELOPMENT.md#run-from-source) ·
-[Contribution notes](docs/CONTRIBUTION_NOTES.md) ·
+[0.4 development handoff](docs/CONTRIBUTION_NOTES.md) ·
 [Packaging](docs/PACKAGING.md) ·
 [Release workflow](docs/automatic-releases.md)
 
@@ -83,8 +88,8 @@ local files**. If Atelier asks for an unlock key or mapping file, follow the
 Noobmaster, Clownfetus and collaborator [Tendo](https://github.com/tendo625).
 Atelier is licensed under the [GNU General Public License v3](LICENSE).
 
-- Xzant · [UAssetToolRivals](https://github.com/XzantGaming/UAssetToolRivals)
+- Xzant · [UAssetToolRivals](https://github.com/X-zant/UAssetToolRivals)
 - Natimerry · [repak-rivals retoc](https://github.com/natimerry/repak-rivals/)
-- Saturn · [Repak-X](https://github.com/XzantGaming/Repak-X) and [SpaceHost](https://spacedepot.github.io/SpaceHost/)
+- Saturn · [Repak-X](https://github.com/X-zant/Repak-X) and [SpaceHost](https://spacedepot.github.io/SpaceHost/)
 - donutman07 · [Character IDs](https://github.com/donutman07/MarvelRivalsCharacterIDs/)
 - [RivalSkins](https://rivalskins.com/heroes/) for optional hero and skin artwork
