@@ -6,10 +6,9 @@ Prepare an isolated Atelier source checkout for testing Project Galacta Skin Swa
 Run from a clone of https://github.com/clownfetus/Atelier at main. See
 docs/skin-swapper-testing.md for the whole test. This script:
 
-  1. creates .venv with 64-bit Python 3.12 and installs requirements.txt;
+  1. creates .venv with 64-bit Python 3.15 if needed and installs requirements.txt;
   2. installs Atelier's native tools into <DataDir>\Tools, copied from an existing Atelier
-     install (-ToolsFrom) or unpacked from the hash-pinned 0.4.1 release installer, which is
-     extracted and never run;
+     install (-ToolsFrom) or built from the inputs pinned in toolchain/tools.lock.json;
   3. reuses the bundled Skin Swapper template, or installs an explicit publisher override;
   4. asks Atelier itself whether Skin Swapper export is available;
   5. starts Atelier in a desktop window when you pass -Launch.
@@ -24,12 +23,11 @@ Normally the complete pair is copied automatically from -ToolsFrom.
 
 .PARAMETER DataDir
 Atelier's isolated data folder: configuration, projects, exports, logs and tools.
-Put it on the same drive as Marvel Rivals so the 3D viewer can keep installed mods out of
-its reads (it hardlinks the game's containers).
+Choose a writable folder separate from the data directory of your installed Atelier.
 
 .PARAMETER ToolsFrom
 A current Atelier install folder (the one holding Atelier.exe and Tools\) to copy
-native tools and the bundled template from, instead of downloading historical tools.
+native tools and the bundled template from.
 
 .PARAMETER Launch
 Start Atelier in a desktop window when setup finishes.
