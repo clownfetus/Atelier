@@ -32,7 +32,7 @@ export function pairedWeapon(weapon) {
 
 const weaponLabel=/weapon|sword|gun|blade|hammer|bow|staff|dagger|shield|pistol|spear|axe|cannon|launcher|rifle|katana|trident|wand|pole|rod|baton|stick|nunchaku|scepter|sickle|claw/i;
 const weaponBone=name=>!/^root$|^pelvis$|^weapon_[lr]$|^ik_/i.test(name) && weaponLabel.test(name);
-const physicalWorld=joint=>joint.node.matrixWorld.clone().multiply(joint.inverseExported).multiply(joint.physical);
+export const physicalWorld=joint=>joint.node.matrixWorld.clone().multiply(joint.inverseExported).multiply(joint.physical);
 
 export function weaponSide(name, hand='auto') {
   if(hand==='left')return 'l';

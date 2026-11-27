@@ -70,6 +70,7 @@ local files**. If Atelier asks for an unlock key or mapping file, follow the
 - <a name="hdr-cubemaps"></a>[Import HDR cubemaps](docs/USER_GUIDE.md#hdr-cubemaps)
   · <a name="process-s-maps"></a>[Process S maps](docs/USER_GUIDE.md#process-s-maps)
   · <a name="skin-swapper-mods"></a>[Export for Skin Swapper](docs/USER_GUIDE.md#skin-swapper-mods)
+- [Author Skin VFX attachments](docs/USER_GUIDE.md#skin-vfx-attachments)
 - <a name="updates"></a>[Update Atelier](docs/USER_GUIDE.md#updates)
   · [Latest release notes](https://github.com/clownfetus/Atelier/releases/latest)
   · [Changelog](CHANGELOG.md)
