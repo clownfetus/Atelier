@@ -200,8 +200,8 @@
 
 <!-- ── confirm: import all ── -->
 <div class="overlay" id="confirm-all-overlay">
-  <div class="modal">
-    <h2><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit all textures?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-all-title">
+    <h2 id="confirm-all-title"><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit all textures?</h2>
     <p id="confirm-all-msg">This will extract and decode all listed textures.</p>
     <div class="warning">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
@@ -219,8 +219,8 @@
 
 <!-- ── confirm: overwrite existing mod on install ── -->
 <div class="overlay" id="confirm-overwrite-overlay">
-  <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace existing mod?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-overwrite-title">
+    <h2 id="confirm-overwrite-title"><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace existing mod?</h2>
     <p id="confirm-overwrite-msg">A mod with this name already exists and will be replaced.</p>
     <div class="modal-row">
       <button class="btn" id="confirm-overwrite-cancel">Cancel</button>
@@ -257,7 +257,7 @@
 
 <!-- ── material parameter editor ── -->
 <div class="overlay" id="material-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="mat-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <div class="mat-tool-label">Material editor</div>
@@ -460,7 +460,7 @@
 
 <!-- ── curve editor (CurveLinearColor R/G/B/A keys) ── -->
 <div class="overlay" id="curve-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="curve-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="spline" size="18"></i> <span id="curve-title">Curve</span></h2>
@@ -479,7 +479,7 @@
 
 <!-- ── Niagara VFX editor (color-curve group recolor) ── -->
 <div class="overlay" id="vfx-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="vfx-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="sparkles" size="18"></i> <span id="vfx-title">VFX</span></h2>
@@ -501,7 +501,7 @@
 
 <!-- ── update check / download ── -->
 <div class="overlay" id="update-overlay">
-  <div class="modal" id="update-modal">
+  <div class="modal" id="update-modal" role="dialog" aria-modal="true" aria-label="Application update">
     <div id="update-confirm" style="display:none;flex-direction:column;gap:16px">
       <h2><i data-lucide="arrow-up-circle" size="18" style="color:var(--acc)"></i> Update available</h2>
       <p>Atelier <strong id="update-tag" style="color:var(--text)"></strong> is ready to install.</p>
@@ -773,9 +773,9 @@
 
 <!-- ── per-texture export options (#20 mips / texture group, #21 Marvel_LQ, #22 blank) ── -->
 <div class="overlay" id="texopt-overlay">
-  <div class="modal setup-modal" style="max-width:560px">
+  <div class="modal setup-modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="texopt-heading">
     <div class="setup-head">
-      <h2><i data-lucide="sliders-horizontal" size="18"></i>
+      <h2 id="texopt-heading"><i data-lucide="sliders-horizontal" size="18"></i>
           Export options<span id="texopt-title" class="muted" style="font-weight:400;font-size:13px"></span></h2>
       <button class="sb-clear" id="texopt-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -872,8 +872,8 @@
 
 <!-- ── reset data confirm ── -->
 <div class="overlay" id="reset-overlay">
-  <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset all data?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-title">
+    <h2 id="reset-title"><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset all data?</h2>
     <p>The following will be permanently deleted:</p>
     <ul style="margin:4px 0 0 16px;font-size:12px;color:var(--muted);line-height:2;list-style:disc">
       <li>All projects and edited assets</li>
@@ -896,9 +896,9 @@
 
 <!-- ── Repatcher ── -->
 <div class="overlay" id="repatch-overlay">
-  <div class="modal repatch-modal">
+  <div class="modal repatch-modal" role="dialog" aria-modal="true" aria-labelledby="repatch-title">
     <div class="shader-head">
-      <h2><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
+      <h2 id="repatch-title"><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
       <span class="muted">port a broken mod to the current patch</span>
       <button class="sb-clear" id="repatch-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -972,9 +972,9 @@
 
 <!-- ── Shader Studio ── -->
 <div class="overlay" id="shader-overlay">
-  <div class="modal shader-modal">
+  <div class="modal shader-modal" role="dialog" aria-modal="true" aria-labelledby="shader-title">
     <div class="shader-head">
-      <h2><i data-lucide="binary" size="18" style="color:var(--acc)"></i> Shader Studio</h2>
+      <h2 id="shader-title"><i data-lucide="binary" size="18" style="color:var(--acc)"></i> Shader Studio</h2>
       <span id="shader-subtitle" class="muted"></span>
       <button class="sb-clear" id="shader-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -1039,7 +1039,7 @@
 
 <!-- ── World / level editor (lights · fog · grade · components) ── -->
 <div class="overlay" id="world-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="world-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="globe" size="18"></i> <span id="world-title">Level</span></h2>
@@ -1058,7 +1058,7 @@
 
 <!-- ── Text / StringTable editor ── -->
 <div class="overlay" id="text-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="text-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="type" size="18"></i> <span id="text-title">StringTable</span></h2>
@@ -1121,6 +1121,7 @@
 <script src="/static/catalogue-art.js"></script>
 <script src="/static/continuity.js"></script>
 <script src="/static/dialog.js"></script>
+<script src="/static/modal-trap.js"></script>
 <script src="/static/trash-dialog.js"></script>
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
