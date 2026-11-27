@@ -1,12 +1,14 @@
-"""Validate per-process port configuration without launching a server or desktop window."""
+"""Check port configuration and when the local server is ready for navigation."""
 import os
 from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 
 def read_port(value=None):
@@ -53,6 +55,27 @@ class AppPort(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("ATELIER_PORT must be an integer from 1 to 65535", result.stderr)
                 self.assertEqual(result.stdout, "")
+
+
+class ServerReadiness(unittest.TestCase):
+    def test_notifies_after_binding_and_before_serving(self):
+        from atelier.web import app as web
+
+        stages = []
+        make_server = web.make_server
+
+        def bind(*args, **kwargs):
+            server = make_server(*args, **kwargs)
+            stages.append("bound")
+            return server
+
+        adapter = web._ThreadedServer(port=0, on_listening=lambda: stages.append("ready"))
+        with patch.object(web, "make_server", bind), patch.object(
+            web._ThreadingWSGIServer, "serve_forever", side_effect=lambda: stages.append("serving")
+        ):
+            adapter.run(web.app)
+
+        self.assertEqual(stages, ["bound", "ready", "serving"])
 
 
 if __name__ == "__main__":

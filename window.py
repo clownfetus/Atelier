@@ -2,9 +2,10 @@
 import sys
 import time
 import threading
-import urllib.request
+import traceback
 import os
 import datetime
+from concurrent.futures import Future
 from pathlib import Path
 from atelier.updates import recover_interrupted
 
@@ -34,7 +35,7 @@ if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
 from atelier import hostos
 from atelier.window_game import GameControls
 from atelier.window_theme import WindowTheme
-from atelier.web.app import PORT, frontend_url
+from atelier.web.app import PORT, _ThreadedServer, app, frontend_url
 
 _ROOT = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
          else os.path.dirname(os.path.abspath(__file__)))
@@ -81,25 +82,19 @@ def _setup_logging():
     sys.stderr = _Tee(orig_err)
 
 
-def _wait_for_server(timeout=15):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            urllib.request.urlopen(URL, timeout=1)
-            return True
-        except Exception:
-            time.sleep(0.1)
-    return False
-
-
-def _run_server():
-    import atelier.web.routes as _routes  # registers all Bottle routes
-    from atelier.web.app import app, PORT as _PORT, _ThreadedServer
+def _run_server(startup):
     try:
-        app.run(host="127.0.0.1", port=_PORT, quiet=True, server=_ThreadedServer)
-    finally:
-        _routes._observer.stop()
-        _routes._observer.join()
+        from atelier.web import routes  # registers all Bottle routes
+        try:
+            app.run(host="127.0.0.1", port=PORT, quiet=True, server=_ThreadedServer,
+                    on_listening=lambda: startup.set_result(None))
+        finally:
+            routes._observer.stop()
+            routes._observer.join()
+    except Exception as error:
+        if startup.done():
+            raise
+        startup.set_exception(error)
 
 
 def main():
@@ -115,12 +110,19 @@ def main():
     webview.settings['ALLOW_DOWNLOADS'] = True  # Viewer captures use the native Save As dialog.
     _setup_logging()
 
-    t = threading.Thread(target=_run_server, daemon=True)
-    t.start()
-
-    if not _wait_for_server():
+    # The listener can signal readiness directly, avoiding localhost's IPv6 fallback
+    # while keeping the browser URL (and its saved profile) on the existing origin.
+    startup = Future()
+    threading.Thread(target=_run_server, args=(startup,), daemon=True).start()
+    try:
+        startup.result(timeout=15)
+    except TimeoutError:
         print("Server did not start in time.", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    except Exception:
+        print("Could not start Atelier's local server.", file=sys.stderr)
+        traceback.print_exc()
+        return 1
 
     appearance = WindowTheme(_DATA_ROOT)
     window = webview.create_window("Atelier", URL, width=1400, height=900,
