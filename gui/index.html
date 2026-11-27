@@ -52,6 +52,7 @@
 <link rel="stylesheet" href="/static/trash-dialog.css">
 <link rel="stylesheet" href="/static/settings-tabs.css">
 <link rel="stylesheet" href="/static/project-palette.css">
+<link rel="stylesheet" href="/static/tray-filters.css">
 </head>
 <body data-page="library">
 
@@ -183,6 +184,13 @@
         <span id="process-s-maps-hint" hidden></span></div>
     </div>
     <div id="mod-tray-heroes" aria-label="Heroes in this mod" hidden></div>
+    <div id="tray-filter-bar" hidden>
+      <div class="tray-search-row">
+        <input id="tray-search" type="search" placeholder="Filter Mod tray…" aria-label="Filter Mod tray assets">
+      </div>
+      <div class="tray-type-pills" role="group" aria-label="Filter Mod tray by type"></div>
+      <div class="tray-filter-summary" hidden></div>
+    </div>
     </div>
     <div id="tray-progress" aria-label="Asset preparation" aria-live="polite"></div>
     <div id="sidebar-list"></div>
@@ -1128,6 +1136,7 @@
 <script src="/static/trash-dialog.js"></script>
 <script src="/static/settings-tabs.js"></script>
 <script src="/static/project-palette.js"></script>
+<script src="/static/tray-filters.js"></script>
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>

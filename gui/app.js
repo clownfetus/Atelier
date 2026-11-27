@@ -3034,6 +3034,7 @@ let _sbLastTok  = null;          // anchor for shift-click ranges
 function _sbVisible() {
   const all = Object.values(sidebarData);
   const q = _libraryQuery().toLowerCase();
+  if (window.AtelierTrayFilters) return window.AtelierTrayFilters.filter(all, q);
   return q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
 }
 
@@ -3111,9 +3112,11 @@ function renderSidebar() {
     return;
   }
   const q     = _libraryQuery().toLowerCase();
-  const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
+  const items = window.AtelierTrayFilters ? window.AtelierTrayFilters.filter(all, q)
+    : (q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all);
+  window.AtelierTrayFilters?.updateControls(all, items);
   if (!items.length) {
-    list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
+    list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the filter.</div>';
     updateInstallBtn();
     return;
   }
@@ -3623,8 +3626,23 @@ async function removeAllEdits() {
   }
 }
 
+window.applySelectionProfile = function applySelectionProfile(name, entry) {
+  const desel = new Set(entry?.deselected || []);
+  for (const item of Object.values(sidebarData)) {
+    item.selected = !desel.has(item.game_rel);
+  }
+  if (entry?.mod_name) {
+    const input = document.getElementById("mod-name-input");
+    if (input) input.value = entry.mod_name;
+  }
+  renderSidebar();
+  saveSelection();
+  toast(`Applied profile “${name}”`, "success");
+};
+
 document.getElementById("tray-menu-btn").addEventListener("click", e => {
   const items = [
+    { icon: "layers", label: "Selection profiles…", action: () => window.AtelierTrayFilters?.openProfiles() },
     { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
   ];
   if (Object.keys(sidebarData).length) {
