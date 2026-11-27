@@ -84,7 +84,7 @@
     <button class="at-btn" id="workspace-retry" type="button" hidden>Try again</button>
   </section>
   <section id="workspace-choice" aria-labelledby="workspace-choice-title" hidden>
-    <div class="workspace-choice-heading"><div><h2 id="workspace-choice-title">Who will you make yours?</h2><p>Choose a hero, then a costume to start colouring.</p></div><input class="at-field" id="workspace-search" type="search" placeholder="Find a hero or costume…" aria-label="Find a hero or costume"></div>
+    <div class="workspace-choice-heading"><h2 id="workspace-choice-title">Choose a costume</h2><input class="at-field" id="workspace-search" type="search" placeholder="Find a hero or costume…" aria-label="Find a hero or costume"></div>
     <p id="workspace-choice-status" role="status"></p>
     <div id="workspace-heroes" aria-label="Heroes"></div>
     <div id="workspace-costumes" aria-label="Costumes"></div>
@@ -498,7 +498,7 @@
 
 <!-- ── launch check and first-run setup page / editable Settings panel ── -->
 <div class="overlay" id="setup-overlay">
-  <div class="modal setup-modal">
+  <div class="modal setup-modal" id="setup-dialog" tabindex="-1">
     <!-- Launch check and first-run setup. Settings shares the controls below. -->
     <header class="at-proj-hero at-setup-hero" id="setup-hero" hidden>
       <div class="at-proj-lockup" role="img" aria-label="Atelier"><img src="/static/brand/atelier-mark.svg" alt=""><svg aria-hidden="true" focusable="false"><use href="#atelier-wordmark"/></svg></div>
@@ -645,7 +645,7 @@
       </div>
       <div class="setup-section" id="setup-export-section" style="display:none">Export</div>
       <div class="setup-field" id="setup-mods-row" style="display:none">
-        <div class="setup-label"><span>Folder mods are installed into — used by "Copy to ..." toggle</span></div>
+        <label class="setup-label" for="setup-mods">Mods folder</label>
         <div class="setup-row">
           <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods" spellcheck="false">
           <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
@@ -778,7 +778,7 @@
 
 <!-- ── project delete confirm ── -->
 <div class="overlay at-identity" id="proj-delete-overlay">
-  <div class="modal at-dialog" role="alertdialog" aria-modal="true" aria-labelledby="proj-delete-title" aria-describedby="proj-delete-msg">
+  <div class="modal at-dialog" role="alertdialog" aria-modal="true" aria-labelledby="proj-delete-title" aria-describedby="proj-delete-msg" tabindex="-1">
     <h2 id="proj-delete-title">Delete project?</h2>
     <p id="proj-delete-msg">This will permanently delete all edited assets in this project.</p>
     <div class="modal-row">

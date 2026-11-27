@@ -62,6 +62,17 @@ def run_find_checks(page,context,url,report,checks):
         tab.wait_for_selector('#search-results .search-result')
         before=tab.locator('#grid-area .card').count()
         assert before==10 # Everywhere does not filter the current folder.
+        field.press('ArrowDown')
+        assert tab.locator('#search-results .search-active').get_attribute('aria-selected') == 'true'
+        field.press('Tab')
+        assert tab.locator('#search-scope').evaluate('el=>el===document.activeElement')
+        assert field.get_attribute('aria-expanded') == 'true'
+        tab.keyboard.press('Tab')
+        assert field.get_attribute('aria-expanded') == 'false'
+        assert not field.get_attribute('aria-activedescendant')
+        tab.wait_for_selector('#search-results', state='hidden', timeout=1000)
+        field.fill('café')
+        tab.wait_for_selector('#search-results .search-result')
         field.press('ArrowDown');field.press('Enter')
         tab.wait_for_function("nav.path==='Characters/1029/1029001/Textures'")
         tab.wait_for_function("document.activeElement.dataset.libraryPath==='Characters/1029/1029001/Textures/T_Cafe'")

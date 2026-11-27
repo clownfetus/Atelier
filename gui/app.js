@@ -3549,6 +3549,9 @@ async function _fetchUsmapPath() {
 // Settings has its own loading cover. At launch, the setup page opens only when
 // configuration is needed or the check fails and needs a retry.
 let _setupLoadingFinish = null, _setupLoadingRevision = 0;
+let _pathsSession = null;
+const _setupOverlay = document.getElementById('setup-overlay');
+const _setupDialog = document.getElementById('setup-dialog');
 function _setupPresent(call) {
   try { call(window.AtelierSetup); } catch (_) { /* The check and setup work without the page's presentation. */ }
 }
@@ -3646,6 +3649,13 @@ document.getElementById("setup-open-settings").addEventListener("click", () => o
 
 function _applySetupMode() {
   const paths = _pathsMode;
+  if (paths) {
+    _setupDialog.setAttribute('role', 'dialog');
+    _setupDialog.setAttribute('aria-modal', 'true');
+    _setupDialog.setAttribute('aria-labelledby', 'setup-title');
+  } else {
+    for (const attribute of ['role', 'aria-modal', 'aria-labelledby']) _setupDialog.removeAttribute(attribute);
+  }
   document.getElementById("setup-title").textContent = paths ? "Settings" : "Initial configuration";
   document.getElementById("setup-mods-row").style.display     = paths ? "" : "none";
   document.getElementById("setup-export-section").style.display = paths ? "" : "none";
@@ -3661,11 +3671,15 @@ function _applySetupMode() {
   _setupPresent(setup => setup?.mode(paths));
 }
 
-async function openPaths() {
+async function openPaths({field, onSave, opener = document.activeElement} = {}) {
   _pathsMode = true;
+  _pathsSession = {opener, onSave};
+  _resetSaveBtn();
+  document.getElementById('setup-save').disabled = true;
   _applySetupMode();
-  document.getElementById("setup-overlay").classList.add("active");
   const revision = _setSetupLoading(true);
+  _setupDialog.querySelector('.setup-body').scrollTop = 0;
+  _setupDialog.focus({preventScroll: true});
   let outcome = 'error';
   try {
     const [statusRes, aes, usmapPath] = await Promise.all([
@@ -3684,7 +3698,8 @@ async function openPaths() {
     _imageEditorName = statusRes.image_editor_name || "";
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
-  if (revision !== _setupLoadingRevision || !document.getElementById('setup-overlay').classList.contains('active')) return;
+  if (revision !== _setupLoadingRevision || !_setupOverlay.classList.contains('active')) return;
+  if (field && document.activeElement === _setupDialog) document.getElementById(field)?.focus();
   loadContentMounts();      // fire-and-forget: informational, never blocks the panel
   loadToolStatus(true);     // likewise: a slow or offline channel must not hold the panel up
   await validateSetup();
@@ -3752,18 +3767,23 @@ document.getElementById("tools-update").addEventListener("click", () => _toolAct
 document.getElementById("tools-repair").addEventListener("click", () => _toolAction("/api/tools_repair", "Checking every tool…"));
 
 // Settings opened from a failed launch check returns to the check when it closes.
-document.getElementById("setup-cancel").addEventListener("click", () => {
-  _setSetupLoading(false); ++_setupLoadingRevision;
-  document.getElementById("setup-overlay").classList.remove("active");
+function closePaths() {
+  if (!_pathsMode) return false;
+  const opener = _pathsSession?.opener;
+  _pathsSession = null;
+  _setSetupLoading(false);
+  ++_setupLoadingRevision;
+  _setupOverlay.classList.remove('active');
   _pathsMode = false;
-  _resumeLaunchCheck();
-});
-document.getElementById("setup-close").addEventListener("click", () => {
-  _setSetupLoading(false); ++_setupLoadingRevision;
-  document.getElementById("setup-overlay").classList.remove("active");
-  _pathsMode = false;
-  _resumeLaunchCheck();
-});
+  if (_resumeLaunchCheck()) return true;
+  const target = opener?.isConnected && opener !== document.body && opener.getClientRects().length
+    ? opener : document.getElementById('menu-btn');
+  target.focus({preventScroll: true});
+  return false;
+}
+document.getElementById('setup-cancel').addEventListener('click', closePaths);
+document.getElementById('setup-close').addEventListener('click', closePaths);
+window.AtelierJobDialogs.trap(_setupOverlay, _setupDialog, closePaths);
 
 const blenderProjectTexturesToggle = document.getElementById('settings-blender-project-textures');
 blenderProjectTexturesToggle.checked = _store.get('atelier.blenderProjectTextures') !== '0';
@@ -4022,12 +4042,14 @@ document.getElementById("setup-save").addEventListener("click", async () => {
   if (!usmapPath) { toast("Please enter or auto-fetch a USMAP file", "warning"); return; }
   if (!aes_key)   { toast("Please enter an AES key", "warning"); return; }
   const payload = { path, aes_key, usmap_path: usmapPath };
-  if (_pathsMode) {
+  const wasPaths = _pathsMode, pathsSession = _pathsSession;
+  if (wasPaths) {
     payload.mods_folder     = document.getElementById("setup-mods").value.trim();
     payload.blender_path    = document.getElementById("setup-blender").value.trim();
     payload.image_editor    = document.getElementById("setup-image-editor").value.trim();
   }
   const btn = document.getElementById("setup-save");
+  if (wasPaths && document.activeElement === btn) _setupDialog.focus({preventScroll: true});
   btn.disabled = true;
   btn.innerHTML = "Saving…";
   const revision = _setupLoadingRevision;
@@ -4039,11 +4061,7 @@ document.getElementById("setup-save").addEventListener("click", async () => {
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      const wasPaths   = _pathsMode;
       const wasModsSet = _modsFolderSet;
-      _pathsMode = false;
-      document.getElementById("setup-overlay").classList.remove("active");
-      _resetSaveBtn();
       _modsFolderPath      = res.mods_folder || "";
       _modsFolderSet       = !!res.mods_folder;
       _imageEditorName     = res.image_editor_name || "";
@@ -4053,13 +4071,19 @@ document.getElementById("setup-save").addEventListener("click", async () => {
         toast(`Mods folder re-pointed to the game's own ~mods:\n${res.mods_folder}`, "info", 9000);
       }
       if (!wasModsSet && _modsFolderSet) _copyToMods = true;
-      if (wasPaths && _resumeLaunchCheck()) {
+      const current = revision === _setupLoadingRevision;
+      const resumedLaunch = current && wasPaths && closePaths();
+      if (current && !wasPaths) _setupOverlay.classList.remove('active');
+      if (current) _resetSaveBtn();
+      const closedRevision = _setupLoadingRevision;
+      if (wasPaths) {
         toast("Settings saved", "success");
-      } else if (wasPaths) {
-        toast("Settings saved", "success");
-        await renderGrid();
-        await loadSidebar();
-        updateInstallBtn();
+        if (!resumedLaunch) {
+          await renderGrid();
+          await loadSidebar();
+          updateInstallBtn();
+          if (current && closedRevision === _setupLoadingRevision) await pathsSession?.onSave?.();
+        }
       } else {
         await checkProject();
         await checkPrereqs();
@@ -4071,12 +4095,12 @@ document.getElementById("setup-save").addEventListener("click", async () => {
     } else {
       stopWorking('error');
       toast(`Error: ${res.error}`, "warning");
-      _resetSaveBtn();
+      if (revision === _setupLoadingRevision) _resetSaveBtn();
     }
   } catch (e) {
     stopWorking('error');
     toast(`Error: ${e.message}`, "warning");
-    _resetSaveBtn();
+    if (revision === _setupLoadingRevision) _resetSaveBtn();
   } finally { stopWorking(); }
 });
 
@@ -4665,6 +4689,7 @@ let _projNameCtx        = null;
 let _projNameBusy       = false;
 let _projNameOpener     = null;
 let _projDeleteNames    = null;   // the names the delete confirmation is holding
+let _projDeleteOpener   = null;
 let _projExportNames    = null;   // …and the export one
 
 const _SAFE_NAME_RE = /[/\\:*?"<>|]/g;
@@ -4940,7 +4965,7 @@ function _renderProjectPicker(projects, keepQuery) {
     });
     card.querySelector("[data-action=delete]").addEventListener("click", e => {
       e.stopPropagation();
-      _projDeleteConfirm([proj.name]);
+      _projDeleteConfirm([proj.name], e.currentTarget);
     });
     grid.appendChild(card);
   });
@@ -4978,10 +5003,11 @@ function _projNameList(names, cap = 6) {
     : `${names.slice(0, cap).join(", ")} …and ${names.length - cap} more`;
 }
 
-function _projDeleteConfirm(names) {
+function _projDeleteConfirm(names, opener = document.activeElement) {
   names = (names || []).filter(Boolean);
   if (!names.length) return;
   _projDeleteNames = names;
+  _projDeleteOpener = opener;
   const assets = _projAssetTotal(names);
   const assetTxt = `${assets} edited asset${assets !== 1 ? "s" : ""}`;
   document.getElementById("proj-delete-title").textContent =
@@ -4990,6 +5016,7 @@ function _projDeleteConfirm(names) {
     ? `Delete project "${names[0]}"? All ${assetTxt} will be permanently deleted.`
     : `Delete these ${names.length} projects? All ${assetTxt} across them will be permanently deleted.\n\n${_projNameList(names)}`;
   document.getElementById("proj-delete-overlay").classList.add("active");
+  document.getElementById('proj-delete-cancel').focus({preventScroll: true});
 }
 
 function _projExportConfirm(names) {
@@ -5041,6 +5068,7 @@ function _applyActiveProject(name) {
   modInput.placeholder = name || "ModFilename";
   const chip = document.getElementById("project-chip");
   document.getElementById("project-chip-name").textContent = name || "";
+  chip.title = name || 'Switch project';
   chip.setAttribute("aria-label", name ? `Project: ${name}. Switch project` : "Switch project");
   chip.hidden = !name;
 }
@@ -5195,14 +5223,25 @@ document.getElementById("proj-name-input").addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("proj-name-ok").click(); }
 });
 
-document.getElementById("proj-delete-cancel").addEventListener("click", () => {
-  document.getElementById("proj-delete-overlay").classList.remove("active");
-  _projDeleteNames = null;
-});
+function _closeProjDelete() {
+  document.getElementById('proj-delete-overlay').classList.remove('active');
+  const opener = _projDeleteOpener;
+  _projDeleteNames = _projDeleteOpener = null;
+  const picker = document.querySelector('#project-overlay.active .proj-modal');
+  const card = opener?.closest('#proj-grid [data-name]');
+  // The card's actions become available again once focus is back inside the card.
+  if (card?.isConnected) card.focus({preventScroll: true});
+  const target = opener?.isConnected && opener !== document.body && opener.getClientRects().length
+    ? opener : card?.isConnected ? card : picker;
+  target?.focus({preventScroll: true});
+}
+document.getElementById('proj-delete-cancel').addEventListener('click', _closeProjDelete);
+window.AtelierJobDialogs.trap(document.getElementById('proj-delete-overlay'),
+  document.querySelector('#proj-delete-overlay .modal'), _closeProjDelete);
 
 document.getElementById("proj-delete-ok").addEventListener("click", async () => {
-  document.getElementById("proj-delete-overlay").classList.remove("active");
-  const names = _projDeleteNames; _projDeleteNames = null;
+  const names = _projDeleteNames;
+  _closeProjDelete();
   if (!names || !names.length) return;
   const failed = [], deleted = [];
   for (const name of names) {
@@ -5226,6 +5265,9 @@ document.getElementById("proj-delete-ok").addEventListener("click", async () => 
     _applyActiveProject('');
     document.getElementById('page-library').disabled=true;
     document.getElementById("project-overlay").classList.add("active");
+  }
+  if (document.activeElement === document.body) {
+    document.querySelector('#project-overlay.active .proj-modal')?.focus({preventScroll: true});
   }
 });
 

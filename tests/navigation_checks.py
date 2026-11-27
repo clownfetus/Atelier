@@ -2,6 +2,7 @@
 
 
 def run_navigation_checks(context, url, report, checks):
+    run_settings_navigation_checks(context, url, checks)
     from project_race_checks import run_project_race_checks
     run_project_race_checks(context, url, report, checks)
     run_home_folder_checks(context, url, report, checks)
@@ -10,9 +11,13 @@ def run_navigation_checks(context, url, report, checks):
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('request', lambda request: workspace_writes.append(request.url)
             if request.method == 'POST' and request.url.endswith('/api/project/workspace') else None)
-    page.route('**/api/catalogue/library', lambda route: route.fulfill(json={'heroes': [
+    heroes = [
         {'name': 'Magik', 'path': 'Characters/1029', 'skins': [
-            {'name': 'Original costume', 'path': 'Characters/1029/1029001'}]}]}))
+            {'name': 'Original costume', 'path': 'Characters/1029/1029001'}]},
+        {'name': 'Storm', 'path': 'Characters/1015', 'skins': [
+            {'name': 'Ivory Breeze', 'path': 'Characters/1015/1015500'}]},
+    ]
+    page.route('**/api/catalogue/library', lambda route: route.fulfill(json={'heroes': heroes}))
     page.route('**/api/catalogue/hero/**', lambda route: route.fulfill(status=404, body='No artwork in this fixture'))
 
     def picker():
@@ -123,12 +128,30 @@ def run_navigation_checks(context, url, report, checks):
         assert not target.locator('.proj-check input').is_checked()
         assert target.locator('.proj-check input').evaluate('el=>el===document.activeElement'), page.evaluate('({tag:document.activeElement.tagName,id:document.activeElement.id})')
         page.screenshot(path=str(report / '04-project-keyboard-after.png'), animations='disabled')
+        target.hover()
+        delete = target.locator('[data-action=delete]')
+        delete.focus()
+        delete.press('Enter')
+        assert page.locator('#proj-delete-cancel').evaluate('el=>el===document.activeElement')
+        page.keyboard.press('Shift+Tab')
+        assert page.locator('#proj-delete-ok').evaluate('el=>el===document.activeElement')
+        page.keyboard.press('Tab')
+        assert page.locator('#proj-delete-cancel').evaluate('el=>el===document.activeElement')
+        page.keyboard.press('Escape')
+        page.locator('#proj-delete-overlay').wait_for(state='hidden')
+        assert delete.evaluate('el=>el===document.activeElement')
+        checks.append('Project deletion starts on Cancel, keeps Tab inside the confirmation and restores focus on Escape')
         page.locator('#proj-search').fill('renamed')
         assert page.locator('#proj-search').evaluate('el=>el===document.activeElement')
         page.locator('#proj-search').fill('')
         page.keyboard.press('Escape')
         page.locator('#project-overlay').wait_for(state='hidden')
         checks.append('Project checkbox selection keeps keyboard focus after redraws; repeated Space and search work without falling into the background')
+        page.set_viewport_size({'width': 1050, 'height': 720})
+        page.locator('#project-chip').hover()
+        page.get_by_role('tooltip').filter(has_text='UI renamed project').wait_for()
+        checks.append('The project tooltip shows the full name after renaming at a compact width')
+        page.set_viewport_size({'width': 1400, 'height': 900})
 
         held = []
         page.route('**/api/project/workspace', lambda route: held.append(route))
@@ -169,8 +192,28 @@ def run_navigation_checks(context, url, report, checks):
         page.locator('#workspace-retry').click()
         page.wait_for_selector('.workspace-costume')
         page.wait_for_function('document.querySelector(".workspace-hero img")?.hidden')
-        assert page.locator('.workspace-hero img').is_hidden()
+        assert page.locator('.workspace-hero img').first.is_hidden()
         assert page.locator('#workspace-opening').is_hidden()
+        storm = page.locator('#workspace-heroes').get_by_role('button', name='Storm', exact=True)
+        storm.focus()
+        storm.press('Enter')
+        assert storm.evaluate('el=>el===document.activeElement && el.getAttribute("aria-pressed")==="true"')
+        search = page.locator('#workspace-search')
+        search.fill('Storm')
+        storm.focus()
+        heroes[1]['skins'].append({'name': 'Mohawk Rock', 'path': 'Characters/1015/1015501'})
+        page.evaluate("window.dispatchEvent(new CustomEvent('atelier:catalogue-updated'))")
+        page.get_by_role('button', name='Mohawk Rock', exact=True).wait_for()
+        assert search.input_value() == 'Storm'
+        assert storm.evaluate('el=>el===document.activeElement')
+        assert page.locator('#workspace-heroes button').count() == 1
+        page.set_viewport_size({'width': 1100, 'height': 720})
+        title = page.get_by_role('heading', name='Choose a costume', exact=True)
+        assert title.bounding_box()['x'] < search.bounding_box()['x']
+        assert abs(title.bounding_box()['y'] - search.bounding_box()['y']) < 20
+        page.set_viewport_size({'width': 560, 'height': 720})
+        assert search.bounding_box()['y'] >= title.bounding_box()['y'] + title.bounding_box()['height']
+        checks.append('The costume chooser preserves focus, selection and search during catalogue updates and fits desktop and narrow windows')
         page.set_viewport_size({'width': 1400, 'height': 900})
         page.evaluate('document.documentElement.dataset.theme="light"')
         page.screenshot(path=str(report / '08-workspace-recovered-after.png'), animations='disabled')
@@ -182,6 +225,66 @@ def run_navigation_checks(context, url, report, checks):
         card(original).click()
         page.wait_for_function('name=>atelierProject()===name && !_projectOpening', arg=original)
         assert not errors, errors
+    finally:
+        page.close()
+
+
+def run_settings_navigation_checks(context, url, checks):
+    page = context.new_page()
+    mods = 'D:/Fixture/Paks/~mods'
+    setup = {'configured': True, 'paks_prefill': 'D:/Fixture/Paks',
+             'usmap_prefill': 'D:/Fixture/game.usmap', 'aes_prefill': '0x' + '0' * 64}
+    page.route('**/api/setup_status', lambda route: route.fulfill(json=setup))
+    page.route('**/api/validate_*?*', lambda route: route.fulfill(json={'status': 'ok'}))
+    page.route('**/api/imported', lambda route: route.fulfill(json=[
+        {'name': 'Body', 'token': 'settings-body', 'game_rel': 'Characters/Fixture/MI_Body',
+         'file_type': 'material', 'selected': True}
+    ]))
+    saves = []
+
+    def save(route):
+        saves.append(route.request.post_data_json)
+        route.fulfill(json={'ok': True, 'mods_folder': mods})
+
+    page.route('**/api/save_paks', save)
+    try:
+        page.set_viewport_size({'width': 1050, 'height': 720})
+        page.goto(url)
+        menu = page.locator('#menu-btn')
+        menu.click()
+        page.locator('#ctx-menu').get_by_role('button', name='Settings…').click()
+        settings = page.locator('#setup-overlay .setup-modal')
+        settings.wait_for()
+        assert page.get_by_role('dialog', name='Settings').count() == 1
+        assert settings.evaluate('el=>el.contains(document.activeElement)')
+        page.wait_for_function("!document.getElementById('setup-save').disabled")
+        settings.locator('.setup-help-btn').focus()
+        page.keyboard.press('Shift+Tab')
+        assert page.locator('#setup-save').evaluate('el=>el===document.activeElement')
+        page.keyboard.press('Escape')
+        settings.wait_for(state='hidden')
+        assert menu.evaluate('el=>el===document.activeElement')
+
+        review_button = page.locator('#install-btn')
+        review_button.click()
+        folder_button = page.get_by_role('button', name='Set mods folder…')
+        folder_button.click()
+        folder = page.get_by_role('textbox', name='Mods folder', exact=True)
+        page.wait_for_function("document.activeElement.id === 'setup-mods'")
+        assert folder.evaluate("""el=>{
+            const row=el.getBoundingClientRect(), body=el.closest('.setup-body').getBoundingClientRect();
+            return row.top>=body.top && row.bottom<=body.bottom;
+        }""")
+        folder.fill(mods)
+        page.locator('#setup-save').click()
+        review = page.get_by_role('dialog', name='Review mod', exact=True)
+        review.wait_for()
+        assert len(saves) == 1 and saves[0]['mods_folder'] == mods
+        assert review.get_by_role('combobox', name='Destination').input_value() == 'install'
+        assert mods in review.inner_text()
+        page.keyboard.press('Escape')
+        assert review_button.evaluate('el=>el===document.activeElement')
+        checks.append('Settings traps keyboard focus and returns it to the opener; Export Review opens the Mods folder field and resumes with its saved destination')
     finally:
         page.close()
 

@@ -111,7 +111,16 @@
     field.append(select, path);
     if (!snapshot.modsPath) {
       const settings = el('button', 'Set mods folder…', 'btn'); settings.type = 'button';
-      settings.addEventListener('click', () => { hide(); current.callbacks.settings(); });
+      settings.addEventListener('click', () => {
+        const {snapshot, callbacks} = current;
+        hide();
+        callbacks.settings({
+          field: 'setup-mods',
+          onSave: () => {
+            if (window.atelierProject() === snapshot.project) return callbacks.refresh();
+          },
+        });
+      });
       field.append(settings);
     }
     return field;
