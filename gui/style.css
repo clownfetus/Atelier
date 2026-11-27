@@ -444,7 +444,7 @@ svg.card-icon.folder-icon { display: block; }
 }
 #tray-selection[hidden], #tray-menu-btn[hidden] { display: none; }
 #tray-menu-btn, #tray-include-all { min-height: 28px; padding: 0 8px; font: var(--studio-type-detail); }
-#sel-count { font-variant-numeric: tabular-nums; }
+#sel-count { color: var(--text); font: var(--studio-type-label); font-weight: 600; font-variant-numeric: tabular-nums; }
 .sb-clear {
   width: 28px; height: 28px;
   border: none;
@@ -541,6 +541,7 @@ svg.card-icon.folder-icon { display: block; }
 #sidebar-footer {
   flex: 0 0 auto;
   padding: 16px;
+  background: var(--md-sys-color-surface-container-high);
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -550,8 +551,8 @@ svg.card-icon.folder-icon { display: block; }
   width: 100%;
   height: var(--studio-control-height);
   box-sizing: border-box;
-  background: var(--bg3);
-  border: 1px solid var(--border);
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--border2);
   border-radius: var(--studio-shape-small);
   color: var(--text);
   font: inherit;

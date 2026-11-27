@@ -172,7 +172,7 @@
       </div>
       <button class="btn" id="tray-menu-btn" type="button" aria-label="Mod tray actions" title="Mod tray actions" hidden><span aria-hidden="true">…</span></button>
       <div id="tray-selection" hidden>
-        <span id="sel-count" role="status"><span id="sel-count-value">0</span><span id="sel-count-total"> of 0 included</span></span>
+        <span>Saved edits</span>
         <button class="btn" id="tray-include-all" type="button">Include all</button>
       </div>
     </div>
@@ -198,6 +198,7 @@
     <div id="sidebar-footer">
       <label class="field-label" for="mod-name-input">Mod filename</label>
       <input id="mod-name-input" type="text" placeholder="ModFilename" maxlength="80">
+      <span id="sel-count" role="status" hidden><span id="sel-count-value">0</span><span id="sel-count-total"> of 0 included</span></span>
       <button class="btn primary" id="install-btn" title="Review which edits to export and where to put the mod" disabled>
         <span class="export-feedback-slot" aria-hidden="true">
           <i data-lucide="hard-drive-download" size="20" class="export-feedback-fallback"></i>

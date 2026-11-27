@@ -39,31 +39,90 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
   filter: drop-shadow(0 2px 6px rgb(0 0 0 / 50%));
 }
 .export-review-ko[hidden] { display: none; }
+.export-review-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  flex-shrink: 0;
+}
+.export-review-count { color: var(--text); font: var(--studio-type-body); font-weight: 600; font-variant-numeric: tabular-nums; }
+.export-review-content, .export-review-body { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
 .export-review-stage { position: relative; margin: -8px auto -4px; flex-shrink: 0; }
 /* With the stage in the dialog, long reports scroll inside the body so the outcome
    heading and the actions stay visible together. */
-.export-review-modal:has(.export-review-stage:not(:empty)) .export-review-body { overflow-y: auto; overscroll-behavior: contain; }
+.export-review-modal:not(.export-review-result):has(.export-review-stage:not(:empty)) .export-review-body,
+.export-review-result .export-review-content { overflow-y: auto; overscroll-behavior: contain; }
 .export-review-stage:empty, .export-review-stage[hidden] { display: none; }
 @media (max-height: 700px) {
   .export-review-banner { display: none; }
-  .export-review-stage.atelier-glyph { width: 197px !important; height: 164px !important; }
+  .export-review-modal:not(.export-review-result) .export-review-stage.atelier-glyph {
+    width: 197px !important; height: 164px !important;
+  }
 }
 .export-review-modal:focus { outline: none; }
-.export-review-body { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
 .export-review-meta { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: var(--studio-text-label); }
 .export-review-meta dt { color: var(--muted); }
 .export-review-meta dd { margin: 0; overflow-wrap: anywhere; color: var(--text); }
 .export-review-destination { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.export-review-destination select { width: auto; max-width: 100%; }
+.export-review-destination select { width: auto; max-width: 100%; font-weight: 600; }
 .export-review-destination small { flex-basis: 100%; }
 .export-review-summary { color: var(--text) !important; }
 .export-review-list { border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); }
 .export-review-list summary { padding: 10px 12px; cursor: pointer; color: var(--text); font-size: var(--studio-text-label); font-weight: 600; }
 .export-review-list ul { list-style: none; padding: 0 12px; margin: 0; max-height: 240px; overflow: auto; }
 .export-review-list li { padding: 12px 0; border-top: 1px solid var(--border); white-space: pre-line; overflow-wrap: anywhere; font-size: var(--studio-text-detail); color: var(--muted); line-height: 1.6; }
+.export-review-asset { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+.export-review-asset strong { color: var(--text); font-weight: 600; }
+.export-review-asset-path { display: block; }
 .export-review-path { overflow-wrap: anywhere; font-family: var(--studio-font-mono, monospace); font-size: var(--studio-text-detail) !important; }
 .export-review-notice { color: var(--yellow) !important; padding: 12px 12px; border-left: 3px solid var(--yellow); background: var(--bg); }
-.export-review-actions { flex-wrap: wrap; }
+.export-review-actions { flex-wrap: wrap; flex-shrink: 0; }
+.export-review-result .export-review-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 188px;
+  grid-template-areas: 'body glyph' 'report report';
+  column-gap: 20px;
+}
+.export-review-result .export-review-content:has(.export-review-stage:empty) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'body' 'report';
+}
+.export-review-result .export-review-body { grid-area: body; }
+.export-review-result .export-review-stage {
+  grid-area: glyph;
+  place-self: center;
+  margin: 0;
+  width: 187px !important;
+  height: 156px !important;
+}
+.export-review-warning {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--status-warning);
+  border-radius: 0 var(--studio-shape-small) var(--studio-shape-small) 0;
+  background: color-mix(in srgb, var(--status-warning) 8%, var(--bg));
+}
+.export-review-warning strong { color: var(--status-warning-text); font-size: 15px; }
+.export-review-warning p { color: var(--text); line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+.export-review-output { display: grid; gap: 4px; }
+.export-review-output p { color: var(--text); font: var(--studio-type-label); font-weight: 600; }
+.export-review-output code { color: var(--muted); }
+.export-review-report {
+  grid-area: report;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+}
+.export-review-report[hidden], .export-review-copy-status:empty { display: none; }
+.export-review-report-count { color: var(--muted); font-weight: 400; }
+.export-review-report-details { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; }
+.export-review-copy { min-height: 40px; }
+.export-review-copy-status { grid-column: 1 / -1; }
+.export-review-copy-field { position: absolute; inset: 0 auto auto 0; width: 1px; height: 1px; clip-path: inset(50%); }
 .export-format { margin: 0; padding: 12px; display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); }
 .export-format legend { padding: 0 4px; color: var(--muted); font-size: var(--studio-text-detail); }
 .export-format-option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); cursor: pointer; transition: border-color var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing); }
@@ -96,4 +155,11 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
 @media (max-width: 600px) {
   .export-review-meta { grid-template-columns: 1fr; gap: 4px; }
   .export-review-meta dd { margin-bottom: 8px; }
+  .export-review-result .export-review-content { grid-template-columns: minmax(0, 1fr) 104px; column-gap: 12px; }
+  .export-review-result .export-review-stage { width: 104px !important; height: 86px !important; }
+}
+@media (max-width: 440px) {
+  .export-review-result .export-review-content { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'body' 'glyph' 'report'; }
+  .export-review-report { grid-template-columns: minmax(0, 1fr); }
+  .export-review-copy { justify-self: start; }
 }

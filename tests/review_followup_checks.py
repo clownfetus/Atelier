@@ -91,6 +91,8 @@ def run_review_followup_checks(context, url, report, checks):
         assert 'Ready to edit: T_First' in tab.locator('#tray-progress').inner_text()
         assert tab.locator('#sidebar-list .sidebar-empty').count() == 0
         tab.wait_for_function('document.getElementById("sel-count").textContent === "1 of 1 included"')
+        assert tab.locator('#sidebar-footer #sel-count').is_visible(), 'Show the live count next to Review mod'
+        assert tab.locator('#sidebar-header #tray-include-all').is_visible()
         snapshots[0].fulfill(json=[])
         tab.wait_for_timeout(100)
         assert tab.locator('#sidebar-list .sb-item').count() == 1

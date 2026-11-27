@@ -1,7 +1,7 @@
 /* Export review and latest session result. No build logic or credentials live here. */
 (function () {
   'use strict';
-  let overlay, panel, banner, koStamp, body, title, actions, lastButton, opener, stageHost, glyph = null;
+  let overlay, panel, banner, koStamp, body, title, count, report, actions, lastButton, opener, stageHost, glyph = null;
   let current = null, busy = false, lastResult = null, preferredFormat = 'standard', bannerToken = 0;
 
   function el(tag, text, className) {
@@ -27,11 +27,17 @@
     koStamp = el('span', undefined, 'export-review-ko');
     koStamp.setAttribute('aria-hidden', 'true'); koStamp.hidden = true;
     banner.append(koStamp);
+    const header = el('div', undefined, 'export-review-header');
     title = el('h2'); title.id = 'export-review-title';
+    count = el('span', undefined, 'export-review-count'); count.hidden = true;
+    header.append(title, count);
+    const content = el('div', undefined, 'export-review-content');
     body = el('div', undefined, 'export-review-body');
+    report = el('div', undefined, 'export-review-report'); report.hidden = true;
     actions = el('div', undefined, 'modal-row export-review-actions');
     stageHost = el('div', undefined, 'export-review-stage');
-    panel.append(banner, title, stageHost, body, actions); overlay.append(panel); document.body.append(overlay);
+    content.append(stageHost, body, report);
+    panel.append(banner, header, content, actions); overlay.append(panel); document.body.append(overlay);
     lastButton = el('button', 'Last export', 'btn export-last-result');
     lastButton.id = 'export-last-result'; lastButton.type = 'button'; lastButton.hidden = true;
     lastButton.addEventListener('click', () => {
@@ -122,8 +128,11 @@
       koProbe.src = koUrl;
     }
   }
-  function reset(heading, state, stageState = state) {
+  function reset(heading, state, {stageState = state, result = false} = {}) {
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
+    count.hidden = true; report.hidden = true; report.replaceChildren();
+    panel.classList.toggle('export-review-result', result);
+    panel.querySelector('.export-review-content').scrollTop = 0;
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
     updateBanner(current?.snapshot, state);
     showStage(stageState);
@@ -141,7 +150,7 @@
     try {
       if (glyph && (!still || glyph.state === state)) { if (!still) glyph.set(state); return; }
       glyph?.destroy();
-      glyph = window.AtelierMotion.glyph.mount(stageHost, {state, size: 216, still});
+      glyph = window.AtelierMotion.glyph.mount(stageHost, {state, size: state === 'busy' ? 216 : 156, still});
     } catch (_) {
       glyph = null; stageHost.replaceChildren();
     }
@@ -183,26 +192,52 @@
     return field;
   }
 
-  function metadata(snapshot, editable = false) {
-    const dl = el('dl', undefined, 'export-review-meta');
-    const destination = editable ? destinationChoice(snapshot) :
-      snapshot.copyToMods ? 'Export folder + ' + snapshot.modsPath : 'Export folder';
-    for (const [label, value] of [
+  function reviewFields(snapshot, destination = snapshot.copyToMods ? 'Export folder + ' + snapshot.modsPath : 'Export folder') {
+    return [
       ['Project', snapshot.project || 'Default project'], ['Mod filename', snapshot.modName],
       ['Destination', destination],
-    ]) {
+    ];
+  }
+  function metadata(snapshot, editable = false, parent = body) {
+    const dl = el('dl', undefined, 'export-review-meta');
+    for (const [label, value] of reviewFields(snapshot, editable ? destinationChoice(snapshot) : undefined)) {
       const detail = el('dd'); detail.append(value);
       dl.append(el('dt', label), detail);
     }
-    body.append(dl);
+    parent.append(dl);
   }
-  function list(heading, items, getText, open = false) {
+  function list(heading, items, getContent, open = false, parent = body) {
     if (!items.length) return;
     const details = el('details', undefined, 'export-review-list'); details.open = open;
     details.append(el('summary', heading + ' · ' + items.length));
     const ul = el('ul');
-    for (const item of items) ul.append(el('li', getText(item)));
-    details.append(ul); body.append(details);
+    for (const item of items) {
+      const row = el('li'); row.append(getContent(item)); ul.append(row);
+    }
+    details.append(ul); parent.append(details);
+  }
+  const fileName = (path = '') => path.split(/[\\/]/).pop();
+  function assetName(item) {
+    if (item.display_name) return item.display_name;
+    const name = item.name || fileName(item.game_rel) || 'Unnamed asset';
+    if (item.file_type === 'material' && /^(?:MI|M|Mat)[_-]/i.test(name)) {
+      const part = window.AtelierViewport?.label?.(name);
+      if (part && part !== 'Material') return /\bmaterial$/i.test(part) ? part : part + ' material';
+    }
+    if (item.file_type === 'texture') {
+      const part = /^T_(?:\d{4}_)?\d{7}_([a-z][a-z0-9_]+)$/i.exec(name)?.[1];
+      if (part) return part.replace(/_D$/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ') + ' texture';
+    }
+    return name;
+  }
+  function assetRow(item) {
+    const row = document.createDocumentFragment();
+    const heading = el('div', undefined, 'export-review-asset');
+    heading.append(el('strong', assetName(item)));
+    if (item.reason) heading.append(el('span', item.reason));
+    row.append(heading);
+    if (item.game_rel) row.append(el('span', item.game_rel, 'export-review-asset-path'));
+    return row;
   }
   function excludedText(item) {
     return (item.name || 'Unnamed asset') + ' · ' + (item.file_type || 'unknown') +
@@ -307,12 +342,11 @@
     reset(swapper ? 'Review Skin Swapper mod' : 'Review mod', 'review'); metadata(snapshot, true);
     if (offer) formatChoice(offer);
     if (swapper) { renderSkinSwapper(offer, note); return; }
-    const countLabel = snapshot.included.length + (snapshot.included.length === 1 ? ' asset' : ' assets');
-    const summary = el('p', countLabel + ' will be exported. Only saved project edits are included.', 'export-review-summary');
-    body.append(summary);
-    list('Included changes', snapshot.included, item =>
-      (item.name || item.game_rel.split('/').pop()) + ' · ' + item.file_type + '\n' + item.game_rel, true);
-    list('Excluded changes', snapshot.excluded, excludedText, snapshot.excluded.length > 0);
+    count.textContent = snapshot.included.length + ' of ' + (snapshot.included.length + snapshot.excluded.length) + ' included';
+    count.hidden = false;
+    body.append(el('p', 'Only saved project edits are included.', 'export-review-summary'));
+    list('Included changes', snapshot.included, assetRow, true);
+    list('Excluded changes', snapshot.excluded, assetRow, true);
     if (note) {
       const alert = el('p', note, 'export-review-notice'); alert.setAttribute('role', 'alert'); body.append(alert);
     }
@@ -323,44 +357,146 @@
       current.retry = () => callbacks.confirm(reviewed); current.retry();
     }, true).id = 'export-review-confirm';
   }
+
+  function resultMessage(text) {
+    const message = el('p', text, 'export-review-summary');
+    message.setAttribute('role', 'status');
+    return message;
+  }
+  function warningMessage(snapshot, skipped, copyError) {
+    const note = el('div', undefined, 'export-review-warning');
+    let heading, message, nextStep;
+    if (copyError) {
+      heading = 'Installation failed';
+      message = copyError;
+      nextStep = 'Check the mods folder in Settings, then retry the export and install.';
+    } else if (skipped.length) {
+      const first = String(skipped[0]);
+      const unreadable = /^(.+?): (could not read (?:the )?replacement texture|PNG missing and decode failed)\b/i.exec(first);
+      const matching = unreadable && snapshot.included.filter(item =>
+        fileName(item.game_rel) === unreadable[1] && item.file_type === 'texture');
+      if (skipped.length === 1 && !snapshot.skipped && matching?.length === 1) {
+        heading = '1 texture skipped';
+        message = assetName(matching[0]) + ' could not be read.';
+        nextStep = /^PNG missing/i.test(unreadable[2]) ? 'Re-import this texture and export again.' :
+          'Check the replacement image and export again.';
+      } else {
+        heading = skipped.length === 1 ? '1 build warning' : skipped.length + ' build warnings';
+        message = first;
+        nextStep = 'Review the build report before testing this mod.';
+      }
+    } else {
+      const selected = snapshot.excluded.find(item => item.selected);
+      heading = snapshot.skipped === 1 ? '1 selected edit excluded' : snapshot.skipped + ' selected edits excluded';
+      message = selected ? assetName(selected) + ' · ' + selected.reason : '';
+      nextStep = 'Review the build report before testing this mod.';
+    }
+    note.append(el('strong', heading), resultMessage(message), el('p', nextStep));
+    return note;
+  }
+  function copyWithSelection(text) {
+    const field = el('textarea', undefined, 'export-review-copy-field');
+    const previous = document.activeElement;
+    field.value = text; field.readOnly = true; field.tabIndex = -1;
+    panel.append(field); field.select();
+    try { return document.execCommand('copy'); }
+    catch (_) { return false; }
+    finally { field.remove(); previous?.focus({preventScroll: true}); }
+  }
+  function buildReport(snapshot, result, paths, installSections) {
+    const applied = result.applied || [], skipped = result.skipped || [];
+    const sections = [
+      ['Skin Swapper checks that failed', result.problems || []],
+      ['Applied operations', applied],
+      ['Skipped or warnings', skipped],
+      ['Excluded before export', snapshot.excluded.map(excludedText)],
+      ...installSections,
+    ];
+    const totals = [applied.length && applied.length + ' applied', skipped.length && skipped.length + ' skipped',
+      snapshot.excluded.length && snapshot.excluded.length + ' excluded'].filter(Boolean);
+    const build = el('details', undefined, 'export-review-list');
+    const summary = el('summary', 'Build report');
+    if (totals.length) summary.append(el('span', ' · ' + totals.join(', '), 'export-review-report-count'));
+    const details = el('div', undefined, 'export-review-report-details');
+    metadata(snapshot, false, details);
+    for (const [heading, items] of sections) list(heading, items, String, true, details);
+    build.append(summary, details);
+
+    const receipt = ['Atelier export diagnostics', title.textContent,
+      ...[...reviewFields(snapshot), ...paths].map(([label, value]) => label + ': ' + value)];
+    if (result.error) receipt.push('', String(result.error));
+    for (const [heading, items] of sections) {
+      if (items.length) receipt.push('', heading, ...items.map(item => '• ' + item));
+    }
+    const text = receipt.join('\n');
+    const copied = el('p', '', 'export-review-copy-status'); copied.setAttribute('role', 'status');
+    const copy = el('button', 'Copy diagnostics', 'btn export-review-copy');
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      let ok = true;
+      try { await navigator.clipboard.writeText(text); }
+      catch (_) {
+        if (!copy.isConnected || !overlay.classList.contains('active')) return;
+        ok = copyWithSelection(text);
+      }
+      if (!copy.isConnected) return;
+      copied.textContent = ok ? 'Diagnostics copied.' : 'Could not copy diagnostics. Select the text in the build report to copy it.';
+      if (!ok) build.open = true;
+    });
+    report.append(build, copy, copied);
+    report.hidden = false;
+  }
   function renderResult() {
     const { snapshot, result, callbacks } = current;
     const built = result.ok || result.built;
     const pending = !!result.install_token;
     const installWarning = result.install_warning;
-    const skipped = snapshot.skipped || (result.skipped || []).length;
-    const warning = built && (!result.ok || skipped || pending ||
+    const skipped = result.skipped || [];
+    const buildWarnings = snapshot.skipped || skipped.length;
+    const warning = built && (!result.ok || buildWarnings || pending ||
       Object.values(installWarning || {}).some(items => items.length));
-    // The heading carries the outcome; the stage only gives it a physical character.
     const suffix = warning && result.ok ? ' with warnings' : '';
     reset(pending ? 'Review install warnings' : built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
-      built ? warning ? 'warning' : 'success' : 'error', result.cancelled && !built ? 'info' : undefined);
-    metadata(result.kept_export ? {...snapshot, copyToMods: false} : snapshot);
-    const summary = pending ? 'The built files are in the export folder. Choose whether to copy them to your mods folder.' :
-      result.kept_export ? 'The files are saved in the export folder.' :
-      skipped ? 'Review the skipped items below before testing this mod.' : 'The build has finished.';
-    const status = el('p', result.error || summary, 'export-review-summary');
-    status.setAttribute('role', 'status'); body.append(status);
-    if (result.pak_path) body.append(el('p', 'Export: ' + result.pak_path, 'export-review-path'));
-    if (result.installed_dir) body.append(el('p', 'Installed to: ' + result.installed_dir, 'export-review-path'));
-    if (installWarning?.conflicts?.length) {
-      body.append(el('p', 'Other enabled mods contain the same packages. The game may load a different version of these packages.'));
-      for (const conflict of installWarning.conflicts) list(conflict.mod, conflict.paths, String, true);
+      built ? warning ? 'warning' : 'success' : 'error', {result: true, stageState: result.cancelled && !built ? 'info' : undefined});
+    if (pending) {
+      body.append(resultMessage(result.error || 'The built files are in the export folder. Choose whether to copy them to your mods folder.'));
+    } else if (built && (!result.ok || buildWarnings)) {
+      const copyError = !result.ok ? result.error || 'The mod could not be copied to your mods folder.' : '';
+      body.append(warningMessage(snapshot, skipped, copyError));
+    } else if (!built) {
+      body.append(resultMessage(result.error || (result.cancelled ? 'Export cancelled.' : 'The build could not finish.')));
+      body.append(el('p', result.cancelled ? 'Your project edits are preserved.' :
+        'Your project edits are preserved. Resolve the error, then retry. Retry checks for existing output first.'));
+    } else if (result.kept_export) {
+      body.append(resultMessage('The files are saved in the export folder.'));
     }
-    if (installWarning?.unreadable?.length) {
-      body.append(el('p', 'The conflict scan is incomplete.', 'export-review-notice'));
-      list('Unreadable containers', installWarning.unreadable, item =>
-        (item.source === 'export' ? 'Built export · ' : '') + item.file + '\n' + item.reason, true);
+    const paths = [['Exported file', result.pak_path], ['Installed to', result.installed_dir]].filter(([, path]) => path);
+    for (const [label, path] of paths) {
+      const output = el('div', undefined, 'export-review-output');
+      output.append(el('p', label), el('code', path, 'export-review-path'));
+      body.append(output);
     }
-    list('Matching filenames in your mods folder', installWarning?.replacements || [], String, true);
     if (result.galacta_folder) {
+      paths.push(['Galacta folder', result.galacta_folder]);
       body.append(el('p', 'Galacta folder: ' + result.galacta_folder, 'export-review-path'),
         el('p', 'Load it with the Project Galacta Companion App. Atelier never edits skins.txt; the Companion App manages it.'));
     }
+    if (installWarning?.conflicts?.length) {
+      body.append(el('p', 'Other enabled mods contain the same packages. The game may load a different version of these packages.'));
+    }
+    if (installWarning?.unreadable?.length) {
+      body.append(el('p', 'The conflict scan is incomplete.', 'export-review-notice'));
+    }
+    const installSections = [
+      ...(installWarning?.conflicts || []).map(conflict => [conflict.mod, conflict.paths]),
+      ['Unreadable containers', (installWarning?.unreadable || []).map(item =>
+        (item.source === 'export' ? 'Built export · ' : '') + item.file + '\n' + item.reason)],
+      ['Matching filenames in your mods folder', installWarning?.replacements || []],
+    ];
+    for (const [heading, items] of installSections) list(heading, items, String, true);
     list('Skin Swapper checks that failed', result.problems || [], String, true);
-    list('Build report · applied operations', result.applied || [], String, true);
-    list('Build report · skipped or warnings', result.skipped || [], String, true);
-    list('Excluded before export', snapshot.excluded, excludedText, true);
+    const reportSnapshot = result.kept_export ? {...snapshot, copyToMods: false} : snapshot;
+    buildReport(reportSnapshot, result, paths, installSections);
     current.fresh = false;
     if (pending) {
       button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
@@ -368,8 +504,6 @@
       button('Install anyway', () => decideInstall(true), true);
       return;
     }
-    if (!built) body.append(el('p', 'Your project edits are preserved. Resolve the error, then retry. A connection failure can occur after a build completes; retry checks for existing output first.'));
-    if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });

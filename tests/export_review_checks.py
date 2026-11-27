@@ -49,8 +49,8 @@ def run_export_review_checks(page, context, url, report, checks):
           _activeProjectName = 'Review Ω';
           _modsFolderSet = true; _modsFolderPath = 'D:/Fixture/mods';
           sidebarData = {
-            material: {name:'Body <img src=x>', game_rel:'Characters/Fixture/MI_Body', file_type:'material', selected:true},
-            texture: {name:'Body texture', game_rel:'Characters/Fixture/T_Body', file_type:'texture', selected:true},
+            material: {name:'MI_Body', display_name:'Body material', game_rel:'Characters/Fixture/MI_Body', file_type:'material', selected:true},
+            texture: {name:'Body texture <img src=x>', game_rel:'Characters/Fixture/T_Body', file_type:'texture', selected:true},
             audio: {name:'Sound', game_rel:'Audio/Sound', file_type:'audio', selected:true},
             mesh: {name:'Mesh', game_rel:'Characters/Fixture/SK_Body', file_type:'mesh', selected:false}
           };
@@ -108,6 +108,8 @@ def run_export_review_checks(page, context, url, report, checks):
         assert 'Excluded changes · 2' in overlay.inner_text()
         assert 'Unsupported export type: audio' in overlay.inner_text()
         assert 'Not selected' in overlay.inner_text()
+        assert overlay.get_by_text('2 of 4 included', exact=True).is_visible()
+        assert overlay.get_by_text('Body material', exact=True).is_visible()
         assert 'Characters/Fixture/MI_Body' in overlay.inner_text()
         assert 'Password' not in overlay.inner_text()  # exports can no longer be locked
         assert overlay.locator('img').count() == 0
@@ -193,9 +195,38 @@ def run_export_review_checks(page, context, url, report, checks):
                                    'installed_dir': 'D:/Fixture/mods', 'applied': ['mat MI_Body'],
                                    'skipped': ['Missing optional texture']})
         review.wait_for_function("document.querySelector('.export-review-modal').dataset.state === 'warning'")
-        assert 'Missing optional texture' in overlay.inner_text()
-        assert 'mat MI_Body' in overlay.inner_text()
+        warning = overlay.get_by_role('status').filter(has_text='Missing optional texture')
+        assert warning.is_visible()
+        report_toggle = overlay.locator('summary', has_text='Build report')
+        assert report_toggle.is_visible() and not report_toggle.locator('..').evaluate('details => details.open')
+        assert 'mat MI_Body' not in overlay.inner_text()
+        warning_box = warning.bounding_box()
+        glyph_box = overlay.locator('.export-review-stage').bounding_box()
+        assert glyph_box['height'] == 156 and glyph_box['x'] > warning_box['x'] + warning_box['width']
         assert 'D:/Fixture/exported/Review.pak' in overlay.inner_text()
+        review.evaluate("""Object.defineProperty(navigator, 'clipboard', {configurable:true, value:{
+          writeText: async text => { window.copiedDiagnostics = text; }
+        }})""")
+        copy = overlay.get_by_role('button', name='Copy diagnostics')
+        copy.click()
+        review.get_by_text('Diagnostics copied.', exact=True).wait_for(state='visible')
+        assert copy.evaluate('el => document.activeElement === el')
+        diagnostics = review.evaluate('window.copiedDiagnostics')
+        for detail in ('Mod installed with warnings', 'Review Ω', 'D:/Fixture/exported/Review.pak',
+                       'Missing optional texture', 'mat MI_Body', 'Not selected'):
+            assert detail in diagnostics
+        review.evaluate("""() => {
+          navigator.clipboard.writeText = async () => { throw Error('Clipboard permission denied'); };
+          document.execCommand = command => {
+            window.copiedFallback = document.activeElement.value;
+            return command === 'copy';
+          };
+        }""")
+        copy.click()
+        review.wait_for_function('window.copiedFallback === window.copiedDiagnostics')
+        assert copy.evaluate('el => document.activeElement === el')
+        report_toggle.click()
+        assert 'mat MI_Body' in overlay.inner_text()
         review.keyboard.press('Escape')
         review.locator('#export-last-result').click()
         assert 'Missing optional texture' in overlay.inner_text()
@@ -365,7 +396,7 @@ def run_import_dialog_glyph_checks(context, url, report, checks):
 
 SNAPSHOT = """{project:'Smoke A', modName:'Glyph fixture', copyToMods:false, modsPath:'', skipped:0, excluded:[],
   included:[{name:'Body', game_rel:'Characters/1015/1015101/Materials/MI_1015101_Body', file_type:'material'},
-            {name:'Equip', game_rel:'Characters/1015/1015101/Texture/T_1015101_Equip_01_D', file_type:'texture'}]}"""
+            {name:'T_1015101_Cape_D', game_rel:'Characters/1015/1015101/Textures/T_1015101_Cape_D', file_type:'texture'}]}"""
 
 
 def run_export_review_glyph_checks(context, url, report, checks):
@@ -430,7 +461,7 @@ def run_export_review_glyph_checks(context, url, report, checks):
 
         # Each outcome maps as SPEC section 7 says.
         for result, want, title in (
-            ("{ok:true, pak_path:'D:/F.pak', applied:[], skipped:['Missing optional texture']}", 'warning', 'Mod exported with warnings'),
+            ("{ok:true, pak_path:'D:/F.pak', applied:[], skipped:['T_1015101_Cape_D: PNG missing and decode failed — re-import this texture']}", 'warning', 'Mod exported with warnings'),
             ("{ok:false, built:true, pak_path:'D:/F.pak', error:'Copy failed', applied:[], skipped:[]}", 'warning', 'Export built; copy failed'),
             ("{ok:false, error:'The build failed. Check the export folder is writable.', applied:[], skipped:[]}", 'error', 'Export failed'),
             ("{ok:false, cancelled:true, error:'Export cancelled.', applied:[], skipped:[]}", 'info', 'Export cancelled'),
@@ -441,6 +472,10 @@ def run_export_review_glyph_checks(context, url, report, checks):
             tab.evaluate(f"AtelierExportReview.finish(reviewSnapshot, {result})")
             got = tab.evaluate(f"({{state: {stage}.dataset.glyphState, title: document.getElementById('export-review-title').textContent}})")
             assert got == {'state': want, 'title': title}, got
+            if title == 'Mod exported with warnings':
+                assert tab.get_by_text('1 texture skipped', exact=True).is_visible()
+                assert tab.get_by_text('Cape texture could not be read.', exact=True).is_visible()
+                assert tab.get_by_text('Re-import this texture and export again.', exact=True).is_visible()
             tab.wait_for_timeout(1500)
             tab.locator('.export-review-modal').screenshot(path=str(report / f'export-review-glyph-{want}-{title.split()[1].strip(";")}.png'))
         checks.append('Export review: a reopened result is still; warnings, a failed copy, failure and cancelling each draw their own state, and a new build moves again')

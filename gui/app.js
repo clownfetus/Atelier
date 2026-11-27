@@ -3846,6 +3846,7 @@ function updateInstallBtn() {
   const count = document.getElementById("sel-count-value");
   if (window.AtelierPolish) window.AtelierPolish.count(count, sel); else count.textContent = `${sel}`;
   document.getElementById("sel-count-total").textContent = ` of ${edited} included`;
+  document.getElementById("sel-count").hidden = edited === 0;
   document.getElementById("tray-selection").hidden = edited === 0;
   document.getElementById("tray-menu-btn").hidden = !_activeProjectName;
   document.getElementById("tray-include-all").textContent = sel === edited ? "Exclude all" : "Include all";
