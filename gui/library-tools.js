@@ -152,25 +152,246 @@
     event.preventDefault(); target?.focus(); target?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   }
   function closePreview() { if (previewDialog?.open) previewDialog.close(); }
-  function previewImage({label, path, src, caption}, opener) {
+  let previewState = null;
+
+  function renderPreviewCanvas() {
+    if (!previewDialog || !previewState) return;
+    const img = previewDialog.querySelector('.library-preview-stage img');
+    const canvas = previewDialog.querySelector('#library-preview-canvas');
+    const stage = previewDialog.querySelector('.library-preview-stage');
+    const wipeWrap = previewDialog.querySelector('#library-preview-wipe-wrap');
+    const wipeLine = previewDialog.querySelector('#library-preview-wipe-line');
+    const { channel, compare, zoom, wipe, origImg, loaded } = previewState;
+    const useCanvas = loaded && (channel !== 'rgb' || compare !== 'edited');
+    if (stage) {
+      stage.dataset.zoom = zoom;
+      stage.classList.toggle('is-checker', !!previewState.checker);
+    }
+    if (wipeWrap) wipeWrap.hidden = !(loaded && compare === 'wipe' && origImg && origImg.complete && origImg.naturalWidth > 0);
+    if (wipeLine) wipeLine.style.left = `${wipe}%`;
+    if (!loaded) {
+      if (canvas) canvas.hidden = true;
+      return;
+    }
+    const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
+    if (!useCanvas || !w || !h || !canvas) {
+      if (canvas) canvas.hidden = true;
+      img.hidden = false;
+      img.style.width = zoom === 'fit' ? '' : `${Math.round(w * (zoom === '200' ? 2 : 1))}px`;
+      img.style.height = zoom === 'fit' ? '' : `${Math.round(h * (zoom === '200' ? 2 : 1))}px`;
+      return;
+    }
+    img.hidden = true;
+    canvas.hidden = false;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    canvas.style.width = zoom === 'fit' ? '' : `${Math.round(w * (zoom === '200' ? 2 : 1))}px`;
+    canvas.style.height = zoom === 'fit' ? '' : `${Math.round(h * (zoom === '200' ? 2 : 1))}px`;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, h);
+    const hasOrig = !!(origImg && origImg.complete && origImg.naturalWidth > 0);
+    if (compare === 'original' && hasOrig) {
+      ctx.drawImage(origImg, 0, 0, w, h);
+    } else if (compare === 'wipe' && hasOrig) {
+      const splitX = Math.round(w * (wipe / 100));
+      ctx.drawImage(img, 0, 0, w, h);
+      if (splitX > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, splitX, h);
+        ctx.clip();
+        ctx.clearRect(0, 0, splitX, h);
+        ctx.drawImage(origImg, 0, 0, w, h);
+        ctx.restore();
+      }
+    } else {
+      ctx.drawImage(img, 0, 0, w, h);
+    }
+    if (channel !== 'rgb') {
+      try {
+        const frame = ctx.getImageData(0, 0, w, h);
+        const data = frame.data;
+        const offset = channel === 'r' ? 0 : channel === 'g' ? 1 : channel === 'b' ? 2 : 3;
+        for (let i = 0; i < data.length; i += 4) {
+          const v = data[i + offset];
+          data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
+        }
+        ctx.putImageData(frame, 0, 0);
+      } catch (_) {}
+    }
+  }
+
+  function updatePixelReadout(event) {
+    if (!previewDialog || !previewState?.loaded || !previewState.isTexture) return;
+    const readout = previewDialog.querySelector('#library-preview-pixel');
+    if (!readout) return;
+    const img = previewDialog.querySelector('.library-preview-stage img');
+    const canvas = previewDialog.querySelector('#library-preview-canvas');
+    const target = canvas && !canvas.hidden ? canvas : img;
+    if (!target || target.hidden) return;
+    const rect = target.getBoundingClientRect();
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!rect.width || !rect.height || !w || !h) return;
+    const px = Math.floor(((event.clientX - rect.left) / rect.width) * w);
+    const py = Math.floor(((event.clientY - rect.top) / rect.height) * h);
+    if (px < 0 || py < 0 || px >= w || py >= h) { readout.textContent = `${w} × ${h} px`; return; }
+    try {
+      if (!previewState.sampleCanvas) {
+        const sc = document.createElement('canvas');
+        sc.width = w; sc.height = h;
+        const sctx = sc.getContext('2d', { willReadFrequently: true });
+        if (sctx) sctx.drawImage(img, 0, 0, w, h);
+        previewState.sampleCanvas = sc;
+      }
+      const p = previewState.sampleCanvas.getContext('2d', { willReadFrequently: true }).getImageData(px, py, 1, 1).data;
+      const hex = '#' + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+      readout.textContent = `${w} × ${h} px · (${px}, ${py}) ${hex} · A ${p[3]}`;
+    } catch (_) {
+      readout.textContent = `${w} × ${h} px`;
+    }
+  }
+
+  function syncPreviewToolbar() {
+    if (!previewDialog || !previewState) return;
+    const toolbar = previewDialog.querySelector('#library-preview-toolbar');
+    if (toolbar) toolbar.hidden = !previewState.isTexture;
+    toolbar?.querySelectorAll('[data-channel]').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.channel === previewState.channel));
+    });
+    toolbar?.querySelectorAll('[data-zoom]').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.zoom === previewState.zoom));
+    });
+    toolbar?.querySelectorAll('[data-compare]').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.compare === previewState.compare));
+    });
+    const compareGroup = previewDialog.querySelector('#library-preview-compare-group');
+    if (compareGroup) compareGroup.hidden = !previewState.originalSrc;
+    const checkerBtn = previewDialog.querySelector('#library-preview-checker');
+    if (checkerBtn) checkerBtn.setAttribute('aria-pressed', String(!!previewState.checker));
+    renderPreviewCanvas();
+  }
+
+  function previewImage({label, path, src, caption, isTexture = false, originalSrc = '', actions = []}, opener) {
     if (!previewDialog) {
       previewDialog = document.createElement('dialog'); previewDialog.id = 'library-preview';
       previewDialog.setAttribute('aria-labelledby', 'library-preview-title');
-      previewDialog.innerHTML = '<div class="library-preview-heading"><div><h2 id="library-preview-title"></h2><p id="library-preview-path"></p></div><button type="button" class="btn" id="library-preview-close">Close</button></div><div class="library-preview-stage"><img alt=""><p class="library-preview-message" role="status"></p></div><div class="library-preview-footer"><span></span><button type="button" class="btn" id="library-preview-retry">Retry preview</button></div>';
+      previewDialog.innerHTML =
+        '<div class="library-preview-heading"><div><h2 id="library-preview-title"></h2><p id="library-preview-path"></p></div><button type="button" class="btn" id="library-preview-close">Close</button></div>' +
+        '<div class="library-preview-toolbar" id="library-preview-toolbar" hidden>' +
+          '<div class="lp-group" role="group" aria-label="Texture channels">' +
+            '<button type="button" class="lp-btn" data-channel="rgb" aria-pressed="true">RGB</button>' +
+            '<button type="button" class="lp-btn" data-channel="r" aria-pressed="false">R</button>' +
+            '<button type="button" class="lp-btn" data-channel="g" aria-pressed="false">G</button>' +
+            '<button type="button" class="lp-btn" data-channel="b" aria-pressed="false">B</button>' +
+            '<button type="button" class="lp-btn" data-channel="a" aria-pressed="false">A</button>' +
+          '</div>' +
+          '<div class="lp-group" id="library-preview-compare-group" role="group" aria-label="Compare original and edited" hidden>' +
+            '<button type="button" class="lp-btn" data-compare="edited" aria-pressed="true">Edited</button>' +
+            '<button type="button" class="lp-btn" data-compare="original" aria-pressed="false">Original</button>' +
+            '<button type="button" class="lp-btn" data-compare="wipe" aria-pressed="false">Wipe</button>' +
+          '</div>' +
+          '<div class="lp-group" role="group" aria-label="Zoom">' +
+            '<button type="button" class="lp-btn" data-zoom="fit" aria-pressed="true">Fit</button>' +
+            '<button type="button" class="lp-btn" data-zoom="100" aria-pressed="false">1:1</button>' +
+            '<button type="button" class="lp-btn" data-zoom="200" aria-pressed="false">200%</button>' +
+          '</div>' +
+          '<button type="button" class="lp-btn" id="library-preview-checker" aria-pressed="false" title="Toggle transparency checkerboard">Checker</button>' +
+          '<span class="lp-pixel" id="library-preview-pixel"></span>' +
+        '</div>' +
+        '<div class="library-preview-stage">' +
+          '<img alt="">' +
+          '<canvas id="library-preview-canvas" hidden></canvas>' +
+          '<div class="lp-wipe-wrap" id="library-preview-wipe-wrap" hidden>' +
+            '<span class="lp-wipe-label lp-wipe-left">Original</span>' +
+            '<span class="lp-wipe-label lp-wipe-right">Edited</span>' +
+            '<div class="lp-wipe-line" id="library-preview-wipe-line"></div>' +
+            '<input type="range" id="library-preview-wipe" min="0" max="100" value="50" aria-label="Original and edited split">' +
+          '</div>' +
+          '<p class="library-preview-message" role="status"></p>' +
+        '</div>' +
+        '<div class="library-preview-footer"><span></span><div class="lp-footer-actions"><div id="library-preview-actions"></div><button type="button" class="btn" id="library-preview-retry">Retry preview</button></div></div>';
       document.body.append(previewDialog);
       document.getElementById('library-preview-close').addEventListener('click', closePreview);
       previewDialog.addEventListener('click', e => { if (e.target === previewDialog) closePreview(); });
+      previewDialog.querySelector('#library-preview-toolbar').addEventListener('click', event => {
+        const btn = event.target.closest('button');
+        if (!btn || !previewState) return;
+        if (btn.dataset.channel) { previewState.channel = btn.dataset.channel; syncPreviewToolbar(); }
+        else if (btn.dataset.zoom) { previewState.zoom = btn.dataset.zoom; syncPreviewToolbar(); }
+        else if (btn.dataset.compare) {
+          previewState.compare = btn.dataset.compare;
+          if (previewState.compare !== 'edited' && previewState.originalSrc && !previewState.origImg) {
+            const orig = new Image();
+            orig.onload = () => renderPreviewCanvas();
+            orig.src = previewState.originalSrc;
+            previewState.origImg = orig;
+          }
+          syncPreviewToolbar();
+        } else if (btn.id === 'library-preview-checker') {
+          previewState.checker = !previewState.checker;
+          syncPreviewToolbar();
+        }
+      });
+      previewDialog.querySelector('#library-preview-wipe').addEventListener('input', event => {
+        if (!previewState) return;
+        previewState.wipe = Number(event.target.value) || 0;
+        renderPreviewCanvas();
+      });
+      const stage = previewDialog.querySelector('.library-preview-stage');
+      stage.addEventListener('mousemove', updatePixelReadout);
+      stage.addEventListener('mouseleave', () => {
+        const img = previewDialog.querySelector('.library-preview-stage img');
+        const readout = previewDialog.querySelector('#library-preview-pixel');
+        if (readout && previewState?.loaded && img?.naturalWidth) readout.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+      });
       previewDialog.addEventListener('close', () => {
         if (previewDialog.open) return; // A previous close can arrive after a new preview opens.
         clearTimeout(previewTimer);
-        const img = previewDialog.querySelector('img'); img.onload = img.onerror = null; img.removeAttribute('src');
+        const img = previewDialog.querySelector('.library-preview-stage img');
+        img.onload = img.onerror = null; img.removeAttribute('src');
+        img.style.width = ''; img.style.height = '';
+        const canvas = previewDialog.querySelector('#library-preview-canvas');
+        if (canvas) { canvas.hidden = true; canvas.width = 0; canvas.height = 0; }
+        previewState = null;
         previewReveal?.destroy(); previewReveal = null;
         if (previewOpener?.isConnected) previewOpener.focus();
       });
       previewDialog.addEventListener('keydown', e => { if (e.key === 'Escape') e.stopPropagation(); });
     }
     previewOpener = opener;
-    const img = previewDialog.querySelector('img'), message = previewDialog.querySelector('.library-preview-message');
+    previewState = {
+      isTexture: !!isTexture,
+      originalSrc: originalSrc || '',
+      origImg: null,
+      channel: 'rgb',
+      compare: 'edited',
+      zoom: 'fit',
+      wipe: 50,
+      checker: false,
+      loaded: false,
+      sampleCanvas: null,
+    };
+    const wipeInput = previewDialog.querySelector('#library-preview-wipe');
+    if (wipeInput) wipeInput.value = '50';
+    const readout = previewDialog.querySelector('#library-preview-pixel');
+    if (readout) readout.textContent = '';
+    const actionHost = previewDialog.querySelector('#library-preview-actions');
+    if (actionHost) {
+      actionHost.replaceChildren();
+      for (const act of actions || []) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.textContent = act.label;
+        btn.addEventListener('click', () => {
+          closePreview();
+          act.action?.();
+        });
+        actionHost.append(btn);
+      }
+    }
+    syncPreviewToolbar();
+    const img = previewDialog.querySelector('.library-preview-stage img'), message = previewDialog.querySelector('.library-preview-message');
     const retry = document.getElementById('library-preview-retry');
     document.getElementById('library-preview-title').textContent = label;
     document.getElementById('library-preview-path').textContent = path;
@@ -178,9 +399,16 @@
     const load = bust => {
       clearTimeout(previewTimer);
       previewReveal?.destroy(); previewReveal = null;
+      if (previewState) { previewState.loaded = false; previewState.sampleCanvas = null; }
       message.textContent = 'Loading preview…'; img.hidden = true; retry.hidden = true;
+      const canvas = previewDialog.querySelector('#library-preview-canvas');
+      if (canvas) canvas.hidden = true;
       img.onload = () => {
-        clearTimeout(previewTimer); img.hidden = false; message.textContent = ''; retry.hidden = true;
+        clearTimeout(previewTimer);
+        if (previewState) previewState.loaded = true;
+        img.hidden = false; message.textContent = ''; retry.hidden = true;
+        if (readout && isTexture && img.naturalWidth) readout.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+        renderPreviewCanvas();
         previewReveal = window.AtelierPolish?.play(img, [{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0)'}],
           window.AtelierMotion.unfoldMs, window.AtelierMotion.ease.unfold);
       };

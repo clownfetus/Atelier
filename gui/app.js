@@ -725,9 +725,30 @@ function previewLibraryCard(card, opener) {
     return;
   }
   const imported = card.type === 'asset' && card.imported;
+  const isTexture = !card.thumbnail && card.type === 'asset' && card.file_type === 'texture';
   const src = card.thumbnail || `${imported ? '/api/preview' : '/api/thumb'}?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`;
-  AtelierLibraryTools.previewImage({label: card.label, path: card.game_rel || card.rel_path, src,
-    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset'}, opener);
+  const originalSrc = isTexture && imported
+    ? `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`
+    : '';
+  const actions = [];
+  if (isTexture) {
+    if (imported) {
+      actions.push({ label: 'Replace image…', action: () => window.AtelierAssetEditors?.replaceTexture(card.game_rel) });
+      const openItem = textureEditorMenuItem(card);
+      actions.push({ label: openItem.label, action: openItem.action });
+    } else {
+      actions.push({ label: 'Edit texture', action: () => editAsset(card) });
+    }
+  }
+  AtelierLibraryTools.previewImage({
+    label: card.label,
+    path: card.game_rel || card.rel_path,
+    src,
+    originalSrc,
+    isTexture,
+    actions,
+    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset',
+  }, opener);
 }
 function libraryParent() {
   if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});

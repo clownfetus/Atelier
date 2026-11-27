@@ -80,10 +80,54 @@
 .library-preview-heading > div { min-width: 0; }
 .library-preview-heading h2 { font: var(--studio-type-title); margin: 0 0 4px; overflow-wrap: anywhere; }
 .library-preview-heading p { margin: 0; color: var(--muted); font: var(--studio-type-detail); overflow-wrap: anywhere; }
-.library-preview-stage { min-height: 220px; height: min(58vh, 600px); display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
-.library-preview-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.library-preview-stage img[hidden] { display: none; }
+.library-preview-stage { position: relative; min-height: 220px; height: min(58vh, 600px); display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); overflow: auto; }
+.library-preview-stage.is-checker {
+  background-color: var(--bg);
+  background-image: linear-gradient(45deg, var(--bg3) 25%, transparent 25%),
+                    linear-gradient(-45deg, var(--bg3) 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, var(--bg3) 75%),
+                    linear-gradient(-45deg, transparent 75%, var(--bg3) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.library-preview-stage[data-zoom="fit"] img,
+.library-preview-stage[data-zoom="fit"] canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+.library-preview-stage img[hidden], .library-preview-stage canvas[hidden] { display: none; }
+.library-preview-stage canvas { image-rendering: pixelated; }
+.library-preview-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  padding: 8px 16px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.library-preview-toolbar[hidden] { display: none; }
+.lp-group { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: var(--studio-shape-small); overflow: hidden; }
+.lp-group[hidden] { display: none; }
+.lp-btn {
+  appearance: none; border: 0; background: transparent; color: var(--muted);
+  padding: 4px 9px; font: var(--studio-type-detail); font-weight: 500; cursor: pointer;
+}
+.lp-group .lp-btn + .lp-btn { border-left: 1px solid var(--border); }
+.library-preview-toolbar > .lp-btn { border: 1px solid var(--border); border-radius: var(--studio-shape-small); }
+.lp-btn:hover { background: var(--bg3); color: var(--text); }
+.lp-btn[aria-pressed="true"] { background: var(--bg3); color: var(--text); font-weight: 600; }
+.lp-pixel { margin-left: auto; font-family: var(--studio-mono); font-size: var(--studio-text-micro); color: var(--muted); white-space: nowrap; }
+.lp-wipe-wrap { position: absolute; inset: 16px; pointer-events: none; }
+.lp-wipe-wrap[hidden] { display: none; }
+.lp-wipe-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--acc); transform: translateX(-1px); }
+.lp-wipe-label {
+  position: absolute; top: 8px; padding: 2px 8px; border-radius: var(--studio-shape-xs);
+  background: var(--bg2); color: var(--text); border: 1px solid var(--border);
+  font-size: var(--studio-text-micro); font-weight: 600;
+}
+.lp-wipe-left { left: 8px; }
+.lp-wipe-right { right: 8px; }
+.lp-wipe-wrap input[type="range"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  opacity: 0; cursor: ew-resize; pointer-events: auto;
+}
 .library-preview-message { color: var(--muted); }
 .library-preview-message:empty { display: none; }
-.library-preview-footer { padding: 12px 16px; display: flex; gap: 12px; justify-content: space-between; align-items: center; color: var(--muted); font: var(--studio-type-detail); }
+.library-preview-footer { padding: 12px 16px; display: flex; gap: 12px; justify-content: space-between; align-items: center; color: var(--muted); font: var(--studio-type-detail); flex-wrap: wrap; }
+.lp-footer-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#library-preview-actions { display: flex; align-items: center; gap: 8px; }
 .library-preview-footer [hidden] { display: none; }
