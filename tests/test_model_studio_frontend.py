@@ -67,6 +67,8 @@ assert.equal(choose(['VenousGrowthBaseColor','BaseTint']),1,'Order must not sele
 assert.equal(choose(['EmissiveColor','BaseColor','RimColor']),1);
 assert.equal(choose(['FabricTint','SkinColor']),1,'Retain descriptive base-colour fallback');
 assert.equal(choose(['EmissiveColor','FresnelTint']),-1,'Do not tint the whole surface from lighting colours');
+assert.equal(choose(['CubeMap_RelectionTint','EmissiveColor','FX_FlowNoiseColor']),-1,'Silver Centurion should show its untinted texture');
+assert.equal(choose(['ReflectionTint','Cube Map BaseColor','FabricTint']),2,'Reflection colours should not compete with a surface tint');
 console.log('PASS canonical base tint and effect colour selection');
 '''
         result=subprocess.run([shutil.which('node'),'-e',script,str(ROOT/'gui/viewport.js')],

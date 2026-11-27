@@ -180,7 +180,8 @@ function pickBaseIdx(colors) {
   if (!colors || !colors.length) return -1;
   const score = n => {
     n = (n || '').toLowerCase();
-    if (/emissive|glow|spec|rim|fresnel|subsurf|sss|ambient|shadow|_ao\b/.test(n)) return -10;
+    // Reflection colours can be labelled as tints, including CubeMap_RelectionTint.
+    if (/emissive|glow|spec|rim|fresnel|subsurf|sss|ambient|shadow|cube[ _-]?map|reflection|_ao\b/.test(n)) return -10;
     // A global tint takes precedence over colours for a named material effect,
     // e.g. Venom's VenousGrowthBaseColor must not replace its white BaseTint.
     if (/^(?:base[ _-]?(?:color|tint)|albedo|diffuse)(?:[ _-]?color)?$/.test(n)) return 8;
