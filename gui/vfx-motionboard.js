@@ -39,7 +39,7 @@
       <div class="mb-workspace">
         <section class="mb-stage-panel" aria-label="Particle proxy preview">
           <div class="mb-stage-heading"><span>Particle proxies</span><label>Arrangement <select id="mb-arrangement"><option value="burst">Burst</option><option value="trail">Trail</option><option value="smoke">Smoke</option><option value="continuous">Continuous</option></select></label></div>
-          <div class="mb-stage"><canvas id="mb-canvas" tabindex="0" aria-label="Artistic particle proxy preview; Space plays or pauses"></canvas><span class="mb-stage-badge">2D PROXY · NOT UNREAL RENDERING</span><span id="mb-preview-caption"></span></div>
+          <div class="mb-stage"><canvas id="mb-canvas" tabindex="0" aria-label="Artistic particle proxy preview; Space plays or pauses"></canvas><span class="mb-stage-badge">2D PROXY · NOT UNREAL RENDERING</span><div id="mb-stage-prompt" class="mb-stage-prompt" hidden><span id="mb-stage-prompt-text"></span><button id="mb-stage-bind" type="button">Preview selected track</button></div><span id="mb-preview-caption"></span></div>
           <p class="mb-preview-note">Artistic proxy: curves are sampled over a simulated lifetime. Layouts and motion are preview choices; ambiguous tracks stay unassigned.</p>
         </section>
         <aside class="mb-inspector" aria-label="Track properties">
@@ -110,7 +110,7 @@
         row.readout.textContent = D.sample(sourceStops(group, state.compare === 'original' ? 'original' : 'edited'), state.time).map(fmt).join(' / ');
       }
     }
-    function refreshInspector(rebuild = false) {
+    function refreshInspector(rebuild = false, forceValue = false) {
       const entry = activeGroup(); if (!entry) return;
       const {g, i} = entry;
       state.point = D.clamp(state.point, 0, g.stops.length - 1); state.channel = D.clamp(state.channel, 0, g.channels - 1);
@@ -129,7 +129,7 @@
         }));
       }
       channel.value = String(state.channel);
-      if (document.activeElement !== get('mb-value')) get('mb-value').value = g.stops[state.point][state.channel];
+      if (forceValue || document.activeElement !== get('mb-value')) get('mb-value').value = g.stops[state.point][state.channel];
       const saved = callbacks.savedGroup(i), original = D.original(g);
       const gameValue = original ? D.sample(original, time)[state.channel] : null;
       get('mb-reference-values').textContent = 'Saved: ' + fmt(D.sample(saved.stops, time)[state.channel]) + ' · Game: ' + fmt(gameValue);
@@ -366,6 +366,22 @@
       } else paintSide(0, width, height, state.compare === 'original' ? 'original' : 'edited');
       const assigned = D.roles.filter(role => state.maps[role]);
       get('mb-preview-caption').textContent = assigned.length ? assigned.map(role => roleNames[role] + (automatic.candidates[role].includes(state.maps[role]) ? ' · named' : ' · manual')).join('   /   ') : 'Neutral proxy · assign inputs to preview curve values';
+      const prompt = get('mb-stage-prompt');
+      if (prompt) {
+        const needsColor = !state.maps.color && !state.maps.emission;
+        const canBindSelected = (() => {
+          const entry = activeGroup();
+          return entry && (D.allowed('color', entry.g) || D.allowed('emission', entry.g));
+        })();
+        const hasAnyColor = groups.some(g => D.allowed('color', g) || D.allowed('emission', g));
+        prompt.hidden = !(needsColor && hasAnyColor);
+        if (!prompt.hidden) {
+          get('mb-stage-prompt-text').textContent = automatic.candidates.color.length > 1
+            ? 'Multiple colour tracks found — kept unassigned so the proxy stays honest.'
+            : 'No colour track assigned to the preview proxy.';
+          get('mb-stage-bind').textContent = canBindSelected ? 'Preview selected track' : 'Preview first colour track';
+        }
+      }
     }
     function frame(now) {
       raf = 0; if (!visible()) { last = 0; return; }
@@ -376,6 +392,19 @@
       last = now; updateTime(); paint(); if (state.playing) schedule();
     }
     on(get('mb-play'), 'click', () => setPlaying(!state.playing));
+    on(get('mb-stage-bind'), 'click', () => {
+      const entry = activeGroup();
+      const target = entry && (D.allowed('color', entry.g) || D.allowed('emission', entry.g))
+        ? entry.g
+        : groups.find(g => D.allowed('color', g)) || groups.find(g => D.allowed('emission', g));
+      if (!target) return;
+      const role = D.allowed('color', target) ? 'color' : 'emission';
+      const key = D.key(target);
+      state.maps[role] = key;
+      const select = mapSelects.get(role);
+      if (select) select.value = key;
+      schedule();
+    });
     on(get('mb-back'), 'click', () => seek(state.time - 1 / (state.duration * 60)));
     on(get('mb-forward'), 'click', () => seek(state.time + 1 / (state.duration * 60)));
     on(get('mb-loop'), 'change', event => { state.loop = event.target.checked; });
@@ -417,15 +446,15 @@
     get('mb-unsupported').textContent = (editor.unsupportedExports?.length || 0) + ' exports have no supported LUT. ' + (editor.unmatchedEdits || 0) + ' saved edit groups are unavailable and are preserved; restore the entire effect to clear them.';
     renderMappings(); renderRows(); updateTime(true); schedule();
     current = {
-      sync(index) {
+      sync(index, { forceValue = false } = {}) {
         if (disposed) return;
         if (index == null) for (const key of rows.keys()) plot(key); else if (groups[index]) plot(D.key(groups[index]));
-        refreshInspector(); updateTime(true); schedule();
+        refreshInspector(false, forceValue); updateTime(true); schedule();
       },
       destroy() { disposed = true; remember(); cancelAnimationFrame(raf); abort.abort(); rowAbort.abort(); resize.disconnect(); visibility.disconnect(); theme.disconnect(); rows.clear(); root.remove(); },
     };
     return current;
   }
   function destroy() { current?.destroy(); current = null; }
-  window.AtelierMotionboard = Object.freeze({mount, destroy, sync: index => current?.sync(index)});
+  window.AtelierMotionboard = Object.freeze({mount, destroy, sync: (index, options) => current?.sync(index, options)});
 })();

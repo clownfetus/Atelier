@@ -50,6 +50,8 @@ def run_library_pins_checks(page, context, url, report, checks):
         glyph = pins_page.locator('#home-pins .library-pin-open[title="Maps"] svg')
         assert glyph.get_attribute('data-lucide') == 'folder-map'
         assert 'map-folder-icon' in glyph.get_attribute('class')
+        # The pin icon squashes briefly as the chip seats.
+        glyph.evaluate("el => Promise.allSettled(el.getAnimations().map(animation => animation.finished))")
         assert glyph.bounding_box()['width'] == 18
         # Folder emblems replace the Sharp glyph by default; below 32 px pins use the small drawing.
         assert glyph.evaluate("""el=>{const expected=document.createElementNS('http://www.w3.org/2000/svg','svg');

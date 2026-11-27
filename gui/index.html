@@ -49,6 +49,11 @@
 <link rel="stylesheet" href="/static/motion/config-discovery.css">
 <link rel="stylesheet" href="/static/identity.css">
 <link rel="stylesheet" href="/static/workspace.css">
+<link rel="stylesheet" href="/static/trash-dialog.css">
+<link rel="stylesheet" href="/static/settings-tabs.css">
+<link rel="stylesheet" href="/static/project-palette.css">
+<link rel="stylesheet" href="/static/tray-filters.css">
+<link rel="stylesheet" href="/static/command-palette.css">
 </head>
 <body data-page="library">
 
@@ -179,7 +184,14 @@
       <div id="process-s-maps-wrap" hidden><button class="btn" id="process-s-maps" type="button" disabled aria-describedby="process-s-maps-hint">Process S maps</button>
         <span id="process-s-maps-hint" hidden></span></div>
     </div>
-    <div id="mod-tray-heroes" aria-label="Heroes in this mod" hidden></div>
+    <div id="mod-tray-heroes" role="group" aria-label="Filter Mod tray by hero" hidden></div>
+    <div id="tray-filter-bar" hidden>
+      <div class="tray-search-row">
+        <input id="tray-search" type="search" placeholder="Filter Mod tray…" aria-label="Filter Mod tray assets">
+      </div>
+      <div class="tray-type-pills" role="group" aria-label="Filter Mod tray by type"></div>
+      <div class="tray-filter-summary" hidden></div>
+    </div>
     </div>
     <div id="tray-progress" aria-label="Asset preparation" aria-live="polite"></div>
     <div id="sidebar-list"></div>
@@ -199,8 +211,8 @@
 
 <!-- ── confirm: import all ── -->
 <div class="overlay" id="confirm-all-overlay">
-  <div class="modal">
-    <h2><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit all textures?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-all-title">
+    <h2 id="confirm-all-title"><i data-lucide="download-cloud" size="18" style="color:var(--acc)"></i> Edit all textures?</h2>
     <p id="confirm-all-msg">This will extract and decode all listed textures.</p>
     <div class="warning">
       <i data-lucide="alert-triangle" size="14" style="flex-shrink:0;margin-top:2px"></i>
@@ -218,8 +230,8 @@
 
 <!-- ── confirm: overwrite existing mod on install ── -->
 <div class="overlay" id="confirm-overwrite-overlay">
-  <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace existing mod?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-overwrite-title">
+    <h2 id="confirm-overwrite-title"><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Replace existing mod?</h2>
     <p id="confirm-overwrite-msg">A mod with this name already exists and will be replaced.</p>
     <div class="modal-row">
       <button class="btn" id="confirm-overwrite-cancel">Cancel</button>
@@ -256,7 +268,7 @@
 
 <!-- ── material parameter editor ── -->
 <div class="overlay" id="material-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="mat-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <div class="mat-tool-label">Material editor</div>
@@ -268,6 +280,8 @@
     <div id="mat-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="mat-status" class="mat-status"></span>
+      <button class="btn" id="mat-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="mat-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="mat-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="mat-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -459,7 +473,7 @@
 
 <!-- ── curve editor (CurveLinearColor R/G/B/A keys) ── -->
 <div class="overlay" id="curve-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="curve-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="spline" size="18"></i> <span id="curve-title">Curve</span></h2>
@@ -470,6 +484,8 @@
     <div id="curve-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="curve-status" class="mat-status"></span>
+      <button class="btn" id="curve-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="curve-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="curve-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="curve-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -478,7 +494,7 @@
 
 <!-- ── Niagara VFX editor (color-curve group recolor) ── -->
 <div class="overlay" id="vfx-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="vfx-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="sparkles" size="18"></i> <span id="vfx-title">VFX</span></h2>
@@ -489,6 +505,8 @@
     <div id="vfx-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="vfx-status" class="mat-status"></span>
+      <button class="btn" id="vfx-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="vfx-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="vfx-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="vfx-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -500,7 +518,7 @@
 
 <!-- ── update check / download ── -->
 <div class="overlay" id="update-overlay">
-  <div class="modal" id="update-modal">
+  <div class="modal" id="update-modal" role="dialog" aria-modal="true" aria-label="Application update">
     <div id="update-confirm" style="display:none;flex-direction:column;gap:16px">
       <h2><i data-lucide="arrow-up-circle" size="18" style="color:var(--acc)"></i> Update available</h2>
       <p>Atelier <strong id="update-tag" style="color:var(--text)"></strong> is ready to install.</p>
@@ -623,15 +641,16 @@
       <h2><i data-lucide="settings" size="18" style="color:var(--acc)"></i> <span id="setup-title">Initial configuration</span><a href="https://github.com/clownfetus/Atelier#help" target="_blank" rel="noopener" class="setup-help-btn" title="Help"><i data-lucide="circle-help" size="15"></i></a></h2>
       <button class="sb-clear" id="setup-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
+    <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="Settings sections"></div>
     <div class="setup-body">
-      <div class="setup-section">Appearance</div>
-      <div class="setup-field">
+      <div class="setup-section" data-settings-group="appearance">Appearance</div>
+      <div class="setup-field" data-settings-group="appearance">
         <label class="setup-label" for="settings-theme">Appearance</label>
         <select id="settings-theme" class="setup-input" data-theme-picker>
           <option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option>
         </select>
       </div>
-      <div class="setup-field">
+      <div class="setup-field" data-settings-group="appearance">
         <span class="setup-label" id="palette-label">Colour palette</span>
         <div class="theme-palettes" role="group" aria-labelledby="palette-label">
           <button type="button" class="theme-preset" data-theme-preset="studio" aria-pressed="true"><span class="theme-swatches" aria-hidden="true"></span><span>Atelier</span></button>
@@ -643,27 +662,27 @@
           <button type="button" class="theme-preset" data-theme-preset="custom" aria-pressed="false" aria-label="Customise palette"><span class="theme-add" aria-hidden="true">+</span><span>Custom</span></button>
         </div>
       </div>
-      <div class="theme-save-row">
+      <div class="theme-save-row" data-settings-group="appearance">
         <label class="theme-name">Palette name<input id="theme-palette-name" class="setup-input" type="text" maxlength="40" placeholder="My palette" autocomplete="off"></label>
         <button type="button" id="theme-palette-save" class="btn" disabled>Save palette</button>
         <button type="button" id="theme-palette-delete" class="btn danger" hidden>Delete palette</button>
       </div>
-      <div class="theme-colors">
+      <div class="theme-colors" data-settings-group="appearance">
         <label class="theme-color">Background (BG)<span><input type="color" data-theme-color="background" value="#17191d"><output>#17191d</output></span></label>
         <label class="theme-color">Foreground (FG)<span><input type="color" data-theme-color="foreground" value="#e4e6e9"><output>#e4e6e9</output></span></label>
         <label class="theme-color">Surface<span><input type="color" data-theme-color="surface" value="#2b2f35"><output>#2b2f35</output></span></label>
         <label class="theme-color">Accent<span><input type="color" data-theme-color="accent" value="#98b7e2"><output>#98b7e2</output></span></label>
       </div>
-      <p class="opt-help theme-help">Choose a colour to open its native picker. Changes apply and persist immediately. Name and save a palette to reuse it. Light and Dark colours are saved separately; text, accents and surfaces adapt for readable contrast.</p>
-      <p class="opt-help theme-contrast" id="theme-contrast" role="status" hidden></p>
-      <div class="setup-section">Hero and skin artwork</div>
-      <p id="catalogue-status" class="opt-help" role="status">Using saved portraits.</p>
-      <p class="opt-help">Checked in the background at launch. Images are saved locally as you browse.
+      <p class="opt-help theme-help" data-settings-group="appearance">Choose a colour to open its native picker. Changes apply and persist immediately. Name and save a palette to reuse it. Light and Dark colours are saved separately; text, accents and surfaces adapt for readable contrast.</p>
+      <p class="opt-help theme-contrast" id="theme-contrast" role="status" hidden data-settings-group="appearance"></p>
+      <div class="setup-section" data-settings-group="appearance">Hero and skin artwork</div>
+      <p id="catalogue-status" class="opt-help" role="status" data-settings-group="appearance">Using saved portraits.</p>
+      <p class="opt-help" data-settings-group="appearance">Checked in the background at launch. Images are saved locally as you browse.
         Names from <a href="https://github.com/donutman07/MarvelRivalsCharacterIDs" target="_blank" rel="noopener">MarvelRivalsCharacterIDs</a>;
         artwork from <a href="https://rivalskins.com/heroes/" target="_blank" rel="noopener">RivalSkins</a>.
       </p>
-      <div class="setup-section">Paths</div>
-      <div class="setup-field">
+      <div class="setup-section" data-settings-group="paths">Paths</div>
+      <div class="setup-field" data-settings-group="paths">
         <div class="setup-label">
           <span>Path to your MarvelRivals install</span>
           <a href="https://github.com/clownfetus/Atelier#get-marvelrivals-path" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
@@ -673,7 +692,7 @@
           <button class="btn" id="setup-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-field">
+      <div class="setup-field" data-settings-group="paths">
         <div class="setup-label">
           <span>USMAP mapping file</span>
           <a href="https://spacedepot.github.io/SpaceHost/" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
@@ -683,22 +702,22 @@
           <button class="btn" id="setup-usmap-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-field" id="setup-blender-row" style="display:none">
+      <div class="setup-field" id="setup-blender-row" style="display:none" data-settings-group="paths">
         <div class="setup-label"><span>Path to blender.exe — used for "Edit in Blender" / "Open in Blender"</span></div>
         <div class="setup-row">
           <input id="setup-blender" type="text" class="setup-input" placeholder="…/Blender Foundation/Blender 4.x/blender.exe" spellcheck="false">
           <button class="btn" id="setup-blender-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-field" id="setup-image-editor-row" style="display:none">
+      <div class="setup-field" id="setup-image-editor-row" style="display:none" data-settings-group="paths">
         <div class="setup-label"><span>Image editor — textures open here from the right-click menu. Leave blank to use your default image app</span></div>
         <div class="setup-row">
           <input id="setup-image-editor" type="text" class="setup-input" placeholder="…/Adobe Photoshop/Photoshop.exe" spellcheck="false">
           <button class="btn" id="setup-image-editor-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-section">AES Keys</div>
-      <div class="setup-field">
+      <div class="setup-section" data-settings-group="paths">AES Keys</div>
+      <div class="setup-field" data-settings-group="paths">
         <div class="setup-label">
           <span>Main AES key</span>
           <a href="https://discord.com/channels/1419106202511609958/1485413590310584374/1485417747834863616" target="_blank" rel="noopener" class="setup-label-link">Where do I find this?</a>
@@ -708,21 +727,21 @@
           <button class="btn" id="setup-paste-key"><i data-lucide="clipboard" size="14"></i> Paste</button>
         </div>
       </div>
-      <div class="setup-section" id="setup-export-section" style="display:none">Export</div>
-      <div class="setup-field" id="setup-mods-row" style="display:none">
+      <div class="setup-section" id="setup-export-section" style="display:none" data-settings-group="export">Export</div>
+      <div class="setup-field" id="setup-mods-row" style="display:none" data-settings-group="export">
         <label class="setup-label" for="setup-mods">Mods folder</label>
         <div class="setup-row">
           <input id="setup-mods" type="text" class="setup-input" placeholder="…/Paks/~mods" spellcheck="false">
           <button class="btn" id="setup-mods-browse"><i data-lucide="folder" size="14"></i> Browse…</button>
         </div>
       </div>
-      <div class="setup-section" id="setup-mounts-section" style="display:none">Installed content</div>
-      <div class="setup-field" id="setup-mounts-row" style="display:none">
+      <div class="setup-section" id="setup-mounts-section" style="display:none" data-settings-group="export">Installed content</div>
+      <div class="setup-field" id="setup-mounts-row" style="display:none" data-settings-group="export">
         <div class="setup-label"><span>Content mounts Atelier read from your paks</span></div>
         <div id="setup-mounts" class="setup-note"></div>
       </div>
-      <div class="setup-section" id="setup-tools-section" style="display:none">Tools</div>
-      <div class="setup-field" id="setup-tools-row" style="display:none">
+      <div class="setup-section" id="setup-tools-section" style="display:none" data-settings-group="export">Tools</div>
+      <div class="setup-field" id="setup-tools-row" style="display:none" data-settings-group="export">
         <div class="setup-label"><span>Modding tools that follow game patches update here, without a new Atelier release</span></div>
         <div id="setup-tools" class="setup-note"></div>
         <div class="setup-row" style="gap:8px;margin-top:8px">
@@ -731,12 +750,12 @@
           <button type="button" class="btn" id="tools-repair">Repair</button>
         </div>
       </div>
-      <div class="setup-section">Behaviour</div>
-      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-home-heroes" checked><span class="switch-track"></span></span>Open Heroes on Home by default</label><p class="setup-note">You can open or close the character roster on Home at any time.</p></div>
-      <div class="setup-field"><label class="setup-label" for="settings-density">Density</label><select id="settings-density" class="setup-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
-      <div class="setup-field"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="full">Full</option><option value="calm">Calm</option><option value="off">Off</option></select></div>
-      <div class="setup-field"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-foley"><span class="switch-track"></span></span>Motion sounds</label><p class="setup-note">An optional click when work completes. Full motion only.</p></div>
-      <div class="setup-field" id="motion-preview">
+      <div class="setup-section" data-settings-group="behaviour">Behaviour</div>
+      <div class="setup-field" data-settings-group="behaviour"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-home-heroes" checked><span class="switch-track"></span></span>Open Heroes on Home by default</label><p class="setup-note">You can open or close the character roster on Home at any time.</p></div>
+      <div class="setup-field" data-settings-group="behaviour"><label class="setup-label" for="settings-density">Density</label><select id="settings-density" class="setup-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
+      <div class="setup-field" data-settings-group="behaviour"><label class="setup-label" for="settings-motion">Motion</label><select id="settings-motion" class="setup-input"><option value="full">Full</option><option value="calm">Calm</option><option value="off">Off</option></select></div>
+      <div class="setup-field" data-settings-group="behaviour"><label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-foley"><span class="switch-track"></span></span>Motion sounds</label><p class="setup-note">An optional click when work completes. Full motion only.</p></div>
+      <div class="setup-field" id="motion-preview" data-settings-group="behaviour">
         <span class="setup-label">Preview motion</span>
         <div class="motion-preview-stage"></div>
         <div class="motion-preview-buttons" role="group" aria-label="Glyph states" data-preview-group="states"></div>
@@ -747,8 +766,8 @@
         </div>
         <p class="setup-note">Each button plays on the real glyph, with your Motion setting. Choose a setting above to compare them.</p>
       </div>
-      <p class="setup-note">Hero and skin colours decorate artwork. Controls, selections and text follow your chosen theme.</p>
-      <div class="setup-field">
+      <p class="setup-note" data-settings-group="behaviour">Hero and skin colours decorate artwork. Controls, selections and text follow your chosen theme.</p>
+      <div class="setup-field" data-settings-group="behaviour">
         <label class="toggle-row"><span class="switch"><input type="checkbox" id="settings-blender-project-textures" checked><span class="switch-track"></span></span>Add model textures to the project when opening in Blender</label>
         <p class="setup-note">Turn this off to keep textures packed in the Blender file. Only the model is added to your project.</p>
       </div>
@@ -772,9 +791,9 @@
 
 <!-- ── per-texture export options (#20 mips / texture group, #21 Marvel_LQ, #22 blank) ── -->
 <div class="overlay" id="texopt-overlay">
-  <div class="modal setup-modal" style="max-width:560px">
+  <div class="modal setup-modal" style="max-width:560px" role="dialog" aria-modal="true" aria-labelledby="texopt-heading">
     <div class="setup-head">
-      <h2><i data-lucide="sliders-horizontal" size="18"></i>
+      <h2 id="texopt-heading"><i data-lucide="sliders-horizontal" size="18"></i>
           Export options<span id="texopt-title" class="muted" style="font-weight:400;font-size:13px"></span></h2>
       <button class="sb-clear" id="texopt-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -871,8 +890,8 @@
 
 <!-- ── reset data confirm ── -->
 <div class="overlay" id="reset-overlay">
-  <div class="modal">
-    <h2><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset all data?</h2>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-title">
+    <h2 id="reset-title"><i data-lucide="alert-triangle" size="18" style="color:var(--yellow)"></i> Reset all data?</h2>
     <p>The following will be permanently deleted:</p>
     <ul style="margin:4px 0 0 16px;font-size:12px;color:var(--muted);line-height:2;list-style:disc">
       <li>All projects and edited assets</li>
@@ -895,9 +914,9 @@
 
 <!-- ── Repatcher ── -->
 <div class="overlay" id="repatch-overlay">
-  <div class="modal repatch-modal">
+  <div class="modal repatch-modal" role="dialog" aria-modal="true" aria-labelledby="repatch-title">
     <div class="shader-head">
-      <h2><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
+      <h2 id="repatch-title"><i data-lucide="wrench" size="18" style="color:var(--acc)"></i> Repatch a mod</h2>
       <span class="muted">port a broken mod to the current patch</span>
       <button class="sb-clear" id="repatch-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -971,9 +990,9 @@
 
 <!-- ── Shader Studio ── -->
 <div class="overlay" id="shader-overlay">
-  <div class="modal shader-modal">
+  <div class="modal shader-modal" role="dialog" aria-modal="true" aria-labelledby="shader-title">
     <div class="shader-head">
-      <h2><i data-lucide="binary" size="18" style="color:var(--acc)"></i> Shader Studio</h2>
+      <h2 id="shader-title"><i data-lucide="binary" size="18" style="color:var(--acc)"></i> Shader Studio</h2>
       <span id="shader-subtitle" class="muted"></span>
       <button class="sb-clear" id="shader-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
@@ -1038,7 +1057,7 @@
 
 <!-- ── World / level editor (lights · fog · grade · components) ── -->
 <div class="overlay" id="world-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="world-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="globe" size="18"></i> <span id="world-title">Level</span></h2>
@@ -1057,7 +1076,7 @@
 
 <!-- ── Text / StringTable editor ── -->
 <div class="overlay" id="text-overlay">
-  <div class="modal mat-modal">
+  <div class="modal mat-modal" role="dialog" aria-modal="true" aria-labelledby="text-title">
     <div class="mat-head">
       <div class="mat-head-titles">
         <h2><i data-lucide="type" size="18"></i> <span id="text-title">StringTable</span></h2>
@@ -1120,6 +1139,13 @@
 <script src="/static/catalogue-art.js"></script>
 <script src="/static/continuity.js"></script>
 <script src="/static/dialog.js"></script>
+<script src="/static/modal-trap.js"></script>
+<script src="/static/trash-dialog.js"></script>
+<script src="/static/settings-tabs.js"></script>
+<script src="/static/project-palette.js"></script>
+<script src="/static/tray-filters.js"></script>
+<script src="/static/edit-history.js"></script>
+<script src="/static/command-palette.js"></script>
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>
@@ -1135,6 +1161,8 @@
 <script src="/static/vfx-motionboard-data.js"></script>
 <script src="/static/vfx-motionboard.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/repatcher.js"></script>
+<script src="/static/shader-studio.js"></script>
 <script src="/static/launch-game.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>

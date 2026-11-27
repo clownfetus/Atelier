@@ -1,0 +1,51 @@
+/* Tabbed category filter bar for Settings */
+.settings-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+#setup-overlay[data-setup-page] .settings-tabs,
+.settings-tabs[hidden] {
+  display: none !important;
+}
+
+.settings-tab {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--studio-shape-small);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: var(--studio-text-detail);
+  font-weight: 500;
+  cursor: pointer;
+  line-height: 1.3;
+  transition: background-color var(--studio-motion-fast) var(--studio-easing),
+              color var(--studio-motion-fast) var(--studio-easing),
+              border-color var(--studio-motion-fast) var(--studio-easing);
+}
+
+.settings-tab:hover {
+  color: var(--text);
+  background: var(--bg3);
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--bg3);
+  border-color: var(--acc);
+  color: var(--text);
+  font-weight: 600;
+}
+
+#setup-dialog[data-settings-tab="appearance"] .setup-body > :not([data-settings-group="appearance"]),
+#setup-dialog[data-settings-tab="paths"] .setup-body > :not([data-settings-group="paths"]),
+#setup-dialog[data-settings-tab="export"] .setup-body > :not([data-settings-group="export"]),
+#setup-dialog[data-settings-tab="behaviour"] .setup-body > :not([data-settings-group="behaviour"]) {
+  display: none !important;
+}

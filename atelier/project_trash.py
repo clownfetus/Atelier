@@ -21,6 +21,8 @@ DIRECTORY = '.atelier-trash'
 EDIT_EXTS = ('.png', '.json', '.blend', '.blend.mat.json', '.blend1', '.mesh.json', '.mesh.glb', '.asset.json')
 MAX_AGE = 7 * 24 * 3600
 MAX_ENTRIES = 20
+_ENTRY_ID = re.compile(r'[0-9a-f]{32}')
+_RECOVERABLE = ('ready', 'kept')
 
 
 class Interrupted(RuntimeError):
@@ -34,10 +36,42 @@ def _inside(root, relative):
     return path
 
 
+def _trash_root(root):
+    base = Path(root, DIRECTORY)
+    if base.is_symlink() or base.is_junction():
+        raise ValueError('The project trash folder cannot be a link.')
+    return _inside(root, DIRECTORY)
+
+
 def _entry(root, entry):
-    if not isinstance(entry, str) or not re.fullmatch(r'[0-9a-f]{32}', entry):
+    if not isinstance(entry, str) or not _ENTRY_ID.fullmatch(entry):
         raise ValueError('Invalid trash entry.')
-    return _inside(root, DIRECTORY + '/' + entry)
+    folder = _trash_root(root) / entry
+    if folder.is_symlink() or folder.is_junction():
+        raise ValueError('A project trash entry cannot be a link.')
+    return folder
+
+
+def _entries(root):
+    base = _trash_root(root)
+    if not base.is_dir():
+        return
+    for folder in base.iterdir():
+        if not _ENTRY_ID.fullmatch(folder.name) or folder.is_symlink() or folder.is_junction():
+            continue
+        manifest = _read_manifest(folder)
+        if manifest is not None:
+            yield folder, manifest
+
+
+def _read_manifest(folder):
+    try:
+        manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if isinstance(manifest, dict) and manifest.get('version') == 1 and isinstance(manifest.get('assets'), list):
+        return manifest
+    return None
 
 
 def _files(root, game_rel):
@@ -110,21 +144,24 @@ def remove(root, game_rels):
 
 def restore(root, entry):
     folder = _entry(root, entry)
-    try:
-        manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
-    except (OSError, ValueError):
+    manifest = _read_manifest(folder)
+    if manifest is None or manifest.get('state') not in _RECOVERABLE:
         raise ValueError('This trash entry is no longer available.')
-    restored, conflicts = [], []
+    kept = manifest['state'] == 'kept'
+    restored, conflicts, missing = [], [], []
     for asset in list(manifest['assets']):
         gr = asset['game_rel']
         config.validate_game_rel(gr)
         pairs = [(_inside(folder / 'files', rel), _inside(root, rel)) for rel in asset['files']]
-        # Check every layout and sidecar: a fresh import must never be overwritten.
+        # Interrupted deletes may have saved only part of an asset.
+        if kept:
+            pairs = [(source, target) for source, target in pairs if source.is_file()]
+        # Check every layout and sidecar so a fresh import stays untouched.
         if _files(root, gr) or any(target.exists() for _, target in pairs):
             conflicts.append(gr)
             continue
-        if any(not source.is_file() for source, _ in pairs):
-            conflicts.append(gr)
+        if not pairs or any(not source.is_file() for source, _ in pairs):
+            missing.append(gr)
             continue
         moved = []
         try:
@@ -148,37 +185,39 @@ def restore(root, entry):
         restored.append(gr)
     if not manifest['assets']:
         shutil.rmtree(folder)
-    return {'ok': not conflicts, 'game_rels': restored, 'conflicts': conflicts,
-            'error': 'New edits already exist; those assets remain in the project trash.' if conflicts else None}
+    errors = []
+    if conflicts:
+        errors.append('New edits already exist. Those assets remain in the project trash.')
+    if missing:
+        errors.append('Some edit files are missing from the project trash.')
+    return {'ok': not errors, 'game_rels': restored, 'conflicts': conflicts + missing,
+            'error': ' '.join(errors) or None}
 
 
 def purge(root, now=None):
     now = time.time() if now is None else now
-    base = _inside(root, DIRECTORY)
-    if not base.is_dir():
-        return
     entries = []
-    for folder in base.iterdir():
-        if not re.fullmatch(r'[0-9a-f]{32}', folder.name):
-            continue
-        folder = _entry(root, folder.name)
+    for folder, manifest in _entries(root):
         try:
-            manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
             deleted = float(manifest['deleted_at'])
-        except (OSError, ValueError, KeyError, TypeError):
+        except (ValueError, KeyError, TypeError):
             continue  # Unknown data is never silently discarded.
         if manifest.get('state') == 'moving':
             # Roll back an interrupted delete; existing edits always win.
             kept = []
             for asset in manifest['assets']:
-                for relative in asset['files']:
-                    source, target = _inside(folder / 'files', relative), _inside(root, relative)
-                    if source.is_file() and not target.exists():
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        os.replace(source, target)
-                if any(_inside(folder / 'files', relative).is_file() for relative in asset['files']):
-                    kept.append(asset)  # A newer edit owns this asset, including its options and selection.
+                pairs = [(_inside(folder / 'files', rel), _inside(root, rel)) for rel in asset['files']]
+                pending = [(source, target) for source, target in pairs if source.is_file()]
+                targets = {target for _, target in pairs}
+                live = _files(root, asset['game_rel'])
+                if any(target.exists() for _, target in pending) or any(p.resolve() not in targets for p in live):
+                    # Keep the older files together and leave the newer asset and its metadata alone.
+                    if pending:
+                        kept.append(asset)
                     continue
+                for source, target in pending:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(source, target)
                 project_meta.restore_asset(root, asset['game_rel'], asset['project_meta'])
                 cached = asset.get('cache') or {}
                 if cached:
@@ -197,3 +236,63 @@ def purge(root, now=None):
     for index, (deleted, folder) in enumerate(entries):
         if index >= MAX_ENTRIES or now - deleted > MAX_AGE:
             shutil.rmtree(folder)
+
+
+def list_entries(root):
+    """Return recoverable trash batches for a project, newest first."""
+    root = str(Path(root).resolve())
+    purge(root)
+    entries = []
+    for folder, manifest in _entries(root):
+        try:
+            deleted_at = float(manifest['deleted_at'])
+        except (ValueError, KeyError, TypeError):
+            continue
+        state = manifest.get('state')
+        if state not in _RECOVERABLE:
+            continue
+        assets = []
+        for asset in manifest['assets']:
+            gr = asset['game_rel']
+            files = asset['files']
+            if state == 'kept':
+                files = [rel for rel in files if _inside(folder / 'files', rel).is_file()]
+            if not files:
+                continue
+            assets.append({
+                'game_rel': gr,
+                'name': gr.rsplit('/', 1)[-1],
+                'files': len(files),
+            })
+        if not assets:
+            continue
+        entries.append({
+            'entry': folder.name,
+            'deleted_at': deleted_at,
+            'expires_at': None if state == 'kept' else deleted_at + MAX_AGE,
+            'state': state,
+            'count': len(assets),
+            'assets': assets,
+        })
+    entries.sort(key=lambda item: item['deleted_at'], reverse=True)
+    return entries
+
+
+def discard(root, entry=None):
+    """Permanently delete one trash entry, or all ready entries when entry is None."""
+    root = str(Path(root).resolve())
+    purge(root)
+    if entry is not None:
+        folder = _entry(root, entry)
+        manifest = _read_manifest(folder)
+        if manifest is None or manifest.get('state') not in _RECOVERABLE:
+            return {'ok': False, 'removed': 0, 'error': 'This trash entry is no longer available.'}
+        shutil.rmtree(folder)
+        return {'ok': True, 'removed': 1}
+    removed = 0
+    for folder, manifest in _entries(root):
+        if manifest.get('state') != 'ready':
+            continue
+        shutil.rmtree(folder)
+        removed += 1
+    return {'ok': True, 'removed': removed}

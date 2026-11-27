@@ -22,9 +22,9 @@ def run_catalogue_identity_checks(context, url, report, checks):
                            'game_rel': 'Atelier/Custom/fixture/T_Paint'}}
     imported = [{'token': 'paint', 'name': 'MI_Body', 'game_rel': material, 'file_type': 'material',
                  'char_id': '1029', 'char_name': 'Magik', 'skin_id': '1029100', 'skin_name': 'Amethyst Armor',
-                 'modified': time.time(), 'selected': True},
-                {'token': 'excluded', 'name': 'MI_Thor', 'game_rel': 'Characters/1035/1035001/MI_Thor',
-                 'file_type': 'material', 'char_id': '1035', 'char_name': 'Thor', 'selected': False}]
+                 'modified': time.time(), 'selected': True}]
+    excluded = {'token': 'excluded', 'name': 'MI_Thor', 'game_rel': 'Characters/1035/1035001/MI_Thor',
+                'file_type': 'material', 'char_id': '1035', 'char_name': 'Thor', 'selected': False}
     tab.route('**/api/catalogue/library', lambda r: r.fulfill(json={'heroes': [hero]}))
     hero_plate = [True]
     def artwork(route):
@@ -78,18 +78,24 @@ def run_catalogue_identity_checks(context, url, report, checks):
         }"""
         single = chips.first.evaluate(measure)
         assert single['divider'] == 0
-        imported.append({**imported[1], 'token': 'thor-helmet', 'name': 'MI_ThorHelmet', 'selected': True,
-                         'game_rel': 'Characters/1035/1035001/Materials/MI_ThorHelmet'})
+        imported.append(excluded)
         tab.evaluate('loadSidebar()')
         assert chips.all_text_contents() == ['Magik', 'Thor']
         first, second = chips.first.evaluate(measure), chips.last.evaluate(measure)
         assert first['size'] == second['size'] < single['size'], (single, first, second)
         assert first['divider'] == 0 and 0 < second['divider'] < second['height'], (first, second)
+        thor = tab.locator('#mod-tray-heroes').get_by_role('button', name='Thor', exact=True)
+        thor.click()
+        assert thor.get_attribute('aria-pressed') == 'true'
+        rows = tab.locator('#sidebar-list .sb-item')
+        assert rows.get_attribute('data-token') == 'excluded'
+        assert not tab.locator('#sidebar-list .sb-item.selected').count()
         imported.pop()
         tab.evaluate('loadSidebar()')
         assert chips.all_text_contents() == ['Magik']
         assert chips.first.evaluate(measure) == single
-        checks.append('Mod tray uses a larger name for one included hero, adds a short divider between compact names, and restores the larger name when the other hero is removed')
+        assert rows.get_attribute('data-token') == 'paint'
+        checks.append('Mod tray hero filters include excluded edits, preserve their inclusion state, and keep names compact with dividers when more than one hero is present')
         tab.wait_for_selector('#continue-ribbon p .hero-chip-art')
         assert tab.locator('#continue-ribbon > img').get_attribute('src') == '/api/catalogue/badge/1029100'
         tab.evaluate("pushNav({path:'Characters/1029/1029100'})")
@@ -108,7 +114,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
         tab.evaluate("document.body.append(AtelierCatalogueArt.heroChip('1035'))")
         tab.wait_for_selector('body > .hero-chip-art[src="/api/catalogue/hero/1035/avatar"]')
         assert tab.evaluate("AtelierCatalogueArt.heroId('Characters/1029/1035001')") is None
-        checks.append(f'At DPR {pixel_ratio:g}, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, selected Mod tray heroes and Continue')
+        checks.append(f'At DPR {pixel_ratio:g}, wide nameplates request sharpening; missing costume plates use the hero nameplate, missing Lord portraits use avatars, and hero chips cover breadcrumbs, pins, Mod tray hero filters and Continue')
 
         empty = BytesIO(); Image.new('RGBA', (2,2), (0,0,0,0)).save(empty, 'PNG')
         tab.route('**/api/catalogue/icon/1029002', lambda r: r.fulfill(body=empty.getvalue(), content_type='image/png'))

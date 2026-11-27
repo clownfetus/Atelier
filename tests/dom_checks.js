@@ -265,9 +265,9 @@ if (!mh.includes("no editable colour or scalar parameters"))
   const realApi = api;
   api = async path => { if (/reset|revert_imported/.test(path)) apiCalls++; return { ok: false, error: "stub" }; };
 
-  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, savedChannels: {}, stops: [] };
   if (await closeCurveEditor() !== true || prompts.length) throw new Error("a clean curve editor must close without asking");
-  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: { R: true } };
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: { R: [{ time: 0, value: .5 }] }, savedChannels: {}, stops: [] };
   if (await closeCurveEditor() !== false || !curveEditor) throw new Error("declining must keep an edited curve open");
   answer = true;
   if (await closeCurveEditor() !== true || curveEditor) throw new Error("accepting must close the edited curve");
@@ -293,7 +293,7 @@ if (!mh.includes("no editable colour or scalar parameters"))
   textEditor.edits.KEY = "changed";
   if (await closeTextEditor() !== false) throw new Error("edited strings closed silently");
 
-  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, stops: [], dirty: {} };
+  curveEditor = { game_rel: "Fx/Curve", name: "Curve", channels: {}, savedChannels: {}, stops: [] };
   vfxEditor = { game_rel: "Fx/NS", name: "NS", groups: [], scalars: [], vectors: [] };
   await resetCurve(); await resetVfx();
   await revertImported({ name: "T_Painted", game_rel: "Fixture/T_Painted", token: "kept" });

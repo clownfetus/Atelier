@@ -121,6 +121,10 @@ def run_motionboard_checks(page, context, url, report, checks):
             open_editor();select_opacity();assert float(tab.locator('#mb-value').input_value())==.125
             assert tab.evaluate('vfxEditor.groups[1].original_samples[2][0]')==.5
             tab.locator('#mb-original-track').click();assert tab.evaluate('_vfxDirty()')
+            tab.locator('#vfx-undo').click()
+            assert float(tab.locator('#mb-value').input_value())==.125 and not tab.evaluate('_vfxDirty()')
+            tab.locator('#vfx-redo').click()
+            assert float(tab.locator('#mb-value').input_value())==.5 and tab.evaluate('_vfxDirty()')
             tab.locator('#vfx-save').click();tab.wait_for_function('vfxEditor===null')
             assert json.loads(Path(C.project_base(ASSET,str(project))+'.json').read_text())['vfx_edits']==[]
             checks.append('HTTP save persists only changed exports in the existing four-field sidecar format; reopening retains edits and the game reference, and restoring a track removes its saved LUT override')

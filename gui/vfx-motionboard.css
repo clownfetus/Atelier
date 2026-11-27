@@ -26,6 +26,15 @@
 .mb-stage { flex: 1; min-height: 110px; position: relative; overflow: hidden; background: var(--md-sys-color-surface-container-lowest); }
 #mb-canvas { width: 100%; height: 100%; display: block; position: absolute; inset: 0; }
 .mb-stage-badge { position: absolute; top: 12px; right: 12px; font-size: var(--studio-text-micro); font-weight: 600; letter-spacing: var(--studio-label-tracking); color: var(--muted); pointer-events: none; }
+.mb-stage-prompt {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: min(360px, calc(100% - 32px)); padding: 10px 14px; text-align: center;
+  background: color-mix(in srgb, var(--bg2) 92%, transparent);
+  border: 1px solid var(--border); border-radius: var(--studio-shape-small);
+  color: var(--muted); font-size: var(--studio-text-micro);
+}
+.mb-stage-prompt button { min-height: 28px; padding: 4px 10px; font-size: var(--studio-text-micro); }
 #mb-preview-caption { position: absolute; bottom: 10px; left: 14px; right: 14px; color: var(--muted); font-size: var(--studio-text-micro); pointer-events: none; }
 .motionboard .mb-preview-note { font-size: var(--studio-text-micro); margin: 0; padding: 8px 12px; line-height: 1.4; }
 .mb-inspector { grid-column: 2; grid-row: 1 / 3; min-height: 0; min-width: 0; overflow: auto; background: var(--md-sys-color-surface-container-low); padding: 16px 12px; }

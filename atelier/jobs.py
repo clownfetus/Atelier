@@ -138,7 +138,16 @@ class JobManager:
 
     def save(self, record):
         record["updated"] = time.time()
-        atomic_json(str(self.directory / (record["id"] + ".json")), record)
+        path = str(self.directory / (record["id"] + ".json"))
+        # A brief Windows file lock can block an atomic replacement.
+        for attempt in range(5):
+            try:
+                atomic_json(path, record)
+                return
+            except PermissionError as error:
+                if getattr(error, "winerror", None) not in (5, 32) or attempt == 4:
+                    raise
+                time.sleep(0.02 * (2 ** attempt))
 
     def workspace(self, job_id):
         # A UUID-owned workspace is the only tree startup recovery may remove.

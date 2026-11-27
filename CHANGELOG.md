@@ -5,6 +5,38 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- **Find commands with Ctrl+K.** Search for common Atelier actions, including
+  Settings and build commands. Open **Keyboard shortcuts** to see the available
+  keys. Settings now has tabs for appearance, paths and keys, export and
+  tools, and behaviour and motion.
+
+- **See what changed in a texture.** Open a texture preview to inspect the
+  red, green, blue or alpha channel on its own. Use the checkerboard to see
+  transparency, zoom to 1:1 or 200%, or drag the **Wipe** divider to compare
+  the original with your edit when both are available.
+
+- **Find and refine material parameters.** Filter the Material Editor by
+  parameter name, inspect colour and alpha together, and save colours to
+  the project's palette for reuse. Undo and redo parameter edits in the
+  Material Editor, curve editor and VFX editor.
+
+- **Keep separate builds in one project.** Filter the Mod tray by name,
+  asset type or hero, then include or exclude the results you see.
+  **Selection profiles** save the checked edits and mod filename so you
+  can switch between builds without setting up the tray again.
+
+- **Recover a deleted edit.** Open **Recently deleted** from the app menu
+  or Mod tray to restore edits from the current project. The last 20
+  delete batches stay available for up to seven days.
+
+- **Find your place in previews.** Assembly View shortens long texture
+  filenames on cards and shows the full name on hover. The VFX Motionboard
+  offers a shortcut to preview a colour track when the particle proxy has
+  none assigned.
+
+- **Keep job results available on Windows.** Atelier retries saving background
+  job status when a brief file lock interrupts the write.
+
 ## 1.2.6 — 2026-11-27
 
 - Keep Settings open when dismissing a dropdown or tooltip

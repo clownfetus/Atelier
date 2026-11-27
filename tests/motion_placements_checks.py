@@ -458,7 +458,7 @@ def run_editor_motion_placements_checks(context, url, report, checks):
             tab.locator('#material-overlay.active').wait_for(state='detached')
 
             tab.evaluate("""() => {
-              curveEditor={game_rel:'Fixture/Curve',name:'Fixture curve',channels:{},stops:[],dirty:{}};
+              curveEditor={game_rel:'Fixture/Curve',name:'Fixture curve',channels:{},savedChannels:{},stops:[]};
               document.getElementById('curve-overlay').classList.add('active');
             }""")
             busy_while('resetCurve()', 'curve-overlay', None)

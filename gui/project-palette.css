@@ -1,0 +1,87 @@
+/* Shared per-project colour palette strip */
+.project-palette-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 8px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-small);
+  background: var(--bg2);
+}
+
+.project-palette-label {
+  font-size: var(--studio-text-micro);
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.project-palette-swatches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.project-palette-chip {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  border-radius: var(--studio-shape-xs);
+  background: var(--swatch-hex, #ffffff);
+  cursor: pointer;
+}
+
+.project-palette-chip:hover {
+  border-color: var(--text);
+}
+
+.project-palette-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.project-palette-del {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-full);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-palette-chip-wrap:hover .project-palette-del,
+.project-palette-chip-wrap:focus-within .project-palette-del {
+  display: inline-flex;
+}
+
+.project-palette-empty {
+  font-size: var(--studio-text-micro);
+  color: var(--muted);
+}
+
+.project-palette-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: var(--studio-text-micro);
+}

@@ -99,6 +99,9 @@ def load(project_dir):
                             if isinstance(k, str) and isinstance(v, dict)},
         "recolours":       {k: v for k, v in (d.get("recolours") or {}).items()
                             if isinstance(k, str) and isinstance(v, dict)},
+        "palette":         [c for c in (d.get("palette") or []) if isinstance(c, str) and len(c) == 7 and c.startswith("#")][:16],
+        "profiles":        {k: v for k, v in (d.get("profiles") or {}).items()
+                            if isinstance(k, str) and isinstance(v, dict)},
     }
 
 
@@ -163,6 +166,64 @@ def set_deselected(project_dir, game_rels):
         d = load(project_dir)
         d["deselected"] = sorted({g for g in game_rels if isinstance(g, str) and g})
         _write(project_dir, d)
+
+
+def get_palette(project_dir):
+    return list(load(project_dir)["palette"])
+
+
+def set_palette(project_dir, colours):
+    import re
+    cleaned = []
+    seen = set()
+    for value in colours or []:
+        if not isinstance(value, str):
+            continue
+        hexv = value.strip().lower()
+        if re.fullmatch(r"#[0-9a-f]{6}", hexv) and hexv not in seen:
+            seen.add(hexv)
+            cleaned.append(hexv)
+        if len(cleaned) >= 16:
+            break
+    with _lock:
+        d = load(project_dir)
+        d["palette"] = cleaned
+        _write(project_dir, d)
+    return cleaned
+
+
+def get_profiles(project_dir):
+    return dict(load(project_dir)["profiles"])
+
+
+def save_profile(project_dir, name, deselected, mod_name=""):
+    label = (name or "").strip()[:48]
+    if not label:
+        raise ValueError("Profile name is required.")
+    entry = {
+        "deselected": sorted({g for g in (deselected or []) if isinstance(g, str) and g}),
+        "mod_name": (mod_name or "").strip()[:80],
+    }
+    with _lock:
+        d = load(project_dir)
+        profiles = dict(d.get("profiles") or {})
+        if label not in profiles and len(profiles) >= 24:
+            raise ValueError("A project can save at most 24 selection profiles.")
+        profiles[label] = entry
+        d["profiles"] = profiles
+        _write(project_dir, d)
+    return profiles
+
+
+def delete_profile(project_dir, name):
+    label = (name or "").strip()
+    with _lock:
+        d = load(project_dir)
+        profiles = dict(d.get("profiles") or {})
+        profiles.pop(label, None)
+        d["profiles"] = profiles
+        _write(project_dir, d)
+    return profiles
 
 
 def get_asset_opts(project_dir, game_rel=None):

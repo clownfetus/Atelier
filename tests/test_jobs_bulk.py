@@ -117,6 +117,27 @@ class Cases(unittest.TestCase):
         reopened = J.JobManager(self.root / "jobs")
         self.assertEqual(reopened.snapshot(record["id"], "A")["result"], result["result"])
 
+    def test_job_retries_a_transient_windows_lock_on_its_result(self):
+        atomic_json = J.atomic_json
+        result_attempts = []
+
+        def write(path, record):
+            if record["state"] == "succeeded":
+                result_attempts.append(record["id"])
+                if len(result_attempts) == 1:
+                    error = PermissionError("Temporary file lock")
+                    error.winerror = 5
+                    raise error
+            atomic_json(path, record)
+
+        with patch.object(J, "atomic_json", side_effect=write):
+            record = self.submit(lambda job: {"ok": True})
+            self.wait(record)
+
+        self.assertEqual(result_attempts, [record["id"], record["id"]])
+        reopened = J.JobManager(self.root / "jobs")
+        self.assertEqual(reopened.snapshot(record["id"], "A")["state"], "succeeded")
+
     def test_start_claim_blocks_project_changes_and_duplicate_jobs(self):
         entered, finish = threading.Event(), threading.Event()
         def work(job):
