@@ -132,7 +132,10 @@ class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
 
 class _ThreadedServer(ServerAdapter):
     def run(self, handler):
-        srv = make_server(self.host, self.port, handler,
-                          server_class=_ThreadingWSGIServer,
-                          handler_class=WSGIRequestHandler)
-        srv.serve_forever()
+        with make_server(self.host, self.port, handler,
+                         server_class=_ThreadingWSGIServer,
+                         handler_class=WSGIRequestHandler) as srv:
+            on_listening = self.options.get("on_listening")
+            if on_listening is not None:
+                on_listening()
+            srv.serve_forever()
