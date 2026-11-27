@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.7 — 2026-11-27
+
 - **Find commands with Ctrl+K.** Search for common Atelier actions, including
   Settings and build commands. Open **Keyboard shortcuts** to see the available
   keys. Settings now has tabs for appearance, paths and keys, export and
