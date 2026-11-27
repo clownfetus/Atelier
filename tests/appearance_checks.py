@@ -180,6 +180,7 @@ def run_appearance_checks(page, context, url, report, checks):
         assert picker.input_value() == 'dark'
         picker.click()
         tab.keyboard.press('Escape')
+        assert picker.is_visible(), 'Dismissing the theme picker closed Settings'
         assert picker.input_value() == 'dark'
         tab.screenshot(path=str(report / 'appearance-settings-dark.png'), animations='disabled')
         checks.append('Dropdown popup selection works with ArrowDown/Enter; Escape dismisses without changing selection')
@@ -269,6 +270,7 @@ def run_appearance_checks(page, context, url, report, checks):
             tab.keyboard.press('Escape')
             # The bubble folds away (P4b.7) and is gone within its 150 ms fold.
             tab.wait_for_selector('#atelier-tooltip', state='hidden', timeout=1000)
+            assert picker.is_visible(), 'Dismissing the help tooltip closed Settings'
             assert help_button.get_attribute('title') == 'Help'
         tab.locator('#setup-close').click()
         for mode in ('light', 'dark'):

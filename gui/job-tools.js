@@ -201,7 +201,14 @@
     el,
     trap(overlay, panel, hide) {
       overlay.addEventListener('keydown', event => {
-        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); hide(); }
+        if (event.defaultPrevented) return;
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          // Let the browser dismiss an open select before Escape can close the dialog.
+          if (CSS.supports('selector(select:open)') && panel.querySelector('select:open')) return;
+          event.preventDefault();
+          hide();
+        }
         if (event.key !== 'Tab') return;
         const nodes = [...panel.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,a[href]')].filter(n => n.getClientRects().length);
         const first = nodes[0], last = nodes[nodes.length-1];
