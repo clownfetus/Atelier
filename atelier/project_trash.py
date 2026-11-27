@@ -197,3 +197,76 @@ def purge(root, now=None):
     for index, (deleted, folder) in enumerate(entries):
         if index >= MAX_ENTRIES or now - deleted > MAX_AGE:
             shutil.rmtree(folder)
+
+
+def list_entries(root):
+    """Return recoverable trash batches for a project, newest first."""
+    root = str(Path(root).resolve())
+    purge(root)
+    base = _inside(root, DIRECTORY)
+    if not base.is_dir():
+        return []
+    entries = []
+    for folder in base.iterdir():
+        if not re.fullmatch(r'[0-9a-f]{32}', folder.name):
+            continue
+        folder = _entry(root, folder.name)
+        try:
+            manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8'))
+            deleted_at = float(manifest['deleted_at'])
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        state = manifest.get('state')
+        if state not in ('ready', 'kept'):
+            continue
+        assets = []
+        for asset in manifest.get('assets') or []:
+            gr = asset.get('game_rel') or ''
+            if not gr:
+                continue
+            assets.append({
+                'game_rel': gr,
+                'name': gr.rsplit('/', 1)[-1],
+                'files': len(asset.get('files') or []),
+            })
+        if not assets:
+            continue
+        entries.append({
+            'entry': folder.name,
+            'deleted_at': deleted_at,
+            'expires_at': None if state == 'kept' else deleted_at + MAX_AGE,
+            'state': state,
+            'count': len(assets),
+            'assets': assets,
+        })
+    entries.sort(key=lambda item: item['deleted_at'], reverse=True)
+    return entries
+
+
+def discard(root, entry=None):
+    """Permanently delete one trash entry, or all ready entries when entry is None."""
+    root = str(Path(root).resolve())
+    purge(root)
+    if entry is not None:
+        folder = _entry(root, entry)
+        if not folder.is_dir():
+            return {'ok': False, 'removed': 0, 'error': 'This trash entry is no longer available.'}
+        shutil.rmtree(folder)
+        return {'ok': True, 'removed': 1}
+    base = _inside(root, DIRECTORY)
+    if not base.is_dir():
+        return {'ok': True, 'removed': 0}
+    removed = 0
+    for folder in list(base.iterdir()):
+        if not re.fullmatch(r'[0-9a-f]{32}', folder.name):
+            continue
+        target = _entry(root, folder.name)
+        try:
+            manifest = json.loads((target / 'manifest.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        if manifest.get('state') != 'ready':
+            continue
+        shutil.rmtree(target)
+        removed += 1
+    return {'ok': True, 'removed': removed}

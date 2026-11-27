@@ -3131,7 +3131,7 @@ function updateInstallBtn() {
   if (window.AtelierPolish) window.AtelierPolish.count(count, sel); else count.textContent = `${sel}`;
   document.getElementById("sel-count-total").textContent = ` of ${edited} included`;
   document.getElementById("tray-selection").hidden = edited === 0;
-  document.getElementById("tray-menu-btn").hidden = edited === 0;
+  document.getElementById("tray-menu-btn").hidden = !_activeProjectName;
   document.getElementById("tray-include-all").textContent = sel === edited ? "Exclude all" : "Include all";
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
@@ -3509,10 +3509,15 @@ async function removeAllEdits() {
 }
 
 document.getElementById("tray-menu-btn").addEventListener("click", e => {
+  const items = [
+    { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
+  ];
+  if (Object.keys(sidebarData).length) {
+    items.push("sep");
+    items.push({ icon: "trash-2", label: "Remove all edits…", danger: true, action: removeAllEdits });
+  }
   _ctxShow({ preventDefault: () => e.preventDefault(), stopPropagation: () => e.stopPropagation(),
-    currentTarget: e.currentTarget }, [
-    { icon: "trash-2", label: "Remove all edits…", danger: true, action: removeAllEdits },
-  ]);
+    currentTarget: e.currentTarget }, items);
 });
 
 // ── pak index warnings ───────────────────────────────────────────────────────
@@ -5335,6 +5340,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
     { preventDefault: () => {}, stopPropagation: () => e.stopPropagation(), clientX: rect.left, clientY: rect.bottom + 4 },
     [
       { icon: "folder-open", label: "My projects", action: openProjectPicker },
+      { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
       { icon: "refresh-cw", label: "Refresh view", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
       { icon: "package-open", label: "Open export folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },

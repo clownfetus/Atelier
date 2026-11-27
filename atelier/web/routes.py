@@ -3695,7 +3695,29 @@ def api_delete_all_imported():
 @app.post('/api/restore_imported')
 def api_restore_imported():
     response.content_type = 'application/json'
-    return json.dumps(project_trash.restore(get_import_root(), (request.json or {}).get('entry')))
+    try:
+        return json.dumps(project_trash.restore(get_import_root(), (request.json or {}).get('entry')))
+    except ValueError as error:
+        response.status = 400
+        return json.dumps({'ok': False, 'error': str(error)})
+
+
+@app.get('/api/trash')
+def api_trash_list():
+    response.content_type = 'application/json'
+    return json.dumps({'ok': True, 'entries': project_trash.list_entries(get_import_root())})
+
+
+@app.post('/api/trash/discard')
+def api_trash_discard():
+    response.content_type = 'application/json'
+    body = request.json or {}
+    entry = body.get('entry')
+    try:
+        return json.dumps(project_trash.discard(get_import_root(), entry))
+    except ValueError as error:
+        response.status = 400
+        return json.dumps({'ok': False, 'error': str(error)})
 
 @app.get("/api/asset_info")
 def api_asset_info():

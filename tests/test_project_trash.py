@@ -255,5 +255,25 @@ class Trash(unittest.TestCase):
         T.purge(str(self.root))
         self.assertTrue(path.exists()); self.assertTrue(PM.get_asset_opts(str(self.root),self.tex)['blank'])
 
+    def test_http_list_and_discard_trash_entries(self):
+        self.seed(self.tex)
+        first = call('/api/delete_imported', {'game_rels': [self.tex]})
+        self.seed(self.mat, '.json')
+        second = call('/api/delete_imported', {'game_rels': [self.mat]})
+        listed = call('/api/trash', method='GET')
+        self.assertTrue(listed['ok'])
+        self.assertEqual(len(listed['entries']), 2)
+        self.assertEqual({e['entry'] for e in listed['entries']}, {first['entry'], second['entry']})
+        self.assertEqual(listed['entries'][0]['assets'][0]['name'], 'MI_Test')
+        removed_one = call('/api/trash/discard', {'entry': first['entry']})
+        self.assertTrue(removed_one['ok']); self.assertEqual(removed_one['removed'], 1)
+        remaining = call('/api/trash', method='GET')['entries']
+        self.assertEqual([e['entry'] for e in remaining], [second['entry']])
+        emptied = call('/api/trash/discard', {})
+        self.assertTrue(emptied['ok']); self.assertEqual(emptied['removed'], 1)
+        self.assertEqual(call('/api/trash', method='GET')['entries'], [])
+        invalid = call('/api/trash/discard', {'entry': '../escape'})
+        self.assertFalse(invalid['ok'])
+
 
 if __name__ == '__main__': unittest.main()
