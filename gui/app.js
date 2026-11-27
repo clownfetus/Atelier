@@ -3750,6 +3750,7 @@ async function openPaths({field, onSave, opener = document.activeElement} = {}) 
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
   if (revision !== _setupLoadingRevision || !_setupOverlay.classList.contains('active')) return;
+  window.AtelierSettingsTabs?.revealField(field);
   if (field && document.activeElement === _setupDialog) document.getElementById(field)?.focus();
   loadContentMounts();      // fire-and-forget: informational, never blocks the panel
   loadToolStatus(true);     // likewise: a slow or offline channel must not hold the panel up
