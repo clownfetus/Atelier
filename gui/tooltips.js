@@ -82,7 +82,14 @@
     if ((owner?.contains(event.target) || tooltip?.contains(event.target))
         && !owner?.contains(event.relatedTarget) && !tooltip?.contains(event.relatedTarget)) hide();
   });
-  document.addEventListener('keydown', event => { input = 'keyboard'; if (event.key === 'Escape') hide(); }, true);
+  document.addEventListener('keydown', event => {
+    input = 'keyboard';
+    if (event.key !== 'Escape') return;
+    if (owner?.contains(event.target) && tooltip && !tooltip.hidden && !tooltip.dataset.folding) {
+      event.preventDefault();
+    }
+    hide();
+  }, true);
   document.addEventListener('pointerdown', () => { input = 'pointer'; hide(); }, true);
   document.addEventListener('scroll', hide, true);
   window.addEventListener('blur', hide);
