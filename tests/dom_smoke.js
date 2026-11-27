@@ -22,6 +22,7 @@ function mkEl(id) {
     attributes: {},
     setAttribute(name, value){ this.attributes[name] = String(value); },
     getAttribute(name){ return this.attributes[name] ?? null; },
+    removeAttribute(name){ delete this.attributes[name]; },
     contains(){ return false; },
     classList: { add(){}, remove(){}, toggle(){}, contains(){return false;} },
     addEventListener(){}, removeEventListener(){}, appendChild(c){ this.children.push(c); },

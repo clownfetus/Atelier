@@ -26,7 +26,8 @@
     $('workspace-step-edit').toggleAttribute('aria-current',!choosing);
     if(choosing)$('workspace-step-choose').setAttribute('aria-current','step');
     else $('workspace-step-edit').setAttribute('aria-current','step');
-    $('workspace-help').textContent=choosing?'Choose a hero below, then pick the costume you want to change.':'Click a part on the model or in the list. Pick a colour, then save your changes.';
+    $('workspace-help').hidden=choosing;
+    $('workspace-help').textContent='Click a part on the model or in the list. Pick a colour, then save your changes.';
   }
   function present() {
     opening();
@@ -63,6 +64,14 @@
       if(ticket===session && project===window.atelierProject?.())opening('error');
     }
   }
+  function loadCatalogue() {
+    loading ||= fetch('/api/catalogue/library').then(response=>{
+      if(!response.ok)throw Error('Could not load heroes.');
+      return response.json();
+    }).finally(()=>loading=null);
+    return loading;
+  }
+
   async function choose(fresh=false) {
     if(await window.AtelierViewport?.close({navigate:false})===false)return;
     opening();
@@ -72,11 +81,9 @@
     $('workspace-search').value=''; $('workspace-heroes').replaceChildren(); $('workspace-costumes').replaceChildren();
     $('workspace-choice-status').textContent='Loading heroes…';
     try {
-      if(!catalogue) {
-        loading ||= fetch('/api/catalogue/library').then(r=>{if(!r.ok)throw Error('Could not load heroes.');return r.json();}).finally(()=>loading=null);
-        catalogue=await loading;
-      }
+      const data=catalogue || await loadCatalogue();
       if(ticket!==session)return;
+      catalogue=data;
       render(); $('workspace-search').focus({preventScroll:true});
     } catch(error) {
       if(ticket!==session)return;
@@ -85,11 +92,16 @@
     }
   }
   function render() {
-    const query=$('workspace-search').value.trim().toLowerCase();
+    const search=$('workspace-search'), heroList=$('workspace-heroes'), costumeList=$('workspace-costumes');
+    const focused=document.activeElement;
+    const focusList=[heroList,costumeList].find(list=>list.contains(focused));
+    const focusPath=focused?.dataset.path;
+    const heroScroll=heroList.scrollLeft;
+    const query=search.value.trim().toLowerCase();
     const heroes=(catalogue?.heroes || []).filter(h=>h.name.toLowerCase().includes(query)||(h.skins||[]).some(s=>s.name.toLowerCase().includes(query)));
     const hero=heroes.find(h=>h.path===selectedHero) || heroes[0];
     selectedHero=hero?.path || '';
-    $('workspace-heroes').replaceChildren(); $('workspace-costumes').replaceChildren();
+    heroList.replaceChildren(); costumeList.replaceChildren();
     $('workspace-choice-status').textContent=heroes.length?(hero.skins?.length?'':'No costumes are available for this hero yet.'):query?'No heroes or costumes match. Try another name.':'The costume library is not ready yet. Try again after indexing.';
     if(!heroes.length&&!query) {
       const retry=document.createElement('button');retry.className='at-btn';retry.textContent='Try again';retry.onclick=()=>{catalogue=null;choose(creating);};$('workspace-choice-status').append(' ',retry);
@@ -98,14 +110,22 @@
       const button=document.createElement('button');button.className='workspace-hero';button.type='button';button.setAttribute('aria-pressed',String(item===hero));
       const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=item.avatar || item.thumbnail || '/api/catalogue/hero/'+encodeURIComponent(item.path.split('/').pop())+'/avatar';
       image.onerror=()=>image.hidden=true;button.append(image,document.createTextNode(item.name));
-      button.onclick=()=>{selectedHero=item.path;render();};$('workspace-heroes').append(button);
+      button.dataset.path=item.path;
+      button.onclick=()=>{selectedHero=item.path;render();};heroList.append(button);
     }
     for(const skin of hero?.skins || []) {
       if(query&&!hero.name.toLowerCase().includes(query)&&!skin.name.toLowerCase().includes(query))continue;
       const button=document.createElement('button');button.className='workspace-costume';button.type='button';button.disabled=busy;
       if(skin.icon||skin.badge){const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=skin.icon||skin.badge;image.onerror=()=>image.hidden=true;button.append(image);}
-      button.append(document.createTextNode(skin.name));const hint=document.createElement('span');hint.textContent='Choose costume';button.append(hint);
-      button.onclick=()=>select(hero,skin);$('workspace-costumes').append(button);
+      button.dataset.path=skin.path;
+      button.append(document.createTextNode(skin.name));
+      button.onclick=()=>select(hero,skin);costumeList.append(button);
+    }
+    heroList.scrollLeft=heroScroll;
+    if(focusList) {
+      const replacement=[...focusList.children].find(button=>button.dataset.path===focusPath&&!button.disabled);
+      const selected=focusList===heroList?heroList.querySelector('[aria-pressed="true"]'):null;
+      (replacement || selected || search).focus({preventScroll:true});
     }
   }
   async function select(hero,skin) {
@@ -135,7 +155,16 @@
       .then(r=>{if(!r.ok)throw Error();}).catch(()=>{if(project===window.atelierProject?.())toast('Could not remember this costume. Your saved edits are safe.','warning');});
   }
   function start() {return choose(true);}
-  window.addEventListener('atelier:catalogue-updated',()=>{catalogue=null;if(choosing&&!busy)choose(creating);});
+  window.addEventListener('atelier:catalogue-updated',async()=>{
+    if(!choosing){catalogue=null;return;}
+    const ticket=session;
+    try {
+      const data=await loadCatalogue();
+      if(ticket!==session || !choosing)return;
+      catalogue=data;
+      if(!busy)render();
+    } catch (_) { /* Keep the usable chooser if the refresh fails. */ }
+  });
   $('page-library').onclick=()=>library();
   $('workspace-advanced').onclick=()=>library();
   $('workspace-retry').onclick=resume;
