@@ -16,7 +16,7 @@
   · <a href="docs/USER_GUIDE.md">User guide</a>
 </p>
 
-![Magik’s Amethyst Armor in Atelier’s Model Studio, with a 3D preview and material controls](images/model-studio.png)
+![Atelier’s Assembly View showing Magik holding her Soulsword, with the sword’s material and textures selected](images/readme-model-studio.png)
 
 <a name="features"></a>
 
@@ -35,6 +35,8 @@
   effects. Apply the same change to several materials or effects in one go.
 - **Build a mod you can install.** Choose which edits to package, review the
   output and copy the finished mod to your game’s mods folder from Atelier.
+
+![The Skin VFX editor showing a Niagara system and its attachment point on Magik’s costume](images/readme-skin-vfx.png)
 
 <a name="installation"></a>
 
