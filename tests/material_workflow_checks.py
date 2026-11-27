@@ -22,12 +22,16 @@ def run_material_workflow_checks(page, context, url, report, checks):
     fixture = {'ok': True, 'colors': [
         {'name': 'Tint', 'rgba': [.25, .5, .75, 1]},
         {'name': 'Region 2 - ColorA', 'rgba': [.8, .2, .1, 1]},
-        {'name': 'Region 2 - ColorB', 'rgba': [.4, .2, .1, 1]}],
+        {'name': 'Region 2 - ColorB', 'rgba': [.4, .2, .1, 1]},
+        {'name': 'ExtraSpecularTint', 'rgba': [1, 1, 1, 1]},
+        {'name': 'RimLightDirection', 'rgba': [-2, 0, 0, 1]}],
         'scalars': [{'name': 'Roughness', 'value': .35}]}
     original = {'ok': True, 'colors': [
         {'name': 'Tint', 'rgba': [1, 1, 1, 1]},
         {'name': 'Region 2 - ColorA', 'rgba': [.2, .8, .1, 1]},
-        {'name': 'Region 2 - ColorB', 'rgba': [.1, .8, .4, 1]}],
+        {'name': 'Region 2 - ColorB', 'rgba': [.1, .8, .4, 1]},
+        {'name': 'ExtraSpecularTint', 'rgba': [1, 1, 1, 1]},
+        {'name': 'RimLightDirection', 'rgba': [-2, 0, 0, 1]}],
         'scalars': [{'name': 'Roughness', 'value': .8}]}
     behavior = {'original': 'ok', 'save': 'ok'}
     tab.route('**/static/viewport.js', lambda route: route.fulfill(
@@ -74,14 +78,27 @@ def run_material_workflow_checks(page, context, url, report, checks):
         tab.goto(url)
         tab.wait_for_function('window.atelierProject?.() && window.__materialWorkflowViewport')
         open_editor()
-        assert tab.locator('.mat-parameter-group:not(#mat-replacement) summary').all_text_contents() == ['Surface colours1', 'Dye region 22', 'Scalar parameters1']
+        assert tab.get_by_label('Main colour', exact=True).is_visible()
+        assert tab.get_by_label('Specular tint', exact=True).is_visible()
+        assert tab.locator('#matalpha0').is_hidden()
+        tab.locator('#matrow0').get_by_text('Intensity and alpha', exact=True).click()
+        tab.locator('#matalpha0').fill('.6')
+        assert tab.evaluate('materialDirtyCount()') == 1
+        tab.locator('#matrow0 .mat-restore').click()
+        assert tab.locator('#matalpha0').input_value() == '1'
+        assert tab.locator('#mathx1').is_visible(), 'Dye region parameters remain available'
+        assert tab.locator('#mathx4').is_hidden()
+        tab.locator('summary').filter(has_text='Shading and lighting').click()
+        assert tab.locator('#mathx4').is_visible()
+        assert tab.locator('#msn0').is_hidden()
+        tab.locator('summary').filter(has_text='Scalar parameters').click()
         assert tab.evaluate('materialDirtyCount()') == 0
         assert 'Saved:' in tab.locator('#matrow0 .mat-reference').inner_text()
         tab.locator('#msn0').fill('.6')
         tab.locator('#msn0').dispatch_event('input')
         assert tab.evaluate('materialDirtyCount()') == 1
         assert tab.locator('#matscalar0').evaluate("el=>el.classList.contains('is-modified')")
-        assert '1 unsaved' in tab.locator('#mat-dirty').inner_text()
+        assert 'Unsaved changes' in tab.locator('#mat-dirty').inner_text()
         tab.locator('#matscalar0 .mat-restore').click()
         assert tab.evaluate('materialDirtyCount()') == 0
         assert tab.evaluate('matEditor.scalars[0].value') == .35
@@ -142,7 +159,7 @@ def run_material_workflow_checks(page, context, url, report, checks):
         assert tab.evaluate('matEditor.scalars[0].value') == .7
         assert tab.evaluate("_matReference('scalars',0,'saved').value") == .5
         assert tab.evaluate('materialDirtyCount()') == 1
-        assert '1 unsaved' in tab.locator('#mat-dirty').inner_text()
+        assert 'Unsaved changes' in tab.locator('#mat-dirty').inner_text()
         for theme in ('light', 'dark'):
             tab.locator('#settings-theme').evaluate('(el,value)=>{el.value=value;el.dispatchEvent(new Event("change"));}', theme)
             tab.wait_for_timeout(250)

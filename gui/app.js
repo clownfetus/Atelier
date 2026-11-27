@@ -988,8 +988,10 @@ function _matRefreshDirty() {
   if (!matEditor) return;
   const n = materialDirtyCount(), busy = _materialSaving.has(matEditor);
   const badge = document.getElementById("mat-dirty");
-  if (badge) { badge.textContent = n ? `${n} unsaved parameter${n === 1 ? "" : "s"}` : "All changes saved"; badge.classList.toggle("dirty", n > 0); }
-  document.getElementById("mat-title").textContent = matEditor.name + (n ? " •" : "");
+  if (badge) {
+    badge.textContent = n ? `Unsaved changes · ${n} parameter${n === 1 ? "" : "s"}` : "All changes saved";
+    badge.classList.toggle("dirty", n > 0);
+  }
   const save = document.getElementById("mat-save");
   save.disabled = busy;
   save.textContent = busy ? "Saving…" : n ? `Save changes (${n})` : "Save";
@@ -1156,7 +1158,7 @@ async function openMaterialEditor(item) {
   clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
   document.getElementById("mat-body").inert = false;
-  document.getElementById("mat-title").textContent = item.name;
+  document.getElementById("mat-title").textContent = item.partLabel || item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
   document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
@@ -1373,7 +1375,8 @@ function _matTexturesHtml(m, expanded) {
   if (!slots.length) return "";
   const custom = m.custom || {};
   const used = slots.filter(s => custom[s]).length;
-  let h = `<details class="mat-parameter-group mat-textures" data-mat-group="Textures" ${expanded.get("Textures") !== false ? "open" : ""}>
+  const open = expanded.get("Textures") ?? (!m.colors?.length && !m.scalars?.length);
+  let h = `<details class="mat-parameter-group mat-textures" data-mat-group="Textures" ${open ? "open" : ""}>
     <summary>Texture slots<span>${used ? `${used} of ${slots.length} using your images` : slots.length}</span></summary>
     <p class="mat-texture-help">Give a slot your own image and it ships as a <b>new texture</b> that only this
       material uses. The game texture stays as it is, so other skins that share it don't change. Your image is
@@ -1544,6 +1547,65 @@ function matFocusRegion(idx) {
   });
 }
 
+function matColourParameterHtml(c, i, expanded, label = "") {
+  const name = _matEscape(c.name), group = `Colour ${i}`;
+  const levels = `<span class="mat-tag">Intensity</span>
+    <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
+    <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
+    <span class="mat-tag mat-alpha-label">${label ? "Alpha" : "A"}</span>
+    <input class="mat-num" id="matalpha${i}" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">`;
+  return `<div class="mat-parameter${label ? " mat-colour-card" : ""}" id="matrow${i}">
+    <div class="mat-row">
+      <label for="mathx${i}" title="${name}">${label || name}<span class="mat-changed" aria-hidden="true"></span></label>
+      <span class="mat-color-well"><input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)"></span>
+      <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
+        title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
+        value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
+        onchange="matColorText(${i},this)">
+      ${label ? "" : levels}
+    </div>
+    ${_matComparison("colors", i)}
+    ${label ? `<details class="mat-colour-levels" data-mat-group="${group}" ${expanded.get(group) ? "open" : ""}>
+      <summary>Intensity and alpha</summary><div class="mat-level-fields">${levels}</div>
+    </details>` : ""}
+  </div>`;
+}
+
+function matColourGroupsHtml(colors, expanded) {
+  if (!colors.length) return "";
+  const featured = new Map(), groups = new Map();
+  const names = colors.map(c => String(c.name ?? "").toLowerCase().replace(/[\s_-]+/g, ""));
+  for (const [pattern, label] of [
+    [/^(?:basetint|basecolor|basecolour|maincolor|maincolour|albedo(?:color)?|diffuse(?:color)?|tint)$/, "Main colour"],
+    [/^(?:extra)?specular(?:tint|color|colour)$/, "Specular tint"],
+    [/^(?:emissive|glow)(?:tint|color|colour)$/, "Glow colour"],
+  ]) {
+    const i = names.findIndex(name => pattern.test(name));
+    if (i >= 0) featured.set(i, label);
+  }
+  colors.forEach((c, i) => {
+    if (featured.has(i)) return;
+    const region = /^Region\s+(\d+)\s*-/.exec(c.name);
+    const group = region ? `Dye region ${region[1]}`
+      : /shade|rimlight|specular|emissive|ambient|fresnel/i.test(c.name) ? "Shading and lighting"
+      : "Other colour parameters";
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(i);
+  });
+  let h = `<div class="mat-section with-ctl">${featured.size ? "Surface colours" : "Colour parameters"} ${colorModeSeg()}</div>`;
+  if (featured.size) {
+    h += `<div class="mat-colour-cards">${Array.from(featured, ([i, label]) => matColourParameterHtml(colors[i], i, expanded, label)).join("")}</div>`;
+  }
+  for (const [name, rows] of groups) {
+    const open = expanded.get(name) ?? (name.startsWith("Dye region ") || !featured.size);
+    h += `<details class="mat-parameter-group" data-mat-group="${name}" ${open ? "open" : ""}>
+      <summary>${name}<span>${rows.length}</span></summary>
+      ${rows.map(i => matColourParameterHtml(colors[i], i, expanded)).join("")}
+    </details>`;
+  }
+  return h;
+}
+
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   const body = document.getElementById("mat-body");
@@ -1558,7 +1620,7 @@ function renderMatEditor() {
       <button type="button" class="seg-btn ${m.compareMode === "original" ? "on" : ""}" aria-pressed="${m.compareMode === "original"}" onclick="matCompare('original')">Game original</button>
     </div>
     <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
-  </div><p class="mat-reference-note">${m.compareMode === "original" ? "Game original values are shown below each parameter. Changes apply only when you save." : "Saved values are from this project's last save. Compare Game original to inspect the unmodified material."}</p>`;
+  </div>`;
   h += materialReplacementHtml(m, expanded);
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
@@ -1587,38 +1649,10 @@ function renderMatEditor() {
       </div>
       ${_dyeOffHtml(m)}`;
   }
-  if (m.colors.length) {
-    h += `<div class="mat-section with-ctl">Colour parameters ${colorModeSeg()}</div>`;
-    const groups = new Map();
-    m.colors.forEach((c, i) => {
-      const region = /^Region\s+(\d+)\s*-/.exec(c.name);
-      const group = region ? `Dye region ${region[1]}` : "Surface colours";
-      if (!groups.has(group)) groups.set(group, []);
-      groups.get(group).push({ c, i });
-    });
-    for (const [name, rows] of groups) {
-      h += `<details class="mat-parameter-group" data-mat-group="${name}" ${expanded.get(name) !== false ? "open" : ""}><summary>${name}<span>${rows.length}</span></summary>`;
-      rows.forEach(({ c, i }) => {
-      const escaped = _matEscape(c.name);
-      h += `<div class="mat-parameter" id="matrow${i}"><div class="mat-row">
-        <label for="mathx${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
-        <span class="mat-color-well"><input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)"></span>
-        <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
-               title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
-               value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
-               onchange="matColorText(${i},this)">
-        <span class="mat-tag">intensity</span>
-        <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
-        <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
-        <span class="mat-tag">A</span>
-        <input class="mat-num" id="matalpha${i}" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">
-      </div>${_matComparison("colors", i)}</div>`;
-      });
-      h += `</details>`;
-    }
-  }
+  h += matColourGroupsHtml(m.colors, expanded);
   if (m.scalars.length) {
-    h += `<details class="mat-parameter-group" data-mat-group="Scalars" ${expanded.get("Scalars") !== false ? "open" : ""}><summary>Scalar parameters<span>${m.scalars.length}</span></summary>`;
+    const open = expanded.get("Scalars") ?? !m.colors.length;
+    h += `<details class="mat-parameter-group" data-mat-group="Scalars" ${open ? "open" : ""}><summary>Scalar parameters<span>${m.scalars.length}</span></summary>`;
     m.scalars.forEach((s, i) => {
       const escaped = _matEscape(s.name);
       h += `<div class="mat-parameter" id="matscalar${i}"><div class="mat-row">
@@ -1639,7 +1673,7 @@ function renderMatEditor() {
   lucide.createIcons({ nodes: [body] });
   window.AtelierPolish?.swatchesAfter(previousSwatches, m.colors);
   m.colors.forEach((c, i) => {
-    for (const [prefix, name] of [["matsw", "Color"], ["mir", "Intensity"], ["min", "Intensity"], ["matalpha", "Alpha"]])
+    for (const [prefix, name] of [["matsw", "Colour"], ["mir", "Intensity"], ["min", "Intensity"], ["matalpha", "Alpha"]])
       document.getElementById(prefix + i)?.setAttribute("aria-label", `${c.name}: ${name}`);
   });
   m.scalars.forEach((s, i) => document.getElementById("msr" + i)?.setAttribute("aria-label", s.name));

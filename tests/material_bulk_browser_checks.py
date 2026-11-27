@@ -105,6 +105,8 @@ def run_material_bulk_checks(page, context, url, report, checks):
             tab.evaluate("item => openMaterialEditor(item)", items[0])
             tab.wait_for_selector("#material-overlay #bulk-edit-open:not([hidden])")
             original_value = tab.locator("#msn0").input_value()
+            if tab.locator("#msn0").is_hidden():
+                tab.locator('summary').filter(has_text='Scalar parameters').click()
             tab.locator("#msn0").fill("9")
             tab.locator("#bulk-edit-open").click()
             assert not tab.locator("#bulk-overlay").evaluate("node => node.classList.contains('active')")

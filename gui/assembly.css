@@ -41,7 +41,7 @@
 .assembly-section-dot { display:block; flex:none; width:12px; height:12px; border-radius:var(--studio-shape-xs); border:1px solid var(--border2); background:var(--bg3); }
 .assembly-section small { color:var(--muted); font-size:var(--studio-text-micro); }
 #viewport-box .assembly-section.is-related { border-left-color:var(--acc); }
-#viewport-box .assembly-section[aria-pressed=true] { background:var(--vp-selected); border-color:var(--acc); color:var(--md-sys-color-on-primary-container); }
+#viewport-box .assembly-section[aria-pressed=true] { background:var(--vp-selected); border-color:var(--acc); border-left-width:2px; color:var(--md-sys-color-on-primary-container); font-weight:600; }
 .assembly-section.is-hidden > span:nth-child(2) { text-decoration:line-through; }
 #assembly-geometry-selection { flex:0 0 auto;max-height:65%;overflow:auto;margin:12px 2px 0;padding-top:12px;border-top:1px solid var(--border); }
 .assembly-geometry-properties { margin-bottom:12px; }
@@ -79,7 +79,7 @@
 .is-assembly #viewport-wipe-line::after { background:var(--acc); border-color:var(--md-sys-color-on-primary); }
 .assembly-stage-selection { position:absolute; bottom:12px; left:16px; right:16px; display:flex; align-items:center; gap:var(--studio-space-2); min-height:var(--studio-control-height); padding:var(--studio-space-2) var(--studio-space-3); border:1px solid var(--border); border-radius:var(--studio-shape-small); color:var(--muted); font:var(--studio-type-detail); background:var(--bg2); pointer-events:none; z-index:2; }
 .assembly-stage-selection > * { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.assembly-stage-selection strong { color:var(--text); font-weight:500; flex-shrink:0; max-width:40%; }
+.assembly-stage-selection strong { color:var(--text); font-weight:600; flex-shrink:0; max-width:40%; padding:3px 7px; border-radius:var(--studio-shape-xs); background:var(--vp-selected); }
 .assembly-connection-arrow { color:var(--acc); flex:none; }
 /* The link draws out from the part to its panels (280ms), holds, then retracts into them (190ms). It sits at
    65% ink the whole time and never fades (P4b.7). */
@@ -125,17 +125,20 @@
 #viewport-box #assembly-material-browse { flex:none; justify-content:space-between; margin:var(--studio-space-3) var(--studio-space-4) 0; padding-inline:var(--studio-space-3); }
 #assembly-material-browse[aria-expanded=true] svg { transform:rotate(180deg); }
 .is-assembly #viewport-skin-card { display:none; }
-#assembly-material-context { padding:16px 24px; border-bottom:1px solid var(--border); }
+#assembly-material-context { padding:15px 24px 12px; border-bottom:1px solid var(--border); }
 #assembly-material-context h3 { font:var(--studio-type-title); font-weight:600; margin:16px 0 8px; }
-#viewport-box .assembly-material-card { display:flex; align-items:center; gap:8px; margin:12px 0; padding:0; width:100%; justify-content:flex-start; border:0; background:transparent; text-align:left; }
-.assembly-material-card strong { overflow-wrap:anywhere; }
-.assembly-material-swatch { display:block; flex:none; width:38px; height:38px; border-radius:var(--studio-shape-xs); border:1px solid var(--border2); background:var(--bg3); }
+.assembly-selection-meta { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 10px; }
+#viewport-box .assembly-material-card { display:flex; align-items:center; gap:8px; margin:10px 0; padding:0; width:100%; justify-content:flex-start; border:0; background:transparent; text-align:left; }
+.assembly-material-card strong { display:block; overflow-wrap:anywhere; }
+.assembly-material-description { min-width:0; }
+.assembly-material-scope { display:block; margin-top:3px; color:var(--muted); font:var(--studio-type-detail); }
+.assembly-material-swatch { display:block; flex:none; width:27px; height:27px; border-radius:var(--studio-shape-xs); border:1px solid var(--border2); background:var(--bg3); }
 .assembly-mesh-heading strong,.assembly-material-card strong { font:400 var(--studio-text-label)/1.4 var(--studio-mono); }
+.assembly-material-card strong { font-size:var(--studio-text-micro); }
 .assembly-path,.assembly-texture-name,#assembly-texture-context,
 #viewport-box.is-assembly #viewport-material-editor :is(.vp-source-name,.vp-hex,.vp-color-reference code) { font:400 var(--studio-text-detail)/1.5 var(--studio-mono); }
 .assembly-path { color:var(--muted); overflow-wrap:anywhere; user-select:text; margin:var(--studio-space-3) 0 var(--studio-space-4); }
 .assembly-affected { display:flex; gap:4px; flex-wrap:wrap; padding-block:12px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
-.assembly-affected > span { flex:1 0 100%; font-size:var(--studio-text-micro); color:var(--muted); margin:0 0 4px; }
 #viewport-box .assembly-affected button { padding-inline:var(--studio-space-2); }
 .assembly-reference-warning { display:flex; align-items:flex-start; gap:var(--studio-space-2); color:var(--status-warning-text); font:var(--studio-type-body); margin:var(--studio-space-3) 0; overflow-wrap:anywhere; }
 .assembly-reference-warning svg { flex:none; color:var(--status-warning); }
@@ -149,8 +152,6 @@
 .is-assembly.assembly-unverified #viewport-material-editor { display:none; }
 .is-assembly .vp-color-label { font:var(--studio-type-label); }
 .is-assembly .vp-color-field { margin-bottom:16px; }
-.is-assembly .vp-color-references { gap:12px; margin-top:12px; }
-.is-assembly .vp-color-reference { gap:var(--studio-space-1); }
 #viewport-box.is-assembly .vp-color-controls input[type=color] { height:var(--studio-control-height); }
 .is-assembly #viewport-material-editor .vp-hex { min-height:var(--studio-control-height); width:92px; }
 .is-assembly #viewport-material-editor .vp-advanced > summary { font:var(--studio-type-label); padding:var(--studio-space-2) 0; }

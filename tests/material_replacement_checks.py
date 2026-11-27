@@ -105,6 +105,8 @@ def run_material_replacement_checks(page, context, url, report, checks):
         checks.append("A confirmation for a closed material cannot replace or reset a subsequently opened editor")
 
         state["replace"] = "fail"
+        if tab.locator("#msn0").is_hidden():
+            tab.locator('summary').filter(has_text='Scalar parameters').click()
         tab.locator("#msn0").fill(".8")
         tab.locator("#msn0").dispatch_event("input")
         tab.locator("#mat-source-path").fill(SOURCE)
