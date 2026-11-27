@@ -1,7 +1,40 @@
 // Per-grid thumbnail delivery. Cached images load immediately; polling recovers missed SSE.
 (() => {
+  // Paint at the display's pixel density so a large catalogue image does not alias
+  // when the browser scales it into a card. Keep the source image for loading and fallback.
+  function resizePortraits(entries) {
+    const pixelRatio = window.devicePixelRatio;
+    for (const {target: img, contentRect} of entries) {
+      const width = Math.round(contentRect.width * pixelRatio);
+      const height = Math.round(contentRect.height * pixelRatio);
+      if (!width || !height || !img.naturalWidth || !img.naturalHeight) continue;
+
+      const canvas = img.nextElementSibling || document.createElement('canvas');
+      if (canvas.isConnected && canvas.width === width && canvas.height === height) continue;
+      const context = canvas.getContext('2d');
+      if (!context) continue;
+      canvas.width = width;
+      canvas.height = height;
+      context.imageSmoothingQuality = 'high';
+
+      // Match object-fit: cover and object-position: center bottom on the source image.
+      const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight);
+      const sourceWidth = width / scale;
+      const sourceHeight = height / scale;
+      context.drawImage(img, (img.naturalWidth - sourceWidth) / 2, img.naturalHeight - sourceHeight,
+        sourceWidth, sourceHeight, 0, 0, width, height);
+      if (!canvas.isConnected) {
+        canvas.setAttribute('aria-hidden', 'true');
+        img.after(canvas);
+      }
+    }
+  }
+
   function create({project, request, makeFallback}) {
     const entries = new Map(), requests = new Set(), requeued = new Set();
+    const portraitSizes = new ResizeObserver(resizePortraits);
+    const portraitBox = 'devicePixelContentBoxSize' in ResizeObserverEntry.prototype
+      ? 'device-pixel-content-box' : 'content-box';
     let destroyed = false, timer = null, checking = false, deadline = 0;
     const usesArtwork = entry => entry.card.thumbnail && !entry.card.imported;
     const remaining = () => [...entries.values()].filter(e => !usesArtwork(e) && !e.loaded && !e.failed);
@@ -149,8 +182,13 @@
       } else if (data.thumb_failed) fail(entry, data.error || undefined);
     }
 
+    function observePortrait(img) {
+      if (!destroyed) portraitSizes.observe(img, {box: portraitBox});
+    }
+
     function destroy() {
       destroyed = true;
+      portraitSizes.disconnect();
       clearTimeout(timer);
       requests.forEach(controller => controller.abort());
       entries.forEach(entry => {
@@ -159,7 +197,7 @@
       });
       entries.clear();
     }
-    return {attach, start, handleEvent, reconcile: check, destroy};
+    return {attach, observePortrait, start, handleEvent, reconcile: check, destroy};
   }
   window.AtelierThumbnails = Object.freeze({create});
 })();

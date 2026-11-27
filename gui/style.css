@@ -259,14 +259,15 @@ body {
   object-fit: contain;
   image-rendering: pixelated;
 }
-/* A portrait opens downwards out of its top edge over the tonal plate once it has loaded (P4b.7). No fade
-   and no travel, so a full grid never shifts. Until then it is simply not painted; it isn't clipped away,
-   because a portrait clipped to nothing never counts as on screen and its lazy load would never start. */
-.card-thumb img.hero-portrait { object-fit: cover; image-rendering: auto; }
-.card-thumb img.hero-portrait:not(.loaded) { opacity: 0; }
-.card-thumb img.hero-portrait.loaded { animation: portrait-open var(--studio-motion-unfold) var(--studio-easing-unfold) both; }
+/* The source and its resampled preview share the existing portrait reveal (P4b.7).
+   The unloaded image keeps its box so lazy loading can see it. */
+.card-portrait { position: absolute; inset: 0; }
+.card-thumb img.hero-portrait { display: block; object-fit: cover; object-position: center bottom; image-rendering: auto; }
+.card-thumb img.hero-portrait:not(.loaded), .card-portrait:has(canvas) img.hero-portrait { opacity: 0; }
+.card-portrait canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.card-portrait:has(img.loaded) { animation: portrait-open var(--studio-motion-unfold) var(--studio-easing-unfold) both; }
 @keyframes portrait-open { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
-:root[data-motion=reduce] .card-thumb img.hero-portrait.loaded { animation: none; }
+:root[data-motion=reduce] .card-portrait:has(img.loaded) { animation: none; }
 .card.artwork-card { padding: 0; gap: 0; overflow: hidden; position: relative; }
 .card.artwork-card::before {
   content: '';
@@ -294,7 +295,6 @@ body {
 .card.artwork-card:hover .card-thumb::after {
   background: linear-gradient(to top, color-mix(in srgb, var(--bg3) 92%, transparent) 0%, color-mix(in srgb, var(--bg3) 24%, transparent) 48%, transparent 100%);
 }
-.card.artwork-card .card-thumb img.hero-portrait { object-position: center bottom; }
 .card.artwork-card .card-name { width: calc(100% - 18px); margin: 4px 8px 8px; }
 .card-context { width: 100%; color: var(--muted); font: var(--studio-type-label); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card.artwork-card .card-context { padding: 8px 8px 0; }

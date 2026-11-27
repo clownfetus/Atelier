@@ -538,7 +538,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   const grid = document.createElement("div");
   grid.className = "grid";
   const project = _activeProjectName;
-  _gridThumbs = window.AtelierThumbnails?.create({
+  const thumbnails = window.AtelierThumbnails?.create({
     project, request: (path, opts) => api(path, {...opts, project}),
     makeFallback: card => {
       const fallback = document.createElement("span");
@@ -552,6 +552,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       return fallback;
     },
   }) || null;
+  _gridThumbs = thumbnails;
 
   filtered.forEach(card => {
     const el = document.createElement("button");
@@ -565,30 +566,34 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
 
     if (card.type === "folder" && card.thumbnail) {
       el.classList.add('artwork-card');
+      const portrait = document.createElement("div");
+      portrait.className = "card-portrait";
       const img = document.createElement("img");
       img.alt = ""; // The button's visible label already names this hero/skin.
       img.className = "hero-portrait";
       img.loading = "lazy";
       img.decoding = "async";
       img.onload = () => {
+        thumbnails?.observePortrait(img);
         img.classList.add("loaded");
         const colour = window.AtelierPolish?.accent?.(img);
         if (colour) { el.style.setProperty("--card-art-colour", colour); el.classList.add("has-art-colour"); }
       };
       img.onerror = () => {
-        img.remove();
+        portrait.remove();
         thumb.appendChild(renderCardIcon(card, el));
         lucide.createIcons({ nodes: [thumb] });
       };
       img.src = card.thumbnail;
       if (card.heroFallback) el.title += " · Hero portrait (skin artwork unavailable)";
-      thumb.appendChild(img);
+      portrait.appendChild(img);
+      thumb.appendChild(portrait);
     } else if (card.type === "asset" && handlerFor(card.file_type).preview && card.game_rel) {
       const img = document.createElement("img");
       img.dataset.gameRel = card.game_rel;
       img.alt = card.label;
       if (card.token) img.dataset.token = card.token;
-      if (_gridThumbs) _gridThumbs.attach(card, img, thumb);
+      if (thumbnails) thumbnails.attach(card, img, thumb);
       else {
         img.onerror = () => {
           img.style.display = "none";
@@ -642,7 +647,7 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
   area.appendChild(grid);
   lucide.createIcons({ nodes: [grid] });
   AtelierLibraryTools.ready(grid, focusPath);
-  _gridThumbs?.start(retryThumbs);
+  thumbnails?.start(retryThumbs);
 }
 
 // An edited material has no preview, so its saved colours fill the thumb as flat diagonal bands.
