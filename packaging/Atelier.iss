@@ -197,10 +197,9 @@ Type: filesandordirs; Name: "{app}\_internal"
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall
 
 [Code]
-// Older Atelier builds veto Restart Manager's synchronous shutdown while their
-// native close handler drains managed jobs asynchronously. Ask the actual
-// installed window to close normally, then wait before Restart Manager scans.
-// No process is terminated and no registry key is renamed or written here.
+// Atelier can outlive its window while background work finishes. Track the
+// installed processes first, then ask their main windows to close normally.
+// Wait for process exit before Restart Manager scans the files.
 type
 #if Ver < 0x07000000
   // Inno Setup 6 is a 32-bit process; version 7 adds native-width script types.
@@ -208,16 +207,18 @@ type
 #else
   TAtelierPointer = NativeInt;
 #endif
-  TAtelierWindow = record
+  TAtelierProcess = record
     Window: HWND;
     Process: THandle;
     ProcessId: DWORD;
   end;
 
 var
-  AtelierWindows: array of TAtelierWindow;
+  AtelierProcesses: array of TAtelierProcess;
   AtelierTargetExe: String;
 
+function AtelierEnumProcesses(var FirstProcessId: DWORD; BufferBytes: DWORD; var BytesReturned: DWORD): BOOL;
+  external 'K32EnumProcesses@kernel32.dll stdcall';
 function AtelierEnumWindows(Callback: TAtelierPointer; Data: TAtelierPointer): BOOL;
   external 'EnumWindows@user32.dll stdcall';
 function AtelierWindowProcess(Window: HWND; var ProcessId: DWORD): DWORD;
@@ -235,17 +236,14 @@ function AtelierWait(Process: THandle; Milliseconds: DWORD): DWORD;
 function AtelierCloseHandle(Handle: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
 
-function CollectAtelierWindow(Window: HWND; Data: TAtelierPointer): BOOL;
+procedure RetainAtelierProcess(ProcessId: DWORD);
 var
-  ProcessId, Count: DWORD;
+  Count: DWORD;
   Process: THandle;
-  Image, Title: String;
-  I, N: Integer;
+  Image: String;
+  Index: Integer;
   Retained: Boolean;
 begin
-  Result := True;
-  ProcessId := 0;
-  AtelierWindowProcess(Window, ProcessId);
   if ProcessId = 0 then Exit;
   // SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION; never PROCESS_TERMINATE.
   Process := AtelierOpenProcess($00101000, False, ProcessId);
@@ -257,27 +255,60 @@ begin
     if not AtelierProcessImage(Process, 0, Image, Count) then Exit;
     SetLength(Image, Count);
     if CompareText(ExpandFileName(Image), AtelierTargetExe) <> 0 then Exit;
-    // The title identifies the main window only AFTER its executable is matched.
-    SetLength(Title, 256);
-    SetLength(Title, AtelierWindowText(Window, Title, 256));
-    if Title <> '{#AppName}' then Exit;
-    for I := 0 to GetArrayLength(AtelierWindows) - 1 do
-      if AtelierWindows[I].ProcessId = ProcessId then Exit;
-    N := GetArrayLength(AtelierWindows);
-    SetArrayLength(AtelierWindows, N + 1);
-    AtelierWindows[N].Window := Window;
-    AtelierWindows[N].Process := Process;
-    AtelierWindows[N].ProcessId := ProcessId;
+    Index := GetArrayLength(AtelierProcesses);
+    SetArrayLength(AtelierProcesses, Index + 1);
+    AtelierProcesses[Index].Window := 0;
+    AtelierProcesses[Index].Process := Process;
+    AtelierProcesses[Index].ProcessId := ProcessId;
     Retained := True;
   finally
     if not Retained then AtelierCloseHandle(Process);
   end;
 end;
 
+function CollectAtelierProcesses: Boolean;
+var
+  ProcessIds: array of DWORD;
+  BufferBytes, BytesReturned: DWORD;
+  I: Integer;
+begin
+  Result := False;
+  SetArrayLength(ProcessIds, 256);
+  repeat
+    BufferBytes := GetArrayLength(ProcessIds) * SizeOf(BytesReturned);
+    // K32EnumProcesses writes DWORDs into the contiguous array starting at element zero.
+    if not AtelierEnumProcesses(ProcessIds[0], BufferBytes, BytesReturned) then Exit;
+    if BytesReturned < BufferBytes then Break;
+    SetArrayLength(ProcessIds, GetArrayLength(ProcessIds) * 2);
+  until False;
+  for I := 0 to Integer(BytesReturned div SizeOf(BytesReturned)) - 1 do
+    RetainAtelierProcess(ProcessIds[I]);
+  Result := True;
+end;
+
+function CollectAtelierWindow(Window: HWND; Data: TAtelierPointer): BOOL;
+var
+  ProcessId: DWORD;
+  Title: String;
+  I: Integer;
+begin
+  Result := True;
+  ProcessId := 0;
+  AtelierWindowProcess(Window, ProcessId);
+  for I := 0 to GetArrayLength(AtelierProcesses) - 1 do
+    if (AtelierProcesses[I].ProcessId = ProcessId) and (AtelierProcesses[I].Window = 0) then begin
+      SetLength(Title, 256);
+      SetLength(Title, AtelierWindowText(Window, Title, 256));
+      if Title = '{#AppName}' then AtelierProcesses[I].Window := Window;
+      Exit;
+    end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   I, Poll: Integer;
-  ProcessId, WaitResult: DWORD;
+  Window: HWND;
+  ProcessId, WindowOwner, WaitResult: DWORD;
   AllExited: Boolean;
 begin
   Result := '';
@@ -285,40 +316,52 @@ begin
   for I := 1 to ParamCount do
     if CompareText(ParamStr(I), '/NOCLOSEAPPLICATIONS') = 0 then Exit;
   AtelierTargetExe := ExpandFileName(ExpandConstant('{app}\{#AppExeName}'));
-  SetArrayLength(AtelierWindows, 0);
+  SetArrayLength(AtelierProcesses, 0);
   try
-    if not AtelierEnumWindows(CreateCallback(@CollectAtelierWindow), 0) then begin
+    if not CollectAtelierProcesses then begin
       Result := 'Could not inspect running applications. Close Atelier and try again.';
       Exit;
     end;
-    if GetArrayLength(AtelierWindows) = 0 then Exit;
+    if GetArrayLength(AtelierProcesses) = 0 then Exit;
+    if not AtelierEnumWindows(CreateCallback(@CollectAtelierWindow), 0) then begin
+      Result := 'Could not inspect application windows. Close Atelier and try again.';
+      Exit;
+    end;
     if not WizardSilent then
       if SuppressibleMsgBox('Atelier must close before updating. Active jobs will be allowed to finish shutting down. Close Atelier now?',
           mbConfirmation, MB_YESNO, IDYES) <> IDYES then begin
         Result := 'Close Atelier when ready, then try the update again.';
         Exit;
       end;
-    for I := 0 to GetArrayLength(AtelierWindows) - 1 do begin
-      if AtelierWait(AtelierWindows[I].Process, 0) <> 0 then begin
-        ProcessId := 0;
-        AtelierWindowProcess(AtelierWindows[I].Window, ProcessId);
-        if ProcessId <> AtelierWindows[I].ProcessId then begin
-          Result := 'The Atelier window changed while preparing the update. Close Atelier and try again.';
-          Exit;
+    for I := 0 to GetArrayLength(AtelierProcesses) - 1 do begin
+      if AtelierWait(AtelierProcesses[I].Process, 0) = 0 then Continue;
+      ProcessId := AtelierProcesses[I].ProcessId;
+      Window := AtelierProcesses[I].Window;
+      if Window <> 0 then begin
+        WindowOwner := 0;
+        AtelierWindowProcess(Window, WindowOwner);
+        if WindowOwner = ProcessId then begin
+          if AtelierPostClose(Window, $0010, 0, 0) then
+            Log(Format('Requested graceful close of %s (PID %d).', [AtelierTargetExe, ProcessId]))
+          else begin
+            // The app can destroy its window between the owner check and WM_CLOSE.
+            WindowOwner := 0;
+            AtelierWindowProcess(Window, WindowOwner);
+            if (WindowOwner = ProcessId) and (AtelierWait(AtelierProcesses[I].Process, 0) = $00000102) then begin
+              Result := 'Could not request a normal Atelier shutdown. Close Atelier and try again.';
+              Exit;
+            end;
+          end;
         end;
-        if not AtelierPostClose(AtelierWindows[I].Window, $0010, 0, 0) then begin
-          Result := 'Could not request a normal Atelier shutdown. Close Atelier and try again.';
-          Exit;
-        end;
-        Log(Format('Requested graceful close of %s (PID %d).', [AtelierTargetExe, ProcessId]));
       end;
+      Log(Format('Waiting for Atelier process (PID %d) to close.', [ProcessId]));
     end;
     // Retained process handles avoid confusing recycled PIDs with the old app.
     // One shared 90-second budget; a timeout aborts BEFORE any payload changes.
     for Poll := 1 to 900 do begin
       AllExited := True;
-      for I := 0 to GetArrayLength(AtelierWindows) - 1 do begin
-        WaitResult := AtelierWait(AtelierWindows[I].Process, 0);
+      for I := 0 to GetArrayLength(AtelierProcesses) - 1 do begin
+        WaitResult := AtelierWait(AtelierProcesses[I].Process, 0);
         if WaitResult = $00000102 then
           AllExited := False
         else if WaitResult <> 0 then begin
@@ -332,10 +375,10 @@ begin
       end;
       Sleep(100);
     end;
-    Result := 'Atelier is still shutting down after 90 seconds. Let active jobs finish, close Atelier, and try again. No application was force-closed.';
+    Result := 'Atelier is still running after 90 seconds. Finish any active work, close Atelier and try the update again.';
   finally
-    for I := 0 to GetArrayLength(AtelierWindows) - 1 do
-      AtelierCloseHandle(AtelierWindows[I].Process);
-    SetArrayLength(AtelierWindows, 0);
+    for I := 0 to GetArrayLength(AtelierProcesses) - 1 do
+      AtelierCloseHandle(AtelierProcesses[I].Process);
+    SetArrayLength(AtelierProcesses, 0);
   end;
 end;

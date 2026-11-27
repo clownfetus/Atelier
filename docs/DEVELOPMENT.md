@@ -966,13 +966,11 @@ policy inside the disposable VM only; VM disposal removes it. The shipped
 installer never adds this policy. See Microsoft's
 [elevated-host override rules](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
-The installer handles older native windows that defer closing while managed jobs
-drain. Its `PrepareToInstall` hook matches the full running executable path to
-the chosen installation directory and additionally checks the main window title.
-It requests normal `WM_CLOSE`, retains process handles, and waits up to 90 seconds
-before Restart Manager checks for in-use files. Refusal or timeout stops the update
-before payload changes; it never force-kills the application. Other installations
-are not selected by title alone, and `/NOCLOSEAPPLICATIONS` skips this hook.
+The installer's `PrepareToInstall` hook matches running Atelier processes to the
+full executable path in the chosen installation directory. It requests normal
+`WM_CLOSE` from matching main windows and waits on the process handles for up to
+90 seconds, including when an Atelier window has already closed. Refusal or timeout
+stops the update before any payload changes. `/NOCLOSEAPPLICATIONS` skips this hook.
 
 This installer-side compatibility path is necessary for previously shipped
 executables: changing only the new application's close handler cannot repair an
