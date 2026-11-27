@@ -267,7 +267,7 @@ def stage_rebuilt_material(stage, game_rel, edits, mapping, work):
 
 def save_rebuilt_material(game_rel, edits, readback):
     """Stage a verified result in the existing project layout, preserving unrelated edits."""
-    root = config.get_import_root()
+    root = os.path.realpath(config.get_import_root())
     target = config.project_base(game_rel, root) + ".json"
     path = next((path for path in (target, config.project_base_legacy(game_rel, root) + ".json")
                  if os.path.isfile(path)), target)
