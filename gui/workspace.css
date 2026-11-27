@@ -18,7 +18,7 @@
 #app-pages button:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
 #app-pages button:disabled { opacity:.45; cursor:default; }
 body[data-page=workspace] #searchbar { display:none; }
-body[data-page=workspace] #menu-btn { margin-left:auto; }
+body[data-page=workspace] #launch-game { margin-left:auto; }
 #workspace { flex:1; min-height:0; display:flex; flex-direction:column; padding:26px 26px 26px; gap:16px; overflow:auto; background:var(--surface); color:var(--text); font:var(--type-body); }
 #workspace[hidden], #body[hidden] { display:none; }
 .workspace-heading { display:flex; align-items:center; justify-content:space-between; flex:none; gap:16px; }
