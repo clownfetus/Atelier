@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 def run_export_review_checks(page, context, url, report, checks):
     review = context.new_page()
-    errors, installs, pending, conflicts, reveals = [], [], [], [], []
+    errors, installs, pending, conflicts, reveals, decisions = [], [], [], [], [], []
     held_checks = []
     hold_check = {'value': False}
     conflict_response = {'default': False, 'mods': False}
@@ -21,6 +21,14 @@ def run_export_review_checks(page, context, url, report, checks):
         installs.append({'body': route.request.post_data_json, 'headers': route.request.headers})
         pending.append(route)
 
+    def decide(route):
+        payload = route.request.post_data_json
+        decisions.append((payload, route.request.headers['x-atelier-project']))
+        result = {'ok': True, 'pak_path': 'D:/Fixture/exported/Review.pak'}
+        if payload['install']:
+            result['installed_dir'] = 'D:/Fixture/mods'
+        route.fulfill(json=result)
+
     def wait_for_request(routes, name):
         # The working glyph can appear before the request reaches its route handler.
         for _ in range(100):
@@ -31,6 +39,7 @@ def run_export_review_checks(page, context, url, report, checks):
 
     review.route('**/api/check_mod_conflict?**', conflict)
     review.route('**/api/install_mod', install)
+    review.route('**/api/install_mod/confirm', decide)
     review.route('**/api/open_export_folder', lambda route: (reveals.append(route.request.url), route.fulfill(json={'ok': True})))
     try:
         review.goto(url)
@@ -248,6 +257,42 @@ def run_export_review_checks(page, context, url, report, checks):
         assert len(review.evaluate('Object.keys(sidebarData)')) == 4
         assert not errors, errors
         checks.append('Destination/network failures preserve edits and a persistent manual retry without submitting unreviewed or automatic builds')
+
+        for install_anyway in (False, True):
+            review.locator('#export-review-refresh').click()
+            if install_anyway:
+                conflict_response.update(mods=True, replacement_check='reviewed-filenames')
+            review.locator('#export-review-confirm').click()
+            if install_anyway:
+                review.wait_for_selector('#confirm-overwrite-overlay.active')
+                review.locator('#confirm-overwrite-ok').click()
+            wait_for_request(pending, 'install')
+            if install_anyway:
+                assert installs[-1]['body']['replacement_check'] == 'reviewed-filenames'
+            pending.pop(0).fulfill(json={
+                'ok': True, 'pak_path': 'D:/Fixture/exported/Review.pak', 'install_token': 'fixture-token',
+                'install_warning': {
+                    'conflicts': [{'mod': 'Nested/Other.pak', 'paths': ['Marvel/Content/MI_Body<img>.uasset']}],
+                    'unreadable': [{'file': 'Broken.utoc', 'reason': 'Unreadable directory index'}],
+                    'replacements': [],
+                },
+            })
+            review.wait_for_selector('#export-review-title:text-is("Review install warnings")', timeout=4000)
+            assert 'Nested/Other.pak' in overlay.inner_text()
+            assert 'Marvel/Content/MI_Body<img>.uasset' in overlay.inner_text()
+            assert 'The conflict scan is incomplete' in overlay.inner_text()
+            assert overlay.locator('img').count() == 0
+            assert review.locator('#export-review-reveal').is_visible()
+            before = len(installs)
+            # View another project while the built export is waiting; the decision still belongs to its project.
+            review.evaluate("_activeProjectName = 'Other project'")
+            overlay.get_by_role('button', name='Install anyway' if install_anyway else 'Keep export only').click()
+            heading = 'Mod installed' if install_anyway else 'Mod exported'
+            overlay.get_by_role('heading', name=heading, exact=False).wait_for()
+            assert decisions[-1] == ({'token': 'fixture-token', 'install': install_anyway}, quote('Review Ω', safe=''))
+            assert len(installs) == before
+            review.evaluate("_activeProjectName = 'Review Ω'")
+        checks.append('Install warnings expose matching package paths and incomplete scans and can install or keep the built files without rebuilding')
 
         review.evaluate("document.querySelectorAll('#toast-area .toast').forEach(el => el.remove())")
         for theme in ('light', 'dark'):

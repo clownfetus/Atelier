@@ -841,7 +841,7 @@
         Decodes the mod's assets and re-applies them onto current-patch vanilla, so a mod broken by a
         game update works again. Materials + textures supported.
       </div>
-      <button class="btn" id="repatch-pick"><i data-lucide="folder-open" size="14"></i> Choose mod (.zip / .pak)…</button>
+      <button class="btn" id="repatch-pick"><i data-lucide="folder-open" size="14"></i> Choose mod…</button>
       <div id="repatch-file" class="muted" style="font-size:12px;word-break:break-all"></div>
       <div id="repatch-lockrow" style="display:none">
         <label class="muted" style="font-size:12px"><i data-lucide="folder-security" size="12"></i> This mod is password-protected — enter its password:</label>
@@ -851,6 +851,8 @@
         <input type="checkbox" id="repatch-stage"> Stage as project in editor
         <span class="muted" style="font-size:11px">(load assets pre-edited, to remix)</span>
       </label>
+      <button class="btn" id="repatch-check" disabled>Check for material issues</button>
+      <div id="repatch-repair-results" class="repatch-repair-results" aria-live="polite"></div>
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
       <div id="repatch-result" style="display:none;font-size:12px;line-height:1.6"></div>
     </div>
@@ -1038,6 +1040,7 @@
 <script src="/static/search.js"></script>
 <script src="/static/export-review.js"></script>
 <script src="/static/job-tools.js"></script>
+<script src="/static/mod-repair.js"></script>
 <script src="/static/bulk-edit.js"></script>
 <link rel="stylesheet" href="/static/mesh-edit.css">
 <script src="/static/mesh-edit.js"></script>

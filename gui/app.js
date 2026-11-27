@@ -3106,7 +3106,7 @@ function updateInstallBtn() {
 
 // `extra` swaps the build endpoint and adds its fields, e.g. a Skin Swapper build; every guard,
 // review state and result path stays the same as a standard export.
-async function _runInstall(modName, exportable, skipped, copyToMods, project = _activeProjectName, review = null, extra = null) {
+async function _runInstall(modName, exportable, skipped, copyToMods, project = _activeProjectName, review = null, extra = null, replacementCheck = null) {
   _exportRunningCount++;
   document.getElementById("install-btn").disabled = true;
   if (project === _activeProjectName) setStatus(`Building ${exportable.length} asset${exportable.length !== 1 ? "s" : ""}…`);
@@ -3130,9 +3130,14 @@ async function _runInstall(modName, exportable, skipped, copyToMods, project = _
         items: exportable.map(i => i.game_rel),
         copy_to_mods: copyToMods,
         ...(extra?.body || {}),
+        ...(replacementCheck ? {replacement_check: replacementCheck} : {}),
       }),
     });
-    if (res.ok) {
+    if (res.install_token) {
+      finishFeedback('warning');
+      settle(`Exported: ${modName}. Review install warnings.`, 'warning', 6500);
+      if (project === _activeProjectName) setStatus(`Exported → ${res.pak_path || ""}`);
+    } else if (res.ok) {
       const outcome = skipped > 0 || (res.skipped || []).length ? "warning" : "success";
       finishFeedback(outcome);
       settle(`${res.installed_dir ? "Installed" : "Exported"}: ${modName}` + (skipped ? ` (${skipped} skipped)` : ""), outcome, 5000);
@@ -3246,7 +3251,7 @@ async function _confirmExportReview(snapshot, extra = null) {
   }
   _exportReviewChecking = true; updateInstallBtn();
   window.AtelierExportReview?.checking(snapshot);
-  const proceed = async () => {
+  const proceed = async (replacementCheck = null) => {
     // This check also covers a project/selection change while overwrite confirmation was open.
     if (_blockExportForDrafts(snapshot)) return;
     if (!_exportReviewCurrent(snapshot)) {
@@ -3257,7 +3262,7 @@ async function _confirmExportReview(snapshot, extra = null) {
     }
     _exportReviewChecking = false;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, snapshot.project, snapshot, extra);
+      snapshot.copyToMods, snapshot.project, snapshot, extra, replacementCheck);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -3274,7 +3279,7 @@ async function _confirmExportReview(snapshot, extra = null) {
       if (conflict.mods) locs.push("your mods folder");
       document.getElementById("confirm-overwrite-msg").textContent =
         `A mod named "${snapshot.modName}" already exists in ${locs.join(" and ")}. Exporting will replace it.`;
-      _pendingOverwriteConfirm = proceed;
+      _pendingOverwriteConfirm = () => proceed(conflict.replacement_check);
       _pendingOverwriteConfirm.cancel = () => {
         _exportReviewChecking = false; updateInstallBtn();
         window.AtelierExportReview?.cancelCheck(snapshot);
@@ -3324,6 +3329,13 @@ async function doInstallMod() {
   window.AtelierExportReview.open(snapshot, {
     confirm: reviewed => _confirmExportReview(reviewed), refresh: doInstallMod, settings: openPaths,
     rememberDestination: copyToMods => { _copyToMods = copyToMods; },
+    decideInstall: async (token, install) => {
+      const result = await api('/api/install_mod/confirm', {
+        project: snapshot.project, method: 'POST', body: JSON.stringify({token, install}),
+      });
+      if (result.installed_dir && snapshot.project === _activeProjectName) setStatus(`Installed → ${result.installed_dir}`);
+      return result;
+    },
     skinSwapper: swapper && {
       ...swapper,
       plan: options => api("/api/skin_swapper/plan", {
@@ -5271,6 +5283,7 @@ document.getElementById("reset-cancel").addEventListener("click", () => {
 let _repatchPath = "";
 function openRepatcher() {
   _repatchPath = "";
+  window.AtelierModRepair?.select();
   document.getElementById("repatch-file").textContent = "";
   document.getElementById("repatch-lockrow").style.display = "none";
   document.getElementById("repatch-unlock").value = "";
@@ -5286,32 +5299,72 @@ document.getElementById("repatch-pick").addEventListener("click", async () => {
   const r = await api("/api/pick_mod_file", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!r || !r.ok || !r.path) return;
   _repatchPath = r.path;
+  window.AtelierModRepair?.select(r.path);
   document.getElementById("repatch-file").textContent = r.path;
   document.getElementById("repatch-lockrow").style.display = r.locked ? "block" : "none";
   document.getElementById("repatch-run").disabled = false;
 });
+function showRepatchSkips(container, skipped = []) {
+  if (!skipped.length) return;
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Review skipped changes";
+  const list = document.createElement("ul");
+  for (const problem of skipped) {
+    const item = document.createElement("li");
+    item.textContent = problem;
+    list.append(item);
+  }
+  details.append(summary, list);
+  container.append(details);
+}
 document.getElementById("repatch-run").addEventListener("click", async () => {
   if (!_repatchPath) return;
-  const btn = document.getElementById("repatch-run"); btn.disabled = true;
-  const res = document.getElementById("repatch-result");
-  res.style.display = "block"; res.innerHTML = '<span class="muted">Repatching…</span>';
+  const btn = document.getElementById("repatch-run");
+  btn.disabled = true;
+  const result = document.getElementById("repatch-result");
+  result.style.display = "block";
+  result.textContent = "Repatching…";
   const stage = document.getElementById("repatch-stage").checked;
   try {
-    const r = await (window.AtelierJobs?.run || api)("/api/repatch", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }) });
-    if (r.locked) { res.innerHTML = '<span class="warning">Wrong or missing password.</span>'; btn.disabled = false; return; }
-    if (!r.ok) { res.innerHTML = '<span class="warning">Failed: ' + (r.error || "unknown") + '</span>'; btn.disabled = false; return; }
+    const r = await (window.AtelierJobs?.run || api)("/api/repatch", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }),
+    });
+    if (!r.ok) {
+      result.textContent = r.locked ? "Wrong or missing password." : r.error || "Couldn’t repatch this mod.";
+      showRepatchSkips(result, r.skipped);
+      return;
+    }
     const m = r.manifest || {};
-    res.innerHTML = '<b>✓ Repatched</b> — ' + r.mod + '<br><span class="muted">' +
-      (m.materials || 0) + ' materials · ' + (m.textures || 0) + ' textures · ' + (m.skipped || 0) + ' skipped' +
-      (stage ? ' · ' + (m.staged_project || 0) + ' staged to project' : '') +
-      '</span><br><a href="#" id="repatch-open">Open export folder</a>';
-    const oa = document.getElementById("repatch-open");
-    if (oa) oa.addEventListener("click", (e) => { e.preventDefault(); projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || "")); });
-    toast("Repatched: " + r.mod, "success", 5000);
+    const title = document.createElement("strong");
+    title.textContent = "Repatched " + r.mod;
+    const counts = document.createElement("span");
+    counts.className = "muted";
+    counts.textContent = [
+      (m.materials || 0) + " materials",
+      (m.textures || 0) + " textures",
+      (m.skipped || 0) + " skipped",
+      ...(m.recovered_materials ? [m.recovered_materials + " recovered from older layouts"] : []),
+      ...(stage ? [(m.staged_project || 0) + " staged to project"] : []),
+    ].join(" · ");
+    const open = document.createElement("a");
+    open.href = "#";
+    open.id = "repatch-open";
+    open.textContent = "Open export folder";
+    open.addEventListener("click", event => {
+      event.preventDefault();
+      projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || ""));
+    });
+    result.replaceChildren(title, document.createElement("br"), counts, document.createElement("br"), open);
+    showRepatchSkips(result, r.skipped);
+    toast("Repatched " + r.mod, m.skipped ? "warning" : "success", 5000);
     if (stage) renderGrid();
-    btn.disabled = false;
-  } catch (e) { res.innerHTML = '<span class="warning">Error: ' + e + '</span>'; btn.disabled = false; }
+  } catch (_) {
+    result.textContent = "Couldn’t repatch this mod.";
+  } finally {
+    btn.disabled = !_repatchPath;
+  }
 });
 
 document.getElementById("reset-ok").addEventListener("click", async () => {
@@ -5333,6 +5386,7 @@ async function init() {
   console.log("[init] starting");
   renderBreadcrumbs();
   window.AtelierChangelog?.start();
+  void window.AtelierModRepair?.checkInstalled();
   // The release check runs alongside startup instead of before it, so a slow or offline GitHub
   // never delays setup or the library. Its dialog appears once one of them is on screen.
   const update = api("/api/update_check").catch(() => null);

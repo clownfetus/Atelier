@@ -260,16 +260,33 @@
   function renderResult() {
     const { snapshot, result, callbacks } = current;
     const built = result.ok || result.built;
-    const warning = built && (!result.ok || snapshot.skipped || (result.skipped || []).length);
+    const pending = !!result.install_token;
+    const installWarning = result.install_warning;
+    const skipped = snapshot.skipped || (result.skipped || []).length;
+    const warning = built && (!result.ok || skipped || pending ||
+      Object.values(installWarning || {}).some(items => items.length));
     // The heading carries the outcome; the stage only gives it a physical character.
     const suffix = warning && result.ok ? ' with warnings' : '';
-    reset(built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
+    reset(pending ? 'Review install warnings' : built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
       built ? warning ? 'warning' : 'success' : 'error', result.cancelled && !built ? 'info' : undefined);
-    metadata(snapshot);
-    const status = el('p', result.error || (warning ? 'Review the skipped items below before testing this mod.' : 'The build has finished.'), 'export-review-summary');
+    metadata(result.kept_export ? {...snapshot, copyToMods: false} : snapshot);
+    const summary = pending ? 'The built files are in the export folder. Choose whether to copy them to your mods folder.' :
+      result.kept_export ? 'The files are saved in the export folder.' :
+      skipped ? 'Review the skipped items below before testing this mod.' : 'The build has finished.';
+    const status = el('p', result.error || summary, 'export-review-summary');
     status.setAttribute('role', 'status'); body.append(status);
     if (result.pak_path) body.append(el('p', 'Export: ' + result.pak_path, 'export-review-path'));
     if (result.installed_dir) body.append(el('p', 'Installed to: ' + result.installed_dir, 'export-review-path'));
+    if (installWarning?.conflicts?.length) {
+      body.append(el('p', 'Other enabled mods contain the same packages. The game may load a different version of these packages.'));
+      for (const conflict of installWarning.conflicts) list(conflict.mod, conflict.paths, String, true);
+    }
+    if (installWarning?.unreadable?.length) {
+      body.append(el('p', 'The conflict scan is incomplete.', 'export-review-notice'));
+      list('Unreadable containers', installWarning.unreadable, item =>
+        (item.source === 'export' ? 'Built export · ' : '') + item.file + '\n' + item.reason, true);
+    }
+    list('Matching filenames in your mods folder', installWarning?.replacements || [], String, true);
     if (result.galacta_folder) {
       body.append(el('p', 'Galacta folder: ' + result.galacta_folder, 'export-review-path'),
         el('p', 'Load it with the Project Galacta Companion App. Atelier never edits skins.txt; the Companion App manages it.'));
@@ -278,14 +295,37 @@
     list('Build report · applied operations', result.applied || [], String, true);
     list('Build report · skipped or warnings', result.skipped || [], String, true);
     list('Excluded before export', snapshot.excluded, excludedText, true);
+    current.fresh = false;
+    if (pending) {
+      button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
+      button('Keep export only', () => decideInstall(false));
+      button('Install anyway', () => decideInstall(true), true);
+      return;
+    }
     if (!built) body.append(el('p', 'Your project edits are preserved. Resolve the error, then retry. A connection failure can occur after a build completes; retry checks for existing output first.'));
     if (result.built && !result.ok) body.append(el('p', 'The exported files are available. Check the mods folder in Settings before retrying the build and copy.'));
     button('Close', hide);
     if (built) button('Show exported files', callbacks.reveal).id = 'export-review-reveal';
-    current.fresh = false;
     if (!result.ok || result.need_mods_folder) button('Settings', () => { hide(); callbacks.settings(); });
     button('Review current selection', callbacks.refresh).id = 'export-review-refresh';
     if (!result.ok) button('Retry export', current.retry || (() => callbacks.confirm(snapshot)), true).id = 'export-review-retry';
+  }
+  async function decideInstall(install) {
+    if (busy || !current.result?.install_token) return;
+    const {snapshot, result, callbacks} = current;
+    busy = true;
+    reset(install ? 'Checking install warnings…' : 'Keeping export…', 'busy');
+    lastButton.textContent = 'View install progress';
+    metadata(snapshot);
+    button('Hide', hide); panel.focus();
+    let next;
+    try {
+      const response = await callbacks.decideInstall(result.install_token, install);
+      next = {...result, install_token: null, ...response, built: true};
+    } catch (error) {
+      next = {...result, ok: false, built: true, error: error.message};
+    }
+    window.AtelierExportReview.finish(snapshot, next);
   }
   window.AtelierExportReview = {
     open(snapshot, callbacks, note) {
@@ -310,7 +350,7 @@
     start(snapshot) {
       if (current?.snapshot !== snapshot) return;
       busy = true; reset('Building mod…', 'busy'); metadata(snapshot);
-      body.append(el('p', snapshot.copyToMods ? 'Building the selected saved edits, then copying the output to your mods folder.' : 'Building the selected saved edits in the export folder.'));
+      body.append(el('p', snapshot.copyToMods ? 'Building the selected saved edits, then checking for conflicts in your mods folder.' : 'Building the selected saved edits in the export folder.'));
       body.append(el('p', 'This operation has no percentage estimate. You can hide this window; the build will continue.'));
       const stage = el('p', 'Starting…'); stage.id = 'export-job-stage'; stage.setAttribute('role','status'); body.append(stage);
       const cancel = button('Cancel export', async () => {
@@ -334,7 +374,7 @@
       if (current?.snapshot !== snapshot) return;
       busy = false; current.result = result; current.fresh = true; lastResult = current;
       lastButton.hidden = false; lastButton.disabled = false;
-      lastButton.textContent = result.ok ? 'View export result' : 'Review export issue';
+      lastButton.textContent = result.install_token ? 'Review install warnings' : result.ok ? 'View export result' : 'Review export issue';
       renderResult(); show();
     },
     // True when the large stage will draw `state` for the current job: busy only while the dialog

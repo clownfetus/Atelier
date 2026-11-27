@@ -1,4 +1,5 @@
 import os, sys, json, re, math, shutil, threading, queue, subprocess, tempfile, time, urllib.request, uuid
+from hashlib import sha256
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from bottle import request, response, static_file
@@ -7,12 +8,14 @@ from atelier.web.app import app
 from atelier import hostos
 from atelier import operations
 from atelier import jobs
+from atelier import install_conflicts
 from atelier import preview
 from atelier import import_server
 from atelier import changelog
 from atelier import updates
 from atelier import retired_cache
-from atelier.storage import publish_files, container_files, PublicationRecoveryError
+from atelier.storage import publish_files, container_files, publication_scope, PublicationRecoveryError
+from atelier.inflight import key_lock
 from contextlib import ExitStack
 from functools import wraps
 from urllib.parse import unquote, urlencode
@@ -3242,10 +3245,10 @@ def _split_export_items(items):
     mesh_items  = [gr for gr in items if _is_mesh_item(gr)]                          # edits from the .blend
     return tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items
 
-def _install_to_mods(mod_name, export_dir, artifacts=None):
+def _install_to_mods(mod_name, export_dir, artifacts=None, *, destination=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
     with verification and rollback of replacements. Returns (ok, error, dest_dir)."""
-    mods = get_mods_folder()
+    mods = get_mods_folder() if destination is None else destination
     if not mods:
         return False, "No mods folder set — configure one in Menu → Settings.", None
     stem = f"{mod_name}_9999999_P"
@@ -3255,6 +3258,7 @@ def _install_to_mods(mod_name, export_dir, artifacts=None):
         return False, f"Mods folder not usable: {e}", None
     try:
         sources = artifacts or container_files(os.path.join(export_dir, stem))
+        jobs.begin_publication("Installing exported files…")
         publish_files(sources, mods)
         return True, None, mods
     except Exception as e:
@@ -3269,6 +3273,118 @@ def _mod_stem(mod_name):
     A mod called "[WIP] Recolor" could not be locked or repatched, with no error anywhere."""
     return re.sub(r'[/\\:*?"<>|.\[\]]', '', (mod_name or "Mod").strip()) or "Mod"
 
+
+_MOD_EXTENSIONS = (".pak", ".ucas", ".utoc")
+_pending_installs = {}  # the latest pending Export Review for each project root, guarded by key_lock
+
+
+def _install_path_key(path):
+    return os.path.normcase(os.path.realpath(path))
+
+
+def _file_stamp(path):
+    info = os.lstat(path)
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _replacement_stamps(destination, names):
+    stamps = {}
+    for name in names:
+        try:
+            stamps[name] = _file_stamp(os.path.join(destination, name))
+        except FileNotFoundError:
+            pass
+    return stamps
+
+
+def _replacement_check(destination, stamps):
+    identity = json.dumps([_install_path_key(destination), stamps], sort_keys=True)
+    return sha256(identity.encode()).hexdigest() if stamps else None
+
+
+def _install_result(result, mod_name, out_dir, artifacts, destination):
+    ok, error, folder = _install_to_mods(mod_name, out_dir, artifacts, destination=destination)
+    if not ok:
+        return {**result, "ok": False, "built": True, "error": error}
+    return {**result, "installed_dir": folder.replace("\\", "/")}
+
+
+def _wait_for_install(review):
+    review['token'] = uuid.uuid4().hex
+    return {**review['result'], 'install_token': review['token'], 'install_warning': review['warning']}
+
+
+def _review_built_install(result, mod_name, out_dir, destination, replacement_check):
+    """Called with the Export Review lock held, after an actual publication succeeded."""
+    try:
+        stem = f"{_mod_stem(mod_name)}_9999999_P"
+        sources = result['artifacts'] or container_files(os.path.join(out_dir, stem))
+        with publication_scope(destination):
+            jobs.progress("Checking installed mods for overlapping packages…")
+            stamps = {path: _file_stamp(path) for path in sources}
+            replacements = _replacement_stamps(destination, map(os.path.basename, sources))
+            expected = {stem + ext for ext in _MOD_EXTENSIONS}
+            checked = {name: stamp for name, stamp in replacements.items() if name in expected}
+            approved = checked and replacement_check == _replacement_check(destination, checked)
+            warning = install_conflicts.scan(sources, destination)
+            warning['replacements'] = sorted(set(replacements) - (set(checked) if approved else set()))
+            if not all(_file_stamp(path) == stamp for path, stamp in stamps.items()):
+                raise ValueError("The exported files changed during the conflict check. Export the mod again before installing.")
+            if any(warning.values()):
+                review = {'result': result, 'mod_name': mod_name, 'out_dir': out_dir,
+                          'destination': _install_path_key(destination), 'sources': stamps,
+                          'warning': warning, 'replacements': replacements}
+                _pending_installs[_install_path_key(get_import_root())] = review
+                return _wait_for_install(review)
+            return _install_result(result, mod_name, out_dir, sources, destination)
+    except (OSError, ValueError, RuntimeError) as error:
+        return {**result, 'ok': False, 'built': True, 'error': str(error)}
+
+
+@app.post('/api/install_mod/confirm')
+def api_confirm_mod_install():
+    """Resolve a pending review using only the server-owned project, paths and file identities."""
+    body = request.json or {}
+    install = body.get('install')
+    if type(install) is not bool:
+        raise ValueError('Choose whether to install the exported mod.')
+    with key_lock('export-review-install'):
+        project = _install_path_key(get_import_root())
+        review = _pending_installs.get(project)
+        if not review or body.get('token') != review['token']:
+            return {'ok': False, 'error': 'This install review is no longer available.'}
+        result = {**review['result'], 'install_warning': review['warning']}
+        if not install:
+            del _pending_installs[project]
+            return {**result, 'kept_export': True}
+        destination = get_mods_folder()
+        try:
+            if not destination or _install_path_key(destination) != review['destination']:
+                raise ValueError('The mods folder changed. Review the current export settings before installing.')
+            with publication_scope(destination):
+                sources = review['sources']
+                if any(_file_stamp(path) != stamp for path, stamp in sources.items()):
+                    raise ValueError('The exported files changed. Export the mod again before installing.')
+                replacements = _replacement_stamps(destination, map(os.path.basename, sources))
+                warning = install_conflicts.scan(sources, destination)
+                if any(_file_stamp(path) != stamp for path, stamp in sources.items()):
+                    raise ValueError('The exported files changed. Export the mod again before installing.')
+                changed = {name for name, stamp in replacements.items() if stamp != review['replacements'].get(name)}
+                warning['replacements'] = sorted(changed | (replacements.keys() & set(review['warning']['replacements'])))
+                if any(warning.values()) and (changed or warning != review['warning']):
+                    review.update(warning=warning, replacements=replacements)
+                    return _wait_for_install(review)
+                result['install_warning'] = warning
+                installed = _install_result(result, review['mod_name'], review['out_dir'], tuple(sources), destination)
+                if installed['ok']:
+                    del _pending_installs[project]
+                    return installed
+                return {**installed, 'install_token': review['token']}
+        except (OSError, ValueError, RuntimeError) as error:
+            del _pending_installs[project]
+            return {**result, 'ok': False, 'built': True, 'error': str(error)}
+
+
 @app.get("/api/check_mod_conflict")
 def api_check_mod_conflict():
     """Whether installing this mod name would overwrite an existing file, in the default export
@@ -3278,21 +3394,19 @@ def api_check_mod_conflict():
     copy_to_mods = request.query.get("copy_to_mods") == "1"
     stem = f"{mod_name}_9999999_P"
     default_exists = any(os.path.exists(os.path.join(ASSETS_MODS, stem + ext))
-                         for ext in (".pak", ".ucas", ".utoc"))
-    mods_exists = False
+                         for ext in _MOD_EXTENSIONS)
+    replacements, check = {}, None
     if copy_to_mods:
         mods = get_mods_folder()
         if mods:
-            mods_exists = any(os.path.exists(os.path.join(mods, stem + ext))
-                              for ext in (".pak", ".ucas", ".utoc"))
+            replacements = _replacement_stamps(mods, (stem + ext for ext in _MOD_EXTENSIONS))
+            check = _replacement_check(mods, replacements)
     response.content_type = "application/json"
-    return json.dumps({"default": default_exists, "mods": mods_exists})
+    return json.dumps({"default": default_exists, "mods": bool(replacements), "replacement_check": check})
 
 @app.post("/api/install_mod")
 def api_install_mod():
-    """Build the selected edits into a mod in the default export folder, then — when copy_to_mods
-    is set — also copy it into the configured mods folder, replacing any previous version there.
-    Single entry point behind the "Install Mod" button, regardless of toggle state."""
+    """Build the selected edits, and check for package overlaps before an optional install."""
     body = request.json or {}
     if body.get("background"):
         return _submit_job("export", "Export " + _mod_stem(body.get("mod_name")),
@@ -3307,36 +3421,31 @@ def _install_mod_payload(body):
     copy_to_mods = bool(body.get("copy_to_mods"))
     if not items:
         return {"ok": False, "error": "no items selected"}
-    if copy_to_mods and not get_mods_folder():
+    mods = get_mods_folder() if copy_to_mods else None
+    if copy_to_mods and not mods:
         return {"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
                 "need_mods_folder": True}
     out_dir = ASSETS_MODS
     os.makedirs(out_dir, exist_ok=True)
     try:
-        tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
-            _split_export_items(items)
-        result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
-                           curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                           text_items=text_items, mesh_items=mesh_items,
-                           asset_opts=_project_meta.get_asset_opts(get_import_root()),
-                           allow_unsafe_world=bool(body.get("allow_unsafe_world")))
-        if not result.get("ok"):
-            return {"ok": False, "error": result.get("error", "build failed")}
-        pak = result.get("pak")
-        # applied/skipped were computed and then dropped on the floor here. A per-item failure --
-        # a dye-off whose ColorID would not extract, a texture group that could not be set -- left
-        # build_mod with ok:true and the user with "Installed", no hint that part of the mod is
-        # missing. That is indistinguishable from the game ignoring the edit, which is exactly the
-        # confusion the whole diagnostics phase exists to remove.
-        resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
-                "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
-                "artifacts": result.get("artifacts") or []}
-        if copy_to_mods:
-            ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
-            if not ok:
-                return {**resp, "ok": False, "built": True, "error": err}
-            resp["installed_dir"] = dest.replace("\\", "/")
-        return resp
+        with key_lock('export-review-install'):
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+                _split_export_items(items)
+            result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
+                               curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
+                               text_items=text_items, mesh_items=mesh_items,
+                               asset_opts=_project_meta.get_asset_opts(get_import_root()),
+                               allow_unsafe_world=bool(body.get("allow_unsafe_world")))
+            if not result.get("ok"):
+                return {"ok": False, "error": result.get("error", "build failed")}
+            pak = result.get("pak")
+            # Keep per-item build warnings alongside the resulting files.
+            resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
+                    "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
+                    "artifacts": result.get("artifacts") or []}
+            if mods and pak:
+                return _review_built_install(resp, mod_name, out_dir, mods, body.get('replacement_check'))
+            return resp
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -3375,36 +3484,35 @@ def _skin_swapper_payload(body):
     from atelier import skin_swapper
     mod_name = body.get("mod_name")
     copy_to_mods = bool(body.get("copy_to_mods"))
-    if copy_to_mods and not get_mods_folder():
+    mods = get_mods_folder() if copy_to_mods else None
+    if copy_to_mods and not mods:
         return {"ok": False, "error": "No mods folder set — configure one in Menu → Settings.",
                 "need_mods_folder": True}
     out_dir = ASSETS_MODS
     os.makedirs(out_dir, exist_ok=True)
     try:
-        result = skin_swapper.build(mod_name, body.get("meshes") or [], body.get("skin_name"),
-                                    body.get("author"), out_dir)
-        if not result.get("ok"):
-            return {"ok": False, "error": result.get("error", "build failed"),
-                    "problems": result.get("problems") or []}
-        pak = result.get("pak")
-        resp = {"ok": True, "pak_path": pak.replace("\\", "/"), "applied": result.get("applied") or [],
-                "skipped": [], "artifacts": result.get("artifacts") or [], "galacta_folder": result.get("folder")}
-        if copy_to_mods:
-            ok, err, dest = _install_to_mods(mod_name, out_dir, result.get("artifacts"))
-            if not ok:
-                return {**resp, "ok": False, "built": True, "error": err}
-            resp["installed_dir"] = dest.replace("\\", "/")
-        return resp
+        with key_lock('export-review-install'):
+            result = skin_swapper.build(mod_name, body.get("meshes") or [], body.get("skin_name"),
+                                        body.get("author"), out_dir)
+            if not result.get("ok"):
+                return {"ok": False, "error": result.get("error", "build failed"),
+                        "problems": result.get("problems") or []}
+            pak = result.get("pak")
+            resp = {"ok": True, "pak_path": pak.replace("\\", "/"), "applied": result.get("applied") or [],
+                    "skipped": [], "artifacts": result.get("artifacts") or [], "galacta_folder": result.get("folder")}
+            if mods:
+                return _review_built_install(resp, mod_name, out_dir, mods, body.get('replacement_check'))
+            return resp
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 
 @app.post("/api/pick_mod_file")
 def api_pick_mod_file():
-    """Native picker for a mod to repatch (.zip / .pak / .utoc). Reports if it's password-locked."""
+    """Native picker for a mod to repatch (.zip / .pak / .utoc / .ucas). Reports if it's password-locked."""
     response.content_type = "application/json"
     try:
-        path = hostos.pick_file("Select a mod to repatch", ("*.zip", "*.pak", "*.utoc"))
+        path = hostos.pick_file("Select a mod to repatch", ("*.zip", "*.pak", "*.utoc", "*.ucas"))
         locked = False
         if path:
             from atelier.handlers import modlock
@@ -3437,11 +3545,6 @@ def _repatch_payload(body):
         os.makedirs(_CACHE, exist_ok=True)
         work = jobs.build_workspace(_CACHE)
         out_base = os.path.join(work, f"{name}_Repatched_9999999_P")
-        if body.get("stage_as_project"):
-            # This legacy option writes each decoded asset into the project.
-            # Once it starts, finish it during shutdown rather than cancelling
-            # halfway through a set of project writes.
-            jobs.begin_publication("Repatching and importing project assets…")
         r = repatch_mod(src, out_base,
                         unlock=(body.get("unlock") or None),
                         stage_as_project=bool(body.get("stage_as_project")),
@@ -3449,7 +3552,8 @@ def _repatch_payload(body):
         if r.get("locked"):
             return {"ok": False, "locked": True, "error": r.get("error")}
         if not r.get("ok"):
-            return {"ok": False, "error": r.get("error", "repatch failed"), "manifest": r.get("manifest")}
+            return {"ok": False, "error": r.get("error", "Repatch failed."),
+                    "manifest": r.get("manifest"), "skipped": r.get("skipped") or []}
         jobs.begin_publication("Publishing repatched files…")
         artifacts = publish_files(container_files(out_base), ASSETS_MODS)
         pak = next(p for p in artifacts if p.endswith(".pak"))
@@ -3461,6 +3565,10 @@ def _repatch_payload(body):
         if work:
             shutil.rmtree(work, ignore_errors=True)
         _build_lock.release()
+
+from atelier.web import mod_repair
+mod_repair.register(app, _submit_job)
+
 
 # ── open a mod ────────────────────────────────────────────────────────────────
 

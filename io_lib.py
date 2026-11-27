@@ -142,8 +142,10 @@ class Toc:
     pass
 
 def parse_toc(path):
-    buf = open(path, "rb").read()
-    assert buf[:16] == b"-==--==--==--==-", "bad magic"
+    with open(path, "rb") as stream:
+        buf = stream.read()
+    if len(buf) < 144 or buf[:16] != b"-==--==--==--==-":
+        raise ValueError("Invalid IoStore table header.")
     t = Toc(); t.buf = buf; t.path = path
     t.version = buf[16]
     g = lambda o: struct.unpack_from("<I", buf, o)[0]
@@ -155,6 +157,12 @@ def parse_toc(path):
     t.enc_guid = buf[b+44:b+60]; t.flags = buf[b+60]
     t.phash_seed_count = g(b+64); t.partition_size = g64(b+68); t.chunks_wo_phash = g(b+76)
     t.encrypted = bool(t.flags & 2); t.signed = bool(t.flags & 4); t.indexed = bool(t.flags & 8)
+    # Bound header-controlled counts before allocating their tables. Installed mod indexes
+    # can be damaged or protected, while the game containers were previously the main caller.
+    tables_end = (144 + 22*t.entry_count + 4*(t.phash_seed_count + t.chunks_wo_phash)
+                  + 12*t.cblk_count + t.cm_name_count*t.cm_name_len)
+    if tables_end + t.dir_index_size > len(buf) or (t.cm_name_count and not t.cm_name_len):
+        raise ValueError("The IoStore table is truncated.")
     p = 144
     t.off_chunkids = p
     t.chunk_ids = [buf[p+i*12:p+i*12+12] for i in range(t.entry_count)]; p += 12*t.entry_count
@@ -182,6 +190,8 @@ def parse_toc(path):
         p += hs  # toc signature
         p += hs  # block signature
         p += 20*t.cblk_count  # per-block sha1
+    if p + t.dir_index_size > len(buf):
+        raise ValueError("The IoStore directory index is truncated.")
     t.off_dirindex = p; p += t.dir_index_size
     t.off_meta = p
     t.meta = [buf[p+i*33:p+i*33+33] for i in range(t.entry_count)]
@@ -239,6 +249,9 @@ def parse_dir_index(t):
     def fstr():
         n = i32()
         if n == 0: return ""
+        size = n if n > 0 else -n * 2
+        if o[0] + size > len(blob):
+            raise ValueError("The IoStore directory index has a truncated name.")
         if n > 0:
             s = blob[o[0]:o[0] + n - 1].decode("latin1"); o[0] += n; return s
         n = -n; s = blob[o[0]:o[0] + (n - 1) * 2].decode("utf-16-le"); o[0] += n * 2; return s
@@ -248,11 +261,18 @@ def parse_dir_index(t):
     strings = [fstr() for _ in range(u32())]
     INV = 0xFFFFFFFF
     out = []
+    seen_dirs, seen_files = set(), set()
     def walk(di, prefix):
+        if di in seen_dirs:
+            raise ValueError("The IoStore directory index repeats a directory link.")
+        seen_dirs.add(di)
         name, firstchild, _ns, firstfile = dirs[di]
         p = prefix if name == INV else prefix + "/" + strings[name]
         f = firstfile
         while f != INV:
+            if f in seen_files:
+                raise ValueError("The IoStore directory index repeats a file link.")
+            seen_files.add(f)
             fn, nxt, ud = files[f]
             out.append((p + "/" + strings[fn], ud)); f = nxt
         c = firstchild
