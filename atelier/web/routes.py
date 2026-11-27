@@ -3719,6 +3719,51 @@ def api_trash_discard():
         response.status = 400
         return json.dumps({'ok': False, 'error': str(error)})
 
+
+@app.get('/api/project/palette')
+def api_project_palette_get():
+    response.content_type = 'application/json'
+    return json.dumps({'ok': True, 'palette': project_meta.get_palette(get_import_root())})
+
+
+@app.post('/api/project/palette')
+def api_project_palette_set():
+    response.content_type = 'application/json'
+    body = request.json or {}
+    saved = project_meta.set_palette(get_import_root(), body.get('palette'))
+    return json.dumps({'ok': True, 'palette': saved})
+
+
+@app.get('/api/project/profiles')
+def api_project_profiles_get():
+    response.content_type = 'application/json'
+    return json.dumps({'ok': True, 'profiles': project_meta.get_profiles(get_import_root())})
+
+
+@app.post('/api/project/profiles')
+def api_project_profiles_save():
+    response.content_type = 'application/json'
+    body = request.json or {}
+    try:
+        profiles = project_meta.save_profile(
+            get_import_root(),
+            body.get('name', ''),
+            body.get('deselected') or [],
+            body.get('mod_name', ''),
+        )
+        return json.dumps({'ok': True, 'profiles': profiles})
+    except ValueError as error:
+        response.status = 400
+        return json.dumps({'ok': False, 'error': str(error)})
+
+
+@app.post('/api/project/profiles/delete')
+def api_project_profiles_delete():
+    response.content_type = 'application/json'
+    body = request.json or {}
+    profiles = project_meta.delete_profile(get_import_root(), body.get('name', ''))
+    return json.dumps({'ok': True, 'profiles': profiles})
+
 @app.get("/api/asset_info")
 def api_asset_info():
     """Return pak source + game path for a game_rel (for sidebar tooltips)."""

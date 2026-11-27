@@ -1570,18 +1570,23 @@ function matFocusRegion(idx) {
 
 function matColourParameterHtml(c, i, expanded, label = "") {
   const name = _matEscape(c.name), group = `Colour ${i}`;
+  const hex = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
+  const alpha = Math.max(0, Math.min(1, Number(c.rgba[3]) || 0));
+  const splitCls = alpha < 0.999 ? " is-split" : "";
+  const alphaPct = `${Math.round(alpha * 100)}%`;
   const levels = `<span class="mat-tag">Intensity</span>
     <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
     <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
     <span class="mat-tag mat-alpha-label">${label ? "Alpha" : "A"}</span>
     <input class="mat-num" id="matalpha${i}" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">`;
-  return `<div class="mat-parameter${label ? " mat-colour-card" : ""}" id="matrow${i}">
+  return `<div class="mat-parameter${label ? " mat-colour-card" : ""}" id="matrow${i}" data-param-name="${_matEscape((label ? label + " " : "") + c.name).toLowerCase()}" data-color-index="${i}">
     <div class="mat-row">
       <label for="mathx${i}" title="${name}">${label || name}<span class="mat-changed" aria-hidden="true"></span></label>
-      <span class="mat-color-well"><input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)"></span>
+      <span class="mat-color-well${splitCls}" id="matwell${i}" style="--mat-rgb:${hex};--mat-alpha-pct:${alphaPct}"><input type="color" id="matsw${i}" value="${hex}" onfocus="matActiveColorIndex=${i}" oninput="matColor(${i},this.value)"></span>
       <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
         title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
         value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
+        onfocus="matActiveColorIndex=${i}"
         onchange="matColorText(${i},this)">
       ${label ? "" : levels}
     </div>
@@ -1627,6 +1632,66 @@ function matColourGroupsHtml(colors, expanded) {
   return h;
 }
 
+let matActiveColorIndex = 0;
+
+function applyMatFilter() {
+  if (!matEditor) return;
+  const body = document.getElementById("mat-body");
+  if (!body) return;
+  const query = (matEditor.paramFilter || "").trim().toLowerCase();
+  const changedOnly = !!matEditor.changedOnly;
+  const rows = [...body.querySelectorAll(".mat-parameter")];
+  let visibleCount = 0;
+  for (const row of rows) {
+    const name = row.dataset.paramName || row.textContent.toLowerCase();
+    const matchText = !query || name.includes(query);
+    const matchChanged = !changedOnly || row.classList.contains("is-modified") || row.classList.contains("is-custom");
+    const show = matchText && matchChanged;
+    row.hidden = !show;
+    if (show) visibleCount++;
+  }
+  for (const group of body.querySelectorAll(".mat-parameter-group")) {
+    if (group.id === "mat-replacement") continue;
+    const groupRows = [...group.querySelectorAll(".mat-parameter")];
+    if (!groupRows.length) continue;
+    const anyVisible = groupRows.some(r => !r.hidden);
+    group.hidden = !anyVisible;
+    if ((query || changedOnly) && anyVisible) group.open = true;
+  }
+  const cards = body.querySelector(".mat-colour-cards");
+  if (cards) cards.hidden = ![...cards.querySelectorAll(".mat-parameter")].some(r => !r.hidden);
+  const empty = document.getElementById("mat-filter-empty");
+  if (empty) empty.hidden = !(rows.length && visibleCount === 0 && (query || changedOnly));
+}
+
+function matSetFilter(value) {
+  if (!matEditor) return;
+  matEditor.paramFilter = value;
+  applyMatFilter();
+}
+
+function matToggleChangedOnly() {
+  if (!matEditor) return;
+  matEditor.changedOnly = !matEditor.changedOnly;
+  const btn = document.getElementById("mat-changed-only");
+  if (btn) {
+    btn.classList.toggle("on", matEditor.changedOnly);
+    btn.setAttribute("aria-pressed", String(matEditor.changedOnly));
+  }
+  applyMatFilter();
+}
+
+function _matUpdateWell(i) {
+  const c = matEditor?.colors?.[i];
+  const well = document.getElementById("matwell" + i);
+  if (!c || !well) return;
+  const hex = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
+  const alpha = Math.max(0, Math.min(1, Number(c.rgba[3]) || 0));
+  well.style.setProperty("--mat-rgb", hex);
+  well.style.setProperty("--mat-alpha-pct", `${Math.round(alpha * 100)}%`);
+  well.classList.toggle("is-split", alpha < 0.999);
+}
+
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   const body = document.getElementById("mat-body");
@@ -1634,6 +1699,8 @@ function renderMatEditor() {
   const expanded = new Map([...body.querySelectorAll("details[data-mat-group]")].map(d => [d.dataset.matGroup, d.open]));
   const previousPreview = body.querySelector("#dye-prev");
   if (previousPreview?.dataset.url) URL.revokeObjectURL(previousPreview.dataset.url);
+  const filterValue = _matEscape(m.paramFilter || "");
+  const changedOnly = !!m.changedOnly;
   let h = `<div class="mat-workflow-toolbar">
     <span id="mat-dirty" class="mat-dirty" role="status" aria-live="polite"></span>
     <div class="mat-compare-controls"><span>Compare</span>
@@ -1641,7 +1708,13 @@ function renderMatEditor() {
       <button type="button" class="seg-btn ${m.compareMode === "original" ? "on" : ""}" aria-pressed="${m.compareMode === "original"}" onclick="matCompare('original')">Game original</button>
     </div>
     <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
-  </div>`;
+  </div>
+  <div class="mat-filter-bar">
+    <input id="mat-param-search" class="mat-filter-input" type="search" placeholder="Filter parameters…" aria-label="Filter material parameters" value="${filterValue}" oninput="matSetFilter(this.value)">
+    <button type="button" id="mat-changed-only" class="seg-btn ${changedOnly ? "on" : ""}" aria-pressed="${changedOnly}" onclick="matToggleChangedOnly()">Changed only</button>
+  </div>
+  <div id="mat-project-palette"></div>
+  <p id="mat-filter-empty" class="mat-filter-empty" hidden>No parameters match this filter.</p>`;
   h += materialReplacementHtml(m, expanded);
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
@@ -1676,7 +1749,7 @@ function renderMatEditor() {
     h += `<details class="mat-parameter-group" data-mat-group="Scalars" ${open ? "open" : ""}><summary>Scalar parameters<span>${m.scalars.length}</span></summary>`;
     m.scalars.forEach((s, i) => {
       const escaped = _matEscape(s.name);
-      h += `<div class="mat-parameter" id="matscalar${i}"><div class="mat-row">
+      h += `<div class="mat-parameter" id="matscalar${i}" data-param-name="${escaped.toLowerCase()}"><div class="mat-row">
         <label for="msn${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
         <input type="range" id="msr${i}" min="${Math.min(0, s.orig)}" max="${s.max}" step="${s.max / 1000}" value="${s.value}" oninput="matScalar(${i},this.value,1)">
         <input class="mat-num wide" id="msn${i}" type="number" step="any" value="${s.value}" oninput="matScalar(${i},this.value,0)">
@@ -1702,6 +1775,21 @@ function renderMatEditor() {
   reset.textContent = "Restore game defaults";
   reset.title = "Replace the project's saved material with original game values";
   _matRefreshDirty();
+  if (matActiveColorIndex >= m.colors.length) matActiveColorIndex = 0;
+  window.AtelierProjectPalette?.mount(document.getElementById("mat-project-palette"), {
+    onPick: hex => {
+      if (!matEditor?.colors?.length) return;
+      const idx = Math.min(Math.max(0, matActiveColorIndex), matEditor.colors.length - 1);
+      matColor(idx, hex);
+      const sw = document.getElementById("matsw" + idx);
+      if (sw) sw.value = hex;
+    },
+    getCurrentHex: () => {
+      const c = matEditor?.colors?.[Math.min(Math.max(0, matActiveColorIndex), (matEditor?.colors?.length || 1) - 1)];
+      return c ? _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten) : "";
+    },
+  });
+  applyMatFilter();
 }
 
 function bodyMaterialBusy(busy) {
@@ -1812,11 +1900,14 @@ function _matSyncRow(i, except) {
   set("mir" + i, Math.min(c.inten, 10));
   set("min" + i, +c.inten.toFixed(3));
   const t = document.getElementById("mathx" + i); if (t) t.classList.remove("bad");
+  _matUpdateWell(i);
   _matRefreshDirty();
+  if (matEditor?.changedOnly) applyMatFilter();
   window.AtelierPolish?.swatchesAfter(oldSwatches, matEditor.colors);
 }
 
 function matColor(i, hex) {
+  matActiveColorIndex = i;
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
@@ -1826,6 +1917,7 @@ function matColor(i, hex) {
 }
 
 function matColorText(i, el) {
+  matActiveColorIndex = i;
   const rgb = parseColor01(el.value);
   if (!rgb) { el.classList.add("bad"); return; }          // leave what they typed so it can be fixed
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
@@ -1835,16 +1927,18 @@ function matColorText(i, el) {
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
+  matActiveColorIndex = i;
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
   _matSyncRow(i, (fromRange ? "mir" : "min") + i);
   dyeRefresh();
 }
-function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matRefreshDirty(); dyeRefresh(); }
+function matAlpha(i, v) { matActiveColorIndex = i; matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matUpdateWell(i); _matRefreshDirty(); if (matEditor?.changedOnly) applyMatFilter(); dyeRefresh(); }
 function matScalar(i, v, fromRange) {
   matEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
   _matRefreshDirty();
+  if (matEditor?.changedOnly) applyMatFilter();
 }
 
 // The editor must not show a split it cannot guarantee. If the server could not store it (an old
