@@ -5605,6 +5605,8 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
+      { icon: "search", label: "Command palette…", action: () => window.AtelierCommands?.openPalette() },
+      { icon: "list", label: "Keyboard shortcuts…", action: () => window.AtelierCommands?.openShortcuts() },
       { icon: "sparkles", label: "What’s new…", action: () => window.AtelierChangelog?.show() },
       { icon: "circle-help", label: "Help and info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
