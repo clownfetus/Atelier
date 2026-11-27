@@ -6,21 +6,25 @@ and native tools for the asset pipeline. Run it from source with
 `scripts/Start-AtelierDev.ps1` (browser mode on http://127.0.0.1:8767, or
 `-Mode Desktop`); see `docs/DEVELOPMENT.md`.
 
-## Current workstream: motion system v2
+## Working agreement
 
-Replacing the old animation system with the three-piece assembly glyph.
-Start with `docs/motion-v2/HANDOFF.md` and follow its phases in order.
+- Start new work on a task branch from the latest `main`, unless the task calls
+  for a different base.
+- Make one focused commit per task. Push, open pull requests or merge only when
+  asked.
+- Use British English in all UI copy.
 
-Rules that always apply:
+## Motion system v2
 
-- `docs/motion-v2/SPEC.md` §1 lists ten invariants. Never break them; if a task
-  seems to need it, stop and ask Thiago.
-- Fixed layer order (tile, mesh, disc). No fades or dissolves in the glyph,
-  except the accessibility cross-fade in Off/reduced motion.
-- Success comes only from a real `succeeded` result, never a timer.
-- Presentation layer only. Don't touch the asset pipeline, project formats,
-  native tools, server routes or artwork rendering.
-- Stop at every ⏸ checkpoint in HANDOFF.md for Thiago's sign-off. Design calls
-  are his.
-- Work on branch `motion-v2`, one commit per task. Don't push or merge unless asked.
-- British English in all UI copy.
+The motion overhaul is complete. `docs/motion-v2/HANDOFF.md` records the rollout
+and its design sign-offs. For changes to motion, use `docs/motion-v2/SPEC.md` as
+the current reference.
+
+- Preserve the ten invariants in SPEC §1. Ask Thiago if a change needs an
+  exception or a new design decision.
+- Keep the glyph's layer order fixed (tile, mesh, disc). The accessibility
+  cross-fade in Off or reduced motion is its only fade.
+- Show success only after a real `succeeded` result.
+- Keep motion changes in the presentation layer. Asset processing, project
+  formats, native tools, server routes and artwork rendering are outside that
+  scope.
