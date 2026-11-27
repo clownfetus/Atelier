@@ -45,7 +45,7 @@ def run_empty_assets_motion_checks(page, context, url, report, checks):
         assert glyphs.count() == 0
         empty_page.locator('#search-scope').click()
         empty_page.locator('#search-input').fill('unmatched-asset')
-        assert 'No Mod tray assets match the search.' in empty_page.locator('#sidebar-list').inner_text()
+        assert 'No Mod tray assets match the filter.' in empty_page.locator('#sidebar-list').inner_text()
         assert empty_page.locator('#sidebar-list .empty-state-glyph').count() == 0
         empty_page.locator('#search-input').fill('')
         fixture['data'] = []

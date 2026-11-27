@@ -10,6 +10,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
     target.on('request', lambda request: imports.append(request.url) if '/api/import_' in request.url else None)
     png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6mXcAAAAASUVORK5CYII=')
     target.route('**/api/thumb?*', lambda r: r.fulfill(body=png, content_type='image/png'))
+    target.route('**/api/texture_png?*', lambda r: r.fulfill(body=png, content_type='image/png'))
     target.route('**/api/prefetch_thumbs', lambda r: r.fulfill(json={'ok': True, 'cached': r.request.post_data_json.get('game_rels', [])}))
     key = 'atelier.libraryView.v1'
     prior = None
@@ -208,6 +209,7 @@ def run_library_workflow_checks(page, context, url, report, checks):
         texture.click()
         target.wait_for_selector('#library-preview[open]')
         assert '/api/preview?' in target.locator('#library-preview img').get_attribute('src') and not launches
+        assert preview.get_by_role('group', name='Texture channels').is_visible()
         target.keyboard.press('Escape')
         preview.wait_for(state='hidden')
         menu = target.get_by_role('button', name='Open in default image app')

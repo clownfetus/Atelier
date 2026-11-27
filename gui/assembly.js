@@ -343,8 +343,10 @@ export function createAssemblyView(api) {
     if (!texture) return;
     const info = selectedInfo(), selected = api.state().selected;
     host.append(make('span', `${texture.slot} · ${textureUsers(api.state().data, texture).length} material slot(s)`, 'assembly-texture-usage'));
+    const originalSrc = !texture.custom && projectRecord(texture.game_rel)
+      ? api.url(`/api/texture_png?game_rel=${encodeURIComponent(texture.game_rel)}&original=1`) : '';
     const preview = button('Preview', () => window.AtelierLibraryTools?.previewImage({label:leaf(texture.game_rel), path:texture.game_rel,
-      src:api.url(texture.url), isTexture:true, caption:`${texture.slot} · ${ownership(texture.game_rel, texture.custom)}`}, preview));
+      src:api.url(texture.url), originalSrc, isTexture:true, caption:`${texture.slot} · ${ownership(texture.game_rel, texture.custom)}`}, preview));
     host.append(preview);
     if (texture.custom) host.append(button('Edit texture slot', () => api.editMaterial(selected, texture.slot)));
     else {

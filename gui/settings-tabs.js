@@ -25,6 +25,11 @@
     active = tabId;
     const dlg = dialog();
     if (dlg) dlg.dataset.settingsTab = tabId;
+    const body = dlg?.querySelector('.setup-body');
+    if (body) {
+      body.setAttribute('aria-labelledby', `settings-tab-${tabId}`);
+      if (scrollTop) body.scrollTop = 0;
+    }
     const nav = bar();
     if (nav) {
       nav.querySelectorAll('.settings-tab').forEach(btn => {
@@ -32,10 +37,6 @@
         btn.setAttribute('aria-selected', String(selected));
         btn.tabIndex = selected ? 0 : -1;
       });
-    }
-    if (scrollTop) {
-      const body = dlg?.querySelector('.setup-body');
-      if (body) body.scrollTop = 0;
     }
   }
 
@@ -55,12 +56,18 @@
   function init() {
     const nav = bar();
     if (!nav) return;
+    const body = dialog()?.querySelector('.setup-body');
+    if (!body) return;
+    body.id = 'settings-panel';
+    body.setAttribute('role', 'tabpanel');
     nav.replaceChildren();
     for (const tab of TABS) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'settings-tab';
+      btn.id = `settings-tab-${tab.id}`;
       btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-controls', body.id);
       btn.dataset.tab = tab.id;
       btn.textContent = tab.label;
       btn.addEventListener('click', () => select(tab.id));

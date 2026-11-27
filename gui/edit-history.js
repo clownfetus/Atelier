@@ -15,16 +15,22 @@
     let lastKey = '';
     let lastAt = 0;
 
+    function endStep() {
+      lastKey = '';
+      lastAt = 0;
+    }
+
     function reset(snapshot) {
       entries = snapshot == null ? [] : [clone(snapshot)];
       cursor = entries.length - 1;
-      lastKey = '';
-      lastAt = 0;
+      endStep();
     }
 
     function record(snapshot, key = '') {
       if (snapshot == null) return;
       const now = Date.now();
+      if (!key) endStep();
+      if (cursor >= 0 && JSON.stringify(snapshot) === JSON.stringify(entries[cursor])) return;
       const copy = clone(snapshot);
       if (cursor >= 0 && key && key === lastKey && now - lastAt <= coalesceMs && cursor === entries.length - 1) {
         entries[cursor] = copy;
@@ -44,22 +50,21 @@
     function undo() {
       if (cursor <= 0) return null;
       cursor--;
-      lastKey = '';
-      lastAt = 0;
+      endStep();
       return clone(entries[cursor]);
     }
 
     function redo() {
       if (cursor < 0 || cursor >= entries.length - 1) return null;
       cursor++;
-      lastKey = '';
-      lastAt = 0;
+      endStep();
       return clone(entries[cursor]);
     }
 
     return {
       reset,
       record,
+      endStep,
       undo,
       redo,
       canUndo: () => cursor > 0,
@@ -72,23 +77,20 @@
     registry.set(overlayId, handlers);
   }
 
-  function topOverlayId() {
-    const active = [...document.querySelectorAll('.overlay.active:not(.mounted)')];
-    return active.at(-1)?.id || '';
-  }
-
   document.addEventListener('keydown', event => {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
     const isUndo = key === 'z' && !event.shiftKey;
     const isRedo = (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey);
     if (!isUndo && !isRedo) return;
     const target = event.target;
-    if (target instanceof HTMLElement && target.matches('input[type="text"], input[type="search"], textarea, [contenteditable="true"]')) {
+    if (target instanceof HTMLElement && (target.isContentEditable || target.matches('input:not([type]), input[type="text"], input[type="search"], textarea'))) {
       return;
     }
-    const id = topOverlayId();
-    const handler = registry.get(id);
+    if (document.querySelector('dialog[open], #ctx-menu.open')) return;
+    const overlay = window.AtelierModal?.topOverlay();
+    if (!overlay?.contains(target)) return;
+    const handler = registry.get(overlay.id);
     if (!handler) return;
     const handled = isUndo ? handler.undo?.() : handler.redo?.();
     if (handled) {

@@ -114,7 +114,7 @@ def _confirm_paths(tab,checks):
         tab.locator('#atelier-confirm-cancel').click();tab.evaluate('action')
         assert tab.evaluate('materialDirtyCount()')==1
     tab.evaluate('closeMaterialEditor(true)')
-    cases=[('curveEditor',"{name:'Curve',game_rel:'Fixture/C_Test',dirty:{0:true}}",'resetCurve()','closeCurveEditor()','curve_reset'),
+    cases=[('curveEditor',"{name:'Curve',game_rel:'Fixture/C_Test',channels:{R:[{time:0,value:.25}]},savedChannels:{R:[{time:0,value:1}]},stops:[]}",'resetCurve()','closeCurveEditor()','curve_reset'),
            ('vfxEditor',"{name:'Effect',game_rel:'Fixture/NS_Test',groups:[],scalars:[],vectors:[],baseline:'dirty'}",'resetVfx()','closeVfxEditor()','vfx_reset'),
            ('worldEditor',"{name:'Level',game_rel:'Fixture/Map.umap',edits:{lights:{}},baseline:'dirty'}","document.getElementById('world-reset').click()",'closeWorldEditor()','world_reset'),
            ('textEditor',"{name:'Text',game_rel:'Fixture/Strings_ST',edits:{Hello:'Hi'},baseline:'dirty'}","document.getElementById('text-reset').click()",'closeTextEditor()','text_reset')]

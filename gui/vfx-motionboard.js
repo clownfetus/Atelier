@@ -110,7 +110,7 @@
         row.readout.textContent = D.sample(sourceStops(group, state.compare === 'original' ? 'original' : 'edited'), state.time).map(fmt).join(' / ');
       }
     }
-    function refreshInspector(rebuild = false) {
+    function refreshInspector(rebuild = false, forceValue = false) {
       const entry = activeGroup(); if (!entry) return;
       const {g, i} = entry;
       state.point = D.clamp(state.point, 0, g.stops.length - 1); state.channel = D.clamp(state.channel, 0, g.channels - 1);
@@ -129,7 +129,7 @@
         }));
       }
       channel.value = String(state.channel);
-      if (document.activeElement !== get('mb-value')) get('mb-value').value = g.stops[state.point][state.channel];
+      if (forceValue || document.activeElement !== get('mb-value')) get('mb-value').value = g.stops[state.point][state.channel];
       const saved = callbacks.savedGroup(i), original = D.original(g);
       const gameValue = original ? D.sample(original, time)[state.channel] : null;
       get('mb-reference-values').textContent = 'Saved: ' + fmt(D.sample(saved.stops, time)[state.channel]) + ' · Game: ' + fmt(gameValue);
@@ -446,15 +446,15 @@
     get('mb-unsupported').textContent = (editor.unsupportedExports?.length || 0) + ' exports have no supported LUT. ' + (editor.unmatchedEdits || 0) + ' saved edit groups are unavailable and are preserved; restore the entire effect to clear them.';
     renderMappings(); renderRows(); updateTime(true); schedule();
     current = {
-      sync(index) {
+      sync(index, { forceValue = false } = {}) {
         if (disposed) return;
         if (index == null) for (const key of rows.keys()) plot(key); else if (groups[index]) plot(D.key(groups[index]));
-        refreshInspector(); updateTime(true); schedule();
+        refreshInspector(false, forceValue); updateTime(true); schedule();
       },
       destroy() { disposed = true; remember(); cancelAnimationFrame(raf); abort.abort(); rowAbort.abort(); resize.disconnect(); visibility.disconnect(); theme.disconnect(); rows.clear(); root.remove(); },
     };
     return current;
   }
   function destroy() { current?.destroy(); current = null; }
-  window.AtelierMotionboard = Object.freeze({mount, destroy, sync: index => current?.sync(index)});
+  window.AtelierMotionboard = Object.freeze({mount, destroy, sync: (index, options) => current?.sync(index, options)});
 })();

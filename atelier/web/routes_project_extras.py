@@ -2,7 +2,7 @@
 import json
 from bottle import request, response
 
-from atelier import project_meta, project_trash
+from atelier import operations, project_meta, project_trash
 
 
 def register(app, get_import_root):
@@ -18,14 +18,23 @@ def register(app, get_import_root):
     @app.get('/api/trash')
     def api_trash_list():
         response.content_type = 'application/json'
-        return json.dumps({'ok': True, 'entries': project_trash.list_entries(get_import_root())})
+        root = get_import_root()
+        # Listing also recovers interrupted deletes and expires old entries.
+        with operations.project_use(root, write=True):
+            entries = project_trash.list_entries(root)
+        return json.dumps({'ok': True, 'entries': entries})
 
     @app.post('/api/trash/discard')
     def api_trash_discard():
         response.content_type = 'application/json'
         body = request.json or {}
-        entry = body.get('entry')
         try:
+            if body.get('all') is True and 'entry' not in body:
+                entry = None
+            elif body.get('entry') is not None and 'all' not in body:
+                entry = body['entry']
+            else:
+                raise ValueError('Specify a trash entry or explicitly empty the project trash.')
             return json.dumps(project_trash.discard(get_import_root(), entry))
         except ValueError as error:
             response.status = 400

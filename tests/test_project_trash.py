@@ -255,6 +255,105 @@ class Trash(unittest.TestCase):
         T.purge(str(self.root))
         self.assertTrue(path.exists()); self.assertTrue(PM.get_asset_opts(str(self.root),self.tex)['blank'])
 
+    def test_http_listing_waits_for_an_in_progress_delete(self):
+        path = self.seed(self.tex)
+        moved, release, listing_done = threading.Event(), threading.Event(), threading.Event()
+        replace = T.os.replace
+
+        def move(source, target):
+            result = replace(source, target)
+            if Path(source) == path and T.DIRECTORY in Path(target).parts:
+                moved.set()
+                if not release.wait(5):
+                    raise TimeoutError('Trash delete was not released')
+            return result
+
+        def list_trash():
+            try:
+                return call('/api/trash', method='GET')
+            finally:
+                listing_done.set()
+
+        with patch.object(T.os, 'replace', side_effect=move), ThreadPoolExecutor(max_workers=2) as workers:
+            deleting = workers.submit(call, '/api/delete_imported', {'game_rel': self.tex})
+            try:
+                self.assertTrue(moved.wait(5))
+                listing = workers.submit(list_trash)
+                self.assertFalse(listing_done.wait(.5), 'Listing ran while the delete was moving files')
+            finally:
+                release.set()
+            deleted = deleting.result(timeout=5)
+            listed = listing.result(timeout=5)
+        self.assertTrue(deleted['ok'])
+        self.assertEqual([item['entry'] for item in listed['entries']], [deleted['entry']])
+        self.assertFalse(path.exists())
+
+    def test_trash_keeps_colliding_asset_sidecars_together(self):
+        mesh = self.seed(self.mesh, '.blend')
+        sidecar = self.seed(self.mesh, '.mesh.json')
+        old_mesh, old_sidecar = mesh.read_bytes(), sidecar.read_bytes()
+        deleted = T.remove(str(self.root), [self.mesh])
+        folder = self.root / T.DIRECTORY / deleted['entry']
+        manifest_path = folder / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        manifest['state'] = 'moving'
+        manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+        mesh.write_bytes(b'new model')
+        PM.set_asset_opts(self.root, self.mesh, {'no_mips': True})
+
+        listed = call('/api/trash', method='GET')['entries']
+        self.assertEqual(listed[0]['state'], 'kept')
+        self.assertFalse(sidecar.exists())
+        self.assertEqual(mesh.read_bytes(), b'new model')
+        self.assertEqual(PM.get_asset_opts(self.root, self.mesh), {'no_mips': True})
+
+        newer = call('/api/delete_imported', {'game_rel': self.mesh})
+        self.assertTrue(newer['ok'])
+        restored = call('/api/restore_imported', {'entry': deleted['entry']})
+        self.assertTrue(restored['ok'])
+        self.assertEqual(mesh.read_bytes(), old_mesh)
+        self.assertEqual(sidecar.read_bytes(), old_sidecar)
+
+    def test_restore_recovers_surviving_files_from_older_kept_entries(self):
+        mesh = self.seed(self.mesh, '.blend')
+        sidecar = self.seed(self.mesh, '.mesh.json')
+        old_mesh = mesh.read_bytes()
+        deleted = T.remove(str(self.root), [self.mesh])
+        folder = self.root / T.DIRECTORY / deleted['entry']
+        manifest_path = folder / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        manifest['state'] = 'kept'
+        manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+        # Older recovery can have moved some files back out without updating their manifest.
+        original_sidecar = folder / 'files' / sidecar.relative_to(self.root)
+        original_sidecar.unlink()
+
+        listed = call('/api/trash', method='GET')['entries']
+        self.assertEqual(listed[0]['assets'][0]['files'], 1)
+        restored = call('/api/restore_imported', {'entry': deleted['entry']})
+        self.assertTrue(restored['ok'])
+        self.assertEqual(mesh.read_bytes(), old_mesh)
+
+    def test_discard_requires_an_explicit_target(self):
+        self.seed(self.tex)
+        deleted = call('/api/delete_imported', {'game_rel': self.tex})
+
+        bad = call('/api/trash/discard', {})
+        self.assertFalse(bad['ok'])
+        self.assertEqual([item['entry'] for item in call('/api/trash', method='GET')['entries']],
+                         [deleted['entry']])
+
+    def test_discard_preserves_unrecognised_folders(self):
+        entry = 'a' * 32
+        folder = self.root / T.DIRECTORY / entry
+        folder.mkdir(parents=True)
+        record = folder / 'file.txt'
+        record.write_text('saved data', encoding='utf-8')
+
+        bad = call('/api/trash/discard', {'entry': entry})
+        self.assertFalse(bad['ok'])
+        self.assertEqual(record.read_text(encoding='utf-8'), 'saved data')
+
     def test_http_list_and_discard_trash_entries(self):
         self.seed(self.tex)
         first = call('/api/delete_imported', {'game_rels': [self.tex]})
@@ -269,7 +368,7 @@ class Trash(unittest.TestCase):
         self.assertTrue(removed_one['ok']); self.assertEqual(removed_one['removed'], 1)
         remaining = call('/api/trash', method='GET')['entries']
         self.assertEqual([e['entry'] for e in remaining], [second['entry']])
-        emptied = call('/api/trash/discard', {})
+        emptied = call('/api/trash/discard', {'all': True})
         self.assertTrue(emptied['ok']); self.assertEqual(emptied['removed'], 1)
         self.assertEqual(call('/api/trash', method='GET')['entries'], [])
         invalid = call('/api/trash/discard', {'entry': '../escape'})

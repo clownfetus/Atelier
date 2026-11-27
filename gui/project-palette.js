@@ -1,69 +1,62 @@
-// Shared per-project colour palette for Material Editor and Model Studio.
+// Colours saved to the active project for reuse across materials.
 (() => {
   'use strict';
 
-  let cachedProject = '';
-  let colours = [];
-  let loaded = false;
+  const projects = new Map();
   const mounts = new Set();
+  const activeProject = () => window.atelierProject?.() || '';
+  let visibleProject = '';
 
   function normalizeHex(value) {
     const clean = String(value || '').trim().toLowerCase();
     return /^#[0-9a-f]{6}$/.test(clean) ? clean : '';
   }
 
-  async function load(project = window.atelierProject?.() || '') {
-    if (!project) {
-      cachedProject = '';
-      colours = [];
-      loaded = true;
-      renderAll();
-      return colours;
-    }
-    if (project === cachedProject && loaded) return colours;
-    cachedProject = project;
-    try {
-      const response = await window.atelierFetch('/api/project/palette', {}, project);
-      const data = await response.json();
-      if (project !== cachedProject) return colours;
-      colours = Array.isArray(data.palette) ? data.palette.map(normalizeHex).filter(Boolean) : [];
-      loaded = true;
-    } catch (_) {
-      colours = [];
-      loaded = true;
-    }
-    renderAll();
-    return colours;
+  async function readPalette(response) {
+    const data = await response.json();
+    if (!response.ok || !data.ok || !Array.isArray(data.palette)) throw Error(data.error || 'Project palette unavailable.');
+    return data.palette.map(normalizeHex).filter(Boolean);
   }
 
-  async function save(next, project = window.atelierProject?.() || '') {
-    if (!project) return;
-    const dedup = [];
-    for (const item of next) {
-      const hex = normalizeHex(item);
-      if (hex && !dedup.includes(hex) && dedup.length < 16) dedup.push(hex);
+  async function load(project = activeProject()) {
+    if (!project) return [];
+    if (!projects.has(project)) projects.set(project, { colours: null, reading: null, error: false, saving: false });
+    const state = projects.get(project);
+    if (state.colours) return state.colours;
+    if (!state.reading) {
+      state.error = false;
+      state.reading = window.atelierFetch('/api/project/palette', {}, project).then(readPalette)
+        .then(result => { state.colours = result; return result; })
+        .catch(() => { state.error = true; return []; })
+        .finally(() => { state.reading = null; if (project === activeProject()) renderAll(); });
+      if (project === activeProject()) renderAll();
     }
-    colours = dedup;
-    cachedProject = project;
-    loaded = true;
+    return state.reading;
+  }
+
+  async function save(next, project, state) {
+    state.saving = true;
     renderAll();
     try {
       const response = await window.atelierFetch('/api/project/palette', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ palette: dedup }),
+        body: JSON.stringify({ palette: next }),
       }, project);
-      const data = await response.json();
-      if (data.ok && Array.isArray(data.palette) && project === cachedProject) {
-        colours = data.palette;
-        renderAll();
-      }
-    } catch (_) {}
+      state.colours = await readPalette(response);
+    } catch (_) {
+      if (project === activeProject()) window.toast?.('Could not save the project palette.', 'error');
+    } finally {
+      state.saving = false;
+      if (project === activeProject()) renderAll();
+    }
   }
 
   function add(hex) {
     const clean = normalizeHex(hex);
-    if (!clean) return;
+    const project = activeProject(), state = projects.get(project);
+    if (!clean || !state?.colours || state.saving) return;
+    const { colours } = state;
     if (colours.includes(clean)) {
       if (typeof window.toast === 'function') window.toast(`${clean.toUpperCase()} is already in the project palette`, 'info', 2500);
       return;
@@ -72,11 +65,13 @@
       if (typeof window.toast === 'function') window.toast('Project palette holds up to 16 colours', 'warning', 3500);
       return;
     }
-    save([...colours, clean]);
+    save([...colours, clean], project, state);
   }
 
   function remove(hex) {
-    save(colours.filter(c => c !== hex));
+    const project = activeProject(), state = projects.get(project);
+    if (!state?.colours || state.saving) return;
+    save(state.colours.filter(c => c !== hex), project, state);
   }
 
   function renderMount(entry) {
@@ -85,6 +80,8 @@
       return;
     }
     const { host, onPick, getCurrentHex } = entry;
+    const project = activeProject(), state = projects.get(project);
+    const colours = state?.colours || [];
     host.className = 'project-palette-bar';
     host.replaceChildren();
 
@@ -97,7 +94,8 @@
     if (!colours.length) {
       const empty = document.createElement('span');
       empty.className = 'project-palette-empty';
-      empty.textContent = 'Save colours here to reuse them across materials.';
+      empty.textContent = state?.error ? 'Project palette unavailable.' : state?.reading ? 'Loading project palette…'
+        : 'Save colours here to reuse them across materials.';
       list.append(empty);
     } else {
       for (const hex of colours) {
@@ -122,6 +120,7 @@
         del.textContent = '×';
         del.title = `Remove ${hex.toUpperCase()}`;
         del.setAttribute('aria-label', `Remove colour ${hex.toUpperCase()}`);
+        del.disabled = state.saving;
         del.addEventListener('click', event => {
           event.stopPropagation();
           remove(hex);
@@ -134,9 +133,11 @@
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'btn project-palette-add';
-    addBtn.textContent = '+ Save colour';
+    addBtn.textContent = state?.error ? 'Retry palette' : state?.saving ? 'Saving palette…' : '+ Save colour';
     addBtn.title = 'Save the active colour into this project’s palette';
+    addBtn.disabled = !state?.error && (!state?.colours || state.saving);
     addBtn.addEventListener('click', () => {
+      if (state?.error) { load(project); return; }
       const hex = normalizeHex(getCurrentHex?.());
       if (hex) add(hex);
       else window.toast?.('Select or edit a colour parameter first', 'info', 2500);
@@ -152,22 +153,23 @@
   function mount(host, { onPick, getCurrentHex } = {}) {
     if (!host) return;
     for (const existing of [...mounts]) {
-      if (existing.host === host) mounts.delete(existing);
+      if (existing.host === host || !existing.host.isConnected) mounts.delete(existing);
     }
     const entry = { host, onPick, getCurrentHex };
     mounts.add(entry);
-    const project = window.atelierProject?.() || '';
-    if (project !== cachedProject || !loaded) load(project);
-    else renderMount(entry);
+    const project = activeProject();
+    renderMount(entry);
+    load(project);
   }
 
   window.addEventListener('atelier:project-assets', event => {
     const project = event.detail?.project || '';
-    if (project !== cachedProject) {
-      loaded = false;
-      load(project);
-    }
+    if (project === visibleProject) return;
+    if (!projects.get(visibleProject)?.saving) projects.delete(visibleProject);
+    visibleProject = project;
+    renderAll();
+    if (mounts.size) load(project);
   });
 
-  window.AtelierProjectPalette = Object.freeze({ load, add, remove, mount, colours: () => [...colours] });
+  window.AtelierProjectPalette = Object.freeze({ load, add, remove, mount, colours: () => [...(projects.get(activeProject())?.colours || [])] });
 })();

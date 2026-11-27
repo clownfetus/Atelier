@@ -10,7 +10,7 @@
     if (sizes.has(saved?.size)) prefs.size = saved.size;
     if (sorts.has(saved?.sort)) prefs.sort = saved.sort;
   } catch (_) {}
-  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewTimer, previewReveal;
+  let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewReveal;
   const items = new WeakMap();
   const normalize = value => String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\\/g, '/');
   const words = query => normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -153,107 +153,159 @@
   }
   function closePreview() { if (previewDialog?.open) previewDialog.close(); }
   let previewState = null;
+  const previewElement = id => document.getElementById('library-preview-' + id);
 
-  function renderPreviewCanvas() {
-    if (!previewDialog || !previewState) return;
-    const img = previewDialog.querySelector('.library-preview-stage img');
-    const canvas = previewDialog.querySelector('#library-preview-canvas');
-    const stage = previewDialog.querySelector('.library-preview-stage');
-    const wipeWrap = previewDialog.querySelector('#library-preview-wipe-wrap');
-    const wipeLine = previewDialog.querySelector('#library-preview-wipe-line');
-    const { channel, compare, zoom, wipe, origImg, loaded } = previewState;
-    const useCanvas = loaded && (channel !== 'rgb' || compare !== 'edited');
-    if (stage) {
-      stage.dataset.zoom = zoom;
-      stage.classList.toggle('is-checker', !!previewState.checker);
-    }
-    if (wipeWrap) wipeWrap.hidden = !(loaded && compare === 'wipe' && origImg && origImg.complete && origImg.naturalWidth > 0);
-    if (wipeLine) wipeLine.style.left = `${wipe}%`;
-    if (!loaded) {
-      if (canvas) canvas.hidden = true;
-      return;
-    }
-    const w = img.naturalWidth || 0, h = img.naturalHeight || 0;
-    if (!useCanvas || !w || !h || !canvas) {
-      if (canvas) canvas.hidden = true;
-      img.hidden = false;
-      img.style.width = zoom === 'fit' ? '' : `${Math.round(w * (zoom === '200' ? 2 : 1))}px`;
-      img.style.height = zoom === 'fit' ? '' : `${Math.round(h * (zoom === '200' ? 2 : 1))}px`;
-      return;
-    }
-    img.hidden = true;
-    canvas.hidden = false;
-    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-    canvas.style.width = zoom === 'fit' ? '' : `${Math.round(w * (zoom === '200' ? 2 : 1))}px`;
-    canvas.style.height = zoom === 'fit' ? '' : `${Math.round(h * (zoom === '200' ? 2 : 1))}px`;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-    ctx.clearRect(0, 0, w, h);
-    const hasOrig = !!(origImg && origImg.complete && origImg.naturalWidth > 0);
-    if (compare === 'original' && hasOrig) {
-      ctx.drawImage(origImg, 0, 0, w, h);
-    } else if (compare === 'wipe' && hasOrig) {
-      const splitX = Math.round(w * (wipe / 100));
-      ctx.drawImage(img, 0, 0, w, h);
-      if (splitX > 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, splitX, h);
-        ctx.clip();
-        ctx.clearRect(0, 0, splitX, h);
-        ctx.drawImage(origImg, 0, 0, w, h);
-        ctx.restore();
-      }
-    } else {
-      ctx.drawImage(img, 0, 0, w, h);
-    }
-    if (channel !== 'rgb') {
-      try {
-        const frame = ctx.getImageData(0, 0, w, h);
-        const data = frame.data;
-        const offset = channel === 'r' ? 0 : channel === 'g' ? 1 : channel === 'b' ? 2 : 3;
-        for (let i = 0; i < data.length; i += 4) {
-          const v = data[i + offset];
-          data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
-        }
-        ctx.putImageData(frame, 0, 0);
-      } catch (_) {}
-    }
+  function previewLayers(state) {
+    if (state.compare === 'original') return [state.original];
+    return state.compare === 'wipe' ? [state.edited, state.original] : [state.edited];
   }
 
-  function updatePixelReadout(event) {
-    if (!previewDialog || !previewState?.loaded || !previewState.isTexture) return;
-    const readout = previewDialog.querySelector('#library-preview-pixel');
-    if (!readout) return;
-    const img = previewDialog.querySelector('.library-preview-stage img');
-    const canvas = previewDialog.querySelector('#library-preview-canvas');
-    const target = canvas && !canvas.hidden ? canvas : img;
-    if (!target || target.hidden) return;
-    const rect = target.getBoundingClientRect();
-    const w = img.naturalWidth, h = img.naturalHeight;
-    if (!rect.width || !rect.height || !w || !h) return;
-    const px = Math.floor(((event.clientX - rect.left) / rect.width) * w);
-    const py = Math.floor(((event.clientY - rect.top) / rect.height) * h);
-    if (px < 0 || py < 0 || px >= w || py >= h) { readout.textContent = `${w} × ${h} px`; return; }
-    try {
-      if (!previewState.sampleCanvas) {
-        const sc = document.createElement('canvas');
-        sc.width = w; sc.height = h;
-        const sctx = sc.getContext('2d', { willReadFrequently: true });
-        if (sctx) sctx.drawImage(img, 0, 0, w, h);
-        previewState.sampleCanvas = sc;
+  function resizePreviewFrame() {
+    const frame = previewElement('frame');
+    if (!previewState || frame.hidden) return;
+    const { naturalWidth: width, naturalHeight: height } = previewLayers(previewState)[0].image;
+    const stage = previewElement('stage'), style = getComputedStyle(stage);
+    const scale = previewState.zoom === '200' ? 2 : previewState.zoom === '100' ? 1 : Math.min(1,
+      (stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / width,
+      (stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) / height);
+    frame.style.width = `${width * scale}px`;
+    frame.style.height = `${height * scale}px`;
+  }
+
+  function previewUrl(src, query) { return src + (src.includes('?') ? '&' : '?') + query; }
+
+  function requestPreviewPixels(state, layer) {
+    if (layer.pixels || layer.reading || layer.pixelError) return;
+    layer.reading = true;
+    const signal = AbortSignal.any([state.abort.signal, AbortSignal.timeout(20000)]);
+    fetch(previewUrl(layer.src, 'rgba=1'), { signal }).then(response => {
+      if (!response.ok || response.headers.get('Content-Type')?.split(';')[0] !== 'application/octet-stream') throw Error();
+      return response.arrayBuffer();
+    }).then(buffer => {
+      if (buffer.byteLength !== layer.image.naturalWidth * layer.image.naturalHeight * 4) throw Error();
+      layer.pixels = new Uint8Array(buffer);
+    }).catch(() => { layer.pixelError = true; }).finally(() => {
+      layer.reading = false;
+      if (state === previewState) renderPreview();
+    });
+  }
+
+  function drawPreviewLayer(layer, channel) {
+    if (layer.channel === channel) return;
+    const { naturalWidth: width, naturalHeight: height } = layer.image;
+    const canvas = layer.canvas;
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (channel === 'rgb') ctx.drawImage(layer.image, 0, 0);
+    else {
+      const frame = ctx.createImageData(width, height), pixels = frame.data;
+      const offset = 'rgba'.indexOf(channel);
+      for (let i = 0; i < pixels.length; i += 4) {
+        pixels[i] = pixels[i + 1] = pixels[i + 2] = layer.pixels[i + offset];
+        pixels[i + 3] = 255;
       }
-      const p = previewState.sampleCanvas.getContext('2d', { willReadFrequently: true }).getImageData(px, py, 1, 1).data;
-      const hex = '#' + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
-      readout.textContent = `${w} × ${h} px · (${px}, ${py}) ${hex} · A ${p[3]}`;
-    } catch (_) {
-      readout.textContent = `${w} × ${h} px`;
+      ctx.putImageData(frame, 0, 0);
     }
+    layer.channel = channel;
+  }
+
+  function updatePixelReadout() {
+    const state = previewState, frame = previewElement('frame'), readout = previewElement('pixel');
+    if (!state?.isTexture || frame.hidden) { readout.textContent = ''; return; }
+    const rect = frame.getBoundingClientRect();
+    const x = (state.pointer?.clientX - rect.left) / rect.width;
+    const y = (state.pointer?.clientY - rect.top) / rect.height;
+    const inside = x >= 0 && x < 1 && y >= 0 && y < 1;
+    const layer = state.compare === 'wipe' && inside && x < state.wipe / 100 ? state.original : previewLayers(state)[0];
+    const { naturalWidth: w, naturalHeight: h } = layer.image;
+    const size = `${w} × ${h} px`;
+    if (!inside || !layer.pixels) {
+      readout.textContent = size;
+      if (inside) requestPreviewPixels(state, layer);
+      return;
+    }
+    const px = Math.floor(x * w), py = Math.floor(y * h), i = (py * w + px) * 4;
+    const [r, g, b, a] = layer.pixels.subarray(i, i + 4);
+    const hex = '#' + [r, g, b].map(value => value.toString(16).padStart(2, '0')).join('').toUpperCase();
+    readout.textContent = `${size} · (${px}, ${py}) ${hex} · A ${a}`;
+  }
+
+  function renderPreview() {
+    const state = previewState;
+    if (!state) return;
+    const frame = previewElement('frame'), message = previewElement('message'), retry = previewElement('retry');
+    const layers = previewLayers(state);
+    const imageMissing = layers.find(layer => layer.status !== 'loaded');
+    if (!imageMissing && state.channel !== 'rgb') layers.forEach(layer => requestPreviewPixels(state, layer));
+    const pixelsMissing = !imageMissing && state.channel !== 'rgb' && layers.find(layer => !layer.pixels);
+    const blocked = imageMissing || pixelsMissing;
+    frame.hidden = !!blocked;
+    retry.hidden = !(imageMissing?.status === 'error' || imageMissing?.status === 'timeout' || pixelsMissing?.pixelError);
+    if (imageMissing) {
+      const name = imageMissing === state.original ? 'Original preview' : 'Preview';
+      message.textContent = imageMissing.status === 'error' ? `${name} unavailable.`
+        : imageMissing.status === 'timeout' ? `${name} is taking too long. You can retry or close it.`
+        : `Loading ${name.toLowerCase()}…`;
+    } else if (pixelsMissing) message.textContent = pixelsMissing.pixelError ? 'Texture channels unavailable.' : 'Loading texture channels…';
+    else {
+      message.textContent = '';
+      const showEditedImage = layers.includes(state.edited) && state.channel === 'rgb';
+      state.edited.image.hidden = !showEditedImage;
+      for (const layer of [state.edited, state.original].filter(Boolean)) {
+        layer.root.hidden = !layers.includes(layer);
+        layer.canvas.hidden = layer === state.edited && showEditedImage;
+        if (!layer.root.hidden && !layer.canvas.hidden) drawPreviewLayer(layer, state.channel);
+      }
+      previewElement('wipe-wrap').hidden = state.compare !== 'wipe';
+      frame.classList.toggle('is-wipe', state.compare === 'wipe');
+      resizePreviewFrame();
+    }
+    updatePixelReadout();
+  }
+
+  function loadPreviewLayer(state, layer, bust = false) {
+    const image = layer.image;
+    clearTimeout(layer.timer);
+    layer.status = 'loading';
+    image.onload = () => {
+      if (state !== previewState) return;
+      clearTimeout(layer.timer);
+      layer.status = 'loaded';
+      renderPreview();
+      if (layer === state.edited && !image.hidden) {
+        previewReveal?.destroy();
+        previewReveal = window.AtelierPolish?.play(image, [{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0)'}],
+          window.AtelierMotion.unfoldMs, window.AtelierMotion.ease.unfold);
+      }
+    };
+    image.onerror = () => {
+      if (state !== previewState) return;
+      clearTimeout(layer.timer);
+      layer.status = 'error';
+      renderPreview();
+    };
+    layer.timer = setTimeout(() => { layer.status = 'timeout'; renderPreview(); }, 20000);
+    image.src = bust ? previewUrl(layer.src, `_t=${Date.now()}`) : layer.src;
+    renderPreview();
+  }
+
+  function clearPreview() {
+    previewState?.abort.abort();
+    for (const layer of [previewState?.edited, previewState?.original].filter(Boolean)) {
+      clearTimeout(layer.timer);
+      layer.image.onload = layer.image.onerror = null;
+      layer.image.removeAttribute('src');
+      layer.image.hidden = true;
+      layer.root.hidden = true;
+      layer.canvas.width = layer.canvas.height = 0;
+    }
+    previewState = null;
+    previewReveal?.destroy(); previewReveal = null;
   }
 
   function syncPreviewToolbar() {
     if (!previewDialog || !previewState) return;
-    const toolbar = previewDialog.querySelector('#library-preview-toolbar');
+    const toolbar = previewElement('toolbar');
     if (toolbar) toolbar.hidden = !previewState.isTexture;
     toolbar?.querySelectorAll('[data-channel]').forEach(btn => {
       btn.setAttribute('aria-pressed', String(btn.dataset.channel === previewState.channel));
@@ -264,11 +316,12 @@
     toolbar?.querySelectorAll('[data-compare]').forEach(btn => {
       btn.setAttribute('aria-pressed', String(btn.dataset.compare === previewState.compare));
     });
-    const compareGroup = previewDialog.querySelector('#library-preview-compare-group');
-    if (compareGroup) compareGroup.hidden = !previewState.originalSrc;
-    const checkerBtn = previewDialog.querySelector('#library-preview-checker');
+    const compareGroup = previewElement('compare-group');
+    if (compareGroup) compareGroup.hidden = !previewState.original;
+    const checkerBtn = previewElement('checker');
     if (checkerBtn) checkerBtn.setAttribute('aria-pressed', String(!!previewState.checker));
-    renderPreviewCanvas();
+    previewElement('stage').classList.toggle('is-checker', previewState.checker);
+    renderPreview();
   }
 
   function previewImage({label, path, src, caption, isTexture = false, originalSrc = '', actions = []}, opener) {
@@ -298,128 +351,111 @@
           '<button type="button" class="lp-btn" id="library-preview-checker" aria-pressed="false" title="Toggle transparency checkerboard">Checker</button>' +
           '<span class="lp-pixel" id="library-preview-pixel"></span>' +
         '</div>' +
-        '<div class="library-preview-stage">' +
-          '<img alt="">' +
-          '<canvas id="library-preview-canvas" hidden></canvas>' +
-          '<div class="lp-wipe-wrap" id="library-preview-wipe-wrap" hidden>' +
-            '<span class="lp-wipe-label lp-wipe-left">Original</span>' +
-            '<span class="lp-wipe-label lp-wipe-right">Edited</span>' +
-            '<div class="lp-wipe-line" id="library-preview-wipe-line"></div>' +
-            '<input type="range" id="library-preview-wipe" min="0" max="100" value="50" aria-label="Original and edited split">' +
+        '<div class="library-preview-stage" id="library-preview-stage">' +
+          '<div class="lp-frame" id="library-preview-frame" hidden>' +
+            '<div class="lp-layer" id="library-preview-edited"><img alt="" hidden><canvas id="library-preview-canvas" hidden></canvas></div>' +
+            '<div class="lp-layer" id="library-preview-original" hidden><canvas id="library-preview-original-canvas"></canvas></div>' +
+            '<div class="lp-wipe-wrap" id="library-preview-wipe-wrap" hidden>' +
+              '<span class="lp-wipe-label lp-wipe-left">Original</span>' +
+              '<span class="lp-wipe-label lp-wipe-right">Edited</span>' +
+              '<div class="lp-wipe-line"></div>' +
+              '<input type="range" id="library-preview-wipe" min="0" max="100" value="50" aria-label="Original and edited split">' +
+            '</div>' +
           '</div>' +
-          '<p class="library-preview-message" role="status"></p>' +
+          '<p class="library-preview-message" id="library-preview-message" role="status"></p>' +
         '</div>' +
         '<div class="library-preview-footer"><span></span><div class="lp-footer-actions"><div id="library-preview-actions"></div><button type="button" class="btn" id="library-preview-retry">Retry preview</button></div></div>';
       document.body.append(previewDialog);
-      document.getElementById('library-preview-close').addEventListener('click', closePreview);
+      previewElement('close').addEventListener('click', closePreview);
       previewDialog.addEventListener('click', e => { if (e.target === previewDialog) closePreview(); });
-      previewDialog.querySelector('#library-preview-toolbar').addEventListener('click', event => {
+      previewElement('toolbar').addEventListener('click', event => {
         const btn = event.target.closest('button');
-        if (!btn || !previewState) return;
-        if (btn.dataset.channel) { previewState.channel = btn.dataset.channel; syncPreviewToolbar(); }
-        else if (btn.dataset.zoom) { previewState.zoom = btn.dataset.zoom; syncPreviewToolbar(); }
+        const state = previewState;
+        if (!btn || !state) return;
+        if (btn.dataset.channel) state.channel = btn.dataset.channel;
+        else if (btn.dataset.zoom) state.zoom = btn.dataset.zoom;
         else if (btn.dataset.compare) {
-          previewState.compare = btn.dataset.compare;
-          if (previewState.compare !== 'edited' && previewState.originalSrc && !previewState.origImg) {
-            const orig = new Image();
-            orig.onload = () => renderPreviewCanvas();
-            orig.src = previewState.originalSrc;
-            previewState.origImg = orig;
-          }
-          syncPreviewToolbar();
-        } else if (btn.id === 'library-preview-checker') {
-          previewState.checker = !previewState.checker;
-          syncPreviewToolbar();
-        }
+          if (!state.original) return;
+          state.compare = btn.dataset.compare;
+          if (state.compare !== 'edited' && !state.original.status) loadPreviewLayer(state, state.original);
+        } else if (btn.id === 'library-preview-checker') state.checker = !state.checker;
+        syncPreviewToolbar();
       });
-      previewDialog.querySelector('#library-preview-wipe').addEventListener('input', event => {
+      previewElement('wipe').addEventListener('input', event => {
         if (!previewState) return;
-        previewState.wipe = Number(event.target.value) || 0;
-        renderPreviewCanvas();
+        previewState.wipe = Number(event.target.value);
+        previewElement('frame').style.setProperty('--preview-split', `${previewState.wipe}%`);
+        updatePixelReadout();
       });
-      const stage = previewDialog.querySelector('.library-preview-stage');
-      stage.addEventListener('mousemove', updatePixelReadout);
-      stage.addEventListener('mouseleave', () => {
-        const img = previewDialog.querySelector('.library-preview-stage img');
-        const readout = previewDialog.querySelector('#library-preview-pixel');
-        if (readout && previewState?.loaded && img?.naturalWidth) readout.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+      const stage = previewElement('stage');
+      stage.addEventListener('pointermove', event => {
+        if (!previewState) return;
+        previewState.pointer = { clientX: event.clientX, clientY: event.clientY };
+        updatePixelReadout();
+      });
+      stage.addEventListener('pointerleave', () => {
+        if (previewState) previewState.pointer = null;
+        updatePixelReadout();
+      });
+      stage.addEventListener('scroll', updatePixelReadout, { passive: true });
+      new ResizeObserver(resizePreviewFrame).observe(stage);
+      previewElement('retry').addEventListener('click', () => {
+        const state = previewState;
+        if (!state) return;
+        const layers = previewLayers(state);
+        const imageMissing = layers.find(layer => layer.status !== 'loaded');
+        if (imageMissing) loadPreviewLayer(state, imageMissing, true);
+        else {
+          for (const layer of layers) layer.pixelError = false;
+          renderPreview();
+        }
       });
       previewDialog.addEventListener('close', () => {
         if (previewDialog.open) return; // A previous close can arrive after a new preview opens.
-        clearTimeout(previewTimer);
-        const img = previewDialog.querySelector('.library-preview-stage img');
-        img.onload = img.onerror = null; img.removeAttribute('src');
-        img.style.width = ''; img.style.height = '';
-        const canvas = previewDialog.querySelector('#library-preview-canvas');
-        if (canvas) { canvas.hidden = true; canvas.width = 0; canvas.height = 0; }
-        previewState = null;
-        previewReveal?.destroy(); previewReveal = null;
+        clearPreview();
         if (previewOpener?.isConnected) previewOpener.focus();
       });
       previewDialog.addEventListener('keydown', e => { if (e.key === 'Escape') e.stopPropagation(); });
     }
+    clearPreview();
     previewOpener = opener;
+    const img = previewElement('edited').querySelector('img');
+    img.alt = label;
     previewState = {
-      isTexture: !!isTexture,
-      originalSrc: originalSrc || '',
-      origImg: null,
+      isTexture,
+      edited: { src, image: img, root: previewElement('edited'), canvas: previewElement('canvas') },
+      original: originalSrc ? { src: originalSrc, image: new Image(), root: previewElement('original'),
+        canvas: previewElement('original-canvas') } : null,
       channel: 'rgb',
       compare: 'edited',
       zoom: 'fit',
       wipe: 50,
       checker: false,
-      loaded: false,
-      sampleCanvas: null,
+      abort: new AbortController(),
     };
-    const wipeInput = previewDialog.querySelector('#library-preview-wipe');
-    if (wipeInput) wipeInput.value = '50';
-    const readout = previewDialog.querySelector('#library-preview-pixel');
-    if (readout) readout.textContent = '';
-    const actionHost = previewDialog.querySelector('#library-preview-actions');
-    if (actionHost) {
-      actionHost.replaceChildren();
-      for (const act of actions || []) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn';
-        btn.textContent = act.label;
-        btn.addEventListener('click', () => {
-          closePreview();
-          act.action?.();
-        });
-        actionHost.append(btn);
-      }
+    previewElement('wipe').value = '50';
+    previewElement('frame').style.setProperty('--preview-split', '50%');
+    const actionHost = previewElement('actions');
+    actionHost.replaceChildren();
+    for (const act of actions) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.textContent = act.label;
+      btn.addEventListener('click', () => {
+        closePreview();
+        act.action?.();
+      });
+      actionHost.append(btn);
     }
-    syncPreviewToolbar();
-    const img = previewDialog.querySelector('.library-preview-stage img'), message = previewDialog.querySelector('.library-preview-message');
-    const retry = document.getElementById('library-preview-retry');
-    document.getElementById('library-preview-title').textContent = label;
-    document.getElementById('library-preview-path').textContent = path;
+    previewElement('title').textContent = label;
+    previewElement('path').textContent = path;
     previewDialog.querySelector('.library-preview-footer span').textContent = caption;
-    const load = bust => {
-      clearTimeout(previewTimer);
-      previewReveal?.destroy(); previewReveal = null;
-      if (previewState) { previewState.loaded = false; previewState.sampleCanvas = null; }
-      message.textContent = 'Loading preview…'; img.hidden = true; retry.hidden = true;
-      const canvas = previewDialog.querySelector('#library-preview-canvas');
-      if (canvas) canvas.hidden = true;
-      img.onload = () => {
-        clearTimeout(previewTimer);
-        if (previewState) previewState.loaded = true;
-        img.hidden = false; message.textContent = ''; retry.hidden = true;
-        if (readout && isTexture && img.naturalWidth) readout.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
-        renderPreviewCanvas();
-        previewReveal = window.AtelierPolish?.play(img, [{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0)'}],
-          window.AtelierMotion.unfoldMs, window.AtelierMotion.ease.unfold);
-      };
-      img.onerror = () => { clearTimeout(previewTimer); message.textContent = 'Preview unavailable. Try again after the thumbnail has loaded.'; retry.hidden = false; };
-      previewTimer = setTimeout(() => { message.textContent = 'Preview is taking too long. You can retry or close it.'; retry.hidden = false; }, 20000);
-      img.alt = label; img.src = src + (bust ? `${src.includes('?') ? '&' : '?'}_t=${Date.now()}` : '');
-    };
-    retry.onclick = () => load(true);
-    load(false);
+    syncPreviewToolbar();
     if (!previewDialog.open) previewDialog.showModal();
-    document.getElementById('library-preview-close').focus();
+    previewElement('stage').scrollTo(0, 0);
+    loadPreviewLayer(previewState, previewState.edited);
+    previewElement('close').focus();
   }
   window.AtelierLibraryTools = Object.freeze({init, matches, filter, sort, resetFilters, hasFilters,
     decorate, ready, supportsPreview, previewImage, closePreview});

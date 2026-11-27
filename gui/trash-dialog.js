@@ -4,8 +4,11 @@
 
   let overlay = null;
   let opener = null;
-  let busy = false;
-  let currentProject = '';
+  let trashSession = null;
+
+  function isCurrent(session) {
+    return session && session === trashSession && session.project === (window.atelierProject?.() || '');
+  }
 
   function formatWhen(seconds) {
     if (!Number.isFinite(seconds)) return '';
@@ -50,12 +53,12 @@
     document.body.appendChild(overlay);
     overlay.querySelector('#trash-close').addEventListener('click', close);
     overlay.querySelector('#trash-done').addEventListener('click', close);
-    overlay.querySelector('#trash-empty-btn').addEventListener('click', emptyTrash);
+    overlay.querySelector('#trash-empty-btn').addEventListener('click', () => discardEntries(trashSession));
     overlay.addEventListener('click', event => {
-      if (event.target === overlay && !busy) close();
+      if (event.target === overlay && !trashSession?.busy) close();
     });
     overlay.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && !busy) {
+      if (event.key === 'Escape' && !trashSession?.busy) {
         event.preventDefault();
         event.stopPropagation();
         close();
@@ -70,13 +73,19 @@
     if (el) el.textContent = text || '';
   }
 
-  async function refresh() {
-    const root = ensureOverlay();
-    const body = root.querySelector('#trash-body');
-    const emptyBtn = root.querySelector('#trash-empty-btn');
-    const project = window.atelierProject?.() || '';
-    currentProject = project;
-    if (!project) {
+  function setBusy(session, busy) {
+    session.busy = busy;
+    const controls = overlay.querySelectorAll('#trash-empty-btn, .trash-card-actions button');
+    for (const button of controls) button.disabled = busy;
+  }
+
+  async function refresh(session = trashSession) {
+    if (!isCurrent(session)) return;
+    const body = overlay.querySelector('#trash-body');
+    const emptyBtn = overlay.querySelector('#trash-empty-btn');
+    const refreshId = ++session.refreshId;
+    const current = () => isCurrent(session) && refreshId === session.refreshId;
+    if (!session.project) {
       body.innerHTML = '<div class="trash-empty"><strong>No active project</strong><span>Open a project to inspect its recently deleted edits.</span></div>';
       emptyBtn.hidden = true;
       setStatus('');
@@ -85,13 +94,13 @@
     body.innerHTML = '<div class="trash-empty"><span>Loading recently deleted edits…</span></div>';
     emptyBtn.hidden = true;
     try {
-      const response = await window.atelierFetch('/api/trash', {}, project);
+      const response = await window.atelierFetch('/api/trash', {}, session.project);
       const data = await response.json();
-      if (project !== currentProject) return;
+      if (!current()) return;
       if (!data.ok) throw new Error(data.error || 'Could not load project trash.');
-      renderEntries(data.entries || [], project);
+      renderEntries(data.entries || [], session);
     } catch (error) {
-      if (project !== currentProject) return;
+      if (!current()) return;
       body.innerHTML = '';
       const box = document.createElement('div');
       box.className = 'trash-empty';
@@ -105,13 +114,13 @@
     }
   }
 
-  function renderEntries(entries, project) {
+  function renderEntries(entries, session) {
     const body = overlay.querySelector('#trash-body');
     const emptyBtn = overlay.querySelector('#trash-empty-btn');
     body.replaceChildren();
     const readyCount = entries.filter(e => e.state === 'ready').length;
     emptyBtn.hidden = readyCount === 0;
-    emptyBtn.disabled = busy;
+    emptyBtn.disabled = session.busy;
     if (!entries.length) {
       const empty = document.createElement('div');
       empty.className = 'trash-empty';
@@ -137,7 +146,10 @@
       meta.className = 'trash-card-meta';
       const title = document.createElement('div');
       title.className = 'trash-card-title';
-      title.textContent = `${item.count} edited asset${item.count === 1 ? '' : 's'}`;
+      const plural = item.count === 1 ? '' : 's';
+      title.textContent = item.state === 'kept'
+        ? `Saved files from ${item.count} interrupted edit deletion${plural}`
+        : `${item.count} edited asset${plural}`;
       const sub = document.createElement('div');
       sub.className = 'trash-card-sub';
       sub.textContent = `${formatWhen(item.deleted_at)} · ${formatRemaining(item.expires_at)}`;
@@ -149,15 +161,15 @@
       restoreBtn.type = 'button';
       restoreBtn.className = 'btn primary';
       restoreBtn.textContent = 'Restore';
-      restoreBtn.disabled = busy;
-      restoreBtn.addEventListener('click', () => restoreEntry(item, project));
+      restoreBtn.disabled = session.busy;
+      restoreBtn.addEventListener('click', () => restoreEntry(session, item));
 
       const discardBtn = document.createElement('button');
       discardBtn.type = 'button';
       discardBtn.className = 'btn danger';
       discardBtn.textContent = 'Remove';
-      discardBtn.disabled = busy;
-      discardBtn.addEventListener('click', () => discardEntry(item, project));
+      discardBtn.disabled = session.busy;
+      discardBtn.addEventListener('click', () => discardEntries(session, item));
 
       actions.append(restoreBtn, discardBtn);
       head.append(meta, actions);
@@ -191,9 +203,10 @@
     }
   }
 
-  async function restoreEntry(item, project) {
-    if (busy) return;
-    busy = true;
+  async function restoreEntry(session, item) {
+    if (!isCurrent(session) || session.busy) return;
+    const {project} = session;
+    setBusy(session, true);
     setStatus('Restoring edits…');
     try {
       const response = await window.atelierFetch('/api/restore_imported', {
@@ -204,8 +217,9 @@
       const data = await response.json();
       if (data.game_rels?.length && project === window.atelierProject?.()) {
         if (typeof window.loadSidebar === 'function') await window.loadSidebar();
-        if (typeof window.renderGrid === 'function') window.renderGrid().catch(() => {});
+        if (project === window.atelierProject?.()) window.renderGrid?.().catch(() => {});
       }
+      if (!isCurrent(session)) return;
       if (data.ok) {
         const n = data.game_rels?.length || item.count;
         if (typeof window.toast === 'function') window.toast(`Restored ${n} edited asset${n === 1 ? '' : 's'}`, 'success');
@@ -213,74 +227,55 @@
         if (typeof window.toast === 'function') window.toast(data.error || 'Some assets could not be restored.', 'warning', 7000);
       }
     } catch (error) {
-      if (typeof window.toast === 'function') window.toast(error.message || 'Could not restore edits.', 'warning');
+      if (isCurrent(session)) window.toast?.(error.message || 'Could not restore edits.', 'warning');
     } finally {
-      busy = false;
-      await refresh();
+      if (isCurrent(session)) {
+        setBusy(session, false);
+        await refresh(session);
+      }
     }
   }
 
-  async function discardEntry(item, project) {
-    if (busy) return;
-    const confirmed = await window.AtelierDialog.confirm({
+  async function discardEntries(session, item) {
+    if (!isCurrent(session) || !session.project || session.busy) return;
+    const confirmed = await window.AtelierDialog.confirm(item ? {
       title: 'Permanently delete batch?',
       body: `Remove ${item.count} deleted asset${item.count === 1 ? '' : 's'} from the project trash? This cannot be undone.`,
       confirmLabel: 'Remove permanently',
       tone: 'danger',
-    });
-    if (!confirmed) return;
-    busy = true;
-    setStatus('Removing from trash…');
-    try {
-      const response = await window.atelierFetch('/api/trash/discard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry: item.entry }),
-      }, project);
-      const data = await response.json();
-      if (!data.ok) throw new Error(data.error || 'Could not remove trash entry.');
-      if (typeof window.toast === 'function') window.toast('Removed from project trash', 'info');
-    } catch (error) {
-      if (typeof window.toast === 'function') window.toast(error.message, 'warning');
-    } finally {
-      busy = false;
-      await refresh();
-    }
-  }
-
-  async function emptyTrash() {
-    if (busy) return;
-    const project = window.atelierProject?.() || '';
-    if (!project) return;
-    const confirmed = await window.AtelierDialog.confirm({
+    } : {
       title: 'Empty project trash?',
       body: 'All ready batches in this project’s trash will be permanently deleted. This cannot be undone.',
       confirmLabel: 'Empty trash',
       tone: 'danger',
     });
-    if (!confirmed) return;
-    busy = true;
-    setStatus('Emptying trash…');
+    if (!confirmed || !isCurrent(session) || session.busy) return;
+    setBusy(session, true);
+    setStatus(item ? 'Removing from trash…' : 'Emptying trash…');
     try {
       const response = await window.atelierFetch('/api/trash/discard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }, project);
+        body: JSON.stringify(item ? { entry: item.entry } : { all: true }),
+      }, session.project);
       const data = await response.json();
-      if (!data.ok) throw new Error(data.error || 'Could not empty project trash.');
-      if (typeof window.toast === 'function') window.toast('Project trash emptied', 'info');
+      if (!isCurrent(session)) return;
+      if (!data.ok) throw new Error(data.error || 'Could not remove files from the project trash.');
+      window.toast?.(item ? 'Removed from project trash' : 'Project trash emptied', 'info');
     } catch (error) {
-      if (typeof window.toast === 'function') window.toast(error.message, 'warning');
+      if (isCurrent(session)) window.toast?.(error.message, 'warning');
     } finally {
-      busy = false;
-      await refresh();
+      if (isCurrent(session)) {
+        setBusy(session, false);
+        await refresh(session);
+      }
     }
   }
 
   function open() {
-    opener = document.activeElement;
     const root = ensureOverlay();
+    if (!root.classList.contains('active')) opener = document.activeElement;
+    trashSession = {project: window.atelierProject?.() || '', busy: false, refreshId: 0};
     root.classList.add('active');
     root.querySelector('.trash-modal')?.focus();
     refresh();
@@ -288,10 +283,15 @@
 
   function close() {
     if (!overlay) return;
+    trashSession = null;
     overlay.classList.remove('active');
     if (opener?.isConnected) opener.focus();
     opener = null;
   }
+
+  window.addEventListener('atelier:project-assets', event => {
+    if (trashSession && trashSession.project !== (event.detail?.project || '')) close();
+  });
 
   window.AtelierTrash = Object.freeze({ open, close, refresh });
 })();

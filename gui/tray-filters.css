@@ -84,7 +84,11 @@
 }
 
 button.tray-hero-chip {
-  font: inherit;
+  appearance: none;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--studio-shape-xs);
+  background: transparent;
   cursor: pointer;
   transition: border-color var(--studio-motion-fast) var(--studio-easing),
               background-color var(--studio-motion-fast) var(--studio-easing);

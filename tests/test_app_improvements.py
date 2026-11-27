@@ -100,5 +100,95 @@ class AppImprovementsTest(unittest.TestCase):
             self.assertEqual(len(bundle_frontend.JS_RE.findall(bundled_html)), 2)
 
 
+class ProjectWorkflowsBrowserTest(unittest.TestCase):
+    def setUp(self):
+        from playwright.sync_api import sync_playwright
+        playwright = sync_playwright().start()
+        self.addCleanup(playwright.stop)
+        browser = playwright.chromium.launch()
+        self.addCleanup(browser.close)
+        self.page = browser.new_page()
+        self.page.set_content('''
+            <style>.overlay { display: none; } .overlay.active { display: block; }</style>
+            <input id="mod-name-input">
+            <div id="tray-filter-bar" hidden>
+              <input id="tray-search">
+              <div class="tray-type-pills"></div>
+              <div class="tray-filter-summary"></div>
+            </div>
+        ''')
+        self.page.evaluate('''() => {
+            window.requests = [];
+            window.atelierFetch = (path, options, project) => new Promise(resolve => {
+                requests.push({path, options, project, reply: data => resolve({json: async () => data})});
+            });
+            window.atelierProject = () => window.testProject;
+            window.AtelierAssetEditors = {projectAssets: () => []};
+            window.switchProject = project => {
+                window.testProject = project;
+                window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail: {project}}));
+            };
+        }''')
+
+    def load_script(self, name):
+        self.page.add_script_tag(path=str(ROOT / 'gui' / name))
+
+    def test_selection_profiles_ignore_previous_project_rows_and_responses(self):
+        from playwright.sync_api import expect
+        self.load_script('tray-filters.js')
+        page = self.page
+        page.evaluate("() => { switchProject('One'); AtelierTrayFilters.openProfiles(); }")
+        page.evaluate("requests[0].reply({ok: true, profiles: {'First profile': {deselected: []}}})")
+        expect(page.get_by_text('First profile')).to_be_visible()
+        page.evaluate('''() => {
+            AtelierTrayFilters.closeProfiles();
+            switchProject('Two');
+            AtelierTrayFilters.openProfiles();
+        }''')
+        self.assertEqual(page.get_by_role('button', name='Apply').count(), 0)
+        page.evaluate("() => { switchProject('Three'); AtelierTrayFilters.openProfiles(); }")
+        page.evaluate("requests[2].reply({ok: true, profiles: {'Current profile': {deselected: []}}})")
+        expect(page.get_by_text('Current profile')).to_be_visible()
+        page.evaluate("requests[1].reply({ok: true, profiles: {'Late profile': {deselected: []}}})")
+        self.assertEqual(page.get_by_text('Late profile').count(), 0)
+        expect(page.get_by_text('Current profile')).to_be_visible()
+
+    def test_trash_empty_confirmation_cannot_outlive_its_project(self):
+        from playwright.sync_api import expect
+        self.load_script('dialog.js')
+        self.load_script('trash-dialog.js')
+        page = self.page
+        page.evaluate("() => { switchProject('One'); AtelierTrash.open(); }")
+        page.evaluate('''requests[0].reply({ok: true, entries: [{
+            entry: 'fixture', state: 'ready', count: 1, assets: [{name: 'T_Test', game_rel: 'A/T_Test'}]
+        }]})''')
+        page.locator('#trash-empty-btn').click()
+        expect(page.locator('#atelier-confirm-ok')).to_be_visible()
+        page.evaluate("switchProject('Two')")
+        page.locator('#atelier-confirm-ok').click()
+        self.assertEqual(page.evaluate("requests.filter(r => r.path === '/api/trash/discard').length"), 0)
+
+    def test_tray_recovers_when_the_filtered_type_disappears(self):
+        from playwright.sync_api import expect
+        self.load_script('tray-filters.js')
+        page = self.page
+        page.evaluate('''() => {
+            window.texture = {name: 'Texture', file_type: 'texture'};
+            window.material = {name: 'Material', file_type: 'material'};
+            window.items = [texture, material];
+            window.renderSidebar = () => {
+                window.shown = AtelierTrayFilters.filter(items);
+                AtelierTrayFilters.updateControls(items, shown);
+            };
+            renderSidebar();
+        }''')
+        page.get_by_role('button', name='Textures').click()
+        self.assertEqual(page.evaluate('shown.map(i => i.name)'), ['Texture'])
+        page.evaluate("() => { items = [material]; renderSidebar(); }")
+        self.assertEqual(page.evaluate('shown.map(i => i.name)'), ['Material'])
+        page.evaluate("() => { items = [texture, material]; renderSidebar(); }")
+        expect(page.get_by_role('button', name='Textures')).to_be_visible()
+
+
 if __name__ == '__main__':
     unittest.main()

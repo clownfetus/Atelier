@@ -738,6 +738,16 @@ def _decode_texture_png(game_rel, base, out_png, cb):
         os.replace(decoded, out_png)
     return out_png
 
+def _texture_rgba(png):
+    """Straight RGBA bytes for inspecting channels that are independent of alpha."""
+    from PIL import Image
+    with Image.open(png) as source:
+        pixels = source.convert('RGBA').tobytes()
+    response.content_type = 'application/octet-stream'
+    response.set_header('Cache-Control', 'no-store')
+    return pixels
+
+
 @app.get("/api/texture_png")
 def api_texture_png():
     """Decode a texture game_rel to PNG and serve it (for the viewport to apply as a mesh map)."""
@@ -752,6 +762,8 @@ def api_texture_png():
         response.content_type = "application/json"
         return json.dumps({"error": str(e)})
     if png and os.path.exists(png):
+        if request.query.get('rgba') == '1':
+            return _texture_rgba(png)
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""
@@ -1685,6 +1697,8 @@ def api_preview():
     if gr:
         png = _import_base(gr) + ".png"
         if os.path.exists(png):
+            if request.query.get('rgba') == '1':
+                return _texture_rgba(png)
             response.content_type = "image/png"
             with open(png, "rb") as f: return f.read()
     tok = request.query.get("token", "")
@@ -1693,6 +1707,8 @@ def api_preview():
         if gr:
             png = _import_base(gr) + ".png"
             if os.path.exists(png):
+                if request.query.get('rgba') == '1':
+                    return _texture_rgba(png)
                 response.content_type = "image/png"
                 with open(png, "rb") as f: return f.read()
     response.status = 404
@@ -2423,6 +2439,8 @@ def api_material_custom_texture_preview():
     if not path or not os.path.isfile(path):
         response.status = 404
         return ""
+    if request.query.get('rgba') == '1':
+        return _texture_rgba(path)
     result = static_file(os.path.basename(path), root=os.path.dirname(path), mimetype="image/png")
     result.set_header("Cache-Control", "no-store")
     return result

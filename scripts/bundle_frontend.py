@@ -13,10 +13,13 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CSS_RE = re.compile(r'<link\s+rel="stylesheet"\s+href="/static/([^"]+)">')
 JS_RE = re.compile(r'<script\s+src="/static/([^"]+)"></script>')
+BUNDLE_MARKER = ".atelier-frontend-bundle"
+BUNDLE_SIGNATURE = "Atelier frontend bundle\n"
 
 
 def _check_paths(src_dir: Path, html: str):
@@ -29,16 +32,28 @@ def _check_paths(src_dir: Path, html: str):
     return missing
 
 
+def _check_output(out_dir: Path):
+    if not out_dir.exists():
+        return
+    if out_dir.is_dir():
+        if not any(out_dir.iterdir()):
+            return
+        marker = out_dir / BUNDLE_MARKER
+        if marker.is_file() and marker.read_text(encoding="utf-8") == BUNDLE_SIGNATURE:
+            return
+    raise ValueError(f"Output must be empty or a previously generated Atelier bundle: {out_dir}")
+
+
 def bundle(src_dir: Path, out_dir: Path):
+    src_dir, out_dir = src_dir.resolve(), out_dir.resolve()
+    if out_dir.is_relative_to(src_dir) or src_dir.is_relative_to(out_dir):
+        raise ValueError("The source and output directories must be separate.")
+    _check_output(out_dir)
     index_path = src_dir / "index.html"
     html = index_path.read_text(encoding="utf-8")
     missing = _check_paths(src_dir, html)
     if missing:
         raise FileNotFoundError(f"Missing static assets referenced in index.html: {missing}")
-
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    shutil.copytree(src_dir, out_dir)
 
     head_end = html.index("</head>")
     head_html, body_html = html[:head_end], html[head_end:]
@@ -51,17 +66,13 @@ def bundle(src_dir: Path, out_dir: Path):
     for rel in css_files:
         text = (src_dir / rel).read_text(encoding="utf-8")
         css_parts.append(f"/* === {rel} === */\n{text}\n")
-    (out_dir / "bundle.css").write_text("\n".join(css_parts), encoding="utf-8", newline="\n")
 
     def concat_js(files):
         parts = []
         for rel in files:
             text = (src_dir / rel).read_text(encoding="utf-8").rstrip()
-            parts.append(f"/* === {rel} === */\n{text};\n")
+            parts.append(f"/* === {rel} === */\n{text}\n;\n")
         return "\n".join(parts)
-
-    (out_dir / "bundle-head.js").write_text(concat_js(head_js_files), encoding="utf-8", newline="\n")
-    (out_dir / "bundle-body.js").write_text(concat_js(body_js_files), encoding="utf-8", newline="\n")
 
     # Replace matched tags with single bundle references at first occurrence.
     css_inserted = False
@@ -91,7 +102,30 @@ def bundle(src_dir: Path, out_dir: Path):
     new_head = JS_RE.sub(replace_head_js, CSS_RE.sub(replace_css, head_html))
     new_body = JS_RE.sub(replace_body_js, CSS_RE.sub(replace_css, body_html))
     bundled_html = re.sub(r"\n{3,}", "\n\n", new_head + new_body)
-    (out_dir / "index.html").write_text(bundled_html, encoding="utf-8", newline="\n")
+
+    files = {
+        "bundle.css": "\n".join(css_parts),
+        "bundle-head.js": concat_js(head_js_files),
+        "bundle-body.js": concat_js(body_js_files),
+        "index.html": bundled_html,
+        BUNDLE_MARKER: BUNDLE_SIGNATURE,
+    }
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".atelier-bundle-", dir=out_dir.parent) as scratch:
+        staged = Path(scratch) / "gui"
+        previous = Path(scratch) / "previous"
+        shutil.copytree(src_dir, staged)
+        for filename, content in files.items():
+            (staged / filename).write_text(content, encoding="utf-8", newline="\n")
+        _check_output(out_dir)
+        if out_dir.exists():
+            out_dir.rename(previous)
+        try:
+            staged.rename(out_dir)
+        except OSError:
+            if previous.exists() and not out_dir.exists():
+                previous.rename(out_dir)
+            raise
 
     return {
         "css_count": len(css_files),
@@ -103,7 +137,7 @@ def bundle(src_dir: Path, out_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--src", type=Path, default=ROOT / "gui")
-    parser.add_argument("--out", type=Path, help="Output directory for bundled GUI")
+    parser.add_argument("--out", type=Path, help="New, empty, or previously generated output directory")
     parser.add_argument("--check", action="store_true", help="Verify all referenced static assets exist")
     args = parser.parse_args()
 
@@ -117,7 +151,10 @@ def main():
         return
     if not args.out:
         parser.error("Provide --out <dir> or --check")
-    stats = bundle(args.src, args.out)
+    try:
+        stats = bundle(args.src, args.out)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
     print(f"Bundled {stats['css_count']} CSS and {stats['head_js_count'] + stats['body_js_count']} JS files into {args.out}")
 
 

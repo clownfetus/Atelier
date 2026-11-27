@@ -31,7 +31,8 @@
   }
 
   function focusables(root) {
-    return [...root.querySelectorAll(FOCUSABLE)].filter(isVisible);
+    return [...root.querySelectorAll(FOCUSABLE)].filter(el =>
+      el.tabIndex >= 0 && !el.matches(':disabled') && isVisible(el));
   }
 
   function isActiveModal(node) {
@@ -91,8 +92,8 @@
   }
 
   document.addEventListener('keydown', event => {
-    if (event.key !== 'Tab') return;
-    if (document.querySelector('dialog[open], #ctx-menu.open')) return;
+    if (event.key !== 'Tab' || event.defaultPrevented) return;
+    if (document.querySelector('dialog[open]') || event.target.closest?.('#ctx-menu.active')) return;
     const overlay = topOverlay();
     if (!overlay || SELF_MANAGED.has(overlay.id)) return;
     const panel = modalPanel(overlay);

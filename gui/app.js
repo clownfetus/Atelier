@@ -726,10 +726,10 @@ function previewLibraryCard(card, opener) {
   }
   const imported = card.type === 'asset' && card.imported;
   const isTexture = !card.thumbnail && card.type === 'asset' && card.file_type === 'texture';
-  const src = card.thumbnail || `${imported ? '/api/preview' : '/api/thumb'}?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`;
-  const originalSrc = isTexture && imported
-    ? `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`
-    : '';
+  const query = `game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`;
+  const gameTexture = `/api/texture_png?${query}&original=1`;
+  const src = card.thumbnail || (imported ? `/api/preview?${query}` : isTexture ? gameTexture : `/api/thumb?${query}`);
+  const originalSrc = isTexture && imported ? gameTexture : '';
   const actions = [];
   if (isTexture) {
     if (imported) {
@@ -747,7 +747,7 @@ function previewLibraryCard(card, opener) {
     originalSrc,
     isTexture,
     actions,
-    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset',
+    caption: isTexture ? imported ? 'Edited texture · project image' : 'Original game texture' : 'Character artwork',
   }, opener);
 }
 function libraryParent() {
@@ -804,7 +804,7 @@ function handleImportedFileAction(item) {
   const ft = item.file_type || "texture";
   switch (ft) {
     case "texture":
-      previewLibraryCard({type:'asset', imported:true, game_rel:item.game_rel, label:item.name}, document.activeElement);
+      previewLibraryCard({type:'asset', file_type:ft, imported:true, game_rel:item.game_rel, label:item.name}, document.activeElement);
       return;
     case "material":
       openMaterialEditor(item);
@@ -989,11 +989,11 @@ const _matHistory = window.AtelierHistory?.create();
 const _curveHistory = window.AtelierHistory?.create();
 const _vfxHistory = window.AtelierHistory?.create();
 
-function _syncHistoryButtons(prefix, stack) {
+function _syncHistoryButtons(prefix, stack, busy = false) {
   const u = document.getElementById(prefix + "-undo");
   const r = document.getElementById(prefix + "-redo");
-  if (u) u.disabled = !stack?.canUndo();
-  if (r) r.disabled = !stack?.canRedo();
+  if (u) u.disabled = busy || !stack?.canUndo();
+  if (r) r.disabled = busy || !stack?.canRedo();
 }
 
 function _matHistoryState() {
@@ -1002,12 +1002,13 @@ function _matHistoryState() {
 function _matHistoryRecord(key = "") {
   if (!_matHistory || !matEditor) return;
   _matHistory.record(_matHistoryState(), key);
-  _syncHistoryButtons("mat", _matHistory);
+  _syncHistoryButtons("mat", _matHistory, _materialSaving.has(matEditor));
 }
 function _matHistoryApply(dir) {
-  if (!matEditor || _materialSaving.has(matEditor) || !_matHistory) return false;
+  if (!matEditor || !_matHistory) return false;
+  if (_materialSaving.has(matEditor)) return true;
   const snap = dir === "undo" ? _matHistory.undo() : _matHistory.redo();
-  if (!snap) return false;
+  if (!snap) return true;
   matEditor.colors = snap.colors;
   matEditor.scalars = snap.scalars;
   renderMatEditor();
@@ -1016,21 +1017,20 @@ function _matHistoryApply(dir) {
   return true;
 }
 
-function _curveHistoryState() {
-  return curveEditor ? { channels: curveEditor.channels, dirty: curveEditor.dirty } : null;
-}
 function _curveHistoryRecord(key = "") {
   if (!_curveHistory || !curveEditor) return;
-  _curveHistory.record(_curveHistoryState(), key);
-  _syncHistoryButtons("curve", _curveHistory);
+  _curveHistory.record(curveEditor.channels, key);
+  _syncHistoryButtons("curve", _curveHistory, _curveSaving.has(curveEditor));
 }
 function _curveHistoryApply(dir) {
   if (!curveEditor || !_curveHistory) return false;
-  const snap = dir === "undo" ? _curveHistory.undo() : _curveHistory.redo();
-  if (!snap) return false;
-  curveEditor.channels = snap.channels;
-  curveEditor.dirty = snap.dirty;
-  curveEditor.stops = _resampleStops(curveEditor.channels);
+  if (_curveSaving.has(curveEditor)) return true;
+  const channels = dir === "undo" ? _curveHistory.undo() : _curveHistory.redo();
+  if (!channels) return true;
+  curveEditor.channels = channels;
+  curveEditor.stops = _resampleStops(channels);
+  const status = document.getElementById("curve-status");
+  if (!_curveDirty() && status.textContent.startsWith("Submitted edits saved")) status.textContent = "Saved changes restored.";
   renderCurveEditor();
   _syncHistoryButtons("curve", _curveHistory);
   return true;
@@ -1051,23 +1051,28 @@ function _vfxHistoryState() {
 function _vfxHistoryRecord(key = "") {
   if (!_vfxHistory || !vfxEditor) return;
   _vfxHistory.record(_vfxHistoryState(), key);
-  _syncHistoryButtons("vfx", _vfxHistory);
+  _syncHistoryButtons("vfx", _vfxHistory, _vfxSaving.has(vfxEditor));
 }
 function _vfxHistoryApply(dir) {
-  if (!vfxEditor || _vfxSaving.has(vfxEditor) || !_vfxHistory) return false;
+  if (!vfxEditor || !_vfxHistory) return false;
+  if (_vfxSaving.has(vfxEditor)) return true;
   const snap = dir === "undo" ? _vfxHistory.undo() : _vfxHistory.redo();
-  if (!snap) return false;
+  if (!snap) return true;
   (vfxEditor.groups || []).forEach((g, idx) => {
     const s = snap.groups?.[idx];
     if (!s) return;
     g.stops = s.stops;
     g.inten = s.inten;
-    if (s.restore_original) g.restore_original = true;
+    if (s.restore_original && g.has_saved_edit) g.restore_original = true;
     else delete g.restore_original;
   });
   if (snap.scalars && vfxEditor.scalars) vfxEditor.scalars = snap.scalars;
   if (snap.vectors && vfxEditor.vectors) vfxEditor.vectors = snap.vectors;
-  renderVfxEditor();
+  if (vfxEditor.kind === "mpc") renderVfxEditor();
+  else {
+    vfxEditor.groups.forEach((_, index) => _refreshVfxGroup(index, true));
+    window.AtelierMotionboard?.sync(undefined, { forceValue: true });
+  }
   _syncHistoryButtons("vfx", _vfxHistory);
   return true;
 }
@@ -1092,6 +1097,7 @@ document.getElementById("vfx-undo")?.addEventListener("click", () => _vfxHistory
 document.getElementById("vfx-redo")?.addEventListener("click", () => _vfxHistoryApply("redo"));
 
 function _matRemember(editor, original) {
+  matActiveColorIndex = 0;
   const copy = value => JSON.parse(JSON.stringify(value));
   const saved = { colors: copy(editor.colors), scalars: copy(editor.scalars) };
   _matHistory?.reset({ colors: editor.colors, scalars: editor.scalars });
@@ -1128,6 +1134,7 @@ function _matRefreshDirty() {
   bodyMaterialBusy(busy);
   const revert = document.getElementById("mat-revert");
   if (revert) revert.disabled = busy || !n;
+  _syncHistoryButtons("mat", _matHistory, busy);
   ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
     const row = document.getElementById((kind === "colors" ? "matrow" : "matscalar") + i);
     row?.classList.toggle("is-modified", _matIsChanged(kind, i));
@@ -1163,6 +1170,7 @@ function matRestoreParameter(kind, index) {
   const item = matEditor[kind][index];
   if (kind === "colors") { item.rgba = ref.rgba.slice(); item.inten = ref.inten; }
   else item.value = ref.value;
+  _matHistoryRecord();
   renderMatEditor(); dyeRefresh(0);
 }
 function matRevertDraft() {
@@ -1171,7 +1179,7 @@ function matRevertDraft() {
   if (!saved) return;
   matEditor.colors = JSON.parse(JSON.stringify(saved.colors));
   matEditor.scalars = JSON.parse(JSON.stringify(saved.scalars));
-  _matHistoryRecord("revert");
+  _matHistoryRecord();
   renderMatEditor(); dyeRefresh(0);
   document.getElementById("mat-status").textContent = "Unsaved parameters reverted to their saved values.";
 }
@@ -1522,7 +1530,7 @@ function _matTexturesHtml(m, expanded) {
       ? `<b>${_matEscape(own.name)}</b><span class="mat-tag">your image${size}${own.source ? ` · ${_matEscape(own.source)}` : ""}</span>`
       : `${_matEscape(String(m.textures[slot]).split("/").pop())}<span class="mat-tag">game texture${is2d ? "" : ` · ${_matEscape(cls)}`}</span>`;
     const where = own ? `Ships as ${own.game_rel}` : m.textures[slot];
-    h += `<div class="mat-parameter mat-texture${own ? " is-custom" : ""}" id="mattex${i}"><div class="mat-row">
+    h += `<div class="mat-parameter mat-texture${own ? " is-custom" : ""}" id="mattex${i}" data-param-name="${_matEscape([slot, own?.name, own?.source, where].filter(Boolean).join(" ").toLowerCase())}"><div class="mat-row">
       <label title="${_matEscape(slot)}">${_matEscape(slot)}</label>
       <span class="mat-texture-thumb">${thumb}</span>
       <span class="mat-texture-name" title="${_matEscape(where)}">${what}</span>
@@ -1889,7 +1897,7 @@ function renderMatEditor() {
     onPick: hex => {
       if (!matEditor?.colors?.length) return;
       const idx = Math.min(Math.max(0, matActiveColorIndex), matEditor.colors.length - 1);
-      matColor(idx, hex);
+      matColor(idx, hex, "");
       const sw = document.getElementById("matsw" + idx);
       if (sw) sw.value = hex;
     },
@@ -2015,14 +2023,14 @@ function _matSyncRow(i, except) {
   window.AtelierPolish?.swatchesAfter(oldSwatches, matEditor.colors);
 }
 
-function matColor(i, hex) {
+function matColor(i, hex, historyKey = "color:" + i) {
   matActiveColorIndex = i;
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _matSyncRow(i, "matsw" + i);
-  _matHistoryRecord("color:" + i);
+  _matHistoryRecord(historyKey);
   dyeRefresh();
 }
 
@@ -2034,7 +2042,7 @@ function matColorText(i, el) {
   c.rgba[0] = rgb[0] * n; c.rgba[1] = rgb[1] * n; c.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);          // normalise what they typed
   _matSyncRow(i, el.id);
-  _matHistoryRecord("colortxt:" + i);
+  _matHistoryRecord();
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
@@ -2077,6 +2085,7 @@ async function saveMaterial() {
   if (!matEditor || _materialSaving.has(matEditor)) return;
   const editor = matEditor, project = _activeProjectName, name = editor.name;
   const submitted = materialSaveSnapshot(editor);
+  _matHistory?.endStep();
   const body = JSON.stringify(submitted);
   const isCurrent = () => matEditor === editor && project === _activeProjectName;
   const notify = (msg, state, duration) => toastMaterialSave(
@@ -2149,6 +2158,8 @@ async function resetMaterial() {
       if (!newer) { editor.colors = _seedColors(res.colors, res.inten); editor.scalars = _seedScalars(res.scalars); }
       const original = { colors: _seedColors(res.colors, res.inten), scalars: _seedScalars(res.scalars) };
       _materialReferences.set(editor, { saved: original, original });
+      _matHistory?.reset(original);
+      if (newer) _matHistoryRecord();
       editor.custom = res.custom_textures || {};
       editor.materialSource = "";
       editor.materialParent = "";
@@ -2190,7 +2201,7 @@ const _vfxSnapshot = v => _editSnapshot({ groups: v.groups.map(g => ({export_ind
   stops:g.stops, channels:g.channels, sample_count:g.sample_count, inten:g.inten, restore_original:!!g.restore_original})),
   scalars: v.scalars, vectors: v.vectors });
 async function _discardUnsaved(dirty, what) { return !dirty || await _confirmAction(`Discard unsaved ${what}?`); }
-function _curveDirty() { return !!curveEditor && Object.values(curveEditor.dirty || {}).some(Boolean); }
+function _curveDirty() { return !!curveEditor && _curveChangedChannels(curveEditor).length > 0; }
 function _vfxDirty() { return !!vfxEditor && _vfxSnapshot(vfxEditor) !== vfxEditor.baseline; }
 function _worldDirty() { return !!worldEditor && _editSnapshot(worldEditor.edits) !== worldEditor.baseline; }
 function _textDirty() { return !!textEditor && _editSnapshot(textEditor.edits) !== textEditor.baseline; }
@@ -2203,12 +2214,12 @@ function _otherEditorsDirty() {
 window.addEventListener("beforeunload", event => {
   if (materialDirtyCount() || (matEditor && _materialSaving.has(matEditor))) {
     event.preventDefault(); event.returnValue = "Material parameters have unsaved changes.";
-  } else if (_otherEditorsDirty() || vfxEditor && _vfxSaving.has(vfxEditor)) {
+  } else if (_otherEditorsDirty() || curveEditor && _curveSaving.has(curveEditor) || vfxEditor && _vfxSaving.has(vfxEditor)) {
     event.preventDefault(); event.returnValue = "An editor has unsaved changes.";
   }
 });
 window.addEventListener("keydown", event => {
-  if (!document.getElementById("material-overlay").classList.contains("active")) return;
+  if (event.defaultPrevented || !document.getElementById("material-overlay").classList.contains("active")) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
     event.preventDefault(); saveMaterial();
   } else if (event.key === "Escape") {
@@ -2225,6 +2236,7 @@ document.getElementById("material-overlay").addEventListener("click", e => {
 
 // ── curve editor (CurveLinearColor R/G/B/A key values) ────────────────────────
 let curveEditor = null;
+const _curveSaving = new WeakSet();
 let _curveOpenRevision = 0;
 const CURVE_CH = ["R", "G", "B", "A"];
 
@@ -2257,6 +2269,8 @@ function _resampleStops(channels) {
 }
 
 async function openCurveEditor(item) {
+  if (curveEditor && _curveSaving.has(curveEditor)) return;
+  if (!(await _discardUnsaved(_curveDirty(), "curve edits"))) return;
   const revision = ++_curveOpenRevision, project = _activeProjectName;
   const current = () => revision === _curveOpenRevision && project === _activeProjectName;
   curveEditor = null;
@@ -2266,6 +2280,7 @@ async function openCurveEditor(item) {
   document.getElementById("curve-title").textContent = item.name;
   document.getElementById("curve-sub").textContent = item.game_rel || "";
   document.getElementById("curve-status").textContent = "";
+  document.getElementById("curve-body").inert = false;
   document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
@@ -2277,9 +2292,10 @@ async function openCurveEditor(item) {
   finally { stopWorking(res?.ok ? 'success' : 'error'); }
   if (!current()) return;
   if (!res.ok) { document.getElementById("curve-body").textContent = res.error || "Failed to read curve"; return; }
-  curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
-  _curveHistory?.reset(_curveHistoryState());
-  _syncHistoryButtons("curve", _curveHistory);
+  const channels = res.channels || {};
+  curveEditor = { game_rel: item.game_rel, name: item.name, channels, stops: res.stops || [], savedChannels: JSON.parse(_editSnapshot(channels)) };
+  _curveHistory?.reset(channels);
+  _curveSetSaving(curveEditor, false);
   renderCurveEditor();
   _syncBulkEditorAction('curve');
   loadSidebar();
@@ -2291,7 +2307,7 @@ function renderCurveEditor() {
   const c = curveEditor; if (!c) return;
   let h = `<div class="curve-preview" id="curve-grad"></div>`;
   for (const ch of CURVE_CH) {
-    const keys = c.channels[ch] || (c.channels[ch] = []);
+    const keys = c.channels[ch] || [];
     h += `<div class="mat-section" style="display:flex;align-items:center;gap:8px">
       <span>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
       <button class="btn btn-small" onclick="curveAddKey('${ch}')">+ key</button></div>`;
@@ -2316,18 +2332,17 @@ function renderCurveEditor() {
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
 }
 
-function _curveTouch(ch) {
-  curveEditor.dirty[ch] = true;
+function _curveTouch() {
   curveEditor.stops = _resampleStops(curveEditor.channels);
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(curveEditor.stops);
 }
 
 function curveKeyField(ch, i, field, v) {
   const c = curveEditor; if (!c || !c.channels[ch] || !c.channels[ch][i]) return;
-  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); _curveHistoryRecord("interp:" + ch + ":" + i); renderCurveEditor(); return; }
+  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(); _curveHistoryRecord(); renderCurveEditor(); return; }
   const val = parseFloat(v); if (isNaN(val)) return;
   c.channels[ch][i][field] = val;
-  _curveTouch(ch);
+  _curveTouch();
   _curveHistoryRecord("field:" + ch + ":" + i + ":" + field);
 }
 
@@ -2335,19 +2350,31 @@ function curveAddKey(ch) {
   const c = curveEditor; const keys = c.channels[ch] || (c.channels[ch] = []);
   const t = keys.length ? Math.min(1, (+keys[keys.length - 1].time || 0) + 0.1) : 0;
   keys.push({ time: t, value: 0, interp: "RCIM_Linear", arriveTangent: 0, arriveTangentWeight: 0, leaveTangent: 0, leaveTangentWeight: 0 });
-  _curveTouch(ch); _curveHistoryRecord("add:" + ch); renderCurveEditor();
+  _curveTouch(); _curveHistoryRecord(); renderCurveEditor();
 }
 
 function curveRemoveKey(ch, i) {
   const c = curveEditor; if (!c.channels[ch]) return;
-  c.channels[ch].splice(i, 1); _curveTouch(ch); _curveHistoryRecord("rem:" + ch); renderCurveEditor();
+  c.channels[ch].splice(i, 1); _curveTouch(); _curveHistoryRecord(); renderCurveEditor();
+}
+
+function _curveChangedChannels(editor) {
+  return CURVE_CH.filter(ch => _editSnapshot(editor.channels[ch] || []) !== _editSnapshot(editor.savedChannels[ch] || []));
+}
+function _curveSetSaving(editor, busy) {
+  if (busy) _curveSaving.add(editor);
+  else _curveSaving.delete(editor);
+  if (curveEditor !== editor) return;
+  document.getElementById("curve-save").disabled = document.getElementById("curve-reset").disabled = busy;
+  _syncHistoryButtons("curve", _curveHistory, busy);
 }
 
 async function saveCurve() {
-  const c = curveEditor; if (!c) return;
-  const edits = {};
-  for (const ch of Object.keys(c.dirty)) if (c.dirty[ch]) edits[ch] = c.channels[ch];   // full key list per changed channel
+  const c = curveEditor; if (!c || _curveSaving.has(c)) return;
+  const edits = Object.fromEntries(_curveChangedChannels(c).map(ch => [ch, c.channels[ch] || []]));
   if (!Object.keys(edits).length) { document.getElementById("curve-status").textContent = "No changes to save."; return; }
+  _curveHistory?.endStep();
+  _curveSetSaving(c, true);
   document.getElementById("curve-status").textContent = "Saving…";
   const project = _activeProjectName, submitted = _editSnapshot(c.channels);
   const current = () => curveEditor === c && project === _activeProjectName;
@@ -2357,8 +2384,7 @@ async function saveCurve() {
       body: JSON.stringify({ game_rel: c.game_rel, edits }) });
     if (!current()) return;
     if (res.ok) {
-      const saved = JSON.parse(submitted);
-      for (const ch of Object.keys(edits)) if (_editSnapshot(c.channels[ch]) === _editSnapshot(saved[ch])) delete c.dirty[ch];
+      c.savedChannels = JSON.parse(submitted);
       const newer = _curveDirty();
       stopWorking();
       toast(`Saved: ${c.name}`, "success"); loadSidebar();
@@ -2367,26 +2393,36 @@ async function saveCurve() {
     }
     else { stopWorking('error'); document.getElementById("curve-status").textContent = "Error: " + (res.error || "save failed"); }
   } catch (e) { stopWorking('error'); if (current()) document.getElementById("curve-status").textContent = "Error: " + e.message; }
-  finally { stopWorking?.(); }
+  finally { stopWorking(); _curveSetSaving(c, false); }
 }
 
 async function resetCurve() {
-  const c = curveEditor; if (!c) return;
+  const c = curveEditor, project = _activeProjectName;
+  if (!c || _curveSaving.has(c)) return;
   if (!(await _confirmAction("Restore this curve's original game values? This deletes the project's saved curve edits and discards the current draft.", 'Restore curve?', 'Restore'))) return;
+  const current = () => curveEditor === c && project === _activeProjectName;
+  if (!current() || _curveSaving.has(c)) return;
+  const body = document.getElementById("curve-body");
+  body.inert = true;
+  _curveSetSaving(c, true);
   document.getElementById("curve-status").textContent = "Resetting…";
-  const project = _activeProjectName;
-  const stopWorking = editorWorking('curve-overlay', () => curveEditor === c && project === _activeProjectName);
+  const stopWorking = editorWorking('curve-overlay', current);
   try {
-    const res = await api("/api/curve_reset", { method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await api("/api/curve_reset", { project, method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game_rel: c.game_rel }) });
-    if (res.ok) { c.channels = res.channels || {}; c.stops = res.stops || []; c.dirty = {}; renderCurveEditor(); _syncBulkEditorAction('curve');
+    if (!current()) return;
+    if (res.ok) {
+      c.channels = res.channels || {}; c.stops = res.stops || []; c.savedChannels = JSON.parse(_editSnapshot(c.channels));
+      _curveHistory?.reset(c.channels);
+      renderCurveEditor(); _syncBulkEditorAction('curve');
       document.getElementById("curve-status").textContent = "Reset to vanilla."; toast(`Reset: ${c.name}`, "info"); }
-    else document.getElementById("curve-status").textContent = "Error: " + (res.error || "reset failed");
-  } catch (e) { document.getElementById("curve-status").textContent = "Error: " + e.message; }
-  finally { stopWorking(); }
+    else { stopWorking('error'); document.getElementById("curve-status").textContent = "Error: " + (res.error || "reset failed"); }
+  } catch (e) { stopWorking('error'); if (current()) document.getElementById("curve-status").textContent = "Error: " + e.message; }
+  finally { stopWorking(); _curveSetSaving(c, false); if (current()) body.inert = false; }
 }
 
 async function closeCurveEditor(force = false) {
+  if (force !== true && curveEditor && _curveSaving.has(curveEditor)) { document.getElementById('curve-status').textContent = 'Wait for this save or reset to finish before closing.'; return false; }
   if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
   ++_curveOpenRevision;
   const overlay = document.getElementById('curve-overlay');
@@ -2531,6 +2567,7 @@ function mpcColor(i, hex) {
   p.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   p.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _mpcSyncRow(i, "mpcsw" + i);
+  _vfxHistoryRecord("mpccolor:" + i);
 }
 function mpcColorText(i, el) {
   const rgb = parseColor01(el.value);
@@ -2539,16 +2576,22 @@ function mpcColorText(i, el) {
   p.rgba[0] = rgb[0] * n; p.rgba[1] = rgb[1] * n; p.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);
   _mpcSyncRow(i, el.id);
+  _vfxHistoryRecord();
 }
 function mpcInten(i, v, fromRange) {
   const p = vfxEditor.vectors[i], o = Math.max(p.inten, 1e-6), nv = parseFloat(v) || 0;
   p.rgba[0] = p.rgba[0] / o * nv; p.rgba[1] = p.rgba[1] / o * nv; p.rgba[2] = p.rgba[2] / o * nv; p.inten = nv;
   _mpcSyncRow(i, (fromRange ? "mpcir" : "mpcin") + i);
+  _vfxHistoryRecord("mpcinten:" + i);
 }
-function mpcAlpha(i, v) { vfxEditor.vectors[i].rgba[3] = parseFloat(v) || 0; }
+function mpcAlpha(i, v) {
+  vfxEditor.vectors[i].rgba[3] = parseFloat(v) || 0;
+  _vfxHistoryRecord("mpcalpha:" + i);
+}
 function mpcScalar(i, v, fromRange) {
   vfxEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "mpcsn" : "mpcsr") + i); if (other) other.value = v;
+  _vfxHistoryRecord("mpcscalar:" + i);
 }
 
 const _VFX_CHAN_COLS = ["#e05a5a", "#5ae06a", "#5a8ae0", "#cccccc"];
@@ -2623,17 +2666,17 @@ function _rememberVfxSaved(v) {
   v.baseline = _vfxSnapshot(v);
   v.savedGroups = JSON.parse(v.baseline).groups;
 }
-function _refreshVfxGroup(gi) {
+function _refreshVfxGroup(gi, fromHistory = false) {
   const g = vfxEditor?.groups[gi]; if (!g) return;
   const gradient = document.getElementById('vgrad'+gi); if (gradient) gradient.style.background = _vfxGradCss(g);
   const spark = document.getElementById('vspark'+gi); if (spark) spark.innerHTML = _vfxSpark(g);
   document.querySelectorAll(`[data-vfx-group="${gi}"] input`).forEach(input => {
-    if (input === document.activeElement) return;
+    if (!fromHistory && input === document.activeElement) return;
     if (input.dataset.vfxColor != null) input.value = _vStopHex(g.stops[Number(input.dataset.vfxColor)], g.inten);
     else if (input.dataset.vfxStop != null) input.value = g.stops[Number(input.dataset.vfxStop)][Number(input.dataset.vfxChannel)];
   });
-  for (const id of ['vint'+gi, 'vinn'+gi]) { const node=document.getElementById(id); if(node && node!==document.activeElement) node.value=g.inten; }
-  window.AtelierMotionboard?.sync(gi);
+  for (const id of ['vint'+gi, 'vinn'+gi]) { const node=document.getElementById(id); if(node && (fromHistory || node!==document.activeElement)) node.value=g.inten; }
+  if (!fromHistory) window.AtelierMotionboard?.sync(gi);
   const status=document.getElementById('vfx-status');
   if (!_vfxDirty() && status.textContent.startsWith('Submitted edits saved; newer')) status.textContent='Saved changes restored.';
 }
@@ -2643,13 +2686,17 @@ function restoreVfxTrack(gi, mode, point, channel) {
   if (!reference) return;
   if (point != null) {
     const time=g.stops.length===1 ? 0 : point/(g.stops.length-1);
+    _vfxHistory?.endStep();
     vfxVal(gi,point,channel,AtelierMotionboardData.sample(mode==='original' ? g.original_samples || reference : reference,time)[channel]);
+    _vfxHistory?.endStep();
   } else {
     g.stops=reference.map(stop=>stop.slice());
     g.inten=mode==='original' ? _vfxInten(g) : saved.inten;
     if (mode==='original' && g.has_saved_edit || mode==='saved' && saved.restore_original) g.restore_original=true;
     else delete g.restore_original;
-    renderVfxEditor();
+    _vfxHistoryRecord();
+    _refreshVfxGroup(gi, true);
+    window.AtelierMotionboard?.sync(gi, { forceValue: true });
   }
 }
 
@@ -2695,7 +2742,9 @@ async function saveVfx() {
   const v = vfxEditor; if (!v || _vfxSaving.has(v)) return;
   const project = _activeProjectName, submitted = _vfxSnapshot(v);
   const current = () => vfxEditor === v && project === _activeProjectName;
+  _vfxHistory?.endStep();
   _vfxSaving.add(v);
+  _syncHistoryButtons("vfx", _vfxHistory, true);
   document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = true;
   document.getElementById("vfx-status").textContent = "Saving…";
   const editedGroups = v.groups.filter(g => !g.restore_original && (!window.AtelierMotionboardData || AtelierMotionboardData.modified(g)));
@@ -2737,6 +2786,7 @@ async function saveVfx() {
     stopWorking?.();
     _vfxSaving.delete(v);
     document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
+    if (current()) _syncHistoryButtons("vfx", _vfxHistory);
   }
 }
 async function resetVfx() {
@@ -2746,6 +2796,7 @@ async function resetVfx() {
   if (vfxEditor !== v || project !== _activeProjectName || _vfxSaving.has(v)) return;
   const current = () => vfxEditor === v && project === _activeProjectName;
   _vfxSaving.add(v); document.getElementById('vfx-body').inert = true;
+  _syncHistoryButtons("vfx", _vfxHistory, true);
   document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = true;
   document.getElementById("vfx-status").textContent = "Resetting…";
   const stopWorking = editorWorking('vfx-overlay', current);
@@ -2757,7 +2808,7 @@ async function resetVfx() {
                   v.scalars = (res.scalars || []).map(x => ({ ...x }));
                   v.vectors = (res.vectors || []).map(x => ({ ...x, inten: _pickInten(x.rgba, res.inten, x.name) }));
                   v.unsupportedExports=res.unsupported_exports || []; v.unmatchedEdits=res.unmatched_edits || 0;
-                  _rememberVfxSaved(v); renderVfxEditor(); _syncBulkEditorAction('vfx'); loadSidebar();
+                  _rememberVfxSaved(v); _vfxHistory?.reset(_vfxHistoryState()); renderVfxEditor(); _syncBulkEditorAction('vfx'); loadSidebar();
       document.getElementById("vfx-status").textContent = "Reset to vanilla."; toast(`Reset: ${v.name}`, "info"); }
     else document.getElementById("vfx-status").textContent = "Error: " + (res.error || "reset failed");
   } catch (e) { if (current()) document.getElementById("vfx-status").textContent = "Error: " + e.message; }
@@ -2765,6 +2816,7 @@ async function resetVfx() {
     stopWorking();
     _vfxSaving.delete(v); document.getElementById('vfx-body').inert = false;
     document.getElementById('vfx-save').disabled = document.getElementById('vfx-reset').disabled = false;
+    if (current()) _syncHistoryButtons("vfx", _vfxHistory);
   }
 }
 async function closeVfxEditor(force = false) {
@@ -3226,6 +3278,10 @@ function renderSidebar() {
   const all = Object.values(sidebarData);
   window.AtelierCatalogueArt?.tray(all);
   window.AtelierSMapsUI?.update(all);
+  const q     = _libraryQuery().toLowerCase();
+  const items = window.AtelierTrayFilters ? window.AtelierTrayFilters.filter(all, q)
+    : (q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all);
+  window.AtelierTrayFilters?.updateControls(all, items);
   if (!all.length) {
     list.innerHTML = '<div class="sidebar-empty"><i data-lucide="package" size="36"></i><strong>Your Mod tray is empty</strong><span>Choose an asset in the library to start editing. Your changes will appear here.</span></div>';
     lucide.createIcons({ nodes: [list] });
@@ -3233,10 +3289,6 @@ function renderSidebar() {
     updateInstallBtn();
     return;
   }
-  const q     = _libraryQuery().toLowerCase();
-  const items = window.AtelierTrayFilters ? window.AtelierTrayFilters.filter(all, q)
-    : (q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all);
-  window.AtelierTrayFilters?.updateControls(all, items);
   if (!items.length) {
     list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the filter.</div>';
     updateInstallBtn();
@@ -3753,10 +3805,8 @@ window.applySelectionProfile = function applySelectionProfile(name, entry) {
   for (const item of Object.values(sidebarData)) {
     item.selected = !desel.has(item.game_rel);
   }
-  if (entry?.mod_name) {
-    const input = document.getElementById("mod-name-input");
-    if (input) input.value = entry.mod_name;
-  }
+  const input = document.getElementById("mod-name-input");
+  if (input) input.value = entry?.mod_name || "";
   renderSidebar();
   saveSelection();
   toast(`Applied profile “${name}”`, "success");
@@ -5368,6 +5418,10 @@ async function _projExportRun(names) {
 
 function _applyActiveProject(name) {
   window.AtelierEmptyAssetsUI?.begin();
+  if (name !== _activeProjectName) {
+    window.AtelierTrash?.close();
+    window.AtelierTrayFilters?.closeProfiles();
+  }
   _activeProjectName = name;
   renderTrayProgress();
   const modInput = document.getElementById("mod-name-input");

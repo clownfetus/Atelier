@@ -107,6 +107,7 @@ def main():
     parser.add_argument('--polish-only', action='store_true', help='Run continuity, presentation preferences and truthful feedback checks')
     parser.add_argument('--motion-placements-only', action='store_true', help='Check asset/batch feedback, workspace slots, pins and preview reveals in every motion mode')
     parser.add_argument('--material-replacement-only', action='store_true', help='Run material replacement and existing editor safety checks')
+    parser.add_argument('--editor-improvements-only', action='store_true', help='Check editor history, the texture inspector and the project palette')
     parser.add_argument('--viewer-followups-only',action='store_true',help='Check story banners, transparency, contextual bulk controls and replacement upload')
     parser.add_argument('--review-followups-only', action='store_true', help='Check project-scoped imports and format-preserving export retries')
     parser.add_argument('--skin-swapper-only', action='store_true', help='Check detected forms, export review and format-preserving retries')
@@ -204,6 +205,12 @@ def main():
                     return
                 from browser_startup import enter_library_on_startup
                 enter_library_on_startup(context)
+                if args.editor_improvements_only:
+                    from editor_improvements_browser_checks import run_editor_improvements_checks
+                    run_editor_improvements_checks(context, url, checks)
+                    (report / 'results.json').write_text(json.dumps({'checks': checks}, indent=2), encoding='utf-8')
+                    for check in checks: print('PASS ' + check)
+                    return
                 if args.motion_placements_only:
                     from motion_placements_checks import run_motion_placements_checks
                     run_motion_placements_checks(context, url, report, checks)
@@ -699,18 +706,23 @@ def main():
                 page.evaluate("""() => {
                     __vp.seed();
                     window.__oldFetch = window.atelierFetch;
-                    window.atelierFetch = () => new Promise(resolve => window.__finishSave = resolve);
-                    window.__saving = __vp.save();
+                    window.__pendingSaves = [];
+                    window.atelierFetch = (url, ...args) => url === '/api/material_save'
+                        ? new Promise(resolve => window.__pendingSaves.push(resolve))
+                        : window.__oldFetch(url, ...args);
+                    void __vp.save();
                     __vp.edit('Body', [0,0,1,1]);
                 }""")
-                assert page.evaluate('__vp.canLeave()') is False
-                page.evaluate("__finishSave({json:async()=>({ok:true})})")
-                page.wait_for_function("__vp.state().edited.Body.Tint[2] === 1")
-                # The second material has its own pending response.
-                page.evaluate("__finishSave({json:async()=>({ok:true})})")
-                page.wait_for_function('!__vp.state().saving')
-                assert page.evaluate('__vp.state().edited.Body.Tint') == [0, 0, 1, 1]
-                page.evaluate('window.atelierFetch = window.__oldFetch')
+                try:
+                    assert page.evaluate('__vp.canLeave()') is False
+                    for index in range(2):
+                        page.wait_for_function('index => __pendingSaves.length > index', arg=index)
+                        page.evaluate('index => __pendingSaves[index]({json:async()=>({ok:true})})', index)
+                    page.wait_for_function('!__vp.state().saving')
+                    state = page.evaluate('__vp.state()')
+                    assert not state['saving'] and state['edited'] == {'Body': {'Tint': [0, 0, 1, 1]}}, state
+                finally:
+                    page.evaluate('window.atelierFetch = window.__oldFetch')
                 checks.append('Edits made during Save survive; leaving while saving is blocked')
 
                 assert page.evaluate('__vp.staleTexture()')

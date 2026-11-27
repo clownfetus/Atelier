@@ -25,10 +25,10 @@
     {
       title: 'Editors',
       items: [
-        ['Save active editor', 'Ctrl+S'],
+        ['Save material, VFX or bulk edits', 'Ctrl+S'],
         ['Undo parameter edit', 'Ctrl+Z'],
         ['Redo parameter edit', 'Ctrl+Shift+Z'],
-        ['Close active dialog or preview', 'Escape'],
+        ['Dismiss supported dialogs and previews', 'Escape'],
       ],
     },
     {
@@ -53,12 +53,15 @@
 
   function staticCommands() {
     const project = window.atelierProject?.() || '';
+    const search = document.querySelector(
+      'body:not([data-page="workspace"]) #search-input, #workspace-choice:not([hidden]) #workspace-search, #viewport-overlay.mounted.active #viewport-material-search',
+    );
     const cmds = [
       { group: 'Navigation', label: 'Open Library', keywords: 'assets home browse', action: () => document.getElementById('page-library')?.click() },
       { group: 'Navigation', label: 'Open Recolour costume workspace', keywords: 'workspace skin studio', action: () => document.getElementById('page-workspace')?.click() },
       { group: 'Navigation', label: 'Switch project…', keywords: 'projects open create', action: () => window.openProjectPicker?.() },
-      { group: 'Navigation', label: 'Focus search', shortcut: 'Ctrl+F', keywords: 'find filter', action: () => { const i = document.getElementById('search-input'); i?.focus(); i?.select(); } },
-      { group: 'Navigation', label: 'Refresh library view', keywords: 'reload grid', action: () => window.renderGrid?.().then(() => window.toast?.('Refreshed view', 'success')) },
+      { group: 'Navigation', label: 'Focus search', shortcut: document.body.dataset.page === 'workspace' ? '' : 'Ctrl+F', keywords: 'find filter', disabled: () => !search?.getClientRects().length, action: () => { search.focus(); search.select(); } },
+      { group: 'Navigation', label: 'Refresh library view', keywords: 'reload grid', action: () => window.renderGrid?.() },
       { group: 'Mod tray', label: 'Review & build mod…', keywords: 'export install pak', disabled: () => document.getElementById('install-btn')?.disabled, action: () => document.getElementById('install-btn')?.click() },
       { group: 'Mod tray', label: 'Add custom asset…', keywords: 'new texture mesh material', action: () => document.getElementById('add-asset-open')?.click() },
       { group: 'Mod tray', label: 'Selection profiles…', keywords: 'presets variants checkboxes', disabled: () => !project, action: () => window.AtelierTrayFilters?.openProfiles() },
@@ -95,7 +98,7 @@
       <section class="modal cmd-modal" role="dialog" aria-modal="true" aria-label="Command palette" tabindex="-1">
         <div class="cmd-search-bar">
           <i data-lucide="search" size="16" aria-hidden="true"></i>
-          <input id="cmd-input" type="search" placeholder="Type a command or edited asset…" aria-label="Search commands" autocomplete="off" spellcheck="false">
+          <input id="cmd-input" type="search" role="combobox" aria-expanded="true" aria-controls="cmd-list" aria-autocomplete="list" placeholder="Type a command or edited asset…" aria-label="Search commands" autocomplete="off" spellcheck="false">
           <span class="cmd-kbd">Esc</span>
         </div>
         <div class="cmd-list" id="cmd-list" role="listbox" aria-label="Commands"></div>
@@ -108,17 +111,19 @@
       if (event.target === cmdOverlay) closePalette();
     });
     cmdOverlay.addEventListener('keydown', event => {
+      if (event.defaultPrevented || event.isComposing) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         closePalette();
-      } else if (event.key === 'ArrowDown') {
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
-        if (filtered.length) { activeIndex = (activeIndex + 1) % filtered.length; syncActive(); }
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        if (filtered.length) { activeIndex = (activeIndex - 1 + filtered.length) % filtered.length; syncActive(); }
-      } else if (event.key === 'Enter') {
+        if (!filtered.length) return;
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        activeIndex = (activeIndex + step + filtered.length) % filtered.length;
+        syncActive();
+        if (event.target !== input) document.getElementById(`cmd-option-${activeIndex}`)?.focus();
+      } else if (event.key === 'Enter' && event.target === input) {
         event.preventDefault();
         const chosen = filtered[activeIndex];
         if (chosen) { closePalette(); chosen.action?.(); }
@@ -134,8 +139,13 @@
       const on = idx === activeIndex;
       btn.classList.toggle('is-active', on);
       btn.setAttribute('aria-selected', String(on));
-      if (on) btn.scrollIntoView({ block: 'nearest' });
     });
+    const selected = buttons[activeIndex];
+    const input = cmdOverlay.querySelector('#cmd-input');
+    if (selected) {
+      input.setAttribute('aria-activedescendant', selected.id);
+      selected.scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
   }
 
   function renderCommands(rawQuery = '') {
@@ -156,6 +166,7 @@
       empty.className = 'cmd-empty';
       empty.textContent = 'No matching commands or assets.';
       list.append(empty);
+      syncActive();
       return;
     }
     let lastGroup = '';
@@ -169,9 +180,9 @@
       }
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'cmd-item' + (index === 0 ? ' is-active' : '');
+      btn.className = 'cmd-item';
+      btn.id = `cmd-option-${index}`;
       btn.setAttribute('role', 'option');
-      btn.setAttribute('aria-selected', String(index === 0));
       const main = document.createElement('span');
       main.className = 'cmd-item-main';
       const label = document.createElement('span');
@@ -191,10 +202,19 @@
         kbd.textContent = cmd.shortcut;
         btn.append(kbd);
       }
-      btn.addEventListener('mouseenter', () => { activeIndex = index; syncActive(); });
+      function selectOption() {
+        if (activeIndex === index) return;
+        activeIndex = index;
+        syncActive();
+      }
+      btn.addEventListener('focus', selectOption);
+      btn.addEventListener('mouseenter', () => {
+        if (!list.contains(document.activeElement)) selectOption();
+      });
       btn.addEventListener('click', () => { closePalette(); cmd.action?.(); });
       list.append(btn);
     });
+    syncActive();
   }
 
   function openPalette() {
@@ -235,7 +255,7 @@
         </div>
         <div class="shortcuts-grid">${sections}</div>
         <div class="trash-foot">
-          <span class="trash-status">Press Ctrl+K at any time to search commands.</span>
+          <span class="trash-status">Press Ctrl+K to search commands.</span>
           <div class="trash-foot-actions">
             <button type="button" class="btn" id="shortcuts-done">Close</button>
           </div>
@@ -249,7 +269,7 @@
       if (event.target === shortcutsOverlay) closeShortcuts();
     });
     shortcutsOverlay.addEventListener('keydown', event => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         event.preventDefault();
         event.stopPropagation();
         closeShortcuts();
@@ -274,13 +294,15 @@
   }
 
   document.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.isComposing) return;
+    const otherSurface = '.overlay.active:not(.mounted), dialog[open], #ctx-menu.active';
     if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       if (cmdOverlay?.classList.contains('active')) {
         event.preventDefault();
         closePalette();
         return;
       }
-      if (document.querySelector('.overlay.active:not(.mounted), dialog[open]')) return;
+      if (document.querySelector(otherSurface)) return;
       event.preventDefault();
       openPalette();
       return;
@@ -288,7 +310,7 @@
     if (event.key === '?' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       const target = event.target;
       if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (document.querySelector('.overlay.active:not(.mounted), dialog[open]')) return;
+      if (document.querySelector(otherSurface)) return;
       event.preventDefault();
       openShortcuts();
     }
