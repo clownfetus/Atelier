@@ -125,32 +125,38 @@
     host.classList.remove('has-art');
     if (preloaded) host.classList.add('has-art');
     const text = document.createElement('div'); text.className = 'library-hero-copy';
-    const eyebrow = document.createElement('span'); eyebrow.textContent = /^Characters\//i.test(path) ? 'CHARACTER LIBRARY' : 'CHARACTER ASSETS';
+    const identityCopy = document.createElement('div'); identityCopy.className = 'library-hero-identity';
+    const heading = document.createElement('div'); heading.className = 'library-hero-heading';
     const title = document.createElement('h2'); title.textContent = label(heroPath);
     const logo=document.createElement('img'); logo.className='hero-emblem'; logo.alt='';
     logo.src='/api/catalogue/hero/'+match[1].split('/')[1]+'/logo'; logo.onerror=()=>logo.remove();
-    title.prepend(logo);
     const signature = document.createElement('img'); signature.className = 'library-hero-signature';
     signature.alt = ''; signature.setAttribute('aria-hidden', 'true'); signature.draggable = false;
     signature.decoding = 'async';
     signature.onload = () => { if (current() && signature.isConnected) signature.classList.add('loaded'); };
     signature.onerror = () => signature.remove();
     signature.src = '/api/catalogue/hero/'+match[1].split('/')[1]+'/signature';
+    heading.append(title, signature);
+    identityCopy.append(heading);
+    text.append(logo, identityCopy);
+    host.append(image, text);
+
     const detail = document.createElement('p');
     detail.textContent = [skinPath && label(skinPath), path.slice((identity?.skin_path || identity?.hero_path || skinPath || heroPath).length + 1).split('/').join(' / '),
-      ].filter(Boolean).join(' · ') || 'Explore costumes, materials and textures';
-    text.append(eyebrow, title, signature);
+      ].filter(Boolean).join(' · ');
     if (inspect) {
       const row = document.createElement('div'); row.className = 'library-hero-detail';
       const button = document.createElement('button');
       button.id = 'library-inspect-costume'; button.type = 'button'; button.className = 'btn';
       button.innerHTML = '<i data-lucide="box" size="15"></i> Inspect in 3D';
       button.addEventListener('click', inspect);
-      row.append(detail, button); text.append(row); host.append(image, text);
+      if (detail.textContent) row.append(detail);
+      row.append(button);
+      identityCopy.append(row);
       lucide.createIcons({nodes: [button]});
       if (restoreInspectFocus) button.focus({preventScroll: true});
-    } else {
-      text.append(detail); host.append(image, text);
+    } else if (detail.textContent) {
+      identityCopy.append(detail);
     }
     const sid = identity?.skin_id || (match?.[2] ? match[2].slice(1) : '');
     if (/^\d{7}$/.test(sid)) {

@@ -8,8 +8,8 @@
 :root[data-theme=light] #library-corner-art { opacity: .12; }
 #library-hero {
   position: relative; isolation: isolate; overflow: hidden; flex: 0 0 auto;
-  min-height: 156px; margin: 0;
-  border-radius: 0;
+  display: flex; align-items: center;
+  min-height: clamp(112px, 14vh, 136px);
   --library-hero-surface: var(--md-sys-color-surface-container);
   background-color: var(--library-hero-surface); transition: background-color 300ms var(--studio-easing);
 }
@@ -28,15 +28,27 @@
 .has-art .library-hero-art { clip-path: inset(0); translate: 0 0; }
 #library-hero::after {
   content: ''; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(90deg, var(--library-hero-surface) 25%, transparent 44%);
+  background: linear-gradient(90deg, var(--library-hero-surface) 34%, transparent 58%);
 }
-.library-hero-copy { position: relative; z-index: 2; width: fit-content; max-width: 48%; padding: 24px 24px; }
-.library-hero-copy > span { font-size: var(--studio-text-micro); font-weight: 600; letter-spacing: var(--studio-label-tracking); color: var(--muted); }
-.library-hero-copy h2 { display:flex; align-items:center; gap:8px; margin: 8px 0 2px; font-size: 28px; line-height: 1.12; color: var(--text); overflow-wrap: anywhere; }
-.library-hero-signature { display: block; width: 132px; height: 36px; max-width: 100%; margin: -2px 0 8px; object-fit: contain; object-position: left center; visibility: hidden; opacity: .45; filter: var(--library-signature-filter); pointer-events: none; user-select: none; }
+.library-hero-copy {
+  position: relative; z-index: 2; display: flex; align-items: center;
+  gap: var(--studio-space-3); max-width: min(64%, 34rem); padding: var(--studio-space-4);
+}
+.library-hero-copy > .hero-emblem { width: 48px; height: 48px; }
+.library-hero-identity { display: grid; gap: var(--studio-space-2); min-width: 0; }
+.library-hero-heading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--studio-space-1) var(--studio-space-3); }
+.library-hero-heading h2 {
+  margin: 0; min-width: 0; font-size: clamp(24px, 4cqi, 32px); line-height: 1.12;
+  color: var(--text); overflow-wrap: anywhere;
+}
+.library-hero-signature {
+  width: clamp(76px, 12cqi, 116px); height: 36px; max-width: 100%; object-fit: contain;
+  object-position: left center; visibility: hidden; opacity: .45; filter: var(--library-signature-filter);
+  pointer-events: none; user-select: none;
+}
 .library-hero-signature.loaded { visibility: visible; }
-.library-hero-copy p { margin: 0; color: var(--muted); font-size: var(--studio-text-detail); overflow-wrap: anywhere; }
-.library-hero-detail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.library-hero-copy p { margin: 0; color: var(--muted); font: var(--studio-type-label); overflow-wrap: anywhere; }
+.library-hero-detail { display: flex; align-items: center; flex-wrap: wrap; gap: var(--studio-space-2) var(--studio-space-3); }
 #library-inspect-costume { background: var(--bg2); white-space: nowrap; }
 #library-inspect-costume:hover { background: var(--bg3); }
 /* Both kinds of banner bleed to the header edges; the surface behind the copy keeps it readable. */
@@ -49,9 +61,14 @@
   pointer-events: none; user-select: none;
 }
 .library-hero-spray[hidden] { display: none; }
-@media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 16px 24px; } .library-hero-copy h2 { font-size: 24px; } .library-hero-spray { width: 48px; height: 48px; right: 16px; bottom: 10px; } }
+@media (max-height: 800px) { .library-hero-spray { width: 48px; height: 48px; right: 16px; bottom: 10px; } }
 @media (max-width: 760px) { .library-hero-spray { display: none; } }
-@media (max-height: 800px) { .library-hero-signature { width: 112px; height: 30px; margin-bottom: 8px; } }
+@container library (max-width: 660px) {
+  #library-hero::after { background: linear-gradient(90deg, var(--library-hero-surface) 50%, transparent 78%); }
+  .library-hero-copy { max-width: 86%; }
+  .library-hero-copy > .hero-emblem { width: 44px; height: 44px; }
+  .library-hero-spray { display: none; }
+}
 
 /* Only the grid container moves. Shared elements have their own named snapshots. */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
