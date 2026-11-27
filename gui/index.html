@@ -279,6 +279,8 @@
     <div id="mat-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="mat-status" class="mat-status"></span>
+      <button class="btn" id="mat-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="mat-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="mat-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="mat-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -481,6 +483,8 @@
     <div id="curve-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="curve-status" class="mat-status"></span>
+      <button class="btn" id="curve-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="curve-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="curve-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="curve-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -500,6 +504,8 @@
     <div id="vfx-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="vfx-status" class="mat-status"></span>
+      <button class="btn" id="vfx-undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn" id="vfx-redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
       <button class="btn" id="vfx-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
       <button class="btn primary" id="vfx-save"><i data-lucide="save" size="13"></i> Save</button>
     </div>
@@ -1137,6 +1143,7 @@
 <script src="/static/settings-tabs.js"></script>
 <script src="/static/project-palette.js"></script>
 <script src="/static/tray-filters.js"></script>
+<script src="/static/edit-history.js"></script>
 <script src="/static/setup-wizard.js"></script>
 <script src="/static/changelog.js"></script>
 <script src="/static/motion/surface-adapters.js"></script>

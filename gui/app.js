@@ -985,9 +985,117 @@ const _matEscape = value => String(value ?? "").replace(/[&<>"']/g, c => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[c]));
 
+const _matHistory = window.AtelierHistory?.create();
+const _curveHistory = window.AtelierHistory?.create();
+const _vfxHistory = window.AtelierHistory?.create();
+
+function _syncHistoryButtons(prefix, stack) {
+  const u = document.getElementById(prefix + "-undo");
+  const r = document.getElementById(prefix + "-redo");
+  if (u) u.disabled = !stack?.canUndo();
+  if (r) r.disabled = !stack?.canRedo();
+}
+
+function _matHistoryState() {
+  return matEditor ? { colors: matEditor.colors, scalars: matEditor.scalars } : null;
+}
+function _matHistoryRecord(key = "") {
+  if (!_matHistory || !matEditor) return;
+  _matHistory.record(_matHistoryState(), key);
+  _syncHistoryButtons("mat", _matHistory);
+}
+function _matHistoryApply(dir) {
+  if (!matEditor || _materialSaving.has(matEditor) || !_matHistory) return false;
+  const snap = dir === "undo" ? _matHistory.undo() : _matHistory.redo();
+  if (!snap) return false;
+  matEditor.colors = snap.colors;
+  matEditor.scalars = snap.scalars;
+  renderMatEditor();
+  dyeRefresh(0);
+  _syncHistoryButtons("mat", _matHistory);
+  return true;
+}
+
+function _curveHistoryState() {
+  return curveEditor ? { channels: curveEditor.channels, dirty: curveEditor.dirty } : null;
+}
+function _curveHistoryRecord(key = "") {
+  if (!_curveHistory || !curveEditor) return;
+  _curveHistory.record(_curveHistoryState(), key);
+  _syncHistoryButtons("curve", _curveHistory);
+}
+function _curveHistoryApply(dir) {
+  if (!curveEditor || !_curveHistory) return false;
+  const snap = dir === "undo" ? _curveHistory.undo() : _curveHistory.redo();
+  if (!snap) return false;
+  curveEditor.channels = snap.channels;
+  curveEditor.dirty = snap.dirty;
+  curveEditor.stops = _resampleStops(curveEditor.channels);
+  renderCurveEditor();
+  _syncHistoryButtons("curve", _curveHistory);
+  return true;
+}
+
+function _vfxHistoryState() {
+  if (!vfxEditor) return null;
+  return {
+    groups: (vfxEditor.groups || []).map(g => ({
+      stops: g.stops,
+      inten: g.inten,
+      restore_original: !!g.restore_original,
+    })),
+    scalars: vfxEditor.scalars || [],
+    vectors: vfxEditor.vectors || [],
+  };
+}
+function _vfxHistoryRecord(key = "") {
+  if (!_vfxHistory || !vfxEditor) return;
+  _vfxHistory.record(_vfxHistoryState(), key);
+  _syncHistoryButtons("vfx", _vfxHistory);
+}
+function _vfxHistoryApply(dir) {
+  if (!vfxEditor || _vfxSaving.has(vfxEditor) || !_vfxHistory) return false;
+  const snap = dir === "undo" ? _vfxHistory.undo() : _vfxHistory.redo();
+  if (!snap) return false;
+  (vfxEditor.groups || []).forEach((g, idx) => {
+    const s = snap.groups?.[idx];
+    if (!s) return;
+    g.stops = s.stops;
+    g.inten = s.inten;
+    if (s.restore_original) g.restore_original = true;
+    else delete g.restore_original;
+  });
+  if (snap.scalars && vfxEditor.scalars) vfxEditor.scalars = snap.scalars;
+  if (snap.vectors && vfxEditor.vectors) vfxEditor.vectors = snap.vectors;
+  renderVfxEditor();
+  _syncHistoryButtons("vfx", _vfxHistory);
+  return true;
+}
+
+window.AtelierHistory?.register("material-overlay", {
+  undo: () => _matHistoryApply("undo"),
+  redo: () => _matHistoryApply("redo"),
+});
+window.AtelierHistory?.register("curve-overlay", {
+  undo: () => _curveHistoryApply("undo"),
+  redo: () => _curveHistoryApply("redo"),
+});
+window.AtelierHistory?.register("vfx-overlay", {
+  undo: () => _vfxHistoryApply("undo"),
+  redo: () => _vfxHistoryApply("redo"),
+});
+document.getElementById("mat-undo")?.addEventListener("click", () => _matHistoryApply("undo"));
+document.getElementById("mat-redo")?.addEventListener("click", () => _matHistoryApply("redo"));
+document.getElementById("curve-undo")?.addEventListener("click", () => _curveHistoryApply("undo"));
+document.getElementById("curve-redo")?.addEventListener("click", () => _curveHistoryApply("redo"));
+document.getElementById("vfx-undo")?.addEventListener("click", () => _vfxHistoryApply("undo"));
+document.getElementById("vfx-redo")?.addEventListener("click", () => _vfxHistoryApply("redo"));
+
 function _matRemember(editor, original) {
   const copy = value => JSON.parse(JSON.stringify(value));
   const saved = { colors: copy(editor.colors), scalars: copy(editor.scalars) };
+  _matHistory?.reset({ colors: editor.colors, scalars: editor.scalars });
+  _syncHistoryButtons("mat", _matHistory);
   _materialReferences.set(editor, { saved,
     original: original ? { colors: _seedColors(original.colors), scalars: _seedScalars(original.scalars) } : null });
 }
@@ -1063,6 +1171,7 @@ function matRevertDraft() {
   if (!saved) return;
   matEditor.colors = JSON.parse(JSON.stringify(saved.colors));
   matEditor.scalars = JSON.parse(JSON.stringify(saved.scalars));
+  _matHistoryRecord("revert");
   renderMatEditor(); dyeRefresh(0);
   document.getElementById("mat-status").textContent = "Unsaved parameters reverted to their saved values.";
 }
@@ -1913,6 +2022,7 @@ function matColor(i, hex) {
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _matSyncRow(i, "matsw" + i);
+  _matHistoryRecord("color:" + i);
   dyeRefresh();
 }
 
@@ -1924,6 +2034,7 @@ function matColorText(i, el) {
   c.rgba[0] = rgb[0] * n; c.rgba[1] = rgb[1] * n; c.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);          // normalise what they typed
   _matSyncRow(i, el.id);
+  _matHistoryRecord("colortxt:" + i);
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
@@ -1931,13 +2042,15 @@ function matInten(i, v, fromRange) {
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
   _matSyncRow(i, (fromRange ? "mir" : "min") + i);
+  _matHistoryRecord("inten:" + i);
   dyeRefresh();
 }
-function matAlpha(i, v) { matActiveColorIndex = i; matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matUpdateWell(i); _matRefreshDirty(); if (matEditor?.changedOnly) applyMatFilter(); dyeRefresh(); }
+function matAlpha(i, v) { matActiveColorIndex = i; matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matUpdateWell(i); _matRefreshDirty(); _matHistoryRecord("alpha:" + i); if (matEditor?.changedOnly) applyMatFilter(); dyeRefresh(); }
 function matScalar(i, v, fromRange) {
   matEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
   _matRefreshDirty();
+  _matHistoryRecord("scalar:" + i);
   if (matEditor?.changedOnly) applyMatFilter();
 }
 
@@ -2165,6 +2278,8 @@ async function openCurveEditor(item) {
   if (!current()) return;
   if (!res.ok) { document.getElementById("curve-body").textContent = res.error || "Failed to read curve"; return; }
   curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
+  _curveHistory?.reset(_curveHistoryState());
+  _syncHistoryButtons("curve", _curveHistory);
   renderCurveEditor();
   _syncBulkEditorAction('curve');
   loadSidebar();
@@ -2209,22 +2324,23 @@ function _curveTouch(ch) {
 
 function curveKeyField(ch, i, field, v) {
   const c = curveEditor; if (!c || !c.channels[ch] || !c.channels[ch][i]) return;
-  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); renderCurveEditor(); return; }
+  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); _curveHistoryRecord("interp:" + ch + ":" + i); renderCurveEditor(); return; }
   const val = parseFloat(v); if (isNaN(val)) return;
   c.channels[ch][i][field] = val;
   _curveTouch(ch);
+  _curveHistoryRecord("field:" + ch + ":" + i + ":" + field);
 }
 
 function curveAddKey(ch) {
   const c = curveEditor; const keys = c.channels[ch] || (c.channels[ch] = []);
   const t = keys.length ? Math.min(1, (+keys[keys.length - 1].time || 0) + 0.1) : 0;
   keys.push({ time: t, value: 0, interp: "RCIM_Linear", arriveTangent: 0, arriveTangentWeight: 0, leaveTangent: 0, leaveTangentWeight: 0 });
-  _curveTouch(ch); renderCurveEditor();
+  _curveTouch(ch); _curveHistoryRecord("add:" + ch); renderCurveEditor();
 }
 
 function curveRemoveKey(ch, i) {
   const c = curveEditor; if (!c.channels[ch]) return;
-  c.channels[ch].splice(i, 1); _curveTouch(ch); renderCurveEditor();
+  c.channels[ch].splice(i, 1); _curveTouch(ch); _curveHistoryRecord("rem:" + ch); renderCurveEditor();
 }
 
 async function saveCurve() {
@@ -2346,6 +2462,8 @@ async function openVfxEditor(item) {
                 groups: (res.groups || []).map(g => ({ ...g, stops:g.stops.map(s=>s.slice()), inten: _vfxInten(g, res.inten) })),
                 unsupportedExports: res.unsupported_exports || [], unmatchedEdits: res.unmatched_edits || 0 };
   _rememberVfxSaved(vfxEditor);
+  _vfxHistory?.reset(_vfxHistoryState());
+  _syncHistoryButtons("vfx", _vfxHistory);
   renderVfxEditor();
   _syncBulkEditorAction('vfx');
   loadSidebar();
@@ -2541,6 +2659,7 @@ function vfxVal(gi, si, ci, val) {
   delete g.restore_original;
   g.stops[si][ci] = x;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfx:" + gi + ":" + si + ":" + ci);
 }
 
 function vfxStop(gi, si, hex) {
@@ -2550,6 +2669,7 @@ function vfxStop(gi, si, hex) {
   s[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   s[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxstop:" + gi + ":" + si);
 }
 function vfxAlpha(gi, si, v) {
   const g = vfxEditor.groups[gi], s = g.stops[si], a = parseFloat(v);
@@ -2558,6 +2678,7 @@ function vfxAlpha(gi, si, v) {
   while (s.length < 4) s.push(1);
   s[3] = Math.min(1, Math.max(0, a));
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxalpha:" + gi + ":" + si);
 }
 function vfxInten(gi, val, fromRange) {
   const g = vfxEditor.groups[gi], o = Math.max(g.inten, 1e-6), nv = parseFloat(val) || 0, k = nv / o;
@@ -2567,6 +2688,7 @@ function vfxInten(gi, val, fromRange) {
   g.inten = nv;
   const other = document.getElementById((fromRange ? "vinn" : "vint") + gi); if (other) other.value = val;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxinten:" + gi);
 }
 
 async function saveVfx() {
