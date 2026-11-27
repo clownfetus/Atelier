@@ -122,19 +122,10 @@ export function createAssemblyView(api) {
     }
     if (!list.childElementCount) list.append(make('p', query ? 'No matching surfaces.' : 'Surfaces appear as the model loads.', 'assembly-empty'));
     list.scrollTop = scroll;
-    if (picked?.id !== lastGeometrySection) {
-      const row = [...list.querySelectorAll('.assembly-section')].find(row=>row.dataset.section === picked?.id);
-      if (row) {
-        const region = list.getBoundingClientRect(), bounds = row.getBoundingClientRect();
-        if (bounds.top < region.top) list.scrollTop -= region.top - bounds.top;
-        else if (bounds.bottom > region.bottom) list.scrollTop += bounds.bottom - region.bottom;
-      }
-      lastGeometrySection = picked?.id;
-    }
     const detail = $('assembly-geometry-selection');
     const expanded = detail.dataset.material === selected && detail.querySelector('details')?.open;
     detail.replaceChildren(); detail.dataset.material = selected || '';
-    if (!picked || !selected) return;
+    if (!picked || !selected) { lastGeometrySection = null; return; }
     const info = data[selected];
     detail.append(make('span', 'Selected surface', 'assembly-eyebrow'), make('strong', api.label(selected)));
     const dl = make('dl', null, 'assembly-properties');
@@ -159,6 +150,15 @@ export function createAssemblyView(api) {
     const blender = button('Edit in Blender', () => api.blender(picked.mesh_game_rel));
     const replace = button('Replace model', () => api.replaceMesh(picked.mesh_game_rel));
     actions.append(uv, blender, replace); detail.append(actions);
+
+    // The selected-surface controls take room from the list. Reveal the chosen row after they have been laid out.
+    const row = list.querySelector('.assembly-section[aria-pressed="true"]');
+    if (row && picked.id !== lastGeometrySection) {
+      const region = list.getBoundingClientRect(), bounds = row.getBoundingClientRect();
+      if (bounds.top < region.top) list.scrollTop -= region.top - bounds.top;
+      else if (bounds.bottom > region.bottom) list.scrollTop += bounds.bottom - region.bottom;
+    }
+    lastGeometrySection = row ? picked.id : null;
   }
 
   function canEditCandidate(info) {
@@ -173,20 +173,32 @@ export function createAssemblyView(api) {
     context.dataset.material = selected || '';
     context.replaceChildren();
     box.classList.toggle('assembly-unverified', !!selected && !trusted && !editingCandidate);
-    if (selected && !info && api.state().loading) {
-      context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'), make('p', 'Reading material references…', 'assembly-empty'));return;
-    }
     if (!selected) {
-      context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'), make('h3', 'Select a surface'),
+      context.append(make('h3', 'Select a surface'),
         make('p', 'Select a surface on the model or browse materials above.', 'assembly-empty'));
       return;
     }
-    context.append(make('span', '02 / MATERIAL', 'assembly-eyebrow'));
+    const summary = make('div', null, 'vp-selection-summary assembly-selection-summary');
+    const meta = make('div', null, 'assembly-selection-meta');
+    meta.append(make('span', section ? 'Selected surface' : 'Selected material', 'vp-selection-label'));
+    if (edited[selected]) meta.append(make('span', 'Unsaved changes', 'vp-selection-state vp-draft-state'));
+    else if (trusted) meta.append(make('span', ownership(info.game_rel), 'vp-selection-state'));
+    summary.append(meta, make('h3', api.label(selected)));
+    context.append(summary);
+    if (!info && api.state().loading) {
+      context.append(make('p', 'Reading material references…', 'assembly-empty'));
+      return;
+    }
+
     const card = button('', () => { materialFocus = true; texture = null; updateRelationships(); renderTextureActions(); pulse(); }, 'assembly-material-card');
     card.setAttribute('aria-label', 'Highlight sections using this material'); card.disabled = !trusted;
     const swatch = make('span', null, 'assembly-material-swatch');
+    const description = make('span', null, 'assembly-material-description');
+    description.id = 'assembly-material-description';
+    card.setAttribute('aria-describedby', description.id);
     if (info) swatch.style.background = api.swatch(selected, info);
-    card.append(swatch, make('strong', trusted ? leaf(info.game_rel) : info?.slot_name || api.label(selected))); context.append(card);
+    description.append(make('strong', trusted ? leaf(info.game_rel) : info?.slot_name || api.label(selected)));
+    card.append(swatch, description); context.append(card);
     if (!trusted) {
       context.append(chip('Reference unverified'), referenceWarning(
         info?.mapping_error ? 'Could not verify this surface’s material link.' : bindingNotice(info), info?.mapping_error));
@@ -202,26 +214,25 @@ export function createAssemblyView(api) {
       }
       return;
     }
-    context.append(chip(ownership(info.game_rel), !!projectRecord(info.game_rel)),
-      ...(edited[selected] ? [chip('Unsaved colours', true)] : []));
     if (info.material_error) context.append(referenceWarning('Could not read this material’s properties. Reopen the preview to retry.', info.material_error));
-    const path = make('p', info.game_rel, 'assembly-path'); path.title = info.game_rel; context.append(path);
+    const path = make('p', info.game_rel, 'assembly-path'); path.title = info.game_rel;
     const materialNames = relatedMaterials(data, info.game_rel), affected = sections.filter(s => materialNames.includes(s.name));
+    const visible = affected.filter(section => section.material.visible).length;
+    description.append(make('span', `Affects ${visible} visible section${visible === 1 ? '' : 's'}`, 'assembly-material-scope'));
     const used = make('div', null, 'assembly-affected');
-    used.append(make('span', `Affects ${affected.length} visible section${affected.length === 1 ? '' : 's'}`));
+    used.hidden = !affected.length;
     for (const other of affected) {
       const control = button(`${api.label(other.name)} · ${sections.indexOf(other)+1}`, () => choose(other));
       control.title = `${other.owner.name} · Section ${other.groupIndex + 1}`;
       control.setAttribute('aria-pressed', String(other.id === section?.id)); used.append(control);
     }
-    context.append(used);
     const shader = make('dl', null, 'assembly-properties');
     shader.append(make('dt', 'Shader'), make('dd', info.surface?.parent || 'Not reported'),
       make('dt', 'Texture slots'), make('dd', String(boundTextures(info).length)));
     if (info.surface?.blend) shader.append(make('dt', 'Blend'), make('dd', info.surface.blend.replace('BLEND_', '')));
     const details = make('details', null, 'assembly-material-details');
     details.open = !!detailsOpen;
-    details.append(make('summary', 'Material details'), used, shader);
+    details.append(make('summary', 'Material details'), path, used, shader);
     if (info.visibility_warning) details.append(make('p', info.visibility_warning, 'assembly-empty'));
     const inferred = (info.texture_sources || []).filter(source => source.inferred);
     if (inferred.length) details.append(make('p', `${inferred.length} preview shader default${inferred.length === 1 ? '' : 's'} omitted from connected slots: ${inferred.map(s=>s.slot).join(', ')}.`, 'assembly-empty'));

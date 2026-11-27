@@ -145,6 +145,8 @@ def run_catalogue_identity_checks(context, url, report, checks):
 
         tab.evaluate('gr=>openMaterialEditor({game_rel:gr,name:"Body"})', material)
         tab.wait_for_selector('#mattex-name-0', state='attached')
+        if not tab.locator('.mat-textures').evaluate('el=>el.open'):
+            tab.locator('.mat-textures > summary').click()
         tab.locator('.mat-texture-location summary').click()
         tab.locator('#mattex-folder-0').fill('../escape')
         tab.locator('.mat-texture-location .btn').click()

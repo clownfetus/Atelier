@@ -130,7 +130,15 @@ def run_assembly_checks(context, url, report, checks):
         assert opening[0]['clipPath'] == 'inset(0px 0px 100%)' and not any('opacity' in frame for frame in opening), opening
         checks.append('Assembly View texture thumbnails open downwards from their top edge once loaded, without a fade')
         assert tab.evaluate('__assembly.state().surface') == 'Torso fixture'
-        assert tab.locator('#assembly-material-context').inner_text().count('Materials/MI_Body') >= 1
+        inspector = tab.locator('#assembly-material-context')
+        assert inspector.get_by_role('heading', name='Body', exact=True).is_visible()
+        assert 'Affects 3 visible sections' in inspector.inner_text()
+        assert inspector.get_by_role('button', name='Edit material', exact=True).is_visible()
+        material_path = inspector.get_by_text('Materials/MI_Body', exact=True)
+        assert material_path.is_hidden()
+        inspector.get_by_text('Material details', exact=True).click()
+        assert material_path.is_visible()
+        inspector.get_by_text('Material details', exact=True).click()
         before = tab.evaluate('__assembly.state()')
         tab.get_by_role('button', name='Hide panels').click()
         assert tab.locator('#assembly-geometry').is_hidden() and tab.locator('#viewport-materials').is_hidden()
@@ -156,6 +164,8 @@ def run_assembly_checks(context, url, report, checks):
         checks.append('Effects inspect references on demand and explain missing reverse references')
         before = tab.evaluate('__assembly.orbitAndOpen()')
         tab.wait_for_selector('#material-overlay.active')
+        assert tab.locator('#mat-title').inner_text() == 'Body'
+        assert tab.locator('#mat-sub').inner_text() == 'Materials/MI_Body'
         tab.locator('#mat-close').click()
         tab.wait_for_selector('#viewport-overlay.active')
         tab.wait_for_function("document.getElementById('viewport-canvas').getAttribute('aria-busy')==='false'")

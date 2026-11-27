@@ -51,6 +51,7 @@ const recolour = createViewportRecolour({
   materials:name => matsByName[name] || [], baseline:name => baselineMaps.get(name), loader:texLoader,
   fetch:(url, options) => projectFetch(url, options), retint:name => retint(name), note:(message, kind) => note(message, kind),
   rebuild:() => buildPanel(), reload:() => reloadMaterials(),
+  previewChanged:() => refreshViewportEditStatus(),
   // A saved recolour replaces the map on every part that draws this texture.
   applied:(texture, ver) => Promise.all(Object.entries(matData).filter(([, info]) => info.texture_roles?.basecolor === texture)
     .map(([name, info]) => { info.tex_ver = {...info.tex_ver, [texture]:ver}; return applyMatTexture(name, texture, 'map', ver); })),
@@ -430,6 +431,7 @@ function clearModel() {
   generation++;   // invalidate any in-flight texture loads from the previous model
   materialGeneration++;
   for (const timer of Object.values(_dyeMeshTimer)) clearTimeout(timer);
+  recolour.discard();
   clearLiveDyes();
   baselineMaps.clear();
   for (const ch of [...modelRoot.children]) { modelRoot.remove(ch); disposeTree(ch); }
@@ -903,8 +905,9 @@ function pickMaterial(name, openEditor = true, surface = null, textureSlot = nul
   }
   if (hasPendingEdits()) { note('Save or revert your studio changes before opening the full editor.', 'warning'); $('viewport-mat-save').focus(); return; }
   if (typeof window.openMaterialEditor !== 'function') { $('viewport-material-editor').querySelector('input')?.focus(); return; }
-  openConnectedEditor('material-overlay',()=>window.AtelierAssetEditors?.material({name:info.game_rel.split('/').pop(),game_rel:info.game_rel},textureSlot)
-    || window.openMaterialEditor({name,game_rel:info.game_rel}));
+  const item = {name:info.game_rel.split('/').pop(), game_rel:info.game_rel, partLabel:materialLabel(name)};
+  openConnectedEditor('material-overlay',()=>window.AtelierAssetEditors?.material(item,textureSlot)
+    || window.openMaterialEditor(item));
 }
 
 // Keep one scene alive while the established editor owns its ordinary modal.
@@ -1356,11 +1359,24 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   if (!info) { recolour.discard(); return; }
   const name = selectedMaterial;
   const heading = document.createElement('div'); heading.className = 'vp-editor-title';
-  const title = document.createElement('h3'); title.textContent = assembly?.active() ? 'Colour controls' : materialGroup(name);
+  const title = document.createElement('h3');
+  if (assembly?.active()) {
+    title.textContent = 'Colour controls';
+    heading.append(title);
+  } else {
+    heading.classList.add('vp-selection-summary');
+    const identity = document.createElement('div'); identity.className = 'vp-selection-identity';
+    const label = document.createElement('span'); label.className = 'vp-selection-label'; label.textContent = 'Selected part';
+    title.textContent = materialLabel(name);
+    identity.append(label, title);
+    const state = document.createElement('span'); state.className = 'vp-selection-state vp-draft-state';
+    state.textContent = 'Unsaved changes'; state.hidden = !edited[name];
+    heading.append(identity, state);
+  }
   const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'vp-editor-dismiss';
   dismiss.setAttribute('aria-label','Deselect material'); dismiss.title = 'Deselect material'; dismiss.innerHTML = '<i data-lucide="x" size="17"></i>';
   dismiss.addEventListener('click',()=>{selectedMaterial=null;buildPanel();$('viewport-mat-section').scrollTop=0;$('viewport-canvas').focus();});
-  heading.append(title,dismiss); editor.append(heading);
+  heading.append(dismiss); editor.append(heading);
   if (info.surface?.preview_omitted) {
     const hint=document.createElement('p');hint.className='vp-inspector-hint';
     hint.textContent=info.surface.preview_omitted==='Animated game effect'
@@ -1406,7 +1422,7 @@ function buildMaterialInspector(names = Object.keys(matData)) {
   window.AtelierIcons?.createIcons({nodes:[editor]});
 }
 
-function colorField(name, color, label, references) {
+function colorField(name, color, label, quick) {
   const row = document.createElement('div'); row.className = 'vp-color-field'; row.dataset.material = name; row.dataset.parameter = color.name;
   const caption = document.createElement('label'); caption.className = 'vp-color-label'; caption.textContent = label; caption.title = color.name;
   const controls = document.createElement('div'); controls.className = 'vp-color-controls';
@@ -1424,28 +1440,23 @@ function colorField(name, color, label, references) {
   });
   hex.addEventListener('input',()=>hex.setCustomValidity(''));
   controls.append(picker,hex); row.append(caption,controls);
-  if (references) {
-    const comparison = document.createElement('div'); comparison.className = 'vp-color-references';
-    for (const saved of [true,false]) {
-      const ref = document.createElement('div'); ref.className = 'vp-color-reference';
-      const text = document.createElement('span'); text.textContent = saved ? 'Saved' : 'Current';
-      const swatch = document.createElement(saved ? 'button' : 'span'); swatch.className = saved ? 'vp-saved-swatch' : 'vp-current-swatch';
-      const code = document.createElement('code'); code.className = saved ? 'vp-saved-hex' : 'vp-current-hex';
-      if (saved) {
-        swatch.type='button';swatch.title=`Restore saved ${color.name}`;swatch.setAttribute('aria-label',swatch.title);
-        swatch.style.setProperty('--vp-saved-color',linToHex(color.rgba));code.textContent=linToHex(color.rgba);
-        swatch.addEventListener('click',()=>{
-          if (saving) return;
-          for(const peer of materialPeers(name)) {
-            if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
-            retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer,{immediate:true});
-          }
-          picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
-        });
+  if (quick) {
+    row.classList.add('vp-quick-colour');
+    const ref = document.createElement('div'); ref.className = 'vp-color-reference';
+    const text = document.createElement('span'); text.textContent = 'Saved';
+    const swatch = document.createElement('button'); swatch.className = 'vp-saved-swatch'; swatch.type = 'button';
+    swatch.title = `Restore saved ${color.name}`; swatch.setAttribute('aria-label', swatch.title);
+    const code = document.createElement('code'); code.className = 'vp-saved-hex'; code.textContent = linToHex(color.rgba);
+    swatch.style.setProperty('--vp-saved-color',code.textContent);
+    swatch.addEventListener('click',()=>{
+      if (saving) return;
+      for(const peer of materialPeers(name)) {
+        if (edited[peer]) {delete edited[peer][color.name];if(!Object.keys(edited[peer]).length) delete edited[peer];}
+        retint(peer);if(matData[peer].dyeable || matData[peer].eye_preview)dyeRebakeMesh(peer,{immediate:true});
       }
-      ref.append(text,swatch,code);comparison.append(ref);
-    }
-    row.append(comparison);
+      picker.value=linToHex(color.rgba);hex.value=picker.value.toUpperCase();refreshFoot();
+    });
+    ref.append(text,swatch,code); row.append(ref);
   }
   return row;
 }
@@ -1547,8 +1558,21 @@ async function dyeDownloadMesh(matName) {
   } catch (e) { /* ignore */ }
 }
 
+function pendingColourCount() {
+  return Object.values(edited).reduce((count, params) => count + Object.keys(params).length, 0);
+}
+
+function refreshViewportEditStatus(count = pendingColourCount()) {
+  const hint = $('viewport-unsaved');
+  const texturePreview = selectedMaterial && recolour.previewing() === selectedMaterial;
+  hint.classList.toggle('is-dirty', count > 0);
+  const message = count ? `${count} unsaved change${count === 1 ? '' : 's'}`
+    : texturePreview ? 'Texture preview' : 'All changes saved';
+  if (hint.textContent !== message) hint.textContent = message;
+}
+
 function refreshFoot() {
-  const n = Object.values(edited).reduce((a, m) => a + Object.keys(m).length, 0);
+  const n = pendingColourCount();
   const save = $('viewport-mat-save');
   save.disabled = saving || n === 0 || !!inspection?.capturing();
   save.textContent = saving ? 'Saving…' : 'Save changes';
@@ -1558,23 +1582,24 @@ function refreshFoot() {
   document.querySelectorAll('#viewport-material-editor .vp-color-field').forEach(row => {
     const changed = !!edited[row.dataset.material]?.[row.dataset.parameter];
     row.classList.toggle('is-modified', changed);
-    const saved = row.querySelector('.vp-saved-swatch');
-    if (saved) saved.disabled = saving || !changed;
+    const ref = row.querySelector('.vp-color-reference');
+    if (ref) {
+      ref.hidden = !changed;
+      ref.querySelector('.vp-saved-swatch').disabled = saving || !changed;
+    }
     const color = matData[row.dataset.material]?.colors.find(color=>color.name === row.dataset.parameter);
     if (!color) return;
     const value = linToHex(edited[row.dataset.material]?.[color.name] || color.rgba);
     row.querySelector('input[type=color]').value = value;
     const hex = row.querySelector('.vp-hex'); if (document.activeElement !== hex) hex.value = value.toUpperCase();
-    const current = row.querySelector('.vp-current-swatch'), code = row.querySelector('.vp-current-hex');
-    if (current) current.style.background = value;
-    if (code) code.textContent = value;
   });
   for (const row of $('viewport-mat-list').querySelectorAll('.vp-mat')) {
     const marker = row.querySelector('.vp-draft-marker'); if (marker) marker.hidden = !Object.keys(edited).some(name=>materialGroup(name)===row.dataset.group);
   }
   const revert = $('viewport-material-editor').querySelector('.vp-revert-material'); if (revert) revert.disabled = saving || !edited[selectedMaterial];
-  const hint = $('viewport-unsaved'); hint.classList.toggle('is-dirty',!!n);
-  hint.textContent = n ? `${n} unsaved colour${n === 1 ? '' : 's'}` : 'All changes saved';
+  const selectionState = $('viewport-material-editor').querySelector('.vp-selection-state');
+  if (selectionState) selectionState.hidden = !edited[selectedMaterial];
+  refreshViewportEditStatus(n);
   assembly?.sync();
 }
 

@@ -158,12 +158,18 @@ function curveEditor(initial, view, onChange) {
 export function createViewportRecolour(api) {
   const drafts = new Map();       // material -> {colour, mode, strength}
   const states = new Map();       // texture game_rel -> server state (recipe, edited, token…)
-  let preview = null;             // {name, texture, revision}
+  let preview = null;             // the texture currently displayed on the model
+  let panel = null;
   let revision = 0, timer = 0;
-  const curveView = {open:false};  // whether "Edit curve by hand" stays open across panel rebuilds
+  const curveView = {open:false, toneOpen:false};
 
   const textureOf = info => info?.texture_roles?.basecolor;
   const eligible = info => !!textureOf(info) && !info.dyeable && !info.eye_preview && !info.texture_urls?.basecolor;
+
+  function refreshPreviewLabel() {
+    if (panel) panel.previewLabel.textContent = preview?.name === panel.name ? 'Preview only' : '';
+    api.previewChanged?.();
+  }
 
   function restoreMap() {
     if (!preview) return;
@@ -172,18 +178,20 @@ export function createViewportRecolour(api) {
     }
     preview.texture?.dispose();
     preview = null;
+    refreshPreviewLabel();
   }
 
   // The panel rebuilds often; only a part other than `keep` loses its draft and preview.
   function discard(keep = null) {
+    if (panel?.name !== keep) panel = null;
     if (preview && preview.name !== keep) restoreMap();
     for (const name of [...drafts.keys()]) if (name !== keep) drafts.delete(name);
     if (!keep || !drafts.has(keep)) { clearTimeout(timer); revision++; }
   }
 
-  async function showPreview(name, info, draft, status) {
-    const ticket = ++revision;
-    status.textContent = 'Preparing preview…';
+  async function showPreview(name, info, draft, ticket) {
+    if (ticket !== revision || !drafts.has(name)) return;
+    if (panel?.name === name && !panel.apply.disabled) panel.status.textContent = 'Preparing preview…';
     try {
       const response = await api.fetch('/api/texture_recolour/preview', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({game_rel:textureOf(info), ...draft})});
@@ -200,9 +208,10 @@ export function createViewportRecolour(api) {
       previous?.dispose();
       preview = {name, texture};
       api.retint(name);
-      status.textContent = 'Preview only. Apply recolour to keep it.';
+      refreshPreviewLabel();
+      if (panel?.name === name && !panel.apply.disabled) panel.status.textContent = '';
     } catch (error) {
-      if (ticket === revision) status.textContent = error.message;
+      if (ticket === revision && panel?.name === name && !panel.apply.disabled) panel.status.textContent = error.message;
     }
   }
 
@@ -215,8 +224,10 @@ export function createViewportRecolour(api) {
 
   async function apply(name, info, controls, replace = false) {
     const draft = drafts.get(name); if (!draft) return;
+    clearTimeout(timer); revision++;
     controls.apply.disabled = true; controls.status.textContent = 'Saving recolour…';
     let stopWorking = working(controls.status);
+    let saved = false;
     try {
       const result = await api.fetch('/api/texture_recolour', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({game_rel:textureOf(info), ...draft, replace})}).then(r => r.json());
@@ -224,39 +235,47 @@ export function createViewportRecolour(api) {
       if (result.needs_replace) {
         const ok = await window.AtelierDialog.confirm({title:'Replace edited texture?', confirmLabel:'Replace', tone:'danger',
           body:'This texture has edits made another way, such as painting or a replacement. Recolouring replaces them with the game texture plus this colour.'});
-        if (ok) return apply(name, info, controls, true);
+        if (ok) return await apply(name, info, controls, true);
         controls.status.textContent = 'Recolour not applied.'; return;
       }
       if (!result.ok) throw Error(result.error || 'Could not save the recolour');
+      saved = true;
       states.delete(textureOf(info));
       drafts.delete(name); revision++;
       await api.applied(textureOf(info), result.ver);
-      if (preview?.name === name) { preview.texture.dispose(); preview = null; }
+      if (preview?.name === name) { preview.texture.dispose(); preview = null; refreshPreviewLabel(); }
       api.note('Recolour saved to your mod', 'success');
       await window.loadSidebar?.();
     } catch (error) {
       controls.status.textContent = error.message;
-    } finally { stopWorking(); api.rebuild(); }
+    } finally {
+      stopWorking();
+      if (saved) api.rebuild();
+      else if (panel === controls) controls.apply.disabled = !drafts.has(name);
+    }
   }
 
-  function field(label, name, input, tag = 'label') {
+  function field(label, input, tag = 'label') {
     const row = document.createElement(tag); row.className = 'vp-recolour-row';
-    const caption = document.createElement('span'); caption.className = 'vp-recolour-caption';
-    const text = document.createElement('span'); text.textContent = label;
-    caption.append(icon(name), text);
+    const caption = document.createElement('span');
+    caption.textContent = label;
     row.append(caption, input); return row;
   }
 
   function section(name, info) {
-    discard(name);
-    if (!eligible(info)) return null;
+    const supported = eligible(info);
+    discard(supported ? name : null);
+    if (!supported) return null;
     const texture = textureOf(info);
     const box = document.createElement('section'); box.className = 'vp-recolour'; box.setAttribute('aria-label','Recolour texture');
+    const heading = document.createElement('div'); heading.className = 'vp-recolour-heading';
     const title = document.createElement('h4'); title.textContent = 'Recolour texture';
-    const hint = document.createElement('p'); hint.className = 'vp-inspector-hint';
-    hint.textContent = 'Blend a colour into this part\'s texture. The game shows it exactly as previewed.';
+    const previewLabel = document.createElement('span'); previewLabel.className = 'vp-recolour-preview';
+    previewLabel.setAttribute('role','status');
+    previewLabel.textContent = preview?.name === name ? 'Preview only' : '';
     const status = document.createElement('p'); status.className = 'vp-recolour-status'; status.setAttribute('role','status');
-    box.append(title, hint);
+    heading.append(title, previewLabel);
+    box.append(heading);
 
     const saved = states.get(texture);
     const draft = {curve:STRAIGHT, ...(drafts.get(name) || saved?.recipe || {colour:'#3F6FD8', mode:'color', strength:1})};
@@ -270,11 +289,20 @@ export function createViewportRecolour(api) {
     const strength = document.createElement('input'); strength.type = 'range'; strength.min = '0'; strength.max = '100';
     strength.value = String(Math.round(draft.strength * 100)); strength.setAttribute('aria-label','Strength');
     const amount = document.createElement('output'); amount.textContent = strength.value + '%';
-    const strengthRow = document.createElement('div'); strengthRow.className = 'vp-recolour-strength'; strengthRow.append(strength, amount);
+    const strengthRow = field('Strength', strength);
+    strengthRow.classList.add('vp-recolour-strength');
+    strengthRow.append(amount);
+    const fields = document.createElement('div'); fields.className = 'vp-recolour-fields';
+    fields.append(field('Colour', colour, 'div'), field('Blend', mode), strengthRow);
+
     let curve = draft.curve;
-    const curveRow = field('Curve', 'spline', curveEditor(curve, curveView, points => { curve = points; changed(); }), 'div');
-    curveRow.classList.add('vp-recolour-curve');
-    box.append(field('Colour', 'palette', colour), field('Blend', 'layers', mode), field('Strength', 'sliders-horizontal', strengthRow), curveRow);
+    const tone = document.createElement('details'); tone.className = 'vp-recolour-curve';
+    tone.open = curveView.toneOpen;
+    tone.addEventListener('toggle', () => { if (tone.isConnected) curveView.toneOpen = tone.open; });
+    const toneHeading = document.createElement('summary'); toneHeading.textContent = 'Tone curve';
+    toneHeading.append(icon('chevron-right'));
+    tone.append(toneHeading, curveEditor(curve, curveView, points => { curve = points; changed(); }));
+    box.append(fields, tone);
 
     const actions = document.createElement('div'); actions.className = 'vp-recolour-actions';
     const applyButton = iconButton('vp-recolour-apply', 'check', 'Apply recolour'); applyButton.disabled = !drafts.has(name);
@@ -284,14 +312,17 @@ export function createViewportRecolour(api) {
     actions.append(applyButton, cancel, restore);
     const feedback = document.createElement('div'); feedback.className = 'vp-recolour-feedback'; feedback.append(status);
     box.append(actions, feedback);
-    const controls = {apply:applyButton, status};
+    const controls = {name, apply:applyButton, previewLabel, status};
+    panel = controls;
 
     const changed = () => {
       const value = {colour:picker.value.toUpperCase(), mode:mode.value, strength:Number(strength.value) / 100, curve};
       drafts.set(name, value);
       applyButton.disabled = false; cancel.hidden = false; restore.hidden = true;
       amount.textContent = strength.value + '%';
-      clearTimeout(timer); timer = setTimeout(() => showPreview(name, info, value, status), 180);
+      clearTimeout(timer);
+      const ticket = ++revision;
+      timer = setTimeout(() => showPreview(name, info, value, ticket), 180);
     };
     picker.addEventListener('input', () => { hex.value = picker.value.toUpperCase(); changed(); });
     hex.addEventListener('change', () => {
@@ -302,7 +333,7 @@ export function createViewportRecolour(api) {
     mode.addEventListener('change', changed);
     strength.addEventListener('input', changed);
     applyButton.addEventListener('click', () => apply(name, info, controls));
-    cancel.addEventListener('click', () => { drafts.delete(name); revision++; restoreMap(); api.rebuild(); });
+    cancel.addEventListener('click', () => { discard(); api.rebuild(); });
     restore.addEventListener('click', async () => {
       if (!saved?.token || !(await window.AtelierModTray?.restore(saved.token))) return;
       states.delete(texture); api.reload();

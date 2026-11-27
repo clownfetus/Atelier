@@ -82,12 +82,16 @@ def run_workspace_checks(context, url, report, checks):
     page.route('**/api/delete_imported', delete)
     texture_rel = 'Characters/1029/1029001/Textures/T_Body'
     recolour_saves = []
+    reject_recolour = False
     blue = BytesIO(); Image.new('RGB', (16, 16), (32, 80, 255)).save(blue, 'PNG')
     page.route('**/api/texture_recolour?*', lambda route: route.fulfill(json={
         'ok': True, 'recipe': {k: recolour_saves[-1][k] for k in ('colour', 'mode', 'strength', 'curve')} if recolour_saves else None,
         'edited': bool(recolour_saves), 'hand_edited': False, 'hdr': False, 'token': 'tok-tex'}))
     page.route('**/api/texture_recolour/preview', lambda route: route.fulfill(body=blue.getvalue(), content_type='image/png'))
     def recolour_save(route):
+        if reject_recolour:
+            route.fulfill(json={'ok': False, 'error': 'The fixture could not save the recolour.'})
+            return
         recolour_saves.append(route.request.post_data_json)
         imported.append({**body_edit, 'token': 'tok-tex', 'game_rel': texture_rel, 'name': 'T_Body', 'file_type': 'texture'})
         route.fulfill(json={'ok': True, 'token': 'tok-tex', 'game_rel': texture_rel, 'ver': '2'})
@@ -175,6 +179,8 @@ def run_workspace_checks(context, url, report, checks):
         assert 'Save a colour change' in page.locator('#workspace-dock-status').inner_text()
         assert page.locator('#workspace-review').is_disabled()
         page.locator('.vp-material-select').first.click()
+        assert page.locator('#viewport-material-editor').get_by_role('heading', name='Body', exact=True).is_visible()
+        assert page.locator('.vp-curve-preset').first.is_hidden()
         for width, height in [(1400, 900), (1280, 720), (1024, 768), (900, 600)]:
             page.set_viewport_size({'width': width, 'height': height})
             for theme in ['light', 'dark']:
@@ -189,7 +195,7 @@ def run_workspace_checks(context, url, report, checks):
                 assert page.locator('#viewport-skin-card').is_hidden()
                 assert page.locator('#viewport-material-editor').evaluate('el=>el.scrollWidth<=el.clientWidth+1')
                 for selector in ('.vp-recolour .vp-hex', '.vp-recolour select', '.vp-recolour-strength input',
-                                 '.vp-curve-custom > summary', '.vp-advanced > summary'):
+                                 '.vp-recolour-curve > summary', '.vp-advanced > summary'):
                     control = page.locator(selector)
                     control.scroll_into_view_if_needed()
                     bounds = control.evaluate('''el=>{
@@ -203,6 +209,7 @@ def run_workspace_checks(context, url, report, checks):
                 page.locator('.vp-editor-dismiss').click()
                 page.locator('.vp-section-select').last.click()
                 assert page.get_by_label('Material part', exact=True).input_value() == 'MI_Equip_08'
+                assert page.locator('#viewport-material-editor').get_by_role('heading', name='Equip 08', exact=True).is_visible()
                 page.locator('.vp-editor-dismiss').click()
                 page.locator('.vp-material-select').first.click()
         checks.append('Nine-material inspector keeps full-sized controls, reachable advanced settings and selectable last sections at 900x600 through 1400x900 in both themes')
@@ -210,6 +217,8 @@ def run_workspace_checks(context, url, report, checks):
         page.locator('.vp-hex').first.fill('#9644CC')
         page.locator('.vp-hex').first.press('Tab')
         assert page.locator('#viewport-mat-save').is_enabled()
+        assert page.locator('#viewport-material-editor').get_by_text('Unsaved changes', exact=True).is_visible()
+        assert page.locator('.vp-saved-hex').first.is_visible()
         page.locator('#project-chip').click()
         page.wait_for_selector('#atelier-confirm.active')
         page.locator('#atelier-confirm-cancel').click()
@@ -260,15 +269,22 @@ def run_workspace_checks(context, url, report, checks):
         assert section.locator('.vp-recolour-apply').is_disabled()
         section.locator('select').select_option('multiply')
         page.wait_for_function('__workspace.recolouring()')
+        section.get_by_text('Preview only', exact=True).wait_for()
+        assert page.locator('#viewport-unsaved').inner_text() == 'Texture preview'
+        assert page.locator('#viewport-mat-save').is_disabled()
         section.locator('.vp-recolour-cancel').click()
         page.wait_for_function('!__workspace.recolouring()')
         assert page.locator('.vp-recolour .vp-recolour-apply').is_disabled()
+        assert page.locator('#viewport-unsaved').inner_text() == 'All changes saved'
         section = page.locator('.vp-recolour')
+        assert section.get_by_text('Preview only', exact=True).is_hidden()
+        section.get_by_label('Blend mode').select_option('hue')
+        section.get_by_label('Strength', exact=True).fill('64')
         section.locator('.vp-hex').fill('#2050ff')
         section.locator('.vp-hex').press('Tab')
-        page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent.startsWith("Preview only")')
+        section.get_by_text('Preview only', exact=True).wait_for()
         section = page.locator('.vp-recolour')
-        assert section.locator('.vp-recolour-caption svg').count() == 4
+        section.get_by_text('Tone curve', exact=True).click()
         for button in ('.vp-recolour-apply', '.vp-recolour-cancel', '.vp-curve-preset'):
             assert section.locator(f'{button} svg').first.is_visible(), button
         lighter = [[0, 0], [.5, .65], [1, 1]]
@@ -293,7 +309,7 @@ def run_workspace_checks(context, url, report, checks):
         assert section.locator('.vp-curve-point').count() == 2
         assert section.locator('.vp-curve-reset').is_hidden()
         section.locator('.vp-curve-preset[data-preset="Lighter"]').click()
-        page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent.startsWith("Preview only")')
+        section.get_by_text('Preview only', exact=True).wait_for()
         # A tall window so the whole section fits in the inspector for review.
         page.set_viewport_size({'width': 1400, 'height': 1900})
         for theme in ['light', 'dark']:
@@ -303,9 +319,16 @@ def run_workspace_checks(context, url, report, checks):
                 section.screenshot(path=str(report / f'recolour-panel{state}-{theme}.png'), animations='disabled')
         page.set_viewport_size({'width': 1400, 'height': 900})
         page.evaluate('document.documentElement.dataset.theme="light"')
+        reject_recolour = True
+        section.locator('.vp-recolour-apply').click()
+        section.get_by_text('The fixture could not save the recolour.', exact=True).wait_for(timeout=5000)
+        assert section.get_by_text('Preview only', exact=True).is_visible()
+        assert section.locator('.vp-recolour-apply').is_enabled()
+        assert not recolour_saves
+        reject_recolour = False
         section.locator('.vp-recolour-apply').click()
         page.wait_for_selector(f'.workspace-slot[data-game-rel="{texture_rel}"]')
-        assert recolour_saves[-1] == {'game_rel': texture_rel, 'colour': '#2050FF', 'mode': 'color', 'strength': 1,
+        assert recolour_saves[-1] == {'game_rel': texture_rel, 'colour': '#2050FF', 'mode': 'hue', 'strength': .64,
                                       'curve': lighter, 'replace': False}
         assert not page.evaluate('__workspace.recolouring()')
         page.wait_for_function('document.querySelector(".vp-recolour-status")?.textContent==="This recolour is in your mod."')

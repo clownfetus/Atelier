@@ -144,7 +144,7 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         hex_input=tab.locator('#viewport-material-editor .vp-hex').first
         hex_input.fill('#70459B'); hex_input.press('Tab')
         assert not tab.locator('#viewport-mat-save').is_disabled()
-        assert tab.locator('.vp-saved-hex').first.inner_text()!=tab.locator('.vp-current-hex').first.inner_text()
+        assert tab.locator('.vp-saved-hex').first.inner_text() != hex_input.input_value()
         tab.locator('.vp-revert-material').click()
         assert tab.locator('#viewport-mat-save').is_disabled()
         tab.locator('.vp-editor-dismiss').click()
@@ -266,7 +266,8 @@ def run_viewport_inspection_checks(page, context, url, report, checks, real_mesh
         tab.locator('.vp-advanced > summary').click()
         tab.locator('.vp-material-edit').click()
         tab.wait_for_selector('#material-overlay.active')
-        assert tab.locator('#mat-title').inner_text() == 'MI_Body'
+        assert tab.locator('#mat-title').inner_text() == 'Body'
+        assert tab.locator('#mat-sub').inner_text().endswith('/MI_Body')
         tab.locator('#mat-close').click()
         tab.wait_for_selector('#viewport-overlay.active')
         checks.append('Hover outlines the material; click selects it immediately, double-click frames the part, and Edit opens its existing editor')
