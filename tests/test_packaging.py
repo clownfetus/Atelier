@@ -1,14 +1,16 @@
 """Packaging invariants: the installer never deletes user data, and always ships the native tools.
 
 Static checks over Atelier.iss and scripts/stage_tools.py, plus the staging script run against a
-fake Tools/ tree. No PyInstaller, Inno Setup or real tools needed.
+fake Tools/ tree. An optional ISCC check runs only the installer's shutdown hook.
 """
 from pathlib import Path
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -57,6 +59,78 @@ class StableAbiPackaging(unittest.TestCase):
                  patch.object(UH.sys, 'base_prefix', tmp), patch.object(UH.sysconfig, 'get_config_var', return_value=0):
                 with self.assertRaisesRegex(RuntimeError, 'python3t.dll'):
                     UH.compatibility_binaries()
+
+
+@unittest.skipUnless(os.name == "nt" and os.environ.get("ISCC"), "requires the Windows Inno Setup compiler")
+class InstallerShutdown(unittest.TestCase):
+    def test_waits_for_windowless_process_from_target_installation(self):
+        with tempfile.TemporaryDirectory(prefix="atelier-close-") as tmp:
+            scratch = Path(tmp)
+            source = scratch / "probe.iss"
+            code = ISS.split("[Code]", 1)[1]
+            source.write_text(r'''
+#define AppName "Atelier"
+#define AppExeName "Atelier.exe"
+[Setup]
+AppName=Atelier shutdown probe
+AppVersion=1
+AppId=AtelierShutdownProbe
+DefaultDirName={tmp}\AtelierShutdownProbe
+DisableDirPage=yes
+UsePreviousAppDir=no
+Uninstallable=no
+CreateUninstallRegKey=no
+UseSetupLdr=no
+PrivilegesRequired=lowest
+OutputBaseFilename=shutdown-probe
+[Code]
+''' + code + '''
+function NextButtonClick(Page: Integer): Boolean;
+var
+  NeedsRestart: Boolean;
+begin
+  Result := Page <> wpReady;
+  if not Result then
+    Log('Shutdown probe result [' + PrepareToInstall(NeedsRestart) + ']');
+  // Stop before the installer enters its preparation or install steps.
+end;
+''', encoding="utf-8")
+            compiled = subprocess.run([os.environ["ISCC"], "/Q", f"/O{scratch}", str(source)],
+                                      capture_output=True, text=True, errors="replace", timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+
+            def hold_process(directory):
+                directory.mkdir()
+                executable = directory / "Atelier.exe"
+                shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32/cmd.exe", executable)
+                return subprocess.Popen([str(executable), "/d", "/q", "/c", "set /p atelier_fixture="],
+                                        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                        creationflags=subprocess.CREATE_NO_WINDOW)
+
+            target = scratch / "target"
+            log = scratch / "probe.log"
+            with hold_process(scratch / "other-installation") as other, hold_process(target) as app:
+                command = [str(scratch / "shutdown-probe.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                           "/SP-", f"/DIR={target}", f"/LOG={log}"]
+                with subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW) as setup:
+                    try:
+                        deadline = time.monotonic() + 15
+                        while True:
+                            trace = log.read_text(encoding="utf-8-sig", errors="replace") if log.exists() else ""
+                            if f"Waiting for Atelier process (PID {app.pid}) to close." in trace:
+                                break
+                            if "Shutdown probe result" in trace or setup.poll() is not None or time.monotonic() >= deadline:
+                                self.fail("Setup skipped the windowless target process.\n" + trace)
+                            time.sleep(.05)
+                        self.assertNotIn("Shutdown probe result", trace)
+                        self.assertIsNone(app.poll())
+                        app.communicate(b"done\r\n", timeout=5)
+                        setup.wait(timeout=10)
+                        self.assertIn("Shutdown probe result []", log.read_text(encoding="utf-8-sig", errors="replace"))
+                        self.assertIsNone(other.poll(), "Setup affected the other Atelier installation.")
+                    finally:
+                        if setup.poll() is None:
+                            setup.terminate()
 
 
 class InstallerKeepsUserData(unittest.TestCase):
