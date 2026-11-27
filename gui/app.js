@@ -725,9 +725,30 @@ function previewLibraryCard(card, opener) {
     return;
   }
   const imported = card.type === 'asset' && card.imported;
+  const isTexture = !card.thumbnail && card.type === 'asset' && card.file_type === 'texture';
   const src = card.thumbnail || `${imported ? '/api/preview' : '/api/thumb'}?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`;
-  AtelierLibraryTools.previewImage({label: card.label, path: card.game_rel || card.rel_path, src,
-    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset'}, opener);
+  const originalSrc = isTexture && imported
+    ? `/api/thumb?game_rel=${encodeURIComponent(card.game_rel)}&_project=${encodeURIComponent(_activeProjectName)}`
+    : '';
+  const actions = [];
+  if (isTexture) {
+    if (imported) {
+      actions.push({ label: 'Replace image…', action: () => window.AtelierAssetEditors?.replaceTexture(card.game_rel) });
+      const openItem = textureEditorMenuItem(card);
+      actions.push({ label: openItem.label, action: openItem.action });
+    } else {
+      actions.push({ label: 'Edit texture', action: () => editAsset(card) });
+    }
+  }
+  AtelierLibraryTools.previewImage({
+    label: card.label,
+    path: card.game_rel || card.rel_path,
+    src,
+    originalSrc,
+    isTexture,
+    actions,
+    caption: card.thumbnail ? 'Character artwork' : imported ? 'Edited texture · project image' : 'Cached texture preview · original game asset',
+  }, opener);
 }
 function libraryParent() {
   if (nav.path) pushNav({path: nav.path.split('/').slice(0, -1).join('/')}, {focusPath: nav.path});
@@ -964,9 +985,117 @@ const _matEscape = value => String(value ?? "").replace(/[&<>"']/g, c => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[c]));
 
+const _matHistory = window.AtelierHistory?.create();
+const _curveHistory = window.AtelierHistory?.create();
+const _vfxHistory = window.AtelierHistory?.create();
+
+function _syncHistoryButtons(prefix, stack) {
+  const u = document.getElementById(prefix + "-undo");
+  const r = document.getElementById(prefix + "-redo");
+  if (u) u.disabled = !stack?.canUndo();
+  if (r) r.disabled = !stack?.canRedo();
+}
+
+function _matHistoryState() {
+  return matEditor ? { colors: matEditor.colors, scalars: matEditor.scalars } : null;
+}
+function _matHistoryRecord(key = "") {
+  if (!_matHistory || !matEditor) return;
+  _matHistory.record(_matHistoryState(), key);
+  _syncHistoryButtons("mat", _matHistory);
+}
+function _matHistoryApply(dir) {
+  if (!matEditor || _materialSaving.has(matEditor) || !_matHistory) return false;
+  const snap = dir === "undo" ? _matHistory.undo() : _matHistory.redo();
+  if (!snap) return false;
+  matEditor.colors = snap.colors;
+  matEditor.scalars = snap.scalars;
+  renderMatEditor();
+  dyeRefresh(0);
+  _syncHistoryButtons("mat", _matHistory);
+  return true;
+}
+
+function _curveHistoryState() {
+  return curveEditor ? { channels: curveEditor.channels, dirty: curveEditor.dirty } : null;
+}
+function _curveHistoryRecord(key = "") {
+  if (!_curveHistory || !curveEditor) return;
+  _curveHistory.record(_curveHistoryState(), key);
+  _syncHistoryButtons("curve", _curveHistory);
+}
+function _curveHistoryApply(dir) {
+  if (!curveEditor || !_curveHistory) return false;
+  const snap = dir === "undo" ? _curveHistory.undo() : _curveHistory.redo();
+  if (!snap) return false;
+  curveEditor.channels = snap.channels;
+  curveEditor.dirty = snap.dirty;
+  curveEditor.stops = _resampleStops(curveEditor.channels);
+  renderCurveEditor();
+  _syncHistoryButtons("curve", _curveHistory);
+  return true;
+}
+
+function _vfxHistoryState() {
+  if (!vfxEditor) return null;
+  return {
+    groups: (vfxEditor.groups || []).map(g => ({
+      stops: g.stops,
+      inten: g.inten,
+      restore_original: !!g.restore_original,
+    })),
+    scalars: vfxEditor.scalars || [],
+    vectors: vfxEditor.vectors || [],
+  };
+}
+function _vfxHistoryRecord(key = "") {
+  if (!_vfxHistory || !vfxEditor) return;
+  _vfxHistory.record(_vfxHistoryState(), key);
+  _syncHistoryButtons("vfx", _vfxHistory);
+}
+function _vfxHistoryApply(dir) {
+  if (!vfxEditor || _vfxSaving.has(vfxEditor) || !_vfxHistory) return false;
+  const snap = dir === "undo" ? _vfxHistory.undo() : _vfxHistory.redo();
+  if (!snap) return false;
+  (vfxEditor.groups || []).forEach((g, idx) => {
+    const s = snap.groups?.[idx];
+    if (!s) return;
+    g.stops = s.stops;
+    g.inten = s.inten;
+    if (s.restore_original) g.restore_original = true;
+    else delete g.restore_original;
+  });
+  if (snap.scalars && vfxEditor.scalars) vfxEditor.scalars = snap.scalars;
+  if (snap.vectors && vfxEditor.vectors) vfxEditor.vectors = snap.vectors;
+  renderVfxEditor();
+  _syncHistoryButtons("vfx", _vfxHistory);
+  return true;
+}
+
+window.AtelierHistory?.register("material-overlay", {
+  undo: () => _matHistoryApply("undo"),
+  redo: () => _matHistoryApply("redo"),
+});
+window.AtelierHistory?.register("curve-overlay", {
+  undo: () => _curveHistoryApply("undo"),
+  redo: () => _curveHistoryApply("redo"),
+});
+window.AtelierHistory?.register("vfx-overlay", {
+  undo: () => _vfxHistoryApply("undo"),
+  redo: () => _vfxHistoryApply("redo"),
+});
+document.getElementById("mat-undo")?.addEventListener("click", () => _matHistoryApply("undo"));
+document.getElementById("mat-redo")?.addEventListener("click", () => _matHistoryApply("redo"));
+document.getElementById("curve-undo")?.addEventListener("click", () => _curveHistoryApply("undo"));
+document.getElementById("curve-redo")?.addEventListener("click", () => _curveHistoryApply("redo"));
+document.getElementById("vfx-undo")?.addEventListener("click", () => _vfxHistoryApply("undo"));
+document.getElementById("vfx-redo")?.addEventListener("click", () => _vfxHistoryApply("redo"));
+
 function _matRemember(editor, original) {
   const copy = value => JSON.parse(JSON.stringify(value));
   const saved = { colors: copy(editor.colors), scalars: copy(editor.scalars) };
+  _matHistory?.reset({ colors: editor.colors, scalars: editor.scalars });
+  _syncHistoryButtons("mat", _matHistory);
   _materialReferences.set(editor, { saved,
     original: original ? { colors: _seedColors(original.colors), scalars: _seedScalars(original.scalars) } : null });
 }
@@ -1042,6 +1171,7 @@ function matRevertDraft() {
   if (!saved) return;
   matEditor.colors = JSON.parse(JSON.stringify(saved.colors));
   matEditor.scalars = JSON.parse(JSON.stringify(saved.scalars));
+  _matHistoryRecord("revert");
   renderMatEditor(); dyeRefresh(0);
   document.getElementById("mat-status").textContent = "Unsaved parameters reverted to their saved values.";
 }
@@ -1549,18 +1679,23 @@ function matFocusRegion(idx) {
 
 function matColourParameterHtml(c, i, expanded, label = "") {
   const name = _matEscape(c.name), group = `Colour ${i}`;
+  const hex = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
+  const alpha = Math.max(0, Math.min(1, Number(c.rgba[3]) || 0));
+  const splitCls = alpha < 0.999 ? " is-split" : "";
+  const alphaPct = `${Math.round(alpha * 100)}%`;
   const levels = `<span class="mat-tag">Intensity</span>
     <input type="range" id="mir${i}" min="0" max="10" step="0.05" value="${Math.min(c.inten, 10)}" oninput="matInten(${i},this.value,1)">
     <input class="mat-num" id="min${i}" type="number" step="0.05" value="${+c.inten.toFixed(3)}" oninput="matInten(${i},this.value,0)">
     <span class="mat-tag mat-alpha-label">${label ? "Alpha" : "A"}</span>
     <input class="mat-num" id="matalpha${i}" type="number" step="0.01" value="${+c.rgba[3].toFixed(3)}" oninput="matAlpha(${i},this.value)">`;
-  return `<div class="mat-parameter${label ? " mat-colour-card" : ""}" id="matrow${i}">
+  return `<div class="mat-parameter${label ? " mat-colour-card" : ""}" id="matrow${i}" data-param-name="${_matEscape((label ? label + " " : "") + c.name).toLowerCase()}" data-color-index="${i}">
     <div class="mat-row">
       <label for="mathx${i}" title="${name}">${label || name}<span class="mat-changed" aria-hidden="true"></span></label>
-      <span class="mat-color-well"><input type="color" id="matsw${i}" value="${_rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten)}" oninput="matColor(${i},this.value)"></span>
+      <span class="mat-color-well${splitCls}" id="matwell${i}" style="--mat-rgb:${hex};--mat-alpha-pct:${alphaPct}"><input type="color" id="matsw${i}" value="${hex}" onfocus="matActiveColorIndex=${i}" oninput="matColor(${i},this.value)"></span>
       <input class="mat-hex" id="mathx${i}" type="text" spellcheck="false"
         title="Type or paste a colour — ${COLOR_LABELS[_colorMode]}"
         value="${fmtColor01(c.rgba[0] / Math.max(c.inten, 1e-6), c.rgba[1] / Math.max(c.inten, 1e-6), c.rgba[2] / Math.max(c.inten, 1e-6))}"
+        onfocus="matActiveColorIndex=${i}"
         onchange="matColorText(${i},this)">
       ${label ? "" : levels}
     </div>
@@ -1606,6 +1741,66 @@ function matColourGroupsHtml(colors, expanded) {
   return h;
 }
 
+let matActiveColorIndex = 0;
+
+function applyMatFilter() {
+  if (!matEditor) return;
+  const body = document.getElementById("mat-body");
+  if (!body) return;
+  const query = (matEditor.paramFilter || "").trim().toLowerCase();
+  const changedOnly = !!matEditor.changedOnly;
+  const rows = [...body.querySelectorAll(".mat-parameter")];
+  let visibleCount = 0;
+  for (const row of rows) {
+    const name = row.dataset.paramName || row.textContent.toLowerCase();
+    const matchText = !query || name.includes(query);
+    const matchChanged = !changedOnly || row.classList.contains("is-modified") || row.classList.contains("is-custom");
+    const show = matchText && matchChanged;
+    row.hidden = !show;
+    if (show) visibleCount++;
+  }
+  for (const group of body.querySelectorAll(".mat-parameter-group")) {
+    if (group.id === "mat-replacement") continue;
+    const groupRows = [...group.querySelectorAll(".mat-parameter")];
+    if (!groupRows.length) continue;
+    const anyVisible = groupRows.some(r => !r.hidden);
+    group.hidden = !anyVisible;
+    if ((query || changedOnly) && anyVisible) group.open = true;
+  }
+  const cards = body.querySelector(".mat-colour-cards");
+  if (cards) cards.hidden = ![...cards.querySelectorAll(".mat-parameter")].some(r => !r.hidden);
+  const empty = document.getElementById("mat-filter-empty");
+  if (empty) empty.hidden = !(rows.length && visibleCount === 0 && (query || changedOnly));
+}
+
+function matSetFilter(value) {
+  if (!matEditor) return;
+  matEditor.paramFilter = value;
+  applyMatFilter();
+}
+
+function matToggleChangedOnly() {
+  if (!matEditor) return;
+  matEditor.changedOnly = !matEditor.changedOnly;
+  const btn = document.getElementById("mat-changed-only");
+  if (btn) {
+    btn.classList.toggle("on", matEditor.changedOnly);
+    btn.setAttribute("aria-pressed", String(matEditor.changedOnly));
+  }
+  applyMatFilter();
+}
+
+function _matUpdateWell(i) {
+  const c = matEditor?.colors?.[i];
+  const well = document.getElementById("matwell" + i);
+  if (!c || !well) return;
+  const hex = _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten);
+  const alpha = Math.max(0, Math.min(1, Number(c.rgba[3]) || 0));
+  well.style.setProperty("--mat-rgb", hex);
+  well.style.setProperty("--mat-alpha-pct", `${Math.round(alpha * 100)}%`);
+  well.classList.toggle("is-split", alpha < 0.999);
+}
+
 function renderMatEditor() {
   const m = matEditor; if (!m) return;
   const body = document.getElementById("mat-body");
@@ -1613,6 +1808,8 @@ function renderMatEditor() {
   const expanded = new Map([...body.querySelectorAll("details[data-mat-group]")].map(d => [d.dataset.matGroup, d.open]));
   const previousPreview = body.querySelector("#dye-prev");
   if (previousPreview?.dataset.url) URL.revokeObjectURL(previousPreview.dataset.url);
+  const filterValue = _matEscape(m.paramFilter || "");
+  const changedOnly = !!m.changedOnly;
   let h = `<div class="mat-workflow-toolbar">
     <span id="mat-dirty" class="mat-dirty" role="status" aria-live="polite"></span>
     <div class="mat-compare-controls"><span>Compare</span>
@@ -1620,7 +1817,13 @@ function renderMatEditor() {
       <button type="button" class="seg-btn ${m.compareMode === "original" ? "on" : ""}" aria-pressed="${m.compareMode === "original"}" onclick="matCompare('original')">Game original</button>
     </div>
     <button type="button" id="mat-revert" class="btn" onclick="matRevertDraft()">Revert unsaved</button>
-  </div>`;
+  </div>
+  <div class="mat-filter-bar">
+    <input id="mat-param-search" class="mat-filter-input" type="search" placeholder="Filter parameters…" aria-label="Filter material parameters" value="${filterValue}" oninput="matSetFilter(this.value)">
+    <button type="button" id="mat-changed-only" class="seg-btn ${changedOnly ? "on" : ""}" aria-pressed="${changedOnly}" onclick="matToggleChangedOnly()">Changed only</button>
+  </div>
+  <div id="mat-project-palette"></div>
+  <p id="mat-filter-empty" class="mat-filter-empty" hidden>No parameters match this filter.</p>`;
   h += materialReplacementHtml(m, expanded);
   if (m.dyeable) {
     const used = (m.dyeUsed || []).length ? `regions ${m.dyeUsed.join(", ")}` : "no regions in mask";
@@ -1655,7 +1858,7 @@ function renderMatEditor() {
     h += `<details class="mat-parameter-group" data-mat-group="Scalars" ${open ? "open" : ""}><summary>Scalar parameters<span>${m.scalars.length}</span></summary>`;
     m.scalars.forEach((s, i) => {
       const escaped = _matEscape(s.name);
-      h += `<div class="mat-parameter" id="matscalar${i}"><div class="mat-row">
+      h += `<div class="mat-parameter" id="matscalar${i}" data-param-name="${escaped.toLowerCase()}"><div class="mat-row">
         <label for="msn${i}" title="${escaped}">${escaped}<span class="mat-changed"></span></label>
         <input type="range" id="msr${i}" min="${Math.min(0, s.orig)}" max="${s.max}" step="${s.max / 1000}" value="${s.value}" oninput="matScalar(${i},this.value,1)">
         <input class="mat-num wide" id="msn${i}" type="number" step="any" value="${s.value}" oninput="matScalar(${i},this.value,0)">
@@ -1681,6 +1884,21 @@ function renderMatEditor() {
   reset.textContent = "Restore game defaults";
   reset.title = "Replace the project's saved material with original game values";
   _matRefreshDirty();
+  if (matActiveColorIndex >= m.colors.length) matActiveColorIndex = 0;
+  window.AtelierProjectPalette?.mount(document.getElementById("mat-project-palette"), {
+    onPick: hex => {
+      if (!matEditor?.colors?.length) return;
+      const idx = Math.min(Math.max(0, matActiveColorIndex), matEditor.colors.length - 1);
+      matColor(idx, hex);
+      const sw = document.getElementById("matsw" + idx);
+      if (sw) sw.value = hex;
+    },
+    getCurrentHex: () => {
+      const c = matEditor?.colors?.[Math.min(Math.max(0, matActiveColorIndex), (matEditor?.colors?.length || 1) - 1)];
+      return c ? _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten) : "";
+    },
+  });
+  applyMatFilter();
 }
 
 function bodyMaterialBusy(busy) {
@@ -1791,39 +2009,49 @@ function _matSyncRow(i, except) {
   set("mir" + i, Math.min(c.inten, 10));
   set("min" + i, +c.inten.toFixed(3));
   const t = document.getElementById("mathx" + i); if (t) t.classList.remove("bad");
+  _matUpdateWell(i);
   _matRefreshDirty();
+  if (matEditor?.changedOnly) applyMatFilter();
   window.AtelierPolish?.swatchesAfter(oldSwatches, matEditor.colors);
 }
 
 function matColor(i, hex) {
+  matActiveColorIndex = i;
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = parseInt(hex.substr(1, 2), 16) / 255 * n;
   c.rgba[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   c.rgba[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _matSyncRow(i, "matsw" + i);
+  _matHistoryRecord("color:" + i);
   dyeRefresh();
 }
 
 function matColorText(i, el) {
+  matActiveColorIndex = i;
   const rgb = parseColor01(el.value);
   if (!rgb) { el.classList.add("bad"); return; }          // leave what they typed so it can be fixed
   const c = matEditor.colors[i], n = Math.max(c.inten, 1e-6);
   c.rgba[0] = rgb[0] * n; c.rgba[1] = rgb[1] * n; c.rgba[2] = rgb[2] * n;
   el.value = fmtColor01(rgb[0], rgb[1], rgb[2]);          // normalise what they typed
   _matSyncRow(i, el.id);
+  _matHistoryRecord("colortxt:" + i);
   dyeRefresh();
 }
 function matInten(i, v, fromRange) {
+  matActiveColorIndex = i;
   const c = matEditor.colors[i], o = Math.max(c.inten, 1e-6), nv = parseFloat(v) || 0;
   c.rgba[0] = c.rgba[0] / o * nv; c.rgba[1] = c.rgba[1] / o * nv; c.rgba[2] = c.rgba[2] / o * nv; c.inten = nv;
   _matSyncRow(i, (fromRange ? "mir" : "min") + i);
+  _matHistoryRecord("inten:" + i);
   dyeRefresh();
 }
-function matAlpha(i, v) { matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matRefreshDirty(); dyeRefresh(); }
+function matAlpha(i, v) { matActiveColorIndex = i; matEditor.colors[i].rgba[3] = parseFloat(v) || 0; _matUpdateWell(i); _matRefreshDirty(); _matHistoryRecord("alpha:" + i); if (matEditor?.changedOnly) applyMatFilter(); dyeRefresh(); }
 function matScalar(i, v, fromRange) {
   matEditor.scalars[i].value = parseFloat(v) || 0;
   const other = document.getElementById((fromRange ? "msn" : "msr") + i); if (other) other.value = v;
   _matRefreshDirty();
+  _matHistoryRecord("scalar:" + i);
+  if (matEditor?.changedOnly) applyMatFilter();
 }
 
 // The editor must not show a split it cannot guarantee. If the server could not store it (an old
@@ -2050,6 +2278,8 @@ async function openCurveEditor(item) {
   if (!current()) return;
   if (!res.ok) { document.getElementById("curve-body").textContent = res.error || "Failed to read curve"; return; }
   curveEditor = { game_rel: item.game_rel, name: item.name, channels: res.channels || {}, stops: res.stops || [], dirty: {} };
+  _curveHistory?.reset(_curveHistoryState());
+  _syncHistoryButtons("curve", _curveHistory);
   renderCurveEditor();
   _syncBulkEditorAction('curve');
   loadSidebar();
@@ -2094,22 +2324,23 @@ function _curveTouch(ch) {
 
 function curveKeyField(ch, i, field, v) {
   const c = curveEditor; if (!c || !c.channels[ch] || !c.channels[ch][i]) return;
-  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); renderCurveEditor(); return; }
+  if (field === "interp") { c.channels[ch][i].interp = v; _curveTouch(ch); _curveHistoryRecord("interp:" + ch + ":" + i); renderCurveEditor(); return; }
   const val = parseFloat(v); if (isNaN(val)) return;
   c.channels[ch][i][field] = val;
   _curveTouch(ch);
+  _curveHistoryRecord("field:" + ch + ":" + i + ":" + field);
 }
 
 function curveAddKey(ch) {
   const c = curveEditor; const keys = c.channels[ch] || (c.channels[ch] = []);
   const t = keys.length ? Math.min(1, (+keys[keys.length - 1].time || 0) + 0.1) : 0;
   keys.push({ time: t, value: 0, interp: "RCIM_Linear", arriveTangent: 0, arriveTangentWeight: 0, leaveTangent: 0, leaveTangentWeight: 0 });
-  _curveTouch(ch); renderCurveEditor();
+  _curveTouch(ch); _curveHistoryRecord("add:" + ch); renderCurveEditor();
 }
 
 function curveRemoveKey(ch, i) {
   const c = curveEditor; if (!c.channels[ch]) return;
-  c.channels[ch].splice(i, 1); _curveTouch(ch); renderCurveEditor();
+  c.channels[ch].splice(i, 1); _curveTouch(ch); _curveHistoryRecord("rem:" + ch); renderCurveEditor();
 }
 
 async function saveCurve() {
@@ -2231,6 +2462,8 @@ async function openVfxEditor(item) {
                 groups: (res.groups || []).map(g => ({ ...g, stops:g.stops.map(s=>s.slice()), inten: _vfxInten(g, res.inten) })),
                 unsupportedExports: res.unsupported_exports || [], unmatchedEdits: res.unmatched_edits || 0 };
   _rememberVfxSaved(vfxEditor);
+  _vfxHistory?.reset(_vfxHistoryState());
+  _syncHistoryButtons("vfx", _vfxHistory);
   renderVfxEditor();
   _syncBulkEditorAction('vfx');
   loadSidebar();
@@ -2426,6 +2659,7 @@ function vfxVal(gi, si, ci, val) {
   delete g.restore_original;
   g.stops[si][ci] = x;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfx:" + gi + ":" + si + ":" + ci);
 }
 
 function vfxStop(gi, si, hex) {
@@ -2435,6 +2669,7 @@ function vfxStop(gi, si, hex) {
   s[1] = parseInt(hex.substr(3, 2), 16) / 255 * n;
   s[2] = parseInt(hex.substr(5, 2), 16) / 255 * n;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxstop:" + gi + ":" + si);
 }
 function vfxAlpha(gi, si, v) {
   const g = vfxEditor.groups[gi], s = g.stops[si], a = parseFloat(v);
@@ -2443,6 +2678,7 @@ function vfxAlpha(gi, si, v) {
   while (s.length < 4) s.push(1);
   s[3] = Math.min(1, Math.max(0, a));
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxalpha:" + gi + ":" + si);
 }
 function vfxInten(gi, val, fromRange) {
   const g = vfxEditor.groups[gi], o = Math.max(g.inten, 1e-6), nv = parseFloat(val) || 0, k = nv / o;
@@ -2452,6 +2688,7 @@ function vfxInten(gi, val, fromRange) {
   g.inten = nv;
   const other = document.getElementById((fromRange ? "vinn" : "vint") + gi); if (other) other.value = val;
   _refreshVfxGroup(gi);
+  _vfxHistoryRecord("vfxinten:" + gi);
 }
 
 async function saveVfx() {
@@ -2919,6 +3156,7 @@ let _sbLastTok  = null;          // anchor for shift-click ranges
 function _sbVisible() {
   const all = Object.values(sidebarData);
   const q = _libraryQuery().toLowerCase();
+  if (window.AtelierTrayFilters) return window.AtelierTrayFilters.filter(all, q);
   return q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
 }
 
@@ -2996,9 +3234,11 @@ function renderSidebar() {
     return;
   }
   const q     = _libraryQuery().toLowerCase();
-  const items = q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all;
+  const items = window.AtelierTrayFilters ? window.AtelierTrayFilters.filter(all, q)
+    : (q ? all.filter(i => AtelierLibraryTools.matches(i, q)) : all);
+  window.AtelierTrayFilters?.updateControls(all, items);
   if (!items.length) {
-    list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the search.</div>';
+    list.innerHTML = '<div style="padding:24px 16px;font-size:12px;color:var(--muted)">No Mod tray assets match the filter.</div>';
     updateInstallBtn();
     return;
   }
@@ -3131,7 +3371,7 @@ function updateInstallBtn() {
   if (window.AtelierPolish) window.AtelierPolish.count(count, sel); else count.textContent = `${sel}`;
   document.getElementById("sel-count-total").textContent = ` of ${edited} included`;
   document.getElementById("tray-selection").hidden = edited === 0;
-  document.getElementById("tray-menu-btn").hidden = edited === 0;
+  document.getElementById("tray-menu-btn").hidden = !_activeProjectName;
   document.getElementById("tray-include-all").textContent = sel === edited ? "Exclude all" : "Include all";
   document.getElementById("project-chip-count").textContent = edited ? `${edited} edited` : "";
   document.getElementById("install-btn").disabled = sel === 0 || _exportRunningCount > 0 || _exportReviewChecking;
@@ -3508,11 +3748,31 @@ async function removeAllEdits() {
   }
 }
 
+window.applySelectionProfile = function applySelectionProfile(name, entry) {
+  const desel = new Set(entry?.deselected || []);
+  for (const item of Object.values(sidebarData)) {
+    item.selected = !desel.has(item.game_rel);
+  }
+  if (entry?.mod_name) {
+    const input = document.getElementById("mod-name-input");
+    if (input) input.value = entry.mod_name;
+  }
+  renderSidebar();
+  saveSelection();
+  toast(`Applied profile “${name}”`, "success");
+};
+
 document.getElementById("tray-menu-btn").addEventListener("click", e => {
+  const items = [
+    { icon: "layers", label: "Selection profiles…", action: () => window.AtelierTrayFilters?.openProfiles() },
+    { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
+  ];
+  if (Object.keys(sidebarData).length) {
+    items.push("sep");
+    items.push({ icon: "trash-2", label: "Remove all edits…", danger: true, action: removeAllEdits });
+  }
   _ctxShow({ preventDefault: () => e.preventDefault(), stopPropagation: () => e.stopPropagation(),
-    currentTarget: e.currentTarget }, [
-    { icon: "trash-2", label: "Remove all edits…", danger: true, action: removeAllEdits },
-  ]);
+    currentTarget: e.currentTarget }, items);
 });
 
 // ── pak index warnings ───────────────────────────────────────────────────────
@@ -3745,6 +4005,7 @@ async function openPaths({field, onSave, opener = document.activeElement} = {}) 
   } catch (e) {}
   _setSetupLoading(false, outcome, revision);
   if (revision !== _setupLoadingRevision || !_setupOverlay.classList.contains('active')) return;
+  window.AtelierSettingsTabs?.revealField(field);
   if (field && document.activeElement === _setupDialog) document.getElementById(field)?.focus();
   loadContentMounts();      // fire-and-forget: informational, never blocks the panel
   loadToolStatus(true);     // likewise: a slow or offline channel must not hold the panel up
@@ -5335,6 +5596,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
     { preventDefault: () => {}, stopPropagation: () => e.stopPropagation(), clientX: rect.left, clientY: rect.bottom + 4 },
     [
       { icon: "folder-open", label: "My projects", action: openProjectPicker },
+      { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
       { icon: "refresh-cw", label: "Refresh view", action: () => renderGrid().then(() => toast("Refreshed view", "success")) },
       { icon: "folder-search", label: "Show in Explorer", action: () => { projectFetch("/api/open_projects_folder"); toast("Explorer opened", "success"); } },
       { icon: "package-open", label: "Open export folder", action: () => { projectFetch("/api/open_export_folder"); toast("Export folder opened", "success"); } },
@@ -5343,6 +5605,8 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
+      { icon: "search", label: "Command palette…", action: () => window.AtelierCommands?.openPalette() },
+      { icon: "list", label: "Keyboard shortcuts…", action: () => window.AtelierCommands?.openShortcuts() },
       { icon: "sparkles", label: "What’s new…", action: () => window.AtelierChangelog?.show() },
       { icon: "circle-help", label: "Help and info", action: () => { window.open("https://github.com/clownfetus/Atelier#usage", "_blank"); toast("Browser tab opened", "info"); } },
       "sep",
@@ -5355,93 +5619,7 @@ document.getElementById("reset-cancel").addEventListener("click", () => {
   document.getElementById("reset-overlay").classList.remove("active");
 });
 
-// ── Repatcher ──────────────────────────────────────────────────────────────
-let _repatchPath = "";
-function openRepatcher() {
-  _repatchPath = "";
-  window.AtelierModRepair?.select();
-  document.getElementById("repatch-file").textContent = "";
-  document.getElementById("repatch-lockrow").style.display = "none";
-  document.getElementById("repatch-unlock").value = "";
-  document.getElementById("repatch-stage").checked = false;
-  document.getElementById("repatch-run").disabled = true;
-  const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = "";
-  document.getElementById("repatch-overlay").classList.add("active");
-  if (window.lucide) lucide.createIcons();
-}
-document.getElementById("repatch-close").addEventListener("click", () =>
-  document.getElementById("repatch-overlay").classList.remove("active"));
-document.getElementById("repatch-pick").addEventListener("click", async () => {
-  const r = await api("/api/pick_mod_file", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-  if (!r || !r.ok || !r.path) return;
-  _repatchPath = r.path;
-  window.AtelierModRepair?.select(r.path);
-  document.getElementById("repatch-file").textContent = r.path;
-  document.getElementById("repatch-lockrow").style.display = r.locked ? "block" : "none";
-  document.getElementById("repatch-run").disabled = false;
-});
-function showRepatchSkips(container, skipped = []) {
-  if (!skipped.length) return;
-  const details = document.createElement("details");
-  const summary = document.createElement("summary");
-  summary.textContent = "Review skipped changes";
-  const list = document.createElement("ul");
-  for (const problem of skipped) {
-    const item = document.createElement("li");
-    item.textContent = problem;
-    list.append(item);
-  }
-  details.append(summary, list);
-  container.append(details);
-}
-document.getElementById("repatch-run").addEventListener("click", async () => {
-  if (!_repatchPath) return;
-  const btn = document.getElementById("repatch-run");
-  btn.disabled = true;
-  const result = document.getElementById("repatch-result");
-  result.style.display = "block";
-  result.textContent = "Repatching…";
-  const stage = document.getElementById("repatch-stage").checked;
-  try {
-    const r = await (window.AtelierJobs?.run || api)("/api/repatch", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }),
-    });
-    if (!r.ok) {
-      result.textContent = r.locked ? "Wrong or missing password." : r.error || "Couldn’t repatch this mod.";
-      showRepatchSkips(result, r.skipped);
-      return;
-    }
-    const m = r.manifest || {};
-    const title = document.createElement("strong");
-    title.textContent = "Repatched " + r.mod;
-    const counts = document.createElement("span");
-    counts.className = "muted";
-    counts.textContent = [
-      (m.materials || 0) + " materials",
-      (m.textures || 0) + " textures",
-      (m.skipped || 0) + " skipped",
-      ...(m.recovered_materials ? [m.recovered_materials + " recovered from older layouts"] : []),
-      ...(stage ? [(m.staged_project || 0) + " staged to project"] : []),
-    ].join(" · ");
-    const open = document.createElement("a");
-    open.href = "#";
-    open.id = "repatch-open";
-    open.textContent = "Open export folder";
-    open.addEventListener("click", event => {
-      event.preventDefault();
-      projectFetch("/api/open_export_folder?select=" + encodeURIComponent(r.pak || ""));
-    });
-    result.replaceChildren(title, document.createElement("br"), counts, document.createElement("br"), open);
-    showRepatchSkips(result, r.skipped);
-    toast("Repatched " + r.mod, m.skipped ? "warning" : "success", 5000);
-    if (stage) renderGrid();
-  } catch (_) {
-    result.textContent = "Couldn’t repatch this mod.";
-  } finally {
-    btn.disabled = !_repatchPath;
-  }
-});
+// Repatcher lives in gui/repatcher.js.
 
 document.getElementById("reset-ok").addEventListener("click", async () => {
   document.getElementById("reset-overlay").classList.remove("active");
@@ -5489,268 +5667,7 @@ async function init() {
 
 init();
 
-// ── Shader Studio ─────────────────────────────────────────────────────────────
-const _sh = { page: 0, total: 0, sel: null, busy: false, poll: null };
-
-function _shEl(id) { return document.getElementById(id); }
-
-async function openShaderStudio() {
-  _shEl("shader-overlay").classList.add("active");
-  lucide.createIcons({ nodes: [_shEl("shader-overlay")] });
-  await refreshShaderStatus();
-}
-
-function closeShaderStudio() {
-  if (_sh.poll) { clearInterval(_sh.poll); _sh.poll = null; }
-  _shEl("shader-overlay").classList.remove("active");
-}
-
-async function refreshShaderStatus() {
-  let st;
-  try { st = await api("/api/shaders/status"); }
-  catch (e) { toast("Shader status failed: " + e.message, "warning"); return; }
-  if (!st.ok || !st.tools_ok) {
-    _shEl("shader-build").style.display = "flex";
-    _shEl("shader-browser").style.display = "none";
-    _shEl("shader-build-title").textContent = "Shader tools not found.";
-    _shEl("shader-build-btn").style.display = "none";
-    _shEl("shader-build-err").style.display = "flex";
-    _shEl("shader-build-err").textContent = "Expected retoc + dxc under Tools/shaders.";
-    return;
-  }
-  if (st.db_ready) { showShaderBrowser(st.libraries || []); }
-  else { _shEl("shader-build").style.display = "flex"; _shEl("shader-browser").style.display = "none"; }
-}
-
-_shEl("shader-build-btn").addEventListener("click", startShaderBuild);
-_shEl("shader-close").addEventListener("click", closeShaderStudio);
-
-async function startShaderBuild() {
-  _shEl("shader-build-btn").style.display = "none";
-  _shEl("shader-build-err").style.display = "none";
-  _shEl("shader-build-prog").style.display = "block";
-  _shEl("shader-bar-fill").style.setProperty("--progress", "0");
-  _shEl("shader-build-msg").textContent = "Starting…";
-  try { await api("/api/shaders/build", { method: "POST" }); }
-  catch (e) { _shBuildError(e.message); return; }
-  _sh.poll = setInterval(async () => {
-    let st; try { st = await api("/api/shaders/status"); } catch { return; }
-    const b = st.build || {};
-    if (b.error) { clearInterval(_sh.poll); _sh.poll = null; _shBuildError(b.error); return; }
-    _shEl("shader-bar-fill").style.setProperty("--progress", Math.max(0, Math.min(100, b.pct || 0)) / 100);
-    _shEl("shader-build-msg").textContent =
-      (b.phase || "Working…") + (b.count ? `  (${b.count.toLocaleString()} shaders)` : "");
-    if (st.db_ready && b.done) {
-      clearInterval(_sh.poll); _sh.poll = null;
-      toast("Shader index built", "success");
-      showShaderBrowser(st.libraries || []);
-    }
-  }, 1200);
-}
-
-function _shBuildError(msg) {
-  _shEl("shader-build-prog").style.display = "none";
-  _shEl("shader-build-btn").style.display = "";
-  _shEl("shader-build-err").style.display = "flex";
-  _shEl("shader-build-err").textContent = "Build failed: " + msg;
-}
-
-function showShaderBrowser(libs) {
-  _shEl("shader-build").style.display = "none";
-  _shEl("shader-browser").style.display = "flex";
-  const sel = _shEl("shader-lib");
-  sel.innerHTML = libs.map(l =>
-    `<option value="${l.name}">${l.short} — ${l.total.toLocaleString()} shaders</option>`).join("");
-  const totalAll = libs.reduce((a, l) => a + l.total, 0);
-  _shEl("shader-subtitle").textContent = `${totalAll.toLocaleString()} shaders indexed`;
-  _sh.page = 0;
-  loadShaderList();
-}
-
-let _shQTimer = null;
-["shader-lib", "shader-freq"].forEach(id =>
-  _shEl(id).addEventListener("change", () => { _sh.page = 0; loadShaderList(); }));
-_shEl("shader-q").addEventListener("input", () => {
-  clearTimeout(_shQTimer);
-  _shQTimer = setTimeout(() => { _sh.page = 0; loadShaderList(); }, 250);
-});
-_shEl("shader-prev").addEventListener("click", () => { if (_sh.page > 0) { _sh.page--; loadShaderList(); } });
-_shEl("shader-next").addEventListener("click", () => {
-  if ((_sh.page + 1) * 200 < _sh.total) { _sh.page++; loadShaderList(); }
-});
-
-const _FREQ_CLASS = { 0: "vtx", 3: "pix", 5: "cmp" };
-
-async function loadShaderList() {
-  const lib = _shEl("shader-lib").value;
-  const freq = _shEl("shader-freq").value;
-  const q = _shEl("shader-q").value.trim();
-  const list = _shEl("shader-list");
-  list.innerHTML = `<div class="shader-loading"><div class="spinner"></div></div>`;
-  let res;
-  try {
-    res = await api(`/api/shaders/list?lib=${encodeURIComponent(lib)}&freq=${freq}` +
-                    `&q=${encodeURIComponent(q)}&page=${_sh.page}&page_size=200`);
-  } catch (e) { list.innerHTML = `<div class="muted" style="padding:16px">Error: ${e.message}</div>`; return; }
-  if (!res.ok) { list.innerHTML = `<div class="muted" style="padding:16px">${res.error}</div>`; return; }
-  _sh.total = res.total;
-  if (!res.rows.length) { list.innerHTML = `<div class="muted" style="padding:16px">No shaders match.</div>`; }
-  else {
-    list.innerHTML = res.rows.map(r => {
-      const fc = _FREQ_CLASS[r.freq] || "oth";
-      return `<div class="shader-row" data-lib="${r.lib}" data-idx="${r.idx}">
-        <span class="sh-badge ${fc}">${r.freq_name}</span>
-        <span class="sh-idx">#${r.idx}</span>
-        <span class="sh-hash">${r.hash.slice(0, 16)}</span>
-        <span class="sh-size">${(r.size / 1024).toFixed(1)}K</span>
-      </div>`;
-    }).join("");
-    list.querySelectorAll(".shader-row").forEach(el =>
-      el.addEventListener("click", () => selectShader(el)));
-  }
-  const start = _sh.total ? _sh.page * 200 + 1 : 0;
-  const end = Math.min(_sh.total, (_sh.page + 1) * 200);
-  _shEl("shader-count").textContent = `${_sh.total.toLocaleString()} match`;
-  _shEl("shader-page").textContent = _sh.total ? `${start.toLocaleString()}–${end.toLocaleString()}` : "0";
-  _shEl("shader-prev").disabled = _sh.page === 0;
-  _shEl("shader-next").disabled = (_sh.page + 1) * 200 >= _sh.total;
-}
-
-async function selectShader(el) {
-  document.querySelectorAll(".shader-row.sel").forEach(r => r.classList.remove("sel"));
-  el.classList.add("sel");
-  _sh.cur = { lib: el.dataset.lib, idx: el.dataset.idx };
-  _shEl("shader-detail-empty").style.display = "none";
-  _shEl("shader-detail-content").style.display = "block";
-  _shEl("shader-meta").innerHTML = `<div class="shader-loading"><div class="spinner"></div><span>Extracting & disassembling…</span></div>`;
-  _shEl("shader-disasm").textContent = "";
-  let res;
-  try { res = await api(`/api/shaders/disasm?lib=${encodeURIComponent(el.dataset.lib)}&idx=${el.dataset.idx}`); }
-  catch (e) { _shEl("shader-meta").innerHTML = `<div class="warning">${e.message}</div>`; return; }
-  if (!res.ok) { _shEl("shader-meta").innerHTML = `<div class="warning">${res.error}</div>`; return; }
-  const m = res.meta || {};
-  _shEl("shader-meta").innerHTML =
-    `<div class="sh-meta-row">
-       <b>${m.stage || "Shader"}</b>
-       ${m.entry ? `<span class="sh-chip">entry <code>${m.entry}</code></span>` : ""}
-       <span class="sh-chip">${(m.dxbc_size || 0).toLocaleString()} B</span>
-     </div>`;
-  _shEl("shader-disasm").textContent = res.disasm || "";
-  renderShaderProps(res.properties || {});
-  _shSelectTab("props");
-}
-
-
-function _shSelectTab(tab) {
-  document.querySelectorAll(".sh-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  _shEl("shader-props").style.display = tab === "props" ? "block" : "none";
-  _shEl("shader-disasm").style.display = tab === "raw" ? "block" : "none";
-}
-
-async function loadShaderEdit() {
-  const wrap = _shEl("shader-edit");
-  if (!_sh.cur) { wrap.innerHTML = `<div class="sh-note">Select a shader first.</div>`; return; }
-  if (wrap.dataset.loadedFor === `${_sh.cur.lib}#${_sh.cur.idx}`) return;   // cache per shader
-  wrap.dataset.loadedFor = `${_sh.cur.lib}#${_sh.cur.idx}`;
-  wrap.innerHTML = `<div class="shader-loading"><div class="spinner"></div><span>Disassembling to editable IR…</span></div>`;
-  let res;
-  try { res = await api(`/api/shaders/ir?lib=${encodeURIComponent(_sh.cur.lib)}&idx=${_sh.cur.idx}`); }
-  catch (e) { wrap.innerHTML = `<div class="warning">${e.message}</div>`; wrap.dataset.loadedFor = ""; return; }
-  if (!res.ok) { wrap.innerHTML = `<div class="warning">${res.error}</div>`; wrap.dataset.loadedFor = ""; return; }
-  wrap.innerHTML = `
-    <div class="sh-note"><i data-lucide="pencil" size="13"></i>
-      This is the shader's real code as editable LLVM IR (${(res.lines || 0).toLocaleString()} lines).
-      Edit it — e.g. change a <code>fmul</code> factor or a <code>float</code> constant — then
-      <b>Reassemble &amp; Build Mod</b>. DXC reassembles it into a real shader.
-      <b>Note:</b> if this dxil.dll can't sign, the mod is emitted unsigned — test it in-game.</div>
-    <textarea id="sh-ir" class="sh-ir" spellcheck="false"></textarea>
-    <div class="sh-buildrow">
-      <input id="sh-mod-name" class="sh-pval" placeholder="mod name (optional)" spellcheck="false" style="flex:1">
-      <button class="btn" id="sh-ir-reset"><i data-lucide="rotate-ccw" size="13"></i> Reset</button>
-      <button class="btn primary" id="sh-build-btn"><i data-lucide="package" size="14"></i> Reassemble &amp; Build Mod</button>
-    </div>`;
-  lucide.createIcons({ nodes: [wrap] });
-  const ta = _shEl("sh-ir");
-  ta.value = res.ir || "";
-  ta.dataset.orig = res.ir || "";
-  _shEl("sh-ir-reset").addEventListener("click", () => { ta.value = ta.dataset.orig; });
-  _shEl("sh-build-btn").addEventListener("click", buildShaderMod);
-}
-
-async function buildShaderMod() {
-  const ta = _shEl("sh-ir");
-  if (!ta || !ta.value.trim()) { toast("No IR to build", "warning"); return; }
-  if (ta.value === ta.dataset.orig) { toast("Edit the IR first — it's unchanged", "warning"); return; }
-  const btn = _shEl("sh-build-btn");
-  btn.disabled = true;
-  const t = toastSpinner("Reassembling & building shader mod…");
-  let res;
-  try {
-    res = await api("/api/shaders/build_mod_ir", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lib: _sh.cur.lib, idx: _sh.cur.idx,
-                             name: (_shEl("sh-mod-name").value || "").trim(), ir: ta.value }),
-    });
-  } catch (e) { t.resolve("Build failed: " + e.message, "error"); btn.disabled = false; return; }
-  btn.disabled = false;
-  if (!res.ok) { t.resolve("Build failed: " + res.error, "error", 7000); return; }
-  t.resolve(`${res.signed ? "Signed" : "UNSIGNED"} shader mod built → ${res.files.join(", ")}`,
-        res.signed ? "success" : "warning", 8000);
-  if (res.note) toast(res.note, "info", 9000);
-}
-document.querySelectorAll(".sh-tab").forEach(b =>
-  b.addEventListener("click", () => _shSelectTab(b.dataset.tab)));
-
-function renderShaderProps(p) {
-  const wrap = _shEl("shader-props");
-  const res = p.resources || [];
-  const cbufs = res.filter(r => r.type === "cbuffer");
-  const other = res.filter(r => r.type !== "cbuffer");
-  const sigRows = (arr) => arr.length
-    ? arr.map(r => `<tr><td class="pk">${_esc(r.name)}</td><td class="pm">${_esc(r.format)}</td>
-        <td class="pm">${_esc(r.mask || "")}</td><td class="pm">reg ${_esc(r.register)}</td></tr>`).join("")
-    : `<tr><td colspan="4" class="pm">none</td></tr>`;
-
-  let html = `<div class="sh-note"><i data-lucide="info" size="13"></i>
-      These are the shader's live properties. Constant buffers are its parameter banks; per-value
-      editing arrives with Phase&nbsp;4's in-game round-trip (proven on one shader first).</div>`;
-
-  // Constant buffers = the shader's parameter banks.
-  html += `<div class="sh-sec">
-      <div class="sh-sec-h"><i data-lucide="box" size="13"></i> Constant buffers (params)
-        <span class="pm">${cbufs.length}</span></div>
-      <table class="sh-tbl">
-        ${cbufs.length ? cbufs.map(r => `<tr>
-          <td class="pk">${_esc(r.bind)}</td><td>${_esc(r.name)}</td>
-          <td><input class="sh-pval" placeholder="edit in Phase 4" disabled
-               title="Per-value editing arrives with the Phase 4 round-trip"></td></tr>`).join("")
-        : `<tr><td class="pm">none</td></tr>`}
-      </table></div>`;
-
-  // Textures / samplers / UAVs.
-  html += `<div class="sh-sec">
-      <div class="sh-sec-h"><i data-lucide="plug" size="13"></i> Textures &amp; samplers
-        <span class="pm">${other.length}</span></div>
-      <table class="sh-tbl">
-        ${other.length ? other.map(r => `<tr>
-          <td class="pk">${_esc(r.bind)}</td><td class="pm">${_esc(r.type)}</td>
-          <td class="pm">${_esc(r.fmt || "")}</td><td>${_esc(r.name)}</td></tr>`).join("")
-        : `<tr><td class="pm">none</td></tr>`}
-      </table></div>`;
-
-  // Signatures.
-  html += `<div class="sh-sec">
-      <div class="sh-sec-h"><i data-lucide="arrow-down-to-line" size="13"></i> Input signature
-        <span class="pm">${(p.input || []).length}</span></div>
-      <table class="sh-tbl">${sigRows(p.input || [])}</table></div>
-    <div class="sh-sec">
-      <div class="sh-sec-h"><i data-lucide="arrow-up-from-line" size="13"></i> Output signature
-        <span class="pm">${(p.output || []).length}</span></div>
-      <table class="sh-tbl">${sigRows(p.output || [])}</table></div>`;
-
-  wrap.innerHTML = html;
-  lucide.createIcons({ nodes: [wrap] });
-}
+// Shader Studio lives in gui/shader-studio.js.
 
 // ── World / level editor (lights · fog · grade · component visibility) ─────────
 let worldEditor = null;

@@ -310,6 +310,13 @@ export function createAssemblyView(api) {
           imageObserver?.unobserve(entry.target); loadThumb(entry.target, entry.target.dataset.src);
         }
       }, {root:cards, rootMargin:'0px 100px'});
+      const middleEllipsis = (text, max = 22) => {
+        const s = String(text || '');
+        if (s.length <= max) return s;
+        const head = Math.max(6, Math.floor((max - 1) * 0.55));
+        const tail = Math.max(5, max - 1 - head);
+        return s.slice(0, head) + '…' + s.slice(-tail);
+      };
       for (const [index, source] of sources.entries()) {
         const card = button('', () => selectTexture(source), 'assembly-texture-card');
         if (!source.custom) card.addEventListener('contextmenu', event => api.textureMenu(event, source));
@@ -319,9 +326,12 @@ export function createAssemblyView(api) {
         const preview = make('span', null, 'assembly-texture-preview');
         const img = make('img'); img.alt = ''; img.width = img.height = 80; img.decoding = 'async';
         img.dataset.src = thumbnailURL(source, info); preview.append(img, make('span', 'Preview unavailable', 'assembly-thumb-error'));
-        card.append(preview, make('strong', roleLabel(source)), make('span', leaf(source.game_rel), 'assembly-texture-name'),
+        const leafName = leaf(source.game_rel);
+        const nameEl = make('span', middleEllipsis(leafName), 'assembly-texture-name');
+        nameEl.title = leafName;
+        card.append(preview, make('strong', roleLabel(source)), nameEl,
           chip(owners[index], owners[index] !== 'Game original'));
-        card.setAttribute('aria-label', `${source.slot}: ${leaf(source.game_rel)}. ${owners[index]}`);
+        card.setAttribute('aria-label', `${source.slot}: ${leafName}. ${owners[index]}`);
         cards.append(card); imageObserver.observe(img);
       }
     }
@@ -334,7 +344,7 @@ export function createAssemblyView(api) {
     const info = selectedInfo(), selected = api.state().selected;
     host.append(make('span', `${texture.slot} · ${textureUsers(api.state().data, texture).length} material slot(s)`, 'assembly-texture-usage'));
     const preview = button('Preview', () => window.AtelierLibraryTools?.previewImage({label:leaf(texture.game_rel), path:texture.game_rel,
-      src:api.url(texture.url), caption:`${texture.slot} · ${ownership(texture.game_rel, texture.custom)}`}, preview));
+      src:api.url(texture.url), isTexture:true, caption:`${texture.slot} · ${ownership(texture.game_rel, texture.custom)}`}, preview));
     host.append(preview);
     if (texture.custom) host.append(button('Edit texture slot', () => api.editMaterial(selected, texture.slot)));
     else {
