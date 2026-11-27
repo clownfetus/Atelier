@@ -5,6 +5,24 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.6 — 2026-11-27
+
+- Keep Settings open when dismissing a dropdown or tooltip
+- docs: refresh the GitHub README screenshots
+- Polish Atelier navigation and export setup
+- Fix reflection tints darkening model previews
+- Wait for Atelier to exit before Windows updates
+- Clarify Model Studio and Assembly editing
+- Open Atelier as soon as its local server is listening
+- Add Marvel Rivals launch button to Atelier
+- Add Project Galacta Skin VFX authoring
+- Integrate material repair, repatching and install checks
+- docs: update Skin Swapper setup help [skip ci]
+- docs: restore direct tutorial shortcuts [skip ci]
+- docs: bring Atelier tutorials up to date [skip ci]
+- docs: refresh the Atelier GitHub landing page [skip ci]
+- docs: add the Atelier user guide [skip ci]
+
 ## 1.2.5 — 2026-11-18
 
 - Atelier now frees the disk space left behind by older versions. From 0.3.3,
