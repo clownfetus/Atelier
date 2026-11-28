@@ -11,6 +11,13 @@
     if (sorts.has(saved?.sort)) prefs.sort = saved.sort;
   } catch (_) {}
   let type = 'all', status = 'all', callbacks = {}, previewDialog, previewOpener, previewReveal;
+  let hudModulePromise = null;
+  const UI_TEXTURE_RE = /(?:^|\/)(?:ui|nameplates?|sprays?|crosshairs?|reticles?)(?:\/|$)|(?:nameplateframe|playerheadframe|herohead|herogallery|killicon|item_kill|item_herohead|lordicon|abilityicon|skillicon|crosshair|reticle)/i;
+  function isUiTexture(path) { return UI_TEXTURE_RE.test(String(path || '').replace(/\\/g, '/')); }
+  function loadHudModule() {
+    if (!hudModulePromise) hudModulePromise = import('/static/ui-mockup.js');
+    return hudModulePromise;
+  }
   const items = new WeakMap();
   const normalize = value => String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\\/g, '/');
   const words = query => normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -259,8 +266,36 @@
       previewElement('wipe-wrap').hidden = state.compare !== 'wipe';
       frame.classList.toggle('is-wipe', state.compare === 'wipe');
       resizePreviewFrame();
+      renderHudMockup(state);
     }
     updatePixelReadout();
+  }
+
+  async function renderHudMockup(state) {
+    const overlay = previewElement('hud-overlay');
+    if (!overlay) return;
+    if (!state?.hudOn || !state.isUi) {
+      overlay.hidden = true;
+      overlay.replaceChildren();
+      return;
+    }
+    try {
+      const mod = await loadHudModule();
+      if (state !== previewState || !state.hudOn) return;
+      const select = previewElement('hud-preset');
+      if (select && !select.options.length) {
+        select.replaceChildren(...mod.HUD_PRESETS.map(p => new Option(p.label, p.id)));
+      }
+      if (!state.hudPreset) state.hudPreset = mod.defaultPresetForPath(state.path);
+      if (select) { select.value = state.hudPreset; select.hidden = false; }
+      const img = state.edited?.image;
+      const info = mod.renderHudOverlay(overlay, state.hudPreset, img?.naturalWidth || 0, img?.naturalHeight || 0);
+      overlay.hidden = false;
+      const captionEl = previewDialog?.querySelector('.library-preview-footer span');
+      if (captionEl && info?.caption) captionEl.textContent = info.caption;
+    } catch (_) {
+      overlay.hidden = true;
+    }
   }
 
   function loadPreviewLayer(state, layer, bust = false) {
@@ -299,6 +334,8 @@
       layer.root.hidden = true;
       layer.canvas.width = layer.canvas.height = 0;
     }
+    const hudOverlay = previewDialog ? previewElement('hud-overlay') : null;
+    if (hudOverlay) { hudOverlay.hidden = true; hudOverlay.replaceChildren(); }
     previewState = null;
     previewReveal?.destroy(); previewReveal = null;
   }
@@ -320,6 +357,17 @@
     if (compareGroup) compareGroup.hidden = !previewState.original;
     const checkerBtn = previewElement('checker');
     if (checkerBtn) checkerBtn.setAttribute('aria-pressed', String(!!previewState.checker));
+    const hudBtn = previewElement('hud');
+    const hudPreset = previewElement('hud-preset');
+    if (hudBtn) {
+      hudBtn.hidden = !previewState.isUi;
+      hudBtn.setAttribute('aria-pressed', String(!!previewState.hudOn));
+    }
+    if (hudPreset) hudPreset.hidden = !(previewState.isUi && previewState.hudOn);
+    if (!previewState.hudOn && previewState.baseCaption) {
+      const captionEl = previewDialog?.querySelector('.library-preview-footer span');
+      if (captionEl) captionEl.textContent = previewState.baseCaption;
+    }
     previewElement('stage').classList.toggle('is-checker', previewState.checker);
     renderPreview();
   }
@@ -349,12 +397,15 @@
             '<button type="button" class="lp-btn" data-zoom="200" aria-pressed="false">200%</button>' +
           '</div>' +
           '<button type="button" class="lp-btn" id="library-preview-checker" aria-pressed="false" title="Toggle transparency checkerboard">Checker</button>' +
+          '<button type="button" class="lp-btn" id="library-preview-hud" aria-pressed="false" title="Preview inside an in-game HUD frame mask" hidden>HUD frame</button>' +
+          '<select class="lp-select" id="library-preview-hud-preset" aria-label="HUD frame preset" hidden></select>' +
           '<span class="lp-pixel" id="library-preview-pixel"></span>' +
         '</div>' +
         '<div class="library-preview-stage" id="library-preview-stage">' +
           '<div class="lp-frame" id="library-preview-frame" hidden>' +
             '<div class="lp-layer" id="library-preview-edited"><img alt="" hidden><canvas id="library-preview-canvas" hidden></canvas></div>' +
             '<div class="lp-layer" id="library-preview-original" hidden><canvas id="library-preview-original-canvas"></canvas></div>' +
+            '<div class="lp-hud-overlay" id="library-preview-hud-overlay" hidden></div>' +
             '<div class="lp-wipe-wrap" id="library-preview-wipe-wrap" hidden>' +
               '<span class="lp-wipe-label lp-wipe-left">Original</span>' +
               '<span class="lp-wipe-label lp-wipe-right">Edited</span>' +
@@ -379,7 +430,13 @@
           state.compare = btn.dataset.compare;
           if (state.compare !== 'edited' && !state.original.status) loadPreviewLayer(state, state.original);
         } else if (btn.id === 'library-preview-checker') state.checker = !state.checker;
+        else if (btn.id === 'library-preview-hud' && state.isUi) state.hudOn = !state.hudOn;
         syncPreviewToolbar();
+      });
+      previewElement('hud-preset')?.addEventListener('change', event => {
+        if (!previewState) return;
+        previewState.hudPreset = event.target.value;
+        renderHudMockup(previewState);
       });
       previewElement('wipe').addEventListener('input', event => {
         if (!previewState) return;
@@ -423,6 +480,10 @@
     img.alt = label;
     previewState = {
       isTexture,
+      isUi: isTexture && isUiTexture(path),
+      hudOn: false,
+      hudPreset: '',
+      baseCaption: caption || '',
       path: path || '',
       edited: { src, image: img, root: previewElement('edited'), canvas: previewElement('canvas') },
       original: originalSrc ? { src: originalSrc, image: new Image(), root: previewElement('original'),
