@@ -1,8 +1,7 @@
 """Optional, cached browsing artwork. Never participates in asset import or mod export.
 
-Names come from donutman07; costume IDs and images are verified on RivalSkins, whose
-card name replaces a different listed name when its page verifies exactly one game ID.
-Missing costumes use a labelled hero portrait, never a guessed skin image.
+The Starsong game data revision supplies hero and skin identities and primary art.
+Verified RivalSkins entries also supply offline metadata and alternate artwork.
 Network work is explicit (start_update/thumbnail), bounded and independent of projects.
 """
 import hashlib
@@ -15,12 +14,13 @@ import re
 import threading
 import time
 import unicodedata
-import urllib.error
 import urllib.parse
 import urllib.request
 
 from PIL import Image
 from atelier import config as C
+from atelier import starsong
+from atelier.changelog import current_version
 from atelier.storage import atomic_json
 from atelier.identity import resolve_ids, identity_tokens
 
@@ -29,6 +29,7 @@ HEROES_URL = 'https://rivalskins.com/heroes/'
 NAMEPLATES_URL = 'https://rivalskins.com/wp-content/themes/astra-child/js/generated/item-data.js'
 DAY = 86400
 PARSER_VERSION = 7
+USER_AGENT = f'Atelier/{current_version(C.VERSION_FILE) or "dev"} (+https://github.com/clownfetus/Atelier)'
 ALIASES = {'punisher': 'thepunisher', 'mrfantastic': 'misterfantastic',
            'jeffthelandshark': 'jeffthelandshark', 'ironfistlinlie': 'ironfist',
            'gorr': 'gorrthegodbutcher'}
@@ -77,6 +78,8 @@ def nameplate_url(icon):
 def allowed_url(url):
     if not isinstance(url, str):
         return False
+    if starsong.is_image_url(url):
+        return True
     try:
         parsed = urllib.parse.urlsplit(url)
         port = parsed.port
@@ -106,18 +109,22 @@ def allowed_url(url):
     )) or url == IDS_URL
 
 
+def _allowed_source(url):
+    return allowed_url(url) or (isinstance(url, str) and url.startswith(starsong.API + '?') and '#' not in url)
+
+
 class _SafeRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not allowed_url(newurl):
+        if not _allowed_source(newurl):
             raise ValueError('Unexpected catalogue redirect')
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def fetch(url, headers=None, limit=8 * 1024 * 1024):
-    if not allowed_url(url):
+    if not _allowed_source(url):
         raise ValueError('Unexpected catalogue source')
     request = urllib.request.Request(url, headers={
-        'User-Agent': 'Atelier/1.0 (optional browsing artwork cache)', **(headers or {})})
+        'User-Agent': USER_AGENT, **(headers or {})})
     with urllib.request.build_opener(_SafeRedirect()).open(request, timeout=8) as response:
         data = response.read(limit + 1)
         if len(data) > limit:
@@ -430,6 +437,12 @@ class Catalogue:
             self.data = bundled
         else:
             self.data = cached or bundled or {'entries': {}}
+        # Keep the previously verified RivalSkins index alongside the revision cache.
+        self.rivalskins = {**(bundled or {}).get('entries', {}), **self.data['entries']}
+        self.revisions = self.root / f'starsong-v{starsong.CACHE_VERSION}'
+        snapshot = self._read(self.revisions / 'current.json')
+        if snapshot and starsong.valid_pin(snapshot.get('revision')):
+            self.data = self._with_rivalskins(snapshot)
         self.state = {'updating': False, 'error': None, 'checked_at': self.data.get('checked_at')}
 
     @staticmethod
@@ -443,8 +456,11 @@ class Catalogue:
                        and (entry.get('image') is None or allowed_url(entry['image']))
                        and (entry.get('banner') is None or allowed_url(entry['banner']))
                        and (entry.get('badge') is None or allowed_url(entry['badge']))
-                       and (entry.get('proficiency') is None or nameplate_url(entry['proficiency']))
+                       and (entry.get('proficiency') is None or nameplate_url(entry['proficiency'])
+                            or starsong.is_image_url(entry['proficiency']))
                        and (entry.get('spray') is None or allowed_url(entry['spray']))
+                       and all(entry.get(field) is None or starsong.is_image_url(entry[field])
+                               for field in ('icon', *starsong.HERO_ART))
                        for key, entry in data['entries'].items()):
                 return None
             return data
@@ -454,7 +470,8 @@ class Catalogue:
     def status(self):
         with self.lock:
             entries = self.data.get('entries', {})
-            return {**self.state, 'entries': len(entries), 'portraits': sum(bool(e.get('image')) for e in entries.values())}
+            return {**self.state, 'revision': self.data.get('revision'),
+                    'entries': len(entries), 'portraits': sum(bool(e.get('image')) for e in entries.values())}
 
     def describe(self, path):
         entries = self.data.get('entries', {})
@@ -492,9 +509,9 @@ class Catalogue:
                 'skin_name': (skin or {}).get('name') or '',
                 'hero': hero, 'skin': skin}
 
-    def identity_entries(self):
+    def identity_entries(self, entries=None):
         """Local display metadata for all known IDs, including entries without artwork."""
-        entries = self.data.get('entries', {})
+        entries = self.data.get('entries', {}) if entries is None else entries
         return {key: {**self._describe_id(key, entries), 'id': key,
                       'kind': entry.get('kind', 'hero' if len(key) == 4 else 'skin'),
                       'hero': key[:4]}
@@ -568,6 +585,59 @@ class Catalogue:
 
     def update(self):
         try:
+            pin = starsong.latest_pin(fetch)
+            cache = self.revisions / (pin.replace(':', '-') + '.json')
+            snapshot = self._read(cache)
+            if not snapshot or snapshot.get('revision') != pin or not snapshot['entries']:
+                snapshot = {'schema': 1, 'revision': pin, 'entries': starsong.read_entries(fetch, pin),
+                            'refreshed_at': time.time(), 'sources': [starsong.API]}
+                atomic_json(cache, snapshot, ensure_ascii=False)
+            now = time.time()
+            snapshot = {**snapshot, 'checked_at': now}
+            data = self._with_rivalskins(snapshot)
+            atomic_json(self.revisions / 'current.json', snapshot, ensure_ascii=False)
+            with self.lock:
+                self.data = data
+                self.state.update(checked_at=now, error=None)
+        except Exception as exc:
+            with self.lock:
+                self.state['error'] = str(exc)
+        finally:
+            with self.lock:
+                self.state['updating'] = False
+
+    def _rival_entry(self, key, entry):
+        rival = self.rivalskins.get(key, {})
+        if rival.get('hero_fallback'):
+            return {}
+        if rival.get('match') == 'name' and normalized(rival['name']) != normalized(entry.get('name', '')):
+            return {}
+        return rival
+
+    def _with_rivalskins(self, snapshot):
+        entries = dict(self.rivalskins)
+        for key, primary in snapshot['entries'].items():
+            rival = self._rival_entry(key, primary)
+            entry = {**primary}
+            if entry.get('multiple_forms') and rival.get('image'):
+                # A single default form may differ from Atelier's established roster art.
+                entry.update(image=rival['image'], avatar=None)
+            for field in ('image', 'banner', 'badge', 'proficiency', 'spray'):
+                if not entry.get(field) and (url := self._rival_url(rival, field)):
+                    entry[field] = url
+                    if field == 'banner' and rival.get('banner_style'):
+                        entry['banner_style'] = rival['banner_style']
+            entries[key] = entry
+        for key in snapshot['entries']:
+            entry = entries[key]
+            if entry.get('kind') == 'skin' and not entry.get('image'):
+                entry['image'] = entries.get(entry['hero'], {}).get('image')
+                entry['hero_fallback'] = True
+        return {**snapshot, 'entries': entries}
+
+    def refresh_rivalskins(self):
+        """Refresh the verified fallback index for the offline catalogue seed."""
+        try:
             md, _ = fetch(IDS_URL)
             roster_html, _ = fetch(HEROES_URL)
             nameplates, _ = fetch(NAMEPLATES_URL)
@@ -603,6 +673,7 @@ class Catalogue:
             atomic_json(str(self.root / 'catalogue.json'), data)
             with self.lock:
                 self.data = data
+                self.rivalskins = data['entries']
                 self.state.update(checked_at=now, error=None)
         except Exception as exc:
             with self.lock:
@@ -627,41 +698,71 @@ class Catalogue:
     def thumbnail(self, key):
         if not re.fullmatch(r'\d{4}(?:\d{3})?', key):
             return None
-        return self._cached(self.data.get('entries', {}).get(key, {}).get('image'))
+        data = self.data
+        entries = data.get('entries', {})
+        entry = entries.get(key, {})
+        if len(key) == 7 and entry.get('hero_fallback') and data.get('revision'):
+            key, entry = key[:4], entries.get(key[:4], {})
+        return self._entry_art(key, entry, 'image')
 
     def icon(self, key):
-        """A costume's square head-and-shoulders icon, published beside its art as img_icon_<name>.
+        """A costume's square head-and-shoulders icon.
         Hero-portrait fallbacks have no costume of their own, so they get none."""
         if not re.fullmatch(r'\d{7}', key):
             return None
         entry = self.data.get('entries', {}).get(key, {})
-        return None if entry.get('hero_fallback') else self._cached(icon_url(entry.get('image')))
+        return None if entry.get('hero_fallback') else self._entry_art(key, entry, 'icon')
 
     def badge(self, key):
         """The square icon of the uniquely matched same-hero nameplate, never a guessed skin."""
         if not re.fullmatch(r'\d{7}', key):
             return None
         entry = self.data.get('entries', {}).get(key, {})
-        url = entry.get('badge')
-        if entry.get('hero_fallback') or not isinstance(url, str) or not nameplate_url(url):
-            return None
-        return self._cached(url)
+        return None if entry.get('hero_fallback') else self._entry_art(key, entry, 'badge')
 
     def proficiency(self, key):
         """The hero's verified Fantastic proficiency reward icon."""
         if not re.fullmatch(r'10\d{2}', key):
             return None
-        url = self.data.get('entries', {}).get(key, {}).get('proficiency')
-        return self._cached(url) if nameplate_url(url) else None
+        entry = self.data.get('entries', {}).get(key, {})
+        return self._entry_art(key, entry, 'proficiency')
 
     def spray(self, key):
         if not re.fullmatch(r'10\d{5}', key):
             return None
         entry = self.data.get('entries', {}).get(key, {})
-        url = entry.get('spray')
-        if entry.get('hero_fallback') or not isinstance(url, str) or not re.fullmatch(r'.*/items/spray/\d+/img_(?!icon_)[^/]+\.webp', url):
+        return None if entry.get('hero_fallback') else self._entry_art(key, entry, 'spray')
+
+    def hero_image(self, key, kind):
+        if not re.fullmatch(r'\d{4}', key) or kind not in starsong.HERO_ART:
             return None
-        return self._cached(url)
+        url = self.data.get('entries', {}).get(key, {}).get(kind)
+        return self._cached(url) if starsong.is_image_url(url) else None
+
+    @staticmethod
+    def _rival_url(entry, field):
+        if field == 'icon':
+            return icon_url(entry.get('image'))
+        url = entry.get(field)
+        if not isinstance(url, str):
+            return None
+        if field in ('badge', 'proficiency') and not nameplate_url(url):
+            return None
+        if field == 'banner' and '/items/nameplate/' not in url:
+            return None
+        if field == 'spray' and not re.fullmatch(r'.*/items/spray/\d+/img_(?!icon_)[^/]+\.webp', url):
+            return None
+        return url
+
+    def _entry_art(self, key, entry, field):
+        url = entry.get(field)
+        if starsong.is_image_url(url):
+            path = self._cached(url)
+            if path:
+                return path
+        elif (rival := self._rival_url(entry, field)):
+            return self._cached(rival)
+        return self._cached(self._rival_url(self._rival_entry(key, entry), field))
 
     @staticmethod
     def _sharp_path(path):
@@ -672,10 +773,9 @@ class Catalogue:
         if not re.fullmatch(r'\d{4}(?:\d{3})?', key):
             return None
         entry = self.data.get('entries', {}).get(key, {})
-        url = entry.get('banner')
-        if entry.get('hero_fallback') or not isinstance(url, str) or '/items/nameplate/' not in url:
+        if entry.get('hero_fallback'):
             return None
-        path = self._cached(url)
+        path = self._entry_art(key, entry, 'banner')
         if path:
             target = self._sharp_path(path)
             if target.is_file():
@@ -732,7 +832,11 @@ class Catalogue:
             with Image.open(io.BytesIO(raw)) as image:
                 if image.format != 'WEBP' or image.width * image.height > 16_000_000:
                     raise ValueError('Unexpected portrait format or dimensions')
-                image.verify()
+                if starsong.is_image_url(url) and 'A' in image.getbands():
+                    if not image.getchannel('A').getbbox():
+                        raise ValueError('Catalogue artwork is blank')
+                else:
+                    image.verify()
             path.parent.mkdir(parents=True, exist_ok=True)
             # Per-thread staging also makes duplicate simultaneous requests harmless.
             staged = path.with_suffix(f'.{threading.get_ident()}.tmp')

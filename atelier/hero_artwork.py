@@ -14,7 +14,7 @@ import time
 from urllib.parse import unquote, urlsplit
 
 from PIL import Image
-from atelier import config
+from atelier import config, starsong
 from atelier.catalogue import allowed_url, fetch, normalized, ALIASES
 from atelier.storage import atomic_json
 
@@ -99,6 +99,11 @@ def parse_assets(html, kind, names):
     return parser.entries
 
 
+def _primary_images(entries):
+    return {(cid, kind) for cid, entry in entries.items() for kind in starsong.HERO_ART
+            if starsong.is_image_url(entry.get(kind))}
+
+
 class HeroArtwork:
     def __init__(self, root):
         self.root = Path(root)
@@ -116,9 +121,13 @@ class HeroArtwork:
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             self.entries = {}
 
-    def status(self):
+    def status(self, catalogue_entries=None):
         with self.lock:
-            return {**self.state, **{('stories' if kind == 'story' else kind + 's'): sum(kind in entry for entry in self.entries.values()) for kind in PAGES}}
+            heroes = {kind: {cid for cid, entry in self.entries.items() if kind in entry} for kind in PAGES}
+            for cid, kind in _primary_images(catalogue_entries or {}):
+                heroes[kind].add(cid)
+            return {**self.state, **{('stories' if kind == 'story' else kind + 's'): len(ids)
+                                     for kind, ids in heroes.items()}}
 
     def start_update(self, entries):
         with self.lock:
@@ -133,7 +142,8 @@ class HeroArtwork:
                 if cid.startswith('10'):
                     matches.setdefault(ALIASES.get(key, key), []).append(cid)
         names = {key: ids[0] for key, ids in matches.items() if len(ids) == 1}
-        threading.Thread(target=self.update, args=(names,), name='atelier-hero-artwork', daemon=True).start()
+        primary = _primary_images(entries)
+        threading.Thread(target=self.update, args=(names, primary), name='atelier-hero-artwork', daemon=True).start()
 
     def _path(self, url):
         return self.root / 'hero-images' / (hashlib.sha256(url.encode()).hexdigest() + '.webp')
@@ -167,7 +177,7 @@ class HeroArtwork:
                     staged.unlink(missing_ok=True)
         return path
 
-    def update(self, names):
+    def update(self, names, primary=()):
         errors, discovered = [], {}
         try:
             for kind, page in PAGES.items():
@@ -182,7 +192,7 @@ class HeroArtwork:
             def download(item):
                 (cid, kind), url = item
                 try:
-                    if kind not in ('prestige', 'signature'):
+                    if kind not in ('prestige', 'signature') and (cid, kind) not in primary:
                         self._image(url)
                     return cid, kind, url
                 except Exception:
@@ -241,11 +251,10 @@ class HeroArtwork:
             return None
         with self.lock:
             url = self.entries.get(cid, {}).get(kind)
-        # UI reads are local: a slow or offline artwork source never blocks navigation.
         path = self._path(url) if url else None
-        # Decorative portraits download only when an image requests one, independently
-        # of navigation or the background metadata refresh.
-        if kind in ('prestige', 'signature') and url:
+        # Primary Starsong artwork is served separately. Its alternate is fetched
+        # only if this image route needs it.
+        if kind in ('avatar', 'logo', 'prestige', 'signature') and path and not path.is_file():
             if time.time() - self.failed_images.get(url, 0) < 300:
                 return None
             try:

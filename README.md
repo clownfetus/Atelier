@@ -94,5 +94,6 @@ Atelier is licensed under the [GNU General Public License v3](LICENSE).
 - Xzant · [UAssetToolRivals](https://github.com/X-zant/UAssetToolRivals)
 - Natimerry · [repak-rivals retoc](https://github.com/natimerry/repak-rivals/)
 - Saturn · [Repak-X](https://github.com/X-zant/Repak-X) and [SpaceHost](https://spacedepot.github.io/SpaceHost/)
-- donutman07 · [Character IDs](https://github.com/donutman07/MarvelRivalsCharacterIDs/)
-- [RivalSkins](https://rivalskins.com/heroes/) for optional hero and skin artwork
+- [Psylocke.gg](https://psylocke.gg/) and the [Starsong Game Data API](https://starsong.dev/docs/game-data-api) for hero and skin data and catalogue artwork
+- [RivalSkins](https://rivalskins.com/heroes/) for fallback catalogue artwork
+- donutman07 · [Character IDs](https://github.com/donutman07/MarvelRivalsCharacterIDs/) for the offline reference

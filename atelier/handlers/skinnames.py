@@ -1,10 +1,12 @@
-"""Human-readable skin/character names from Tools/MarvelRivalsCharacterIDs.md.
+"""Display names from the game data catalogue and the offline ID reference.
 
 The pak folders are bare ids (Characters/1060/1060501), so the viewport's chroma picker would show
 "1060501" instead of "COASTAL KUMIHO". This parses the shipped reference table into a lookup so the
-UI can label them. Purely cosmetic — nothing downstream depends on the names.
+UI can label them.
 """
 import os, re
+from atelier import starsong
+from atelier.catalogue import catalogue
 from atelier.config import TOOLS, dir_glob
 from atelier.skin_name_fixes import correct_skin_name
 
@@ -35,7 +37,8 @@ def _parse():
     skins, chars = {}, {}
     cur_char, cur_name = None, None
     try:
-        lines = open(_md_path(), encoding="utf-8").read().splitlines()
+        with open(_md_path(), encoding="utf-8") as reference:
+            lines = reference.read().splitlines()
     except OSError:
         return {"skins": {}, "chars": {}}
     for ln in lines:
@@ -64,14 +67,23 @@ def _data():
     return _CACHE
 
 
+def _catalogue_name(folder_id, kind):
+    entry = catalogue.data.get('entries', {}).get(str(folder_id), {})
+    if entry.get('kind') == kind and entry.get('source') == starsong.API:
+        return entry.get('name')
+    return None
+
+
 def skin_name(skin_id):
     """Display name for a skin id, or None if unknown."""
+    if name := _catalogue_name(skin_id, 'skin'):
+        return name
     e = _data()["skins"].get(str(skin_id))
     return e["skin"] if e else None
 
 
 def char_name(char_id):
-    return _data()["chars"].get(str(char_id))
+    return _catalogue_name(char_id, 'hero') or _data()["chars"].get(str(char_id))
 
 
 def label_for(folder_id):
