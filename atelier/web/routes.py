@@ -646,19 +646,22 @@ def api_mesh_visibility():
 
 @app.get("/api/idle_animations")
 def api_idle_animations():
-    from atelier.handlers.animation import idle_candidates
+    from atelier.handlers.animation import animation_candidates, idle_candidates
     try:
-        return {"ok": True, "animations": idle_candidates(request.query.get('game_rel', ''))}
+        include_all = str(request.query.get('all', '')).lower() in ('1', 'true', 'yes')
+        fn = animation_candidates if include_all else idle_candidates
+        return {"ok": True, "animations": fn(request.query.get('game_rel', ''))}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
 
 @app.post("/api/idle_animation")
 def api_idle_animation():
-    from atelier.handlers.animation import decode_idle
+    from atelier.handlers.animation import decode_animation, decode_idle
     body = request.json or {}
     try:
-        return {"ok": True, **decode_idle(body.get('game_rel', ''), body.get('animation_rel', ''))}
+        fn = decode_animation if body.get('all') else decode_idle
+        return {"ok": True, **fn(body.get('game_rel', ''), body.get('animation_rel', ''))}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 

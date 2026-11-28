@@ -297,7 +297,11 @@
 #viewport-foot #viewport-fit { background:transparent; border-color:transparent; padding-left:0; color:var(--muted); }
 #viewport-playback { display:flex; align-items:center; justify-content:center; gap:8px; margin:auto; min-width:0; }
 #viewport-animation { max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#viewport-box #viewport-play { min-width:88px; }
+#viewport-box #viewport-play { min-width:74px; }
+#viewport-scrub-wrap { display:flex; align-items:center; gap:6px; min-width:0; }
+#viewport-scrub-wrap[hidden] { display:none; }
+#viewport-scrub { width:108px; accent-color:var(--text); cursor:pointer; }
+#viewport-scrub-time { font-family:var(--studio-mono); font-size:var(--studio-text-micro); color:var(--muted); min-width:68px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 #viewport-navigation { color:var(--muted); font-size:var(--studio-text-micro); white-space:nowrap; }
 #viewport-navigation span { padding:0 4px; }
 .vp-status-line { display:contents; }
