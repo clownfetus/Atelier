@@ -5,6 +5,8 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+## 1.2.8 — 2026-11-28
+
 - **Library.** Sharper hero and costume thumbnails on high-DPI screens,
   shorter character banners with bigger emblems, and more artwork in search
   and the Project Picker.
