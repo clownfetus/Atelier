@@ -311,8 +311,8 @@
       <details id="viewport-capture-menu" class="vp-menu"><summary title="Capture an image or turntable"><i data-lucide="camera" size="18"></i><span>Capture</span></summary><div class="vp-popover vp-capture-panel">
         <h3>Capture this view</h3>
         <label>Image name<input id="viewport-capture-name" maxlength="100" placeholder="Edited skin"></label>
-        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turnaround">Save turnaround sheet PNG</button><button id="viewport-turntable">Save turntable WebP</button>
-        <p>Includes the current palette. Turnaround: 4 angles on one sheet. Turntable: one revolution, 48 frames.</p>
+        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turnaround">Save turnaround sheet PNG</button><button id="viewport-turntable">Save turntable WebP</button><button id="viewport-turntable-webm">Save turntable WebM</button>
+        <p>Includes the current palette. Turnaround: 4 angles on one sheet. Turntable: one full 360° loop (WebP or Discord-ready WebM).</p>
       </div></details>
       <button class="sb-clear" id="viewport-expand" title="Expand workspace" aria-label="Expand workspace" aria-pressed="false"><i data-lucide="square" size="16"></i></button>
       <button class="sb-clear" id="viewport-close" title="Close preview" aria-label="Close preview"><i data-lucide="x" size="16"></i></button>
@@ -371,6 +371,7 @@
         <button id="viewport-pbr" aria-pressed="false" title="Load Normal and ORM maps (1024px) for metal, leather and surface relief">Surface detail (PBR)</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
+      <button id="viewport-showcase-duo" type="button" aria-pressed="false" hidden title="Place the untouched original costume beside your edited costume in Showcase">Compare side by side</button>
       <details id="viewport-qa-section" class="vp-qa-section">
         <summary>Pre-flight mesh QA</summary>
         <div class="vp-qa-body">
