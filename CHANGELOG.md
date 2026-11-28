@@ -5,6 +5,32 @@ The app, installers and update checker identify each release by its full number,
 
 ## Unreleased
 
+- **Library.** Sharper hero and costume thumbnails on high-DPI screens,
+  shorter character banners with bigger emblems, and more artwork in search
+  and the Project Picker.
+
+- **Catalogue.** Hero and costume names, game IDs and artwork now come from
+  Psylocke.gg’s Starsong API. The last complete catalogue works offline.
+  Atelier uses RivalSkins for missing artwork when it can verify a match.
+
+- **Custom assets.** Turn on **Use exact name** to keep the package name you
+  enter for a texture, mesh or material. Material slot textures keep their
+  package path when you change the image. New assets from an opened mod keep
+  their original package names.
+
+- **Mod tray and export.** The included count is beside **Review mod**.
+  Export Review shows asset names above paths and makes build warnings easier
+  to spot. Open **Build report** for the details or use **Copy diagnostics**
+  to share them.
+
+- **Model Studio.** **Save turnaround sheet PNG** captures four angles in one
+  image. Showcase adds hero artwork and emblem backdrops, plus **Dramatic
+  rim** and **Warm hero** lighting.
+
+- **Colour and curve editing.** Sample colours from costume art or generate
+  harmonies in Project Palette. Drag curve stops on the graph and preview
+  saved edits from the Mod tray.
+
 ## 1.2.7 — 2026-11-27
 
 - **Find commands with Ctrl+K.** Search for common Atelier actions, including

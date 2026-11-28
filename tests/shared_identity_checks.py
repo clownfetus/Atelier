@@ -126,7 +126,7 @@ def run_shared_identity_checks(context, url, report, checks):
         result.wait_for()
         assert 'Infernal Idol' in result.locator('strong').inner_text()
         assert result.locator('img').count() == 1
-        assert 'Magik — Infernal Idol' in result.locator(':scope > span').inner_text()
+        assert result.get_by_text('Magik — Infernal Idol').is_visible()
         assert result.get_attribute('title') == UI+'/1029304'
         result.click()
         tab.wait_for_function('nav.path.endsWith("/1029304")&&_gridStatus==="ready"')
