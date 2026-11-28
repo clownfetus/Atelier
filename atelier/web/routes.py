@@ -2599,47 +2599,16 @@ def api_events():
 # ── file change watcher ───────────────────────────────────────────────────────
 
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from atelier.file_watcher import ProjectFileHandler
 
-class _PNGHandler(FileSystemEventHandler):
-    _last: dict = {}
-
-    def on_modified(self, event):
-        if not event.is_directory and event.src_path.endswith(".png"):
-            import_root = get_import_root().replace("\\", "/")
-            evt_path    = event.src_path.replace("\\", "/")
-            if not evt_path.startswith(import_root + "/"):
-                return
-            if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
-                return
-            now = time.monotonic()
-            if now - self._last.get(event.src_path, 0) < 0.5:
-                return
-            self._last[event.src_path] = now
-            # Derive game_rel from the subfolder-mirrored path; legacy flat files resolve via cache.
-            gr = project_game_rel(event.src_path, get_import_root())
-            if "/" not in gr:
-                gr = _asset_cache.by_name(gr) or gr
-            _push_sse({"file_changed": True, "token": token(gr), "game_rel": gr})
-
-    def on_created(self, event):
-        self.on_modified(event)
-
-    def on_deleted(self, event):
-        # Any edited-asset file (texture/material/curve/vfx json, mesh .blend) removed from the
-        # active project externally (e.g. deleted in Explorer) — tell the sidebar to reconcile.
-        if event.is_directory:
-            return
-        p = event.src_path
-        if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
-            return
-        import_root = get_import_root().replace("\\", "/")
-        evt_path    = p.replace("\\", "/")
-        if not evt_path.startswith(import_root + "/"):
-            return
-        if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
-            return
-        _push_sse({"asset_removed": True})
+_png_handler = ProjectFileHandler(
+    get_import_root=get_import_root,
+    project_game_rel=project_game_rel,
+    resolve_by_name=_asset_cache.by_name,
+    token_fn=token,
+    push_sse=_push_sse,
+    ignored_dirs=(".atelier", project_trash.DIRECTORY),
+)
 
 def _migrate_legacy_imports():
     """Move files from assets/imported/ to projects/Default/ on first use of projects."""
@@ -2665,7 +2634,7 @@ _migrate_legacy_imports()
 retired_cache.start(_CACHE)
 os.makedirs(PROJECTS_ROOT, exist_ok=True)
 _observer = Observer()
-_observer.schedule(_PNGHandler(), PROJECTS_ROOT, recursive=True)
+_observer.schedule(_png_handler, PROJECTS_ROOT, recursive=True)
 _observer.start()
 
 # ── projects ─────────────────────────────────────────────────────────────────

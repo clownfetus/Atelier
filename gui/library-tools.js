@@ -423,6 +423,7 @@
     img.alt = label;
     previewState = {
       isTexture,
+      path: path || '',
       edited: { src, image: img, root: previewElement('edited'), canvas: previewElement('canvas') },
       original: originalSrc ? { src: originalSrc, image: new Image(), root: previewElement('original'),
         canvas: previewElement('original-canvas') } : null,
@@ -457,6 +458,42 @@
     loadPreviewLayer(previewState, previewState.edited);
     previewElement('close').focus();
   }
+  function reloadPreviewTexture(gameRel, ver, project) {
+    const state = previewState;
+    if (!state?.isTexture || !previewDialog?.open || !gameRel) return false;
+    const norm = p => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+    if (norm(state.path) !== norm(gameRel)) return false;
+    const stamp = String(ver || Date.now());
+    const proj = project || new URLSearchParams((state.edited.src.split('?')[1] || '')).get('_project') || '';
+    const query = new URLSearchParams({ game_rel: state.path, ...(proj ? { _project: proj } : {}), _t: stamp });
+    const freshSrc = `/api/preview?${query}`;
+    // If preview was opened on an unedited game texture before the external save landed,
+    // keep that original URL for wipe comparison and promote edited to the project preview.
+    if (!state.original && state.edited.src.includes('original=1')) {
+      state.original = {
+        src: state.edited.src,
+        image: new Image(),
+        root: previewElement('original'),
+        canvas: previewElement('original-canvas'),
+      };
+    }
+    state.edited.src = freshSrc;
+    state.edited.pixels = null;
+    state.edited.channel = null;
+    state.edited.pixelError = false;
+    state.edited.reading = false;
+    const captionEl = previewDialog.querySelector('.library-preview-footer span');
+    if (captionEl) captionEl.textContent = 'Edited texture · updated live';
+    syncPreviewToolbar();
+    loadPreviewLayer(state, state.edited, false);
+    return true;
+  }
+
+  window.addEventListener('atelier:asset-updated', event => {
+    const detail = event.detail || {};
+    if (detail.game_rel) reloadPreviewTexture(detail.game_rel, detail.ver, detail.project);
+  });
+
   window.AtelierLibraryTools = Object.freeze({init, matches, filter, sort, resetFilters, hasFilters,
-    decorate, ready, supportsPreview, previewImage, closePreview});
+    decorate, ready, supportsPreview, previewImage, closePreview, reloadPreviewTexture});
 })();

@@ -3260,9 +3260,14 @@ function connectSSE() {
 }
 window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; _gridThumbs?.destroy(); });
 
-function refreshEditedTexture(gameRel, tok, animate = true) {
+function refreshEditedTexture(gameRel, tok, animate = true, ver = '', project = '') {
   if (!gameRel) return;
-  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {detail:{game_rel:gameRel,project:_activeProjectName}}));
+  const targetProject = project || _activeProjectName;
+  const stamp = ver || String(Date.now());
+  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {
+    detail: { game_rel: gameRel, project: targetProject, ver: stamp, token: tok || '' },
+  }));
+  if (project && project !== _activeProjectName) return;
   const images = new Set(document.querySelectorAll(
     `#grid-area img[data-game-rel="${CSS.escape(gameRel)}"]`));
   if (tok) {
@@ -3270,8 +3275,7 @@ function refreshEditedTexture(gameRel, tok, animate = true) {
       #sidebar-list .sb-item[data-token="${CSS.escape(tok)}"] .sb-thumb img`)
       .forEach(img => images.add(img));
   }
-  const project = _activeProjectName;
-  const query = new URLSearchParams({game_rel: gameRel, _project: project, _t: String(Date.now())});
+  const query = new URLSearchParams({game_rel: gameRel, _project: targetProject, _t: stamp});
   const src = `/api/preview?${query}`;
   for (const img of images) {
     if (animate && window.AtelierPolish) window.AtelierPolish.swapImage(img, src);
@@ -3310,7 +3314,7 @@ function handleSSE(d) {
   }
   if (d.file_changed) {
     const suppressed = suppressedImportGameRels.has(_assetOperationKey(d.game_rel));
-    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressed);
+    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressed, d.ver, d.project);
     if (!importing && !suppressed) window.AtelierPolish?.fly(d.game_rel);
     if (!importing && !suppressed && Date.now() >= suppressChangeToastUntil) {
       toast("Edit saved", "success", 4000);

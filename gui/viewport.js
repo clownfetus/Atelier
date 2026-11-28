@@ -1952,4 +1952,66 @@ function reloadMaterials() {
   return true;
 }
 
-window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, label:materialLabel };
+const _normRel = path => String(path || '').replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+
+async function hotReloadTexture(gameRel, ver, project) {
+  if (!inited || modelLoading || !$('viewport-overlay')?.classList.contains('active')) return false;
+  if (project && viewportProject && project !== viewportProject) return false;
+  const target = _normRel(gameRel);
+  if (!target) return false;
+  const stamp = String(ver || Date.now());
+  const jobs = [];
+  for (const [name, info] of Object.entries(matData)) {
+    if (!info || !info.game_rel) continue;
+    const tex = info.textures || {};
+    const roles = textureRoles(info);
+    const urls = info.texture_urls || {};
+    const matches = candidate => Boolean(candidate) && _normRel(candidate) === target;
+    let updatedSlot = false;
+    if (info.eye_preview && Object.values(tex).some(matches)) {
+      info.eye_ver = stamp;
+      jobs.push(applyMatTexture(name, tex.ScleraBaseColor || gameRel, 'map', stamp,
+        `/api/eye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(stamp)}`));
+      updatedSlot = true;
+    } else if (info.dyeable && (matches(tex.BaseColor) || matches(tex.DyeingTexture) || matches(roles.basecolor))) {
+      info.dye_ver = stamp;
+      jobs.push(applyMatTexture(name, tex.BaseColor || info.game_rel, 'map', stamp,
+        `/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(stamp)}`));
+      updatedSlot = true;
+    } else if (matches(roles.basecolor)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.basecolor]: stamp};
+      jobs.push(applyMatTexture(name, roles.basecolor, 'map', stamp, urls.basecolor));
+      updatedSlot = true;
+    }
+    if (matches(roles.emissive)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.emissive]: stamp};
+      jobs.push(applyMatTexture(name, roles.emissive, 'emissiveMap', stamp, urls.emissive));
+      updatedSlot = true;
+    }
+    if (matches(roles.opacity)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.opacity]: stamp};
+      jobs.push(applyMatTexture(name, roles.opacity, 'alphaMap', stamp, urls.opacity));
+      updatedSlot = true;
+    }
+    if (!updatedSlot && Object.values(tex).some(matches)) {
+      info.tex_ver = {...(info.tex_ver || {}), [gameRel]: stamp};
+    }
+  }
+  if (!jobs.length) return false;
+  await Promise.allSettled(jobs);
+  trimTextureCache();
+  const shortName = String(gameRel).replace(/\\/g, '/').split('/').pop() || 'texture';
+  const status = $('viewport-status');
+  if (status) {
+    status.textContent = `Updated ${shortName} live`;
+    status.dataset.kind = 'success';
+  }
+  return true;
+}
+
+window.addEventListener('atelier:asset-updated', event => {
+  const detail = event.detail || {};
+  if (detail.game_rel) hotReloadTexture(detail.game_rel, detail.ver, detail.project);
+});
+
+window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, hotReloadTexture, label:materialLabel };
