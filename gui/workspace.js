@@ -67,6 +67,7 @@
       ? 'Your saved edits are still in this project.' : 'Loading the costume you last worked on.';
   }
   function page(name) {
+    window.AtelierRoster?.hideHoverCard?.();
     document.body.dataset.page=name;
     $('workspace').hidden=name!=='workspace'; $('body').hidden=name!=='library';
     for(const item of ['library','workspace']) $('page-'+item).setAttribute('aria-current',item===name?'page':'false');
@@ -163,7 +164,16 @@
       const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=item.avatar || item.thumbnail || '/api/catalogue/hero/'+encodeURIComponent(item.path.split('/').pop())+'/avatar';
       image.onerror=()=>image.hidden=true;button.append(image,document.createTextNode(item.name));
       button.dataset.path=item.path;
-      button.onclick=()=>{selectedHero=item.path;render();};heroList.append(button);
+      button.onclick=()=>{window.AtelierRoster?.hideHoverCard?.();selectedHero=item.path;render();};heroList.append(button);
+      const cid=item.path?.split('/').pop()||'';
+      const costumeCount=item.skins?.length||0;
+      window.AtelierRoster?.attachHoverCard?.(button,()=>({
+        title:item.name,
+        subtitle:`${costumeCount} costume${costumeCount===1?'':'s'}`,
+        charId:/^\d{4}$/.test(cid)?cid:'',
+        skinId:'',
+        avatar:item.avatar||item.thumbnail||'',
+      }));
     }
     for(const skin of hero?.skins || []) {
       if(query&&!hero.name.toLowerCase().includes(query)&&!skin.name.toLowerCase().includes(query))continue;
@@ -171,7 +181,17 @@
       if(skin.icon||skin.badge){const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=skin.icon||skin.badge;image.onerror=()=>image.hidden=true;button.append(image);}
       button.dataset.path=skin.path;
       button.append(document.createTextNode(skin.name));
-      button.onclick=()=>select(hero,skin);costumeList.append(button);
+      button.onclick=()=>{window.AtelierRoster?.hideHoverCard?.();select(hero,skin);};costumeList.append(button);
+      const skinMatch=/^Characters\/(\d{4})(?:\/(\d{7}))?/i.exec(skin.path||'');
+      window.AtelierRoster?.attachHoverCard?.(button,()=>({
+        title:skin.name,
+        subtitle:hero.name,
+        charId:skinMatch?.[1]||hero.path?.split('/').pop()||'',
+        skinId:skin.hero_fallback?'':(skinMatch?.[2]||''),
+        icon:skin.icon||skin.badge||'',
+        thumbnail:skin.thumbnail||'',
+        avatar:hero.avatar||hero.thumbnail||'',
+      }));
     }
     heroList.scrollLeft=heroScroll;
     if(focusList) {

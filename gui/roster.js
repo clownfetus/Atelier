@@ -12,7 +12,177 @@
   }
   function editorFor(item) {try{return JSON.parse(localStorage.getItem('atelier.editors.'+project+'.v1')||'{}')[item.game_rel]||item.file_type;}catch(_){return item.file_type;}}
   const colourCache = new Map();
+  const hoverPaletteCache = new Map();
+  let hoverCardEl = null, hoverCardTimer = 0, hoverCardAnchor = null, hoverCardToken = 0;
   const host = () => document.getElementById('hero-roster');
+
+  function ensureHoverCard() {
+    if (hoverCardEl?.isConnected) return hoverCardEl;
+    const card = document.createElement('div');
+    card.id = 'roster-hover-card';
+    card.className = 'roster-hover-card';
+    card.setAttribute('aria-hidden', 'true');
+    card.hidden = true;
+    card.innerHTML = `
+      <div class="roster-hover-art">
+        <img class="roster-hover-banner" alt="" decoding="async" hidden>
+        <span class="roster-hover-emblem" hidden></span>
+      </div>
+      <div class="roster-hover-body">
+        <div class="roster-hover-titles">
+          <strong class="roster-hover-title"></strong>
+          <span class="roster-hover-sub"></span>
+        </div>
+        <div class="roster-hover-swatches" hidden></div>
+      </div>`;
+    document.body.append(card);
+    hoverCardEl = card;
+    return card;
+  }
+
+  function positionHoverCard(card, anchor) {
+    if (!card || !anchor?.isConnected) return;
+    const rect = anchor.getBoundingClientRect();
+    if (!rect.width && !rect.height) { hideHoverCard(); return; }
+    const pad = 12, gap = 10;
+    const cardW = card.offsetWidth || 268;
+    const cardH = card.offsetHeight || 160;
+    let left = rect.left + rect.width / 2 - cardW / 2;
+    left = Math.max(pad, Math.min(window.innerWidth - cardW - pad, left));
+    let top = rect.top - cardH - gap;
+    if (top < pad) top = rect.bottom + gap;
+    top = Math.max(pad, Math.min(window.innerHeight - cardH - pad, top));
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+  }
+
+  function hideHoverCard() {
+    clearTimeout(hoverCardTimer);
+    hoverCardTimer = 0;
+    hoverCardAnchor = null;
+    hoverCardToken++;
+    if (hoverCardEl) hoverCardEl.hidden = true;
+  }
+
+  function renderHoverSwatches(hostEl, colours) {
+    hostEl.replaceChildren();
+    if (!colours?.length) { hostEl.hidden = true; return; }
+    for (const hex of colours.slice(0, 4)) {
+      const dot = document.createElement('span');
+      dot.className = 'roster-hover-swatch';
+      dot.style.background = hex;
+      hostEl.append(dot);
+    }
+    hostEl.hidden = false;
+  }
+
+  function showHoverCard(anchor, info) {
+    if (!anchor?.isConnected || !info) return;
+    const card = ensureHoverCard();
+    const token = ++hoverCardToken;
+    hoverCardAnchor = anchor;
+    const titleEl = card.querySelector('.roster-hover-title');
+    const subEl = card.querySelector('.roster-hover-sub');
+    const bannerEl = card.querySelector('.roster-hover-banner');
+    const emblemEl = card.querySelector('.roster-hover-emblem');
+    const swatchesEl = card.querySelector('.roster-hover-swatches');
+    const artWrap = card.querySelector('.roster-hover-art');
+
+    titleEl.textContent = info.title || '';
+    subEl.textContent = info.subtitle || '';
+    subEl.hidden = !info.subtitle;
+    bannerEl.hidden = true;
+    bannerEl.removeAttribute('src');
+    artWrap.classList.remove('has-art');
+    artWrap.style.removeProperty('--hover-accent');
+    emblemEl.hidden = true;
+    emblemEl.style.removeProperty('--hover-emblem');
+    renderHoverSwatches(swatchesEl, []);
+
+    const enc = encodeURIComponent;
+    const cid = info.charId || '';
+    const sid = info.skinId || '';
+    const bannerSources = [
+      sid && window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/' + enc(sid)),
+      cid && window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/' + enc(cid)),
+      cid && '/api/catalogue/hero/' + enc(cid) + '/story',
+      sid && (info.thumbnail || '/api/catalogue/thumbnail/' + enc(sid)),
+      sid && (info.icon || '/api/catalogue/icon/' + enc(sid)),
+      cid && (info.avatar || '/api/catalogue/hero/' + enc(cid) + '/avatar'),
+    ].filter(Boolean);
+    const uniqueBanner = [...new Set(bannerSources)];
+
+    const nextBanner = () => {
+      if (token !== hoverCardToken) return;
+      if (!uniqueBanner.length) { bannerEl.hidden = true; return; }
+      bannerEl.src = uniqueBanner.shift();
+    };
+    bannerEl.onload = () => {
+      if (token !== hoverCardToken || !bannerEl.naturalWidth) return;
+      bannerEl.hidden = false;
+      artWrap.classList.add('has-art');
+      const src = bannerEl.getAttribute('src') || '';
+      let cached = hoverPaletteCache.get(src);
+      if (!cached) {
+        const colours = window.AtelierPolish?.samplePalette?.(bannerEl) || [];
+        const accent = window.AtelierPolish?.accent?.(bannerEl) || colours[0] || '';
+        cached = { colours: colours.slice(0, 4), accent };
+        hoverPaletteCache.set(src, cached);
+      }
+      if (cached.accent) artWrap.style.setProperty('--hover-accent', cached.accent);
+      renderHoverSwatches(swatchesEl, cached.colours);
+      positionHoverCard(card, anchor);
+    };
+    bannerEl.onerror = nextBanner;
+    nextBanner();
+
+    if (/^\d{4}$/.test(cid)) {
+      const logoUrl = '/api/catalogue/hero/' + enc(cid) + '/logo';
+      const probe = new Image();
+      probe.decoding = 'async';
+      probe.onload = () => {
+        if (token !== hoverCardToken || !probe.naturalWidth) return;
+        emblemEl.style.setProperty('--hover-emblem', `url("${logoUrl}")`);
+        emblemEl.hidden = false;
+      };
+      probe.src = logoUrl;
+    }
+
+    card.hidden = false;
+    positionHoverCard(card, anchor);
+  }
+
+  function attachHoverCard(el, getInfo) {
+    if (!el) return;
+    const schedule = (delay) => {
+      clearTimeout(hoverCardTimer);
+      hoverCardTimer = setTimeout(() => {
+        if (!el.isConnected) return;
+        showHoverCard(el, typeof getInfo === 'function' ? getInfo() : getInfo);
+      }, delay);
+    };
+    el.addEventListener('pointerenter', event => {
+      if (event.pointerType === 'touch') return;
+      schedule(180);
+    });
+    el.addEventListener('pointerleave', () => {
+      if (hoverCardAnchor === el) hideHoverCard();
+      else clearTimeout(hoverCardTimer);
+    });
+    el.addEventListener('pointerdown', hideHoverCard);
+    el.addEventListener('focus', () => {
+      if (el.matches(':focus-visible')) schedule(120);
+    });
+    el.addEventListener('blur', () => {
+      if (hoverCardAnchor === el) hideHoverCard();
+      else clearTimeout(hoverCardTimer);
+    });
+  }
+
+  window.addEventListener('scroll', hideHoverCard, { capture: true, passive: true });
+  window.addEventListener('keydown', event => { if (event.key === 'Escape') hideHoverCard(); });
+  window.addEventListener('blur', hideHoverCard);
+  window.addEventListener('pagehide', hideHoverCard);
   const homeHeroesKey='atelier.homeHeroesOpen';
   const openByDefault=()=>{try{return localStorage.getItem(homeHeroesKey)==='1';}catch(_){return false;}};
   let heroesOpen=openByDefault();
@@ -167,8 +337,18 @@
         if(skin.icon||skin.badge){const icon=document.createElement('img');icon.className='roster-skin-icon';icon.alt='';icon.loading='lazy';icon.decoding='async';
           window.AtelierCatalogueArt.load(icon,[skin.icon,skin.badge]);tile.append(icon);}
         const label=document.createElement('span'); label.textContent=skin.name; tile.append(label);
-        tile.addEventListener('click',()=>options.openSkin?options.openSkin(skin):navigate?.(skin.path)); skins.append(tile);
+        tile.addEventListener('click',()=>{hideHoverCard();options.openSkin?options.openSkin(skin):navigate?.(skin.path);}); skins.append(tile);
         tintSkin(tile,skin,hero);
+        const skinMatch=/^Characters\/(\d{4})(?:\/(\d{7}))?/i.exec(skin.path||'');
+        attachHoverCard(tile,()=>({
+          title:skin.name,
+          subtitle:hero.name,
+          charId:skinMatch?.[1]||hero.path?.split('/')[1]||'',
+          skinId:skin.hero_fallback?'':(skinMatch?.[2]||''),
+          icon:skin.icon||skin.badge||'',
+          thumbnail:skin.thumbnail||'',
+          avatar:hero.avatar||hero.thumbnail||'',
+        }));
       }
       skins.scrollLeft=0;requestAnimationFrame(skinCarousel.update);
       if (record && changed) {
@@ -227,12 +407,15 @@
   }
   window.addEventListener('atelier:catalogue-updated', () => {
     colourCache.clear();
+    hoverPaletteCache.clear();
+    hideHoverCard();
     if (pending) return;
     pending=fetch('/api/catalogue/library').then(response=>{if(!response.ok)throw Error();return response.json();})
       .then(result=>{data=result;window.AtelierCatalogueArt?.setIdentities(result);host()?.replaceChildren();render();}).catch(()=>{}).finally(()=>{pending=null;});
   });
   function show(home, onNavigate,opts={}) {
     requested=home; navigate=onNavigate;options=opts;const root=host(); if (!root) return;
+    hideHoverCard();
     fold(false,false);
     renderContinue();
     if (!home) {root.hidden=true;return;}
@@ -313,5 +496,5 @@
     const parts=path.split('/'), hero=data?.heroes?.find(item=>item.path==='Characters/'+parts[1]);
     return hero ? {hero,skin:hero.skins?.find(item=>item.path==='Characters/'+parts[1]+'/'+parts[2])} : null;
   }
-  window.AtelierRoster=Object.freeze({show,describe,update,rememberEditor});
+  window.AtelierRoster=Object.freeze({show,describe,update,rememberEditor,attachHoverCard,hideHoverCard});
 })();

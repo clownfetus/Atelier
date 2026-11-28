@@ -2361,18 +2361,159 @@ async function openCurveEditor(item) {
 }
 
 const CURVE_INTERP = ["RCIM_Linear", "RCIM_Cubic", "RCIM_Constant"];
+let _curveDraggingStop = false;
+let _curveSelectedTime = null;
+
+function _curveStopDomain(stops) {
+  if (!stops || !stops.length) return { t0: 0, t1: 1, span: 1 };
+  const t0 = stops[0].time, t1 = stops[stops.length - 1].time;
+  return { t0, t1, span: (t1 - t0) || 1 };
+}
+
+function _curveStopPercent(time, domain) {
+  if (domain.t1 > domain.t0) return Math.max(0, Math.min(100, ((time - domain.t0) / domain.span) * 100));
+  return Math.max(0, Math.min(100, time * 100));
+}
+
+function _selectCurveStop(time) {
+  _curveSelectedTime = time;
+  const body = document.getElementById("curve-body");
+  if (!body) return;
+  let firstMatch = null;
+  body.querySelectorAll(".curve-key").forEach(row => {
+    const tInput = row.querySelector('input[title="time"]');
+    const rowTime = parseFloat(tInput?.value);
+    const match = Number.isFinite(rowTime) && Math.abs(rowTime - time) < 1e-4;
+    row.classList.toggle("is-stop-selected", match);
+    if (match && !firstMatch) firstMatch = row;
+  });
+  body.querySelectorAll(".curve-stop-handle").forEach(btn => {
+    const bt = parseFloat(btn.dataset.time);
+    btn.classList.toggle("is-active", Number.isFinite(bt) && Math.abs(bt - time) < 1e-4);
+  });
+  firstMatch?.scrollIntoView({ block: "nearest" });
+}
+
+function _renderCurveStops() {
+  const c = curveEditor;
+  const track = document.getElementById("curve-stop-track");
+  if (!c || !track) return;
+  track.replaceChildren();
+  const stops = c.stops || [];
+  if (!stops.length) return;
+  const domain = _curveStopDomain(stops);
+  for (const stop of stops) {
+    const [r, g, b] = stop.rgba || [0, 0, 0];
+    const rgb = `rgb(${Math.round(_c01(r) * 255)}, ${Math.round(_c01(g) * 255)}, ${Math.round(_c01(b) * 255)})`;
+    const pct = _curveStopPercent(stop.time, domain);
+    const labelTime = Number(stop.time.toFixed(3));
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "curve-stop-handle";
+    if (_curveSelectedTime !== null && Math.abs(stop.time - _curveSelectedTime) < 1e-4) handle.classList.add("is-active");
+    handle.style.left = pct.toFixed(2) + "%";
+    handle.style.setProperty("--stop-color", rgb);
+    handle.dataset.time = String(stop.time);
+    handle.title = `Time ${labelTime} — Drag to retime, click to jump to keys`;
+    handle.setAttribute("aria-label", `Gradient stop at time ${labelTime}`);
+    const tip = document.createElement("span");
+    tip.className = "curve-stop-tip";
+    tip.textContent = String(labelTime);
+    handle.append(tip);
+
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || _curveSaving.has(c)) return;
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      const rect = track.getBoundingClientRect();
+      if (!rect.width) return;
+      const originTime = stop.time;
+      const members = [];
+      for (const ch of CURVE_CH) {
+        (c.channels[ch] || []).forEach((k, idx) => {
+          if (Math.abs((k.time || 0) - originTime) < 1e-4) members.push({ ch, i: idx });
+        });
+      }
+      const dragMin = Math.min(0, domain.t0);
+      const dragMax = Math.max(1, domain.t1);
+      const dragSpan = (dragMax - dragMin) || 1;
+      const startX = event.clientX;
+      let moved = false;
+      let currentTime = originTime;
+      _curveDraggingStop = true;
+      handle.classList.add("is-dragging");
+
+      const onMove = ev => {
+        if (!handle.hasPointerCapture(ev.pointerId)) return;
+        if (!moved && Math.abs(ev.clientX - startX) < 3) return;
+        moved = true;
+        const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+        const nextTime = Math.round((dragMin + ratio * dragSpan) * 1000) / 1000;
+        if (nextTime === currentTime) return;
+        currentTime = nextTime;
+        const body = document.getElementById("curve-body");
+        for (const { ch, i } of members) {
+          if (c.channels[ch]?.[i]) c.channels[ch][i].time = nextTime;
+          const row = body?.querySelector(`.curve-key[data-ch="${ch}"][data-index="${i}"] input[title="time"]`);
+          if (row) row.value = String(nextTime);
+        }
+        c.stops = _resampleStops(c.channels);
+        const grad = document.getElementById("curve-grad");
+        if (grad) grad.style.background = _curveGradCss(c.stops);
+        const liveDomain = _curveStopDomain(c.stops);
+        handle.style.left = _curveStopPercent(nextTime, liveDomain).toFixed(2) + "%";
+        handle.dataset.time = String(nextTime);
+        tip.textContent = String(Number(nextTime.toFixed(3)));
+      };
+
+      const finish = ev => {
+        if (handle.hasPointerCapture(ev.pointerId)) handle.releasePointerCapture(ev.pointerId);
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        handle.classList.remove("is-dragging");
+        _curveDraggingStop = false;
+        if (moved) {
+          _curveSelectedTime = currentTime;
+          _curveHistoryRecord();
+          _renderCurveStops();
+          _selectCurveStop(currentTime);
+        } else {
+          _selectCurveStop(originTime);
+        }
+      };
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+    });
+
+    handle.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        _selectCurveStop(stop.time);
+      }
+    });
+
+    track.append(handle);
+  }
+}
 
 function renderCurveEditor() {
   const c = curveEditor; if (!c) return;
-  let h = `<div class="curve-preview" id="curve-grad"></div>`;
+  let h = `<div class="curve-grad-shell">
+    <div class="curve-preview" id="curve-grad"></div>
+    <div class="curve-stop-track" id="curve-stop-track"></div>
+    <div class="curve-grad-hint">Drag stops to retime · Click a stop to highlight its keys</div>
+  </div>`;
   for (const ch of CURVE_CH) {
     const keys = c.channels[ch] || [];
-    h += `<div class="mat-section" style="display:flex;align-items:center;gap:8px">
-      <span>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
+    h += `<div class="mat-section curve-ch-head" data-ch="${ch}">
+      <span class="curve-ch-label"><i class="curve-ch-dot" aria-hidden="true"></i>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
       <button class="btn btn-small" onclick="curveAddKey('${ch}')">+ key</button></div>`;
     keys.forEach((k, i) => {
       const cubic = (k.interp || "RCIM_Linear") === "RCIM_Cubic";
-      h += `<div class="curve-key">
+      h += `<div class="curve-key" data-ch="${ch}" data-index="${i}">
         <input class="editor-field" type="number" step="any" title="time" style="width:72px" value="${k.time}" oninput="curveKeyField('${ch}',${i},'time',this.value)">
         <input class="editor-field" type="number" step="any" title="value" style="width:88px" value="${k.value}" oninput="curveKeyField('${ch}',${i},'value',this.value)">
         <select title="interpolation" onchange="curveKeyField('${ch}',${i},'interp',this.value)">
@@ -2389,11 +2530,13 @@ function renderCurveEditor() {
   document.getElementById("curve-body").innerHTML = h;
   lucide.createIcons({ nodes: [document.getElementById("curve-body")] });
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
+  _renderCurveStops();
 }
 
 function _curveTouch() {
   curveEditor.stops = _resampleStops(curveEditor.channels);
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(curveEditor.stops);
+  if (!_curveDraggingStop) _renderCurveStops();
 }
 
 function curveKeyField(ch, i, field, v) {
@@ -2489,6 +2632,8 @@ async function closeCurveEditor(force = false) {
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   curveEditor = null;
+  _curveSelectedTime = null;
+  _curveDraggingStop = false;
   _syncBulkEditorAction();
   return true;
 }
@@ -3327,9 +3472,21 @@ function _readAllProjectCardMeta() {
     return raw && typeof raw === 'object' ? raw : {};
   } catch (_) { return {}; }
 }
+const _PROJ_TYPE_ORDER = [
+  ['texture', 'tex'],
+  ['material', 'mat'],
+  ['mesh', 'mesh'],
+  ['vfx', 'vfx'],
+  ['curve', 'curve'],
+  ['other', 'other'],
+];
 function _extractProjectCardMeta(items) {
   const targets = [], seenTarget = new Set(), colors = [], seenColor = new Set();
+  const counts = {};
   for (const item of items || []) {
+    const rawType = String(item.file_type || '').toLowerCase();
+    const bucket = ['texture', 'material', 'mesh', 'vfx', 'curve'].includes(rawType) ? rawType : 'other';
+    counts[bucket] = (counts[bucket] || 0) + 1;
     const desc = window.AtelierCatalogueArt?.describe(item.game_rel || '');
     const skin = /^\d{7}$/.test(item.skin_id || '') ? item.skin_id : (desc?.skin_id || '');
     const hero = skin ? skin.slice(0, 4) : (/^\d{4}$/.test(item.char_id || '') ? item.char_id : (window.AtelierCatalogueArt?.heroId(item) || ''));
@@ -3343,7 +3500,166 @@ function _extractProjectCardMeta(items) {
       if (hex && !seenColor.has(hex) && colors.length < 5) { seenColor.add(hex); colors.push(hex); }
     }
   }
-  return (targets.length || colors.length) ? { targets, colors } : null;
+  return (targets.length || colors.length || Object.keys(counts).length) ? { targets, colors, counts } : null;
+}
+function _projectTypePillsEl(counts, maxPills = 4) {
+  if (!counts || typeof counts !== 'object') return null;
+  const entries = _PROJ_TYPE_ORDER.filter(([key]) => Number(counts[key]) > 0).slice(0, maxPills);
+  if (!entries.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'proj-type-pills';
+  for (const [key, label] of entries) {
+    const pill = document.createElement('span');
+    pill.className = 'proj-type-pill';
+    pill.dataset.type = key;
+    const dot = document.createElement('i');
+    dot.className = 'proj-type-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    pill.append(dot, document.createTextNode(`${counts[key]} ${label}`));
+    wrap.append(pill);
+  }
+  return wrap;
+}
+
+// ── Mod tray live quick-peek card (fixed on body; no fade per Motion v2) ──────
+let _trayPeekEl = null, _trayPeekTimer = 0, _trayPeekToken = '', _trayPeekBound = false;
+function _ensureTrayPeek() {
+  if (_trayPeekEl?.isConnected) return _trayPeekEl;
+  const el = document.createElement('div');
+  el.id = 'tray-peek-card';
+  el.className = 'tray-peek-card';
+  el.setAttribute('aria-hidden', 'true');
+  el.hidden = true;
+  document.body.append(el);
+  _trayPeekEl = el;
+  return el;
+}
+function _hideTrayPeek() {
+  clearTimeout(_trayPeekTimer);
+  _trayPeekTimer = 0;
+  _trayPeekToken = '';
+  if (_trayPeekEl) _trayPeekEl.hidden = true;
+}
+function _showTrayPeek(row, item) {
+  if (!row?.isConnected || !item) return;
+  const ctxMenu = document.getElementById('ctx-menu');
+  if (ctxMenu && ctxMenu.style.display === 'block') return;
+  const card = _ensureTrayPeek();
+  card.replaceChildren();
+  _trayPeekToken = item.token || '';
+
+  const h = handlerFor(item.file_type);
+  const preview = item.ui_preview;
+  if (h.preview) {
+    const media = document.createElement('div');
+    media.className = 'tray-peek-media';
+    const img = document.createElement('img');
+    img.alt = '';
+    img.decoding = 'async';
+    img.src = `/api/preview?token=${encodeURIComponent(item.token)}&game_rel=${encodeURIComponent(item.game_rel)}`;
+    media.append(img);
+    card.append(media);
+  } else if (preview?.colors?.length) {
+    const grid = document.createElement('div');
+    grid.className = 'tray-peek-swatches';
+    for (const color of preview.colors.slice(0, 6)) {
+      if (!Array.isArray(color) || !color.slice(0, 3).every(Number.isFinite)) continue;
+      const hex = _rgbHex(...color.slice(0, 3), Math.max(1, ...color.slice(0, 3)));
+      const cell = document.createElement('div');
+      cell.className = 'tray-peek-swatch';
+      const chip = document.createElement('span');
+      chip.className = 'tray-peek-swatch-chip';
+      chip.style.background = hex;
+      const code = document.createElement('code');
+      code.textContent = hex.toUpperCase();
+      cell.append(chip, code);
+      grid.append(cell);
+    }
+    if (grid.childElementCount) card.append(grid);
+  } else if (preview?.points?.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tray-peek-curve';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 40 28');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    const line = document.createElementNS(svg.namespaceURI, 'polyline');
+    line.setAttribute('points', preview.points.map(p => p.join(',')).join(' '));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', '1.8');
+    svg.append(line);
+    wrap.append(svg);
+    card.append(wrap);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'tray-peek-info';
+  const head = document.createElement('div');
+  head.className = 'tray-peek-head';
+  const typePill = document.createElement('span');
+  typePill.className = 'tray-peek-type';
+  typePill.dataset.type = item.file_type || 'other';
+  typePill.textContent = (item.file_type || 'asset').toUpperCase();
+  const title = document.createElement('strong');
+  title.className = 'tray-peek-name';
+  title.textContent = item.name || '';
+  head.append(typePill, title);
+  info.append(head);
+
+  const subText = sbSubLabel(item);
+  if (subText) {
+    const sub = document.createElement('div');
+    sub.className = 'tray-peek-sub';
+    sub.textContent = subText;
+    info.append(sub);
+  }
+  if (item.game_rel) {
+    const pathEl = document.createElement('div');
+    pathEl.className = 'tray-peek-path';
+    pathEl.textContent = item.game_rel;
+    info.append(pathEl);
+  }
+  card.append(info);
+  card.hidden = false;
+
+  const rowRect = row.getBoundingClientRect();
+  const sbRect = document.getElementById('sidebar')?.getBoundingClientRect() || rowRect;
+  const pad = 12, gap = 10;
+  const cardW = card.offsetWidth || 256;
+  const cardH = card.offsetHeight || 160;
+  let left = sbRect.left - cardW - gap;
+  if (left < pad) left = sbRect.right + gap;
+  left = Math.max(pad, Math.min(window.innerWidth - cardW - pad, left));
+  let top = rowRect.top + rowRect.height / 2 - cardH / 2;
+  top = Math.max(pad, Math.min(window.innerHeight - cardH - pad, top));
+  card.style.left = Math.round(left) + 'px';
+  card.style.top = Math.round(top) + 'px';
+}
+function _bindTrayPeek() {
+  if (_trayPeekBound) return;
+  const list = document.getElementById('sidebar-list');
+  if (!list) return;
+  _trayPeekBound = true;
+  list.addEventListener('pointerover', event => {
+    if (event.pointerType === 'touch') return;
+    const row = event.target.closest('.sb-item[data-token]');
+    if (!row) { _hideTrayPeek(); return; }
+    const token = row.dataset.token;
+    if (token === _trayPeekToken && _trayPeekEl && !_trayPeekEl.hidden) return;
+    clearTimeout(_trayPeekTimer);
+    _trayPeekTimer = setTimeout(() => {
+      if (!row.isConnected || !row.matches(':hover')) return;
+      const item = sidebarData[token];
+      if (item) _showTrayPeek(row, item);
+    }, 180);
+  });
+  list.addEventListener('pointerleave', _hideTrayPeek);
+  list.addEventListener('pointerdown', _hideTrayPeek);
+  list.addEventListener('contextmenu', _hideTrayPeek);
+  list.addEventListener('scroll', _hideTrayPeek, { passive: true });
+  window.addEventListener('keydown', event => { if (event.key === 'Escape') _hideTrayPeek(); });
+  window.addEventListener('blur', _hideTrayPeek);
+  window.addEventListener('pagehide', _hideTrayPeek);
 }
 function _rememberProjectCardMeta(projectName, items) {
   if (!projectName) return;
@@ -3461,6 +3777,8 @@ function renderSidebar() {
     el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsSidebar(item)));
     list.appendChild(el);
   });
+  _bindTrayPeek();
+  if (_trayPeekToken && !sidebarData[_trayPeekToken]) _hideTrayPeek();
   lucide.createIcons({ nodes: [list] });
   updateInstallBtn();
 }
@@ -5468,6 +5786,8 @@ function _renderProjectPicker(projects, keepQuery) {
         }
       }
     }
+    const pillsEl = _projectTypePillsEl(cardMeta?.counts, _projView === 'list' ? 3 : 4);
+    if (pillsEl) card.querySelector('.proj-body')?.append(pillsEl);
     card.querySelector(".proj-check").addEventListener("click", e => {
       e.stopPropagation();
       _projSelClick(proj.name, e);

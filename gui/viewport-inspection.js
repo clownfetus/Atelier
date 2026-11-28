@@ -211,8 +211,8 @@ export function createViewportInspection(api) {
     $('viewport-hidden').hidden = !objects.length || !!visible.length;
     const floor = showcaseMode ? showcaseGrid : showGrid;
     grid.visible = floor && !!visible.length; $('viewport-grid').setAttribute('aria-pressed', String(floor));
-    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turntable']) $(id).disabled = !visible.length;
-    for (const id of ['viewport-poster','viewport-turntable']) $(id).disabled ||= !api.ready();
+    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled = !visible.length;
+    for (const id of ['viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled ||= !api.ready();
     for (const id of ['viewport-edited','viewport-original','viewport-wipe']) $(id).disabled = !Object.keys(api.materials().data).length;
     $('viewport-regions').disabled = !Object.values(api.materials().data).some(d => d.dyeable);
     for (const [id,title] of editingControls) {
@@ -498,26 +498,187 @@ export function createViewportInspection(api) {
     return [...new Set(Object.entries(api.materials().data).flatMap(([name,d]) => (d.colors || []).filter(c => !/emiss|glow/i.test(c.name)).map(c => api.hex(api.materials().edited[name]?.[c.name] || c.rgba))))].slice(0,8);
   }
 
+  function drawCaptureBackdrop(context, width, height, art = showcaseArt(), canonical = false) {
+    const mode = $('viewport-backdrop').value;
+    if (art) {
+      window.AtelierShowcaseArt.draw(context, width, height, canonical ? undefined : showcaseDrawOptions());
+    } else if (mode !== 'checker') {
+      const style = getComputedStyle($('viewport-stage'));
+      const gradient = context.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, style.getPropertyValue('--viewport-gradient-top').trim() || '#253142');
+      gradient.addColorStop(1, style.getPropertyValue('--viewport-gradient-bottom').trim() || '#101217');
+      context.fillStyle = mode === 'solid' ? $('viewport-backdrop-color').value : gradient;
+      context.fillRect(0, 0, width, height);
+    }
+  }
+
   function posterCanvas(size, footer = 96,art=showcaseArt(),canonical=false) {
     const output = document.createElement('canvas'); output.width = size; output.height = size + footer;
     const context = output.getContext('2d');
     context.fillStyle = '#101217'; context.fillRect(0,size,size,footer);
-    const mode = $('viewport-backdrop').value;
-    if(art)window.AtelierShowcaseArt.draw(context,size,size,canonical?undefined:showcaseDrawOptions());
-    else if (mode !== 'checker') {
-      const style = getComputedStyle($('viewport-stage'));
-      const gradient = context.createLinearGradient(0,0,size,size);
-      gradient.addColorStop(0,style.getPropertyValue('--viewport-gradient-top').trim() || '#253142');
-      gradient.addColorStop(1,style.getPropertyValue('--viewport-gradient-bottom').trim() || '#101217');
-      context.fillStyle = mode === 'solid' ? $('viewport-backdrop-color').value : gradient;
-      context.fillRect(0,0,size,size);
-    }
+    drawCaptureBackdrop(context, size, size, art, canonical);
     context.drawImage(renderer.domElement, 0,0,size,size);
     if(footer<=0)return output;
     context.fillStyle = '#e5e2e4'; context.font = `500 ${Math.round(size*.025)}px Inter, sans-serif`;
     context.fillText(($('viewport-capture-name').value.trim() || $('viewport-title').textContent).slice(0,100), size*.035, size+footer*.38, size*.85);
     palette().forEach((color,i) => { context.fillStyle = color; context.fillRect(size*.035 + i*size*.045, size+footer*.6, size*.032, footer*.18); });
     return output;
+  }
+
+  function frameDirection(vec) {
+    const parts = worldBoxes();
+    const box = parts.reduce((acc, part) => acc.union(part), new THREE.Box3());
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const scale = Math.max(size.x, size.y, size.z) || 1;
+    const direction = new THREE.Vector3(...vec).normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(up, direction).normalize();
+    const vertical = new THREE.Vector3().crossVectors(direction, right).normalize();
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const tanH = tanV * camera.aspect;
+    let distance = scale * .1;
+    for (const part of parts) for (const x of [part.min.x, part.max.x]) for (const y of [part.min.y, part.max.y]) for (const z of [part.min.z, part.max.z]) {
+      const corner = new THREE.Vector3(x, y, z).sub(center);
+      distance = Math.max(distance, corner.dot(direction) + Math.max(Math.abs(corner.dot(right)) / tanH, Math.abs(corner.dot(vertical)) / tanV) * 1.08);
+    }
+    camera.up.copy(up);
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(direction, distance);
+    camera.near = Math.max(scale / 1000, .00001);
+    camera.far = distance + scale * 100;
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+  }
+
+  async function captureTurnaroundSheet() {
+    if (capture || bounds().isEmpty() || !api.ready()) return;
+    finishCamera();
+    const controller = new AbortController(); capture = controller;
+    $('viewport-capture-menu').open = false; $('viewport-capture-cancel').hidden = false;
+    $('viewport-tools').inert = true; $('viewport-inspect-tools').inert = true;
+    $('viewport-materials').inert = true;
+    for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = true;
+    $('viewport-playback').inert = true; $('viewport-capture-menu').inert = true;
+    $('viewport-fit').disabled = true; api.refreshEdits?.();
+    const blenderDisabled = $('viewport-blender-btn').disabled;
+    const liveDisabled = $('viewport-blender-send')?.disabled;
+    $('viewport-blender-btn').disabled = true;
+    if ($('viewport-blender-send')) $('viewport-blender-send').disabled = true;
+    $('viewport-expand').disabled = true;
+    const size = renderer.getSize(new THREE.Vector2()), ratio = renderer.getPixelRatio();
+    const saved = {position:camera.position.clone(), up:camera.up.clone(), target:controls.target.clone(), aspect:camera.aspect,
+      near:camera.near, far:camera.far, fitOnResize, enabled:controls.enabled, min:controls.minDistance, max:controls.maxDistance};
+    const animationState = api.pauseAnimation?.();
+    controls.enabled = false; clearHover();
+    let completed = false;
+    api.notify('Capturing turnaround sheet…');
+    try {
+      const tile = 720, pad = 24, gap = 16, footer = 108;
+      const sheetW = pad * 2 + tile * 2 + gap;
+      const sheetH = pad * 2 + tile * 2 + gap + footer;
+      const sheet = document.createElement('canvas');
+      sheet.width = sheetW; sheet.height = sheetH;
+      const ctx = sheet.getContext('2d');
+      ctx.fillStyle = '#0e1015';
+      ctx.fillRect(0, 0, sheetW, sheetH);
+
+      renderer.setPixelRatio(1);
+      renderer.setSize(tile, tile, false);
+      camera.aspect = 1;
+      camera.updateProjectionMatrix();
+
+      const views = [
+        { label: 'FRONT', dir: [0, 0, 1], col: 0, row: 0 },
+        { label: '3/4 VIEW', dir: [.58, .12, 1], col: 1, row: 0 },
+        { label: 'BACK', dir: [0, 0, -1], col: 0, row: 1 },
+        { label: 'SIDE', dir: [1, .06, 0], col: 1, row: 1 },
+      ];
+      for (let i = 0; i < views.length; i++) {
+        if (controller.signal.aborted) throw new DOMException('Capture cancelled', 'AbortError');
+        const v = views[i];
+        frameDirection(v.dir);
+        render(true);
+        const x = pad + v.col * (tile + gap);
+        const y = pad + v.row * (tile + gap);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, tile, tile);
+        ctx.clip();
+        ctx.translate(x, y);
+        drawCaptureBackdrop(ctx, tile, tile);
+        ctx.drawImage(renderer.domElement, 0, 0, tile, tile);
+        ctx.fillStyle = 'rgba(14, 16, 21, 0.72)';
+        ctx.fillRect(14, 14, 108, 28);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(14.5, 14.5, 107, 27);
+        ctx.fillStyle = '#e5e2e4';
+        ctx.font = '600 13px Inter, sans-serif';
+        ctx.fillText(v.label, 24, 33);
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + .5, y + .5, tile - 1, tile - 1);
+        await new Promise(requestAnimationFrame);
+      }
+
+      const footY = pad * 2 + tile * 2 + gap;
+      ctx.fillStyle = '#12151c';
+      ctx.fillRect(0, footY, sheetW, footer);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(0, footY, sheetW, 1);
+
+      const title = ($('viewport-capture-name').value.trim() || $('viewport-title').textContent).slice(0, 100);
+      ctx.fillStyle = '#e5e2e4';
+      ctx.font = '600 28px Inter, sans-serif';
+      ctx.fillText(title, pad, footY + 46, sheetW * 0.56);
+      ctx.fillStyle = '#9aa1ae';
+      ctx.font = '500 15px Inter, sans-serif';
+      ctx.fillText('Turnaround sheet · 4 angles', pad, footY + 76);
+
+      const swatches = palette().slice(0, 6);
+      if (swatches.length) {
+        const chipW = 78, chipGap = 10;
+        let sx = sheetW - pad - (swatches.length * chipW + (swatches.length - 1) * chipGap);
+        for (const hex of swatches) {
+          ctx.fillStyle = hex;
+          ctx.fillRect(sx, footY + 26, chipW, 28);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+          ctx.strokeRect(sx + .5, footY + 26.5, chipW - 1, 27);
+          ctx.fillStyle = '#c9ced8';
+          ctx.font = '500 12px monospace';
+          ctx.fillText(hex.toUpperCase(), sx + 6, footY + 72);
+          sx += chipW + chipGap;
+        }
+      }
+
+      const blob = await toBlob(sheet, 'image/png');
+      if (!controller.signal.aborted) download(blob, '-turnaround.png');
+      completed = !controller.signal.aborted;
+    } catch (error) {
+      if (error.name !== 'AbortError') api.notify(`Turnaround sheet could not be created. ${error.message}`, 'error');
+    }
+    finally {
+      const damping = controls.enableDamping; controls.enableDamping = false; controls.update();
+      camera.position.copy(saved.position); camera.up.copy(saved.up); controls.target.copy(saved.target);
+      camera.aspect = saved.aspect; camera.near = saved.near; camera.far = saved.far;
+      controls.minDistance = saved.min; controls.maxDistance = saved.max; controls.update(); controls.enableDamping = damping;
+      camera.updateProjectionMatrix(); controls.enabled = saved.enabled; fitOnResize = saved.fitOnResize;
+      renderer.setPixelRatio(ratio); renderer.setSize(size.x, size.y, false);
+      capture = null; api.resumeAnimation?.(animationState);
+      $('viewport-tools').inert = false; $('viewport-inspect-tools').inert = false;
+      $('viewport-materials').inert = false;
+      $('viewport-playback').inert = false; $('viewport-capture-menu').inert = false;
+      for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = false;
+      $('viewport-blender-btn').disabled = blenderDisabled;
+      if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
+      $('viewport-expand').disabled = false;
+      $('viewport-capture-cancel').hidden = true; api.refreshEdits?.(); refresh(); api.resize();
+      if (controller.signal.aborted) api.notify('Capture cancelled');
+      else if (completed) api.notify('Turnaround sheet ready', 'success');
+    }
   }
 
   const toBlob = (canvas, type) => new Promise((resolve,reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(Error('Image encoding failed')), type, .88));
@@ -613,6 +774,7 @@ export function createViewportInspection(api) {
     }
   }
   $('viewport-poster').addEventListener('click', () => captureShowcase(false));
+  $('viewport-turnaround')?.addEventListener('click', () => captureTurnaroundSheet());
   $('viewport-turntable').addEventListener('click', () => captureShowcase(true));
   $('viewport-capture-cancel').addEventListener('click', () => capture?.abort());
 
