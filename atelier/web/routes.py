@@ -3801,6 +3801,9 @@ globals().update(_routes_mods.register(
     push_sse=_push_sse,
 ))
 
+from atelier.web import routes_refs as _routes_refs
+globals().update(_routes_refs.register(app))
+
 @app.get("/api/asset_info")
 def api_asset_info():
     """Return pak source + game path for a game_rel (for sidebar tooltips)."""

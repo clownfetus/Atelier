@@ -1353,6 +1353,7 @@ async function openMaterialEditor(item) {
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
   matEditor = null;
+  window.AtelierAssetRefs?.clearMaterialBanner();
   clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
   document.getElementById("mat-body").inert = false;
@@ -1378,6 +1379,7 @@ async function openMaterialEditor(item) {
   renderMatEditor();
   stopWorking('success');
   _syncBulkEditorAction('material');
+  window.AtelierAssetRefs?.checkMaterial(item.game_rel);
   loadSidebar();
   await loadMaterialDye(item, current, project);
 }
@@ -5187,6 +5189,9 @@ function _ctxItemsCard(card) {
     items.push(textureEditorMenuItem(card));
     items.push(explorerMenuItem(card));
     items.push({icon:'refresh-cw', label:'Retry preview', action:() => buildGrid(allItems.map(_makeCard), true)});
+  }
+  if (card.game_rel && ['texture', 'material', 'mesh', 'vfx'].includes(card.file_type)) {
+    items.push({icon: 'compass', label: 'Where is this used…', action: () => window.AtelierAssetRefs?.openUsage(card.game_rel, document.activeElement)});
   }
   if (!card.imported) {
     if (card.file_type !== 'mesh') items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
