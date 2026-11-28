@@ -25,7 +25,7 @@ function mkEl(id) {
     removeAttribute(name){ delete this.attributes[name]; },
     contains(){ return false; },
     classList: { add(){}, remove(){}, toggle(){}, contains(){return false;} },
-    addEventListener(){}, removeEventListener(){}, appendChild(c){ this.children.push(c); },
+    addEventListener(){}, removeEventListener(){}, appendChild(c){ this.children.push(c); }, prepend(...nodes){ this.children.unshift(...nodes); },
     querySelector(){ return mkEl(id + "-q"); }, querySelectorAll(){ return []; },
     closest(){ return mkEl(id + "-c"); }, scrollIntoView(){}, focus(){}, select(){}, remove(){},
     insertAdjacentHTML(){}, getBoundingClientRect(){ return {top:0,left:0,width:0,height:0}; },
