@@ -4016,8 +4016,11 @@ async function _confirmExportReview(snapshot, extra = null) {
       return;
     }
     _exportReviewChecking = false;
+    const mergedExtra = snapshot.releaseKit
+      ? { ...(extra || {}), body: { ...(extra?.body || {}), release_kit: true } }
+      : extra;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, snapshot.project, snapshot, extra, replacementCheck);
+      snapshot.copyToMods, snapshot.project, snapshot, mergedExtra, replacementCheck);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -4070,6 +4073,27 @@ async function _skinSwapperOffer(snapshot) {
            defaults: { skinName: skinLabel || snapshot.modName, author } };
 }
 
+async function _runBatchProfileExport(snapshot) {
+  if (_blockExportForDrafts(snapshot)) return;
+  const allExportable = Object.values(sidebarData).filter(i => i && i.game_rel && _exportBlockReason(i) === "");
+  if (!allExportable.length) {
+    window.AtelierExportReview?.notice("No exportable project edits are available.");
+    return;
+  }
+  await _runInstall(
+    snapshot.modName,
+    allExportable,
+    0,
+    false,
+    snapshot.project,
+    snapshot,
+    {
+      endpoint: "/api/project/export_batch",
+      body: { release_kit: !!snapshot.releaseKit },
+    },
+  );
+}
+
 async function doInstallMod() {
   if (_exportRunningCount || _exportReviewChecking) return;
   if (_blockExportForDrafts()) return;
@@ -4080,9 +4104,15 @@ async function doInstallMod() {
   const snapshot = _captureExportReview();
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
   if (!window.AtelierExportReview) { await _confirmExportReview(snapshot); return; }
+  try {
+    const profRes = await api("/api/project/profiles", { project: snapshot.project });
+    snapshot.profiles = Object.keys(profRes?.profiles || {});
+  } catch (_) { snapshot.profiles = []; }
   const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
-    confirm: reviewed => _confirmExportReview(reviewed), refresh: doInstallMod, settings: openPaths,
+    confirm: reviewed => _confirmExportReview(reviewed),
+    batchExport: reviewed => _runBatchProfileExport(reviewed),
+    refresh: doInstallMod, settings: openPaths,
     rememberDestination: copyToMods => { _copyToMods = copyToMods; },
     decideInstall: async (token, install) => {
       const result = await api('/api/install_mod/confirm', {

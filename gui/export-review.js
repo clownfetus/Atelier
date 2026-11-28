@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   let overlay, panel, banner, koStamp, body, title, count, report, actions, lastButton, opener, stageHost, glyph = null;
-  let current = null, busy = false, lastResult = null, preferredFormat = 'standard', bannerToken = 0;
+  let current = null, busy = false, lastResult = null, preferredFormat = 'standard', includeReleaseKit = false, bannerToken = 0;
 
   function el(tag, text, className) {
     const node = document.createElement(tag);
@@ -347,12 +347,29 @@
     body.append(el('p', 'Only saved project edits are included.', 'export-review-summary'));
     list('Included changes', snapshot.included, assetRow, true);
     list('Excluded changes', snapshot.excluded, assetRow, true);
+    const kitRow = el('label', undefined, 'export-kit-option');
+    const kitCheck = document.createElement('input');
+    kitCheck.type = 'checkbox'; kitCheck.id = 'export-review-kit'; kitCheck.checked = includeReleaseKit;
+    kitCheck.addEventListener('change', () => { includeReleaseKit = kitCheck.checked; });
+    kitRow.append(kitCheck, el('span', 'Write release kit (ZIP archive + README.md in the export folder)'));
+    body.append(kitRow);
     if (note) {
       const alert = el('p', note, 'export-review-notice'); alert.setAttribute('role', 'alert'); body.append(alert);
     }
     button('Cancel', hide);
     button('Refresh review', callbacks.refresh).id = 'export-review-refresh';
+    const profileCount = (snapshot.profiles || []).length;
+    if (callbacks.batchExport && profileCount >= 2) {
+      const batchBtn = button(`Build all profiles (${profileCount})`, () => {
+        current.snapshot.releaseKit = includeReleaseKit;
+        const reviewed = current.snapshot;
+        current.retry = () => callbacks.batchExport(reviewed); current.retry();
+      });
+      batchBtn.id = 'export-review-batch';
+      batchBtn.title = 'Build every saved selection profile into separate mod files';
+    }
     button(exportLabel(snapshot.copyToMods), () => {
+      current.snapshot.releaseKit = includeReleaseKit;
       const reviewed = current.snapshot;
       current.retry = () => callbacks.confirm(reviewed); current.retry();
     }, true).id = 'export-review-confirm';
@@ -456,7 +473,10 @@
     const warning = built && (!result.ok || buildWarnings || pending ||
       Object.values(installWarning || {}).some(items => items.length));
     const suffix = warning && result.ok ? ' with warnings' : '';
-    reset(pending ? 'Review install warnings' : built ? (result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed') : result.cancelled ? 'Export cancelled' : 'Export failed',
+    const builtHeading = result.batch
+      ? `${result.built_count || 0} of ${result.total_count || 0} variants exported` + suffix
+      : result.installed_dir ? 'Mod installed' + suffix : result.ok ? 'Mod exported' + suffix : 'Export built; copy failed';
+    reset(pending ? 'Review install warnings' : built ? builtHeading : result.cancelled ? 'Export cancelled' : 'Export failed',
       built ? warning ? 'warning' : 'success' : 'error', {result: true, stageState: result.cancelled && !built ? 'info' : undefined});
     if (pending) {
       body.append(resultMessage(result.error || 'The built files are in the export folder. Choose whether to copy them to your mods folder.'));
@@ -470,11 +490,19 @@
     } else if (result.kept_export) {
       body.append(resultMessage('The files are saved in the export folder.'));
     }
-    const paths = [['Exported file', result.pak_path], ['Installed to', result.installed_dir]].filter(([, path]) => path);
+    const paths = [
+      ['Exported file', result.pak_path],
+      ['Installed to', result.installed_dir],
+      ['Release kit', result.release_kit?.kit_dir],
+    ].filter(([, path]) => path);
     for (const [label, path] of paths) {
       const output = el('div', undefined, 'export-review-output');
       output.append(el('p', label), el('code', path, 'export-review-path'));
       body.append(output);
+    }
+    if (result.batch && Array.isArray(result.variants) && result.variants.length) {
+      list('Built profile variants', result.variants, v =>
+        `${v.profile} · ${v.mod_stem} (${(v.items || []).length} edits) — ${v.ok ? (v.zip_path || v.pak_path || 'exported') : (v.error || v.skipped_reason || 'skipped')}`, true);
     }
     if (result.galacta_folder) {
       paths.push(['Galacta folder', result.galacta_folder]);

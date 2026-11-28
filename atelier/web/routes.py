@@ -3424,6 +3424,26 @@ def _install_mod_payload(body):
             resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
                     "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
                     "artifacts": result.get("artifacts") or []}
+            if body.get("release_kit") and resp["ok"]:
+                from atelier import release_kit
+                project_name = os.path.basename(get_import_root().rstrip("/\\")) or "Project"
+                kit_dir = os.path.join(out_dir, f"{mod_name}_ReleaseKit")
+                resp["release_kit"] = release_kit.write_release_kit(
+                    kit_dir=kit_dir,
+                    project_name=project_name,
+                    mod_name=mod_name,
+                    built_variants=[{
+                        "profile": mod_name,
+                        "mod_stem": mod_name,
+                        "items": items,
+                        "ok": True,
+                        "artifacts": resp["artifacts"],
+                        "skipped": resp["skipped"],
+                    }],
+                    all_items=items,
+                    out_dir=out_dir,
+                    atelier_version=_project_meta.current_version(),
+                )
             if mods and pak:
                 return _review_built_install(resp, mod_name, out_dir, mods, body.get('replacement_check'))
             return resp
@@ -3673,8 +3693,102 @@ def api_delete_all_imported():
     return json.dumps(_delete_imported([item['game_rel'] for item in items]))
 
 
+def _batch_export_payload(body, job=None):
+    from atelier import release_kit
+    base_name = _mod_stem(body.get("mod_name"))
+    items = [g for g in (body.get("items") or []) if isinstance(g, str) and g]
+    if not items:
+        return {"ok": False, "error": "No exportable assets in this project."}
+    root = get_import_root()
+    profiles = _project_meta.get_profiles(root)
+    if len(profiles) < 1:
+        return {"ok": False, "error": "Save at least one selection profile before batch exporting."}
+    plan = release_kit.plan_profile_variants(profiles, items, base_name, body.get("profiles"))
+    if not plan:
+        return {"ok": False, "error": "No matching selection profiles found."}
+    out_dir = ASSETS_MODS
+    os.makedirs(out_dir, exist_ok=True)
+    asset_opts = _project_meta.get_asset_opts(root)
+    allow_unsafe_world = bool(body.get("allow_unsafe_world"))
+    built_variants = []
+    all_applied = []
+    all_skipped = []
+    first_pak = None
+    with key_lock('export-review-install'):
+        total = len(plan)
+        for idx, spec in enumerate(plan, 1):
+            jobs.checkpoint()
+            if job is not None:
+                job.set_stage(f"Building variant {idx}/{total}: {spec['profile']}…")
+            if not spec["items"]:
+                built_variants.append({**spec, "ok": False, "artifacts": [], "applied": [], "skipped": []})
+                all_skipped.append(f"{spec['profile']}: {spec['skipped_reason']}")
+                continue
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+                _split_export_items(spec["items"])
+            res = build_mod(
+                spec["mod_stem"], tex_items, mat_items, out_dir, force=True,
+                curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
+                text_items=text_items, mesh_items=mesh_items,
+                asset_opts=asset_opts, allow_unsafe_world=allow_unsafe_world,
+            )
+            ok = bool(res.get("ok") and res.get("pak"))
+            pak = res.get("pak")
+            if ok and not first_pak:
+                first_pak = pak.replace("\\", "/")
+            v_applied = res.get("applied") or []
+            v_skipped = res.get("skipped") or []
+            all_applied.extend(f"[{spec['profile']}] {a}" for a in v_applied)
+            all_skipped.extend(f"[{spec['profile']}] {s}" for s in v_skipped)
+            if not ok:
+                all_skipped.append(f"[{spec['profile']}] {res.get('error', 'build failed')}")
+            built_variants.append({
+                **spec,
+                "ok": ok,
+                "pak_path": pak.replace("\\", "/") if pak else None,
+                "artifacts": res.get("artifacts") or [],
+                "applied": v_applied,
+                "skipped": v_skipped,
+                "error": None if ok else res.get("error", "build failed"),
+            })
+
+    succeeded = [v for v in built_variants if v["ok"]]
+    resp = {
+        "ok": len(succeeded) > 0,
+        "batch": True,
+        "pak_path": first_pak,
+        "variants": built_variants,
+        "built_count": len(succeeded),
+        "total_count": len(built_variants),
+        "applied": all_applied,
+        "skipped": all_skipped,
+    }
+    if body.get("release_kit") and resp["ok"]:
+        project_name = os.path.basename(root.rstrip("/\\")) or "Project"
+        kit_dir = os.path.join(out_dir, f"{base_name}_ReleaseKit")
+        resp["release_kit"] = release_kit.write_release_kit(
+            kit_dir=kit_dir,
+            project_name=project_name,
+            mod_name=base_name,
+            built_variants=built_variants,
+            all_items=items,
+            out_dir=out_dir,
+            atelier_version=_project_meta.current_version(),
+        )
+    if not resp["ok"]:
+        resp["error"] = "No profile variants could be built."
+    return resp
+
+
+def _handle_batch_export(body):
+    if body.get("background"):
+        return _submit_job("export", "Batch export " + _mod_stem(body.get("mod_name")),
+                           lambda job: _batch_export_payload(body, job))
+    return _batch_export_payload(body)
+
+
 from atelier.web import routes_project_extras as _routes_project_extras
-globals().update(_routes_project_extras.register(app, get_import_root))
+globals().update(_routes_project_extras.register(app, get_import_root, batch_export_handler=_handle_batch_export))
 
 @app.get("/api/asset_info")
 def api_asset_info():
