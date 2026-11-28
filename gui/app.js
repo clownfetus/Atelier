@@ -5273,16 +5273,19 @@ function _renderProjectPicker(projects, keepQuery) {
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
-    card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "");
+    const active = proj.name === _activeProjectName;
+    card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "") + (active ? " is-active" : "");
     card.dataset.name = proj.name;
     card.tabIndex = 0;
     card.setAttribute("aria-label", `${proj.name}, ${proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`}`);
     const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
     const check = `<div class="proj-check" title="Select"><input type="checkbox" aria-label="Select ${_esc(proj.name)}" ${sel ? "checked" : ""}></div>`;
+    const activeBadge = active ? '<span class="proj-active-badge">Active</span>' : '';
     const thumb = `<div class="proj-thumb">
       ${proj.asset_count ? `<img src="${thumbUrl}" alt="" loading="lazy" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">` : ''}
       <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon folder-icon"></i>
+      ${_projView === "list" ? "" : activeBadge}
     </div>`;
     const actions = `
       <div class="proj-actions">
@@ -5296,6 +5299,7 @@ function _renderProjectPicker(projects, keepQuery) {
     card.innerHTML = _projView === "list"
       ? `${check}${thumb}
          <div class="proj-body">${name}</div>
+         ${activeBadge}
          <div class="proj-meta proj-col-assets">${assetTxt}</div>
          <div class="proj-meta proj-col-time">${_relTime(proj.mtime)}</div>
          ${actions}`
@@ -5952,7 +5956,7 @@ function renderTextEditor(filter) {
     const cur = (e.key in ed) ? ed[e.key] : e.value;
     if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
     const changed = (e.key in ed) && ed[e.key] !== e.value;
-    rows.push('<div class="text-row">' +
+    rows.push('<div class="text-row' + (changed ? ' is-changed' : '') + '">' +
       '<div class="text-key" title="' + _esc(e.key) + '">' + (changed ? '<span class="text-changed">●</span> ' : '') + _esc(e.key) + '</div>' +
       '<input class="editor-field" data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"></div>');
   }
@@ -5962,8 +5966,10 @@ function renderTextEditor(filter) {
     (rows.join("") || '<div class="mat-empty">No matching strings.</div>');
   body.querySelectorAll("[data-tkey]").forEach(el => el.addEventListener("input", () => {
     const k = el.dataset.tkey, orig = (textEditor.entries.find(x => String(x.key) === k) || {}).value;
-    if (el.value === (orig == null ? "" : String(orig))) delete ed[k];
+    const isChanged = el.value !== (orig == null ? "" : String(orig));
+    if (!isChanged) delete ed[k];
     else ed[k] = el.value;
+    el.closest('.text-row')?.classList.toggle('is-changed', isChanged);
   }));
 }
 

@@ -6,10 +6,11 @@
 .job-body, .bulk-body { display: grid; gap: 12px; margin: 16px 0; }
 .job-body { min-height: 0; overflow-y: auto; }
 .job-body p, .bulk-body p { margin: 4px 0; line-height: 1.5; }
-.job-row { border: 1px solid var(--border); padding: 16px; border-radius: var(--studio-shape-small); }
+.job-row { border: 1px solid var(--border); padding: 14px 16px; border-radius: var(--studio-shape-small); background: var(--bg2); box-shadow: var(--studio-elevation-card); transition: border-color var(--studio-motion-fast) var(--studio-easing); }
+.job-row:hover { border-color: var(--border2); }
 .job-state { float: right; font-size: var(--studio-text-detail); color: var(--muted); text-transform: capitalize; }
 .job-row .btn { margin: 8px 8px 0 0; }
-.job-path, .bulk-path { font-size: var(--studio-text-detail); overflow-wrap: anywhere; color: var(--muted); }
+.job-path, .bulk-path { font: 400 var(--studio-text-micro)/1.45 var(--studio-mono); overflow-wrap: anywhere; color: var(--muted); }
 .bulk-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
 .bulk-controls label { display: grid; gap: 8px; font-size: var(--studio-text-detail); }
 .bulk-controls > [hidden] { display: none; }
