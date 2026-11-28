@@ -834,6 +834,14 @@
   <button class="btn" id="usmap-update-dismiss" type="button">Got it</button>
 </div>
 
+<!-- ── Game Patch Radar notice: invisible unless a game update changed an edited target ── -->
+<div class="notice-banner" id="patch-radar-banner" role="status" hidden>
+  <i data-lucide="alert-triangle" size="16"></i>
+  <span><strong>Game update detected</strong><br><span id="patch-radar-banner-summary">Some edited assets changed in the latest game files.</span></span>
+  <button class="btn primary" id="patch-radar-inspect" type="button">Inspect changes</button>
+  <button class="btn" id="patch-radar-dismiss" type="button">Dismiss</button>
+</div>
+
 <!-- ── project picker ── -->
 <div class="overlay" id="project-overlay">
   <div class="modal proj-modal" role="dialog" aria-modal="true" aria-labelledby="proj-title" tabindex="-1">
@@ -1185,9 +1193,11 @@
 <script src="/static/shader-studio.js"></script>
 <link rel="stylesheet" href="/static/mods-drawer.css">
 <link rel="stylesheet" href="/static/asset-refs.css">
+<link rel="stylesheet" href="/static/patch-radar.css">
 <script src="/static/launch-game.js"></script>
 <script src="/static/mods-drawer.js"></script>
 <script src="/static/asset-refs.js"></script>
+<script src="/static/patch-radar.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>

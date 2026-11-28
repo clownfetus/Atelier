@@ -6033,6 +6033,7 @@ async function _selectProject(name, workspace=null) {
     renderBreadcrumbs();
     await renderGrid();
     await loadSidebar();
+    window.AtelierPatchRadar?.checkQuiet();
   }
   if(workspace) {
     window.AtelierWorkspace.present();
@@ -6196,6 +6197,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       "sep",
       { icon: "scan-box", label: "Open a mod…", action: () => window.AtelierModOpen?.open() },
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
+      { icon: "shield-alert", label: "Game patch radar…", action: () => window.AtelierPatchRadar?.open() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
       { icon: "search", label: "Command palette…", action: () => window.AtelierCommands?.openPalette() },
@@ -6254,6 +6256,7 @@ async function init() {
   await renderGrid();
   await loadSidebar();
   checkUsmapUpdate();
+  window.AtelierPatchRadar?.checkQuiet();
   window.AtelierChangelog?.ready();
   acknowledgeUpdateStartup();
 }

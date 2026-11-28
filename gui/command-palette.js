@@ -70,6 +70,7 @@
       { group: 'Tools', icon: 'folder-open', label: 'Open a mod…', keywords: 'inspect pak utoc zip', action: () => window.AtelierModOpen?.open() },
       { group: 'Tools', icon: 'package', label: 'Installed mods & clean-test…', keywords: 'mods folder enable disable sandbox pause', action: () => window.AtelierModsDrawer?.open() },
       { group: 'Tools', icon: 'wrench', label: 'Repatch a mod…', keywords: 'fix repair broken patch', action: () => window.openRepatcher?.() },
+      { group: 'Tools', icon: 'shield-alert', label: 'Game patch radar…', keywords: 'update diff broken changed baseline season', action: () => window.AtelierPatchRadar?.open() },
       { group: 'Tools', icon: 'code-2', label: 'Shader Studio…', keywords: 'dxil disassemble hlsl', action: () => window.openShaderStudio?.() },
       { group: 'Tools', icon: 'sliders-horizontal', label: 'Settings…', keywords: 'appearance theme palette paths blender motion', action: () => window.openPaths?.() },
       { group: 'Tools', icon: 'folder', label: 'Show project folder in Explorer', keywords: 'files folder open', action: () => window.atelierFetch?.('/api/open_projects_folder') },

@@ -3425,6 +3425,12 @@ def _install_mod_payload(body):
             resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
                     "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
                     "artifacts": result.get("artifacts") or []}
+            if resp["ok"]:
+                try:
+                    from atelier import patch_radar as _patch_radar
+                    _patch_radar.record_baseline(get_import_root(), items)
+                except Exception:
+                    pass
             if body.get("release_kit") and resp["ok"]:
                 from atelier import release_kit
                 project_name = os.path.basename(get_import_root().rstrip("/\\")) or "Project"
@@ -3764,6 +3770,12 @@ def _batch_export_payload(body, job=None):
         "applied": all_applied,
         "skipped": all_skipped,
     }
+    if resp["ok"]:
+        try:
+            from atelier import patch_radar as _patch_radar
+            _patch_radar.record_baseline(root, items)
+        except Exception:
+            pass
     if body.get("release_kit") and resp["ok"]:
         project_name = os.path.basename(root.rstrip("/\\")) or "Project"
         kit_dir = os.path.join(out_dir, f"{base_name}_ReleaseKit")
@@ -3804,6 +3816,19 @@ globals().update(_routes_mods.register(
 
 from atelier.web import routes_refs as _routes_refs
 globals().update(_routes_refs.register(app))
+
+def _list_project_game_rels(root):
+    rels = []
+    seen = set()
+    for item in _discover_imported_files(root):
+        gr = item.get("game_rel")
+        if gr and gr not in seen:
+            seen.add(gr)
+            rels.append(gr)
+    return rels
+
+from atelier.web import routes_radar as _routes_radar
+globals().update(_routes_radar.register(app, get_import_root, _list_project_game_rels))
 
 @app.get("/api/asset_info")
 def api_asset_info():
