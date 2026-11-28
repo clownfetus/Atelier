@@ -65,6 +65,7 @@
       { group: 'Mod tray', icon: 'download', label: 'Review & build mod…', keywords: 'export install pak', disabled: () => document.getElementById('install-btn')?.disabled, action: () => document.getElementById('install-btn')?.click() },
       { group: 'Mod tray', icon: 'plus', label: 'Add custom asset…', keywords: 'new texture mesh material', action: () => document.getElementById('add-asset-open')?.click() },
       { group: 'Mod tray', icon: 'layers', label: 'Selection profiles…', keywords: 'presets variants checkboxes', disabled: () => !project, action: () => window.AtelierTrayFilters?.openProfiles() },
+      { group: 'Mod tray', icon: 'palette', label: 'Look presets & Hero theme…', keywords: 'colours swatches recolour gold symbiote neon look theme', disabled: () => !project, action: () => window.AtelierHeroThemes?.open() },
       { group: 'Mod tray', icon: 'trash-2', label: 'Recently deleted (Project trash)…', keywords: 'trash undo restore recover', disabled: () => !project, action: () => window.AtelierTrash?.open() },
       { group: 'Mod tray', icon: 'sparkles', label: 'Process S maps', keywords: 'specular diffuse blend', disabled: () => document.getElementById('process-s-maps')?.disabled || document.getElementById('process-s-maps-wrap')?.hidden, action: () => document.getElementById('process-s-maps')?.click() },
       { group: 'Tools', icon: 'folder-open', label: 'Open a mod…', keywords: 'inspect pak utoc zip', action: () => window.AtelierModOpen?.open() },

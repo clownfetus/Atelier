@@ -3863,6 +3863,9 @@ def _list_project_game_rels(root):
 from atelier.web import routes_radar as _routes_radar
 globals().update(_routes_radar.register(app, get_import_root, _list_project_game_rels))
 
+from atelier.web import routes_themes as _routes_themes
+globals().update(_routes_themes.register(app, get_import_root, _list_project_game_rels))
+
 @app.get("/api/asset_info")
 def api_asset_info():
     """Return pak source + game path for a game_rel (for sidebar tooltips)."""

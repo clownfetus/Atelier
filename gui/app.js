@@ -4275,6 +4275,7 @@ window.applySelectionProfile = function applySelectionProfile(name, entry) {
 
 document.getElementById("tray-menu-btn").addEventListener("click", e => {
   const items = [
+    { icon: "palette", label: "Look presets & Hero theme…", action: () => window.AtelierHeroThemes?.open() },
     { icon: "layers", label: "Selection profiles…", action: () => window.AtelierTrayFilters?.openProfiles() },
     { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
   ];
