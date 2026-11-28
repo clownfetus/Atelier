@@ -68,6 +68,7 @@
       { group: 'Mod tray', icon: 'trash-2', label: 'Recently deleted (Project trash)…', keywords: 'trash undo restore recover', disabled: () => !project, action: () => window.AtelierTrash?.open() },
       { group: 'Mod tray', icon: 'sparkles', label: 'Process S maps', keywords: 'specular diffuse blend', disabled: () => document.getElementById('process-s-maps')?.disabled || document.getElementById('process-s-maps-wrap')?.hidden, action: () => document.getElementById('process-s-maps')?.click() },
       { group: 'Tools', icon: 'folder-open', label: 'Open a mod…', keywords: 'inspect pak utoc zip', action: () => window.AtelierModOpen?.open() },
+      { group: 'Tools', icon: 'package', label: 'Installed mods & clean-test…', keywords: 'mods folder enable disable sandbox pause', action: () => window.AtelierModsDrawer?.open() },
       { group: 'Tools', icon: 'wrench', label: 'Repatch a mod…', keywords: 'fix repair broken patch', action: () => window.openRepatcher?.() },
       { group: 'Tools', icon: 'code-2', label: 'Shader Studio…', keywords: 'dxil disassemble hlsl', action: () => window.openShaderStudio?.() },
       { group: 'Tools', icon: 'sliders-horizontal', label: 'Settings…', keywords: 'appearance theme palette paths blender motion', action: () => window.openPaths?.() },

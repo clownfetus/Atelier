@@ -74,11 +74,17 @@
     <kbd>Ctrl+F</kbd>
     <div id="search-results" role="listbox" aria-label="Search results" hidden></div>
   </div>
-  <button class="menu-btn" id="launch-game" type="button" aria-disabled="true" title="Launch Marvel Rivals from the desktop app">
-    <span class="launch-game-play" aria-hidden="true"></span>
-    <i data-lucide="check-circle" size="16"></i>
-    <span id="launch-game-label" aria-live="polite">Launch game</span>
-  </button>
+  <div class="launch-split">
+    <button class="menu-btn" id="launch-game" type="button" aria-disabled="true" title="Launch Marvel Rivals from the desktop app">
+      <span class="launch-game-play" aria-hidden="true"></span>
+      <i data-lucide="check-circle" size="16"></i>
+      <span id="launch-game-label" aria-live="polite">Launch game</span>
+    </button>
+    <button class="menu-btn" id="mods-drawer-btn" type="button" aria-expanded="false" aria-haspopup="true" aria-label="Installed mods and clean-test mode" title="Installed mods &amp; clean-test mode">
+      <i data-lucide="chevron-down" size="15"></i>
+      <span class="mods-clean-dot" hidden aria-hidden="true"></span>
+    </button>
+  </div>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
 </div>
 
@@ -1165,7 +1171,9 @@
 <script src="/static/app.js"></script>
 <script src="/static/repatcher.js"></script>
 <script src="/static/shader-studio.js"></script>
+<link rel="stylesheet" href="/static/mods-drawer.css">
 <script src="/static/launch-game.js"></script>
+<script src="/static/mods-drawer.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>

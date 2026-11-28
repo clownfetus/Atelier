@@ -3790,6 +3790,17 @@ def _handle_batch_export(body):
 from atelier.web import routes_project_extras as _routes_project_extras
 globals().update(_routes_project_extras.register(app, get_import_root, batch_export_handler=_handle_batch_export))
 
+from atelier.web import routes_mods as _routes_mods
+from atelier import window_game as _window_game
+globals().update(_routes_mods.register(
+    app,
+    get_mods_folder,
+    game_running_fn=_window_game._game_running,
+    state_path=os.path.join(_CACHE, "clean_test_state.json"),
+    open_folder_fn=hostos.open_path,
+    push_sse=_push_sse,
+))
+
 @app.get("/api/asset_info")
 def api_asset_info():
     """Return pak source + game path for a game_rel (for sidebar tooltips)."""
