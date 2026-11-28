@@ -243,6 +243,10 @@ function init() {
   animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible && object.kind !== 'weapon'), fetch:sceneFetch, frame:()=>{if(!preserveAnimationCamera)frameCamera();}, notify:note, changed:()=>inspection?.refresh()});
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
+    primaryMeshRel:() => {
+      const idx = objects.findIndex(o => o.loaded && o.root.visible && o.kind !== 'weapon');
+      return meshMeta[idx >= 0 ? idx : 0]?.game_rel || '';
+    },
     materials:() => ({data:matData, byName:matsByName, edited}),
     context:()=>({project:viewportProject,skin:currentSkin||meshSkin}),
     fetch:(url, options) => materialFetch(url, options), texture:materialTexture, url:projectUrl, hex:linToHex,

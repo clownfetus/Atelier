@@ -427,11 +427,11 @@ def _decoded_elsewhere(out_dir, name, since):
                 hits.append(p)
     return max(hits, key=os.path.getmtime) if hits else None
 
-def _model_glb(game_rel):
+def _model_glb(game_rel, *, original=False):
     """Decode (cached) a mesh game_rel to a .glb and return its path, or raise saying why there is
     no model. The decoder's failure used to be dropped and the route answered a bare 404, which
     the viewer could only show as 'fetch ... responded with 404: Not Found'."""
-    if os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json'):
+    if not original and (os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json')):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
     if import_server.available():
@@ -472,8 +472,9 @@ def api_model_gltf():
     if not gr:
         response.status = 400
         return b""
+    original = str(request.query.get("original", "")).lower() in ("1", "true", "yes")
     try:
-        glb = _model_glb(gr)
+        glb = _model_glb(gr, original=original)
     except Exception as e:
         response.status = 404 if isinstance(e, LookupError) else 500
         response.content_type = "application/json"

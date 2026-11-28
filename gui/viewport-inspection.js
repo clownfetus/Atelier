@@ -45,7 +45,77 @@ export function createViewportInspection(api) {
   // Showcase keeps its own floor toggle so its default look stays floorless.
   let showcaseMode=false,showcaseBackdrop=null,showcaseGrid=false;
   // Inspection overlays would leak into Showcase captures, so Showcase disables them with a reason.
-  const editingControls=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
+  const editingControls=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe','viewport-qa-ghost','viewport-qa-backfaces','viewport-qa-stress'].map(id=>[id,$(id)?.title || '']));
+  let meshQa = null, meshQaPromise = null;
+  async function ensureMeshQa() {
+    if (meshQa) return meshQa;
+    if (!meshQaPromise) {
+      meshQaPromise = import('./viewport-mesh-qa.js').then(async mod => {
+        const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+        meshQa = await mod.createMeshQa({
+          THREE,
+          GLTFLoader,
+          modelRoot,
+          objects: () => api.objects(),
+          primaryMeshRel: () => api.primaryMeshRel?.() || '',
+          notify: (msg, kind) => api.notify?.(msg, kind),
+          onChanged: syncMeshQaUI,
+        });
+        return meshQa;
+      });
+    }
+    return meshQaPromise;
+  }
+  function syncMeshQaUI() {
+    const summary = $('viewport-qa-summary');
+    const ghostBtn = $('viewport-qa-ghost');
+    const backBtn = $('viewport-qa-backfaces');
+    const stressBtn = $('viewport-qa-stress');
+    if (!summary || !ghostBtn || !backBtn || !stressBtn) return;
+    if (!meshQa) {
+      ghostBtn.setAttribute('aria-pressed', 'false');
+      backBtn.setAttribute('aria-pressed', 'false');
+      stressBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    const st = meshQa.state();
+    ghostBtn.setAttribute('aria-pressed', String(st.ghost));
+    ghostBtn.textContent = st.ghostLoading ? 'Loading silhouette…' : 'Original silhouette';
+    backBtn.setAttribute('aria-pressed', String(st.backfaces));
+    stressBtn.setAttribute('aria-pressed', String(st.stress));
+    stressBtn.textContent = st.stress ? 'Stop stress test' : 'Pose stress test';
+    const report = meshQa.analyse();
+    if (!report.sections) {
+      summary.dataset.state = '';
+      summary.textContent = 'No visible mesh geometry loaded.';
+    } else if (report.healthy) {
+      summary.dataset.state = 'ok';
+      summary.textContent = `Healthy · ${report.triangles.toLocaleString()} tris · ${report.sections} sections${report.bones ? ` · ${report.bones} bones` : ''}`;
+    } else {
+      summary.dataset.state = 'warn';
+      summary.textContent = `${report.warnings.join(' · ')} (${report.triangles.toLocaleString()} tris)`;
+    }
+  }
+  $('viewport-qa-section')?.addEventListener('toggle', async event => {
+    if (!event.target.open) return;
+    await ensureMeshQa();
+    syncMeshQaUI();
+  });
+  $('viewport-qa-ghost')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    await qa.setGhost(!qa.state().ghost);
+  });
+  $('viewport-qa-backfaces')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    qa.setBackfaces(!qa.state().backfaces);
+  });
+  $('viewport-qa-stress')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    qa.toggleStress($('viewport-animation'), $('viewport-scrub'));
+  });
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
   // The default backdrop is the mode's own; plain colour and transparent replace the art.
@@ -110,6 +180,7 @@ export function createViewportInspection(api) {
     $('viewport-uv-toggle').disabled = showcaseMode;
     $('viewport-uv-toggle').title = showcaseMode ? 'Turn off Showcase to use UV X-Ray' : 'Inspect a surface\'s texture and mesh UV layout';
     if(showcaseMode){
+      meshQa?.clearAll();
       ensureShowcaseAssets();
       clearHover();drawShowcase();
     }
@@ -211,14 +282,17 @@ export function createViewportInspection(api) {
     $('viewport-hidden').hidden = !objects.length || !!visible.length;
     const floor = showcaseMode ? showcaseGrid : showGrid;
     grid.visible = floor && !!visible.length; $('viewport-grid').setAttribute('aria-pressed', String(floor));
-    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled = !visible.length;
+    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turnaround','viewport-turntable','viewport-qa-ghost','viewport-qa-backfaces','viewport-qa-stress']) if ($(id)) $(id).disabled = !visible.length;
     for (const id of ['viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled ||= !api.ready();
     for (const id of ['viewport-edited','viewport-original','viewport-wipe']) $(id).disabled = !Object.keys(api.materials().data).length;
     $('viewport-regions').disabled = !Object.values(api.materials().data).some(d => d.dyeable);
     for (const [id,title] of editingControls) {
-      $(id).disabled ||= showcaseMode;
-      $(id).title = showcaseMode ? 'Turn off Showcase to use this control' : title;
+      const control = $(id);
+      if (!control) continue;
+      control.disabled ||= showcaseMode;
+      control.title = showcaseMode ? 'Turn off Showcase to use this control' : title;
     }
+    if (meshQa && $('viewport-qa-section')?.open) syncMeshQaUI();
     $('viewport-show-all').disabled = objects.every(o => o.root.visible);
   }
 
@@ -790,6 +864,9 @@ export function createViewportInspection(api) {
   }
   function reset() {
     related = null;
+    meshQa?.clearAll();
+    const qaSec = $('viewport-qa-section');
+    if (qaSec) qaSec.open = false;
     if ($('viewport-overlay').classList.contains('mounted')) {
       wireframe = false;
       $('viewport-wireframe').setAttribute('aria-pressed', 'false');
@@ -806,7 +883,7 @@ export function createViewportInspection(api) {
     $('viewport-overlay').classList.add('active');
     requestAnimationFrame(() => { if ($('viewport-overlay').classList.contains('active')) renderer.domElement.focus({preventScroll:true}); });
   }
-  function closed() { clearUV(); capture?.abort(); finishCamera(false); if (opener?.isConnected) opener.focus({preventScroll:true}); }
+  function closed() { clearUV(); meshQa?.clearAll(); capture?.abort(); finishCamera(false); if (opener?.isConnected) opener.focus({preventScroll:true}); }
   function keydown(event) {
     if (event.defaultPrevented || document.querySelector('#material-overlay.active')) return;
     if (event.key === 'Tab') {

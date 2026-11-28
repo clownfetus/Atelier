@@ -364,7 +364,18 @@
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
-      <p id="viewport-showcase-note" hidden>Turn off Showcase to use wireframe, dye regions or texture comparison.</p>
+      <details id="viewport-qa-section" class="vp-qa-section">
+        <summary>Pre-flight mesh QA</summary>
+        <div class="vp-qa-body">
+          <div id="viewport-qa-summary" class="vp-qa-summary" role="status">Open to inspect geometry and skin weights.</div>
+          <div class="vp-qa-actions">
+            <button id="viewport-qa-ghost" type="button" aria-pressed="false" title="Overlay the untouched vanilla mesh as a translucent wireframe">Original silhouette</button>
+            <button id="viewport-qa-backfaces" type="button" aria-pressed="false" title="Highlight inside-out triangles and flipped normals in red">Flipped normals</button>
+            <button id="viewport-qa-stress" type="button" aria-pressed="false" title="Cycle poses to spot skinning tears and clipping">Pose stress test</button>
+          </div>
+        </div>
+      </details>
+      <p id="viewport-showcase-note" hidden>Turn off Showcase to use wireframe, dye regions, mesh QA or texture comparison.</p>
       <details class="vp-shortcuts"><summary>Navigation &amp; shortcuts</summary><p>Drag to orbit · Right-drag to pan · Scroll to zoom<br>F — fit · W — wireframe · G — grid<br>1 — front · 3 — right · 7 — top<br>Double-click a part to frame it.</p><span id="viewport-stats" role="status">No model loaded</span></details>
       </div></details>
         </div>
