@@ -41,7 +41,16 @@
 #library-inspect-costume:hover { background: var(--bg3); }
 /* Both kinds of banner bleed to the header edges; the surface behind the copy keeps it readable. */
 .library-hero-art.nameplate { width: 84%; }
-@media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 16px 24px; } .library-hero-copy h2 { font-size: 24px; } }
+.library-hero-spray {
+  position: absolute; right: 20px; bottom: 12px; z-index: 2;
+  width: 62px; height: 62px; object-fit: contain;
+  transform: rotate(-3deg);
+  filter: drop-shadow(0 4px 12px rgb(0 0 0 / 38%));
+  pointer-events: none; user-select: none;
+}
+.library-hero-spray[hidden] { display: none; }
+@media (max-height: 800px) { #library-hero { min-height: 118px; } .library-hero-copy { padding: 16px 24px; } .library-hero-copy h2 { font-size: 24px; } .library-hero-spray { width: 48px; height: 48px; right: 16px; bottom: 10px; } }
+@media (max-width: 760px) { .library-hero-spray { display: none; } }
 @media (max-height: 800px) { .library-hero-signature { width: 112px; height: 30px; margin-bottom: 8px; } }
 
 /* Only the grid container moves. Shared elements have their own named snapshots. */

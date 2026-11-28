@@ -1,6 +1,57 @@
 (() => {
   const $ = id => document.getElementById(id);
-  let catalogue, loading, creating=false, choosing=false, busy=false, session=0, selectedHero='';
+  let catalogue, loading, creating=false, choosing=false, busy=false, session=0, selectedHero='', heroArtToken=0;
+  function decorateChoiceHeading(hero) {
+    const heading = document.querySelector('#workspace-choice .workspace-choice-heading');
+    if (!heading) return;
+    const token = ++heroArtToken;
+    heading.classList.remove('has-hero-art');
+    heading.style.removeProperty('--ws-hero-art');
+    let ornament = heading.querySelector('.workspace-hero-ornament');
+    if (ornament) ornament.replaceChildren();
+    const cid = hero?.path?.split('/').pop();
+    if (!/^\d{4}$/.test(cid || '')) { ornament?.remove(); return; }
+    if (!ornament) {
+      ornament = document.createElement('div');
+      ornament.className = 'workspace-hero-ornament';
+      ornament.setAttribute('aria-hidden', 'true');
+      const searchInput = $('workspace-search');
+      if (searchInput && searchInput.parentElement === heading) searchInput.before(ornament);
+      else heading.append(ornament);
+    }
+    const enc = encodeURIComponent;
+    const logo = document.createElement('img');
+    logo.className = 'workspace-hero-logo'; logo.alt = ''; logo.decoding = 'async'; logo.hidden = true;
+    logo.onload = () => { if (token === heroArtToken) logo.hidden = false; };
+    logo.onerror = () => logo.remove();
+    logo.src = '/api/catalogue/hero/' + enc(cid) + '/logo';
+    const sig = document.createElement('img');
+    sig.className = 'workspace-hero-signature'; sig.alt = ''; sig.decoding = 'async'; sig.hidden = true;
+    sig.onload = () => { if (token === heroArtToken) sig.hidden = false; };
+    sig.onerror = () => sig.remove();
+    sig.src = '/api/catalogue/hero/' + enc(cid) + '/signature';
+    ornament.append(logo, sig);
+    const sources = [
+      '/api/catalogue/hero/' + enc(cid) + '/story',
+      window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/' + enc(cid)),
+    ].filter(Boolean);
+    const probe = new Image(); probe.decoding = 'async';
+    const next = () => {
+      if (token !== heroArtToken) return;
+      if (!sources.length) return;
+      probe.src = sources.shift();
+    };
+    probe.onload = () => {
+      if (token !== heroArtToken) return;
+      const loaded = probe.getAttribute('src');
+      if (loaded) {
+        heading.style.setProperty('--ws-hero-art', `url("${loaded}")`);
+        heading.classList.add('has-hero-art');
+      }
+    };
+    probe.onerror = next;
+    next();
+  }
   function opening(state=null) {
     $('workspace-opening').hidden=!state;
     if(state==='loading')$('workspace').setAttribute('aria-busy','true');
@@ -101,6 +152,7 @@
     const heroes=(catalogue?.heroes || []).filter(h=>h.name.toLowerCase().includes(query)||(h.skins||[]).some(s=>s.name.toLowerCase().includes(query)));
     const hero=heroes.find(h=>h.path===selectedHero) || heroes[0];
     selectedHero=hero?.path || '';
+    decorateChoiceHeading(hero);
     heroList.replaceChildren(); costumeList.replaceChildren();
     $('workspace-choice-status').textContent=heroes.length?(hero.skins?.length?'':'No costumes are available for this hero yet.'):query?'No heroes or costumes match. Try another name.':'The costume library is not ready yet. Try again after indexing.';
     if(!heroes.length&&!query) {

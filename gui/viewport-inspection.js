@@ -49,23 +49,65 @@ export function createViewportInspection(api) {
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
   // The default backdrop is the mode's own; plain colour and transparent replace the art.
-  const showcaseArt=()=>showcaseMode&&$('viewport-backdrop').value==='gradient';
+  const showcaseArt=()=>showcaseMode&&['gradient','emblem','story'].includes($('viewport-backdrop').value);
+  let showcaseAssets={hero:'',emblem:null,art:null,signature:null,token:0};
+  function activeHeroId(){
+    const ctx=api.context?.()||{};
+    const skin=ctx.skin||'';
+    if(/^\d{7}$/.test(skin))return skin.slice(0,4);
+    const logoSrc=$('viewport-hero-logo')?.getAttribute('src')||'';
+    const match=/\/hero\/(\d{4})\/logo/.exec(logoSrc);
+    return match?match[1]:'';
+  }
+  function loadOptionalArt(sources,done){
+    const urls=[...new Set(sources.filter(Boolean))];
+    const img=new Image();img.decoding='async';
+    const next=()=>{if(!urls.length){done(null);return;}img.src=urls.shift();};
+    img.onload=()=>done(img.naturalWidth?img:null);
+    img.onerror=next;
+    next();
+  }
+  function ensureShowcaseAssets(){
+    const hero=activeHeroId(),skin=api.context?.()?.skin||'';
+    if(!hero||showcaseAssets.hero===hero)return;
+    const token=++showcaseAssets.token;
+    showcaseAssets={hero,emblem:null,art:null,signature:null,token};
+    const enc=encodeURIComponent;
+    const redeem=(key,img)=>{if(showcaseAssets.token===token){showcaseAssets[key]=img;if(showcaseMode)drawShowcase();}};
+    loadOptionalArt(['/api/catalogue/hero/'+enc(hero)+'/logo'],img=>redeem('emblem',img));
+    loadOptionalArt([
+      '/api/catalogue/hero/'+enc(hero)+'/story',
+      /^\d{7}$/.test(skin)&&window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/'+enc(skin)),
+      window.AtelierCatalogueArt?.bannerUrl('/api/catalogue/banner/'+enc(hero)),
+    ],img=>redeem('art',img));
+    loadOptionalArt(['/api/catalogue/hero/'+enc(hero)+'/signature'],img=>redeem('signature',img));
+  }
+  function showcaseDrawOptions(){
+    const mode=$('viewport-backdrop').value;
+    if(mode!=='emblem'&&mode!=='story')return undefined;
+    ensureShowcaseAssets();
+    return {mode,emblem:showcaseAssets.emblem,art:showcaseAssets.art,signature:showcaseAssets.signature};
+  }
   function drawShowcase(){
     if(!showcaseArt()){showcaseBackdrop?.remove();showcaseBackdrop=null;return;}
     if(!showcaseBackdrop){showcaseBackdrop=document.createElement('canvas');showcaseBackdrop.className='vp-showcase-backdrop';showcaseBackdrop.setAttribute('aria-hidden','true');$('viewport-stage').prepend(showcaseBackdrop);}
     const width=Math.max(1,$('viewport-stage').clientWidth),height=Math.max(1,$('viewport-stage').clientHeight-58);
     showcaseBackdrop.width=width;showcaseBackdrop.height=height;
-    const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height);
+    const context=showcaseBackdrop.getContext('2d');if(context)window.AtelierShowcaseArt.draw(context,width,height,showcaseDrawOptions());
   }
   function setShowcase(value){
     showcaseMode=!!value;$('viewport-showcase').setAttribute('aria-pressed',String(showcaseMode));
     $('viewport-stage').classList.toggle('vp-showcase',showcaseMode);showcaseBackdrop?.remove();showcaseBackdrop=null;
-    $('viewport-backdrop').options[0].textContent=showcaseMode?'Showcase art':'Studio';
+    const select=$('viewport-backdrop');
+    select.options[0].textContent=showcaseMode?'Showcase art':'Studio';
+    for(const opt of select.options){if(opt.value==='emblem'||opt.value==='story')opt.hidden=!showcaseMode;}
+    if(!showcaseMode&&(select.value==='emblem'||select.value==='story')){select.value='gradient';backdrop();}
     $('viewport-showcase-note').hidden=!showcaseMode;
     if (showcaseMode && uvOpen) openUV();
     $('viewport-uv-toggle').disabled = showcaseMode;
     $('viewport-uv-toggle').title = showcaseMode ? 'Turn off Showcase to use UV X-Ray' : 'Inspect a surface\'s texture and mesh UV layout';
     if(showcaseMode){
+      ensureShowcaseAssets();
       clearHover();drawShowcase();
     }
     updateRegions();refresh();
@@ -443,12 +485,12 @@ export function createViewportInspection(api) {
     return [...new Set(Object.entries(api.materials().data).flatMap(([name,d]) => (d.colors || []).filter(c => !/emiss|glow/i.test(c.name)).map(c => api.hex(api.materials().edited[name]?.[c.name] || c.rgba))))].slice(0,8);
   }
 
-  function posterCanvas(size, footer = 96,art=showcaseArt()) {
+  function posterCanvas(size, footer = 96,art=showcaseArt(),canonical=false) {
     const output = document.createElement('canvas'); output.width = size; output.height = size + footer;
     const context = output.getContext('2d');
     context.fillStyle = '#101217'; context.fillRect(0,size,size,footer);
     const mode = $('viewport-backdrop').value;
-    if(art)window.AtelierShowcaseArt.draw(context,size,size);
+    if(art)window.AtelierShowcaseArt.draw(context,size,size,canonical?undefined:showcaseDrawOptions());
     else if (mode !== 'checker') {
       const style = getComputedStyle($('viewport-stage'));
       const gradient = context.createLinearGradient(0,0,size,size);
@@ -472,7 +514,7 @@ export function createViewportInspection(api) {
     const dimensions=renderer.getSize(new THREE.Vector2()),ratio=renderer.getPixelRatio();
     const saved={position:camera.position.clone(),up:camera.up.clone(),target:controls.target.clone(),aspect:camera.aspect,near:camera.near,far:camera.far,min:controls.minDistance,max:controls.maxDistance,fit:fitOnResize,damping:controls.enableDamping};
     const animationState=api.pauseAnimation?.();
-    try{renderer.setPixelRatio(1);renderer.setSize(size,size,false);camera.aspect=1;camera.updateProjectionMatrix();frame(true);render(true,true,true);return posterCanvas(size,0,true);}
+    try{renderer.setPixelRatio(1);renderer.setSize(size,size,false);camera.aspect=1;camera.updateProjectionMatrix();frame(true);render(true,true,true);return posterCanvas(size,0,true,true);}
     finally{controls.enableDamping=false;camera.position.copy(saved.position);camera.up.copy(saved.up);controls.target.copy(saved.target);camera.aspect=saved.aspect;camera.near=saved.near;camera.far=saved.far;controls.minDistance=saved.min;controls.maxDistance=saved.max;controls.update();controls.enableDamping=saved.damping;fitOnResize=saved.fit;camera.updateProjectionMatrix();renderer.setPixelRatio(ratio);renderer.setSize(dimensions.x,dimensions.y,false);api.resumeAnimation?.(animationState);api.resize();}
   }
   function download(blob, extension) {

@@ -47,10 +47,27 @@ body[data-page=workspace] #launch-game { margin-left:auto; }
 .workspace-opening .at-btn { margin-top:16px; }
 .workspace-opening[hidden], #workspace-retry[hidden] { display:none; }
 #workspace-choice { flex:1; padding:var(--studio-space-4); background:var(--surface-panel); border:1px solid var(--line); border-radius:var(--studio-shape-medium); }
-.workspace-choice-heading { display:flex; justify-content:space-between; align-items:center; gap:var(--studio-space-4); }
+.workspace-choice-heading {
+  position:relative; isolation:isolate; overflow:hidden;
+  display:flex; justify-content:space-between; align-items:center; gap:var(--studio-space-4);
+  padding:12px 14px; margin:-8px -8px 8px;
+  border-radius:var(--studio-shape-small);
+}
+.workspace-choice-heading.has-hero-art::before {
+  content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background-image:var(--ws-hero-art); background-size:cover; background-position:right 25%;
+  opacity:.18; mask-image:linear-gradient(90deg, transparent 20%, #000 84%);
+}
+:root[data-theme=light] .workspace-choice-heading.has-hero-art::before { opacity:.12; }
+.workspace-hero-ornament { display:flex; align-items:center; gap:12px; margin-left:auto; flex:none; pointer-events:none; user-select:none; }
+.workspace-hero-logo { width:32px; height:32px; object-fit:contain; filter:brightness(0) invert(1); opacity:.28; }
+.workspace-hero-signature { height:32px; width:108px; object-fit:contain; object-position:right center; filter:var(--library-signature-filter); opacity:.42; }
+:root[data-theme=light] .workspace-hero-logo { filter:brightness(0); opacity:.2; }
+.workspace-hero-logo[hidden], .workspace-hero-signature[hidden] { display:none; }
+@media(max-width:960px) { .workspace-hero-ornament { display:none; } }
 .workspace-choice-heading h2 { font:var(--type-title); margin:0; }
 .workspace-choice-heading p { margin:0; color:var(--text-muted); }
-.workspace-choice-heading input { width:min(280px, 45%); min-height:40px; }
+.workspace-choice-heading input { width:min(280px, 45%); min-height:40px; position:relative; z-index:1; }
 #workspace-choice-status { color:var(--text-muted); }
 #workspace-choice-status:empty { display:none; }
 #workspace-heroes { display:flex; gap:10px; overflow:auto; padding:10px 2px 16px; }

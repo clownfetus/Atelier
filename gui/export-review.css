@@ -4,12 +4,48 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
   z-index: calc(var(--studio-layer-overlay) - 1);
 }
 .export-review-modal { max-width: 720px !important; gap: 16px; --glyph-halo: var(--md-sys-color-surface-container); }
+.export-review-banner {
+  position: relative;
+  flex-shrink: 0;
+  height: 44px;
+  margin: -4px 0 -4px;
+  border-radius: var(--studio-shape-small);
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  background-image: var(--export-banner, none);
+  background-size: cover;
+  background-position: right 28%;
+  overflow: hidden;
+}
+.export-review-banner[hidden] { display: none; }
+.export-review-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 52%, transparent) 0%, transparent 55%, color-mix(in srgb, var(--bg) 42%, transparent) 100%);
+  pointer-events: none;
+}
+.export-review-ko {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  background-image: var(--export-ko, none);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 50%));
+}
+.export-review-ko[hidden] { display: none; }
 .export-review-stage { position: relative; margin: -8px auto -4px; flex-shrink: 0; }
 /* With the stage in the dialog, long reports scroll inside the body so the outcome
    heading and the actions stay visible together. */
 .export-review-modal:has(.export-review-stage:not(:empty)) .export-review-body { overflow-y: auto; overscroll-behavior: contain; }
 .export-review-stage:empty, .export-review-stage[hidden] { display: none; }
 @media (max-height: 700px) {
+  .export-review-banner { display: none; }
   .export-review-stage.atelier-glyph { width: 197px !important; height: 164px !important; }
 }
 .export-review-modal:focus { outline: none; }

@@ -29,6 +29,56 @@
     });
     if(items[active]){$('search-input').setAttribute('aria-activedescendant',items[active].id);items[active].scrollIntoView({block:'nearest'});}
   }
+  function fallbackEmblemClass(group, item) {
+    const type = String(item.type || item.file_type || '').toLowerCase();
+    const raw = String(item.game_rel || item.path || item.name || '').toLowerCase();
+    if (group === 'heroes' || group === 'skins') return 'char-icon';
+    if (type === 'texture' || /\btextures?\b/.test(raw)) return 'texture-folder-icon';
+    if (type === 'material' || /\bmaterials?\b/.test(raw)) return 'material-folder-icon';
+    if (type === 'mesh' || /\bmesh(?:es)?\b/.test(raw)) return 'mesh-folder-icon';
+    if (type === 'vfx' || type === 'curve' || /\bvfx\b/.test(raw)) return 'vfx-folder-icon';
+    if (type === 'text' || type === 'config' || /\b(?:string|text|loc)\b/.test(raw)) return 'text-folder-icon';
+    if (type === 'world' || /\bmaps?\b/.test(raw)) return 'map-folder-icon';
+    if (/\bui\b/.test(raw)) return 'ui-folder-icon';
+    if (/\bcharacters?\b/.test(raw)) return 'char-icon';
+    if (/\bweapons?\b/.test(raw)) return 'weapon-folder-icon';
+    if (/\babilities?\b/.test(raw)) return 'ability-folder-icon';
+    if (/\benvironment\b/.test(raw)) return 'environment-folder-icon';
+    return 'folder-icon';
+  }
+  function makeEmblemSvg(cls) {
+    const emblems = window.AtelierFolderEmblems;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('search-thumb-emblem');
+    const role = emblems?.roles?.[cls] || 'neutral';
+    svg.style.color = `var(--studio-emblem-${role})`;
+    svg.innerHTML = emblems?.markup?.(cls, 18) || '<rect x="4" y="6" width="16" height="12" rx="2"/>';
+    return svg;
+  }
+  function makeSearchThumb(group, item) {
+    const slot = document.createElement('span');
+    slot.className = 'search-thumb';
+    slot.setAttribute('aria-hidden', 'true');
+    const fallback = () => {
+      if (slot.querySelector('.search-thumb-emblem')) return;
+      slot.replaceChildren(makeEmblemSvg(fallbackEmblemClass(group, item)));
+    };
+    const art = window.AtelierCatalogueArt?.identityChip(item);
+    if (art) {
+      art.classList.add('search-thumb-art');
+      const prevOnError = art.onerror;
+      art.onerror = () => {
+        prevOnError?.();
+        if (!art.isConnected) fallback();
+      };
+      slot.append(art);
+    } else {
+      fallback();
+    }
+    return slot;
+  }
   async function lookup() {
     const q=$('search-input').value.trim();cancel();if(scope!=='everywhere'||!q){reset();return;}
     const gen=generation, project=window.atelierProject();controller=new AbortController();
@@ -46,12 +96,13 @@
         for(const item of data[group]) {
           const row=document.createElement('button');row.type='button';row.className='search-result';row.setAttribute('role','option');row.tabIndex=-1;row.id='search-result-'+gen+'-'+group+'-'+section.children.length;
           row.setAttribute('aria-selected','false');
+          const thumb=makeSearchThumb(group,item);
+          const copy=document.createElement('div');copy.className='search-copy';
           const name=document.createElement('strong');name.textContent=item.display_name || item.name;
-          const art=window.AtelierCatalogueArt?.identityChip(item);if(art)name.prepend(art);
           const raw=item.game_rel||item.path;row.title=raw;
           const friendly=window.AtelierCatalogueArt?.pathLabel(raw)||raw;
           const path=document.createElement('span');path.textContent=friendly===raw&&item.identity_label ? item.identity_label+' · '+raw : friendly;
-          row.append(name,path);row.addEventListener('click',()=>{reset();$('search-input').blur();callbacks.open?.(group,item);});section.append(row);
+          copy.append(name,path);row.append(thumb,copy);row.addEventListener('click',()=>{reset();$('search-input').blur();callbacks.open?.(group,item);});section.append(row);
         }
         panel.append(section);
       }

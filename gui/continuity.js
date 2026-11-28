@@ -152,6 +152,17 @@
     } else {
       text.append(detail); host.append(image, text);
     }
+    const sid = identity?.skin_id || (match?.[2] ? match[2].slice(1) : '');
+    if (/^\d{7}$/.test(sid)) {
+      const sprayUrl = skin.spray || '/api/catalogue/spray/' + encodeURIComponent(sid);
+      const sticker = document.createElement('img');
+      sticker.className = 'library-hero-spray'; sticker.alt = ''; sticker.decoding = 'async';
+      sticker.setAttribute('aria-hidden', 'true'); sticker.draggable = false; sticker.hidden = true;
+      sticker.onload = () => { if (current() && sticker.isConnected) sticker.hidden = false; };
+      sticker.onerror = () => sticker.remove();
+      sticker.src = sprayUrl;
+      host.append(sticker);
+    }
     nextSource();
     // Shared-element snapshots wait only for decoding an image already on screen.
     if (preloaded && image.decode) return image.decode().catch(()=>{});

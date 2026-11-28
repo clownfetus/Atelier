@@ -52,7 +52,7 @@
 #viewport-stage[data-backdrop=checker] { background-color:#b7bdc5; background-image:conic-gradient(#e0e3e8 25%,transparent 0 50%,#e0e3e8 0 75%,transparent 0); background-size:24px 24px; }
 #viewport-canvas { position:absolute; inset:58px 0 0; width:100%; height:calc(100% - 58px); display:block; background:transparent; outline-offset:-4px; touch-action:none; }
 .vp-showcase-backdrop {position:absolute;inset:58px 0 0;width:100%;height:calc(100% - 58px);pointer-events:none;}
-#viewport-stage.vp-showcase[data-backdrop=gradient] .vp-showcase-backdrop {background:#14161b;}
+#viewport-stage.vp-showcase:is([data-backdrop=gradient],[data-backdrop=emblem],[data-backdrop=story]) .vp-showcase-backdrop {background:#14161b;}
 #viewport-inspect-tools, #viewport-tools { position:absolute; z-index:5; top:20px; display:flex; align-items:center; gap:12px; padding:0; background:transparent; border:0; }
 #viewport-inspect-tools { left:22px; }
 #viewport-inspect-tools {max-width:330px;flex-wrap:wrap;gap:8px;pointer-events:none;}
@@ -173,6 +173,12 @@
 .vp-material-select .vp-draft-marker { margin-left:auto; font-size:var(--studio-text-micro); color:var(--acc); }
 #viewport-box .vp-material-chip { width:17px; height:17px; border-radius:var(--studio-shape-small); border:1px solid var(--border2); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--text) 14%,transparent); margin:0; flex:none; }
 #viewport-material-empty { padding:38px 32px; flex:1; border-top:1px solid var(--border); color:var(--muted); }
+#viewport-material-empty.has-empty-art > svg { display:none; }
+.vp-empty-art { display:block; width:88px; height:88px; object-fit:contain; object-position:left center; margin-bottom:2px; pointer-events:none; user-select:none; }
+.vp-empty-art[data-kind=spray] { filter:drop-shadow(0 6px 14px rgb(0 0 0 / 28%)); }
+.vp-empty-art[data-kind=logo] { width:52px; height:52px; filter:brightness(0) invert(1); opacity:.28; }
+:root[data-theme=light] .vp-empty-art[data-kind=logo] { filter:brightness(0); opacity:.18; }
+.vp-empty-art[hidden] { display:none; }
 #viewport-material-empty h3 { font-size:var(--studio-text-body); font-weight:600; color:var(--text); margin:16px 0 8px; }
 #viewport-material-empty p { font-size:var(--studio-text-label); line-height:1.7; margin:0; max-width:240px; }
 #viewport-material-editor { min-width:0; overflow:visible; padding:24px 24px 16px; border-top:1px solid var(--border); }

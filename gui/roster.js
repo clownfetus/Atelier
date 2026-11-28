@@ -182,7 +182,19 @@
       const button=document.createElement('button'); button.className='roster-portrait'; button.setAttribute('aria-pressed','false');
       const count=editCount(hero);button.classList.toggle('has-edits',count>0);
       button.title=hero.name;button.setAttribute('aria-label',hero.name);
-      const artwork=document.createElement('div');artwork.className='roster-art';artwork.append(image(hero));button.append(artwork);
+      const artwork=document.createElement('div');artwork.className='roster-art';artwork.append(image(hero));
+      const heroCid=hero.path?.split('/')[1];
+      if(/^\d{4}$/.test(heroCid||'')){
+        const emblem=document.createElement('span');emblem.className='roster-emblem';
+        emblem.setAttribute('aria-hidden','true');emblem.hidden=true;
+        const logoUrl='/api/catalogue/hero/'+encodeURIComponent(heroCid)+'/logo';
+        const probe=new Image();probe.decoding='async';
+        probe.onload=()=>{if(emblem.isConnected){emblem.style.setProperty('--roster-emblem',`url("${logoUrl}")`);emblem.hidden=false;}};
+        probe.onerror=()=>emblem.remove();
+        probe.src=logoUrl;
+        artwork.append(emblem);
+      }
+      button.append(artwork);
       const label=document.createElement('strong');label.className='roster-hero-name';label.textContent=hero.name;
       const costumes=hero.skins?.length||0;
       const counts = document.createElement('span');

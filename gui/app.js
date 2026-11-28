@@ -1296,6 +1296,41 @@ function _seedScalars(arr) {
                                  max: Math.max(Math.abs(s.value) * 3, 1) }));
 }
 
+function _decorateMaterialHead(gameRel) {
+  const head = document.querySelector('#material-overlay .mat-head');
+  if (!head) return;
+  head.querySelectorAll('.mat-hero-badge, .mat-hero-watermark').forEach(node => node.remove());
+  if (!gameRel) return;
+  const desc = window.AtelierCatalogueArt?.describe(gameRel);
+  const hero = desc?.char_id || window.AtelierCatalogueArt?.heroId(gameRel) || '';
+  const skin = desc?.skin_id || '';
+  if (!hero && !skin) return;
+  const enc = encodeURIComponent;
+  const badgeSources = [
+    skin && '/api/catalogue/badge/' + enc(skin),
+    skin && '/api/catalogue/icon/' + enc(skin),
+    hero && '/api/catalogue/hero/' + enc(hero) + '/avatar',
+  ].filter(Boolean);
+  if (badgeSources.length) {
+    const badge = document.createElement('img');
+    badge.className = 'mat-hero-badge'; badge.alt = ''; badge.decoding = 'async';
+    badge.setAttribute('aria-hidden', 'true'); badge.hidden = true;
+    badge.onload = () => { badge.hidden = false; };
+    badge.onerror = () => { if (badgeSources.length) badge.src = badgeSources.shift(); else badge.remove(); };
+    badge.src = badgeSources.shift();
+    head.prepend(badge);
+  }
+  if (/^\d{4}$/.test(hero)) {
+    const mark = document.createElement('img');
+    mark.className = 'mat-hero-watermark'; mark.alt = ''; mark.decoding = 'async';
+    mark.setAttribute('aria-hidden', 'true'); mark.hidden = true;
+    mark.onload = () => { mark.hidden = false; };
+    mark.onerror = () => mark.remove();
+    mark.src = '/api/catalogue/hero/' + enc(hero) + '/logo';
+    head.append(mark);
+  }
+}
+
 async function openMaterialEditor(item) {
   window.AtelierRoster?.rememberEditor(item.game_rel,'material',_activeProjectName);
   if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
@@ -1309,6 +1344,7 @@ async function openMaterialEditor(item) {
   document.getElementById("mat-title").textContent = item.partLabel || item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
+  _decorateMaterialHead(item.game_rel);
   document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
@@ -2196,6 +2232,7 @@ async function closeMaterialEditor(force = false) {
   const img = document.getElementById("dye-prev");
   if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
   const overlay = document.getElementById('material-overlay');
+  _decorateMaterialHead('');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   matEditor = null;
@@ -3270,9 +3307,49 @@ async function performClearMany(items) {
   }
 }
 
+const _PROJ_CARD_META_KEY = 'atelier.projectCards.v1';
+function _readAllProjectCardMeta() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(_PROJ_CARD_META_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (_) { return {}; }
+}
+function _extractProjectCardMeta(items) {
+  const targets = [], seenTarget = new Set(), colors = [], seenColor = new Set();
+  for (const item of items || []) {
+    const desc = window.AtelierCatalogueArt?.describe(item.game_rel || '');
+    const skin = /^\d{7}$/.test(item.skin_id || '') ? item.skin_id : (desc?.skin_id || '');
+    const hero = skin ? skin.slice(0, 4) : (/^\d{4}$/.test(item.char_id || '') ? item.char_id : (window.AtelierCatalogueArt?.heroId(item) || ''));
+    if (hero) {
+      const key = skin || hero;
+      if (!seenTarget.has(key) && targets.length < 3) { seenTarget.add(key); targets.push({ hero, skin }); }
+    }
+    for (const color of item.ui_preview?.colors || []) {
+      if (!Array.isArray(color) || !color.slice(0, 3).every(Number.isFinite)) continue;
+      const hex = _rgbHex(...color.slice(0, 3), Math.max(1, ...color.slice(0, 3)));
+      if (hex && !seenColor.has(hex) && colors.length < 5) { seenColor.add(hex); colors.push(hex); }
+    }
+  }
+  return (targets.length || colors.length) ? { targets, colors } : null;
+}
+function _rememberProjectCardMeta(projectName, items) {
+  if (!projectName) return;
+  const all = _readAllProjectCardMeta();
+  const meta = _extractProjectCardMeta(items);
+  if (meta) all[projectName] = meta;
+  else delete all[projectName];
+  const keys = Object.keys(all);
+  if (keys.length > 60) {
+    for (const k of keys.slice(0, keys.length - 60)) delete all[k];
+  }
+  try { localStorage.setItem(_PROJ_CARD_META_KEY, JSON.stringify(all)); } catch (_) {}
+}
+
 function renderSidebar() {
   window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail:{project:_activeProjectName}}));
-  window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
+  const sidebarItems = Object.values(sidebarData);
+  _rememberProjectCardMeta(_activeProjectName, sidebarItems);
+  window.AtelierRoster?.update(sidebarItems,_activeProjectName);
   const list = document.getElementById("sidebar-list");
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
   const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
@@ -5270,10 +5347,16 @@ function _renderProjectPicker(projects, keepQuery) {
     restoreFocus();
     return;
   }
+  const cardMetaMap = _readAllProjectCardMeta();
+  if (_activeProjectName) {
+    const liveMeta = _extractProjectCardMeta(Object.values(sidebarData));
+    if (liveMeta) cardMetaMap[_activeProjectName] = liveMeta;
+  }
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
     const active = proj.name === _activeProjectName;
+    const cardMeta = proj.asset_count ? cardMetaMap[proj.name] : null;
     card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "") + (active ? " is-active" : "");
     card.dataset.name = proj.name;
     card.tabIndex = 0;
@@ -5283,7 +5366,6 @@ function _renderProjectPicker(projects, keepQuery) {
     const check = `<div class="proj-check" title="Select"><input type="checkbox" aria-label="Select ${_esc(proj.name)}" ${sel ? "checked" : ""}></div>`;
     const activeBadge = active ? '<span class="proj-active-badge">Active</span>' : '';
     const thumb = `<div class="proj-thumb">
-      ${proj.asset_count ? `<img src="${thumbUrl}" alt="" loading="lazy" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">` : ''}
       <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon folder-icon"></i>
       ${_projView === "list" ? "" : activeBadge}
     </div>`;
@@ -5309,6 +5391,70 @@ function _renderProjectPicker(projects, keepQuery) {
            <div class="proj-meta">${assetTxt} &middot; ${_relTime(proj.mtime)}</div>
          </div>
          ${actions}`;
+    const thumbHost = card.querySelector('.proj-thumb');
+    const folderIcon = thumbHost?.querySelector('.proj-thumb-icon');
+    const attachCoverArt = () => {
+      if (!thumbHost || !cardMeta?.targets?.length) return;
+      const targets = cardMeta.targets;
+      if (_projView === 'list') {
+        const first = targets[0];
+        const cover = document.createElement('img');
+        cover.className = 'proj-cover-single'; cover.alt = ''; cover.loading = 'lazy'; cover.decoding = 'async';
+        const urls = [first.skin && `/api/catalogue/icon/${encodeURIComponent(first.skin)}`, `/api/catalogue/hero/${encodeURIComponent(first.hero)}/avatar`, `/api/catalogue/thumbnail/${encodeURIComponent(first.skin || first.hero)}`].filter(Boolean);
+        cover.onload = () => { if (folderIcon) folderIcon.style.display = 'none'; };
+        cover.onerror = () => { if (urls.length) cover.src = urls.shift(); else cover.remove(); };
+        cover.src = urls.shift();
+        thumbHost.prepend(cover);
+        return;
+      }
+      const coverWrap = document.createElement('div');
+      coverWrap.className = targets.length > 1 ? `proj-cover-mosaic is-count-${targets.length}` : 'proj-cover-layer';
+      coverWrap.setAttribute('aria-hidden', 'true');
+      let loadedCount = 0;
+      for (const target of targets) {
+        const img = document.createElement('img');
+        img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+        const urls = [
+          target.skin && `/api/catalogue/thumbnail/${encodeURIComponent(target.skin)}`,
+          `/api/catalogue/thumbnail/${encodeURIComponent(target.hero)}`,
+          `/api/catalogue/hero/${encodeURIComponent(target.hero)}/avatar`,
+        ].filter(Boolean);
+        img.onload = () => { loadedCount++; if (folderIcon) folderIcon.style.display = 'none'; };
+        img.onerror = () => { if (urls.length) img.src = urls.shift(); else { img.remove(); if (!coverWrap.childElementCount) coverWrap.remove(); } };
+        img.src = urls.shift();
+        coverWrap.append(img);
+      }
+      if (coverWrap.childElementCount) thumbHost.prepend(coverWrap);
+    };
+    if (proj.asset_count && thumbHost) {
+      const texImg = document.createElement('img');
+      texImg.className = 'proj-tex-thumb'; texImg.alt = ''; texImg.loading = 'lazy';
+      texImg.onload = () => { if (folderIcon) folderIcon.style.display = 'none'; };
+      texImg.onerror = () => { texImg.remove(); attachCoverArt(); };
+      texImg.src = thumbUrl;
+      thumbHost.prepend(texImg);
+      if (_projView !== 'list' && cardMeta) {
+        const firstHero = cardMeta.targets?.[0]?.hero;
+        if (firstHero) {
+          const emblem = document.createElement('img');
+          emblem.className = 'proj-cover-emblem'; emblem.alt = ''; emblem.loading = 'lazy'; emblem.decoding = 'async';
+          emblem.setAttribute('aria-hidden', 'true');
+          emblem.onerror = () => emblem.remove();
+          emblem.src = `/api/catalogue/hero/${encodeURIComponent(firstHero)}/logo`;
+          thumbHost.append(emblem);
+        }
+        if (cardMeta.colors?.length) {
+          const bar = document.createElement('div');
+          bar.className = 'proj-cover-palette'; bar.setAttribute('aria-hidden', 'true');
+          for (const hex of cardMeta.colors) {
+            const swatch = document.createElement('span');
+            swatch.style.background = hex;
+            bar.append(swatch);
+          }
+          thumbHost.append(bar);
+        }
+      }
+    }
     card.querySelector(".proj-check").addEventListener("click", e => {
       e.stopPropagation();
       _projSelClick(proj.name, e);

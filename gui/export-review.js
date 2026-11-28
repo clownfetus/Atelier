@@ -1,8 +1,8 @@
 /* Export review and latest session result. No build logic or credentials live here. */
 (function () {
   'use strict';
-  let overlay, panel, body, title, actions, lastButton, opener, stageHost, glyph = null;
-  let current = null, busy = false, lastResult = null, preferredFormat = 'standard';
+  let overlay, panel, banner, koStamp, body, title, actions, lastButton, opener, stageHost, glyph = null;
+  let current = null, busy = false, lastResult = null, preferredFormat = 'standard', bannerToken = 0;
 
   function el(tag, text, className) {
     const node = document.createElement(tag);
@@ -22,11 +22,16 @@
     panel = el('section', undefined, 'modal export-review-modal');
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-labelledby', 'export-review-title'); panel.tabIndex = -1;
+    banner = el('div', undefined, 'export-review-banner');
+    banner.setAttribute('aria-hidden', 'true'); banner.hidden = true;
+    koStamp = el('span', undefined, 'export-review-ko');
+    koStamp.setAttribute('aria-hidden', 'true'); koStamp.hidden = true;
+    banner.append(koStamp);
     title = el('h2'); title.id = 'export-review-title';
     body = el('div', undefined, 'export-review-body');
     actions = el('div', undefined, 'modal-row export-review-actions');
     stageHost = el('div', undefined, 'export-review-stage');
-    panel.append(title, stageHost, body, actions); overlay.append(panel); document.body.append(overlay);
+    panel.append(banner, title, stageHost, body, actions); overlay.append(panel); document.body.append(overlay);
     lastButton = el('button', 'Last export', 'btn export-last-result');
     lastButton.id = 'export-last-result'; lastButton.type = 'button'; lastButton.hidden = true;
     lastButton.addEventListener('click', () => {
@@ -66,9 +71,61 @@
     else if (!lastButton.hidden && !lastButton.disabled) lastButton.focus();
     else document.getElementById('install-btn').focus();
   }
+  function updateBanner(snapshot, state) {
+    const token = ++bannerToken;
+    banner.hidden = true; banner.style.removeProperty('--export-banner');
+    koStamp.hidden = true; koStamp.style.removeProperty('--export-ko');
+    const items = snapshot?.included || [];
+    const heroes = new Set(), skins = new Set();
+    for (const item of items) {
+      const desc = window.AtelierCatalogueArt?.describe(item.game_rel || '');
+      const sid = /^\d{7}$/.test(item.skin_id || '') ? item.skin_id : (desc?.skin_id || '');
+      const cid = sid ? sid.slice(0, 4) : (/^\d{4}$/.test(item.char_id || '') ? item.char_id : (window.AtelierCatalogueArt?.heroId(item) || ''));
+      if (/^\d{4}$/.test(cid)) heroes.add(cid);
+      if (/^\d{7}$/.test(sid)) skins.add(sid);
+    }
+    if (!heroes.size) return;
+    const hero = [...heroes][0];
+    const singleHero = heroes.size === 1;
+    const singleSkin = singleHero && skins.size === 1 ? [...skins][0] : '';
+    const bannerUrl = window.AtelierCatalogueArt?.bannerUrl || (u => u);
+    const sources = [
+      singleSkin && bannerUrl('/api/catalogue/banner/' + singleSkin),
+      bannerUrl('/api/catalogue/banner/' + hero),
+      '/api/catalogue/hero/' + hero + '/story',
+    ].filter(Boolean);
+    const probe = new Image(); probe.decoding = 'async';
+    const next = () => {
+      if (token !== bannerToken) return;
+      if (!sources.length) return;
+      probe.src = sources.shift();
+    };
+    probe.onload = () => {
+      if (token !== bannerToken) return;
+      const loaded = probe.getAttribute('src');
+      if (loaded) {
+        banner.style.setProperty('--export-banner', `url("${loaded}")`);
+        banner.hidden = false;
+      }
+    };
+    probe.onerror = next;
+    next();
+    if (singleHero && (state === 'success' || state === 'warning')) {
+      const koUrl = '/api/catalogue/hero/' + hero + '/kill';
+      const koProbe = new Image(); koProbe.decoding = 'async';
+      koProbe.onload = () => {
+        if (token !== bannerToken) return;
+        koStamp.style.setProperty('--export-ko', `url("${koUrl}")`);
+        koStamp.hidden = false;
+        banner.hidden = false;
+      };
+      koProbe.src = koUrl;
+    }
+  }
   function reset(heading, state, stageState = state) {
     title.textContent = heading; body.replaceChildren(); actions.replaceChildren();
     panel.dataset.state = state; panel.setAttribute('aria-busy', String(state === 'busy'));
+    updateBanner(current?.snapshot, state);
     showStage(stageState);
   }
   // The build runs in the glyph, which then forms its result. Decorative only; the progress bar and
