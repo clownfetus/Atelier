@@ -139,3 +139,19 @@
   .mb-preview-note { max-height: 42px; overflow: auto; }
   .mb-inspector { padding-top: 12px; }
 }
+
+/* Vision lens selector in VFX Motionboard header (preview-only filter) */
+.vfx-vision-select {
+  height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-small);
+  background: var(--bg);
+  color: var(--text);
+  font: var(--studio-type-detail);
+  margin-left: auto;
+  margin-right: 8px;
+}
+#vfx-body[data-vision-lens] :is(.vfx-grad, .vmb-canvas, canvas, .vmb-preview-stage, .vmb-swatch) {
+  filter: var(--vfx-lens-filter);
+}

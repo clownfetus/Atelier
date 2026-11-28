@@ -363,6 +363,7 @@
         </select>
       </label>
       <label class="vp-setting">Backdrop <select id="viewport-backdrop" aria-label="Preview backdrop"><option value="gradient">Studio</option><option value="emblem" hidden>Hero emblem</option><option value="story" hidden>Hero artwork</option><option value="solid">Plain colour</option><option value="checker">Transparent</option></select></label>
+      <label class="vp-setting">Vision lens <select id="viewport-vision-lens" aria-label="Colourblind and contrast simulation lens" title="Preview-only colourblind and contrast check; never alters exports"></select></label>
       <input id="viewport-backdrop-color" type="color" value="#14161b" hidden aria-label="Backdrop colour">
       <div class="vp-toggle-settings">
         <button id="viewport-grid" aria-pressed="true" title="Toggle floor grid (G)"><i data-lucide="layout-grid" size="16"></i> Floor grid</button>
@@ -527,6 +528,7 @@
         <h2><i data-lucide="sparkles" size="18"></i> <span id="vfx-title">VFX</span></h2>
         <div id="vfx-sub" class="mat-subpath"></div>
       </div>
+      <select id="vfx-vision-lens" class="vfx-vision-select" aria-label="VFX colourblind and contrast lens" title="Preview-only colourblind and readability check"></select>
       <button class="sb-clear" id="vfx-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
     <div id="vfx-body" class="mat-body"></div>
@@ -1208,6 +1210,7 @@
 <script src="/static/asset-refs.js"></script>
 <script src="/static/patch-radar.js"></script>
 <script src="/static/hero-themes.js"></script>
+<script src="/static/vision-lens.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>
