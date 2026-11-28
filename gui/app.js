@@ -5935,25 +5935,25 @@ async function openWorldEditor(item) {
 
 function renderWorldEditor() {
   const m = worldEditor.model, ed = worldEditor.edits, out = [];
-  const sec = (icon, title, inner) => '<div style="margin-bottom:16px"><div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:8px"><i data-lucide="' + icon + '" size="14" style="color:var(--acc)"></i> ' + title + '</div>' + inner + '</div>';
-  const row = inner => '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;flex-wrap:wrap">' + inner + '</div>';
+  const sec = (icon, title, inner) => '<section class="world-sec"><div class="world-sec-head"><i data-lucide="' + icon + '" size="14"></i> ' + title + '</div>' + inner + '</section>';
+  const row = inner => '<div class="world-row">' + inner + '</div>';
 
   if (m.lights && m.lights.length) {
     const rows = m.lights.map(L => {
       const cur = ed.lights[L.idx] || {};
       const inten = (cur.intensity != null) ? cur.intensity : L.intensity;
       const col = cur.color || L.color;
-      const ni = (L.intensity != null) ? '<label style="font-size:12px">Intensity <input type="number" step="0.1" style="width:80px" data-lidx="' + L.idx + '" data-lk="intensity" value="' + inten + '"></label>' : "";
-      const nc = (L.color) ? '<label style="font-size:12px">Color <input type="color" data-lidx="' + L.idx + '" data-lk="color" value="' + _rgb255Hex(col) + '"></label>' : "";
-      return row('<span style="flex:1;min-width:180px;font-size:12px">' + L.name + ' <span class="muted">' + L.cls.replace(/Component$/, "") + '</span></span>' + ni + nc);
+      const ni = (L.intensity != null) ? '<label class="world-field">Intensity <input class="editor-field world-num" type="number" step="0.1" data-lidx="' + L.idx + '" data-lk="intensity" value="' + inten + '"></label>' : "";
+      const nc = (L.color) ? '<label class="world-field">Colour <input type="color" data-lidx="' + L.idx + '" data-lk="color" value="' + _rgb255Hex(col) + '"></label>' : "";
+      return row('<span class="world-name">' + _esc(L.name) + ' <span class="muted">' + _esc(L.cls.replace(/Component$/, "")) + '</span></span>' + ni + nc);
     }).join("");
     out.push(sec("sun", 'Lights <span class="muted">(' + m.lights.length + ')</span>', rows));
   }
   if (m.fog) {
     const fc = ed.fog.color || m.fog.color;
     const fd = (ed.fog.density != null) ? ed.fog.density : m.fog.density;
-    const nc = (m.fog.color) ? '<label style="font-size:12px">Inscatter color <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
-    const nd = (m.fog.density != null) ? '<label style="font-size:12px">Density <input type="number" step="0.001" style="width:90px" data-fog="density" value="' + fd + '"></label>' : "";
+    const nc = (m.fog.color) ? '<label class="world-field">Inscatter colour <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
+    const nd = (m.fog.density != null) ? '<label class="world-field">Density <input class="editor-field world-num" type="number" step="0.001" data-fog="density" value="' + fd + '"></label>' : "";
     out.push(sec("cloud-fog", "Height fog", row(nc + nd)));
   }
   const ppv = (m.components || []).find(c => c.is_ppv);
@@ -5968,17 +5968,17 @@ function renderWorldEditor() {
       const gd = ppv.grade[name];
       const cur = (name in (ed.grade || {})) ? ed.grade[name] : gd.value;
       const pretty = name.replace(/^Color/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
-      const tag = gd.override ? "" : ' <span class="muted" style="font-size:11px">(off — edit to enable)</span>';
-      const dim = gd.override ? "" : ";opacity:.72";
-      const lbl = '<span style="flex:0 0 158px">' + pretty + tag + '</span>';
+      const tag = gd.override ? "" : ' <span class="muted world-grade-tag">(off — edit to enable)</span>';
+      const lbl = '<span class="world-grade-label">' + _esc(pretty) + tag + '</span>';
+      const dimCls = gd.override ? "" : " is-dim";
       if (Array.isArray(gd.value)) {
         const v = Array.isArray(cur) ? cur : gd.value;
-        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
-          [0, 1, 2].map(ci => '<input type="number" step="0.01" style="width:64px" title="' + "RGB"[ci] +
-            '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + name + '" data-gch="' + ci + '">').join("") + '</div>';
+        gh += '<div class="world-grade-row' + dimCls + '">' + lbl +
+          [0, 1, 2].map(ci => '<input class="editor-field world-num world-rgb" type="number" step="0.01" title="' + "RGB"[ci] +
+            '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + _esc(name) + '" data-gch="' + ci + '">').join("") + '</div>';
       } else {
-        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
-          '<input type="number" step="0.05" style="width:82px" value="' + (+cur).toFixed(3) + '" data-gname="' + name + '"></div>';
+        gh += '<div class="world-grade-row' + dimCls + '">' + lbl +
+          '<input class="editor-field world-num" type="number" step="0.05" value="' + (+cur).toFixed(3) + '" data-gname="' + _esc(name) + '"></div>';
       }
     }
     out.push(sec("palette", "Post-process grade", gh));
@@ -5987,10 +5987,10 @@ function renderWorldEditor() {
   if (hide.length) {
     const rows = hide.map(c => {
       const cur = (c.idx in ed.visibility) ? ed.visibility[c.idx] : (c.enables && "bVisible" in c.enables ? c.enables.bVisible : true);
-      return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + c.name + ' <span class="muted">' + c.cls.replace(/Component$/, "") + '</span></span></label>';
+      return '<label class="world-vis-item"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + _esc(c.name) + ' <span class="muted">' + _esc(c.cls.replace(/Component$/, "")) + '</span></span></label>';
     }).join("");
     out.push(sec("eye", 'Visibility <span class="muted">(' + hide.length + ')</span>',
-      '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 12px">' + rows + '</div>'));
+      '<div class="world-vis-list">' + rows + '</div>'));
   }
   const body = document.getElementById("world-body");
   body.innerHTML = out.join("") || '<div class="mat-empty">No editable lights, fog, grade, or components in this sublevel.</div>';
@@ -6080,6 +6080,7 @@ document.getElementById("world-reset").addEventListener("click", async () => {
 // ── Text / StringTable editor ─────────────────────────────────────────────────
 let textEditor = null;
 let _textOpenRevision = 0;
+let _textChangedOnly = false;
 
 function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
@@ -6087,12 +6088,14 @@ async function openTextEditor(item) {
   const revision = ++_textOpenRevision, project = _activeProjectName;
   const current = () => revision === _textOpenRevision && project === _activeProjectName;
   textEditor = null;
+  _textChangedOnly = false;
   window.AtelierRoster?.rememberEditor(item.game_rel,'text',_activeProjectName);
   const ov = document.getElementById("text-overlay");
   document.getElementById("text-title").textContent = item.name;
   document.getElementById("text-sub").textContent = item.game_rel || "";
   document.getElementById("text-status").textContent = "";
   document.getElementById("text-search").value = "";
+  document.getElementById("text-changed-only")?.setAttribute("aria-pressed", "false");
   document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
@@ -6111,18 +6114,21 @@ async function openTextEditor(item) {
 function renderTextEditor(filter) {
   const ed = textEditor.edits, f = (filter || "").toLowerCase();
   const rows = [];
+  let changedTotal = 0;
   for (const e of textEditor.entries) {
     const cur = (e.key in ed) ? ed[e.key] : e.value;
-    if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
     const changed = (e.key in ed) && ed[e.key] !== e.value;
+    if (changed) changedTotal++;
+    if (_textChangedOnly && !changed) continue;
+    if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
     rows.push('<div class="text-row' + (changed ? ' is-changed' : '') + '">' +
       '<div class="text-key" title="' + _esc(e.key) + '">' + (changed ? '<span class="text-changed">●</span> ' : '') + _esc(e.key) + '</div>' +
       '<input class="editor-field" data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"></div>');
   }
   const body = document.getElementById("text-body");
   body.innerHTML = '<div class="text-count">' + textEditor.entries.length +
-    ' strings' + (f ? ' (' + rows.length + ' shown)' : '') + '</div>' +
-    (rows.join("") || '<div class="mat-empty">No matching strings.</div>');
+    ' strings' + (changedTotal ? ' · ' + changedTotal + ' edited' : '') + ((f || _textChangedOnly) ? ' (' + rows.length + ' shown)' : '') + '</div>' +
+    (rows.join("") || '<div class="mat-empty">' + (_textChangedOnly ? 'No edited strings yet.' : 'No matching strings.') + '</div>');
   body.querySelectorAll("[data-tkey]").forEach(el => el.addEventListener("input", () => {
     const k = el.dataset.tkey, orig = (textEditor.entries.find(x => String(x.key) === k) || {}).value;
     const isChanged = el.value !== (orig == null ? "" : String(orig));
@@ -6133,6 +6139,11 @@ function renderTextEditor(filter) {
 }
 
 document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
+document.getElementById("text-changed-only")?.addEventListener("click", (e) => {
+  _textChangedOnly = !_textChangedOnly;
+  e.currentTarget.setAttribute("aria-pressed", String(_textChangedOnly));
+  if (textEditor) renderTextEditor(document.getElementById("text-search").value);
+});
 
 async function closeTextEditor(force = false) {
   if (force !== true && _textDirty() && !(await _discardUnsaved(true, "text edits"))) return false;
