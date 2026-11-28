@@ -1,4 +1,5 @@
 import os, json, shutil, tempfile, threading, hashlib, copy
+from atelier.added_assets import recorded_file_type
 from atelier.storage import atomic_json, publish_files, publish_project_json
 from atelier.config import (WORK_IMPORT_ROOT, PAKS, USMAP, _CACHE, CACHE_3DVIEW, get_import_root, validate_game_rel,
                             project_base, project_base_legacy)
@@ -11,7 +12,10 @@ _SOURCE_KEY = "_atelier_material_source"
 _PARENT_KEY = "_atelier_material_parent"
 
 def is_material(path_or_name):
-    return os.path.basename(path_or_name).upper().startswith("MI_")
+    name = os.path.basename(path_or_name)
+    # The indexed game paths include .uasset. Added asset records use extensionless paths.
+    kind = recorded_file_type(os.fspath(path_or_name)) if not name.lower().endswith('.uasset') else None
+    return kind == 'material' if kind else name.upper().startswith("MI_")
 
 def _f(x):
     try: return float(x)
@@ -332,7 +336,7 @@ def _material_path(game_rel, *, allow_base=False):
     validate_game_rel(gr)
     name = os.path.basename(gr).upper()
     if not (is_material(gr) or allow_base and name.startswith("M_")) or "." in name:
-        raise ValueError("Choose a material (M_… or MI_…)" if allow_base else "Choose a material instance (MI_…)")
+        raise ValueError("Choose a material" if allow_base else "Choose a material instance")
     # These are the package paths understood by the material/texture readers.
     if gr.casefold().startswith(("plugins/", "marvel_lq/")) or \
             get_content_prefix(gr).rstrip("/").casefold() != "marvel/content/marvel":

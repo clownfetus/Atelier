@@ -1,4 +1,5 @@
 import os, re, json, hashlib, threading
+from atelier.added_assets import recorded_file_type
 from atelier.catalogue import catalogue
 from atelier.config import ROOT, get_import_root, project_base, project_base_legacy, project_game_rel, validate_game_rel
 from atelier.handlers import skinnames
@@ -185,6 +186,10 @@ def _classify_file(name, rel_path=""):
     if "/textures/" in ("/" + rel_path.lower() + "/"):
         return "texture"
     return "other"
+
+def project_file_type(game_rel):
+    """Use the saved type for additions and game naming conventions for older edits."""
+    return recorded_file_type(game_rel) or _classify_file(os.path.basename(game_rel))
 
 def _label_folder(rel_path, folder_name):
     """Return display label for folder_name found at rel_path under Marvel/Content/Marvel/."""
@@ -456,6 +461,7 @@ def all_imported(game_rel=None):
         # Atelier's own per-project bookkeeping, not user edits. Pruned by name rather than left
         # to _classify_file, which rejects "manifest"/"project" only by accident of prefix.
         _dirs[:] = [d for d in _dirs if d not in ('.atelier', '.atelier-trash')]
+        filenames = set(files)
         for fname in sorted(files):
             fpath = os.path.join(dirpath, fname)
             if fname.endswith('.asset.json'):
@@ -463,7 +469,7 @@ def all_imported(game_rel=None):
             if fname.endswith('.mesh.json'):
                 gr=project_game_rel(fpath[:-len('.mesh.json')]+'.blend',import_root)
                 ext='.blend'
-            elif fname.endswith('.blend') and fname[:-len('.blend')]+'.mesh.json' in files:
+            elif fname.endswith('.blend') and fname[:-len('.blend')]+'.mesh.json' in filenames:
                 continue
             elif fname.endswith(".png"):
                 ext = ".png"
@@ -476,12 +482,18 @@ def all_imported(game_rel=None):
             else:
                 continue
             if not fname.endswith('.mesh.json'):gr = project_game_rel(fpath, import_root)
-            if "/" not in gr and not os.path.isfile(project_base(gr, import_root) + '.asset.json'):
+            added = os.path.basename(gr) + '.asset.json' in filenames
+            if "/" not in gr and not added:
                 gr = _ac.by_name(gr) or gr
             if game_rel is not None and gr != game_rel:
                 continue
             name = os.path.basename(gr)
-            if ext == ".png":
+            added_type = recorded_file_type(gr, import_root) if added else None
+            if added_type:
+                if ext != {'texture': '.png', 'material': '.json', 'mesh': '.blend'}[added_type]:
+                    continue
+                ft = added_type
+            elif ext == ".png":
                 ft = "texture"
             elif ext == ".blend":
                 ft = "mesh"                             # a Blender mesh edit awaiting build

@@ -120,6 +120,7 @@ def main():
                 custom_texture.assign(args.material, slot, slot+'-source.png', content.getvalue(), template)
                 name = args.name if index == 0 else args.name+'_'+re.sub(r'[^A-Za-z0-9_]', '_', slot)
                 record = custom_texture.set_location(args.material, slot, name, args.folder)[slot]
+                assert record['name'] == name, record
                 # Change the image after choosing the destination, as the editor permits.
                 image.putpixel((48,16), (80,120,220,255))
                 replacement = io.BytesIO(); image.save(replacement, 'PNG')

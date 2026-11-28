@@ -231,14 +231,14 @@ class CustomTextureTests(unittest.TestCase):
         self.assign()
         with patch('atelier.index.ensure_index', return_value=[]):
             custom = CT.set_location(MI, 'BaseColor', 'Hood_Paint', '/Game/Marvel/MyMod/Textures', str(self.project))
-            self.assertEqual(custom['BaseColor']['game_rel'], 'MyMod/Textures/T_Hood_Paint')
+            self.assertEqual(custom['BaseColor']['game_rel'], 'MyMod/Textures/Hood_Paint')
             self.assign(filename='different.png', data=png(color=(30,40,50,255)))
-            self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['game_rel'], 'MyMod/Textures/T_Hood_Paint')
+            self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['game_rel'], 'MyMod/Textures/Hood_Paint')
             with patch.object(CT, 'get_import_root', return_value=str(self.project)):
                 M.stage_material(str(self.stage), MI, {}, {})
-        self.assertTrue((self.stage/'Marvel/Content/Marvel/MyMod/Textures/T_Hood_Paint.uasset').is_file())
-        self.assertEqual(self.uat.compiled['T_Hood_Paint']['FolderName'], '/Game/Marvel/MyMod/Textures/T_Hood_Paint')
-        self.assertIn('/Game/Marvel/MyMod/Textures/T_Hood_Paint', self.uat.compiled['MI_Body']['NameMap'])
+        self.assertTrue((self.stage/'Marvel/Content/Marvel/MyMod/Textures/Hood_Paint.uasset').is_file())
+        self.assertEqual(self.uat.compiled['Hood_Paint']['FolderName'], '/Game/Marvel/MyMod/Textures/Hood_Paint')
+        self.assertIn('/Game/Marvel/MyMod/Textures/Hood_Paint', self.uat.compiled['MI_Body']['NameMap'])
 
     def test_location_validation_and_collisions_leave_assignment_unchanged(self):
         before = self.assign()
@@ -247,7 +247,7 @@ class CustomTextureTests(unittest.TestCase):
                        'X/CON', 'Plugins/Foo', 'Marvel_LQ/Foo', 'X/'+'a'*65):
             with self.subTest(folder=folder), self.assertRaises(ValueError):
                 CT.set_location(MI, 'BaseColor', 'T_Paint', folder, str(self.project))
-        for name in ('T_../Bad', 'T_bad.name', 'T_bad name', 'T_', 'T_'+'x'*61):
+        for name in ('T_../Bad', 'T_bad.name', 'T_bad name', '', 'NUL', 'T_'+'x'*61):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 CT.set_location(MI, 'BaseColor', name, 'MyMod/Textures', str(self.project))
         with patch('atelier.index.ensure_index', return_value=[('mymod/textures/t_paint.uasset', 'fixture.utoc', 'Marvel/Content/Marvel/')]):
@@ -282,11 +282,11 @@ class CustomTextureTests(unittest.TestCase):
         with patch('atelier.index.ensure_index', return_value=[]):
             result = json.loads(self.call('POST', '/api/material_custom_texture/location', body=body)[1])
             self.assertTrue(result['ok'], result)
-            self.assertEqual(result['custom_textures']['BaseColor']['game_rel'], 'MyMod/Textures/T_Chosen')
+            self.assertEqual(result['custom_textures']['BaseColor']['game_rel'], 'MyMod/Textures/Chosen')
             for changes in ({'folder': '../escape'}, {'slot': 'Nope'}, {'game_rel': '../MI_Body'}, {'name': None}):
                 result = json.loads(self.call('POST', '/api/material_custom_texture/location', body={**body, **changes})[1])
                 self.assertFalse(result['ok'], result)
-        self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['name'], 'T_Chosen')
+        self.assertEqual(CT.public(MI, str(self.project))['BaseColor']['name'], 'Chosen')
 
     # ── export ───────────────────────────────────────────────────────────────────
 

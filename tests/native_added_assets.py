@@ -19,6 +19,7 @@ def main():
     from atelier import config as C, added_assets as A, tools
     from atelier.handlers import texture as T, material as M, meshedit, mesh, meshreplace, custom_texture as CT
     from atelier.web import browse as B
+    from atelier.web.routes import _split_export_items
     report = args.report_dir.resolve()
     if report.exists() or report.is_relative_to(Path(C.PAKS).resolve()):
         parser.error('Use a new report directory outside the game Paks folder.')
@@ -26,18 +27,25 @@ def main():
     project = report / 'project'; project.mkdir()
     entries = [entry[0][:-7] for entry in A.ensure_index()
                if entry[0].startswith('Characters/1015/1015502/') and entry[0].endswith('.uasset')]
-    sources = {kind: next(gr for gr in entries if B._classify_file(Path(gr).name) == kind)
-               for kind in A.CLASSES}
-    sources['mesh'] = 'Characters/1015/1015502/Meshes/SK_1015_1015502'
+    sources = {
+        'texture': next(gr for gr in entries if B._classify_file(Path(gr).name) == 'texture'),
+        'material': 'Characters/1015/1015502/Materials/MI_1015502_Equip_01',
+        'mesh': 'Characters/1015/1015502/Meshes/SK_1015_1015502',
+    }
     result = {'sources': sources, 'checks': [], 'in_game_verified': False}
     try:
         with C.project_context(str(project)):
             image = report / 'MyTexture.png'; Image.new('RGBA', (16, 16), (200, 40, 90, 255)).save(image)
-            texture = A.add('texture', 'Atelier/AddedAssetCheck/Textures', 'MyTexture_7', sources['texture'], [image])
-            material = A.add('material', 'Atelier/AddedAssetCheck/Materials', 'MyMaterial_8', sources['material'])
-            model = A.add('mesh', 'Atelier/AddedAssetCheck/Meshes', 'MyMesh_9', sources['mesh'])
+            texture = A.add('texture', 'Atelier/AddedAssetCheck/Textures', 'MyTexture_7',
+                            sources['texture'], [image], exact_name=True)
+            material = A.add('material', 'Atelier/AddedAssetCheck/Materials', 'MyMaterial_8',
+                             sources['material'], exact_name=True)
+            model = A.add('mesh', 'Atelier/AddedAssetCheck/Meshes', 'MyMesh_9',
+                          sources['mesh'], exact_name=True)
             assets = [texture, material, model]
-            assert {row['game_rel'] for row in B.all_imported()} == {row['game_rel'] for row in assets}
+            paths = [asset['game_rel'] for asset in assets]
+            assert [asset['name'] for asset in assets] == ['MyTexture_7', 'MyMaterial_8', 'MyMesh_9']
+            assert {row['game_rel'] for row in B.all_imported()} == set(paths)
             assert len(B.browse_dispatch('Atelier/AddedAssetCheck')) == 3
             result['checks'].append('native add and library/Mod tray discovery for texture, material and mesh')
             original_mesh = mesh.Mesh(meshedit._resolve_base(sources['mesh']))
@@ -52,8 +60,10 @@ def main():
             assert M.read_material(material['game_rel'])['colors'] == M.read_material_original(material['game_rel'])['colors']
             M.save_material(material['game_rel'], {}, {})
             Image.new('RGBA', (16, 16), (30, 180, 90, 255)).save(C.project_base(texture['game_rel']) + '.png')
-            built = T.build_mod('AtelierAddedAssetsCheck', [texture['game_rel']], [{'game_rel': material['game_rel']}],
-                                str(report / 'exported'), mesh_items=[model['game_rel']])
+            textures, materials, curves, vfx, worlds, texts, meshes = _split_export_items(paths)
+            built = T.build_mod('AtelierAddedAssetsCheck', textures, materials, str(report / 'exported'),
+                                curve_items=curves, vfx_items=vfx, world_items=worlds, text_items=texts,
+                                mesh_items=meshes)
             assert built['ok'] and not built['skipped'], built
             result['checks'].append('added texture edits, material edits and unchanged mesh build together')
             result['build'] = built

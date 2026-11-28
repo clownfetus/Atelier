@@ -1,4 +1,10 @@
-"""Keep new JSON FNames serializable without moving existing name-map indices."""
+"""Unreal package names and JSON name maps."""
+import re
+
+
+def is_windows_device_name(name):
+    """An asset or folder with this stem cannot be written on Windows."""
+    return re.fullmatch(r'CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]', name, re.IGNORECASE) is not None
 
 
 def add_names(document, *values):

@@ -48,6 +48,7 @@ from pathlib import Path
 from atelier import project_meta
 from atelier.config import USMAP, get_import_root
 from atelier.tools import uat
+from atelier.unreal_names import is_windows_device_name
 
 GAME_PREFIX = "/Game/Marvel/"
 CUSTOM_ROOT = "Atelier/Custom"
@@ -55,7 +56,7 @@ _OPT = "custom_textures"
 _STORE = os.path.join(".atelier", "custom_textures")
 _FILE_RE = re.compile(r"^[0-9a-f]{20}\.png$")
 _HDR_FILE_RE = re.compile(r"^[0-9a-f]{20}\.dds$")
-_NAME_RE = re.compile(r"^T_[A-Za-z0-9_]{1,60}$")
+_NAME_RE = re.compile(r"[A-Za-z0-9_]{1,62}")
 MIN_SIDE, MAX_SIDE = 4, 8192
 _lock = threading.Lock()
 
@@ -77,7 +78,9 @@ def texture_name(filename):
 def package_game_rel(material_game_rel, slot, name, folder=None):
     """Storage-relative path of the new texture package (see the module docstring)."""
     if not isinstance(name, str) or not _NAME_RE.fullmatch(name):
-        raise ValueError('Use a texture name beginning T_, followed by up to 60 letters, numbers or underscores.')
+        raise ValueError('Enter a texture name using letters, numbers and underscores (up to 62 characters).')
+    if is_windows_device_name(name):
+        raise ValueError('Choose a texture name that can be saved on Windows.')
     key = hashlib.sha1(f"{material_game_rel}|{slot}".encode("utf-8")).hexdigest()[:10]
     if folder is None:
         folder = f"{CUSTOM_ROOT}/{key}"
@@ -92,13 +95,7 @@ def package_game_rel(material_game_rel, slot, name, folder=None):
 def _name(value):
     if not isinstance(value, str):
         raise ValueError('Enter a texture name.')
-    value = value.strip()
-    if value[:2].upper() == 'T_':
-        value = 'T_' + value[2:]
-    else:
-        value = 'T_' + value
-    package_game_rel('', '', value)
-    return value
+    return value.strip()
 
 
 def _available(material_game_rel, slot, name, folder, project_dir):
@@ -119,16 +116,21 @@ def _available(material_game_rel, slot, name, folder, project_dir):
             for extension in extensions:
                 if relative.lower().endswith(extension) and relative[:-len(extension)].casefold() == target.casefold():
                     raise ValueError('An asset already exists in this project at this location. Choose another name or folder.')
+    check_slot_collision(target, project_dir, excluding=(material_game_rel, slot))
+    return target
+
+
+def check_slot_collision(target, project_dir, *, excluding=None):
+    """Reject a package path already used by a custom material texture slot."""
     for material, opts in project_meta.get_asset_opts(project_dir).items():
-        if not isinstance(opts, dict):
+        if not isinstance(opts, dict) or not opts.get(_OPT):
             continue
-        for other_slot, rec in assignments(material, project_dir).items():
-            if material == material_game_rel and other_slot == slot:
+        for slot, rec in assignments(material, project_dir).items():
+            if (material, slot) == excluding:
                 continue
-            other = package_game_rel(material, other_slot, rec['name'], rec.get('folder'))
+            other = package_game_rel(material, slot, rec['name'], rec.get('folder'))
             if target.casefold() == other.casefold():
                 raise ValueError('Another material texture slot already uses this name and folder. Choose another location.')
-    return target
 
 
 def store_dir(project_dir=None):
@@ -146,11 +148,11 @@ def assignments(material_game_rel, project_dir=None):
     out = {}
     for slot, rec in (raw or {}).items() if isinstance(raw, dict) else ():
         if (isinstance(slot, str) and slot and isinstance(rec, dict)
-                and _FILE_RE.fullmatch(str(rec.get("file", ""))) and _NAME_RE.fullmatch(str(rec.get("name", "")))):
+                and _FILE_RE.fullmatch(str(rec.get("file", "")))):
             if rec.get('hdr_file') and (not _HDR_FILE_RE.fullmatch(str(rec['hdr_file'])) or rec.get('texture_class') != 'TextureCube'):
                 continue
             try:
-                package_game_rel(material_game_rel, slot, rec['name'], rec.get('folder'))
+                package_game_rel(material_game_rel, slot, rec.get('name'), rec.get('folder'))
             except ValueError:
                 continue
             out[slot] = dict(rec)

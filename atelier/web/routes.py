@@ -69,10 +69,8 @@ if CONFIG_HAS_PAKS and _io_lib_mod.AES_KEY:
 from atelier.handlers.material import mat_json, is_material, read_material, read_material_original, save_material, reset_material
 import atelier.handlers.material as _material_mod
 import atelier.handlers.custom_texture as _custom_tex
-from atelier.handlers.vfx import read_vfx, is_vfx, save_vfx, reset_vfx, stage_vfx
-from atelier.handlers.curve import read_curve, save_curve, reset_curve, is_curve, stage_curve
-from atelier.handlers.world import is_world
-from atelier.handlers.text import is_text
+from atelier.handlers.vfx import read_vfx, save_vfx, reset_vfx, stage_vfx
+from atelier.handlers.curve import read_curve, save_curve, reset_curve, stage_curve
 from atelier.paths import game_rel_for_skin, pak_game_path
 from atelier.web.browse import (browse_dispatch, token, game_rel_from_token, all_imported)
 import atelier.project_meta as _project_meta
@@ -2021,7 +2019,7 @@ def api_assets_add():
             raise
     def work(job):
         return added_assets.add(body.get('file_type'), body.get('folder', ''), body.get('name', ''),
-                                body.get('source', ''), files)
+                                body.get('source', ''), files, exact_name=body.get('exact_name') in (True, 'true'))
     try:
         return _submit_job('asset-add', 'Add ' + str(body.get('name') or 'asset'), work,
                            upload.cleanup if upload else None)
@@ -2378,7 +2376,7 @@ def api_material_replace():
 def _custom_tex_slot(gr, slot, with_class=False):
     """The slot's current game texture, or ValueError naming why it cannot take a custom one."""
     if not is_material(gr):
-        raise ValueError("custom textures can only be assigned to a material (MI_…)")
+        raise ValueError("Custom textures can only be assigned to a material.")
     with open(mat_json(gr), encoding="utf-8-sig") as stream:
         slots = _material_mod.texture_slots(json.load(stream))
     if slot not in slots:
@@ -3245,22 +3243,16 @@ def api_open_blend():
 
 # ── export ────────────────────────────────────────────────────────────────────
 
-def _is_mesh_item(game_rel):
-    """A mesh edit: its edits live in a .blend, not a PNG, so it must not fall into tex_items."""
-    return _browse_mod._classify_file(os.path.basename(game_rel)) == "mesh"
-
 def _split_export_items(items):
     """Partition selected game_rels into build_mod's buckets (edits already live on disk / sidecar)."""
-    tex_items   = [gr for gr in items if not is_material(gr) and not is_curve(gr)
-                   and not is_vfx(gr) and not is_world(gr) and not is_text(gr)
-                   and not _is_mesh_item(gr)]
-    mat_items   = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in items if is_material(gr)]
-    curve_items = [{"game_rel": gr, "edits": {}} for gr in items if is_curve(gr)]   # edits already on disk
-    vfx_items   = [gr for gr in items if is_vfx(gr)]                                 # edits from sidecar
-    world_items = [gr for gr in items if is_world(gr)]                               # edits from sidecar
-    text_items  = [gr for gr in items if is_text(gr)]                                # edits from sidecar
-    mesh_items  = [gr for gr in items if _is_mesh_item(gr)]                          # edits from the .blend
-    return tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items
+    by_type = {kind: [] for kind in _browse_mod.LISTED_FILE_TYPES}
+    for game_rel in items:
+        kind = _browse_mod.project_file_type(game_rel)
+        by_type.get(kind, by_type["texture"]).append(game_rel)
+    mat_items = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in by_type["material"]]
+    curve_items = [{"game_rel": gr, "edits": {}} for gr in by_type["curve"]]
+    return (by_type["texture"], mat_items, curve_items, by_type["vfx"],
+            by_type["world"], by_type["text"], by_type["mesh"])
 
 def _install_to_mods(mod_name, export_dir, artifacts=None, *, destination=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,

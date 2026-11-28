@@ -40,8 +40,9 @@ def digest(path):
 
 def target_base(game_rel):
     config.validate_game_rel(game_rel)
-    from atelier.web.browse import _classify_file
-    if _classify_file(os.path.basename(game_rel))!='mesh':raise ValueError('Choose a mesh asset')
+    from atelier.web.browse import project_file_type
+    if project_file_type(game_rel) != 'mesh':
+        raise ValueError('Choose a mesh asset')
     return config.project_base(game_rel)
 
 

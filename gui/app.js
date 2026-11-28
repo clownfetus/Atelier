@@ -1606,7 +1606,7 @@ function _matTexturesHtml(m, expanded) {
 
 function matCustomTexturePath(i) {
   const folder=document.getElementById(`mattex-folder-${i}`).value.trim().replaceAll('\\','/').replace(/^\/Game\/Marvel(?:\/|$)/,'').replace(/\/+$/,'');
-  let name=document.getElementById(`mattex-name-${i}`).value.trim();name=/^T_/i.test(name)?'T_'+name.slice(2):'T_'+name;
+  const name=document.getElementById(`mattex-name-${i}`).value.trim();
   document.getElementById(`mattex-path-${i}`).textContent='/Game/Marvel/'+[folder,name].filter(Boolean).join('/');
 }
 
