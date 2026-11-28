@@ -132,6 +132,8 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
 .export-format-option span { display: grid; gap: 2px; font-size: var(--studio-text-label); color: var(--text); }
 .export-format-option small { color: var(--muted); font-size: var(--studio-text-detail); line-height: 1.5; }
 .export-format-option:has(input:disabled) { cursor: default; opacity: .72; }
+.export-kit-option { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); color: var(--text); font-size: var(--studio-text-detail); cursor: pointer; }
+.export-kit-option input { accent-color: var(--acc); }
 .skin-swapper-field { display: grid; gap: 8px; font-size: var(--studio-text-detail); color: var(--muted); }
 .skin-swapper-meshes { display: grid; gap: 8px; }
 .skin-swapper-mesh { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--studio-text-label); color: var(--text); overflow-wrap: anywhere; }

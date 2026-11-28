@@ -41,6 +41,7 @@ const ASSET_HANDLERS = {
   mesh:     { import_endpoint: null,                   preview: false, icon: "scan-box"     },
   curve:    { import_endpoint: "/api/curve_params",    preview: false, icon: "spline"       },
   text:     { import_endpoint: "/api/text_params",     preview: false, icon: "type-outline" },
+  audio:    { import_endpoint: null,                   preview: false, icon: "folder-audio" },
 };
 function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
@@ -51,6 +52,7 @@ const ASSET_ICON_CLS = {
   mesh:     "mesh-icon",
   curve:    "curve-icon",
   text:     "text-icon",
+  audio:    "audio-icon",
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
@@ -66,6 +68,7 @@ const ICON_CLS_TO_LUCIDE = {
   "mesh-icon":            "scan-box",
   "curve-icon":           "spline",
   "text-icon":            "type-outline",
+  "audio-icon":           "folder-audio",
   "unhandled-icon":       "file-question",
 };
 
@@ -833,6 +836,9 @@ function handleImportedFileAction(item) {
     case "mesh":
       window.AtelierMeshEdit?.open(item);
       return;
+    case "audio":
+      window.AtelierAudioStudio?.openClip(item.game_rel);
+      return;
   }
 }
 
@@ -1353,6 +1359,7 @@ async function openMaterialEditor(item) {
   const revision = ++_materialOpenRevision, project = _activeProjectName;
   const current = () => revision === _materialOpenRevision && project === _activeProjectName;
   matEditor = null;
+  window.AtelierAssetRefs?.clearMaterialBanner();
   clearTimeout(_dyeTimer); ++_dyePreviewRevision;
   const ov = document.getElementById("material-overlay");
   document.getElementById("mat-body").inert = false;
@@ -1378,6 +1385,7 @@ async function openMaterialEditor(item) {
   renderMatEditor();
   stopWorking('success');
   _syncBulkEditorAction('material');
+  window.AtelierAssetRefs?.checkMaterial(item.game_rel);
   loadSidebar();
   await loadMaterialDye(item, current, project);
 }
@@ -3260,9 +3268,14 @@ function connectSSE() {
 }
 window.addEventListener("pagehide", () => { _eventSource?.close(); _eventSource = null; _gridThumbs?.destroy(); });
 
-function refreshEditedTexture(gameRel, tok, animate = true) {
+function refreshEditedTexture(gameRel, tok, animate = true, ver = '', project = '') {
   if (!gameRel) return;
-  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {detail:{game_rel:gameRel,project:_activeProjectName}}));
+  const targetProject = project || _activeProjectName;
+  const stamp = ver || String(Date.now());
+  window.dispatchEvent(new CustomEvent('atelier:asset-updated', {
+    detail: { game_rel: gameRel, project: targetProject, ver: stamp, token: tok || '' },
+  }));
+  if (project && project !== _activeProjectName) return;
   const images = new Set(document.querySelectorAll(
     `#grid-area img[data-game-rel="${CSS.escape(gameRel)}"]`));
   if (tok) {
@@ -3270,8 +3283,7 @@ function refreshEditedTexture(gameRel, tok, animate = true) {
       #sidebar-list .sb-item[data-token="${CSS.escape(tok)}"] .sb-thumb img`)
       .forEach(img => images.add(img));
   }
-  const project = _activeProjectName;
-  const query = new URLSearchParams({game_rel: gameRel, _project: project, _t: String(Date.now())});
+  const query = new URLSearchParams({game_rel: gameRel, _project: targetProject, _t: stamp});
   const src = `/api/preview?${query}`;
   for (const img of images) {
     if (animate && window.AtelierPolish) window.AtelierPolish.swapImage(img, src);
@@ -3310,7 +3322,7 @@ function handleSSE(d) {
   }
   if (d.file_changed) {
     const suppressed = suppressedImportGameRels.has(_assetOperationKey(d.game_rel));
-    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressed);
+    refreshEditedTexture(d.game_rel, d.token, !importing && !suppressed, d.ver, d.project);
     if (!importing && !suppressed) window.AtelierPolish?.fly(d.game_rel);
     if (!importing && !suppressed && Date.now() >= suppressChangeToastUntil) {
       toast("Edit saved", "success", 4000);
@@ -3400,6 +3412,14 @@ function refreshSidebarEntry(game_rel, name, skin_id, imported) {
 }
 
 function sbSubLabel(item) {
+  if (item.file_type === "audio") {
+    const bits = [];
+    if (item.char_name) bits.push(item.char_name);
+    else if (item.audio_bank) bits.push(item.audio_bank);
+    if (item.audio_subtitle) bits.push(`“${item.audio_subtitle}”`);
+    else if (item.audio_label) bits.push(item.audio_label);
+    if (bits.length) return bits.join(" · ");
+  }
   if (item.char_name || item.skin_id) {
     return `${item.char_name || item.skin_id} / ${item.skin_name || ""}`;
   }
@@ -3837,7 +3857,7 @@ function _flushSelection(project) {
 
 let _exportRunningCount = 0;
 let _exportReviewChecking = false;
-const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
+const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh", "audio"]);
 
 function updateInstallBtn() {
   const items = Object.values(sidebarData);
@@ -4012,8 +4032,11 @@ async function _confirmExportReview(snapshot, extra = null) {
       return;
     }
     _exportReviewChecking = false;
+    const mergedExtra = snapshot.releaseKit
+      ? { ...(extra || {}), body: { ...(extra?.body || {}), release_kit: true } }
+      : extra;
     await _runInstall(snapshot.modName, snapshot.included, snapshot.skipped,
-      snapshot.copyToMods, snapshot.project, snapshot, extra, replacementCheck);
+      snapshot.copyToMods, snapshot.project, snapshot, mergedExtra, replacementCheck);
   };
   const destinationCheck = new AbortController();
   const checkTimeout = setTimeout(() => destinationCheck.abort(), 15000);
@@ -4066,6 +4089,27 @@ async function _skinSwapperOffer(snapshot) {
            defaults: { skinName: skinLabel || snapshot.modName, author } };
 }
 
+async function _runBatchProfileExport(snapshot) {
+  if (_blockExportForDrafts(snapshot)) return;
+  const allExportable = Object.values(sidebarData).filter(i => i && i.game_rel && _exportBlockReason(i) === "");
+  if (!allExportable.length) {
+    window.AtelierExportReview?.notice("No exportable project edits are available.");
+    return;
+  }
+  await _runInstall(
+    snapshot.modName,
+    allExportable,
+    0,
+    false,
+    snapshot.project,
+    snapshot,
+    {
+      endpoint: "/api/project/export_batch",
+      body: { release_kit: !!snapshot.releaseKit },
+    },
+  );
+}
+
 async function doInstallMod() {
   if (_exportRunningCount || _exportReviewChecking) return;
   if (_blockExportForDrafts()) return;
@@ -4076,9 +4120,15 @@ async function doInstallMod() {
   const snapshot = _captureExportReview();
   if (!snapshot.included.length) { toast("Nothing exportable selected", "info"); return; }
   if (!window.AtelierExportReview) { await _confirmExportReview(snapshot); return; }
+  try {
+    const profRes = await api("/api/project/profiles", { project: snapshot.project });
+    snapshot.profiles = Object.keys(profRes?.profiles || {});
+  } catch (_) { snapshot.profiles = []; }
   const swapper = await _skinSwapperOffer(snapshot);
   window.AtelierExportReview.open(snapshot, {
-    confirm: reviewed => _confirmExportReview(reviewed), refresh: doInstallMod, settings: openPaths,
+    confirm: reviewed => _confirmExportReview(reviewed),
+    batchExport: reviewed => _runBatchProfileExport(reviewed),
+    refresh: doInstallMod, settings: openPaths,
     rememberDestination: copyToMods => { _copyToMods = copyToMods; },
     decideInstall: async (token, install) => {
       const result = await api('/api/install_mod/confirm', {
@@ -4239,6 +4289,7 @@ window.applySelectionProfile = function applySelectionProfile(name, entry) {
 
 document.getElementById("tray-menu-btn").addEventListener("click", e => {
   const items = [
+    { icon: "palette", label: "Look presets & Hero theme…", action: () => window.AtelierHeroThemes?.open() },
     { icon: "layers", label: "Selection profiles…", action: () => window.AtelierTrayFilters?.openProfiles() },
     { icon: "rotate-ccw", label: "Recently deleted…", action: () => window.AtelierTrash?.open() },
   ];
@@ -5154,6 +5205,9 @@ function _ctxItemsCard(card) {
     items.push(explorerMenuItem(card));
     items.push({icon:'refresh-cw', label:'Retry preview', action:() => buildGrid(allItems.map(_makeCard), true)});
   }
+  if (card.game_rel && ['texture', 'material', 'mesh', 'vfx'].includes(card.file_type)) {
+    items.push({icon: 'compass', label: 'Where is this used…', action: () => window.AtelierAssetRefs?.openUsage(card.game_rel, document.activeElement)});
+  }
   if (!card.imported) {
     if (card.file_type !== 'mesh') items.push({ icon: "download", label: "Edit this asset", action: () => handleAssetClick({ imported: card.imported, token: card.token, file_type: card.file_type, name: card.label, rel_path: card.rel_path, game_rel: card.game_rel }) });
     if (card.file_type === "mesh" && card.game_rel)
@@ -5994,6 +6048,7 @@ async function _selectProject(name, workspace=null) {
     renderBreadcrumbs();
     await renderGrid();
     await loadSidebar();
+    window.AtelierPatchRadar?.checkQuiet();
   }
   if(workspace) {
     window.AtelierWorkspace.present();
@@ -6157,6 +6212,8 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       "sep",
       { icon: "scan-box", label: "Open a mod…", action: () => window.AtelierModOpen?.open() },
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
+      { icon: "shield-alert", label: "Game patch radar…", action: () => window.AtelierPatchRadar?.open() },
+      { icon: "folder-audio", label: "Audio & Voice Studio…", action: () => window.AtelierAudioStudio?.open() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
       { icon: "search", label: "Command palette…", action: () => window.AtelierCommands?.openPalette() },
@@ -6215,6 +6272,7 @@ async function init() {
   await renderGrid();
   await loadSidebar();
   checkUsmapUpdate();
+  window.AtelierPatchRadar?.checkQuiet();
   window.AtelierChangelog?.ready();
   acknowledgeUpdateStartup();
 }

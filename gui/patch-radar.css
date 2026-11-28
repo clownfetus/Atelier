@@ -1,0 +1,156 @@
+/* Game Patch Radar — non-blocking banner & post-update review dialog */
+#patch-radar-banner {
+  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border));
+}
+#patch-radar-banner svg {
+  color: var(--status-warning);
+}
+
+#patch-radar-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(84vh, 680px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--studio-shape-dialog);
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: var(--studio-elevation-dialog);
+  overflow: hidden;
+}
+#patch-radar-dialog::backdrop { background: var(--studio-scrim); }
+#patch-radar-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: dialog-unfold var(--studio-motion-unfold) var(--studio-easing-unfold);
+}
+.pr-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--md-sys-color-surface-container, var(--bg2));
+}
+.pr-head h2 {
+  margin: 0 0 3px;
+  font: var(--studio-type-title);
+  font-size: 16px;
+}
+.pr-sub {
+  margin: 0;
+  font-size: var(--studio-text-detail);
+  color: var(--muted);
+}
+.pr-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+}
+.pr-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pr-stat {
+  padding: 5px 10px;
+  border-radius: var(--studio-shape-small);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--studio-text-detail);
+  color: var(--text);
+}
+.pr-stat.is-warn {
+  border-color: color-mix(in srgb, var(--status-warning) 55%, var(--border));
+  color: var(--status-warning-text, var(--text));
+}
+.pr-stat.is-ok {
+  border-color: color-mix(in srgb, var(--status-complete) 45%, var(--border));
+}
+.pr-list {
+  display: grid;
+  gap: 8px;
+}
+.pr-card {
+  padding: 11px 12px;
+  border-radius: var(--studio-shape-small);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: grid;
+  gap: 6px;
+}
+.pr-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pr-card-title {
+  font-size: var(--studio-text-label);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.pr-risk {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--studio-shape-xs);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+}
+.pr-risk[data-risk="high"] {
+  border-color: color-mix(in srgb, var(--status-error) 55%, var(--border));
+  color: var(--status-error-text, var(--text));
+}
+.pr-risk[data-risk="medium"] {
+  border-color: color-mix(in srgb, var(--status-warning) 55%, var(--border));
+  color: var(--status-warning-text, var(--text));
+}
+.pr-card-reason {
+  font-size: var(--studio-text-detail);
+  color: var(--text);
+  line-height: 1.4;
+}
+.pr-card-advice {
+  font-size: var(--studio-text-micro);
+  color: var(--muted);
+  line-height: 1.4;
+}
+.pr-card-path {
+  font-family: var(--studio-mono);
+  font-size: var(--studio-text-micro);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.pr-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.pr-card-actions .btn {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: var(--studio-text-micro);
+}
+.pr-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.pr-foot-right {
+  display: flex;
+  gap: 8px;
+}

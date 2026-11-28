@@ -1151,7 +1151,7 @@ _build_lock = threading.Lock()  # legacy staging helpers still share scratch fil
 
 
 def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
-              world_items=None, text_items=None, mesh_items=None, asset_opts=None,
+              world_items=None, text_items=None, mesh_items=None, audio_items=None, asset_opts=None,
               allow_unsafe_world=False):
     """Build privately, validate every container, then publish with rollback.
 
@@ -1178,16 +1178,24 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
         result = _build_mod_staged(mod_name, tex_items, mat_items, staged_out, force,
                                    curve_items, vfx_items, world_items, text_items,
                                    mesh_items, asset_opts, stage_dir=os.path.join(work, "assets"),
-                                   allow_unsafe_world=allow_unsafe_world)
+                                   allow_unsafe_world=allow_unsafe_world, audio_items=audio_items)
         if not result.get("ok"):
             return result
-        paks = list(dict.fromkeys([result["pak"]] + result.get("world_mods", [])))
-        sources = [p for pak in paks for p in container_files(pak[:-4])]
+        paks = list(dict.fromkeys([result["pak"]] + result.get("world_mods", []) + result.get("audio_mods", [])))
+        sources = []
+        for pak in paks:
+            cfiles = container_files(pak[:-4])
+            if cfiles:
+                sources.extend(cfiles)
+            elif os.path.isfile(pak):
+                sources.append(pak)
         jobs.begin_publication()
         result["artifacts"] = publish_files(sources, out_dir)
         result["pak"] = os.path.join(os.path.abspath(out_dir), os.path.basename(result["pak"]))
         result["world_mods"] = [os.path.join(os.path.abspath(out_dir), os.path.basename(p))
                                 for p in result.get("world_mods", [])]
+        result["audio_mods"] = [os.path.join(os.path.abspath(out_dir), os.path.basename(p))
+                                for p in result.get("audio_mods", [])]
         return result
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -1199,7 +1207,7 @@ def build_mod(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=N
 
 def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve_items=None, vfx_items=None,
                       world_items=None, text_items=None, mesh_items=None, asset_opts=None,
-                      stage_dir=None, allow_unsafe_world=False):
+                      stage_dir=None, allow_unsafe_world=False, audio_items=None):
     """Pack texture edits (inject) + material/curve param edits + Niagara curve edits + level (world)
     edits + StringTable (text) edits + Blender mesh edits into one mod. tex_items: [game_rel];
     mat_items: [{game_rel, colors, scalars}]; curve_items: [{game_rel, edits}];
@@ -1315,6 +1323,16 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
                                if not allow_unsafe_world else f"{sub}: {r.get('error')}")
         except Exception as e:
             skipped.append(f"{sub}: {e}")
+    audio_out = []
+    if audio_items:
+        jobs.progress("Packing Wwise audio mod…")
+        from atelier.handlers.audio import build_audio_pak
+        audio_pak_name = f"{mod_name}_Audio_9999999_P.pak" if (staged_any or world_out) else f"{mod_name}_9999999_P.pak"
+        ares = build_audio_pak(audio_items, os.path.join(out_dir, audio_pak_name))
+        applied.extend(ares.get("applied") or [])
+        skipped.extend(ares.get("skipped") or [])
+        if ares.get("ok") and ares.get("pak"):
+            audio_out.append(ares["pak"])
     if not applied:
         return {"ok": False, "error": "nothing staged: " + "; ".join(skipped)}
     os.makedirs(out_dir, exist_ok=True)
@@ -1323,7 +1341,7 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
         uat(["create_mod_iostore", os.path.abspath(base), os.path.abspath(stage), "--usmap", USMAP])
         if not os.path.exists(base + ".utoc"):
             return {"ok": False, "error": "create_mod_iostore failed"}
-    pak = (base + ".pak") if staged_any else (world_out[0] if world_out else base + ".pak")
+    pak = (base + ".pak") if staged_any else (world_out[0] if world_out else (audio_out[0] if audio_out else base + ".pak"))
     # COMBINE into one container. This runs AFTER both builders and only copies their finished chunks
     # (world edits stay exactly as build_world_mod produced them — no re-pack, byte-identical). If the
     # merge fails for any reason, we keep today's separate-paks behavior untouched.
@@ -1350,7 +1368,7 @@ def _build_mod_staged(mod_name, tex_items, mat_items, out_dir, force=True, curve
             raise
         except Exception as e:
             skipped.append(f"pak-combine skipped (kept separate paks): {e}")
-    return {"ok": True, "applied": applied, "skipped": skipped, "pak": pak, "world_mods": world_out}
+    return {"ok": True, "applied": applied, "skipped": skipped, "pak": pak, "world_mods": world_out, "audio_mods": audio_out}
 
 # ── CLI commands ───────────────────────────────────────────────────────────────
 

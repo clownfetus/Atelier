@@ -19,6 +19,7 @@ from atelier.storage import atomic_json
 
 DIRECTORY = '.atelier-trash'
 EDIT_EXTS = ('.png', '.json', '.blend', '.blend.mat.json', '.blend1', '.mesh.json', '.mesh.glb', '.asset.json')
+AUDIO_EXTS = ('.audio.json', '.wav')
 MAX_AGE = 7 * 24 * 3600
 MAX_ENTRIES = 20
 _ENTRY_ID = re.compile(r'[0-9a-f]{32}')
@@ -80,9 +81,16 @@ def _files(root, game_rel):
         originals = source_files(game_rel, root)
     except (ValueError, OSError):
         originals = []  # A damaged source record must still be removable/recoverable as an edit.
-    return sorted({Path(base + ext) for base in
-                   (config.project_base(game_rel, root), config.project_base_legacy(game_rel, root))
-                   for ext in EDIT_EXTS if Path(base + ext).is_file()} | set(originals))
+    exts = EDIT_EXTS + (AUDIO_EXTS if (game_rel or '').replace('\\', '/').lower().startswith('audio/') else ())
+    found = {Path(base + ext) for base in
+             (config.project_base(game_rel, root), config.project_base_legacy(game_rel, root))
+             for ext in exts if Path(base + ext).is_file()}
+    for base in (config.project_base(game_rel, root), config.project_base_legacy(game_rel, root)):
+        if Path(base + '.audio.json').is_file():
+            for ext in AUDIO_EXTS:
+                if Path(base + ext).is_file():
+                    found.add(Path(base + ext))
+    return sorted(found | set(originals))
 
 
 def remove(root, game_rels):

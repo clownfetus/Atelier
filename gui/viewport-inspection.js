@@ -45,7 +45,115 @@ export function createViewportInspection(api) {
   // Showcase keeps its own floor toggle so its default look stays floorless.
   let showcaseMode=false,showcaseBackdrop=null,showcaseGrid=false;
   // Inspection overlays would leak into Showcase captures, so Showcase disables them with a reason.
-  const editingControls=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe'].map(id=>[id,$(id).title]));
+  const editingControls=new Map(['viewport-wireframe','viewport-regions','viewport-edited','viewport-original','viewport-wipe','viewport-qa-ghost','viewport-qa-backfaces','viewport-qa-stress'].map(id=>[id,$(id)?.title || '']));
+  let meshQa = null, meshQaPromise = null;
+  async function ensureMeshQa() {
+    if (meshQa) return meshQa;
+    if (!meshQaPromise) {
+      meshQaPromise = import('./viewport-mesh-qa.js').then(async mod => {
+        const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+        meshQa = await mod.createMeshQa({
+          THREE,
+          GLTFLoader,
+          modelRoot,
+          objects: () => api.objects(),
+          primaryMeshRel: () => api.primaryMeshRel?.() || '',
+          notify: (msg, kind) => api.notify?.(msg, kind),
+          onChanged: syncMeshQaUI,
+        });
+        return meshQa;
+      });
+    }
+    return meshQaPromise;
+  }
+  function syncMeshQaUI() {
+    const summary = $('viewport-qa-summary');
+    const ghostBtn = $('viewport-qa-ghost');
+    const backBtn = $('viewport-qa-backfaces');
+    const stressBtn = $('viewport-qa-stress');
+    if (!summary || !ghostBtn || !backBtn || !stressBtn) return;
+    if (!meshQa) {
+      ghostBtn.setAttribute('aria-pressed', 'false');
+      backBtn.setAttribute('aria-pressed', 'false');
+      stressBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    const st = meshQa.state();
+    ghostBtn.setAttribute('aria-pressed', String(st.ghost));
+    ghostBtn.textContent = st.ghostLoading ? 'Loading silhouette…' : 'Original silhouette';
+    backBtn.setAttribute('aria-pressed', String(st.backfaces));
+    stressBtn.setAttribute('aria-pressed', String(st.stress));
+    stressBtn.textContent = st.stress ? 'Stop stress test' : 'Pose stress test';
+    const report = meshQa.analyse();
+    if (!report.sections) {
+      summary.dataset.state = '';
+      summary.textContent = 'No visible mesh geometry loaded.';
+    } else if (report.healthy) {
+      summary.dataset.state = 'ok';
+      summary.textContent = `Healthy · ${report.triangles.toLocaleString()} tris · ${report.sections} sections${report.bones ? ` · ${report.bones} bones` : ''}`;
+    } else {
+      summary.dataset.state = 'warn';
+      summary.textContent = `${report.warnings.join(' · ')} (${report.triangles.toLocaleString()} tris)`;
+    }
+  }
+  $('viewport-qa-section')?.addEventListener('toggle', async event => {
+    if (!event.target.open) return;
+    await ensureMeshQa();
+    syncMeshQaUI();
+  });
+  $('viewport-qa-ghost')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    await qa.setGhost(!qa.state().ghost);
+  });
+  $('viewport-qa-backfaces')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    qa.setBackfaces(!qa.state().backfaces);
+  });
+  $('viewport-qa-stress')?.addEventListener('click', async () => {
+    if (showcaseMode) return;
+    const qa = await ensureMeshQa();
+    qa.toggleStress($('viewport-animation'), $('viewport-scrub'));
+  });
+  let showcaseDuo = null, showcaseDuoPromise = null;
+  async function ensureShowcaseDuo() {
+    if (showcaseDuo) return showcaseDuo;
+    if (!showcaseDuoPromise) {
+      showcaseDuoPromise = import('./viewport-showcase-compare.js').then(async mod => {
+        const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+        showcaseDuo = mod.createShowcaseDuo({
+          THREE,
+          GLTFLoader,
+          modelRoot,
+          objects: () => api.objects(),
+          primaryMeshRel: () => api.primaryMeshRel?.() || '',
+          materials: () => api.materials(),
+          textureRoles: api.textureRoles,
+          applySurface: api.applySurface,
+          loadTexture: url => api.texture(url),
+          frame: (instant, preserve) => frame(instant, preserve),
+          notify: (msg, kind) => api.notify?.(msg, kind),
+          onChanged: syncShowcaseDuoUI,
+        });
+        return showcaseDuo;
+      });
+    }
+    return showcaseDuoPromise;
+  }
+  function syncShowcaseDuoUI() {
+    const btn = $('viewport-showcase-duo');
+    if (!btn) return;
+    btn.hidden = !showcaseMode;
+    const st = showcaseDuo?.state() || { active: false, loading: false };
+    btn.setAttribute('aria-pressed', String(st.active));
+    btn.textContent = st.loading ? 'Loading original…' : st.active ? 'Single model' : 'Compare side by side';
+  }
+  $('viewport-showcase-duo')?.addEventListener('click', async () => {
+    if (!showcaseMode) return;
+    const duo = await ensureShowcaseDuo();
+    await duo.toggle();
+  });
   const toonGradient=new THREE.DataTexture(new Uint8Array([0,90,180,255]),4,1,THREE.RedFormat);
   toonGradient.minFilter=toonGradient.magFilter=THREE.NearestFilter;toonGradient.needsUpdate=true;
   // The default backdrop is the mode's own; plain colour and transparent replace the art.
@@ -110,9 +218,13 @@ export function createViewportInspection(api) {
     $('viewport-uv-toggle').disabled = showcaseMode;
     $('viewport-uv-toggle').title = showcaseMode ? 'Turn off Showcase to use UV X-Ray' : 'Inspect a surface\'s texture and mesh UV layout';
     if(showcaseMode){
+      meshQa?.clearAll();
       ensureShowcaseAssets();
       clearHover();drawShowcase();
+    } else {
+      showcaseDuo?.clear();
     }
+    syncShowcaseDuoUI();
     updateRegions();refresh();
     $('viewport-comparison').hidden=comparison!=='wipe' || showcaseMode;
   }
@@ -211,14 +323,17 @@ export function createViewportInspection(api) {
     $('viewport-hidden').hidden = !objects.length || !!visible.length;
     const floor = showcaseMode ? showcaseGrid : showGrid;
     grid.visible = floor && !!visible.length; $('viewport-grid').setAttribute('aria-pressed', String(floor));
-    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled = !visible.length;
-    for (const id of ['viewport-poster','viewport-turnaround','viewport-turntable']) if ($(id)) $(id).disabled ||= !api.ready();
+    for (const id of ['viewport-fit','viewport-view','viewport-wireframe','viewport-poster','viewport-turnaround','viewport-turntable','viewport-turntable-webm','viewport-qa-ghost','viewport-qa-backfaces','viewport-qa-stress']) if ($(id)) $(id).disabled = !visible.length;
+    for (const id of ['viewport-poster','viewport-turnaround','viewport-turntable','viewport-turntable-webm']) if ($(id)) $(id).disabled ||= !api.ready();
     for (const id of ['viewport-edited','viewport-original','viewport-wipe']) $(id).disabled = !Object.keys(api.materials().data).length;
     $('viewport-regions').disabled = !Object.values(api.materials().data).some(d => d.dyeable);
     for (const [id,title] of editingControls) {
-      $(id).disabled ||= showcaseMode;
-      $(id).title = showcaseMode ? 'Turn off Showcase to use this control' : title;
+      const control = $(id);
+      if (!control) continue;
+      control.disabled ||= showcaseMode;
+      control.title = showcaseMode ? 'Turn off Showcase to use this control' : title;
     }
+    if (meshQa && $('viewport-qa-section')?.open) syncMeshQaUI();
     $('viewport-show-all').disabled = objects.every(o => o.root.visible);
   }
 
@@ -450,6 +565,10 @@ export function createViewportInspection(api) {
     studio: { hemi: [0xffffff, 0x404050, .45], key: [0xffffff, 1.4, 1, 2, 1.5], fill: [0xaaccff, .5, -1.5, .6, -1], env: .45 },
     dramatic: { hemi: [0xb8c8e8, 0x1a1d28, .24], key: [0xfff4e4, 1.75, 1.6, 2.2, 1.0], fill: [0x66aaff, 1.35, -1.8, 1.1, -1.6], env: .28 },
     warm: { hemi: [0xfff0dc, 0x3b2d26, .52], key: [0xffe0b5, 1.65, 1.3, 1.8, 1.6], fill: [0x9ec5ff, .62, -1.4, .7, -1.2], env: .50 },
+    tokyo2099: { hemi: [0x6c8cff, 0x1b0f30, .36], key: [0x82e8ff, 1.40, 1.4, 1.9, 1.3], fill: [0xff5ec4, 1.18, -1.7, .9, -1.3], env: .26 },
+    klyntar: { hemi: [0x7c528e, 0x120814, .24], key: [0xffd8be, 1.25, 1.5, 2.3, .9], fill: [0xb33872, .95, -1.6, .6, -1.4], env: .18 },
+    wakanda: { hemi: [0xfff6e5, 0x614934, .64], key: [0xfff1d2, 1.95, 1.1, 2.6, 1.4], fill: [0xffc98b, .68, -1.5, .8, -1.0], env: .62 },
+    yggsgard: { hemi: [0xe0eeff, 0x4f3d22, .54], key: [0xffe19c, 1.78, 1.4, 2.2, 1.5], fill: [0x8cc8ff, .85, -1.6, 1.0, -1.2], env: .54 },
   };
   function applyLighting(mode) {
     lighting = mode;
@@ -773,9 +892,78 @@ export function createViewportInspection(api) {
       else if (completed) api.notify(`${captureType} ready`, 'success');
     }
   }
+  async function captureTurntableWebm() {
+    if (capture || bounds().isEmpty() || !api.ready()) return;
+    finishCamera();
+    const controller = new AbortController(); capture = controller;
+    $('viewport-capture-menu').open = false; $('viewport-capture-cancel').hidden = false;
+    $('viewport-tools').inert = true; $('viewport-inspect-tools').inert = true;
+    $('viewport-materials').inert = true;
+    for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = true;
+    $('viewport-playback').inert = true; $('viewport-capture-menu').inert = true;
+    $('viewport-fit').disabled = true; api.refreshEdits?.();
+    const blenderDisabled = $('viewport-blender-btn').disabled;
+    const liveDisabled = $('viewport-blender-send')?.disabled;
+    $('viewport-blender-btn').disabled = true;
+    if ($('viewport-blender-send')) $('viewport-blender-send').disabled = true;
+    $('viewport-expand').disabled = true;
+    const size = renderer.getSize(new THREE.Vector2()), ratio = renderer.getPixelRatio();
+    const saved = {position:camera.position.clone(), up:camera.up.clone(), target:controls.target.clone(), aspect:camera.aspect,
+      near:camera.near, far:camera.far, fitOnResize, enabled:controls.enabled, min:controls.minDistance, max:controls.maxDistance};
+    const animationState = api.pauseAnimation?.();
+    controls.enabled = false; clearHover();
+    let completed = false;
+    api.notify('Recording WebM turntable…');
+    try {
+      const mod = await import('./viewport-showcase-compare.js');
+      const width = 720;
+      renderer.setPixelRatio(1); renderer.setSize(width, width, false); camera.aspect = 1; camera.updateProjectionMatrix(); frame(true);
+      const offset = camera.position.clone().sub(controls.target);
+      const radius = bounds().getBoundingSphere(new THREE.Sphere()).radius;
+      offset.setLength(Math.max(offset.length(), radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.12));
+      const blob = await mod.recordTurntableWebm({
+        width,
+        totalFrames: 60,
+        fps: 24,
+        signal: controller.signal,
+        drawFrame: (ctx, i, total) => {
+          camera.position.copy(controls.target).add(offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), i * Math.PI * 2 / total));
+          camera.lookAt(controls.target);
+          render(true);
+          const frameCanvas = posterCanvas(width, 80);
+          ctx.clearRect(0, 0, width, width);
+          ctx.drawImage(frameCanvas, 0, 0, width, width);
+          if (i % 6 === 0) api.notify(`Recording ${i + 1} of ${total} video frames…`);
+        },
+      });
+      if (!controller.signal.aborted) download(blob, '-turntable.webm');
+      completed = !controller.signal.aborted;
+    } catch (error) {
+      if (error.name !== 'AbortError') api.notify(`WebM turntable could not be created. ${error.message}`, 'error');
+    } finally {
+      const damping = controls.enableDamping; controls.enableDamping = false; controls.update();
+      camera.position.copy(saved.position); camera.up.copy(saved.up); controls.target.copy(saved.target);
+      camera.aspect = saved.aspect; camera.near = saved.near; camera.far = saved.far;
+      controls.minDistance = saved.min; controls.maxDistance = saved.max; controls.update(); controls.enableDamping = damping;
+      camera.updateProjectionMatrix(); controls.enabled = saved.enabled; fitOnResize = saved.fitOnResize;
+      renderer.setPixelRatio(ratio); renderer.setSize(size.x, size.y, false);
+      capture = null; api.resumeAnimation?.(animationState);
+      $('viewport-tools').inert = false; $('viewport-inspect-tools').inert = false;
+      $('viewport-materials').inert = false;
+      $('viewport-playback').inert = false; $('viewport-capture-menu').inert = false;
+      for (const id of ['assembly-geometry','assembly-geometry-reopen','assembly-textures','viewport-view-actions']) if ($(id)) $(id).inert = false;
+      $('viewport-blender-btn').disabled = blenderDisabled;
+      if ($('viewport-blender-send')) $('viewport-blender-send').disabled = liveDisabled;
+      $('viewport-expand').disabled = false;
+      $('viewport-capture-cancel').hidden = true; api.refreshEdits?.(); refresh(); api.resize();
+      if (controller.signal.aborted) api.notify('Capture cancelled');
+      else if (completed) api.notify('WebM turntable ready', 'success');
+    }
+  }
   $('viewport-poster').addEventListener('click', () => captureShowcase(false));
   $('viewport-turnaround')?.addEventListener('click', () => captureTurnaroundSheet());
   $('viewport-turntable').addEventListener('click', () => captureShowcase(true));
+  $('viewport-turntable-webm')?.addEventListener('click', () => captureTurntableWebm());
   $('viewport-capture-cancel').addEventListener('click', () => capture?.abort());
 
   function clearMaterials() {
@@ -790,6 +978,10 @@ export function createViewportInspection(api) {
   }
   function reset() {
     related = null;
+    meshQa?.clearAll();
+    showcaseDuo?.clear();
+    const qaSec = $('viewport-qa-section');
+    if (qaSec) qaSec.open = false;
     if ($('viewport-overlay').classList.contains('mounted')) {
       wireframe = false;
       $('viewport-wireframe').setAttribute('aria-pressed', 'false');
@@ -806,7 +998,7 @@ export function createViewportInspection(api) {
     $('viewport-overlay').classList.add('active');
     requestAnimationFrame(() => { if ($('viewport-overlay').classList.contains('active')) renderer.domElement.focus({preventScroll:true}); });
   }
-  function closed() { clearUV(); capture?.abort(); finishCamera(false); if (opener?.isConnected) opener.focus({preventScroll:true}); }
+  function closed() { clearUV(); meshQa?.clearAll(); showcaseDuo?.clear(); capture?.abort(); finishCamera(false); if (opener?.isConnected) opener.focus({preventScroll:true}); }
   function keydown(event) {
     if (event.defaultPrevented || document.querySelector('#material-overlay.active')) return;
     if (event.key === 'Tab') {

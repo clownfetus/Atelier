@@ -4,13 +4,28 @@ const aliases = {
   basecolor:['basecolor','base','diffuse','albedo','basecolormap','basecolortexture','diffusemap'],
   emissive:['emissive','emissivemap','emission','emissivetexture','emissivecolor'],
   opacity:['opacity','opacitymap','opacitymask','opacitytexture','alphamap','alphamask'],
+  normal:['normal','normalmap','normaltexture','normaltex','base_normal','basenormal','n'],
+  orm:['orm','ormmap','rma','rmamap','arm','mra','roughnessmetallic','metallicroughness','metallicmap','roughnessmap','maskmap','m','s'],
+};
+
+const pathSuffixRoles = {
+  normal: /(?:^|_)(?:n|normal)$/i,
+  orm: /(?:^|_)(?:m|orm|rma|arm|mra)$/i,
 };
 
 export function textureRoles(info) {
   const roles = {...info.texture_roles};
-  for (const [name,path] of Object.entries(info.textures || {})) {
+  const entries = Object.entries(info.textures || {});
+  for (const [name,path] of entries) {
     const canon = name.toLowerCase().replace(/[^a-z0-9]/g,'');
     for (const [role,names] of Object.entries(aliases)) if (!roles[role] && names.includes(canon)) roles[role]=path;
+  }
+  for (const [,path] of entries) {
+    if (!path) continue;
+    const base = String(path).replace(/\\/g, '/').split('/').pop() || '';
+    for (const [role, pattern] of Object.entries(pathSuffixRoles)) {
+      if (!roles[role] && pattern.test(base)) roles[role] = path;
+    }
   }
   return roles;
 }

@@ -71,6 +71,89 @@ window.addEventListener('atelier:catalogue-updated', () => { if (heroId) updateH
 let generation = 0;   // bumped on every clear/open; async texture loads bail if it changed under them
 let materialGeneration = 0, saving = false, viewportProject = '';
 const liveDyeTextures = new Map(), baselineMaps = new Map();
+let pbrDetailOn = false, pbrRevision = 0;
+const pbrOwnedTextures = new Set();
+const pbrMaterialDefaults = new WeakMap();
+
+function clearPbrDetail() {
+  pbrRevision++;
+  for (const mats of Object.values(matsByName)) {
+    for (const m of mats) {
+      if (m.normalMap && pbrOwnedTextures.has(m.normalMap)) m.normalMap = null;
+      if (m.roughnessMap && pbrOwnedTextures.has(m.roughnessMap)) m.roughnessMap = null;
+      if (m.metalnessMap && pbrOwnedTextures.has(m.metalnessMap)) m.metalnessMap = null;
+      const saved = pbrMaterialDefaults.get(m);
+      if (saved) {
+        m.roughness = saved.roughness;
+        m.metalness = saved.metalness;
+      }
+      m.needsUpdate = true;
+    }
+  }
+  for (const tex of pbrOwnedTextures) tex.dispose();
+  pbrOwnedTextures.clear();
+}
+
+async function applyPbrDetail(enabled) {
+  pbrDetailOn = !!enabled;
+  const btn = $('viewport-pbr');
+  if (btn) btn.setAttribute('aria-pressed', String(pbrDetailOn));
+  clearPbrDetail();
+  if (!pbrDetailOn || !inited) return;
+  const rev = ++pbrRevision;
+  const gen = generation, matGen = materialGeneration;
+  const jobs = [];
+  let count = 0;
+  for (const [name, info] of Object.entries(matData)) {
+    if (!info?.game_rel) continue;
+    const mats = matsByName[name] || [];
+    if (!mats.length) continue;
+    const roles = textureRoles(info);
+    const ver = info.tex_ver || {};
+    const loadMap = async (texRel, kind) => {
+      const url = `/api/texture_png?game_rel=${encodeURIComponent(texRel)}&v=${encodeURIComponent(ver[texRel] || '0')}&max_dim=1024`;
+      const tex = await materialTexture(url);
+      if (rev !== pbrRevision || gen !== generation || matGen !== materialGeneration || !pbrDetailOn) {
+        tex.dispose();
+        return;
+      }
+      tex.colorSpace = THREE.NoColorSpace;
+      tex.flipY = false;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      if (renderer) tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+      pbrOwnedTextures.add(tex);
+      for (const m of mats) {
+        if (!pbrMaterialDefaults.has(m)) pbrMaterialDefaults.set(m, { roughness: m.roughness, metalness: m.metalness });
+        if (kind === 'normal') {
+          m.normalMap = tex;
+          if (m.normalScale) m.normalScale.set(0.85, 0.85);
+        } else if (kind === 'orm') {
+          m.roughnessMap = tex;
+          m.metalnessMap = tex;
+          m.roughness = 1.0;
+          m.metalness = 1.0;
+        }
+        m.needsUpdate = true;
+      }
+      count++;
+    };
+    if (roles.normal) jobs.push(loadMap(roles.normal, 'normal').catch(() => {}));
+    if (roles.orm) jobs.push(loadMap(roles.orm, 'orm').catch(() => {}));
+  }
+  if (!jobs.length) {
+    note('No Normal or ORM maps were listed on this model.', 'info');
+    return;
+  }
+  const status = $('viewport-status');
+  if (status) status.textContent = `Loading surface detail (${jobs.length} maps)…`;
+  await Promise.allSettled(jobs);
+  if (rev === pbrRevision && gen === generation && matGen === materialGeneration && pbrDetailOn && status) {
+    status.textContent = count ? `Surface detail active (${count} maps)` : 'Surface detail unavailable';
+    status.dataset.kind = count ? 'success' : 'warning';
+  }
+}
+
+$('viewport-pbr')?.addEventListener('click', () => applyPbrDetail(!pbrDetailOn));
 const projectUrl = url => url + (url.includes('?') ? '&' : '?') + '_project=' + encodeURIComponent(viewportProject);
 const projectFetch = (url, opts = {}, project = viewportProject) =>
   window.atelierFetch ? window.atelierFetch(url, opts, project) : fetch(url, opts);
@@ -126,6 +209,7 @@ async function canLeave() {
 }
 
 function clearLiveDyes() {
+  clearPbrDetail();
   for (const [name, tex] of liveDyeTextures) {
     for (const mat of matsByName[name] || []) {
       if (mat.map === tex) { mat.map = baselineMaps.get(name) || null; mat.needsUpdate = true; }
@@ -243,6 +327,10 @@ function init() {
   animation = createViewportAnimation({objects:()=>objects.filter(object=>object.root.visible && object.kind !== 'weapon'), fetch:sceneFetch, frame:()=>{if(!preserveAnimationCamera)frameCamera();}, notify:note, changed:()=>inspection?.refresh()});
   inspection = createViewportInspection({renderer, scene, camera, controls, grid, modelRoot,
     lights:[hemisphere,key,fill], objects:() => objects,
+    primaryMeshRel:() => {
+      const idx = objects.findIndex(o => o.loaded && o.root.visible && o.kind !== 'weapon');
+      return meshMeta[idx >= 0 ? idx : 0]?.game_rel || '';
+    },
     materials:() => ({data:matData, byName:matsByName, edited}),
     context:()=>({project:viewportProject,skin:currentSkin||meshSkin}),
     fetch:(url, options) => materialFetch(url, options), texture:materialTexture, url:projectUrl, hex:linToHex,
@@ -1226,6 +1314,7 @@ async function loadMaterialSet(skinId, load, additions=null) {
     const failed=results.filter(result=>result.status==='rejected'||result.value===false).length;
     $('viewport-status').textContent = failed ? `${failed} texture${failed===1?'':'s'} could not load. Reopen the preview to retry.` : 'Materials ready';
     $('viewport-status').dataset.kind = failed ? 'warning' : 'success';
+    if (pbrDetailOn) applyPbrDetail(true);
     return !failed;
   }
 }
@@ -1952,4 +2041,66 @@ function reloadMaterials() {
   return true;
 }
 
-window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, label:materialLabel };
+const _normRel = path => String(path || '').replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+
+async function hotReloadTexture(gameRel, ver, project) {
+  if (!inited || modelLoading || !$('viewport-overlay')?.classList.contains('active')) return false;
+  if (project && viewportProject && project !== viewportProject) return false;
+  const target = _normRel(gameRel);
+  if (!target) return false;
+  const stamp = String(ver || Date.now());
+  const jobs = [];
+  for (const [name, info] of Object.entries(matData)) {
+    if (!info || !info.game_rel) continue;
+    const tex = info.textures || {};
+    const roles = textureRoles(info);
+    const urls = info.texture_urls || {};
+    const matches = candidate => Boolean(candidate) && _normRel(candidate) === target;
+    let updatedSlot = false;
+    if (info.eye_preview && Object.values(tex).some(matches)) {
+      info.eye_ver = stamp;
+      jobs.push(applyMatTexture(name, tex.ScleraBaseColor || gameRel, 'map', stamp,
+        `/api/eye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(stamp)}`));
+      updatedSlot = true;
+    } else if (info.dyeable && (matches(tex.BaseColor) || matches(tex.DyeingTexture) || matches(roles.basecolor))) {
+      info.dye_ver = stamp;
+      jobs.push(applyMatTexture(name, tex.BaseColor || info.game_rel, 'map', stamp,
+        `/api/dye_texture?game_rel=${encodeURIComponent(info.game_rel)}&v=${encodeURIComponent(stamp)}`));
+      updatedSlot = true;
+    } else if (matches(roles.basecolor)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.basecolor]: stamp};
+      jobs.push(applyMatTexture(name, roles.basecolor, 'map', stamp, urls.basecolor));
+      updatedSlot = true;
+    }
+    if (matches(roles.emissive)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.emissive]: stamp};
+      jobs.push(applyMatTexture(name, roles.emissive, 'emissiveMap', stamp, urls.emissive));
+      updatedSlot = true;
+    }
+    if (matches(roles.opacity)) {
+      info.tex_ver = {...(info.tex_ver || {}), [roles.opacity]: stamp};
+      jobs.push(applyMatTexture(name, roles.opacity, 'alphaMap', stamp, urls.opacity));
+      updatedSlot = true;
+    }
+    if (!updatedSlot && Object.values(tex).some(matches)) {
+      info.tex_ver = {...(info.tex_ver || {}), [gameRel]: stamp};
+    }
+  }
+  if (!jobs.length) return false;
+  await Promise.allSettled(jobs);
+  trimTextureCache();
+  const shortName = String(gameRel).replace(/\\/g, '/').split('/').pop() || 'texture';
+  const status = $('viewport-status');
+  if (status) {
+    status.textContent = `Updated ${shortName} live`;
+    status.dataset.kind = 'success';
+  }
+  return true;
+}
+
+window.addEventListener('atelier:asset-updated', event => {
+  const detail = event.detail || {};
+  if (detail.game_rel) hotReloadTexture(detail.game_rel, detail.ver, detail.project);
+});
+
+window.AtelierViewport = { open, openMesh, close, mount, hasPendingEdits, focusPendingEdits,captureModPoster, reloadMaterials, hotReloadTexture, label:materialLabel };

@@ -427,11 +427,11 @@ def _decoded_elsewhere(out_dir, name, since):
                 hits.append(p)
     return max(hits, key=os.path.getmtime) if hits else None
 
-def _model_glb(game_rel):
+def _model_glb(game_rel, *, original=False):
     """Decode (cached) a mesh game_rel to a .glb and return its path, or raise saying why there is
     no model. The decoder's failure used to be dropped and the route answered a bare 404, which
     the viewer could only show as 'fetch ... responded with 404: Not Found'."""
-    if os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json'):
+    if not original and (os.path.isfile(project_base(game_rel)+'.blend') or os.path.isfile(project_base(game_rel)+'.asset.json')):
         from atelier.handlers.meshreplace import preview as edited_mesh_preview
         return edited_mesh_preview(game_rel)
     if import_server.available():
@@ -472,8 +472,9 @@ def api_model_gltf():
     if not gr:
         response.status = 400
         return b""
+    original = str(request.query.get("original", "")).lower() in ("1", "true", "yes")
     try:
-        glb = _model_glb(gr)
+        glb = _model_glb(gr, original=original)
     except Exception as e:
         response.status = 404 if isinstance(e, LookupError) else 500
         response.content_type = "application/json"
@@ -646,19 +647,22 @@ def api_mesh_visibility():
 
 @app.get("/api/idle_animations")
 def api_idle_animations():
-    from atelier.handlers.animation import idle_candidates
+    from atelier.handlers.animation import animation_candidates, idle_candidates
     try:
-        return {"ok": True, "animations": idle_candidates(request.query.get('game_rel', ''))}
+        include_all = str(request.query.get('all', '')).lower() in ('1', 'true', 'yes')
+        fn = animation_candidates if include_all else idle_candidates
+        return {"ok": True, "animations": fn(request.query.get('game_rel', ''))}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
 
 @app.post("/api/idle_animation")
 def api_idle_animation():
-    from atelier.handlers.animation import decode_idle
+    from atelier.handlers.animation import decode_animation, decode_idle
     body = request.json or {}
     try:
-        return {"ok": True, **decode_idle(body.get('game_rel', ''), body.get('animation_rel', ''))}
+        fn = decode_animation if body.get('all') else decode_idle
+        return {"ok": True, **fn(body.get('game_rel', ''), body.get('animation_rel', ''))}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
@@ -746,6 +750,33 @@ def _texture_rgba(png):
     return pixels
 
 
+def _scaled_texture_png(png_path: str, max_dim: int) -> str:
+    """Return a cached downscaled copy of ``png_path`` capped at ``max_dim`` for lightweight PBR previews."""
+    max_dim = max(64, min(2048, int(max_dim)))
+    try:
+        st = os.stat(png_path)
+    except OSError:
+        return png_path
+    from PIL import Image
+    import hashlib
+    with Image.open(png_path) as im:
+        w, h = im.size
+        if max(w, h) <= max_dim:
+            return png_path
+        cache_dir = os.path.join(_CACHE, "pbr_preview")
+        os.makedirs(cache_dir, exist_ok=True)
+        digest = hashlib.sha1(f"{os.path.abspath(png_path)}|{st.st_mtime_ns}|{st.st_size}|{max_dim}".encode("utf-8")).hexdigest()[:20]
+        target = os.path.join(cache_dir, f"{digest}_{max_dim}.png")
+        if os.path.isfile(target):
+            return target
+        scale = max_dim / float(max(w, h))
+        resized = im.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.Resampling.LANCZOS)
+        tmp = target + ".tmp"
+        resized.save(tmp, format="PNG")
+        os.replace(tmp, target)
+        return target
+
+
 @app.get("/api/texture_png")
 def api_texture_png():
     """Decode a texture game_rel to PNG and serve it (for the viewport to apply as a mesh map)."""
@@ -762,6 +793,12 @@ def api_texture_png():
     if png and os.path.exists(png):
         if request.query.get('rgba') == '1':
             return _texture_rgba(png)
+        max_dim_raw = request.query.get("max_dim", "")
+        if max_dim_raw.isdigit():
+            try:
+                png = _scaled_texture_png(png, int(max_dim_raw))
+            except Exception:
+                pass
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""
@@ -2599,47 +2636,16 @@ def api_events():
 # ── file change watcher ───────────────────────────────────────────────────────
 
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from atelier.file_watcher import ProjectFileHandler
 
-class _PNGHandler(FileSystemEventHandler):
-    _last: dict = {}
-
-    def on_modified(self, event):
-        if not event.is_directory and event.src_path.endswith(".png"):
-            import_root = get_import_root().replace("\\", "/")
-            evt_path    = event.src_path.replace("\\", "/")
-            if not evt_path.startswith(import_root + "/"):
-                return
-            if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
-                return
-            now = time.monotonic()
-            if now - self._last.get(event.src_path, 0) < 0.5:
-                return
-            self._last[event.src_path] = now
-            # Derive game_rel from the subfolder-mirrored path; legacy flat files resolve via cache.
-            gr = project_game_rel(event.src_path, get_import_root())
-            if "/" not in gr:
-                gr = _asset_cache.by_name(gr) or gr
-            _push_sse({"file_changed": True, "token": token(gr), "game_rel": gr})
-
-    def on_created(self, event):
-        self.on_modified(event)
-
-    def on_deleted(self, event):
-        # Any edited-asset file (texture/material/curve/vfx json, mesh .blend) removed from the
-        # active project externally (e.g. deleted in Explorer) — tell the sidebar to reconcile.
-        if event.is_directory:
-            return
-        p = event.src_path
-        if p.endswith(".blend.mat.json") or not p.endswith((".png", ".json", ".blend")):
-            return
-        import_root = get_import_root().replace("\\", "/")
-        evt_path    = p.replace("\\", "/")
-        if not evt_path.startswith(import_root + "/"):
-            return
-        if evt_path[len(import_root) + 1:].split('/')[0] in ('.atelier', project_trash.DIRECTORY):
-            return
-        _push_sse({"asset_removed": True})
+_png_handler = ProjectFileHandler(
+    get_import_root=get_import_root,
+    project_game_rel=project_game_rel,
+    resolve_by_name=_asset_cache.by_name,
+    token_fn=token,
+    push_sse=_push_sse,
+    ignored_dirs=(".atelier", project_trash.DIRECTORY),
+)
 
 def _migrate_legacy_imports():
     """Move files from assets/imported/ to projects/Default/ on first use of projects."""
@@ -2665,7 +2671,7 @@ _migrate_legacy_imports()
 retired_cache.start(_CACHE)
 os.makedirs(PROJECTS_ROOT, exist_ok=True)
 _observer = Observer()
-_observer.schedule(_PNGHandler(), PROJECTS_ROOT, recursive=True)
+_observer.schedule(_png_handler, PROJECTS_ROOT, recursive=True)
 _observer.start()
 
 # ── projects ─────────────────────────────────────────────────────────────────
@@ -3246,13 +3252,17 @@ def api_open_blend():
 def _split_export_items(items):
     """Partition selected game_rels into build_mod's buckets (edits already live on disk / sidecar)."""
     by_type = {kind: [] for kind in _browse_mod.LISTED_FILE_TYPES}
+    by_type["audio"] = []
     for game_rel in items:
+        if (game_rel or "").replace("\\", "/").lower().startswith("audio/") or os.path.isfile(project_base(game_rel) + ".audio.json"):
+            by_type["audio"].append(game_rel)
+            continue
         kind = _browse_mod.project_file_type(game_rel)
         by_type.get(kind, by_type["texture"]).append(game_rel)
     mat_items = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in by_type["material"]]
     curve_items = [{"game_rel": gr, "edits": {}} for gr in by_type["curve"]]
     return (by_type["texture"], mat_items, curve_items, by_type["vfx"],
-            by_type["world"], by_type["text"], by_type["mesh"])
+            by_type["world"], by_type["text"], by_type["mesh"], by_type["audio"])
 
 def _install_to_mods(mod_name, export_dir, artifacts=None, *, destination=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
@@ -3438,11 +3448,11 @@ def _install_mod_payload(body):
     os.makedirs(out_dir, exist_ok=True)
     try:
         with key_lock('export-review-install'):
-            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items, audio_items = \
                 _split_export_items(items)
             result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                                curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                               text_items=text_items, mesh_items=mesh_items,
+                               text_items=text_items, mesh_items=mesh_items, audio_items=audio_items,
                                asset_opts=_project_meta.get_asset_opts(get_import_root()),
                                allow_unsafe_world=bool(body.get("allow_unsafe_world")))
             if not result.get("ok"):
@@ -3452,6 +3462,32 @@ def _install_mod_payload(body):
             resp = {"ok": bool(pak), "pak_path": pak.replace("\\", "/") if pak else None,
                     "applied": result.get("applied") or [], "skipped": result.get("skipped") or [],
                     "artifacts": result.get("artifacts") or []}
+            if resp["ok"]:
+                try:
+                    from atelier import patch_radar as _patch_radar
+                    _patch_radar.record_baseline(get_import_root(), items)
+                except Exception:
+                    pass
+            if body.get("release_kit") and resp["ok"]:
+                from atelier import release_kit
+                project_name = os.path.basename(get_import_root().rstrip("/\\")) or "Project"
+                kit_dir = os.path.join(out_dir, f"{mod_name}_ReleaseKit")
+                resp["release_kit"] = release_kit.write_release_kit(
+                    kit_dir=kit_dir,
+                    project_name=project_name,
+                    mod_name=mod_name,
+                    built_variants=[{
+                        "profile": mod_name,
+                        "mod_stem": mod_name,
+                        "items": items,
+                        "ok": True,
+                        "artifacts": resp["artifacts"],
+                        "skipped": resp["skipped"],
+                    }],
+                    all_items=items,
+                    out_dir=out_dir,
+                    atelier_version=_project_meta.current_version(),
+                )
             if mods and pak:
                 return _review_built_install(resp, mod_name, out_dir, mods, body.get('replacement_check'))
             return resp
@@ -3701,8 +3737,141 @@ def api_delete_all_imported():
     return json.dumps(_delete_imported([item['game_rel'] for item in items]))
 
 
+def _batch_export_payload(body, job=None):
+    from atelier import release_kit
+    base_name = _mod_stem(body.get("mod_name"))
+    items = [g for g in (body.get("items") or []) if isinstance(g, str) and g]
+    if not items:
+        return {"ok": False, "error": "No exportable assets in this project."}
+    root = get_import_root()
+    profiles = _project_meta.get_profiles(root)
+    if len(profiles) < 1:
+        return {"ok": False, "error": "Save at least one selection profile before batch exporting."}
+    plan = release_kit.plan_profile_variants(profiles, items, base_name, body.get("profiles"))
+    if not plan:
+        return {"ok": False, "error": "No matching selection profiles found."}
+    out_dir = ASSETS_MODS
+    os.makedirs(out_dir, exist_ok=True)
+    asset_opts = _project_meta.get_asset_opts(root)
+    allow_unsafe_world = bool(body.get("allow_unsafe_world"))
+    built_variants = []
+    all_applied = []
+    all_skipped = []
+    first_pak = None
+    with key_lock('export-review-install'):
+        total = len(plan)
+        for idx, spec in enumerate(plan, 1):
+            jobs.checkpoint()
+            if job is not None:
+                job.set_stage(f"Building variant {idx}/{total}: {spec['profile']}…")
+            if not spec["items"]:
+                built_variants.append({**spec, "ok": False, "artifacts": [], "applied": [], "skipped": []})
+                all_skipped.append(f"{spec['profile']}: {spec['skipped_reason']}")
+                continue
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items, audio_items = \
+                _split_export_items(spec["items"])
+            res = build_mod(
+                spec["mod_stem"], tex_items, mat_items, out_dir, force=True,
+                curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
+                text_items=text_items, mesh_items=mesh_items, audio_items=audio_items,
+                asset_opts=asset_opts, allow_unsafe_world=allow_unsafe_world,
+            )
+            ok = bool(res.get("ok") and res.get("pak"))
+            pak = res.get("pak")
+            if ok and not first_pak:
+                first_pak = pak.replace("\\", "/")
+            v_applied = res.get("applied") or []
+            v_skipped = res.get("skipped") or []
+            all_applied.extend(f"[{spec['profile']}] {a}" for a in v_applied)
+            all_skipped.extend(f"[{spec['profile']}] {s}" for s in v_skipped)
+            if not ok:
+                all_skipped.append(f"[{spec['profile']}] {res.get('error', 'build failed')}")
+            built_variants.append({
+                **spec,
+                "ok": ok,
+                "pak_path": pak.replace("\\", "/") if pak else None,
+                "artifacts": res.get("artifacts") or [],
+                "applied": v_applied,
+                "skipped": v_skipped,
+                "error": None if ok else res.get("error", "build failed"),
+            })
+
+    succeeded = [v for v in built_variants if v["ok"]]
+    resp = {
+        "ok": len(succeeded) > 0,
+        "batch": True,
+        "pak_path": first_pak,
+        "variants": built_variants,
+        "built_count": len(succeeded),
+        "total_count": len(built_variants),
+        "applied": all_applied,
+        "skipped": all_skipped,
+    }
+    if resp["ok"]:
+        try:
+            from atelier import patch_radar as _patch_radar
+            _patch_radar.record_baseline(root, items)
+        except Exception:
+            pass
+    if body.get("release_kit") and resp["ok"]:
+        project_name = os.path.basename(root.rstrip("/\\")) or "Project"
+        kit_dir = os.path.join(out_dir, f"{base_name}_ReleaseKit")
+        resp["release_kit"] = release_kit.write_release_kit(
+            kit_dir=kit_dir,
+            project_name=project_name,
+            mod_name=base_name,
+            built_variants=built_variants,
+            all_items=items,
+            out_dir=out_dir,
+            atelier_version=_project_meta.current_version(),
+        )
+    if not resp["ok"]:
+        resp["error"] = "No profile variants could be built."
+    return resp
+
+
+def _handle_batch_export(body):
+    if body.get("background"):
+        return _submit_job("export", "Batch export " + _mod_stem(body.get("mod_name")),
+                           lambda job: _batch_export_payload(body, job))
+    return _batch_export_payload(body)
+
+
 from atelier.web import routes_project_extras as _routes_project_extras
-globals().update(_routes_project_extras.register(app, get_import_root))
+globals().update(_routes_project_extras.register(app, get_import_root, batch_export_handler=_handle_batch_export))
+
+from atelier.web import routes_mods as _routes_mods
+from atelier import window_game as _window_game
+globals().update(_routes_mods.register(
+    app,
+    get_mods_folder,
+    game_running_fn=_window_game._game_running,
+    state_path=os.path.join(_CACHE, "clean_test_state.json"),
+    open_folder_fn=hostos.open_path,
+    push_sse=_push_sse,
+))
+
+from atelier.web import routes_refs as _routes_refs
+globals().update(_routes_refs.register(app))
+
+def _list_project_game_rels(root):
+    rels = []
+    seen = set()
+    for item in _discover_imported_files(root):
+        gr = item.get("game_rel")
+        if gr and gr not in seen:
+            seen.add(gr)
+            rels.append(gr)
+    return rels
+
+from atelier.web import routes_radar as _routes_radar
+globals().update(_routes_radar.register(app, get_import_root, _list_project_game_rels))
+
+from atelier.web import routes_themes as _routes_themes
+globals().update(_routes_themes.register(app, get_import_root, _list_project_game_rels))
+
+from atelier.web import routes_audio as _routes_audio
+globals().update(_routes_audio.register(app, get_import_root))
 
 @app.get("/api/asset_info")
 def api_asset_info():

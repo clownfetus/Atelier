@@ -5,7 +5,7 @@ from bottle import request, response
 from atelier import operations, project_meta, project_trash
 
 
-def register(app, get_import_root):
+def register(app, get_import_root, *, batch_export_handler=None):
     @app.post('/api/restore_imported')
     def api_restore_imported():
         response.content_type = 'application/json'
@@ -80,6 +80,18 @@ def register(app, get_import_root):
         profiles = project_meta.delete_profile(get_import_root(), body.get('name', ''))
         return json.dumps({'ok': True, 'profiles': profiles})
 
+    @app.post('/api/project/export_batch')
+    def api_project_export_batch():
+        response.content_type = 'application/json'
+        if batch_export_handler is None:
+            response.status = 501
+            return json.dumps({'ok': False, 'error': 'Batch profile export is unavailable.'})
+        body = request.json or {}
+        result = batch_export_handler(body)
+        if isinstance(result, str):
+            return result
+        return json.dumps(result)
+
     return {
         'api_restore_imported': api_restore_imported,
         'api_trash_list': api_trash_list,
@@ -89,4 +101,5 @@ def register(app, get_import_root):
         'api_project_profiles_get': api_project_profiles_get,
         'api_project_profiles_save': api_project_profiles_save,
         'api_project_profiles_delete': api_project_profiles_delete,
+        'api_project_export_batch': api_project_export_batch,
     }

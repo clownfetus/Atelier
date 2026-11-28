@@ -74,17 +74,23 @@
     <kbd>Ctrl+F</kbd>
     <div id="search-results" role="listbox" aria-label="Search results" hidden></div>
   </div>
-  <button class="menu-btn" id="launch-game" type="button" aria-disabled="true" title="Launch Marvel Rivals from the desktop app">
-    <span class="launch-game-play" aria-hidden="true"></span>
-    <i data-lucide="check-circle" size="16"></i>
-    <span id="launch-game-label" aria-live="polite">Launch game</span>
-  </button>
+  <div class="launch-split">
+    <button class="menu-btn" id="launch-game" type="button" aria-disabled="true" title="Launch Marvel Rivals from the desktop app">
+      <span class="launch-game-play" aria-hidden="true"></span>
+      <i data-lucide="check-circle" size="16"></i>
+      <span id="launch-game-label" aria-live="polite">Launch game</span>
+    </button>
+    <button class="menu-btn" id="mods-drawer-btn" type="button" aria-expanded="false" aria-haspopup="true" aria-label="Installed mods and clean-test mode" title="Installed mods &amp; clean-test mode">
+      <i data-lucide="chevron-down" size="15"></i>
+      <span class="mods-clean-dot" hidden aria-hidden="true"></span>
+    </button>
+  </div>
   <button class="menu-btn" id="menu-btn"><i data-lucide="menu" size="15"></i> Menu</button>
 </div>
 
 <!-- ── body ── -->
 <main id="workspace" class="at-identity" aria-label="Project workspace" hidden>
-  <header class="workspace-heading"><div><span class="proj-eyebrow">Your workspace</span><h1 id="workspace-title"></h1><p id="workspace-help">Choose a costume, make it yours, then review your mod.</p></div><div class="workspace-heading-actions"><button class="at-btn" id="workspace-choose" type="button">Change costume</button><button class="at-btn at-btn--quiet" id="workspace-advanced" type="button">Open Library <i data-lucide="arrow-right" size="15"></i></button></div></header>
+  <header class="workspace-heading"><div><span class="proj-eyebrow">Your workspace</span><h1 id="workspace-title"></h1><p id="workspace-help">Choose a costume, make it yours, then review your mod.</p></div><div class="workspace-heading-actions"><button class="at-btn" id="workspace-themes" type="button" title="Apply a curated colour look or hero theme"><i data-lucide="palette" size="15"></i> Looks &amp; themes</button><button class="at-btn" id="workspace-choose" type="button">Change costume</button><button class="at-btn at-btn--quiet" id="workspace-advanced" type="button">Open Library <i data-lucide="arrow-right" size="15"></i></button></div></header>
   <ol class="workspace-steps" aria-label="How to create your mod">
     <li id="workspace-step-choose"><span aria-hidden="true">1</span><div><strong>Choose a costume</strong><small>Start with your favourite hero</small></div></li>
     <li id="workspace-step-edit"><span aria-hidden="true">2</span><div><strong>Make it yours</strong><small>Pick a part, change colours, save</small></div></li>
@@ -278,6 +284,7 @@
       </div>
       <button class="sb-clear" id="mat-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
+    <div id="mat-shared-banner" class="shared-banner" role="status" hidden></div>
     <div id="mat-body" class="mat-body"></div>
     <div class="mat-foot">
       <span id="mat-status" class="mat-status"></span>
@@ -304,8 +311,8 @@
       <details id="viewport-capture-menu" class="vp-menu"><summary title="Capture an image or turntable"><i data-lucide="camera" size="18"></i><span>Capture</span></summary><div class="vp-popover vp-capture-panel">
         <h3>Capture this view</h3>
         <label>Image name<input id="viewport-capture-name" maxlength="100" placeholder="Edited skin"></label>
-        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turnaround">Save turnaround sheet PNG</button><button id="viewport-turntable">Save turntable WebP</button>
-        <p>Includes the current palette. Turnaround: 4 angles on one sheet. Turntable: one revolution, 48 frames.</p>
+        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turnaround">Save turnaround sheet PNG</button><button id="viewport-turntable">Save turntable WebP</button><button id="viewport-turntable-webm">Save turntable WebM</button>
+        <p>Includes the current palette. Turnaround: 4 angles on one sheet. Turntable: one full 360° loop (WebP or Discord-ready WebM).</p>
       </div></details>
       <button class="sb-clear" id="viewport-expand" title="Expand workspace" aria-label="Expand workspace" aria-pressed="false"><i data-lucide="square" size="16"></i></button>
       <button class="sb-clear" id="viewport-close" title="Close preview" aria-label="Close preview"><i data-lucide="x" size="16"></i></button>
@@ -347,17 +354,37 @@
       <label class="vp-setting">Lighting
         <select id="viewport-lighting" aria-label="Preview lighting">
           <option value="studio">Studio</option><option value="dramatic" hidden>Dramatic rim</option><option value="warm" hidden>Warm hero</option><option value="flat">Flat albedo</option><option value="emissive">Emissive only</option>
+          <optgroup label="In-game maps">
+            <option value="tokyo2099">Tokyo 2099 Neon</option>
+            <option value="klyntar">Klyntar Dark</option>
+            <option value="wakanda">Wakanda Sun</option>
+            <option value="yggsgard">Yggsgard Gold</option>
+          </optgroup>
         </select>
       </label>
       <label class="vp-setting">Backdrop <select id="viewport-backdrop" aria-label="Preview backdrop"><option value="gradient">Studio</option><option value="emblem" hidden>Hero emblem</option><option value="story" hidden>Hero artwork</option><option value="solid">Plain colour</option><option value="checker">Transparent</option></select></label>
+      <label class="vp-setting">Vision lens <select id="viewport-vision-lens" aria-label="Colourblind and contrast simulation lens" title="Preview-only colourblind and contrast check; never alters exports"></select></label>
       <input id="viewport-backdrop-color" type="color" value="#14161b" hidden aria-label="Backdrop colour">
       <div class="vp-toggle-settings">
         <button id="viewport-grid" aria-pressed="true" title="Toggle floor grid (G)"><i data-lucide="layout-grid" size="16"></i> Floor grid</button>
         <button id="viewport-wireframe" aria-pressed="false" title="Toggle wireframe (W)"><i data-lucide="box" size="16"></i> Wireframe</button>
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
+        <button id="viewport-pbr" aria-pressed="false" title="Load Normal and ORM maps (1024px) for metal, leather and surface relief">Surface detail (PBR)</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
-      <p id="viewport-showcase-note" hidden>Turn off Showcase to use wireframe, dye regions or texture comparison.</p>
+      <button id="viewport-showcase-duo" type="button" aria-pressed="false" hidden title="Place the untouched original costume beside your edited costume in Showcase">Compare side by side</button>
+      <details id="viewport-qa-section" class="vp-qa-section">
+        <summary>Pre-flight mesh QA</summary>
+        <div class="vp-qa-body">
+          <div id="viewport-qa-summary" class="vp-qa-summary" role="status">Open to inspect geometry and skin weights.</div>
+          <div class="vp-qa-actions">
+            <button id="viewport-qa-ghost" type="button" aria-pressed="false" title="Overlay the untouched vanilla mesh as a translucent wireframe">Original silhouette</button>
+            <button id="viewport-qa-backfaces" type="button" aria-pressed="false" title="Highlight inside-out triangles and flipped normals in red">Flipped normals</button>
+            <button id="viewport-qa-stress" type="button" aria-pressed="false" title="Cycle poses to spot skinning tears and clipping">Pose stress test</button>
+          </div>
+        </div>
+      </details>
+      <p id="viewport-showcase-note" hidden>Turn off Showcase to use wireframe, dye regions, mesh QA or texture comparison.</p>
       <details class="vp-shortcuts"><summary>Navigation &amp; shortcuts</summary><p>Drag to orbit · Right-drag to pan · Scroll to zoom<br>F — fit · W — wireframe · G — grid<br>1 — front · 3 — right · 7 — top<br>Double-click a part to frame it.</p><span id="viewport-stats" role="status">No model loaded</span></details>
       </div></details>
         </div>
@@ -459,7 +486,7 @@
     </div>
     <div id="viewport-foot">
       <button id="viewport-fit" title="Fit visible objects (F)"><i data-lucide="scan-box" size="18"></i> Fit view</button>
-      <div id="viewport-playback"><select id="viewport-animation" aria-label="Standing idle animation"><option value="">Rest pose</option></select><button id="viewport-play" disabled aria-pressed="false">Play idle</button></div>
+      <div id="viewport-playback"><select id="viewport-animation" aria-label="Pose and animation"><option value="">Rest pose</option></select><button id="viewport-play" disabled aria-pressed="false">Play</button><div id="viewport-scrub-wrap" hidden><input type="range" id="viewport-scrub" min="0" max="1" step="0.01" value="0" aria-label="Scrub animation frame" title="Drag to freeze on any frame for Showcase or inspection"><span id="viewport-scrub-time" aria-hidden="true">0.0s</span></div></div>
       <button id="viewport-capture-cancel" hidden>Cancel capture</button>
       <span id="viewport-navigation">Drag to orbit <span aria-hidden="true">·</span> Pan <span aria-hidden="true">·</span> Zoom</span>
       <div class="vp-status-line">
@@ -501,6 +528,7 @@
         <h2><i data-lucide="sparkles" size="18"></i> <span id="vfx-title">VFX</span></h2>
         <div id="vfx-sub" class="mat-subpath"></div>
       </div>
+      <select id="vfx-vision-lens" class="vfx-vision-select" aria-label="VFX colourblind and contrast lens" title="Preview-only colourblind and readability check"></select>
       <button class="sb-clear" id="vfx-close" title="Close"><i data-lucide="x" size="16"></i></button>
     </div>
     <div id="vfx-body" class="mat-body"></div>
@@ -814,6 +842,14 @@
   <i data-lucide="refresh-cw" size="16"></i>
   <span><strong>New USMAP mapping downloaded</strong> <span id="usmap-update-name"></span><br>Restart Atelier when you're ready to use it. Your open work is not affected.</span>
   <button class="btn" id="usmap-update-dismiss" type="button">Got it</button>
+</div>
+
+<!-- ── Game Patch Radar notice: invisible unless a game update changed an edited target ── -->
+<div class="notice-banner" id="patch-radar-banner" role="status" hidden>
+  <i data-lucide="alert-triangle" size="16"></i>
+  <span><strong>Game update detected</strong><br><span id="patch-radar-banner-summary">Some edited assets changed in the latest game files.</span></span>
+  <button class="btn primary" id="patch-radar-inspect" type="button">Inspect changes</button>
+  <button class="btn" id="patch-radar-dismiss" type="button">Dismiss</button>
 </div>
 
 <!-- ── project picker ── -->
@@ -1165,7 +1201,18 @@
 <script src="/static/app.js"></script>
 <script src="/static/repatcher.js"></script>
 <script src="/static/shader-studio.js"></script>
+<link rel="stylesheet" href="/static/mods-drawer.css">
+<link rel="stylesheet" href="/static/asset-refs.css">
+<link rel="stylesheet" href="/static/patch-radar.css">
+<link rel="stylesheet" href="/static/hero-themes.css">
+<link rel="stylesheet" href="/static/audio-studio.css">
 <script src="/static/launch-game.js"></script>
+<script src="/static/mods-drawer.js"></script>
+<script src="/static/asset-refs.js"></script>
+<script src="/static/patch-radar.js"></script>
+<script src="/static/hero-themes.js"></script>
+<script src="/static/audio-studio.js"></script>
+<script src="/static/vision-lens.js"></script>
 <script src="/static/workspace.js"></script>
 <script src="/static/workspace-dock.js"></script>
 <script src="/static/viewport-identity.js"></script>
