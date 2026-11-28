@@ -750,6 +750,33 @@ def _texture_rgba(png):
     return pixels
 
 
+def _scaled_texture_png(png_path: str, max_dim: int) -> str:
+    """Return a cached downscaled copy of ``png_path`` capped at ``max_dim`` for lightweight PBR previews."""
+    max_dim = max(64, min(2048, int(max_dim)))
+    try:
+        st = os.stat(png_path)
+    except OSError:
+        return png_path
+    from PIL import Image
+    import hashlib
+    with Image.open(png_path) as im:
+        w, h = im.size
+        if max(w, h) <= max_dim:
+            return png_path
+        cache_dir = os.path.join(_CACHE, "pbr_preview")
+        os.makedirs(cache_dir, exist_ok=True)
+        digest = hashlib.sha1(f"{os.path.abspath(png_path)}|{st.st_mtime_ns}|{st.st_size}|{max_dim}".encode("utf-8")).hexdigest()[:20]
+        target = os.path.join(cache_dir, f"{digest}_{max_dim}.png")
+        if os.path.isfile(target):
+            return target
+        scale = max_dim / float(max(w, h))
+        resized = im.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.Resampling.LANCZOS)
+        tmp = target + ".tmp"
+        resized.save(tmp, format="PNG")
+        os.replace(tmp, target)
+        return target
+
+
 @app.get("/api/texture_png")
 def api_texture_png():
     """Decode a texture game_rel to PNG and serve it (for the viewport to apply as a mesh map)."""
@@ -766,6 +793,12 @@ def api_texture_png():
     if png and os.path.exists(png):
         if request.query.get('rgba') == '1':
             return _texture_rgba(png)
+        max_dim_raw = request.query.get("max_dim", "")
+        if max_dim_raw.isdigit():
+            try:
+                png = _scaled_texture_png(png, int(max_dim_raw))
+            except Exception:
+                pass
         return static_file(os.path.basename(png), root=os.path.dirname(png), mimetype="image/png")
     response.status = 404
     return b""

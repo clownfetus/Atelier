@@ -524,6 +524,10 @@ export function createViewportInspection(api) {
     studio: { hemi: [0xffffff, 0x404050, .45], key: [0xffffff, 1.4, 1, 2, 1.5], fill: [0xaaccff, .5, -1.5, .6, -1], env: .45 },
     dramatic: { hemi: [0xb8c8e8, 0x1a1d28, .24], key: [0xfff4e4, 1.75, 1.6, 2.2, 1.0], fill: [0x66aaff, 1.35, -1.8, 1.1, -1.6], env: .28 },
     warm: { hemi: [0xfff0dc, 0x3b2d26, .52], key: [0xffe0b5, 1.65, 1.3, 1.8, 1.6], fill: [0x9ec5ff, .62, -1.4, .7, -1.2], env: .50 },
+    tokyo2099: { hemi: [0x6c8cff, 0x1b0f30, .36], key: [0x82e8ff, 1.40, 1.4, 1.9, 1.3], fill: [0xff5ec4, 1.18, -1.7, .9, -1.3], env: .26 },
+    klyntar: { hemi: [0x7c528e, 0x120814, .24], key: [0xffd8be, 1.25, 1.5, 2.3, .9], fill: [0xb33872, .95, -1.6, .6, -1.4], env: .18 },
+    wakanda: { hemi: [0xfff6e5, 0x614934, .64], key: [0xfff1d2, 1.95, 1.1, 2.6, 1.4], fill: [0xffc98b, .68, -1.5, .8, -1.0], env: .62 },
+    yggsgard: { hemi: [0xe0eeff, 0x4f3d22, .54], key: [0xffe19c, 1.78, 1.4, 2.2, 1.5], fill: [0x8cc8ff, .85, -1.6, 1.0, -1.2], env: .54 },
   };
   function applyLighting(mode) {
     lighting = mode;

@@ -354,6 +354,12 @@
       <label class="vp-setting">Lighting
         <select id="viewport-lighting" aria-label="Preview lighting">
           <option value="studio">Studio</option><option value="dramatic" hidden>Dramatic rim</option><option value="warm" hidden>Warm hero</option><option value="flat">Flat albedo</option><option value="emissive">Emissive only</option>
+          <optgroup label="In-game maps">
+            <option value="tokyo2099">Tokyo 2099 Neon</option>
+            <option value="klyntar">Klyntar Dark</option>
+            <option value="wakanda">Wakanda Sun</option>
+            <option value="yggsgard">Yggsgard Gold</option>
+          </optgroup>
         </select>
       </label>
       <label class="vp-setting">Backdrop <select id="viewport-backdrop" aria-label="Preview backdrop"><option value="gradient">Studio</option><option value="emblem" hidden>Hero emblem</option><option value="story" hidden>Hero artwork</option><option value="solid">Plain colour</option><option value="checker">Transparent</option></select></label>
@@ -362,6 +368,7 @@
         <button id="viewport-grid" aria-pressed="true" title="Toggle floor grid (G)"><i data-lucide="layout-grid" size="16"></i> Floor grid</button>
         <button id="viewport-wireframe" aria-pressed="false" title="Toggle wireframe (W)"><i data-lucide="box" size="16"></i> Wireframe</button>
         <button id="viewport-bloom" aria-pressed="false" title="Optional emissive glow; uses more GPU memory">Bloom</button>
+        <button id="viewport-pbr" aria-pressed="false" title="Load Normal and ORM maps (1024px) for metal, leather and surface relief">Surface detail (PBR)</button>
       </div>
       <button id="viewport-regions" aria-pressed="false" disabled title="Project labelled dye regions onto the model">Dye regions</button>
       <details id="viewport-qa-section" class="vp-qa-section">
