@@ -3252,13 +3252,17 @@ def api_open_blend():
 def _split_export_items(items):
     """Partition selected game_rels into build_mod's buckets (edits already live on disk / sidecar)."""
     by_type = {kind: [] for kind in _browse_mod.LISTED_FILE_TYPES}
+    by_type["audio"] = []
     for game_rel in items:
+        if (game_rel or "").replace("\\", "/").lower().startswith("audio/") or os.path.isfile(project_base(game_rel) + ".audio.json"):
+            by_type["audio"].append(game_rel)
+            continue
         kind = _browse_mod.project_file_type(game_rel)
         by_type.get(kind, by_type["texture"]).append(game_rel)
     mat_items = [{"game_rel": gr, "colors": {}, "scalars": {}} for gr in by_type["material"]]
     curve_items = [{"game_rel": gr, "edits": {}} for gr in by_type["curve"]]
     return (by_type["texture"], mat_items, curve_items, by_type["vfx"],
-            by_type["world"], by_type["text"], by_type["mesh"])
+            by_type["world"], by_type["text"], by_type["mesh"], by_type["audio"])
 
 def _install_to_mods(mod_name, export_dir, artifacts=None, *, destination=None):
     """Copy a freshly-built mod's .pak/.ucas/.utoc from export_dir into the configured mods folder,
@@ -3444,11 +3448,11 @@ def _install_mod_payload(body):
     os.makedirs(out_dir, exist_ok=True)
     try:
         with key_lock('export-review-install'):
-            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items, audio_items = \
                 _split_export_items(items)
             result = build_mod(mod_name, tex_items, mat_items, out_dir, force=True,
                                curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                               text_items=text_items, mesh_items=mesh_items,
+                               text_items=text_items, mesh_items=mesh_items, audio_items=audio_items,
                                asset_opts=_project_meta.get_asset_opts(get_import_root()),
                                allow_unsafe_world=bool(body.get("allow_unsafe_world")))
             if not result.get("ok"):
@@ -3764,12 +3768,12 @@ def _batch_export_payload(body, job=None):
                 built_variants.append({**spec, "ok": False, "artifacts": [], "applied": [], "skipped": []})
                 all_skipped.append(f"{spec['profile']}: {spec['skipped_reason']}")
                 continue
-            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items = \
+            tex_items, mat_items, curve_items, vfx_items, world_items, text_items, mesh_items, audio_items = \
                 _split_export_items(spec["items"])
             res = build_mod(
                 spec["mod_stem"], tex_items, mat_items, out_dir, force=True,
                 curve_items=curve_items, vfx_items=vfx_items, world_items=world_items,
-                text_items=text_items, mesh_items=mesh_items,
+                text_items=text_items, mesh_items=mesh_items, audio_items=audio_items,
                 asset_opts=asset_opts, allow_unsafe_world=allow_unsafe_world,
             )
             ok = bool(res.get("ok") and res.get("pak"))
@@ -3865,6 +3869,9 @@ globals().update(_routes_radar.register(app, get_import_root, _list_project_game
 
 from atelier.web import routes_themes as _routes_themes
 globals().update(_routes_themes.register(app, get_import_root, _list_project_game_rels))
+
+from atelier.web import routes_audio as _routes_audio
+globals().update(_routes_audio.register(app, get_import_root))
 
 @app.get("/api/asset_info")
 def api_asset_info():

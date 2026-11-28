@@ -466,10 +466,15 @@ def all_imported(game_rel=None):
             fpath = os.path.join(dirpath, fname)
             if fname.endswith('.asset.json'):
                 continue
-            if fname.endswith('.mesh.json'):
+            if fname.endswith('.audio.json'):
+                gr = project_game_rel(fpath[:-len('.audio.json')] + '.wav', import_root)
+                ext = '.audio.json'
+            elif fname.endswith('.mesh.json'):
                 gr=project_game_rel(fpath[:-len('.mesh.json')]+'.blend',import_root)
                 ext='.blend'
             elif fname.endswith('.blend') and fname[:-len('.blend')]+'.mesh.json' in filenames:
+                continue
+            elif fname.endswith('.wav') and fname[:-len('.wav')]+'.audio.json' in filenames:
                 continue
             elif fname.endswith(".png"):
                 ext = ".png"
@@ -481,7 +486,7 @@ def all_imported(game_rel=None):
                 ext = ".blend"
             else:
                 continue
-            if not fname.endswith('.mesh.json'):gr = project_game_rel(fpath, import_root)
+            if not fname.endswith(('.mesh.json', '.audio.json')):gr = project_game_rel(fpath, import_root)
             added = os.path.basename(gr) + '.asset.json' in filenames
             if "/" not in gr and not added:
                 gr = _ac.by_name(gr) or gr
@@ -489,7 +494,9 @@ def all_imported(game_rel=None):
                 continue
             name = os.path.basename(gr)
             added_type = recorded_file_type(gr, import_root) if added else None
-            if added_type:
+            if ext == ".audio.json":
+                ft = "audio"
+            elif added_type:
                 if ext != {'texture': '.png', 'material': '.json', 'mesh': '.blend'}[added_type]:
                     continue
                 ft = added_type
@@ -504,6 +511,20 @@ def all_imported(game_rel=None):
                 if ft not in JSON_EDIT_TYPES:
                     continue
             cid = sid = None
+            audio_extra = {}
+            if ext == ".audio.json":
+                try:
+                    with open(fpath, encoding="utf-8") as af:
+                        am = json.load(af)
+                    if am.get("hero_id"):
+                        cid = str(am["hero_id"])
+                    audio_extra = {
+                        "audio_label": am.get("label") or "",
+                        "audio_subtitle": am.get("subtitle") or "",
+                        "audio_bank": am.get("bank_stem") or "",
+                    }
+                except Exception:
+                    pass
             for hr in _HERO_LABEL_RES:
                 m = hr.match(gr)
                 if m:
@@ -520,6 +541,7 @@ def all_imported(game_rel=None):
                 # anything new to the project arrives included in the next export.
                 "selected": gr not in deselected,
                 "opts": all_opts.get(gr) or {},
+                **audio_extra,
                 **(hdr_project_info(fpath[:-4]) if ext == '.png' else {}),
             }))
     return items
