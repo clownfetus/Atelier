@@ -323,5 +323,35 @@
   }
   function startupDone() { startupEnded=true; clearTimeout(startupTimer);window.AtelierSurfaces?.startupDone(); document.getElementById('startup-splash')?.remove(); }
   window.addEventListener('pagehide',()=>{startupEnded=true;clearTimeout(startupTimer);});
+  function syncRange(input) {
+    if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
+    const min = Number(input.min || 0), max = Number(input.max || 100), val = Number(input.value || 0);
+    const pct = max > min ? Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100)) : 0;
+    input.style.setProperty('--range-pct', pct.toFixed(2) + '%');
+  }
+  function syncRanges(root = document) {
+    if (root instanceof HTMLInputElement && root.type === 'range') { syncRange(root); return; }
+    root.querySelectorAll?.('input[type="range"]').forEach(syncRange);
+  }
+  document.addEventListener('input', event => syncRange(event.target), true);
+  document.addEventListener('change', event => syncRange(event.target), true);
+  const rangeObserver = new MutationObserver(records => {
+    for (const record of records) {
+      if (record.type === 'attributes') syncRange(record.target);
+      else for (const node of record.addedNodes) if (node.nodeType === 1) syncRanges(node);
+    }
+  });
+  rangeObserver.observe(document.documentElement, {childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'min', 'max']});
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => syncRanges(), {once: true});
+  else syncRanges();
+  const rangeValueDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  if (rangeValueDesc?.set) {
+    Object.defineProperty(HTMLInputElement.prototype, 'value', {
+      configurable: true,
+      get() { return rangeValueDesc.get.call(this); },
+      set(next) { rangeValueDesc.set.call(this, next); if (this.type === 'range') syncRange(this); },
+    });
+  }
+  window.addEventListener('pagehide', () => { rangeObserver.disconnect(); });
   window.AtelierPolish=Object.freeze({count,sample,samplePalette,accent,artwork,fly,seat,foldAway,swapImage,sidebarBefore,sidebarAfter,swatchesBefore,swatchesAfter,empty,importStart,importProgress,startup,startupDone,play,leave});
 })();

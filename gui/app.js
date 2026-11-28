@@ -570,7 +570,11 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       img.className = "hero-portrait";
       img.loading = "lazy";
       img.decoding = "async";
-      img.onload = () => img.classList.add("loaded");
+      img.onload = () => {
+        img.classList.add("loaded");
+        const colour = window.AtelierPolish?.accent?.(img);
+        if (colour) { el.style.setProperty("--card-art-colour", colour); el.classList.add("has-art-colour"); }
+      };
       img.onerror = () => {
         img.remove();
         thumb.appendChild(renderCardIcon(card, el));
@@ -1110,11 +1114,14 @@ function _matReference(kind, index, mode = matEditor?.compareMode || "saved") {
   const item = matEditor?.[kind]?.[index];
   return (refs?.[mode]?.[kind] || []).find(value => value.name === item?.name);
 }
+function _matDiffersFrom(kind, index, mode = "saved") {
+  const item = matEditor?.[kind]?.[index], ref = _matReference(kind, index, mode);
+  if (!item || !ref) return false;
+  return kind === "colors" ? JSON.stringify([item.rgba, item.inten]) !== JSON.stringify([ref.rgba, ref.inten])
+    : item.value !== ref.value;
+}
 function _matIsChanged(kind, index) {
-  const item = matEditor?.[kind]?.[index], saved = _matReference(kind, index, "saved");
-  if (!item || !saved) return false;
-  return kind === "colors" ? JSON.stringify([item.rgba, item.inten]) !== JSON.stringify([saved.rgba, saved.inten])
-    : item.value !== saved.value;
+  return _matDiffersFrom(kind, index, "saved");
 }
 function materialDirtyCount() {
   return matEditor ? ["colors", "scalars"].reduce((n, kind) => n + matEditor[kind].filter((_, i) => _matIsChanged(kind, i)).length, 0) : 0;
@@ -1137,9 +1144,12 @@ function _matRefreshDirty() {
   _syncHistoryButtons("mat", _matHistory, busy);
   ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
     const row = document.getElementById((kind === "colors" ? "matrow" : "matscalar") + i);
-    row?.classList.toggle("is-modified", _matIsChanged(kind, i));
+    const changed = _matIsChanged(kind, i);
+    const refDiff = _matDiffersFrom(kind, i, matEditor.compareMode);
+    row?.classList.toggle("is-modified", changed);
+    row?.classList.toggle("is-ref-diff", refDiff);
     const marker = row?.querySelector(".mat-changed");
-    if (marker) marker.textContent = _matIsChanged(kind, i) ? "Unsaved" : "";
+    if (marker) marker.textContent = changed ? "Unsaved" : "";
   }));
 }
 async function matCompare(mode) {
@@ -3312,6 +3322,7 @@ function renderSidebar() {
     el.className = "sb-item" + (item.selected ? " selected" : "") + (_sbMarked.has(item.token) ? " marked" : "");
     el.dataset.token = item.token;
     el.dataset.gameRel = item.game_rel;
+    el.dataset.fileType = item.file_type || "";
     const h = handlerFor(item.file_type);
     el.innerHTML = `
       <button class="sb-clear" title="Delete"><i data-lucide="x" size="12"></i></button>

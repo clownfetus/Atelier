@@ -45,7 +45,7 @@
         <aside class="mb-inspector" aria-label="Track properties">
           <div class="mb-inspector-heading"><span class="mb-kicker">Selected track</span><h3 id="mb-track-name"></h3><span id="mb-binding-badge" class="mb-binding-badge"></span></div>
           <div class="mb-point-navigation"><label>Point <input id="mb-point" type="number" min="1" step="1"></label><span id="mb-point-time"></span></div>
-          <label class="mb-field">Component <select id="mb-channel"></select></label>
+          <div class="mb-field"><span>Component</span><div class="mb-channel-wrap"><select id="mb-channel" class="mb-channel-native" aria-label="Component" tabindex="-1"></select><div id="mb-channel-pills" class="mb-channel-pills" role="group" aria-label="Component"></div></div></div>
           <label class="mb-field">Edited value <input id="mb-value" type="number" step="any"></label>
           <div id="mb-reference-values" class="mb-reference-values"></div>
           <div class="mb-reset-actions"><button id="mb-reset-point" type="button">Restore point</button><button id="mb-original-point" type="button">Game value</button><button id="mb-reset-track" type="button">Restore track</button><button id="mb-original-track" type="button">Game original</button></div>
@@ -122,13 +122,23 @@
       if (document.activeElement !== point) point.value = state.point + 1;
       const time = g.stops.length === 1 ? 0 : state.point / (g.stops.length - 1);
       get('mb-point-time').textContent = time.toFixed(4) + ' input';
-      const channel = get('mb-channel');
+      const channel = get('mb-channel'), pills = get('mb-channel-pills');
       if (rebuild || channel.options.length !== g.channels) {
-        channel.replaceChildren(...Array.from({length: g.channels}, (_, c) => {
-          const option = make('option', g.channels === 4 ? components[c] : g.channels === 1 ? 'Value' : axes[c]); option.value = c; return option;
+        const names = Array.from({length: g.channels}, (_, c) => g.channels === 4 ? components[c] : g.channels === 1 ? 'Value' : axes[c]);
+        channel.replaceChildren(...names.map((name, c) => {
+          const option = make('option', name); option.value = c; return option;
+        }));
+        pills.replaceChildren(...names.map((name, c) => {
+          const btn = make('button', null, 'mb-channel-pill'); btn.type = 'button'; btn.dataset.mbChannelPill = String(c);
+          const dot = make('span', null, 'mb-channel-dot');
+          dot.style.setProperty('--mb-ch-color', g.channels === 1 ? 'var(--acc)' : colors[c]);
+          btn.append(dot, make('span', name));
+          btn.addEventListener('click', () => choose(state.selected, state.point, c));
+          return btn;
         }));
       }
       channel.value = String(state.channel);
+      for (const btn of pills.querySelectorAll('.mb-channel-pill')) btn.setAttribute('aria-pressed', String(Number(btn.dataset.mbChannelPill) === state.channel));
       if (forceValue || document.activeElement !== get('mb-value')) get('mb-value').value = g.stops[state.point][state.channel];
       const saved = callbacks.savedGroup(i), original = D.original(g);
       const gameValue = original ? D.sample(original, time)[state.channel] : null;
@@ -178,10 +188,22 @@
       const reference = D.original(group), bounds = drag?.key === key ? drag.bounds : D.extent([...group.stops, ...(reference || [])]); row.bounds = bounds;
       const selectedChannel = key === state.selected ? state.channel : 0;
       let svg = '<line class="mb-zero" x1="10" x2="990" y1="' + (66 - (0 - bounds.min) / (bounds.max - bounds.min) * 48) + '" y2="' + (66 - (0 - bounds.min) / (bounds.max - bounds.min) * 48) + '"/>';
+      const idx = byKey.get(key).i;
+      let defs = '';
       if (group.channels === 4) {
         const maximum = Math.max(1, ...group.stops.flatMap(stop => stop.slice(0, 3)));
         const stops = group.stops.map((s, i) => '<stop offset="' + (group.stops.length === 1 ? 0 : i / (group.stops.length - 1) * 100) + '%" stop-color="rgb(' + s.slice(0, 3).map(v => Math.round(D.clamp(v / maximum) * 255)).join(',') + ')" stop-opacity="' + D.clamp(s[3]) + '"/>').join('');
-        svg += '<defs><linearGradient id="mb-grad-' + byKey.get(key).i + '">' + stops + '</linearGradient></defs><rect x="10" y="2" width="980" height="8" rx="2" fill="url(#mb-grad-' + byKey.get(key).i + ')"/>';
+        defs += '<linearGradient id="mb-grad-' + idx + '">' + stops + '</linearGradient>';
+      }
+      const areaColor = group.channels === 1 ? 'var(--acc)' : colors[selectedChannel];
+      defs += '<linearGradient id="mb-area-' + idx + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + areaColor + '" stop-opacity="0.22"/><stop offset="100%" stop-color="' + areaColor + '" stop-opacity="0"/></linearGradient>';
+      svg += '<defs>' + defs + '</defs>';
+      if (group.channels === 4) {
+        svg += '<rect x="10" y="2" width="980" height="8" rx="2" fill="url(#mb-grad-' + idx + ')"/>';
+      }
+      if (state.compare !== 'original') {
+        const areaD = path(D.edited(group), selectedChannel, bounds);
+        if (areaD) svg += '<path class="mb-area-fill" d="' + areaD + ' L990,66 L10,66 Z" fill="url(#mb-area-' + idx + ')"/>';
       }
       for (let c = 0; c < group.channels; c++) {
         const color = group.channels === 1 ? 'var(--acc)' : colors[c];
