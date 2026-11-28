@@ -65,7 +65,7 @@ class Artwork(unittest.TestCase):
                    '1035': {'name': 'Thor'}, '1099': {'name': 'Thor'}}
         with patch('atelier.hero_artwork.threading.Thread') as worker:
             art.start_update(entries)
-        self.assertEqual(worker.call_args.kwargs['args'], ({'magik': '1029'},))
+        self.assertEqual(worker.call_args.kwargs['args'], ({'magik': '1029'}, set()))
 
     def test_each_launch_checks_all_pages_and_downloads_only_new_artwork(self):
         ids, calls = ['1029'], []
@@ -94,6 +94,26 @@ class Artwork(unittest.TestCase):
         self.assertEqual(second.status()['logos'], 2)
         self.assertIsNotNone(second.image('1035','avatar'))
         self.assertIsNotNone(second.image('1035','story'))
+
+    def test_primary_artwork_keeps_rivalskins_avatar_available_on_demand(self):
+        art = HeroArtwork(self.root)
+        entries = {'1029': {'name': 'Magik',
+                            'avatar': 'https://cdn.starsong.dev/marvel-rivals/objects/aa/' + 'a' * 64 + '?width=342'}}
+        self.assertEqual(art.status(entries)['avatars'], 1)
+
+        def fetch(url):
+            kind = next((key for key, page_url in PAGES.items() if page_url == url), None)
+            return (page(kind, ['1029']) if kind else self.raw), {}
+
+        with patch('atelier.hero_artwork.threading.Thread') as worker:
+            art.start_update(entries)
+        with patch('atelier.hero_artwork.fetch', side_effect=fetch):
+            art.update(*worker.call_args.kwargs['args'])
+            avatar = art._path(art.entries['1029']['avatar'])
+            self.assertEqual(art.status(entries)['avatars'], 1)
+            self.assertFalse(avatar.is_file())
+            self.assertEqual(art.image('1029', 'avatar'), avatar)
+            self.assertTrue(avatar.is_file())
 
     def test_story_matches_only_url_character_codes_and_prefers_first_story(self):
         urls=[f'{PREFIX}hero-story-images/img_herostory_105702_hover.png',

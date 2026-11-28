@@ -440,7 +440,7 @@ class CatalogueTests(unittest.TestCase):
              patch('atelier.catalogue.published_costumes', return_value=costumes), \
              patch('atelier.catalogue.matched_sprays', return_value={}), \
              patch('atelier.catalogue.build_entries') as build:
-            self.catalogue.update()
+            self.catalogue.refresh_rivalskins()
         self.assertEqual(get.call_count, 3)
         build.assert_not_called()
         self.assertEqual(self.catalogue.status()['checked_at'], 1001)
@@ -453,7 +453,7 @@ class CatalogueTests(unittest.TestCase):
              patch('atelier.catalogue.published_costumes', return_value=costumes), \
              patch('atelier.catalogue.matched_sprays', return_value={}), \
              patch('atelier.catalogue.build_entries', return_value={cid: {'name': char['name'], 'image': IMAGE} for cid, char in chars.items()}) as build:
-            self.catalogue.update()
+            self.catalogue.refresh_rivalskins()
         build.assert_called_once()  # Website additions refresh immediately, even within the daily cache window.
         self.assertIsNone(self.catalogue.status()['error'])
 

@@ -1,5 +1,6 @@
 // Optional catalogue updates never block setup, navigation or editing.
 (() => {
+  let catalogueRevision = null;
   let artworkRevision = null;
   async function check(attempt = 0) {
     const label = document.getElementById('catalogue-status');
@@ -8,8 +9,10 @@
       if (!response.ok) throw new Error('Catalogue unavailable');
       const status = await response.json();
       const artwork = status.hero_artwork;
-      if (artwork?.checked_at && artwork.checked_at !== artworkRevision) {
-        artworkRevision = artwork.checked_at;
+      if ((status.revision && status.revision !== catalogueRevision) ||
+          (artwork?.checked_at && artwork.checked_at !== artworkRevision)) {
+        catalogueRevision = status.revision;
+        artworkRevision = artwork?.checked_at;
         window.dispatchEvent(new CustomEvent('atelier:catalogue-updated'));
       }
       label.textContent = status.updating ? (attempt < 80 ? 'Checking for new heroes and skins…' : 'Artwork refresh continues in the background. Saved portraits are available.')

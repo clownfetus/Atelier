@@ -281,14 +281,14 @@ def catalogue_status():
     if not status['updating']:
         hero_artwork.start_update(entries)
     response.content_type = 'application/json'
-    status['hero_artwork'] = hero_artwork.status()
+    status['hero_artwork'] = hero_artwork.status(entries)
     status['updating'] = status['updating'] or status['hero_artwork']['updating']
     return json.dumps(status)
 
 
 @app.get('/api/catalogue/hero/<cid>/<kind>')
 def catalogue_hero_artwork(cid, kind):
-    path = hero_artwork.image(cid, kind)
+    path = catalogue.hero_image(cid, kind) or hero_artwork.image(cid, kind)
     if not path:
         response.status = 404
         response.set_header('Cache-Control', 'no-store')
@@ -1676,7 +1676,7 @@ def api_catalogue_library():
         heroes.append(hero)
     response.content_type = 'application/json'
     return json.dumps({'heroes': sorted(heroes, key=lambda hero: hero['name'].casefold()),
-                       'identities': catalogue.identity_entries()})
+                       'identities': catalogue.identity_entries(entries)})
 
 @app.get("/api/browse")
 def api_browse():
@@ -2461,7 +2461,6 @@ def _push_sse(data: dict):
             except queue.Full: dead.append(q)
         for q in dead: _sse_queues.remove(q)
 
-_browse_mod._update_callback = _push_sse
 
 def _run_import_job(items, project_root=None, release=None):
     root = project_root or get_import_root()

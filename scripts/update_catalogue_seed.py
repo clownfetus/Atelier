@@ -1,4 +1,4 @@
-"""Refresh the shipped metadata seed through the normal verified catalogue parser.
+"""Refresh the shipped offline seed through the verified RivalSkins parser.
 
 Run explicitly before a release. Downloads stay in an optional artwork cache; only
 metadata and source URLs are written to gui/catalogue.json. A failed refresh leaves
@@ -32,7 +32,7 @@ def main():
     args = parser.parse_args()
     seed = ROOT / 'gui' / 'catalogue.json'
     catalogue = Catalogue(args.cache_dir, seed)
-    catalogue.update()
+    catalogue.refresh_rivalskins()
     if catalogue.status()['error']:
         raise SystemExit(catalogue.status()['error'])
     data, banners = validate_seed(args.cache_dir / 'catalogue.json')

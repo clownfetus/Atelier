@@ -1,10 +1,9 @@
-import os, re, json, hashlib, threading, urllib.request
+import os, re, json, hashlib, threading
 from atelier.catalogue import catalogue
-from atelier.config import ROOT, TOOLS, get_import_root, project_base, project_base_legacy, project_game_rel, validate_game_rel
+from atelier.config import ROOT, get_import_root, project_base, project_base_legacy, project_game_rel, validate_game_rel
+from atelier.handlers import skinnames
 from atelier.index import ensure_index
-from atelier.paths import (skin_entries, skin_rel, game_rel_for_skin,
-                           char_id as get_char_id)
-from atelier.skin_name_fixes import correct_skin_name, merge_reference
+from atelier.paths import skin_entries, skin_rel, game_rel_for_skin
 
 def _imported_exists(game_rel, ext):
     """A project copy exists at the unique subfolder path, or at the legacy flat path (back-compat)."""
@@ -57,11 +56,6 @@ def edited_colour_changes(game_rel, limit=6):
         if len(out) == limit:
             break
     return out
-
-_REMOTE_MD_URL   = "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/refs/heads/main/MarvelRivalsCharacterIDs.md"
-_update_callback = None   # set by routes.py to _push_sse after it's defined
-_fetch_attempted = False
-_fetch_lock      = threading.Lock()
 
 # Paths (relative to Marvel/Content/Marvel/) where skin browsing is used
 # (immediate children are char IDs, grandchildren are skin IDs navigated via _browse_skin).
@@ -131,92 +125,13 @@ def _project_folders(rel_path):
     return {entry.name.lower() for entry in folders
             if any(files for _dir, _subdirs, files in os.walk(entry.path))}
 
-def _parse_char_md_text(text):
-    """Parse MD table text -> {char_id: {name, skins:{skin_id:name}}}"""
-    chars = {}
-    cur   = None
-    for line in text.splitlines():
-        m = re.match(r'\|\s*(\d{4})\s*\|\s*([^|]+?)\s*\|(?:\s*(\d{7})\s*\|\s*([^|]*?)\s*\|)?', line)
-        if m and m.group(1):
-            cur  = m.group(1)
-            name = m.group(2).strip()
-            if name and name.upper() != "NAME":
-                chars.setdefault(cur, {"name": name, "skins": {}})
-                if m.group(3):
-                    chars[cur]["skins"][m.group(3)] = correct_skin_name(m.group(3), (m.group(4) or "").strip())
-            continue
-        m2 = re.match(r'\|\s*\|\s*\|\s*(\d{7})\s*\|\s*([^|]*?)\s*\|', line)
-        if m2 and cur and cur in chars:
-            chars[cur]["skins"][m2.group(1)] = correct_skin_name(m2.group(1), m2.group(2).strip())
-    return chars
-
-def _parse_char_md():
-    path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
-    try:
-        return _parse_char_md_text(open(path, encoding="utf-8").read())
-    except Exception:
-        return {}
-
-def _fetch_char_data():
-    global _CHAR_DATA
-    try:
-        req = urllib.request.Request(
-            _REMOTE_MD_URL,
-            headers={"User-Agent": "Atelier-ModTool/1.0 (character-id-sync)"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as r:
-            text = r.read().decode("utf-8")
-    except Exception:
-        return
-    new_data = _parse_char_md_text(text)
-    if not new_data:
-        return  # do not publish an empty/broken catalogue
-    merged, changed = merge_reference(_CHAR_DATA, new_data)
-    if changed:
-        # Publish a complete consistent snapshot; existing names can be renamed.
-        # Persist the merged table so missing/offline entries survive a restart.
-        _CHAR_DATA = merged
-        # write updated file back so next launch starts with fresh data
-        try:
-            path = os.path.join(TOOLS, "MarvelRivalsCharacterIDs.md")
-            tmp = path + '.atlas-update.tmp'
-            try:
-                with open(tmp, 'w', encoding='utf-8') as f:
-                    for cid, row in sorted(merged.items()):
-                        f.write(f"| {cid} | {row['name'].replace('|', ' ')} | | |\n")
-                        for sid, label in sorted(row['skins'].items()):
-                            f.write(f"| | | {sid} | {label.replace('|', ' ')} |\n")
-                os.replace(tmp, path)
-            finally:
-                try: os.unlink(tmp)
-                except FileNotFoundError: pass
-        except Exception:
-            pass
-        if _update_callback:
-            _update_callback({"toast": f"Character names updated — {changed} entries added or corrected", "toast_type": "success"})
-
-def _try_fetch_once():
-    global _fetch_attempted
-    with _fetch_lock:
-        if _fetch_attempted:
-            return
-        _fetch_attempted = True
-    threading.Thread(target=_fetch_char_data, daemon=True).start()
-
-_CHAR_DATA = _parse_char_md()
-
 def char_name(cid):
-    name = _CHAR_DATA.get(cid, {}).get("name")
-    if not name:
-        _try_fetch_once()
-    return name or f"Character {cid}"
+    return skinnames.char_name(cid) or f"Character {cid}"
+
 
 def skin_name(sid):
-    cid  = get_char_id(sid)
-    name = _CHAR_DATA.get(cid, {}).get("skins", {}).get(sid)
-    if not name:
-        _try_fetch_once()
-    return name or sid
+    return skinnames.skin_name(sid) or sid
+
 
 def token(game_rel):
     return hashlib.md5(game_rel.encode()).hexdigest()[:20]
