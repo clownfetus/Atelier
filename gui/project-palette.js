@@ -68,6 +68,69 @@
     save([...colours, clean], project, state);
   }
 
+  function addMany(hexList) {
+    const project = activeProject(), state = projects.get(project);
+    if (!state?.colours || state.saving) return 0;
+    const existing = new Set(state.colours);
+    const fresh = [];
+    for (const raw of hexList || []) {
+      const clean = normalizeHex(raw);
+      if (clean && !existing.has(clean) && state.colours.length + fresh.length < 16) {
+        existing.add(clean);
+        fresh.push(clean);
+      }
+    }
+    if (!fresh.length) {
+      window.toast?.(state.colours.length >= 16 ? 'Project palette holds up to 16 colours' : 'Those costume colours are already in the project palette', 'info', 2600);
+      return 0;
+    }
+    save([...state.colours, ...fresh], project, state);
+    window.toast?.(`Added ${fresh.length} costume colour${fresh.length === 1 ? '' : 's'} to project palette`, 'success', 2600);
+    return fresh.length;
+  }
+
+  function artworkSourcesFor(path) {
+    if (!path) return [];
+    const desc = window.AtelierCatalogueArt?.describe(path);
+    const hero = desc?.char_id || window.AtelierCatalogueArt?.heroId(path) || '';
+    const skin = desc?.skin_id || '';
+    if (!hero && !skin) return [];
+    const enc = encodeURIComponent;
+    return [
+      skin && '/api/catalogue/icon/' + enc(skin),
+      skin && '/api/catalogue/thumbnail/' + enc(skin),
+      hero && '/api/catalogue/hero/' + enc(hero) + '/avatar',
+      hero && '/api/catalogue/hero/' + enc(hero) + '/story',
+    ].filter(Boolean);
+  }
+
+  function sampleFromArtwork(sources) {
+    return new Promise(resolve => {
+      const urls = [...new Set(sources.filter(Boolean))];
+      const img = new Image();
+      img.decoding = 'async';
+      const next = () => {
+        if (!urls.length) { resolve([]); return; }
+        img.src = urls.shift();
+      };
+      img.onload = () => {
+        let colours = [];
+        try {
+          const sampled = window.AtelierPolish?.samplePalette?.(img) || [];
+          colours = sampled.map(normalizeHex).filter(Boolean).slice(0, 5);
+          if (!colours.length) {
+            const single = normalizeHex(window.AtelierPolish?.accent?.(img));
+            if (single) colours = [single];
+          }
+        } catch (_) {}
+        if (colours.length) resolve(colours);
+        else next();
+      };
+      img.onerror = next;
+      next();
+    });
+  }
+
   function remove(hex) {
     const project = activeProject(), state = projects.get(project);
     if (!state?.colours || state.saving) return;
@@ -79,7 +142,7 @@
       mounts.delete(entry);
       return;
     }
-    const { host, onPick, getCurrentHex } = entry;
+    const { host, onPick, getCurrentHex, getArtworkPath } = entry;
     const project = activeProject(), state = projects.get(project);
     const colours = state?.colours || [];
     host.className = 'project-palette-bar';
@@ -130,6 +193,29 @@
       }
     }
 
+    const actions = document.createElement('div');
+    actions.className = 'project-palette-actions';
+    const sources = artworkSourcesFor(getArtworkPath?.());
+    if (sources.length) {
+      const sampleBtn = document.createElement('button');
+      sampleBtn.type = 'button';
+      sampleBtn.className = 'btn project-palette-sample';
+      sampleBtn.textContent = 'Sample costume art';
+      sampleBtn.title = 'Extract colours from this costume’s artwork into the project palette';
+      sampleBtn.disabled = !!state?.error || !state?.colours || state.saving;
+      sampleBtn.addEventListener('click', async () => {
+        if (sampleBtn.disabled) return;
+        sampleBtn.disabled = true;
+        const sampled = await sampleFromArtwork(sources);
+        if (sampled.length) addMany(sampled);
+        else {
+          window.toast?.('No costume artwork available to sample right now', 'info', 2500);
+          renderAll();
+        }
+      });
+      actions.append(sampleBtn);
+    }
+
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'btn project-palette-add';
@@ -142,20 +228,21 @@
       if (hex) add(hex);
       else window.toast?.('Select or edit a colour parameter first', 'info', 2500);
     });
+    actions.append(addBtn);
 
-    host.append(label, list, addBtn);
+    host.append(label, list, actions);
   }
 
   function renderAll() {
     for (const entry of [...mounts]) renderMount(entry);
   }
 
-  function mount(host, { onPick, getCurrentHex } = {}) {
+  function mount(host, { onPick, getCurrentHex, getArtworkPath } = {}) {
     if (!host) return;
     for (const existing of [...mounts]) {
       if (existing.host === host || !existing.host.isConnected) mounts.delete(existing);
     }
-    const entry = { host, onPick, getCurrentHex };
+    const entry = { host, onPick, getCurrentHex, getArtworkPath };
     mounts.add(entry);
     const project = activeProject();
     renderMount(entry);

@@ -1743,17 +1743,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
 #texopt-overlay .modal { --studio-piece: var(--atelier-texture); --studio-piece-hue: 258.9; --studio-piece-ink: var(--studio-icon-texture); --studio-band-base: var(--md-sys-color-surface-container); }
 #viewport-overlay.overlay #viewport-box { --studio-piece: var(--atelier-mesh); --studio-piece-hue: 173.5; --studio-piece-ink: var(--studio-icon-mesh); --studio-band-base: var(--bg2); }
 #material-overlay .mat-modal { --studio-piece: var(--atelier-material); --studio-piece-hue: 46.8; --studio-piece-ink: var(--studio-icon-material); --studio-band-base: var(--md-sys-color-surface-container); }
-#texopt-overlay .modal, #viewport-overlay.overlay #viewport-box, #material-overlay .mat-modal { border-top: 3px solid var(--studio-piece); }
-#texopt-overlay .setup-head, #viewport-overlay.overlay #viewport-head, #material-overlay .mat-head {
+#curve-overlay .mat-modal { --studio-piece: var(--studio-emblem-vfx, var(--acc)); --studio-piece-hue: 328; --studio-piece-ink: var(--studio-emblem-vfx, var(--acc)); --studio-band-base: var(--md-sys-color-surface-container); }
+#texopt-overlay .modal, #viewport-overlay.overlay #viewport-box, #material-overlay .mat-modal, #curve-overlay .mat-modal { border-top: 3px solid var(--studio-piece); }
+#texopt-overlay .setup-head, #viewport-overlay.overlay #viewport-head, #material-overlay .mat-head, #curve-overlay .mat-head {
   background: var(--studio-band-base);
   background: oklch(from var(--studio-band-base) min(l, 0.975) calc(0.009 + (1 - l) * 0.022) var(--studio-piece-hue));
   border-bottom-color: color-mix(in srgb, var(--studio-piece) 45%, var(--border));
 }
 #texopt-overlay .setup-head h2 > svg:first-child, #material-overlay .mat-head h2 > svg:first-child,
+#curve-overlay .mat-head h2 > svg:first-child,
 #viewport-overlay.overlay .vp-workspace-label { color: var(--studio-piece-ink); }
-#material-overlay .mat-head { position: relative; overflow: hidden; isolation: isolate; }
-#material-overlay .mat-head-titles { min-width: 0; flex: 1; position: relative; z-index: 1; }
-#material-overlay .mat-head > .sb-clear { position: relative; z-index: 2; }
+#material-overlay .mat-head, #curve-overlay .mat-head { position: relative; overflow: hidden; isolation: isolate; }
+#material-overlay .mat-head-titles, #curve-overlay .mat-head-titles { min-width: 0; flex: 1; position: relative; z-index: 1; }
+#material-overlay .mat-head > .sb-clear, #curve-overlay .mat-head > .sb-clear { position: relative; z-index: 2; }
 .mat-hero-badge {
   width: 38px; height: 38px; flex: none; align-self: center;
   border-radius: var(--studio-shape-small);
@@ -1770,3 +1772,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offs
   filter: brightness(0) invert(1); opacity: .13;
 }
 :root[data-theme=light] .mat-hero-watermark { filter: brightness(0); opacity: .08; }
+.mat-foot .btn[data-steps]::after {
+  content: attr(data-steps) / "";
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: var(--studio-shape-xs);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-family: var(--studio-mono);
+  font-size: var(--studio-text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}

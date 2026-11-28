@@ -57,29 +57,30 @@
       'body:not([data-page="workspace"]) #search-input, #workspace-choice:not([hidden]) #workspace-search, #viewport-overlay.mounted.active #viewport-material-search',
     );
     const cmds = [
-      { group: 'Navigation', label: 'Open Library', keywords: 'assets home browse', action: () => document.getElementById('page-library')?.click() },
-      { group: 'Navigation', label: 'Open Recolour costume workspace', keywords: 'workspace skin studio', action: () => document.getElementById('page-workspace')?.click() },
-      { group: 'Navigation', label: 'Switch project…', keywords: 'projects open create', action: () => window.openProjectPicker?.() },
-      { group: 'Navigation', label: 'Focus search', shortcut: document.body.dataset.page === 'workspace' ? '' : 'Ctrl+F', keywords: 'find filter', disabled: () => !search?.getClientRects().length, action: () => { search.focus(); search.select(); } },
-      { group: 'Navigation', label: 'Refresh library view', keywords: 'reload grid', action: () => window.renderGrid?.() },
-      { group: 'Mod tray', label: 'Review & build mod…', keywords: 'export install pak', disabled: () => document.getElementById('install-btn')?.disabled, action: () => document.getElementById('install-btn')?.click() },
-      { group: 'Mod tray', label: 'Add custom asset…', keywords: 'new texture mesh material', action: () => document.getElementById('add-asset-open')?.click() },
-      { group: 'Mod tray', label: 'Selection profiles…', keywords: 'presets variants checkboxes', disabled: () => !project, action: () => window.AtelierTrayFilters?.openProfiles() },
-      { group: 'Mod tray', label: 'Recently deleted (Project trash)…', keywords: 'trash undo restore recover', disabled: () => !project, action: () => window.AtelierTrash?.open() },
-      { group: 'Mod tray', label: 'Process S maps', keywords: 'specular diffuse blend', disabled: () => document.getElementById('process-s-maps')?.disabled || document.getElementById('process-s-maps-wrap')?.hidden, action: () => document.getElementById('process-s-maps')?.click() },
-      { group: 'Tools', label: 'Open a mod…', keywords: 'inspect pak utoc zip', action: () => window.AtelierModOpen?.open() },
-      { group: 'Tools', label: 'Repatch a mod…', keywords: 'fix repair broken patch', action: () => window.openRepatcher?.() },
-      { group: 'Tools', label: 'Shader Studio…', keywords: 'dxil disassemble hlsl', action: () => window.openShaderStudio?.() },
-      { group: 'Tools', label: 'Settings…', keywords: 'appearance theme palette paths blender motion', action: () => window.openPaths?.() },
-      { group: 'Tools', label: 'Show project folder in Explorer', keywords: 'files folder open', action: () => window.atelierFetch?.('/api/open_projects_folder') },
-      { group: 'Tools', label: 'Open export folder', keywords: 'exported mods paks', action: () => window.atelierFetch?.('/api/open_export_folder') },
-      { group: 'Tools', label: 'What’s new…', keywords: 'changelog release notes', action: () => window.AtelierChangelog?.show() },
-      { group: 'Tools', label: 'Keyboard shortcuts…', shortcut: '?', keywords: 'keys hotkeys help', action: () => openShortcuts() },
+      { group: 'Navigation', icon: 'grid-2x2', label: 'Open Library', keywords: 'assets home browse', action: () => document.getElementById('page-library')?.click() },
+      { group: 'Navigation', icon: 'palette', label: 'Open Recolour costume workspace', keywords: 'workspace skin studio', action: () => document.getElementById('page-workspace')?.click() },
+      { group: 'Navigation', icon: 'folder-kanban', label: 'Switch project…', keywords: 'projects open create', action: () => window.openProjectPicker?.() },
+      { group: 'Navigation', icon: 'search', label: 'Focus search', shortcut: document.body.dataset.page === 'workspace' ? '' : 'Ctrl+F', keywords: 'find filter', disabled: () => !search?.getClientRects().length, action: () => { search.focus(); search.select(); } },
+      { group: 'Navigation', icon: 'refresh-cw', label: 'Refresh library view', keywords: 'reload grid', action: () => window.renderGrid?.() },
+      { group: 'Mod tray', icon: 'download', label: 'Review & build mod…', keywords: 'export install pak', disabled: () => document.getElementById('install-btn')?.disabled, action: () => document.getElementById('install-btn')?.click() },
+      { group: 'Mod tray', icon: 'plus', label: 'Add custom asset…', keywords: 'new texture mesh material', action: () => document.getElementById('add-asset-open')?.click() },
+      { group: 'Mod tray', icon: 'layers', label: 'Selection profiles…', keywords: 'presets variants checkboxes', disabled: () => !project, action: () => window.AtelierTrayFilters?.openProfiles() },
+      { group: 'Mod tray', icon: 'trash-2', label: 'Recently deleted (Project trash)…', keywords: 'trash undo restore recover', disabled: () => !project, action: () => window.AtelierTrash?.open() },
+      { group: 'Mod tray', icon: 'sparkles', label: 'Process S maps', keywords: 'specular diffuse blend', disabled: () => document.getElementById('process-s-maps')?.disabled || document.getElementById('process-s-maps-wrap')?.hidden, action: () => document.getElementById('process-s-maps')?.click() },
+      { group: 'Tools', icon: 'folder-open', label: 'Open a mod…', keywords: 'inspect pak utoc zip', action: () => window.AtelierModOpen?.open() },
+      { group: 'Tools', icon: 'wrench', label: 'Repatch a mod…', keywords: 'fix repair broken patch', action: () => window.openRepatcher?.() },
+      { group: 'Tools', icon: 'code-2', label: 'Shader Studio…', keywords: 'dxil disassemble hlsl', action: () => window.openShaderStudio?.() },
+      { group: 'Tools', icon: 'sliders-horizontal', label: 'Settings…', keywords: 'appearance theme palette paths blender motion', action: () => window.openPaths?.() },
+      { group: 'Tools', icon: 'folder', label: 'Show project folder in Explorer', keywords: 'files folder open', action: () => window.atelierFetch?.('/api/open_projects_folder') },
+      { group: 'Tools', icon: 'external-link', label: 'Open export folder', keywords: 'exported mods paks', action: () => window.atelierFetch?.('/api/open_export_folder') },
+      { group: 'Tools', icon: 'book-open', label: 'What’s new…', keywords: 'changelog release notes', action: () => window.AtelierChangelog?.show() },
+      { group: 'Tools', icon: 'keyboard', label: 'Keyboard shortcuts…', shortcut: '?', keywords: 'keys hotkeys help', action: () => openShortcuts() },
     ];
     const assets = window.AtelierAssetEditors?.projectAssets?.() || [];
     for (const item of assets) {
       cmds.push({
         group: 'Mod tray assets',
+        asset: item,
         label: item.name || item.game_rel,
         sub: item.game_rel || '',
         keywords: `${item.file_type || ''} ${item.char_name || ''} ${item.skin_name || ''} ${item.game_rel || ''}`,
@@ -102,6 +103,11 @@
           <span class="cmd-kbd">Esc</span>
         </div>
         <div class="cmd-list" id="cmd-list" role="listbox" aria-label="Commands"></div>
+        <div class="cmd-footer" aria-hidden="true">
+          <span><kbd class="cmd-kbd">↑↓</kbd> Navigate</span>
+          <span><kbd class="cmd-kbd">↵</kbd> Run</span>
+          <span><kbd class="cmd-kbd">Esc</kbd> Close</span>
+        </div>
       </section>
     `;
     document.body.append(cmdOverlay);
@@ -185,16 +191,39 @@
       btn.setAttribute('role', 'option');
       const main = document.createElement('span');
       main.className = 'cmd-item-main';
+      const lead = document.createElement('span');
+      lead.className = 'cmd-item-icon';
+      lead.setAttribute('aria-hidden', 'true');
+      if (cmd.asset) {
+        const chip = window.AtelierCatalogueArt?.identityChip(cmd.asset);
+        if (chip) {
+          chip.classList.add('cmd-item-art');
+          lead.append(chip);
+        } else {
+          const dot = document.createElement('span');
+          dot.className = 'cmd-item-dot';
+          dot.dataset.fileType = cmd.asset.file_type || '';
+          lead.append(dot);
+        }
+      } else if (cmd.icon) {
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', cmd.icon);
+        icon.setAttribute('size', '14');
+        lead.append(icon);
+      }
+      const copy = document.createElement('span');
+      copy.className = 'cmd-item-copy';
       const label = document.createElement('span');
       label.className = 'cmd-item-label';
       label.textContent = cmd.label;
-      main.append(label);
+      copy.append(label);
       if (cmd.sub) {
         const sub = document.createElement('span');
         sub.className = 'cmd-item-sub';
         sub.textContent = cmd.sub;
-        main.append(sub);
+        copy.append(sub);
       }
+      main.append(lead, copy);
       btn.append(main);
       if (cmd.shortcut) {
         const kbd = document.createElement('span');
@@ -214,6 +243,7 @@
       btn.addEventListener('click', () => { closePalette(); cmd.action?.(); });
       list.append(btn);
     });
+    if (window.lucide) window.lucide.createIcons({ nodes: [list] });
     syncActive();
   }
 

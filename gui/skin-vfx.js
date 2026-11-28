@@ -49,6 +49,7 @@ export function createSkinVfxEditor(fetchAssets) {
         edited();
       });
       const label = element('label', axis, 'skin-vfx-field');
+      label.dataset.axis = ['x', 'y', 'z'][index] || '';
       label.append(input);
       group.append(label);
       return input;

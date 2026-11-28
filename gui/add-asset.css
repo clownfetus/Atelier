@@ -11,13 +11,13 @@
 .add-asset-inline input { flex: 1; }
 .add-asset-inline .btn { flex-shrink: 0; }
 .add-asset-files { overflow-wrap: anywhere; font-size: var(--studio-text-label); color: var(--muted); }
-.add-asset-destination { display: grid; gap: 8px; padding: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--studio-shape-medium); font-size: var(--studio-text-detail); }
-.add-asset-destination code, .add-asset-browser-path { overflow-wrap: anywhere; color: var(--text); }
-.add-asset-browser { border: 1px solid var(--border); border-radius: var(--studio-shape-medium); padding: 12px; background: var(--bg2); }
-.add-asset-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; font-size: var(--studio-text-detail); }
+.add-asset-destination { display: grid; gap: 6px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--studio-shape-small); font-size: var(--studio-text-detail); }
+.add-asset-destination code, .add-asset-browser-path { overflow-wrap: anywhere; color: var(--text); font-family: var(--studio-mono); font-size: var(--studio-text-micro); }
+.add-asset-browser { border: 1px solid var(--border); border-radius: var(--studio-shape-small); padding: 12px; background: var(--bg2); }
+.add-asset-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: var(--studio-text-detail); }
 .add-asset-browser-path { flex: 1; min-width: 0; }
 .add-asset-browser-items { display: grid; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 12px; }
-.add-asset-browser-items button { width: 100%; justify-content: flex-start; text-align: left; overflow-wrap: anywhere; white-space: normal; }
+.add-asset-browser-items button { width: 100%; justify-content: flex-start; text-align: left; overflow-wrap: anywhere; white-space: normal; transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing); }
 .add-asset-browser-items .hero-chip-art { flex: 0 0 32px; width: 32px; height: 32px; object-fit: contain; }
 .add-asset-browser-items small { color: var(--muted); margin-left: auto; }
 .add-asset-status { margin: 0; min-height: 20px; }

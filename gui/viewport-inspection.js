@@ -102,6 +102,9 @@ export function createViewportInspection(api) {
     select.options[0].textContent=showcaseMode?'Showcase art':'Studio';
     for(const opt of select.options){if(opt.value==='emblem'||opt.value==='story')opt.hidden=!showcaseMode;}
     if(!showcaseMode&&(select.value==='emblem'||select.value==='story')){select.value='gradient';backdrop();}
+    const lightSelect=$('viewport-lighting');
+    for(const opt of lightSelect.options){if(opt.value==='dramatic'||opt.value==='warm')opt.hidden=!showcaseMode;}
+    if(!showcaseMode&&(lighting==='dramatic'||lighting==='warm')){lightSelect.value='studio';applyLighting('studio');}
     $('viewport-showcase-note').hidden=!showcaseMode;
     if (showcaseMode && uvOpen) openUV();
     $('viewport-uv-toggle').disabled = showcaseMode;
@@ -361,7 +364,7 @@ export function createViewportInspection(api) {
   // Showcase honours View settings; the canonical mod-card poster ignores them.
   function renderPass(original = false, showcase = false, comic=false,canonical=false) {
     const restore = [];
-    const gridVisible=grid.visible,toon=comic&&(canonical||lighting==='studio');
+    const gridVisible=grid.visible,toon=comic&&(canonical||!['flat','emissive'].includes(lighting));
     try {
     if(canonical)grid.visible=false;
     modelRoot.traverse(mesh => {
@@ -443,11 +446,21 @@ export function createViewportInspection(api) {
   $('viewport-fit').addEventListener('click', () => frame(true,true));
   $('viewport-wireframe').addEventListener('click', () => { wireframe = !wireframe; $('viewport-wireframe').setAttribute('aria-pressed', String(wireframe)); });
   $('viewport-grid').addEventListener('click', () => { if (showcaseMode) showcaseGrid = !showcaseGrid; else showGrid = !showGrid; refresh(); });
-  $('viewport-lighting').addEventListener('change', event => {
-    lighting = event.target.value;
-    lights.forEach((light,i) => { light.intensity = [.45,1.4,.5][i]; });
-    scene.environmentIntensity = .45;
-  });
+  const LIGHT_PRESETS = {
+    studio: { hemi: [0xffffff, 0x404050, .45], key: [0xffffff, 1.4, 1, 2, 1.5], fill: [0xaaccff, .5, -1.5, .6, -1], env: .45 },
+    dramatic: { hemi: [0xb8c8e8, 0x1a1d28, .24], key: [0xfff4e4, 1.75, 1.6, 2.2, 1.0], fill: [0x66aaff, 1.35, -1.8, 1.1, -1.6], env: .28 },
+    warm: { hemi: [0xfff0dc, 0x3b2d26, .52], key: [0xffe0b5, 1.65, 1.3, 1.8, 1.6], fill: [0x9ec5ff, .62, -1.4, .7, -1.2], env: .50 },
+  };
+  function applyLighting(mode) {
+    lighting = mode;
+    const preset = LIGHT_PRESETS[mode] || LIGHT_PRESETS.studio;
+    const [hemi, key, fill] = lights;
+    if (hemi) { hemi.color.setHex(preset.hemi[0]); hemi.groundColor?.setHex(preset.hemi[1]); hemi.intensity = preset.hemi[2]; }
+    if (key) { key.color.setHex(preset.key[0]); key.intensity = preset.key[1]; key.position.set(preset.key[2], preset.key[3], preset.key[4]); }
+    if (fill) { fill.color.setHex(preset.fill[0]); fill.intensity = preset.fill[1]; fill.position.set(preset.fill[2], preset.fill[3], preset.fill[4]); }
+    scene.environmentIntensity = preset.env;
+  }
+  $('viewport-lighting').addEventListener('change', event => applyLighting(event.target.value));
   $('viewport-bloom').addEventListener('click', event => {
     const enabled = event.currentTarget.getAttribute('aria-pressed') !== 'true';
     try { effects.setBloom(enabled); event.currentTarget.setAttribute('aria-pressed',String(enabled)); }

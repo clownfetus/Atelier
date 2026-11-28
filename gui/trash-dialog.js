@@ -152,7 +152,13 @@
         : `${item.count} edited asset${plural}`;
       const sub = document.createElement('div');
       sub.className = 'trash-card-sub';
-      sub.textContent = `${formatWhen(item.deleted_at)} · ${formatRemaining(item.expires_at)}`;
+      const when = document.createElement('span');
+      when.textContent = formatWhen(item.deleted_at);
+      const pill = document.createElement('span');
+      pill.className = 'trash-expiry-pill';
+      pill.textContent = formatRemaining(item.expires_at);
+      if (item.expires_at != null && (item.expires_at - Date.now() / 1000) <= 86400) pill.dataset.urgent = 'true';
+      sub.append(when, pill);
       meta.append(title, sub);
 
       const actions = document.createElement('div');
@@ -180,16 +186,21 @@
       const visible = (item.assets || []).slice(0, 6);
       for (const asset of visible) {
         const li = document.createElement('li');
+        const lead = document.createElement('span');
+        lead.className = 'trash-asset-lead';
+        const chip = window.AtelierCatalogueArt?.identityChip(asset.game_rel);
+        if (chip) { chip.classList.add('trash-asset-art'); lead.append(chip); }
         const name = document.createElement('span');
         name.className = 'trash-asset-name';
         name.textContent = asset.name;
         name.title = asset.game_rel;
+        lead.append(name);
         const path = document.createElement('span');
         path.className = 'trash-asset-path';
         const parts = asset.game_rel.split('/');
         path.textContent = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
         path.title = asset.game_rel;
-        li.append(name, path);
+        li.append(lead, path);
         list.append(li);
       }
       if ((item.assets || []).length > visible.length) {

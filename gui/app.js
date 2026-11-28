@@ -996,8 +996,18 @@ const _vfxHistory = window.AtelierHistory?.create();
 function _syncHistoryButtons(prefix, stack, busy = false) {
   const u = document.getElementById(prefix + "-undo");
   const r = document.getElementById(prefix + "-redo");
-  if (u) u.disabled = busy || !stack?.canUndo();
-  if (r) r.disabled = busy || !stack?.canRedo();
+  const uCount = stack?.undoCount?.() || 0;
+  const rCount = stack?.redoCount?.() || 0;
+  if (u) {
+    u.disabled = busy || !stack?.canUndo();
+    u.title = uCount ? `Undo · ${uCount} step${uCount === 1 ? "" : "s"} (Ctrl+Z)` : "Undo (Ctrl+Z)";
+    if (uCount > 0) u.dataset.steps = String(uCount); else delete u.dataset.steps;
+  }
+  if (r) {
+    r.disabled = busy || !stack?.canRedo();
+    r.title = rCount ? `Redo · ${rCount} step${rCount === 1 ? "" : "s"} (Ctrl+Shift+Z)` : "Redo (Ctrl+Shift+Z)";
+    if (rCount > 0) r.dataset.steps = String(rCount); else delete r.dataset.steps;
+  }
 }
 
 function _matHistoryState() {
@@ -1296,8 +1306,8 @@ function _seedScalars(arr) {
                                  max: Math.max(Math.abs(s.value) * 3, 1) }));
 }
 
-function _decorateMaterialHead(gameRel) {
-  const head = document.querySelector('#material-overlay .mat-head');
+function _decorateMaterialHead(gameRel, overlayId = 'material-overlay') {
+  const head = document.querySelector(`#${overlayId} .mat-head`);
   if (!head) return;
   head.querySelectorAll('.mat-hero-badge, .mat-hero-watermark').forEach(node => node.remove());
   if (!gameRel) return;
@@ -1951,6 +1961,7 @@ function renderMatEditor() {
       const c = matEditor?.colors?.[Math.min(Math.max(0, matActiveColorIndex), (matEditor?.colors?.length || 1) - 1)];
       return c ? _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten) : "";
     },
+    getArtworkPath: () => matEditor?.game_rel || "",
   });
   applyMatFilter();
 }
@@ -2327,6 +2338,7 @@ async function openCurveEditor(item) {
   document.getElementById("curve-title").textContent = item.name;
   document.getElementById("curve-sub").textContent = item.game_rel || "";
   document.getElementById("curve-status").textContent = "";
+  _decorateMaterialHead(item.game_rel, 'curve-overlay');
   document.getElementById("curve-body").inert = false;
   document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
@@ -2473,6 +2485,7 @@ async function closeCurveEditor(force = false) {
   if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
   ++_curveOpenRevision;
   const overlay = document.getElementById('curve-overlay');
+  _decorateMaterialHead('', 'curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   curveEditor = null;
