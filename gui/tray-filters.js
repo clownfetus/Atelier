@@ -11,6 +11,7 @@
     curve: 'Curves',
     text: 'Text',
     world: 'Worlds',
+    audio: 'Audio',
     other: 'Other',
   };
 

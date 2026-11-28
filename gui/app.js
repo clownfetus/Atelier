@@ -41,6 +41,7 @@ const ASSET_HANDLERS = {
   mesh:     { import_endpoint: null,                   preview: false, icon: "scan-box"     },
   curve:    { import_endpoint: "/api/curve_params",    preview: false, icon: "spline"       },
   text:     { import_endpoint: "/api/text_params",     preview: false, icon: "type-outline" },
+  audio:    { import_endpoint: null,                   preview: false, icon: "folder-audio" },
 };
 function handlerFor(ft) { return ASSET_HANDLERS[ft] || { import_endpoint: "/api/import", preview: false, icon: "file-question" }; }
 
@@ -51,6 +52,7 @@ const ASSET_ICON_CLS = {
   mesh:     "mesh-icon",
   curve:    "curve-icon",
   text:     "text-icon",
+  audio:    "audio-icon",
 };
 function assetIconCls(ft) { return ASSET_ICON_CLS[ft] || "unhandled-icon"; }
 
@@ -66,6 +68,7 @@ const ICON_CLS_TO_LUCIDE = {
   "mesh-icon":            "scan-box",
   "curve-icon":           "spline",
   "text-icon":            "type-outline",
+  "audio-icon":           "folder-audio",
   "unhandled-icon":       "file-question",
 };
 
@@ -832,6 +835,9 @@ function handleImportedFileAction(item) {
       return;
     case "mesh":
       window.AtelierMeshEdit?.open(item);
+      return;
+    case "audio":
+      window.AtelierAudioStudio?.openClip(item.game_rel);
       return;
   }
 }
@@ -3406,6 +3412,14 @@ function refreshSidebarEntry(game_rel, name, skin_id, imported) {
 }
 
 function sbSubLabel(item) {
+  if (item.file_type === "audio") {
+    const bits = [];
+    if (item.char_name) bits.push(item.char_name);
+    else if (item.audio_bank) bits.push(item.audio_bank);
+    if (item.audio_subtitle) bits.push(`“${item.audio_subtitle}”`);
+    else if (item.audio_label) bits.push(item.audio_label);
+    if (bits.length) return bits.join(" · ");
+  }
   if (item.char_name || item.skin_id) {
     return `${item.char_name || item.skin_id} / ${item.skin_name || ""}`;
   }
@@ -3843,7 +3857,7 @@ function _flushSelection(project) {
 
 let _exportRunningCount = 0;
 let _exportReviewChecking = false;
-const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh"]);
+const _exportTypes = new Set(["texture", "material", "curve", "vfx", "world", "text", "mesh", "audio"]);
 
 function updateInstallBtn() {
   const items = Object.values(sidebarData);
@@ -6199,6 +6213,7 @@ document.getElementById("menu-btn").addEventListener("click", e => {
       { icon: "scan-box", label: "Open a mod…", action: () => window.AtelierModOpen?.open() },
       { icon: "wrench", label: "Repatch a mod…", action: () => openRepatcher() },
       { icon: "shield-alert", label: "Game patch radar…", action: () => window.AtelierPatchRadar?.open() },
+      { icon: "folder-audio", label: "Audio & Voice Studio…", action: () => window.AtelierAudioStudio?.open() },
       { icon: "binary", label: "Shader Studio…", action: () => openShaderStudio() },
       { icon: "sliders-horizontal", label: "Settings…", action: () => openPaths() },
       { icon: "search", label: "Command palette…", action: () => window.AtelierCommands?.openPalette() },
