@@ -11,8 +11,8 @@ from atelier.handlers.meshreplace import digest
 
 def revert(game_rel):
     config.validate_game_rel(game_rel)
-    from atelier.web.browse import _classify_file, _imported_exists
-    kind = _classify_file(os.path.basename(game_rel))
+    from atelier.web.browse import project_file_type, _imported_exists
+    kind = project_file_type(game_rel)
     extension = '.blend' if kind == 'mesh' else '.png' if kind == 'texture' else '.json'
     if not _imported_exists(game_rel, extension):
         raise ValueError('This asset is not in the edit list')

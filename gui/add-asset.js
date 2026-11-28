@@ -3,14 +3,15 @@
   'use strict';
   const el = (...args) => AtelierJobDialogs.el(...args);
   const prefixes = {texture: 'T_', mesh: 'SK_', material: 'MI_'};
-  let overlay, panel, form, kind, name, mode, files, fileRow, fileNames, sourceRow, sourceLabel,
+  let overlay, panel, form, kind, name, exactName, mode, files, fileRow, fileNames, sourceRow, sourceLabel,
     source, folder, destination, status, submit, browser, browserItems, browserPath, useFolder,
     up, closeButton, help, browseMode, browseLocation = '', browseRequest = 0, project, busy = false, stopWorking;
   function gamePath(value) { return value.trim().replaceAll('\\', '/').replace(/^\/Game\/Marvel(?:\/|$)/, '').replace(/\/$/, ''); }
   function assetName() {
     const value = name.value.trim();
+    if (!value || exactName.checked) return value;
     const valid = kind.value === 'mesh' ? /^(SK_|SM_)/i : new RegExp('^' + prefixes[kind.value], 'i');
-    return value && (valid.test(value) ? value : prefixes[kind.value] + value);
+    return valid.test(value) ? value : prefixes[kind.value] + value;
   }
   function stopMotion() { stopWorking?.(); stopWorking = null; }
   function showMotion() {
@@ -27,11 +28,12 @@
     fileRow.hidden = !upload;
     sourceRow.hidden = upload && (kind.value !== 'texture' || cooked);
     sourceLabel.textContent = upload ? 'Game texture template' : 'Game asset to copy';
-    name.placeholder = prefixes[kind.value] + {texture: 'MyTexture', mesh: 'MyMesh', material: 'MyMaterial'}[kind.value];
+    const prefix = exactName.checked ? '' : prefixes[kind.value];
+    name.placeholder = prefix + {texture: 'MyTexture', mesh: 'MyMesh', material: 'MyMaterial'}[kind.value];
     help.textContent = {
       texture: 'Images use the template’s texture type and format. For HDR cubemaps, choose a TextureCube template and a .hdr panorama, six-face strip or cubemap DDS.',
       mesh: 'For FBX, GLB or Blender files, copy a game mesh first, then use Replace model.',
-      material: 'Material files must be cooked material instances (MI_).',
+      material: 'Material files must be cooked material instances.',
     }[kind.value];
     source.placeholder = kind.value === 'texture' ? 'Characters/…/Textures/T_Body_D' :
       kind.value === 'mesh' ? 'Characters/…/Meshes/SK_Body' : 'Characters/…/Materials/MI_Body';
@@ -39,7 +41,7 @@
     fileNames.textContent = [...files.files].map(file => file.name).join(', ') ||
       (kind.value === 'texture' ? 'Choose an image, or a cooked .uasset with its companion files.' :
         'Choose a cooked .uasset with its .uexp, .ubulk and .uptnl files when present.');
-    const target = [gamePath(folder.value), assetName() || prefixes[kind.value] + 'YourName'].filter(Boolean).join('/');
+    const target = [gamePath(folder.value), assetName() || prefix + 'YourName'].filter(Boolean).join('/');
     destination.textContent = '/Game/Marvel/' + target;
   }
   function field(labelText, id, control) {
@@ -102,8 +104,15 @@
     }
     name = el('input'); name.type = 'text'; name.required = true; name.maxLength = 80; name.pattern = '[A-Za-z0-9_]+';
     name.placeholder = 'T_MyTexture'; name.spellcheck = false;
+    const nameField = field('Asset name', 'add-asset-name', name);
+    exactName = el('input'); exactName.type = 'checkbox';
+    const exactNameLabel = el('label', undefined, 'add-asset-exact-name');
+    exactNameLabel.append(exactName, 'Use exact name');
+    const nameLabels = el('div', undefined, 'add-asset-name-labels');
+    nameLabels.append(nameField.firstElementChild, exactNameLabel);
+    nameField.prepend(nameLabels);
     const columns = el('div', undefined, 'add-asset-columns');
-    columns.append(field('Asset type', 'add-asset-type', kind), field('Asset name', 'add-asset-name', name));
+    columns.append(field('Asset type', 'add-asset-type', kind), nameField);
     mode = el('select');
     for (const [value, label] of [['file', 'File from computer'], ['game', 'Copy a game asset']]) {
       const option = el('option', label); option.value = value; mode.append(option);
@@ -141,6 +150,7 @@
     form.addEventListener('submit', add);
     kind.addEventListener('change', () => { files.value = ''; source.value = ''; browser.hidden = true; browseRequest++; refresh(); });
     mode.addEventListener('change', () => { browser.hidden = true; browseRequest++; refresh(); });
+    exactName.addEventListener('change', refresh);
     for (const input of [name, folder, source]) input.addEventListener('input', refresh);
     files.addEventListener('change', () => {
       if (!name.value && files.files.length) name.value = files.files[0].name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_]+/g, '_');
@@ -159,6 +169,7 @@
     if (!sourceRow.hidden && !source.value.trim()) { message('Choose a game asset' + (uploading ? ' to use as the texture template.' : ' to copy.'), true); source.focus(); return; }
     const body = new FormData();
     body.append('file_type', kind.value); body.append('name', name.value.trim()); body.append('folder', folder.value.trim());
+    if (exactName.checked) body.append('exact_name', 'true');
     body.append('source', sourceRow.hidden ? '' : source.value.trim());
     if (uploading) for (const file of files.files) body.append('files', file, file.name);
     busy = true; browser.hidden = true; browseRequest++;

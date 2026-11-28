@@ -16,7 +16,7 @@ os.environ['ATELIER_DATA_DIR'] = _data.name
 atexit.register(_data.cleanup)
 
 from atelier import added_assets as A, config as C, project_trash, storage
-from atelier.handlers import custom_texture as CT, material as M, texture as T, meshreplace
+from atelier.handlers import custom_texture as CT, material as M, texture as T, meshreplace, projectedit
 from atelier.web import browse as B
 from added_asset_fixtures import AssetTool, decode_png, image_bytes, package, mesh_probe
 
@@ -42,9 +42,10 @@ class AddedAssets(unittest.TestCase):
     def source(self, kind, name=None):
         return package(self.root / 'input' / ((name or A.PREFIXES[kind] + 'Source') + '.uasset'), kind)
 
-    def add(self, kind='texture', name='Custom', folder='MyAssets', source=None):
+    def add(self, kind='texture', name='Custom', folder='MyAssets', source=None, *, exact_name=False):
         source = source or self.source(kind)
-        return A.add(kind, folder, name, files=[p for p in source.parent.glob(source.stem + '.*')])
+        return A.add(kind, folder, name, files=[p for p in source.parent.glob(source.stem + '.*')],
+                     exact_name=exact_name)
 
     def test_types_are_listed_once_and_use_the_requested_package_identity(self):
         for kind in A.CLASSES:
@@ -73,6 +74,48 @@ class AddedAssets(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError): A.asset_path('material', 'Custom', name)
         with self.assertRaises(ValueError): A.asset_path('other', '', 'Good')
         self.assertFalse(list(self.project.iterdir()))
+
+    def test_exact_names_keep_the_recorded_type_through_editing_and_export(self):
+        from atelier.web.routes import _split_export_items
+
+        # These names resemble other Unreal asset types. Only the verified source class counts.
+        names = {'texture': 'Paint_st', 'material': 'Cloth', 'mesh': 'MI_Shape'}
+        paths = {kind: self.add(kind, name, exact_name=True)['game_rel'] for kind, name in names.items()}
+        self.assertEqual(paths, {kind: 'MyAssets/' + name for kind, name in names.items()})
+        self.assertEqual({row['file_type']: row['game_rel'] for row in B.all_imported()}, paths)
+        self.assertEqual({row['file_type']: row['game_rel'] for row in B.browse_dispatch('MyAssets')}, paths)
+        self.assertEqual(_split_export_items(list(paths.values())),
+                         ([paths['texture']], [{'game_rel': paths['material'], 'colors': {}, 'scalars': {}}],
+                          [], [], [], [], [paths['mesh']]))
+        self.assertTrue(M.is_material(paths['material']))
+        self.assertFalse(M.is_material(paths['mesh']))
+        with patch('atelier.tools.uat', self.tool):
+            for path in paths.values():
+                with self.subTest(path=path):
+                    self.assertTrue(projectedit.revert(path)['ok'])
+
+    def test_exact_names_must_be_safe_and_unique(self):
+        self.add(name='MyPaint', exact_name=True)
+        with self.assertRaisesRegex(ValueError, 'already'):
+            self.add(name='mypaint', exact_name=True)
+        CT.assign('MI_Body', 'BaseColor', 'Paint.png', image_bytes(), 'Fixtures/T_Source',
+                  name='SlotPaint', folder='MyAssets')
+        with self.assertRaisesRegex(ValueError, 'Another material texture slot'):
+            self.add(name='slotpaint', exact_name=True)
+        for name in ('CON', 'lpt1', '../Escape', 'Has Space', 'x' * 81):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                A.asset_path('texture', 'MyAssets', name, exact_name=True)
+
+    def test_adding_from_an_open_mod_keeps_the_package_path(self):
+        from atelier.handlers import mod_open
+
+        source = self.source('material', 'ModCloth')
+        path = 'ModFolder/ModCloth'
+        self.assertEqual(mod_open._editability('material', 'MaterialInstanceConstant', path, False),
+                         (True, 'add', None))
+        files = [p.relative_to(self.root).as_posix() for p in source.parent.glob(source.stem + '.*')]
+        mod_open._add_new(str(self.root), {'kind': 'material', 'game_rel': path, 'files': files})
+        self.assertEqual([row['game_rel'] for row in B.all_imported()], [path])
 
     def test_collisions_and_wrong_source_types_leave_existing_bytes_untouched(self):
         target = self.add()['game_rel']; before = Path(C.project_base(target) + '.png').read_bytes()

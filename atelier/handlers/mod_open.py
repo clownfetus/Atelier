@@ -268,7 +268,7 @@ def _editability(kind, cls, game_rel, in_game):
     from atelier import added_assets
     folder, name = game_rel.rsplit('/', 1) if '/' in game_rel else ('', game_rel)
     try:
-        added_assets.asset_path(kind, folder, name)
+        added_assets.asset_path(kind, folder, name, exact_name=True)
     except ValueError as exc:
         return False, None, 'New in this mod, at a path Atelier cannot add assets to: ' + str(exc)
     return True, 'add', None
@@ -505,7 +505,7 @@ def _add_new(work, asset):
     folder, name = asset['game_rel'].rsplit('/', 1) if '/' in asset['game_rel'] else ('', asset['game_rel'])
     files = [base + ext for ext in _COMPANIONS if os.path.isfile(base + ext)]
     try:
-        added_assets.add(asset['kind'], folder, name, files=files)
+        added_assets.add(asset['kind'], folder, name, files=files, exact_name=True)
         return 'New in this mod, so it was added as your own asset at the same path.'
     except (ValueError, RuntimeError) as exc:
         template = _template(name) if asset['kind'] == 'texture' else None
@@ -515,7 +515,7 @@ def _add_new(work, asset):
     # they were made from.
     with tempfile.TemporaryDirectory(prefix='mod-texture-', dir=work) as temporary:
         png = _decode_png(work, asset, temporary)
-        added_assets.add('texture', folder, name, source=template, files=[png])
+        added_assets.add('texture', folder, name, source=template, files=[png], exact_name=True)
     return ('New in this mod, so it was added as your own asset at the same path, from its image '
             'on the game texture %s.' % template.rsplit('/', 1)[-1])
 

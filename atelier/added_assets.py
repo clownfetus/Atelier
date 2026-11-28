@@ -12,7 +12,7 @@ from atelier import config, jobs
 from atelier.index import ensure_index
 from atelier.storage import atomic_json, publish_project_files
 from atelier.tools import uat
-from atelier.unreal_names import add_names
+from atelier.unreal_names import add_names, is_windows_device_name
 
 PACKAGE_EXTS = ('.uasset', '.uexp', '.ubulk', '.uptnl')
 IMAGE_EXTS = {'.png', '.tga', '.jpg', '.jpeg', '.webp', '.bmp', '.dds', '.hdr'}
@@ -35,7 +35,7 @@ def folder_path(value):
         parts = config.validate_game_rel(value)
         if any(not re.fullmatch(r'[A-Za-z0-9_]+', part) for part in parts):
             raise ValueError('Folder names can contain letters, numbers and underscores.')
-        if any(re.fullmatch(r'CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]', part, re.IGNORECASE) for part in parts):
+        if any(is_windows_device_name(part) for part in parts):
             raise ValueError('Choose folder names that can be saved on Windows.')
         if parts[0].lower() in ('plugins', 'marvel_lq'):
             raise ValueError('Choose a folder in the main game content (/Game/Marvel/).')
@@ -43,18 +43,18 @@ def folder_path(value):
     return value
 
 
-def asset_path(file_type, folder, name):
-    if file_type not in CLASSES:
+def asset_path(file_type, folder, name, *, exact_name=False):
+    if not isinstance(file_type, str) or file_type not in CLASSES:
         raise ValueError('Choose a texture, mesh or material.')
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_]{1,80}', name.strip()):
         raise ValueError('Enter an asset name using letters, numbers and underscores (up to 80 characters).')
     name = name.strip()
-    prefixes = ('SK_', 'SM_') if file_type == 'mesh' else (PREFIXES[file_type],)
-    if not name.upper().startswith(prefixes):
-        name = PREFIXES[file_type] + name
-    from atelier.web.browse import _classify_file
-    if _classify_file(name) != file_type:
-        raise ValueError('Choose a name for this asset type (T_, MI_, SK_ or SM_).')
+    if not exact_name:
+        prefixes = ('SK_', 'SM_') if file_type == 'mesh' else (PREFIXES[file_type],)
+        if not name.upper().startswith(prefixes):
+            name = PREFIXES[file_type] + name
+    if is_windows_device_name(name):
+        raise ValueError('Choose an asset name that can be saved on Windows.')
     folder = folder_path(folder)
     return (folder + '/' if folder else '') + name
 
@@ -66,10 +66,19 @@ def record(game_rel, root=None):
     with open(path, encoding='utf-8') as stream:
         data = json.load(stream)
     if (not isinstance(data, dict) or data.get('version') != 1 or
-            data.get('file_type') not in CLASSES or
+            not isinstance(data.get('file_type'), str) or data['file_type'] not in CLASSES or
             not re.fullmatch(r'[0-9a-f]{32}', str(data.get('id', '')))):
         raise ValueError('This added asset has an invalid source record: ' + game_rel)
     return data
+
+
+def recorded_file_type(game_rel, root=None):
+    """Return the verified type of an added asset, if it has a readable record."""
+    try:
+        data = record(game_rel, root)
+    except (OSError, ValueError):
+        return None
+    return data['file_type'] if data else None
 
 
 def source_base(game_rel, root=None):
@@ -230,13 +239,14 @@ def _available(target):
         raise ValueError('An added asset already uses this name and folder.')
 
 
-def add(file_type, folder, name, source='', files=()):
+def add(file_type, folder, name, source='', files=(), *, exact_name=False):
     """Prepare and verify privately; publish the package, editor files and record together."""
     from atelier.handlers import texture, custom_texture
     from atelier.web.browse import token
-    target = asset_path(file_type, folder, name)
-    _available(target)
+    target = asset_path(file_type, folder, name, exact_name=exact_name)
     root = config.get_import_root()
+    _available(target)
+    custom_texture.check_slot_collision(target, root)
     files = [Path(p) for p in files]
     images = [p for p in files if p.suffix.lower() in IMAGE_EXTS]
     packages = [p for p in files if p.suffix.lower() == '.uasset']
@@ -364,6 +374,9 @@ def add(file_type, folder, name, source='', files=()):
         if is_cube:
             dds = work/'image.dds'; dds.write_bytes(hdr_texture.write_dds(hdr_cube))
             changes.append({'path': target+'.dds', 'before': None, 'source': str(dds)})
-        jobs.checkpoint(); _available(target); jobs.begin_publication('Adding the asset to your project…')
+        jobs.checkpoint()
+        _available(target)
+        custom_texture.check_slot_collision(target, root)
+        jobs.begin_publication('Adding the asset to your project…')
         publish_project_files(root, changes)
     return {'ok': True, 'game_rel': target, 'file_type': file_type, 'name': target.rsplit('/', 1)[-1], 'token': token(target)}

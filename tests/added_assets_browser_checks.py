@@ -55,15 +55,18 @@ def run_added_asset_checks(page, context, url, report, checks):
             assert tab.locator('#add-asset-folder').input_value() == 'Fixtures/Textures'
             tab.locator('#add-asset-folder').fill('Custom/Textures')
             assert tab.locator('#add-asset-path').inner_text() == '/Game/Marvel/Custom/Textures/T_MyPaint_D'
+            tab.get_by_role('checkbox', name='Use exact name').check()
+            assert tab.locator('#add-asset-path').inner_text() == '/Game/Marvel/Custom/Textures/MyPaint_D'
             tab.locator('#add-asset-submit').click()
-            texture = 'Custom/Textures/T_MyPaint_D'
+            texture = 'Custom/Textures/MyPaint_D'
             tab.wait_for_function('gr => Object.values(sidebarData).some(row => row.game_rel === gr)', arg=texture)
             assert (root / (texture + '.png')).read_bytes() == image_bytes()
             assert tab.locator('#process-s-maps').is_enabled()
-            checks.append('Add custom asset browses real game folders and uploads a named texture; Process S maps appears once a D map is in the tray')
+            checks.append('Add custom asset browses game folders and uploads a texture without T_; Process S maps appears once a D map is in the tray')
 
             # The exact same destination reports an error and preserves the form and saved image.
             open_button.click(); tab.locator('#add-asset-name').fill('MyPaint_D')
+            tab.get_by_role('checkbox', name='Use exact name').check()
             tab.locator('#add-asset-files').set_input_files({'name': 'new.png', 'mimeType': 'image/png', 'buffer': image_bytes((1, 2, 3, 255))})
             tab.locator('#add-asset-source').fill(paths['texture']); tab.locator('#add-asset-folder').fill('Custom/Textures')
             tab.locator('#add-asset-submit').click()
@@ -114,6 +117,7 @@ def run_added_asset_checks(page, context, url, report, checks):
                 open_button.click(); tab.locator('#add-asset-name').fill('MyTexture')
                 tab.locator('#add-asset-folder').fill('Custom/Textures')
                 tab.locator('#add-asset-source').fill(paths['texture'])
+                tab.get_by_role('checkbox', name='Use exact name').check()
                 tab.wait_for_function("getComputedStyle(document.querySelector('#add-asset-overlay')).opacity === '1' && getComputedStyle(document.querySelector('.add-asset-modal')).opacity === '1'")
                 tab.screenshot(path=str(report / ('add-asset-' + theme + '.png')))
                 assert tab.locator('.add-asset-modal').evaluate('node => node.scrollWidth <= node.clientWidth')

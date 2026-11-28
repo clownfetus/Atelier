@@ -5,8 +5,11 @@
 .add-asset-form { display: grid; gap: 12px; }
 .add-asset-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
 .add-asset-field { display: flex; flex-direction: column; gap: 8px; font-size: var(--studio-text-label); min-width: 0; }
-.add-asset-field input, .add-asset-field select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); background: var(--bg2); color: var(--text); font: inherit; padding: 8px 12px; }
+.add-asset-field input:not([type="checkbox"]), .add-asset-field select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); background: var(--bg2); color: var(--text); font: inherit; padding: 8px 12px; }
 .add-asset-field input:focus-visible, .add-asset-field select:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.add-asset-name-labels { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.add-asset-exact-name { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.add-asset-exact-name input { margin: 0; accent-color: var(--acc); }
 .add-asset-inline { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .add-asset-inline input { flex: 1; }
 .add-asset-inline .btn { flex-shrink: 0; }

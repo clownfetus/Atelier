@@ -56,7 +56,7 @@ def run_catalogue_identity_checks(context, url, report, checks):
             route.fulfill(json={'ok': False, 'error': 'invalid asset path'})
         else:
             folder = body['folder'].removeprefix('/Game/Marvel/')
-            name = body['name'] if body['name'].startswith('T_') else 'T_'+body['name']
+            name = body['name']
             custom['BaseColor'].update(name=name, folder=folder, game_rel=folder+'/'+name)
             route.fulfill(json={'ok': True, 'custom_textures': custom})
     tab.route('**/api/material_custom_texture/location', location)
@@ -160,12 +160,12 @@ def run_catalogue_identity_checks(context, url, report, checks):
         assert tab.locator('#mattex-folder-0').input_value() == '../escape'
         tab.locator('#mattex-name-0').fill('t_Chosen')
         tab.locator('#mattex-folder-0').fill('/Game/Marvel/')
-        assert tab.locator('#mattex-path-0').inner_text() == '/Game/Marvel/T_Chosen'
+        assert tab.locator('#mattex-path-0').inner_text() == '/Game/Marvel/t_Chosen'
         tab.locator('#mattex-name-0').fill('Chosen')
         tab.locator('#mattex-folder-0').fill('/Game/Marvel/MyMod/Textures')
-        assert tab.locator('#mattex-path-0').inner_text() == '/Game/Marvel/MyMod/Textures/T_Chosen'
+        assert tab.locator('#mattex-path-0').inner_text() == '/Game/Marvel/MyMod/Textures/Chosen'
         tab.locator('.mat-texture-location .btn').click()
-        tab.wait_for_function("matEditor.custom.BaseColor.game_rel==='MyMod/Textures/T_Chosen'")
+        tab.wait_for_function("matEditor.custom.BaseColor.game_rel==='MyMod/Textures/Chosen'")
         assert all(header == project_header for _,header in writes)
         tab.locator('.mat-texture-location summary').click()
         tab.wait_for_function("document.querySelector('img[src*=\"material_custom_texture/preview\"]')?.naturalWidth>0")
