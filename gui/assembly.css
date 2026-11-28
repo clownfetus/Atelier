@@ -21,7 +21,16 @@
 .assembly-geometry { position:relative; grid-column:1; grid-row:1 / 3; display:flex; flex-direction:column; min-height:0; min-width:0; background:var(--bg2); }
 .assembly-panel-head { display:flex; align-items:center; gap:var(--studio-space-2); min-height:48px; padding:var(--studio-space-1) var(--studio-space-4); flex:none; }
 .assembly-panel-head h3 { margin:0; font-size:var(--studio-text-label); font-weight:600; }
-.assembly-number { color:var(--muted); font-size:var(--studio-text-micro); font-variant-numeric:tabular-nums; }
+.assembly-number { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:var(--studio-text-micro); font-family:var(--studio-mono); font-variant-numeric:tabular-nums; }
+.assembly-geometry .assembly-number::before,
+.assembly-textures .assembly-number::before,
+#assembly-material-context > .assembly-eyebrow::before {
+  content:''; display:inline-block; width:6px; height:6px; border-radius:50%; flex:none;
+}
+.assembly-geometry .assembly-number::before { background:var(--atelier-mesh); }
+.assembly-textures .assembly-number::before { background:var(--atelier-texture); }
+#assembly-material-context > .assembly-eyebrow { display:inline-flex; align-items:center; gap:6px; }
+#assembly-material-context > .assembly-eyebrow::before { background:var(--atelier-material); }
 #viewport-box .assembly-icon { flex:none; width:var(--studio-control-height); padding:0; border:0; background:transparent; color:var(--muted); margin-left:auto; }
 .assembly-geometry-content { display:flex;flex-direction:column;min-height:0;overflow:hidden;flex:1;padding:0 12px 16px; }
 .assembly-geometry-content > * { flex-shrink:0; }
@@ -77,10 +86,16 @@
 .is-assembly #viewport-comparison > span { background:var(--bg2); color:var(--text); }
 .is-assembly #viewport-wipe-line::before { background:var(--text); box-shadow:0 0 0 1px var(--bg2); }
 .is-assembly #viewport-wipe-line::after { background:var(--acc); border-color:var(--md-sys-color-on-primary); }
-.assembly-stage-selection { position:absolute; bottom:12px; left:16px; right:16px; display:flex; align-items:center; gap:var(--studio-space-2); min-height:var(--studio-control-height); padding:var(--studio-space-2) var(--studio-space-3); border:1px solid var(--border); border-radius:var(--studio-shape-small); color:var(--muted); font:var(--studio-type-detail); background:var(--bg2); pointer-events:none; z-index:2; }
+.is-assembly #viewport-wipe-range { bottom:58px; }
+.assembly-stage-selection { position:absolute; bottom:12px; left:16px; right:16px; display:flex; align-items:center; gap:var(--studio-space-2); min-height:var(--studio-control-height); padding:var(--studio-space-2) var(--studio-space-3); border:1px solid color-mix(in srgb,var(--border2) 76%,transparent); border-radius:var(--studio-shape-small); color:var(--muted); font:var(--studio-type-detail); background:color-mix(in srgb,var(--bg2) 90%,transparent); box-shadow:0 4px 16px rgb(0 0 0 / 18%); pointer-events:none; z-index:2; }
 .assembly-stage-selection > * { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .assembly-stage-selection strong { color:var(--text); font-weight:600; flex-shrink:0; max-width:40%; padding:3px 7px; border-radius:var(--studio-shape-xs); background:var(--vp-selected); }
-.assembly-connection-arrow { color:var(--acc); flex:none; }
+.assembly-trail-node { display:inline-flex; align-items:center; gap:6px; min-width:0; }
+.assembly-trail-node::before { content:''; width:6px; height:6px; border-radius:50%; flex:none; }
+.assembly-trail-node[data-piece="mesh"]::before { background:var(--atelier-mesh); }
+.assembly-trail-node[data-piece="material"]::before { background:var(--atelier-material); }
+.assembly-trail-node[data-piece="texture"]::before { background:var(--atelier-texture); }
+.assembly-connection-arrow { color:var(--acc); flex:none; opacity:.65; }
 /* The link draws out from the part to its panels (280ms), holds, then retracts into them (190ms). It sits at
    65% ink the whole time and never fades (P4b.7). */
 #assembly-links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; visibility:hidden; opacity:.65; overflow:visible; }
@@ -98,7 +113,7 @@
 .assembly-textures { grid-column:2; grid-row:2; background:var(--bg2); min-width:0; }
 .assembly-count { color:var(--muted); font-size:var(--studio-text-micro); }
 #assembly-texture-context { color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#assembly-texture-cards { display:flex; gap:8px; overflow-x:auto; padding:0 16px 12px; min-height:135px; scrollbar-width:thin; }
+#assembly-texture-cards { display:flex; gap:8px; overflow-x:auto; padding:0 24px 12px 16px; min-height:135px; scrollbar-width:thin; mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 20px),transparent 100%); }
 #assembly-texture-cards > .assembly-empty { align-self:center; max-width:330px; margin:12px 0; }
 #viewport-box .assembly-texture-card { flex:0 0 118px; display:flex; flex-direction:column; gap:var(--studio-space-1); align-items:stretch; justify-content:flex-start; padding:var(--studio-space-2); background:var(--bg2); border:1px solid var(--border); border-radius:var(--studio-shape-small); box-shadow:var(--studio-elevation-card); min-width:0; text-align:left; }
 #viewport-box .assembly-texture-card[aria-pressed=true] { border-color:var(--acc); background:var(--vp-selected); color:var(--text); }
@@ -109,7 +124,8 @@
 .assembly-texture-preview[data-failed=true] .assembly-thumb-error { display:block; }
 .assembly-texture-card strong { font:var(--studio-type-label); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:var(--studio-space-1); }
 .assembly-texture-name { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.assembly-texture-card .assembly-badge { align-self:flex-start; font-size:var(--studio-text-micro); padding:2px 4px; margin-top:2px; }
+.assembly-texture-card .assembly-badge { align-self:flex-start; font-size:var(--studio-text-micro); padding:2px 0; margin-top:2px; border-color:transparent; background:transparent; }
+.assembly-texture-card .assembly-badge.is-project { padding:2px 6px; border-color:color-mix(in srgb,var(--acc) 55%,var(--border)); background:color-mix(in srgb,var(--acc) 10%,var(--bg2)); }
 #assembly-texture-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:8px 16px; border-top:1px solid var(--border); }
 #viewport-box #assembly-texture-actions button { padding-inline:var(--studio-space-2); }
 .assembly-texture-usage { color:var(--muted); font:var(--studio-type-detail); flex:1; min-width:90px; }
@@ -167,9 +183,11 @@
 .is-assembly #viewport-status[data-kind=error]:not(:empty) ~ [data-outcome=error] { display:block; color:var(--status-error); }
 .vp-status-icon { flex:none; order:-1; }
 .is-assembly .assembly-resize { display:block; position:absolute; width:8px; top:0; bottom:0; z-index:6; cursor:col-resize; touch-action:none; }
+.is-assembly .assembly-resize::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:2px; height:28px; border-radius:var(--studio-shape-full); background:var(--border2); opacity:0; transition:opacity var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing); }
 .assembly-geometry-resize { right:-4px; }
 .assembly-material-resize { left:-4px; }
-.assembly-resize:hover { background:color-mix(in srgb,var(--acc) 35%,transparent); }
+.assembly-resize:hover { background:color-mix(in srgb,var(--acc) 22%,transparent); }
+.assembly-resize:hover::after, .assembly-resize:focus-visible::after { opacity:1; background:var(--acc); }
 .assembly-resize:focus-visible { outline:2px solid var(--acc); outline-offset:-2px; }
 #viewport-box .assembly-geometry-reopen { display:none; position:absolute; top:55px; left:12px; z-index:3; padding-inline:var(--studio-space-2); }
 @media (width > 850px) {

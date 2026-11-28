@@ -18,7 +18,7 @@
   const WHERE = {mod: 'in this mod', game: 'in the game', missing: 'not in the game'};
   const NOUN = {texture: 'texture', material: 'material'};
   let overlay, opener = null, project = '', path = '', locked = false, phase = 'empty';
-  let mod = null, selected = new Set(), outcomes = {}, busy = false, changed = false, glyphs = {};
+  let mod = null, selected = new Set(), outcomes = {}, busy = false, changed = false, glyphs = {}, filterQuery = '';
 
   const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
   const full = () => window.AtelierMotionPolicy ? window.AtelierMotionPolicy.allows(3) : true;
@@ -70,7 +70,7 @@
     $('mod-open-title').focus();
   }
   function reset() {
-    path = ''; locked = false; phase = 'empty'; mod = null; selected = new Set(); outcomes = {};
+    path = ''; locked = false; phase = 'empty'; mod = null; selected = new Set(); outcomes = {}; filterQuery = '';
     $('mod-open-password').value = '';
   }
   function close() {
@@ -101,7 +101,7 @@
     busy = false;
     if (result.locked) { phase = 'locked'; render(); $('mod-open-password-what').textContent = $('mod-open-password').value ? "That password didn't open it. Try again." : 'Its author locked this mod. Enter the password they gave you.'; $('mod-open-password').focus(); return; }
     if (!result.ok) { phase = 'failed'; render(result.error || 'Atelier could not read this mod.'); return; }
-    mod = result.mod; locked = false; phase = 'read';
+    mod = result.mod; locked = false; phase = 'read'; filterQuery = '';
     selected = new Set(mod.assets.filter(a => a.editable && !a.in_tray).map(a => a.id));
     render();
   }
@@ -164,7 +164,11 @@
       check.append(box);
     }
     const detail = el('div', 'at-modopen-detail');
-    detail.append(el('span', 'at-modopen-name', asset.name),
+    const nameRow = el('div', 'at-modopen-name-row');
+    const art = window.AtelierCatalogueArt?.identityChip(asset.path);
+    if (art) { art.classList.add('at-modopen-thumb'); nameRow.append(art); }
+    nameRow.append(el('span', 'at-modopen-name', asset.name));
+    detail.append(nameRow,
       el('span', 'at-modopen-path', (asset.class ? asset.class + ' · ' : '') + asset.path),
       el('span', 'at-modopen-status', text));
     const refs = asset.references || [];
@@ -193,13 +197,21 @@
     return row;
   }
 
-  function renderGroups() {
-    const host = $('mod-open-groups');
-    host.replaceChildren();
+  function renderGroupSections(container) {
+    container.replaceChildren();
     if (!mod) return;
+    const q = filterQuery.trim().toLowerCase();
+    let shownCount = 0;
     for (const [kind, title, note] of KINDS) {
-      const assets = mod.assets.filter(a => a.kind === kind);
+      let assets = mod.assets.filter(a => a.kind === kind);
+      if (q) {
+        assets = assets.filter(a =>
+          `${a.name || ''} ${a.path || ''} ${a.class || ''} ${kind}`.toLowerCase().includes(q)
+          || (window.AtelierCatalogueArt?.pathLabel(a.path || '') || '').toLowerCase().includes(q)
+        );
+      }
       if (!assets.length) continue;
+      shownCount += assets.length;
       const group = el('section', 'at-modopen-group'); group.dataset.kind = kind;
       const head = el('header', 'at-modopen-group-head');
       const h2 = el('h2', null, title + ' '); h2.append(el('span', 'at-modopen-n', String(assets.length)));
@@ -209,13 +221,59 @@
         const all = editable.every(a => selected.has(a.id));
         const toggle = el('button', 'at-btn at-btn--quiet', all ? 'Select none' : 'Select all');
         toggle.type = 'button'; toggle.disabled = busy;
-        toggle.addEventListener('click', () => { for (const a of editable) all ? selected.delete(a.id) : selected.add(a.id); renderGroups(); renderFoot(); });
+        toggle.addEventListener('click', () => { for (const a of editable) all ? selected.delete(a.id) : selected.add(a.id); renderGroupSections(container); renderFoot(); });
         head.append(toggle);
       }
       const list = el('ul', 'at-modopen-assets');
       for (const asset of assets) list.append(assetRow(asset));
-      group.append(head, list); host.append(group);
+      group.append(head, list); container.append(group);
     }
+    if (q && !shownCount) {
+      container.append(el('p', 'at-modopen-empty-filter', `No assets in this mod match “${filterQuery.trim()}”.`));
+    }
+  }
+
+  function renderGroups() {
+    const host = $('mod-open-groups');
+    host.replaceChildren();
+    if (!mod || !mod.assets.length) return;
+    const heroes = new Map();
+    for (const asset of mod.assets) {
+      const desc = window.AtelierCatalogueArt?.describe(asset.path || '');
+      const cid = desc?.char_id || window.AtelierCatalogueArt?.heroId(asset.path || '');
+      if (!cid) continue;
+      let entry = heroes.get(cid);
+      if (!entry) { entry = { id: cid, name: desc?.hero?.name || cid, count: 0 }; heroes.set(cid, entry); }
+      entry.count++;
+    }
+    const sections = el('div', 'at-modopen-sections');
+    if (heroes.size || mod.assets.length > 8) {
+      const bar = el('div', 'at-modopen-summary');
+      const chips = el('div', 'at-modopen-heroes');
+      for (const entry of heroes.values()) {
+        const chip = el('span', 'at-modopen-hero-chip');
+        const img = window.AtelierCatalogueArt?.heroChip(entry.id);
+        if (img) chip.append(img);
+        chip.append(el('span', null, entry.name), el('small', null, String(entry.count)));
+        chips.append(chip);
+      }
+      bar.append(chips);
+      if (mod.assets.length > 8) {
+        const input = el('input', 'at-modopen-filter');
+        input.type = 'search';
+        input.placeholder = 'Filter assets…';
+        input.setAttribute('aria-label', 'Filter mod assets');
+        input.value = filterQuery;
+        input.addEventListener('input', () => {
+          filterQuery = input.value;
+          renderGroupSections(sections);
+        });
+        bar.append(input);
+      }
+      host.append(bar);
+    }
+    host.append(sections);
+    renderGroupSections(sections);
   }
 
   function renderFoot() {

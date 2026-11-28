@@ -28,12 +28,14 @@
   max-height: 156px; overflow-y: auto;
 }
 .library-pins[hidden] { display: none; }
-.library-pins-label { color: var(--muted); font-size: var(--studio-text-detail); font-weight: 500; padding-top: 8px; }
+.library-pins-label { color: var(--muted); font-size: var(--studio-text-micro); font-weight: 600; text-transform: uppercase; letter-spacing: var(--studio-label-tracking); padding-top: 9px; }
 .library-pins-items { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .library-pin-chip {
   display: inline-flex; align-items: center; min-width: 0; max-width: 280px;
   background: var(--bg2); border: 1px solid var(--border); border-radius: var(--studio-shape-medium);
+  transition: border-color var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing);
 }
+.library-pin-chip:hover { border-color: var(--border2); }
 .library-pin-open, .library-pin-remove {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   color: var(--text); background: transparent; border: 0; cursor: pointer;
@@ -42,7 +44,9 @@
 .library-pin-open { min-width: 0; border-radius: var(--studio-shape-medium) 0 0 var(--studio-shape-medium); }
 .library-pin-open span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-pin-open .card-icon { width: 18px; height: 18px; flex: 0 0 18px; }
-.library-pin-remove { color: var(--muted); width: 28px; flex: 0 0 28px; padding: 8px; border-radius: 0 var(--studio-shape-medium) var(--studio-shape-medium) 0; }
+.library-pin-remove { color: var(--muted); width: 28px; flex: 0 0 28px; padding: 8px; border-radius: 0 var(--studio-shape-medium) var(--studio-shape-medium) 0; opacity: .45; transition: opacity var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing), color var(--studio-motion-fast) var(--studio-easing); }
+.library-pin-chip:hover .library-pin-remove, .library-pin-chip:focus-within .library-pin-remove { opacity: 1; }
+@media (hover: none) { .library-pin-remove { opacity: 1; } }
 .library-pin-remove svg { width: 15px; height: 15px; }
 .library-pin-open:hover, .library-pin-remove:hover { background: var(--bg3); }
 .library-pin-open:focus-visible, .library-pin-remove:focus-visible, .library-pin-toggle:focus-visible {

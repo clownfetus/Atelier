@@ -303,8 +303,8 @@
       <details id="viewport-capture-menu" class="vp-menu"><summary title="Capture an image or turntable"><i data-lucide="camera" size="18"></i><span>Capture</span></summary><div class="vp-popover vp-capture-panel">
         <h3>Capture this view</h3>
         <label>Image name<input id="viewport-capture-name" maxlength="100" placeholder="Edited skin"></label>
-        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turntable">Save turntable WebP</button>
-        <p>Includes the current palette. Turntable: one revolution, 48 frames.</p>
+        <button id="viewport-poster">Save poster PNG</button><button id="viewport-turnaround">Save turnaround sheet PNG</button><button id="viewport-turntable">Save turntable WebP</button>
+        <p>Includes the current palette. Turnaround: 4 angles on one sheet. Turntable: one revolution, 48 frames.</p>
       </div></details>
       <button class="sb-clear" id="viewport-expand" title="Expand workspace" aria-label="Expand workspace" aria-pressed="false"><i data-lucide="square" size="16"></i></button>
       <button class="sb-clear" id="viewport-close" title="Close preview" aria-label="Close preview"><i data-lucide="x" size="16"></i></button>
@@ -345,10 +345,10 @@
       </label>
       <label class="vp-setting">Lighting
         <select id="viewport-lighting" aria-label="Preview lighting">
-          <option value="studio">Studio</option><option value="flat">Flat albedo</option><option value="emissive">Emissive only</option>
+          <option value="studio">Studio</option><option value="dramatic" hidden>Dramatic rim</option><option value="warm" hidden>Warm hero</option><option value="flat">Flat albedo</option><option value="emissive">Emissive only</option>
         </select>
       </label>
-      <label class="vp-setting">Backdrop <select id="viewport-backdrop" aria-label="Preview backdrop"><option value="gradient">Studio</option><option value="solid">Plain colour</option><option value="checker">Transparent</option></select></label>
+      <label class="vp-setting">Backdrop <select id="viewport-backdrop" aria-label="Preview backdrop"><option value="gradient">Studio</option><option value="emblem" hidden>Hero emblem</option><option value="story" hidden>Hero artwork</option><option value="solid">Plain colour</option><option value="checker">Transparent</option></select></label>
       <input id="viewport-backdrop-color" type="color" value="#14161b" hidden aria-label="Backdrop colour">
       <div class="vp-toggle-settings">
         <button id="viewport-grid" aria-pressed="true" title="Toggle floor grid (G)"><i data-lucide="layout-grid" size="16"></i> Floor grid</button>
@@ -926,19 +926,19 @@
         game update works again. Materials + textures supported.
       </div>
       <button class="btn" id="repatch-pick"><i data-lucide="folder-open" size="14"></i> Choose mod…</button>
-      <div id="repatch-file" class="muted" style="font-size:12px;word-break:break-all"></div>
+      <div id="repatch-file" class="repatch-file-pill"></div>
       <div id="repatch-lockrow" style="display:none">
         <label class="muted" style="font-size:12px"><i data-lucide="folder-security" size="12"></i> This mod is password-protected — enter its password:</label>
         <input id="repatch-unlock" class="setup-input repatch-field" type="password" placeholder="mod password" style="margin-top:4px">
       </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-        <input type="checkbox" id="repatch-stage"> Stage as project in editor
-        <span class="muted" style="font-size:11px">(load assets pre-edited, to remix)</span>
+      <label class="repatch-option">
+        <input type="checkbox" id="repatch-stage">
+        <span><strong>Stage as project in editor</strong><small>Load assets pre-edited so you can remix them.</small></span>
       </label>
       <button class="btn" id="repatch-check" disabled>Check for material issues</button>
       <div id="repatch-repair-results" class="repatch-repair-results" aria-live="polite"></div>
       <button class="btn primary" id="repatch-run" disabled><i data-lucide="wrench" size="14"></i> Repatch</button>
-      <div id="repatch-result" style="display:none;font-size:12px;line-height:1.6"></div>
+      <div id="repatch-result" class="repatch-result-card" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -1086,6 +1086,7 @@
     </div>
     <div class="text-search-row">
       <input id="text-search" class="setup-input" type="text" placeholder="Search keys or values…" spellcheck="false">
+      <button type="button" class="btn text-changed-toggle" id="text-changed-only" aria-pressed="false">Changed only</button>
     </div>
     <div id="text-body" class="mat-body"></div>
     <div class="mat-foot">

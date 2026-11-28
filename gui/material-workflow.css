@@ -35,14 +35,20 @@
 #material-overlay .mat-parameter-group { border: 1px solid var(--border); border-radius: var(--studio-shape-small); margin: 12px 0; overflow: hidden; }
 #material-overlay .mat-parameter-group > summary { cursor: pointer; padding: 10px 12px; color: var(--text); font-size: var(--studio-text-detail); font-weight: 600; background: var(--bg2); }
 #material-overlay .mat-parameter-group > summary > span { color: var(--muted); font-weight: 400; margin-left: 8px; }
-#material-overlay .mat-parameter { padding: 8px 12px; border-top: 1px solid var(--border); border-left: 2px solid transparent; }
-#material-overlay .mat-parameter.is-modified { border-left-color: var(--acc); }
+#material-overlay .mat-parameter { padding: 8px 12px; border-top: 1px solid var(--border); border-left: 3px solid transparent; transition: background-color var(--studio-motion-fast) var(--studio-easing), border-color var(--studio-motion-fast) var(--studio-easing); }
+#material-overlay .mat-parameter:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+#material-overlay .mat-parameter.is-modified { border-left-color: var(--acc); background: color-mix(in srgb, var(--acc) 6%, transparent); }
 #material-overlay .mat-row label { flex-basis: 180px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
 #material-overlay .mat-changed { display: block; font-size: var(--studio-text-micro); font-weight: 500; color: var(--acc); }
 #material-overlay .mat-reference { display: flex; align-items: center; gap: 8px; margin-top: 4px; color: var(--muted); font-size: var(--studio-text-micro); }
-#material-overlay .mat-reference code { font-size: var(--studio-text-micro); font-variant-numeric: tabular-nums; }
+#material-overlay .mat-reference code { font-family: var(--studio-mono); font-size: var(--studio-text-micro); font-variant-numeric: tabular-nums; }
 #material-overlay .mat-reference-swatch { width: 14px; height: 14px; border: 1px solid var(--border2); border-radius: var(--studio-shape-xs); flex: none; }
-#material-overlay .mat-restore { border: 0; border-radius: var(--studio-shape-xs); background: transparent; color: var(--acc); font: inherit; font-size: var(--studio-text-micro); min-height: 28px; padding: 0 8px; cursor: pointer; margin-left: auto; }
+#material-overlay .mat-restore { border: 0; border-radius: var(--studio-shape-xs); background: transparent; color: var(--acc); font: inherit; font-size: var(--studio-text-micro); min-height: 28px; padding: 0 8px; cursor: pointer; margin-left: auto; transition: opacity var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing); }
+#material-overlay .mat-parameter:not(.is-ref-diff) .mat-restore { opacity: 0; }
+#material-overlay .mat-parameter:hover .mat-restore,
+#material-overlay .mat-parameter:focus-within .mat-restore,
+#material-overlay .mat-parameter.is-ref-diff .mat-restore { opacity: 1; }
+@media (hover: none) { #material-overlay .mat-parameter:not(.is-ref-diff) .mat-restore { opacity: 1; } }
 #material-overlay .mat-restore:hover { background: var(--bg3); }
 #material-overlay .mat-colour-cards {
   display: grid;

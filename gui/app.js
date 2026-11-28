@@ -570,7 +570,11 @@ function buildGrid(cards, retryThumbs = false, navigationFocus = null) {
       img.className = "hero-portrait";
       img.loading = "lazy";
       img.decoding = "async";
-      img.onload = () => img.classList.add("loaded");
+      img.onload = () => {
+        img.classList.add("loaded");
+        const colour = window.AtelierPolish?.accent?.(img);
+        if (colour) { el.style.setProperty("--card-art-colour", colour); el.classList.add("has-art-colour"); }
+      };
       img.onerror = () => {
         img.remove();
         thumb.appendChild(renderCardIcon(card, el));
@@ -992,8 +996,18 @@ const _vfxHistory = window.AtelierHistory?.create();
 function _syncHistoryButtons(prefix, stack, busy = false) {
   const u = document.getElementById(prefix + "-undo");
   const r = document.getElementById(prefix + "-redo");
-  if (u) u.disabled = busy || !stack?.canUndo();
-  if (r) r.disabled = busy || !stack?.canRedo();
+  const uCount = stack?.undoCount?.() || 0;
+  const rCount = stack?.redoCount?.() || 0;
+  if (u) {
+    u.disabled = busy || !stack?.canUndo();
+    u.title = uCount ? `Undo · ${uCount} step${uCount === 1 ? "" : "s"} (Ctrl+Z)` : "Undo (Ctrl+Z)";
+    if (uCount > 0) u.dataset.steps = String(uCount); else delete u.dataset.steps;
+  }
+  if (r) {
+    r.disabled = busy || !stack?.canRedo();
+    r.title = rCount ? `Redo · ${rCount} step${rCount === 1 ? "" : "s"} (Ctrl+Shift+Z)` : "Redo (Ctrl+Shift+Z)";
+    if (rCount > 0) r.dataset.steps = String(rCount); else delete r.dataset.steps;
+  }
 }
 
 function _matHistoryState() {
@@ -1110,11 +1124,14 @@ function _matReference(kind, index, mode = matEditor?.compareMode || "saved") {
   const item = matEditor?.[kind]?.[index];
   return (refs?.[mode]?.[kind] || []).find(value => value.name === item?.name);
 }
+function _matDiffersFrom(kind, index, mode = "saved") {
+  const item = matEditor?.[kind]?.[index], ref = _matReference(kind, index, mode);
+  if (!item || !ref) return false;
+  return kind === "colors" ? JSON.stringify([item.rgba, item.inten]) !== JSON.stringify([ref.rgba, ref.inten])
+    : item.value !== ref.value;
+}
 function _matIsChanged(kind, index) {
-  const item = matEditor?.[kind]?.[index], saved = _matReference(kind, index, "saved");
-  if (!item || !saved) return false;
-  return kind === "colors" ? JSON.stringify([item.rgba, item.inten]) !== JSON.stringify([saved.rgba, saved.inten])
-    : item.value !== saved.value;
+  return _matDiffersFrom(kind, index, "saved");
 }
 function materialDirtyCount() {
   return matEditor ? ["colors", "scalars"].reduce((n, kind) => n + matEditor[kind].filter((_, i) => _matIsChanged(kind, i)).length, 0) : 0;
@@ -1137,9 +1154,12 @@ function _matRefreshDirty() {
   _syncHistoryButtons("mat", _matHistory, busy);
   ["colors", "scalars"].forEach(kind => matEditor[kind].forEach((_, i) => {
     const row = document.getElementById((kind === "colors" ? "matrow" : "matscalar") + i);
-    row?.classList.toggle("is-modified", _matIsChanged(kind, i));
+    const changed = _matIsChanged(kind, i);
+    const refDiff = _matDiffersFrom(kind, i, matEditor.compareMode);
+    row?.classList.toggle("is-modified", changed);
+    row?.classList.toggle("is-ref-diff", refDiff);
     const marker = row?.querySelector(".mat-changed");
-    if (marker) marker.textContent = _matIsChanged(kind, i) ? "Unsaved" : "";
+    if (marker) marker.textContent = changed ? "Unsaved" : "";
   }));
 }
 async function matCompare(mode) {
@@ -1286,6 +1306,41 @@ function _seedScalars(arr) {
                                  max: Math.max(Math.abs(s.value) * 3, 1) }));
 }
 
+function _decorateMaterialHead(gameRel, overlayId = 'material-overlay') {
+  const head = document.querySelector(`#${overlayId} .mat-head`);
+  if (!head) return;
+  head.querySelectorAll('.mat-hero-badge, .mat-hero-watermark').forEach(node => node.remove());
+  if (!gameRel) return;
+  const desc = window.AtelierCatalogueArt?.describe(gameRel);
+  const hero = desc?.char_id || window.AtelierCatalogueArt?.heroId(gameRel) || '';
+  const skin = desc?.skin_id || '';
+  if (!hero && !skin) return;
+  const enc = encodeURIComponent;
+  const badgeSources = [
+    skin && '/api/catalogue/badge/' + enc(skin),
+    skin && '/api/catalogue/icon/' + enc(skin),
+    hero && '/api/catalogue/hero/' + enc(hero) + '/avatar',
+  ].filter(Boolean);
+  if (badgeSources.length) {
+    const badge = document.createElement('img');
+    badge.className = 'mat-hero-badge'; badge.alt = ''; badge.decoding = 'async';
+    badge.setAttribute('aria-hidden', 'true'); badge.hidden = true;
+    badge.onload = () => { badge.hidden = false; };
+    badge.onerror = () => { if (badgeSources.length) badge.src = badgeSources.shift(); else badge.remove(); };
+    badge.src = badgeSources.shift();
+    head.prepend(badge);
+  }
+  if (/^\d{4}$/.test(hero)) {
+    const mark = document.createElement('img');
+    mark.className = 'mat-hero-watermark'; mark.alt = ''; mark.decoding = 'async';
+    mark.setAttribute('aria-hidden', 'true'); mark.hidden = true;
+    mark.onload = () => { mark.hidden = false; };
+    mark.onerror = () => mark.remove();
+    mark.src = '/api/catalogue/hero/' + enc(hero) + '/logo';
+    head.append(mark);
+  }
+}
+
 async function openMaterialEditor(item) {
   window.AtelierRoster?.rememberEditor(item.game_rel,'material',_activeProjectName);
   if (materialDirtyCount() && !(await _confirmAction("Discard unsaved material parameters and open another material?"))) return;
@@ -1299,6 +1354,7 @@ async function openMaterialEditor(item) {
   document.getElementById("mat-title").textContent = item.partLabel || item.name;
   document.getElementById("mat-sub").textContent = item.game_rel || "";
   document.getElementById("mat-status").textContent = "";
+  _decorateMaterialHead(item.game_rel);
   document.getElementById("mat-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
   else ov.classList.add("active");
@@ -1905,6 +1961,7 @@ function renderMatEditor() {
       const c = matEditor?.colors?.[Math.min(Math.max(0, matActiveColorIndex), (matEditor?.colors?.length || 1) - 1)];
       return c ? _rgbHex(c.rgba[0], c.rgba[1], c.rgba[2], c.inten) : "";
     },
+    getArtworkPath: () => matEditor?.game_rel || "",
   });
   applyMatFilter();
 }
@@ -2186,6 +2243,7 @@ async function closeMaterialEditor(force = false) {
   const img = document.getElementById("dye-prev");
   if (img?.dataset.url) URL.revokeObjectURL(img.dataset.url);
   const overlay = document.getElementById('material-overlay');
+  _decorateMaterialHead('');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   matEditor = null;
@@ -2280,6 +2338,7 @@ async function openCurveEditor(item) {
   document.getElementById("curve-title").textContent = item.name;
   document.getElementById("curve-sub").textContent = item.game_rel || "";
   document.getElementById("curve-status").textContent = "";
+  _decorateMaterialHead(item.game_rel, 'curve-overlay');
   document.getElementById("curve-body").inert = false;
   document.getElementById("curve-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   if (window.AtelierContinuity) await window.AtelierContinuity.openEditor(ov, item.game_rel);
@@ -2302,18 +2361,159 @@ async function openCurveEditor(item) {
 }
 
 const CURVE_INTERP = ["RCIM_Linear", "RCIM_Cubic", "RCIM_Constant"];
+let _curveDraggingStop = false;
+let _curveSelectedTime = null;
+
+function _curveStopDomain(stops) {
+  if (!stops || !stops.length) return { t0: 0, t1: 1, span: 1 };
+  const t0 = stops[0].time, t1 = stops[stops.length - 1].time;
+  return { t0, t1, span: (t1 - t0) || 1 };
+}
+
+function _curveStopPercent(time, domain) {
+  if (domain.t1 > domain.t0) return Math.max(0, Math.min(100, ((time - domain.t0) / domain.span) * 100));
+  return Math.max(0, Math.min(100, time * 100));
+}
+
+function _selectCurveStop(time) {
+  _curveSelectedTime = time;
+  const body = document.getElementById("curve-body");
+  if (!body) return;
+  let firstMatch = null;
+  body.querySelectorAll(".curve-key").forEach(row => {
+    const tInput = row.querySelector('input[title="time"]');
+    const rowTime = parseFloat(tInput?.value);
+    const match = Number.isFinite(rowTime) && Math.abs(rowTime - time) < 1e-4;
+    row.classList.toggle("is-stop-selected", match);
+    if (match && !firstMatch) firstMatch = row;
+  });
+  body.querySelectorAll(".curve-stop-handle").forEach(btn => {
+    const bt = parseFloat(btn.dataset.time);
+    btn.classList.toggle("is-active", Number.isFinite(bt) && Math.abs(bt - time) < 1e-4);
+  });
+  firstMatch?.scrollIntoView({ block: "nearest" });
+}
+
+function _renderCurveStops() {
+  const c = curveEditor;
+  const track = document.getElementById("curve-stop-track");
+  if (!c || !track) return;
+  track.replaceChildren();
+  const stops = c.stops || [];
+  if (!stops.length) return;
+  const domain = _curveStopDomain(stops);
+  for (const stop of stops) {
+    const [r, g, b] = stop.rgba || [0, 0, 0];
+    const rgb = `rgb(${Math.round(_c01(r) * 255)}, ${Math.round(_c01(g) * 255)}, ${Math.round(_c01(b) * 255)})`;
+    const pct = _curveStopPercent(stop.time, domain);
+    const labelTime = Number(stop.time.toFixed(3));
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "curve-stop-handle";
+    if (_curveSelectedTime !== null && Math.abs(stop.time - _curveSelectedTime) < 1e-4) handle.classList.add("is-active");
+    handle.style.left = pct.toFixed(2) + "%";
+    handle.style.setProperty("--stop-color", rgb);
+    handle.dataset.time = String(stop.time);
+    handle.title = `Time ${labelTime} — Drag to retime, click to jump to keys`;
+    handle.setAttribute("aria-label", `Gradient stop at time ${labelTime}`);
+    const tip = document.createElement("span");
+    tip.className = "curve-stop-tip";
+    tip.textContent = String(labelTime);
+    handle.append(tip);
+
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || _curveSaving.has(c)) return;
+      event.preventDefault();
+      handle.setPointerCapture(event.pointerId);
+      const rect = track.getBoundingClientRect();
+      if (!rect.width) return;
+      const originTime = stop.time;
+      const members = [];
+      for (const ch of CURVE_CH) {
+        (c.channels[ch] || []).forEach((k, idx) => {
+          if (Math.abs((k.time || 0) - originTime) < 1e-4) members.push({ ch, i: idx });
+        });
+      }
+      const dragMin = Math.min(0, domain.t0);
+      const dragMax = Math.max(1, domain.t1);
+      const dragSpan = (dragMax - dragMin) || 1;
+      const startX = event.clientX;
+      let moved = false;
+      let currentTime = originTime;
+      _curveDraggingStop = true;
+      handle.classList.add("is-dragging");
+
+      const onMove = ev => {
+        if (!handle.hasPointerCapture(ev.pointerId)) return;
+        if (!moved && Math.abs(ev.clientX - startX) < 3) return;
+        moved = true;
+        const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+        const nextTime = Math.round((dragMin + ratio * dragSpan) * 1000) / 1000;
+        if (nextTime === currentTime) return;
+        currentTime = nextTime;
+        const body = document.getElementById("curve-body");
+        for (const { ch, i } of members) {
+          if (c.channels[ch]?.[i]) c.channels[ch][i].time = nextTime;
+          const row = body?.querySelector(`.curve-key[data-ch="${ch}"][data-index="${i}"] input[title="time"]`);
+          if (row) row.value = String(nextTime);
+        }
+        c.stops = _resampleStops(c.channels);
+        const grad = document.getElementById("curve-grad");
+        if (grad) grad.style.background = _curveGradCss(c.stops);
+        const liveDomain = _curveStopDomain(c.stops);
+        handle.style.left = _curveStopPercent(nextTime, liveDomain).toFixed(2) + "%";
+        handle.dataset.time = String(nextTime);
+        tip.textContent = String(Number(nextTime.toFixed(3)));
+      };
+
+      const finish = ev => {
+        if (handle.hasPointerCapture(ev.pointerId)) handle.releasePointerCapture(ev.pointerId);
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        handle.classList.remove("is-dragging");
+        _curveDraggingStop = false;
+        if (moved) {
+          _curveSelectedTime = currentTime;
+          _curveHistoryRecord();
+          _renderCurveStops();
+          _selectCurveStop(currentTime);
+        } else {
+          _selectCurveStop(originTime);
+        }
+      };
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+    });
+
+    handle.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        _selectCurveStop(stop.time);
+      }
+    });
+
+    track.append(handle);
+  }
+}
 
 function renderCurveEditor() {
   const c = curveEditor; if (!c) return;
-  let h = `<div class="curve-preview" id="curve-grad"></div>`;
+  let h = `<div class="curve-grad-shell">
+    <div class="curve-preview" id="curve-grad"></div>
+    <div class="curve-stop-track" id="curve-stop-track"></div>
+    <div class="curve-grad-hint">Drag stops to retime · Click a stop to highlight its keys</div>
+  </div>`;
   for (const ch of CURVE_CH) {
     const keys = c.channels[ch] || [];
-    h += `<div class="mat-section" style="display:flex;align-items:center;gap:8px">
-      <span>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
+    h += `<div class="mat-section curve-ch-head" data-ch="${ch}">
+      <span class="curve-ch-label"><i class="curve-ch-dot" aria-hidden="true"></i>${ch} channel — ${keys.length} key${keys.length !== 1 ? "s" : ""}</span>
       <button class="btn btn-small" onclick="curveAddKey('${ch}')">+ key</button></div>`;
     keys.forEach((k, i) => {
       const cubic = (k.interp || "RCIM_Linear") === "RCIM_Cubic";
-      h += `<div class="curve-key">
+      h += `<div class="curve-key" data-ch="${ch}" data-index="${i}">
         <input class="editor-field" type="number" step="any" title="time" style="width:72px" value="${k.time}" oninput="curveKeyField('${ch}',${i},'time',this.value)">
         <input class="editor-field" type="number" step="any" title="value" style="width:88px" value="${k.value}" oninput="curveKeyField('${ch}',${i},'value',this.value)">
         <select title="interpolation" onchange="curveKeyField('${ch}',${i},'interp',this.value)">
@@ -2330,11 +2530,13 @@ function renderCurveEditor() {
   document.getElementById("curve-body").innerHTML = h;
   lucide.createIcons({ nodes: [document.getElementById("curve-body")] });
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(c.stops);
+  _renderCurveStops();
 }
 
 function _curveTouch() {
   curveEditor.stops = _resampleStops(curveEditor.channels);
   const g = document.getElementById("curve-grad"); if (g) g.style.background = _curveGradCss(curveEditor.stops);
+  if (!_curveDraggingStop) _renderCurveStops();
 }
 
 function curveKeyField(ch, i, field, v) {
@@ -2426,9 +2628,12 @@ async function closeCurveEditor(force = false) {
   if (force !== true && _curveDirty() && !(await _discardUnsaved(true, "curve edits"))) return false;
   ++_curveOpenRevision;
   const overlay = document.getElementById('curve-overlay');
+  _decorateMaterialHead('', 'curve-overlay');
   if (window.AtelierContinuity) window.AtelierContinuity.closeEditor(overlay);
   else overlay.classList.remove('active');
   curveEditor = null;
+  _curveSelectedTime = null;
+  _curveDraggingStop = false;
   _syncBulkEditorAction();
   return true;
 }
@@ -3260,9 +3465,220 @@ async function performClearMany(items) {
   }
 }
 
+const _PROJ_CARD_META_KEY = 'atelier.projectCards.v1';
+function _readAllProjectCardMeta() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(_PROJ_CARD_META_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (_) { return {}; }
+}
+const _PROJ_TYPE_ORDER = [
+  ['texture', 'tex'],
+  ['material', 'mat'],
+  ['mesh', 'mesh'],
+  ['vfx', 'vfx'],
+  ['curve', 'curve'],
+  ['other', 'other'],
+];
+function _extractProjectCardMeta(items) {
+  const targets = [], seenTarget = new Set(), colors = [], seenColor = new Set();
+  const counts = {};
+  for (const item of items || []) {
+    const rawType = String(item.file_type || '').toLowerCase();
+    const bucket = ['texture', 'material', 'mesh', 'vfx', 'curve'].includes(rawType) ? rawType : 'other';
+    counts[bucket] = (counts[bucket] || 0) + 1;
+    const desc = window.AtelierCatalogueArt?.describe(item.game_rel || '');
+    const skin = /^\d{7}$/.test(item.skin_id || '') ? item.skin_id : (desc?.skin_id || '');
+    const hero = skin ? skin.slice(0, 4) : (/^\d{4}$/.test(item.char_id || '') ? item.char_id : (window.AtelierCatalogueArt?.heroId(item) || ''));
+    if (hero) {
+      const key = skin || hero;
+      if (!seenTarget.has(key) && targets.length < 3) { seenTarget.add(key); targets.push({ hero, skin }); }
+    }
+    for (const color of item.ui_preview?.colors || []) {
+      if (!Array.isArray(color) || !color.slice(0, 3).every(Number.isFinite)) continue;
+      const hex = _rgbHex(...color.slice(0, 3), Math.max(1, ...color.slice(0, 3)));
+      if (hex && !seenColor.has(hex) && colors.length < 5) { seenColor.add(hex); colors.push(hex); }
+    }
+  }
+  return (targets.length || colors.length || Object.keys(counts).length) ? { targets, colors, counts } : null;
+}
+function _projectTypePillsEl(counts, maxPills = 4) {
+  if (!counts || typeof counts !== 'object') return null;
+  const entries = _PROJ_TYPE_ORDER.filter(([key]) => Number(counts[key]) > 0).slice(0, maxPills);
+  if (!entries.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'proj-type-pills';
+  for (const [key, label] of entries) {
+    const pill = document.createElement('span');
+    pill.className = 'proj-type-pill';
+    pill.dataset.type = key;
+    const dot = document.createElement('i');
+    dot.className = 'proj-type-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    pill.append(dot, document.createTextNode(`${counts[key]} ${label}`));
+    wrap.append(pill);
+  }
+  return wrap;
+}
+
+// ── Mod tray live quick-peek card (fixed on body; no fade per Motion v2) ──────
+let _trayPeekEl = null, _trayPeekTimer = 0, _trayPeekToken = '', _trayPeekBound = false;
+function _ensureTrayPeek() {
+  if (_trayPeekEl?.isConnected) return _trayPeekEl;
+  const el = document.createElement('div');
+  el.id = 'tray-peek-card';
+  el.className = 'tray-peek-card';
+  el.setAttribute('aria-hidden', 'true');
+  el.hidden = true;
+  document.body.append(el);
+  _trayPeekEl = el;
+  return el;
+}
+function _hideTrayPeek() {
+  clearTimeout(_trayPeekTimer);
+  _trayPeekTimer = 0;
+  _trayPeekToken = '';
+  if (_trayPeekEl) _trayPeekEl.hidden = true;
+}
+function _showTrayPeek(row, item) {
+  if (!row?.isConnected || !item) return;
+  const ctxMenu = document.getElementById('ctx-menu');
+  if (ctxMenu && ctxMenu.style.display === 'block') return;
+  const card = _ensureTrayPeek();
+  card.replaceChildren();
+  _trayPeekToken = item.token || '';
+
+  const h = handlerFor(item.file_type);
+  const preview = item.ui_preview;
+  if (h.preview) {
+    const media = document.createElement('div');
+    media.className = 'tray-peek-media';
+    const img = document.createElement('img');
+    img.alt = '';
+    img.decoding = 'async';
+    img.src = `/api/preview?token=${encodeURIComponent(item.token)}&game_rel=${encodeURIComponent(item.game_rel)}`;
+    media.append(img);
+    card.append(media);
+  } else if (preview?.colors?.length) {
+    const grid = document.createElement('div');
+    grid.className = 'tray-peek-swatches';
+    for (const color of preview.colors.slice(0, 6)) {
+      if (!Array.isArray(color) || !color.slice(0, 3).every(Number.isFinite)) continue;
+      const hex = _rgbHex(...color.slice(0, 3), Math.max(1, ...color.slice(0, 3)));
+      const cell = document.createElement('div');
+      cell.className = 'tray-peek-swatch';
+      const chip = document.createElement('span');
+      chip.className = 'tray-peek-swatch-chip';
+      chip.style.background = hex;
+      const code = document.createElement('code');
+      code.textContent = hex.toUpperCase();
+      cell.append(chip, code);
+      grid.append(cell);
+    }
+    if (grid.childElementCount) card.append(grid);
+  } else if (preview?.points?.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tray-peek-curve';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 40 28');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    const line = document.createElementNS(svg.namespaceURI, 'polyline');
+    line.setAttribute('points', preview.points.map(p => p.join(',')).join(' '));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', '1.8');
+    svg.append(line);
+    wrap.append(svg);
+    card.append(wrap);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'tray-peek-info';
+  const head = document.createElement('div');
+  head.className = 'tray-peek-head';
+  const typePill = document.createElement('span');
+  typePill.className = 'tray-peek-type';
+  typePill.dataset.type = item.file_type || 'other';
+  typePill.textContent = (item.file_type || 'asset').toUpperCase();
+  const title = document.createElement('strong');
+  title.className = 'tray-peek-name';
+  title.textContent = item.name || '';
+  head.append(typePill, title);
+  info.append(head);
+
+  const subText = sbSubLabel(item);
+  if (subText) {
+    const sub = document.createElement('div');
+    sub.className = 'tray-peek-sub';
+    sub.textContent = subText;
+    info.append(sub);
+  }
+  if (item.game_rel) {
+    const pathEl = document.createElement('div');
+    pathEl.className = 'tray-peek-path';
+    pathEl.textContent = item.game_rel;
+    info.append(pathEl);
+  }
+  card.append(info);
+  card.hidden = false;
+
+  const rowRect = row.getBoundingClientRect();
+  const sbRect = document.getElementById('sidebar')?.getBoundingClientRect() || rowRect;
+  const pad = 12, gap = 10;
+  const cardW = card.offsetWidth || 256;
+  const cardH = card.offsetHeight || 160;
+  let left = sbRect.left - cardW - gap;
+  if (left < pad) left = sbRect.right + gap;
+  left = Math.max(pad, Math.min(window.innerWidth - cardW - pad, left));
+  let top = rowRect.top + rowRect.height / 2 - cardH / 2;
+  top = Math.max(pad, Math.min(window.innerHeight - cardH - pad, top));
+  card.style.left = Math.round(left) + 'px';
+  card.style.top = Math.round(top) + 'px';
+}
+function _bindTrayPeek() {
+  if (_trayPeekBound) return;
+  const list = document.getElementById('sidebar-list');
+  if (!list) return;
+  _trayPeekBound = true;
+  list.addEventListener('pointerover', event => {
+    if (event.pointerType === 'touch') return;
+    const row = event.target.closest('.sb-item[data-token]');
+    if (!row) { _hideTrayPeek(); return; }
+    const token = row.dataset.token;
+    if (token === _trayPeekToken && _trayPeekEl && !_trayPeekEl.hidden) return;
+    clearTimeout(_trayPeekTimer);
+    _trayPeekTimer = setTimeout(() => {
+      if (!row.isConnected || !row.matches(':hover')) return;
+      const item = sidebarData[token];
+      if (item) _showTrayPeek(row, item);
+    }, 180);
+  });
+  list.addEventListener('pointerleave', _hideTrayPeek);
+  list.addEventListener('pointerdown', _hideTrayPeek);
+  list.addEventListener('contextmenu', _hideTrayPeek);
+  list.addEventListener('scroll', _hideTrayPeek, { passive: true });
+  window.addEventListener('keydown', event => { if (event.key === 'Escape') _hideTrayPeek(); });
+  window.addEventListener('blur', _hideTrayPeek);
+  window.addEventListener('pagehide', _hideTrayPeek);
+}
+function _rememberProjectCardMeta(projectName, items) {
+  if (!projectName) return;
+  const all = _readAllProjectCardMeta();
+  const meta = _extractProjectCardMeta(items);
+  if (meta) all[projectName] = meta;
+  else delete all[projectName];
+  const keys = Object.keys(all);
+  if (keys.length > 60) {
+    for (const k of keys.slice(0, keys.length - 60)) delete all[k];
+  }
+  try { localStorage.setItem(_PROJ_CARD_META_KEY, JSON.stringify(all)); } catch (_) {}
+}
+
 function renderSidebar() {
   window.dispatchEvent(new CustomEvent('atelier:project-assets', {detail:{project:_activeProjectName}}));
-  window.AtelierRoster?.update(Object.values(sidebarData),_activeProjectName);
+  const sidebarItems = Object.values(sidebarData);
+  _rememberProjectCardMeta(_activeProjectName, sidebarItems);
+  window.AtelierRoster?.update(sidebarItems,_activeProjectName);
   const list = document.getElementById("sidebar-list");
   const existing = new Map([...list.querySelectorAll('.sb-item')].map(row=>[row.dataset.token,row]));
   const scroll=list.scrollTop, focused=list.contains(document.activeElement)?document.activeElement:null;
@@ -3312,6 +3728,7 @@ function renderSidebar() {
     el.className = "sb-item" + (item.selected ? " selected" : "") + (_sbMarked.has(item.token) ? " marked" : "");
     el.dataset.token = item.token;
     el.dataset.gameRel = item.game_rel;
+    el.dataset.fileType = item.file_type || "";
     const h = handlerFor(item.file_type);
     el.innerHTML = `
       <button class="sb-clear" title="Delete"><i data-lucide="x" size="12"></i></button>
@@ -3360,6 +3777,8 @@ function renderSidebar() {
     el.addEventListener("contextmenu", e => _ctxShow(e, _ctxItemsSidebar(item)));
     list.appendChild(el);
   });
+  _bindTrayPeek();
+  if (_trayPeekToken && !sidebarData[_trayPeekToken]) _hideTrayPeek();
   lucide.createIcons({ nodes: [list] });
   updateInstallBtn();
 }
@@ -5259,19 +5678,27 @@ function _renderProjectPicker(projects, keepQuery) {
     restoreFocus();
     return;
   }
+  const cardMetaMap = _readAllProjectCardMeta();
+  if (_activeProjectName) {
+    const liveMeta = _extractProjectCardMeta(Object.values(sidebarData));
+    if (liveMeta) cardMetaMap[_activeProjectName] = liveMeta;
+  }
   projects.forEach(proj => {
     const card = document.createElement("div");
     const sel  = _projSel.has(proj.name);
-    card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "");
+    const active = proj.name === _activeProjectName;
+    const cardMeta = proj.asset_count ? cardMetaMap[proj.name] : null;
+    card.className = (_projView === "list" ? "proj-row" : "proj-card") + (sel ? " sel" : "") + (active ? " is-active" : "");
     card.dataset.name = proj.name;
     card.tabIndex = 0;
     card.setAttribute("aria-label", `${proj.name}, ${proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`}`);
     const assetTxt  = proj.asset_count === 1 ? "1 asset" : `${proj.asset_count} assets`;
     const thumbUrl  = `/api/project/thumb?project=${encodeURIComponent(proj.name)}&_t=${proj.mtime}`;
     const check = `<div class="proj-check" title="Select"><input type="checkbox" aria-label="Select ${_esc(proj.name)}" ${sel ? "checked" : ""}></div>`;
+    const activeBadge = active ? '<span class="proj-active-badge">Active</span>' : '';
     const thumb = `<div class="proj-thumb">
-      ${proj.asset_count ? `<img src="${thumbUrl}" alt="" loading="lazy" onload="this.nextElementSibling.style.display='none'" onerror="this.remove()">` : ''}
       <i data-lucide="folder" size="${_projView === 'list' ? 18 : 40}" class="proj-thumb-icon folder-icon"></i>
+      ${_projView === "list" ? "" : activeBadge}
     </div>`;
     const actions = `
       <div class="proj-actions">
@@ -5285,6 +5712,7 @@ function _renderProjectPicker(projects, keepQuery) {
     card.innerHTML = _projView === "list"
       ? `${check}${thumb}
          <div class="proj-body">${name}</div>
+         ${activeBadge}
          <div class="proj-meta proj-col-assets">${assetTxt}</div>
          <div class="proj-meta proj-col-time">${_relTime(proj.mtime)}</div>
          ${actions}`
@@ -5294,6 +5722,72 @@ function _renderProjectPicker(projects, keepQuery) {
            <div class="proj-meta">${assetTxt} &middot; ${_relTime(proj.mtime)}</div>
          </div>
          ${actions}`;
+    const thumbHost = card.querySelector('.proj-thumb');
+    const folderIcon = thumbHost?.querySelector('.proj-thumb-icon');
+    const attachCoverArt = () => {
+      if (!thumbHost || !cardMeta?.targets?.length) return;
+      const targets = cardMeta.targets;
+      if (_projView === 'list') {
+        const first = targets[0];
+        const cover = document.createElement('img');
+        cover.className = 'proj-cover-single'; cover.alt = ''; cover.loading = 'lazy'; cover.decoding = 'async';
+        const urls = [first.skin && `/api/catalogue/icon/${encodeURIComponent(first.skin)}`, `/api/catalogue/hero/${encodeURIComponent(first.hero)}/avatar`, `/api/catalogue/thumbnail/${encodeURIComponent(first.skin || first.hero)}`].filter(Boolean);
+        cover.onload = () => { if (folderIcon) folderIcon.style.display = 'none'; };
+        cover.onerror = () => { if (urls.length) cover.src = urls.shift(); else cover.remove(); };
+        cover.src = urls.shift();
+        thumbHost.prepend(cover);
+        return;
+      }
+      const coverWrap = document.createElement('div');
+      coverWrap.className = targets.length > 1 ? `proj-cover-mosaic is-count-${targets.length}` : 'proj-cover-layer';
+      coverWrap.setAttribute('aria-hidden', 'true');
+      let loadedCount = 0;
+      for (const target of targets) {
+        const img = document.createElement('img');
+        img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+        const urls = [
+          target.skin && `/api/catalogue/thumbnail/${encodeURIComponent(target.skin)}`,
+          `/api/catalogue/thumbnail/${encodeURIComponent(target.hero)}`,
+          `/api/catalogue/hero/${encodeURIComponent(target.hero)}/avatar`,
+        ].filter(Boolean);
+        img.onload = () => { loadedCount++; if (folderIcon) folderIcon.style.display = 'none'; };
+        img.onerror = () => { if (urls.length) img.src = urls.shift(); else { img.remove(); if (!coverWrap.childElementCount) coverWrap.remove(); } };
+        img.src = urls.shift();
+        coverWrap.append(img);
+      }
+      if (coverWrap.childElementCount) thumbHost.prepend(coverWrap);
+    };
+    if (proj.asset_count && thumbHost) {
+      const texImg = document.createElement('img');
+      texImg.className = 'proj-tex-thumb'; texImg.alt = ''; texImg.loading = 'lazy';
+      texImg.onload = () => { if (folderIcon) folderIcon.style.display = 'none'; };
+      texImg.onerror = () => { texImg.remove(); attachCoverArt(); };
+      texImg.src = thumbUrl;
+      thumbHost.prepend(texImg);
+      if (_projView !== 'list' && cardMeta) {
+        const firstHero = cardMeta.targets?.[0]?.hero;
+        if (firstHero) {
+          const emblem = document.createElement('img');
+          emblem.className = 'proj-cover-emblem'; emblem.alt = ''; emblem.loading = 'lazy'; emblem.decoding = 'async';
+          emblem.setAttribute('aria-hidden', 'true');
+          emblem.onerror = () => emblem.remove();
+          emblem.src = `/api/catalogue/hero/${encodeURIComponent(firstHero)}/logo`;
+          thumbHost.append(emblem);
+        }
+        if (cardMeta.colors?.length) {
+          const bar = document.createElement('div');
+          bar.className = 'proj-cover-palette'; bar.setAttribute('aria-hidden', 'true');
+          for (const hex of cardMeta.colors) {
+            const swatch = document.createElement('span');
+            swatch.style.background = hex;
+            bar.append(swatch);
+          }
+          thumbHost.append(bar);
+        }
+      }
+    }
+    const pillsEl = _projectTypePillsEl(cardMeta?.counts, _projView === 'list' ? 3 : 4);
+    if (pillsEl) card.querySelector('.proj-body')?.append(pillsEl);
     card.querySelector(".proj-check").addEventListener("click", e => {
       e.stopPropagation();
       _projSelClick(proj.name, e);
@@ -5761,25 +6255,25 @@ async function openWorldEditor(item) {
 
 function renderWorldEditor() {
   const m = worldEditor.model, ed = worldEditor.edits, out = [];
-  const sec = (icon, title, inner) => '<div style="margin-bottom:16px"><div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:8px"><i data-lucide="' + icon + '" size="14" style="color:var(--acc)"></i> ' + title + '</div>' + inner + '</div>';
-  const row = inner => '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;flex-wrap:wrap">' + inner + '</div>';
+  const sec = (icon, title, inner) => '<section class="world-sec"><div class="world-sec-head"><i data-lucide="' + icon + '" size="14"></i> ' + title + '</div>' + inner + '</section>';
+  const row = inner => '<div class="world-row">' + inner + '</div>';
 
   if (m.lights && m.lights.length) {
     const rows = m.lights.map(L => {
       const cur = ed.lights[L.idx] || {};
       const inten = (cur.intensity != null) ? cur.intensity : L.intensity;
       const col = cur.color || L.color;
-      const ni = (L.intensity != null) ? '<label style="font-size:12px">Intensity <input type="number" step="0.1" style="width:80px" data-lidx="' + L.idx + '" data-lk="intensity" value="' + inten + '"></label>' : "";
-      const nc = (L.color) ? '<label style="font-size:12px">Color <input type="color" data-lidx="' + L.idx + '" data-lk="color" value="' + _rgb255Hex(col) + '"></label>' : "";
-      return row('<span style="flex:1;min-width:180px;font-size:12px">' + L.name + ' <span class="muted">' + L.cls.replace(/Component$/, "") + '</span></span>' + ni + nc);
+      const ni = (L.intensity != null) ? '<label class="world-field">Intensity <input class="editor-field world-num" type="number" step="0.1" data-lidx="' + L.idx + '" data-lk="intensity" value="' + inten + '"></label>' : "";
+      const nc = (L.color) ? '<label class="world-field">Colour <input type="color" data-lidx="' + L.idx + '" data-lk="color" value="' + _rgb255Hex(col) + '"></label>' : "";
+      return row('<span class="world-name">' + _esc(L.name) + ' <span class="muted">' + _esc(L.cls.replace(/Component$/, "")) + '</span></span>' + ni + nc);
     }).join("");
     out.push(sec("sun", 'Lights <span class="muted">(' + m.lights.length + ')</span>', rows));
   }
   if (m.fog) {
     const fc = ed.fog.color || m.fog.color;
     const fd = (ed.fog.density != null) ? ed.fog.density : m.fog.density;
-    const nc = (m.fog.color) ? '<label style="font-size:12px">Inscatter color <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
-    const nd = (m.fog.density != null) ? '<label style="font-size:12px">Density <input type="number" step="0.001" style="width:90px" data-fog="density" value="' + fd + '"></label>' : "";
+    const nc = (m.fog.color) ? '<label class="world-field">Inscatter colour <input type="color" data-fog="color" value="' + _rgb01Hex(fc) + '"></label>' : "";
+    const nd = (m.fog.density != null) ? '<label class="world-field">Density <input class="editor-field world-num" type="number" step="0.001" data-fog="density" value="' + fd + '"></label>' : "";
     out.push(sec("cloud-fog", "Height fog", row(nc + nd)));
   }
   const ppv = (m.components || []).find(c => c.is_ppv);
@@ -5794,17 +6288,17 @@ function renderWorldEditor() {
       const gd = ppv.grade[name];
       const cur = (name in (ed.grade || {})) ? ed.grade[name] : gd.value;
       const pretty = name.replace(/^Color/, "").replace(/([a-z])([A-Z])/g, "$1 $2");
-      const tag = gd.override ? "" : ' <span class="muted" style="font-size:11px">(off — edit to enable)</span>';
-      const dim = gd.override ? "" : ";opacity:.72";
-      const lbl = '<span style="flex:0 0 158px">' + pretty + tag + '</span>';
+      const tag = gd.override ? "" : ' <span class="muted world-grade-tag">(off — edit to enable)</span>';
+      const lbl = '<span class="world-grade-label">' + _esc(pretty) + tag + '</span>';
+      const dimCls = gd.override ? "" : " is-dim";
       if (Array.isArray(gd.value)) {
         const v = Array.isArray(cur) ? cur : gd.value;
-        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
-          [0, 1, 2].map(ci => '<input type="number" step="0.01" style="width:64px" title="' + "RGB"[ci] +
-            '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + name + '" data-gch="' + ci + '">').join("") + '</div>';
+        gh += '<div class="world-grade-row' + dimCls + '">' + lbl +
+          [0, 1, 2].map(ci => '<input class="editor-field world-num world-rgb" type="number" step="0.01" title="' + "RGB"[ci] +
+            '" value="' + (+v[ci]).toFixed(3) + '" data-gname="' + _esc(name) + '" data-gch="' + ci + '">').join("") + '</div>';
       } else {
-        gh += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px' + dim + '">' + lbl +
-          '<input type="number" step="0.05" style="width:82px" value="' + (+cur).toFixed(3) + '" data-gname="' + name + '"></div>';
+        gh += '<div class="world-grade-row' + dimCls + '">' + lbl +
+          '<input class="editor-field world-num" type="number" step="0.05" value="' + (+cur).toFixed(3) + '" data-gname="' + _esc(name) + '"></div>';
       }
     }
     out.push(sec("palette", "Post-process grade", gh));
@@ -5813,10 +6307,10 @@ function renderWorldEditor() {
   if (hide.length) {
     const rows = hide.map(c => {
       const cur = (c.idx in ed.visibility) ? ed.visibility[c.idx] : (c.enables && "bVisible" in c.enables ? c.enables.bVisible : true);
-      return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + c.name + ' <span class="muted">' + c.cls.replace(/Component$/, "") + '</span></span></label>';
+      return '<label class="world-vis-item"><input type="checkbox" data-vidx="' + c.idx + '" ' + (cur ? "checked" : "") + '> <span>' + _esc(c.name) + ' <span class="muted">' + _esc(c.cls.replace(/Component$/, "")) + '</span></span></label>';
     }).join("");
     out.push(sec("eye", 'Visibility <span class="muted">(' + hide.length + ')</span>',
-      '<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 12px">' + rows + '</div>'));
+      '<div class="world-vis-list">' + rows + '</div>'));
   }
   const body = document.getElementById("world-body");
   body.innerHTML = out.join("") || '<div class="mat-empty">No editable lights, fog, grade, or components in this sublevel.</div>';
@@ -5906,6 +6400,7 @@ document.getElementById("world-reset").addEventListener("click", async () => {
 // ── Text / StringTable editor ─────────────────────────────────────────────────
 let textEditor = null;
 let _textOpenRevision = 0;
+let _textChangedOnly = false;
 
 function _esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
@@ -5913,12 +6408,14 @@ async function openTextEditor(item) {
   const revision = ++_textOpenRevision, project = _activeProjectName;
   const current = () => revision === _textOpenRevision && project === _activeProjectName;
   textEditor = null;
+  _textChangedOnly = false;
   window.AtelierRoster?.rememberEditor(item.game_rel,'text',_activeProjectName);
   const ov = document.getElementById("text-overlay");
   document.getElementById("text-title").textContent = item.name;
   document.getElementById("text-sub").textContent = item.game_rel || "";
   document.getElementById("text-status").textContent = "";
   document.getElementById("text-search").value = "";
+  document.getElementById("text-changed-only")?.setAttribute("aria-pressed", "false");
   document.getElementById("text-body").innerHTML = '<div class="spinner" style="margin:48px auto"></div>';
   ov.classList.add("active");
   lucide.createIcons({ nodes: [ov] });
@@ -5937,26 +6434,36 @@ async function openTextEditor(item) {
 function renderTextEditor(filter) {
   const ed = textEditor.edits, f = (filter || "").toLowerCase();
   const rows = [];
+  let changedTotal = 0;
   for (const e of textEditor.entries) {
     const cur = (e.key in ed) ? ed[e.key] : e.value;
-    if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
     const changed = (e.key in ed) && ed[e.key] !== e.value;
-    rows.push('<div class="text-row">' +
+    if (changed) changedTotal++;
+    if (_textChangedOnly && !changed) continue;
+    if (f && !(String(e.key).toLowerCase().includes(f) || String(cur == null ? "" : cur).toLowerCase().includes(f))) continue;
+    rows.push('<div class="text-row' + (changed ? ' is-changed' : '') + '">' +
       '<div class="text-key" title="' + _esc(e.key) + '">' + (changed ? '<span class="text-changed">●</span> ' : '') + _esc(e.key) + '</div>' +
       '<input class="editor-field" data-tkey="' + _esc(e.key) + '" value="' + _esc(cur) + '" spellcheck="false"></div>');
   }
   const body = document.getElementById("text-body");
   body.innerHTML = '<div class="text-count">' + textEditor.entries.length +
-    ' strings' + (f ? ' (' + rows.length + ' shown)' : '') + '</div>' +
-    (rows.join("") || '<div class="mat-empty">No matching strings.</div>');
+    ' strings' + (changedTotal ? ' · ' + changedTotal + ' edited' : '') + ((f || _textChangedOnly) ? ' (' + rows.length + ' shown)' : '') + '</div>' +
+    (rows.join("") || '<div class="mat-empty">' + (_textChangedOnly ? 'No edited strings yet.' : 'No matching strings.') + '</div>');
   body.querySelectorAll("[data-tkey]").forEach(el => el.addEventListener("input", () => {
     const k = el.dataset.tkey, orig = (textEditor.entries.find(x => String(x.key) === k) || {}).value;
-    if (el.value === (orig == null ? "" : String(orig))) delete ed[k];
+    const isChanged = el.value !== (orig == null ? "" : String(orig));
+    if (!isChanged) delete ed[k];
     else ed[k] = el.value;
+    el.closest('.text-row')?.classList.toggle('is-changed', isChanged);
   }));
 }
 
 document.getElementById("text-search").addEventListener("input", (e) => { if (textEditor) renderTextEditor(e.target.value); });
+document.getElementById("text-changed-only")?.addEventListener("click", (e) => {
+  _textChangedOnly = !_textChangedOnly;
+  e.currentTarget.setAttribute("aria-pressed", String(_textChangedOnly));
+  if (textEditor) renderTextEditor(document.getElementById("text-search").value);
+});
 
 async function closeTextEditor(force = false) {
   if (force !== true && _textDirty() && !(await _discardUnsaved(true, "text edits"))) return false;

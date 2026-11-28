@@ -29,7 +29,28 @@
 .card-thumb:has(.hero-portrait) { background:transparent; }
 .mat-row label:has(input[type=color]) { position:relative; }
 .swatch-wipe { position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:2; }
-.mat-color-well { position:relative; display:inline-flex; flex:0 0 auto; border-radius:var(--studio-shape-xs); background-color:var(--bg2); background-image:conic-gradient(var(--border) 25%,transparent 0 50%,var(--border) 0 75%,transparent 0); background-size:8px 8px; }
+.mat-color-well {
+  position:relative; display:inline-flex; flex:0 0 auto;
+  border:1px solid var(--border2); border-radius:var(--studio-shape-small);
+  background-color:var(--bg2); background-image:conic-gradient(var(--border) 25%,transparent 0 50%,var(--border) 0 75%,transparent 0); background-size:8px 8px;
+  box-shadow:inset 0 0 0 1px rgb(0 0 0 / 8%);
+}
+/* Split swatch: top-left diagonal shows solid RGB so A=0 tints stay legible beside their alpha preview. */
+.mat-color-well::before {
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:1;
+  background:var(--swatch-color, transparent);
+  clip-path:polygon(0 0, 56% 0, 34% 100%, 0 100%);
+}
+.mat-color-well > input[type=color] { position:relative; z-index:0; }
+:root[data-theme=dark] :is(.card, .modal, #ctx-menu, .vp-popover, #search-results, .notice-banner, #sidebar) {
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / 5%), var(--studio-elevation-card);
+}
+:root[data-theme=dark] :is(#ctx-menu, .vp-popover, #search-results, .notice-banner) {
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / 6%), var(--studio-elevation-menu);
+}
+:root[data-theme=dark] .overlay > :first-child {
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / 6%), var(--studio-elevation-dialog);
+}
 .toast { position:relative; overflow:hidden; }
 .toast-timed::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--toast-rule); transform-origin:left; animation:toast-timer var(--toast-duration) linear forwards; }
 .toast-timed:hover::after { animation-play-state:paused; }

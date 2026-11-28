@@ -189,14 +189,22 @@
         event.target.matches('.library-hero-art:not(.image-swap), #viewport-skin-card img:not(.image-swap)'))
       watchBanner(event.target);
   }, true);
+  let trayBannerToken = 0;
   function tray(items) {
     const host = document.getElementById('mod-tray-heroes'); if (!host) return;
     const heroes = new Map();
     for (const item of items) {
-      const id = heroId(item); if (id && !heroes.has(id)) heroes.set(id, item.char_name || id);
+      const id = heroId(item);
+      if (id) {
+        let entry = heroes.get(id);
+        if (!entry) { entry = { name: item.char_name || id, skins: new Set() }; heroes.set(id, entry); }
+        const desc = describe(item.game_rel || '');
+        const sid = /^\d{7}$/.test(item.skin_id || '') ? item.skin_id : desc?.skin_id;
+        if (sid && sid.startsWith(id)) entry.skins.add(sid);
+      }
     }
     const activeHero = window.AtelierTrayFilters?.selectedHero?.() || '';
-    const signature = JSON.stringify([...heroes]);
+    const signature = JSON.stringify([...heroes].map(([id, entry]) => [id, entry.name, [...entry.skins].sort()]));
     if (host.dataset.heroes === signature) {
       host.querySelectorAll('.tray-hero-chip').forEach(btn => {
         btn.setAttribute('aria-pressed', String(!!activeHero && btn.dataset.heroId === activeHero));
@@ -204,15 +212,41 @@
       return;
     }
     host.dataset.heroes = signature; host.replaceChildren(); host.hidden = !heroes.size;
-    for (const [id,name] of heroes) {
+    host.classList.toggle('is-single-hero', heroes.size === 1);
+    const token = ++trayBannerToken;
+    for (const [id, entry] of heroes) {
       const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'tray-hero-chip';
       chip.dataset.heroId = id;
       chip.setAttribute('aria-pressed', String(!!activeHero && activeHero === id));
-      chip.title = `Filter Mod tray by ${name}`;
-      const art = heroChip(id), label = document.createElement('span'); label.textContent = name;
+      chip.title = `Filter Mod tray by ${entry.name}`;
+      const art = heroChip(id), label = document.createElement('span'); label.textContent = entry.name;
       if (art) chip.append(art); chip.append(label);
       chip.addEventListener('click', () => window.AtelierTrayFilters?.toggleHero(id));
       host.append(chip);
+      if (heroes.size === 1 && /^\d{4}$/.test(id)) {
+        const singleSkin = entry.skins.size === 1 ? [...entry.skins][0] : '';
+        const sources = [
+          singleSkin && bannerUrl('/api/catalogue/banner/' + singleSkin),
+          bannerUrl('/api/catalogue/banner/' + id),
+          '/api/catalogue/hero/' + id + '/story',
+        ].filter(Boolean);
+        const probe = new Image(); probe.decoding = 'async';
+        const next = () => {
+          if (token !== trayBannerToken || !chip.isConnected) return;
+          if (!sources.length) return;
+          probe.src = sources.shift();
+        };
+        probe.onload = () => {
+          if (token !== trayBannerToken || !chip.isConnected) return;
+          const loaded = probe.getAttribute('src');
+          if (loaded) {
+            chip.style.setProperty('--tray-banner', `url("${loaded}")`);
+            chip.classList.add('has-banner');
+          }
+        };
+        probe.onerror = next;
+        next();
+      }
     }
   }
   window.AtelierCatalogueArt = Object.freeze({heroId, heroChip, identityChip, resolveIds, describe,

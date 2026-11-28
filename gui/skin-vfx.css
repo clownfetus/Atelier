@@ -65,6 +65,10 @@
 .skin-vfx-transform { margin: 0; padding: 0; min-width: 0; border: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .skin-vfx-transform legend { padding: 0; margin-bottom: 5px; font-size: var(--studio-text-detail); }
 .skin-vfx-transform .skin-vfx-field { font-size: var(--studio-text-micro); }
+.skin-vfx-transform input[type="number"] { font-family: var(--studio-mono); font-variant-numeric: tabular-nums; }
+.skin-vfx-transform .skin-vfx-field[data-axis="x"] input { border-left: 2px solid #e06c75; }
+.skin-vfx-transform .skin-vfx-field[data-axis="y"] input { border-left: 2px solid #7cc87e; }
+.skin-vfx-transform .skin-vfx-field[data-axis="z"] input { border-left: 2px solid #61afef; }
 .skin-vfx-footer { border-top: 1px solid var(--border); display: grid; gap: 7px; }
 .skin-vfx-footer .skin-vfx-row { justify-content: space-between; }
 #viewport-box #skin-vfx-export {
@@ -88,5 +92,5 @@
   box-shadow: 0 0 0 2px #111924;
   transform: translate(-50%, -50%);
 }
-.skin-vfx-guide-point { width: 14px; height: 14px; background: var(--atelier-mesh); }
+.skin-vfx-guide-point { width: 14px; height: 14px; background: var(--atelier-mesh); box-shadow: 0 0 0 2px #111924, 0 0 10px color-mix(in srgb, var(--atelier-mesh) 70%, transparent); }
 .skin-vfx-guide-link { position: absolute; height: 2px; background: white; box-shadow: 0 0 0 1px #111924; transform-origin: left; }

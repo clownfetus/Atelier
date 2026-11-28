@@ -374,9 +374,11 @@ export function createAssemblyView(api) {
     if (!selected) {
       selection.append(make('span', 'Select a surface to see its material and textures.'));
     } else {
-      selection.append(make('strong', api.label(selected)), make('span', '→', 'assembly-connection-arrow'),
-        make('span', verifiedBinding(info) ? leaf(info.game_rel) : 'Reference unverified'),
-        make('span', '→', 'assembly-connection-arrow'), make('span', texture ? `${texture.slot} · ${names.size} slot(s)` : `${boundTextures(info).length} textures`));
+      const meshNode = make('strong', api.label(selected), 'assembly-trail-node'); meshNode.dataset.piece = 'mesh';
+      const matNode = make('span', verifiedBinding(info) ? leaf(info.game_rel) : 'Reference unverified', 'assembly-trail-node'); matNode.dataset.piece = 'material';
+      const texNode = make('span', texture ? `${texture.slot} · ${names.size} slot(s)` : `${boundTextures(info).length} textures`, 'assembly-trail-node'); texNode.dataset.piece = 'texture';
+      selection.append(meshNode, make('span', '→', 'assembly-connection-arrow'),
+        matNode, make('span', '→', 'assembly-connection-arrow'), texNode);
     }
   }
 

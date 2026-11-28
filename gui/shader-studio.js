@@ -113,10 +113,30 @@
     _shEl("shader-next").disabled = (_sh.page + 1) * 200 >= _sh.total;
   }
 
+  function renderHighlightedDxil(pre, text) {
+    if (!text) { pre.textContent = ""; return; }
+    const lines = text.split(/\r?\n/);
+    if (lines.length > 4000) { pre.textContent = text; return; }
+    const kwRe = /\b(define|declare|call|ret|br|switch|store|load|fadd|fmul|fsub|fdiv|add|sub|mul|and|or|xor|shl|lshr|ashr|bitcast|extractvalue|insertvalue|getelementptr|icmp|fcmp|select|phi|alloca|trunc|zext|sext|fptosi|fptoui|sitofp|uitofp|dx\.op\.[A-Za-z0-9_.]+)\b/g;
+    const tokenise = code => {
+      const escaped = _esc(code);
+      return escaped
+        .replace(kwRe, '<span class="dxil-kw">$1</span>')
+        .replace(/([%@!][A-Za-z0-9_.$]+)/g, '<span class="dxil-reg">$1</span>')
+        .replace(/\b(0x[0-9a-fA-F]+|-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g, '<span class="dxil-num">$1</span>');
+    };
+    pre.innerHTML = lines.map((line, i) => {
+      const semi = line.indexOf(';');
+      const code = semi >= 0 ? line.slice(0, semi) : line;
+      const cmt = semi >= 0 ? `<span class="dxil-cmt">${_esc(line.slice(semi))}</span>` : '';
+      return `<span class="dxil-line"><span class="dxil-ln">${i + 1}</span><span class="dxil-code">${tokenise(code)}${cmt}</span></span>`;
+    }).join('\n');
+  }
+
   async function selectShader(el) {
     document.querySelectorAll(".shader-row.sel").forEach(r => r.classList.remove("sel"));
     el.classList.add("sel");
-    _sh.cur = { lib: el.dataset.lib, idx: el.dataset.idx };
+    _sh.cur = { lib: el.dataset.lib, idx: el.dataset.idx, raw: "" };
     _shEl("shader-detail-empty").style.display = "none";
     _shEl("shader-detail-content").style.display = "block";
     _shEl("shader-meta").innerHTML = `<div class="shader-loading"><div class="spinner"></div><span>Extracting & disassembling…</span></div>`;
@@ -126,13 +146,25 @@
     catch (e) { _shEl("shader-meta").innerHTML = `<div class="warning">${e.message}</div>`; return; }
     if (!res.ok) { _shEl("shader-meta").innerHTML = `<div class="warning">${res.error}</div>`; return; }
     const m = res.meta || {};
+    _sh.cur.raw = res.disasm || "";
     _shEl("shader-meta").innerHTML =
       `<div class="sh-meta-row">
-         <b>${m.stage || "Shader"}</b>
-         ${m.entry ? `<span class="sh-chip">entry <code>${m.entry}</code></span>` : ""}
+         <b>${_esc(m.stage || "Shader")}</b>
+         ${m.entry ? `<span class="sh-chip">entry <code>${_esc(m.entry)}</code></span>` : ""}
          <span class="sh-chip">${(m.dxbc_size || 0).toLocaleString()} B</span>
+         <button type="button" class="btn btn-small sh-copy-btn" id="shader-copy-dxil"><i data-lucide="copy" size="12"></i> Copy DXIL</button>
        </div>`;
-    _shEl("shader-disasm").textContent = res.disasm || "";
+    const copyBtn = _shEl("shader-copy-dxil");
+    copyBtn?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(_sh.cur?.raw || "");
+        toast("DXIL copied to clipboard", "success", 2200);
+      } catch (_) {
+        toast("Could not copy DXIL", "warning", 2500);
+      }
+    });
+    lucide.createIcons({ nodes: [_shEl("shader-meta")] });
+    renderHighlightedDxil(_shEl("shader-disasm"), _sh.cur.raw);
     renderShaderProps(res.properties || {});
     _shSelectTab("props");
   }

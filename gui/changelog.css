@@ -7,20 +7,21 @@
   gap: 0;
   overflow: hidden;
 }
-.changelog-modal .setup-head { align-items: flex-start; }
-.changelog-heading { flex: 1; min-width: 0; }
+.changelog-modal .setup-head { align-items: center; }
+.changelog-heading { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .changelog-version {
   display: inline-block;
-  margin-top: 12px;
-  padding: 4px 8px;
+  margin-top: 0;
+  padding: 3px 8px;
   border-radius: var(--studio-shape-small);
   background: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
-  font-size: var(--studio-text-detail);
+  font-family: var(--studio-mono);
+  font-size: var(--studio-text-micro);
   font-weight: 600;
 }
 .changelog-modal .changelog-intro { padding: 16px 24px 0; flex-shrink: 0; }
-.changelog-body { padding: 16px 24px 24px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.changelog-body { padding: 16px 24px 28px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 20px), transparent 100%); }
 .changelog-release + .changelog-release { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
 .changelog-release h3 { font: var(--studio-type-title); }
 .changelog-release h4 { margin: 16px 0 8px; font-size: var(--studio-text-label); }

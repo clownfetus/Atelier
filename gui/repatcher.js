@@ -12,7 +12,7 @@
     document.getElementById("repatch-unlock").value = "";
     document.getElementById("repatch-stage").checked = false;
     document.getElementById("repatch-run").disabled = true;
-    const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = "";
+    const res = document.getElementById("repatch-result"); res.style.display = "none"; res.innerHTML = ""; delete res.dataset.state;
     document.getElementById("repatch-overlay").classList.add("active");
     if (window.lucide) lucide.createIcons();
   }
@@ -51,6 +51,7 @@
     btn.disabled = true;
     const result = document.getElementById("repatch-result");
     result.style.display = "block";
+    result.dataset.state = "busy";
     result.textContent = "Repatching…";
     const stage = document.getElementById("repatch-stage").checked;
     try {
@@ -59,11 +60,13 @@
         body: JSON.stringify({ path: _repatchPath, unlock: document.getElementById("repatch-unlock").value, stage_as_project: stage }),
       });
       if (!r.ok) {
+        result.dataset.state = "error";
         result.textContent = r.locked ? "Wrong or missing password." : r.error || "Couldn’t repatch this mod.";
         showRepatchSkips(result, r.skipped);
         return;
       }
       const m = r.manifest || {};
+      result.dataset.state = m.skipped ? "warning" : "success";
       const title = document.createElement("strong");
       title.textContent = "Repatched " + r.mod;
       const counts = document.createElement("span");
@@ -88,6 +91,7 @@
       toast("Repatched " + r.mod, m.skipped ? "warning" : "success", 5000);
       if (stage) renderGrid();
     } catch (_) {
+      result.dataset.state = "error";
       result.textContent = "Couldn’t repatch this mod.";
     } finally {
       btn.disabled = !_repatchPath;

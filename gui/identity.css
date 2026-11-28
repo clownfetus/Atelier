@@ -441,23 +441,60 @@
 .at-modopen-problems:empty { display: none; }
 .at-modopen-problems li { font: 400 13px/1.45 var(--font-ui); color: var(--caution-text); overflow-wrap: anywhere; }
 .at-modopen-problems code { font: var(--type-data); color: var(--text); }
+.at-modopen-summary {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);
+  margin-top: var(--space-4); padding: var(--space-3);
+  background: var(--surface-panel); border: 1px solid var(--line); border-radius: var(--radius-card);
+}
+.at-modopen-heroes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.at-modopen-hero-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px 3px 4px; border-radius: var(--radius-control);
+  background: var(--surface); border: 1px solid var(--line);
+  font: 500 13px/1.2 var(--font-ui); color: var(--text);
+}
+.at-modopen-hero-chip .hero-chip-art { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; object-position: center 20%; }
+.at-modopen-hero-chip small { font: var(--type-data); color: var(--text-muted); }
+.at-modopen-filter {
+  width: min(240px, 100%); height: 34px; box-sizing: border-box; margin-left: auto;
+  padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--surface); color: var(--text); font: 400 13px/1 var(--font-ui);
+}
+.at-modopen-filter:focus { outline: none; border-color: var(--drop); }
+.at-modopen-empty-filter { margin: var(--space-4) 0; color: var(--text-muted); font: var(--type-body); }
 .at-modopen-group { margin-top: var(--space-5); }
 .at-modopen-group-head {
   display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1) var(--space-3);
   padding: 0 var(--space-1) var(--space-2); border-bottom: 1px solid var(--line);
 }
-.at-modopen-group-head h2 { margin: 0; font: var(--type-title); color: var(--text); }
+.at-modopen-group-head h2 { margin: 0; font: var(--type-title); color: var(--text); display: inline-flex; align-items: center; gap: 7px; }
+.at-modopen-group[data-kind="texture"] .at-modopen-group-head h2::before,
+.at-modopen-group[data-kind="material"] .at-modopen-group-head h2::before,
+.at-modopen-group[data-kind="mesh"] .at-modopen-group-head h2::before,
+.at-modopen-group[data-kind="effect"] .at-modopen-group-head h2::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%; flex: none;
+}
+.at-modopen-group[data-kind="texture"] .at-modopen-group-head h2::before { background: var(--atelier-texture); }
+.at-modopen-group[data-kind="material"] .at-modopen-group-head h2::before { background: var(--atelier-material); }
+.at-modopen-group[data-kind="mesh"] .at-modopen-group-head h2::before { background: var(--atelier-mesh); }
+.at-modopen-group[data-kind="effect"] .at-modopen-group-head h2::before { background: var(--studio-emblem-vfx, var(--drop)); }
 .at-modopen-n { font: var(--type-data); color: var(--text-muted); }
 .at-modopen-group-note { flex: 1 1 36ch; margin: 0; font: 400 13px/1.45 var(--font-ui); color: var(--text-muted); }
 .at-modopen-group-head .at-btn { height: 28px; padding: 0 10px; font-size: 12px; }
 .at-modopen-assets { list-style: none; margin: 0; padding: 0; }
 .at-modopen-asset {
   display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start;
-  gap: var(--space-3); padding: var(--space-3) var(--space-1); border-bottom: 1px solid var(--line);
+  gap: var(--space-3); padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--line);
+  border-radius: 4px;
+  transition: background-color var(--studio-motion-fast) var(--studio-easing);
 }
-.at-modopen-check { display: flex; justify-content: center; padding-top: 1px; }
+.at-modopen-asset:hover { background: var(--surface-panel); }
+.at-modopen-asset:has(.at-modopen-check input:checked) { background: var(--drop-wash); }
+.at-modopen-check { display: flex; justify-content: center; padding-top: 2px; }
 .at-modopen-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--drop); cursor: pointer; }
 .at-modopen-detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.at-modopen-name-row { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.at-modopen-thumb { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; object-position: center 20%; flex: none; }
 .at-modopen-name { font: 500 13px/18px var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
 .at-modopen-path { font: var(--type-data); color: var(--text-muted); overflow-wrap: anywhere; }
 .at-modopen-status { font: 400 13px/1.45 var(--font-ui); color: var(--text-muted); }

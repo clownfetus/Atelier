@@ -4,12 +4,48 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
   z-index: calc(var(--studio-layer-overlay) - 1);
 }
 .export-review-modal { max-width: 720px !important; gap: 16px; --glyph-halo: var(--md-sys-color-surface-container); }
+.export-review-banner {
+  position: relative;
+  flex-shrink: 0;
+  height: 44px;
+  margin: -4px 0 -4px;
+  border-radius: var(--studio-shape-small);
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  background-image: var(--export-banner, none);
+  background-size: cover;
+  background-position: right 28%;
+  overflow: hidden;
+}
+.export-review-banner[hidden] { display: none; }
+.export-review-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 52%, transparent) 0%, transparent 55%, color-mix(in srgb, var(--bg) 42%, transparent) 100%);
+  pointer-events: none;
+}
+.export-review-ko {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  background-image: var(--export-ko, none);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 50%));
+}
+.export-review-ko[hidden] { display: none; }
 .export-review-stage { position: relative; margin: -8px auto -4px; flex-shrink: 0; }
 /* With the stage in the dialog, long reports scroll inside the body so the outcome
    heading and the actions stay visible together. */
 .export-review-modal:has(.export-review-stage:not(:empty)) .export-review-body { overflow-y: auto; overscroll-behavior: contain; }
 .export-review-stage:empty, .export-review-stage[hidden] { display: none; }
 @media (max-height: 700px) {
+  .export-review-banner { display: none; }
   .export-review-stage.atelier-glyph { width: 197px !important; height: 164px !important; }
 }
 .export-review-modal:focus { outline: none; }
@@ -28,9 +64,11 @@ body:has(.export-review-overlay.active, #confirm-overwrite-overlay.active) #toas
 .export-review-path { overflow-wrap: anywhere; font-family: var(--studio-font-mono, monospace); font-size: var(--studio-text-detail) !important; }
 .export-review-notice { color: var(--yellow) !important; padding: 12px 12px; border-left: 3px solid var(--yellow); background: var(--bg); }
 .export-review-actions { flex-wrap: wrap; }
-.export-format { margin: 0; padding: 12px 12px 12px; display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); }
+.export-format { margin: 0; padding: 12px; display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--studio-shape-medium); }
 .export-format legend { padding: 0 4px; color: var(--muted); font-size: var(--studio-text-detail); }
-.export-format-option { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.export-format-option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--studio-shape-small); background: var(--bg); cursor: pointer; transition: border-color var(--studio-motion-fast) var(--studio-easing), background-color var(--studio-motion-fast) var(--studio-easing); }
+.export-format-option:hover:not(:has(input:disabled)) { border-color: var(--border2); background: var(--bg2); }
+.export-format-option:has(input:checked) { border-color: var(--acc); background: var(--md-sys-color-secondary-container); }
 .export-format-option input { margin-top: 4px; accent-color: var(--acc); }
 .export-format-option span { display: grid; gap: 2px; font-size: var(--studio-text-label); color: var(--text); }
 .export-format-option small { color: var(--muted); font-size: var(--studio-text-detail); line-height: 1.5; }

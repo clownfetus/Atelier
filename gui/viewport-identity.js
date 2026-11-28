@@ -27,11 +27,18 @@
     box.classList.remove('has-skin-colour'); box.style.removeProperty('--vp-skin-colour');
     const icon = element('viewport-skin-icon', 'img', $('viewport-title')?.parentElement, 'prepend');
     const card = element('viewport-skin-card', 'figure', $('viewport-materials'), 'prepend');
+    const emptyHost = $('viewport-material-empty');
+    const emptyArt = emptyHost ? element('viewport-empty-art', 'img', emptyHost, 'prepend') : null;
     if (!icon || !card) return;
     icon.alt = ''; card.setAttribute('aria-hidden', 'true');
     const art = card.querySelector('img') || card.appendChild(document.createElement('img'));
     art.alt = ''; card.hidden = true; card.className = '';
     icon.hidden = true; art.hidden = true;
+    if (emptyArt) {
+      emptyArt.className = 'vp-empty-art'; emptyArt.alt = ''; emptyArt.setAttribute('aria-hidden', 'true');
+      emptyArt.hidden = true; delete emptyArt.dataset.kind;
+      emptyHost.classList.remove('has-empty-art');
+    }
     let iconColour = null, artReady = false;
     const accent = image => {
       if (stamp !== token) return;
@@ -61,10 +68,20 @@
       card.className = src && (src === nameplate || src === heroNameplate) ? 'is-nameplate' : 'is-story';
       artReady = !!src; if (artReady && !iconColour) accent(art);
     });
+    if (emptyArt) {
+      const spray = skin && '/api/catalogue/spray/' + enc(skin);
+      const logo = hero && '/api/catalogue/hero/' + enc(hero) + '/logo';
+      load(emptyArt, [spray, logo], stamp, src => {
+        if (stamp !== token) return;
+        const kind = src ? (src.includes('/spray/') ? 'spray' : 'logo') : '';
+        if (kind) emptyArt.dataset.kind = kind; else delete emptyArt.dataset.kind;
+        emptyHost.classList.toggle('has-empty-art', !!src);
+      });
+    }
   }
   function clear() {
     token++;
-    for (const id of ['viewport-skin-icon', 'viewport-skin-card']) {
+    for (const id of ['viewport-skin-icon', 'viewport-skin-card', 'viewport-empty-art']) {
       const node = $(id);
       if (node) {
         node.hidden = true;
@@ -73,6 +90,7 @@
         }
       }
     }
+    $('viewport-material-empty')?.classList.remove('has-empty-art');
     $('viewport-box')?.classList.remove('has-skin-colour');
     $('viewport-box')?.style.removeProperty('--vp-skin-colour');
   }

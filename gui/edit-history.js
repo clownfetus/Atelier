@@ -69,6 +69,8 @@
       redo,
       canUndo: () => cursor > 0,
       canRedo: () => cursor >= 0 && cursor < entries.length - 1,
+      undoCount: () => Math.max(0, cursor),
+      redoCount: () => Math.max(0, entries.length - 1 - cursor),
       size: () => entries.length,
     };
   }
